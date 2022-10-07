@@ -1,6 +1,7 @@
 use std::cmp::{max, min};
 use euclid::*;
 use crate::{ColorName, Glyph, IPoint};
+use euclid::point2 as p;
 
 enum Pieces {
     Player,
@@ -10,7 +11,7 @@ enum Pieces {
 pub struct Game {
     grid: Vec<Vec<i32>>, // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
-    running: bool,              // set false to quit
+    pub(crate) running: bool,              // set false to quit
     player_position: IPoint,
 }
 
@@ -41,14 +42,11 @@ impl Game {
         self.height() as i32 - 1
     }
 
-    fn square_is_in_world(&self, pos: Point2D<i32>) -> bool {
-        pos.x() >= 0
-            && pos.x() < self.terminal_size.0 as i32
-            && pos.y() >= 0
-            && pos.y() < self.terminal_size.1 as i32
-    }
-    fn square_is_empty(&mut self, square: IPoint) -> bool {
-        self.square_is_in_world(square) && matches!(self.get_block(square), Block::Air)
+    fn square_is_in_world(&self, pos: IPoint) -> bool {
+        pos.x >= 0
+            && pos.x < self.width() as i32
+            && pos.y >= 0
+            && pos.y < self.height() as i32
     }
 
 }

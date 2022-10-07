@@ -1,6 +1,9 @@
 use euclid::default::{Point2D, Vector2D};
 use euclid::point2 as p;
 
+pub type IPoint = Point2D<i32>;
+pub type FPoint = Point2D<f32>;
+
 pub const DOWN_I: Point2D<i32> = p(0, -1);
 pub const UP_I: Point2D<i32> = p(0, 1);
 pub const LEFT_I: Point2D<i32> = p(-1, 0);
@@ -16,7 +19,7 @@ pub fn sign(x: f32) -> f32 {
     }
 }
 
-pub fn sign2d(point: Point2D<f32>) -> Point2D<f32> {
+pub fn sign2d(point: FPoint) -> FPoint {
     p (sign(point.x), sign(point.y))
 }
 
