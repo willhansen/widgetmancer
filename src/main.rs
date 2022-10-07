@@ -7,7 +7,6 @@ mod game;
 mod graphics;
 mod input;
 
-extern crate geo;
 extern crate line_drawing;
 extern crate num;
 extern crate std;
@@ -49,13 +48,6 @@ use crate::game::Game;
 struct StepFoe {
     square: IPoint,
 }
-fn init_platformer_test_world(width: u16, height: u16) -> Game {
-    let mut game = Game::new(width, height);
-    game.place_line_of_blocks((2, 3), (8, 3), Block::Wall);
-    game.place_player(5.0, 5.0);
-
-    game
-}
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -72,7 +64,7 @@ fn set_up_input_thread() -> Receiver<Event> {
             tx.send(evt).unwrap();
         }
     });
-    rx
+    return rx;
 }
 
 fn main() {
@@ -91,10 +83,10 @@ fn main() {
 
     let mut prev_start_time = Instant::now();
     while game.running {
-        let start_time = Instant::now();
-        let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
-        let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
-        prev_start_time = start_time;
+        //let start_time = Instant::now();
+        //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
+        //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
+        //prev_start_time = start_time;
 
         game.recent_tick_durations_s
             .push_front(prev_tick_duration_s);
@@ -108,7 +100,7 @@ fn main() {
         game.tick_physics();
         game.update_output_buffer();
         game.update_screen(&mut terminal);
-        let tick_duration_so_far_ms = start_time.elapsed().as_millis();
+        //let tick_duration_so_far_ms = start_time.elapsed().as_millis();
         if tick_duration_so_far_ms < IDEAL_FRAME_DURATION_MS {
             thread::sleep(Duration::from_millis(
                 (IDEAL_FRAME_DURATION_MS - tick_duration_so_far_ms) as u64,

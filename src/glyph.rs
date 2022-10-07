@@ -1,8 +1,9 @@
-extern crate geo;
 
 use termion::color;
+use crate::utility::sign;
 
-use geo::Point;
+use euclid::default::Point2D;
+use euclid::point2 as p;
 use std::cmp::min;
 
 use crate::utility::*;
@@ -169,10 +170,10 @@ impl Glyph {
         }
     }
     pub fn colored_square_with_half_step_offset(
-        offset: Point<f32>,
+        offset: Point2D<f32>,
         color_name: ColorName,
     ) -> Glyph {
-        let step = round_vector_with_tie_break_toward_inf(offset * 2.0);
+        let step = (offset * 2.0).ceil();
         Glyph {
             character: quarter_block_by_offset((step.x(), step.y())),
             fg_color: color_name,
@@ -181,15 +182,15 @@ impl Glyph {
     }
 
     #[allow(dead_code)]
-    pub fn get_glyphs_for_floating_square(pos: Point<f32>) -> Vec<Vec<Option<Glyph>>> {
+    pub fn get_glyphs_for_floating_square(pos: Point2D<f32>) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
 
     pub fn get_glyphs_for_colored_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
-        let grid_offset = offset_from_grid(pos);
+        let grid_offset = fraction_part(pos);
         let x_offset = grid_offset.x();
         let y_offset = grid_offset.y();
         if y_offset.abs() < x_offset.abs() && y_offset.abs() < 0.25 {
@@ -202,12 +203,15 @@ impl Glyph {
     }
     #[allow(dead_code)]
     pub fn get_smooth_horizontal_glyphs_for_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
     ) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
+
+
+
     pub fn get_smooth_horizontal_glyphs_for_colored_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
@@ -215,9 +219,9 @@ impl Glyph {
 
         let c = width / 2 as usize;
 
-        let grid_offset = offset_from_grid(pos);
+        let grid_offset = fraction_part(pos);
         let x_offset = grid_offset.x();
-        let offset_dir = round(sign(grid_offset));
+        let offset_dir = sign2d(grid_offset);
 
         for i in 0..3 {
             let x = i as i32 - 1;
@@ -233,12 +237,12 @@ impl Glyph {
     }
     #[allow(dead_code)]
     pub fn get_smooth_vertical_glyphs_for_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
     ) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
     pub fn get_smooth_vertical_glyphs_for_colored_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
@@ -246,9 +250,9 @@ impl Glyph {
 
         let c = width / 2 as usize;
 
-        let grid_offset = offset_from_grid(pos);
+        let grid_offset = fraction_part(pos);
         let y_offset = grid_offset.y();
-        let offset_dir = round(sign(grid_offset));
+        let offset_dir = sign2d(grid_offset).round();
         for j in 0..3 {
             let y = j as i32 - 1;
             if offset_dir.y() == y || y == 0 {
@@ -261,18 +265,18 @@ impl Glyph {
         return output;
     }
 
-    pub fn get_half_grid_glyphs_for_floating_square(pos: Point<f32>) -> Vec<Vec<Option<Glyph>>> {
+    pub fn get_half_grid_glyphs_for_floating_square(pos: Point2D<f32>) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
 
     pub fn get_half_grid_glyphs_for_colored_floating_square(
-        pos: Point<f32>,
+        pos: Point2D<f32>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
         let mut output = vec![vec![None; width]; width];
-        let grid_offset = offset_from_grid(pos);
-        let offset_dir = round(sign(grid_offset));
+        let grid_offset = fraction_part(pos);
+        let offset_dir = sign2d(grid_offset).round();
 
         for i in 0..3 {
             for j in 0..3 {
@@ -281,7 +285,7 @@ impl Glyph {
                 let square = p(x as f32, y as f32);
                 if (offset_dir.x() == x || x == 0) && (offset_dir.y() == y || y == 0) {
                     let glyph =
-                        Glyph::colored_square_with_half_step_offset(grid_offset - square, color);
+                        Glyph::colored_square_with_half_step_offset((grid_offset - square).to_point(), color);
                     if glyph.character != ' ' {
                         output[i][j] = Some(glyph);
                     }
@@ -303,12 +307,12 @@ impl Glyph {
         return char::from_u32('\u{2800}' as u32 | dot_val).unwrap();
     }
 
-    pub fn braille_bit_for_pos(p: Point<i32>) -> u32 {
+    pub fn braille_bit_for_pos(p: Point2D<i32>) -> u32 {
         let braille_value_map = vec![vec![7, 3, 2, 1], vec![8, 6, 5, 4]];
         1 << (braille_value_map[p.x() as usize][p.y() as usize] - 1)
     }
 
-    pub fn add_braille_dot(character: char, p: Point<i32>) -> char {
+    pub fn add_braille_dot(character: char, p: Point2D<i32>) -> char {
         char::from_u32(character as u32 | Glyph::braille_bit_for_pos(p)).unwrap()
     }
 
@@ -340,25 +344,25 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_braille_line(
-        start_pos: Point<f32>,
-        end_pos: Point<f32>,
+        start_pos: Point2D<f32>,
+        end_pos: Point2D<f32>,
     ) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, ColorName::White)
     }
 
-    pub fn world_pos_to_braille_pos(pos: Point<f32>) -> Point<f32> {
+    pub fn world_pos_to_braille_pos(pos: Point2D<f32>) -> Point2D<f32> {
         p(pos.x() * 2.0 + 0.5, pos.y() * 4.0 + 1.5)
     }
 
-    pub fn braille_pos_to_world_pos(pos: Point<f32>) -> Point<f32> {
+    pub fn braille_pos_to_world_pos(pos: Point2D<f32>) -> Point2D<f32> {
         p((pos.x() - 0.5) / 2.0, (pos.y() - 1.5) / 4.0)
     }
 
-    pub fn braille_square_to_dot_in_character(pos: Point<i32>) -> Point<i32> {
+    pub fn braille_square_to_dot_in_character(pos: Point2D<i32>) -> Point2D<i32> {
         p((pos.x() % 2).abs(), (pos.y() % 4).abs())
     }
 
-    pub fn braille_grid_to_character_grid(braille_square: Point<i32>) -> Point<i32> {
+    pub fn braille_grid_to_character_grid(braille_square: Point2D<i32>) -> Point2D<i32> {
         p(
             ((braille_square.x() as f32 - 0.5) / 2.0).round() as i32,
             ((braille_square.y() as f32 - 1.5) / 4.0).round() as i32,
@@ -366,14 +370,14 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_colored_braille_line(
-        start_pos: Point<f32>,
-        end_pos: Point<f32>,
+        start_pos: Point2D<f32>,
+        end_pos: Point2D<f32>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
-        let start_grid_square = snap_to_grid(start_pos);
-        let end_grid_square = snap_to_grid(end_pos);
-        let start_braille_grid_square = snap_to_grid(Glyph::world_pos_to_braille_pos(start_pos));
-        let end_braille_grid_square = snap_to_grid(Glyph::world_pos_to_braille_pos(end_pos));
+        let start_grid_square = fraction_part(start_pos);
+        let end_grid_square = fraction_part(end_pos);
+        let start_braille_grid_square = fraction_part(Glyph::world_pos_to_braille_pos(start_pos));
+        let end_braille_grid_square = fraction_part(Glyph::world_pos_to_braille_pos(end_pos));
 
         let grid_diagonal = end_grid_square - start_grid_square;
         let grid_width = grid_diagonal.x().abs() + 1;
@@ -410,17 +414,17 @@ impl Glyph {
         return output_grid;
     }
 
-    pub fn world_pos_to_braille_char(world_pos: Point<f32>) -> char {
+    pub fn world_pos_to_braille_char(world_pos: Point2D<f32>) -> char {
         let character = Glyph::empty_braille();
         Glyph::add_braille_dot(
             character,
-            Glyph::braille_square_to_dot_in_character(snap_to_grid(
-                Glyph::world_pos_to_braille_pos(world_pos),
-            )),
+            Glyph::braille_square_to_dot_in_character(fraction_part(
+                Glyph::world_pos_to_braille_pos(world_pos)
+            ).into() ),
         )
     }
 
-    pub fn world_pos_to_colored_braille_glyph(world_pos: Point<f32>, color: ColorName) -> Glyph {
+    pub fn world_pos_to_colored_braille_glyph(world_pos: Point2D<f32>, color: ColorName) -> Glyph {
         Glyph {
             character: Glyph::world_pos_to_braille_char(world_pos),
             fg_color: color,
@@ -731,7 +735,8 @@ mod tests {
     #[test]
     fn test_world_point_to_braille_char_is_always_braille() {
         for _ in 0..200 {
-            let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
+            //let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
+            let random_point = p(23.2273, 2.05);
 
             assert!(Glyph::is_braille(Glyph::world_pos_to_braille_char(
                 random_point
