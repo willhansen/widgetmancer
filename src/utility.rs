@@ -1,13 +1,15 @@
 use euclid::default::{Point2D, Vector2D};
-use euclid::point2 as p;
+use euclid::*;
 
 pub type IPoint = Point2D<i32>;
 pub type FPoint = Point2D<f32>;
+pub type IVector = Vector2D<i32>;
+pub type FVector = Vector2D<f32>;
 
-pub const DOWN_I: Point2D<i32> = p(0, -1);
-pub const UP_I: Point2D<i32> = p(0, 1);
-pub const LEFT_I: Point2D<i32> = p(-1, 0);
-pub const RIGHT_I: Point2D<i32> = p(1, 0);
+pub const DOWN_I: IVector = vec2(0, -1);
+pub const UP_I: IVector = vec2(0, 1);
+pub const LEFT_I: IVector = vec2(-1, 0);
+pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub fn sign(x: f32) -> f32 {
     if x < 0.0 {
@@ -20,7 +22,7 @@ pub fn sign(x: f32) -> f32 {
 }
 
 pub fn sign2d(point: FPoint) -> FPoint {
-    p (sign(point.x), sign(point.y))
+    point2(sign(point.x), sign(point.y))
 }
 
 pub fn fraction_part(point: Point2D<f32>) -> Point2D<f32> {

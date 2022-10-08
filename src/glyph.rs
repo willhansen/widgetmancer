@@ -14,8 +14,8 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄'
 
 pub type BrailleArray = [[bool; 4]; 2];
 
-pub fn quarter_block_by_offset(half_steps: (i32, i32)) -> char {
-    match half_steps {
+pub fn quarter_block_by_offset(half_steps: IPoint) -> char {
+    match half_steps.to_tuple() {
         (1, -1) => '▗',
         (1, 0) => '▐',
         (1, 1) => '▝',
@@ -175,7 +175,7 @@ impl Glyph {
     ) -> Glyph {
         let step: IPoint = (offset * 2.0).ceil().to_i32();
         Glyph {
-            character: quarter_block_by_offset((step.x, step.y)),
+            character: quarter_block_by_offset(p(step.x, step.y)),
             fg_color: color_name,
             bg_color: ColorName::Black,
         }
