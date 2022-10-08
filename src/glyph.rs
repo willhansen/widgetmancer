@@ -3,7 +3,7 @@ use termion::color;
 use crate::utility::sign;
 
 use euclid::default::Point2D;
-use euclid::point2 as p;
+use euclid::{point2 as p, vec2};
 use std::cmp::min;
 
 use crate::utility::*;
@@ -14,7 +14,7 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄'
 
 pub type BrailleArray = [[bool; 4]; 2];
 
-pub fn quarter_block_by_offset(half_steps: IPoint) -> char {
+pub fn quarter_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
         (1, -1) => '▗',
         (1, 0) => '▐',
@@ -175,7 +175,7 @@ impl Glyph {
     ) -> Glyph {
         let step: IPoint = (offset * 2.0).ceil().to_i32();
         Glyph {
-            character: quarter_block_by_offset(p(step.x, step.y)),
+            character: quarter_block_by_offset(vec2(step.x, step.y)),
             fg_color: color_name,
             bg_color: ColorName::Black,
         }
@@ -442,7 +442,7 @@ mod tests {
     fn test_colored_square_with_half_step_offsets() {
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.0, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((0, 0))
+                == quarter_block_by_offset(vec2(0, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.0, 0.0), ColorName::Red).fg_color
@@ -454,55 +454,55 @@ mod tests {
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.1, 0.1), ColorName::Red).character
-                == quarter_block_by_offset((0, 0))
+                == quarter_block_by_offset(vec2(0, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.24, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((0, 0))
+                == quarter_block_by_offset(vec2(0, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.25, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((1, 0))
+                == quarter_block_by_offset(vec2(1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.26, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((1, 0))
+                == quarter_block_by_offset(vec2(1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(-0.25, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((0, 0))
+                == quarter_block_by_offset(vec2(0, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(-0.26, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((-1, 0))
+                == quarter_block_by_offset(vec2(-1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.49, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((1, 0))
+                == quarter_block_by_offset(vec2(1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.5, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((1, 0))
+                == quarter_block_by_offset(vec2(1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.2, 0.4), ColorName::Red).character
-                == quarter_block_by_offset((0, 1))
+                == quarter_block_by_offset(vec2(0, 1))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(-0.499, 0.4), ColorName::Red).character
-                == quarter_block_by_offset((-1, 1))
+                == quarter_block_by_offset(vec2(-1, 1))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.74, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((1, 0))
+                == quarter_block_by_offset(vec2(1, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.76, 0.0), ColorName::Red).character
-                == quarter_block_by_offset((2, 0))
+                == quarter_block_by_offset(vec2(2, 0))
         );
         assert!(
             Glyph::colored_square_with_half_step_offset(p(0.3, -0.6), ColorName::Red).character
-                == quarter_block_by_offset((1, -1))
+                == quarter_block_by_offset(vec2(1, -1))
         );
     }
     #[test]
@@ -513,7 +513,7 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((0, 0)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(0, 0)));
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -527,8 +527,8 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((0, 1)));
-        assert!(glyphs[1][2].clone().unwrap().character == quarter_block_by_offset((0, -1)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(0, 1)));
+        assert!(glyphs[1][2].clone().unwrap().character == quarter_block_by_offset(vec2(0, -1)));
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
         assert!(glyphs[2][2] == None);
@@ -542,8 +542,8 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((0, 1)));
-        assert!(glyphs[1][2].clone().unwrap().character == quarter_block_by_offset((0, -1)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(0, 1)));
+        assert!(glyphs[1][2].clone().unwrap().character == quarter_block_by_offset(vec2(0, -1)));
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
         assert!(glyphs[2][2] == None);
@@ -556,7 +556,7 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((0, 0)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(0, 0)));
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -570,10 +570,10 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((1, 0)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(1, 0)));
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1].clone().unwrap().character == quarter_block_by_offset((-1, 0)));
+        assert!(glyphs[2][1].clone().unwrap().character == quarter_block_by_offset(vec2(-1, 0)));
         assert!(glyphs[2][2] == None);
     }
 
@@ -582,10 +582,10 @@ mod tests {
         let test_pos = p(-0.3, 0.2);
         let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
         assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1].clone().unwrap().character == quarter_block_by_offset((1, 0)));
+        assert!(glyphs[0][1].clone().unwrap().character == quarter_block_by_offset(vec2(1, 0)));
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset((-1, 0)));
+        assert!(glyphs[1][1].clone().unwrap().character == quarter_block_by_offset(vec2(-1, 0)));
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);

@@ -3,7 +3,6 @@ use euclid::*;
 use crate::{ColorName, Glyph, IPoint, IVector};
 use crate::graphics::Graphics;
 
-
 enum Pieces {
     Player,
     Pawn,
@@ -58,6 +57,9 @@ impl Game {
 
     pub fn move_player(&mut self, movement: IVector) {
         self.player_position += movement;
+    }
+    pub fn get_player_position(&self) -> IPoint {
+        return self.player_position;
     }
 
 }
