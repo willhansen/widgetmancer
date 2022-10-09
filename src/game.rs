@@ -1,4 +1,5 @@
 use std::cmp::{max, min};
+use std::io::Write;
 use euclid::*;
 use crate::{ColorName, Glyph, IPoint, IVector};
 use crate::graphics::Graphics;
@@ -9,11 +10,13 @@ enum Pieces {
 }
 
 pub struct Game {
-    grid: Vec<Vec<i32>>, // (x,y), left to right, top to bottom
+    grid: Vec<Vec<i32>>,
+    // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
-    pub(crate) running: bool,              // set false to quit
+    pub(crate) running: bool,
+    // set false to quit
     player_position: IPoint,
-    graphics: Option<Graphics>,
+    graphics: Graphics,
 }
 
 impl Game {
@@ -22,8 +25,8 @@ impl Game {
             grid: vec![vec![0; height as usize]; width as usize],
             //step_foes: Vec::<StepFoe>::new(),
             running: true,
-            player_position: point2(5,5),
-            graphics: None,
+            player_position: point2((width / 2) as i32, (height / 2) as i32),
+            graphics: Graphics::new(width, height),
         }
     }
 
@@ -59,8 +62,18 @@ impl Game {
         self.player_position += movement;
     }
     pub fn get_player_position(&self) -> IPoint {
-        return self.player_position;
+        return self.player_position.clone();
     }
 
+    pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
+        return &mut self.graphics;
+    }
+
+    pub fn draw(&mut self, writer: &Option<Box<dyn Write>>) {
+        self.graphics.fill_output_buffer_with_black();
+        self.graphics.draw_player(self.player_position);
+        self.graphics.display(writer);
+
+    }
 }
 

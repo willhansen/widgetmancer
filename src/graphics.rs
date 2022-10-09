@@ -1,22 +1,24 @@
 use std::cmp::min;
 use std::io::Write;
+
+use euclid::{point2 as p, point2};
 use euclid::default::Point2D;
-use euclid::point2 as p;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
+
 use crate::{ColorName, Game, Glyph, IPoint};
 
-
 pub struct Graphics {
-    output_buffer: Vec<Vec<Glyph>>, // (x,y), left to right, top to bottom
-    output_on_screen: Vec<Vec<Glyph>>, // (x,y), left to right, top to bottom
+    output_buffer: Vec<Vec<Glyph>>,
+    // (x,y), left to right, top to bottom
+    output_on_screen: Vec<Vec<Glyph>>,
+    // (x,y), left to right, top to bottom
     terminal_size: (u16, u16),  // (width, height)
 }
 
 impl Graphics {
-
-    fn new(width: u16, height: u16) -> Graphics {
+    pub(crate) fn new(width: u16, height: u16) -> Graphics {
         Graphics {
             output_buffer: vec![vec![Glyph::from_char(' '); height as usize]; width as usize],
             output_on_screen: vec![vec![Glyph::from_char('x'); height as usize]; width as usize],
@@ -33,15 +35,15 @@ impl Graphics {
     }
 
     fn square_is_on_screen(&self, square: IPoint) -> bool {
-        return square.x >= 0 && square.x < self.terminal_size.0 as i32 && square.y >= 0 && square.y < self.terminal_size.1 as i32
+        return square.x >= 0 && square.x < self.terminal_size.0 as i32 && square.y >= 0 && square.y < self.terminal_size.1 as i32;
     }
 
-    fn world_to_screen(&self, world_position: &(i32, i32)) -> (u16, u16) {
+    pub fn world_to_screen(&self, world_position: IPoint) -> IPoint {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
-        (
-            world_position.0 as u16 + 1,
-            (self.terminal_size.1 as i32 - world_position.1) as u16,
+        point2(
+            world_position.x + 1,
+            self.terminal_size.1 as i32 - world_position.y,
         )
     }
 
@@ -84,7 +86,7 @@ impl Graphics {
         let start_grid_square: IPoint = start_pos.round().to_i32();
         let end_grid_square: IPoint = end_pos.round().to_i32();
         let bottom_square_y = start_grid_square.y.min(end_grid_square.y);
-        let left_square_x = start_grid_square.x.min( end_grid_square.x);
+        let left_square_x = start_grid_square.x.min(end_grid_square.x);
 
         for i in 0..squares_to_place.len() {
             for j in 0..squares_to_place[0].len() {
@@ -108,7 +110,7 @@ impl Graphics {
         }
     }
 
-    fn fill_output_buffer_with_black(&mut self) {
+    pub fn fill_output_buffer_with_black(&mut self) {
         for x in 0..self.terminal_size.0 as usize {
             for y in 0..self.terminal_size.1 as usize {
                 self.output_buffer[x][y] = Glyph::from_char(' ');
@@ -143,33 +145,43 @@ impl Graphics {
         }
     }
 
-    fn update_output_buffer(&mut self) {
-        self.fill_output_buffer_with_black();
-
-        //if self.player.alive {
-            //self.draw_player();
-        //}
+    pub fn display(&mut self, optional_writer: &Option<Box<dyn Write>>) {
+        if optional_writer.is_some() {
+            self.update_screen(optional_writer.unwrap());
+        }
+        self.output_on_screen = self.output_buffer.clone();
     }
 
-    fn update_screen(&mut self, stdout: &mut MouseTerminal<RawTerminal<std::io::Stdout>>) {
+    pub fn draw_string_to_screen(&mut self, screen_pos: IPoint, the_string: &str) {
+        for i in 0..the_string.len() {
+            let character: char = the_string.chars().nth(i).unwrap();
+            self.output_buffer[screen_pos.x as usize + i][screen_pos.y as usize] = Glyph::from_char(character);
+        }
+    }
+
+    pub fn draw_player(&mut self, world_pos: IPoint) {
+        self.draw_string_to_screen(self.world_to_screen(world_pos), "@");
+    }
+
+
+    pub fn update_screen(&mut self, writer: Box<dyn Write>) {
         // Now update the graphics where applicable
         for x in 0..self.width() as usize {
-            for y in 0..self.height() as usize{
+            for y in 0..self.height() as usize {
                 if self.output_buffer[x][y] != self.output_on_screen[x][y] {
-                    let (term_x, term_y) = self.world_to_screen(&(x as i32, y as i32));
-                    write!(stdout, "{}", termion::cursor::Goto(term_x, term_y)).unwrap();
-                    write!(stdout, "{}", self.output_buffer[x][y].to_string()).unwrap();
+                    let term_pos = self.world_to_screen(point2(x as i32, y as i32));
+                    write!(writer, "{}", termion::cursor::Goto(term_pos.x as u16, term_pos.y as u16)).unwrap();
+                    write!(writer, "{}", self.output_buffer[x][y].to_string()).unwrap();
                 }
             }
         }
         //write!(
-            //stdout,
-            //"{}{}",
-            //termion::cursor::Goto(1, 1),
-            //self.fps() as i32
+        //stdout,
+        //"{}{}",
+        //termion::cursor::Goto(1, 1),
+        //self.fps() as i32
         //)
-            //.unwrap();
-        stdout.flush().unwrap();
-        self.output_on_screen = self.output_buffer.clone();
+        //.unwrap();
+        writer.flush().unwrap();
     }
 }

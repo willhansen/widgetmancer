@@ -39,7 +39,8 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use glyph::*;
 use utility::*;
 use crate::game::Game;
-use crate::input::Input;
+use crate::graphics::Graphics;
+use crate::input::InputMap;
 
 //const DEFAULT_PARTICLE_DENSITY_FOR_AMALGAMATION: i32 = 6; // just more than a diagonal line
 
@@ -71,8 +72,8 @@ fn set_up_input_thread() -> Receiver<Event> {
 pub fn do_everything() {
     let (width, height) = termion::terminal_size().unwrap();
     let mut game = Game::new(width, height);
-    let mut input = Input::new(width, height);
-    //let mut game = init_platformer_test_world(width, height);
+    let mut input_map = InputMap::new(width, height);
+     //let mut game = init_platformer_test_world(width, height);
 
     let mut terminal = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
         MouseTerminal::from(stdout().into_raw_mode().unwrap()),
@@ -92,10 +93,9 @@ pub fn do_everything() {
 
 
         while let Ok(event) = event_receiver.try_recv() {
-            input.handle_event(&mut game, event);
+            input_map.handle_event(&mut game, event);
         }
-        //game.update_output_buffer();
-        //game.update_screen(&mut terminal);
+        game.draw(&Some(Box::new(terminal)));
         thread::sleep(Duration::from_millis(100 ));
     }
 }

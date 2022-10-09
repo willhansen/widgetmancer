@@ -5,13 +5,13 @@ use euclid::*;
 use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 
-pub struct Input {
+pub struct InputMap {
     prev_mouse_pos: Point2D<i32>,
     terminal_size: (u16, u16),  // (width, height)
 }
-impl Input {
-    pub fn new(width: u16, height: u16) -> Input {
-        Input {
+impl InputMap {
+    pub fn new(width: u16, height: u16) -> InputMap {
+        InputMap {
             prev_mouse_pos: point2((width / 2) as i32, (height / 2) as i32),
             terminal_size: (width, height)
         }
