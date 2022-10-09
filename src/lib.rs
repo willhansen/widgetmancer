@@ -2,7 +2,7 @@
 #![feature(is_sorted)]
 #![allow(warnings)]
 mod glyph;
-mod utility;
+pub mod utility;
 pub mod game;
 mod graphics;
 mod input;
@@ -84,6 +84,8 @@ pub fn do_everything() {
     // Separate thread for reading input
     let event_receiver = set_up_input_thread();
 
+    let mut wrapped_terminal:  &mut Option::<Box<dyn Write> > = &mut Some(Box::new(terminal));
+
     let mut prev_start_time = Instant::now();
     while game.running {
         //let start_time = Instant::now();
@@ -95,7 +97,7 @@ pub fn do_everything() {
         while let Ok(event) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
         }
-        game.draw(&Some(Box::new(terminal)));
+        game.draw(&mut wrapped_terminal);
         thread::sleep(Duration::from_millis(100 ));
     }
 }

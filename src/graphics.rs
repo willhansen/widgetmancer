@@ -145,9 +145,9 @@ impl Graphics {
         }
     }
 
-    pub fn display(&mut self, optional_writer: &Option<Box<dyn Write>>) {
+    pub fn display(&mut self, optional_writer: &mut Option<Box<dyn Write>>) {
         if optional_writer.is_some() {
-            self.update_screen(optional_writer.unwrap());
+            self.update_screen(optional_writer.as_mut().unwrap());
         }
         self.output_on_screen = self.output_buffer.clone();
     }
@@ -164,7 +164,7 @@ impl Graphics {
     }
 
 
-    pub fn update_screen(&mut self, writer: Box<dyn Write>) {
+    pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
         // Now update the graphics where applicable
         for x in 0..self.width() as usize {
             for y in 0..self.height() as usize {

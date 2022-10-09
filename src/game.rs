@@ -69,10 +69,10 @@ impl Game {
         return &mut self.graphics;
     }
 
-    pub fn draw(&mut self, writer: &Option<Box<dyn Write>>) {
+    pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_player(self.player_position);
-        self.graphics.display(writer);
+        self.graphics.display(&mut writer);
 
     }
 }
