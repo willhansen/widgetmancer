@@ -47,7 +47,7 @@ impl Game {
         self.height() as i32 - 1
     }
 
-    fn square_is_in_world(&self, pos: IPoint) -> bool {
+    fn square_is_in_world(&self, pos: &IPoint) -> bool {
         pos.x >= 0
             && pos.x < self.width() as i32
             && pos.y >= 0
@@ -58,15 +58,28 @@ impl Game {
         self.running = false;
     }
 
-    pub fn move_player(&mut self, movement: IVector) {
-        self.player_position += movement;
+    pub fn move_player(&mut self, movement: IVector) -> Result<(), ()>{
+        let new_pos = self.player_position + movement;
+        self.set_player_position(&new_pos)
     }
     pub fn get_player_position(&self) -> IPoint {
         return self.player_position.clone();
     }
+    pub fn set_player_position(&mut self, pos: &IPoint) -> Result<(), ()> {
+        if self.square_is_in_world(pos) {
+            self.player_position = pos.clone();
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
         return &mut self.graphics;
+    }
+
+    pub fn draw_headless(&mut self) {
+        self.draw(&mut None)
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>) {

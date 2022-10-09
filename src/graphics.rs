@@ -130,7 +130,7 @@ impl Graphics {
         return &self.output_on_screen[pos.x as usize][pos.y as usize];
     }
 
-    fn print_output_buffer(&self) {
+    pub fn print_output_buffer(&self) {
         for y in 0..self.height() as usize {
             let reverse_y: usize = self.height() as usize - 1 - y;
             let mut row_string = String::new();
@@ -138,7 +138,7 @@ impl Graphics {
                 row_string += &self.output_buffer[x][reverse_y].to_string();
             }
             row_string += &Glyph::reset_colors();
-            if reverse_y % 5 == 0 {
+            if reverse_y % 5 == 0 || y == 0 {
                 row_string += &format!("-- {}", reverse_y);
             }
             println!("{}", row_string);
@@ -161,7 +161,6 @@ impl Graphics {
 
     pub fn get_char_at_screen_pos(&self, screen_pos: IPoint) -> char {
         get_by_point(&self.output_on_screen, screen_pos).character
-
     }
 
     pub fn draw_player(&mut self, world_pos: IPoint) {
@@ -188,5 +187,27 @@ impl Graphics {
         //)
         //.unwrap();
         writer.flush().unwrap();
+    }
+}
+
+#[cfg(test)]
+
+mod tests {
+    use super::*;
+    #[test]
+    fn test_world_to_screen() {
+        let g = Graphics::new(20, 20);
+
+        let world_pos = point2(0,0);
+        let screen_pos = point2(1,20);
+        assert_eq!(screen_pos, g.world_to_screen(world_pos));
+
+        let world_pos = point2(0,19);
+        let screen_pos = point2(1,1);
+        assert_eq!(screen_pos, g.world_to_screen(world_pos));
+    }
+
+    fn test_screen_pos_to_buffer_pos() {
+        //assert_eq!(point2())
     }
 }
