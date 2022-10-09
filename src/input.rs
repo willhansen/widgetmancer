@@ -21,10 +21,10 @@ impl InputMap {
         match evt {
             Event::Key(ke) => match ke {
                 Key::Char('q') => game.quit(),
-                Key::Char('k') | Key::Char('w') | Key::Up => game.move_player(UP_I).unwrap_or_default(),
-                Key::Char('h') | Key::Char('a') | Key::Left => game.move_player(LEFT_I).unwrap_or_default(),
-                Key::Char('j') | Key::Char('s') | Key::Down => game.move_player(DOWN_I).unwrap_or_default(),
-                Key::Char('l') | Key::Char('d') | Key::Right => game.move_player(RIGHT_I).unwrap_or_default(),
+                Key::Char('k') | Key::Char('w') | Key::Up => game.move_player(UP_I.cast_unit()).unwrap_or_default(),
+                Key::Char('h') | Key::Char('a') | Key::Left => game.move_player(LEFT_I.cast_unit()).unwrap_or_default(),
+                Key::Char('j') | Key::Char('s') | Key::Down => game.move_player(DOWN_I.cast_unit()).unwrap_or_default(),
+                Key::Char('l') | Key::Char('d') | Key::Right => game.move_player(RIGHT_I.cast_unit()).unwrap_or_default(),
                 _ => {}
             },
             Event::Mouse(me) => match me {

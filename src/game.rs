@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::io::Write;
 use euclid::*;
-use crate::{ColorName, Glyph, IPoint, IVector};
+use crate::{ColorName, Glyph, IPoint, IVector, WorldSpace};
 use crate::graphics::Graphics;
 
 enum Pieces {
@@ -15,18 +15,18 @@ pub struct Game {
     //step_foes: Vec<StepFoe>,
     pub(crate) running: bool,
     // set false to quit
-    player_position: IPoint,
+    player_position: Point2D<i32, WorldSpace>,
     graphics: Graphics,
 }
 
 impl Game {
-    pub fn new(width: u16, height: u16) -> Game {
+    pub fn new(terminal_width: u16, terminal_height: u16) -> Game {
         Game {
-            grid: vec![vec![0; height as usize]; width as usize],
+            grid: vec![vec![0; terminal_height as usize]; terminal_width as usize],
             //step_foes: Vec::<StepFoe>::new(),
             running: true,
-            player_position: point2((width / 2) as i32, (height / 2) as i32),
-            graphics: Graphics::new(width, height),
+            player_position: point2((terminal_width / 2) as i32, (terminal_height / 2) as i32),
+            graphics: Graphics::new(terminal_width, terminal_height),
         }
     }
 
@@ -47,7 +47,7 @@ impl Game {
         self.height() as i32 - 1
     }
 
-    fn square_is_in_world(&self, pos: &IPoint) -> bool {
+    fn square_is_in_world(&self, pos: &Point2D<i32, WorldSpace>) -> bool {
         pos.x >= 0
             && pos.x < self.width() as i32
             && pos.y >= 0
@@ -58,14 +58,14 @@ impl Game {
         self.running = false;
     }
 
-    pub fn move_player(&mut self, movement: IVector) -> Result<(), ()>{
+    pub fn move_player(&mut self, movement: Vector2D<i32, WorldSpace>) -> Result<(), ()>{
         let new_pos = self.player_position + movement;
         self.set_player_position(&new_pos)
     }
-    pub fn get_player_position(&self) -> IPoint {
+    pub fn get_player_position(&self) -> Point2D<i32, WorldSpace> {
         return self.player_position.clone();
     }
-    pub fn set_player_position(&mut self, pos: &IPoint) -> Result<(), ()> {
+    pub fn set_player_position(&mut self, pos: &Point2D<i32, WorldSpace>) -> Result<(), ()> {
         if self.square_is_in_world(pos) {
             self.player_position = pos.clone();
             Ok(())
