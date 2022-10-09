@@ -21,6 +21,6 @@ fn test_player_drawn_to_screen() {
     let graphics = game.borrow_graphics_mut();
     graphics.display(&mut None);
     let screen_player_pos: IPoint = graphics.world_to_screen(start_pos);
-    let drawn_player_string: String = graphics.string_at_screen_pos(screen_player_pos);
+    let drawn_player_string: String = graphics.get_char_at_screen_pos(screen_player_pos).to_string();
     assert_eq!("@", drawn_player_string)
 }

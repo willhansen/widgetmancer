@@ -7,7 +7,7 @@ use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
 
-use crate::{ColorName, Game, Glyph, IPoint};
+use crate::{ColorName, Game, get_by_point, Glyph, IPoint};
 
 pub struct Graphics {
     output_buffer: Vec<Vec<Glyph>>,
@@ -157,6 +157,11 @@ impl Graphics {
             let character: char = the_string.chars().nth(i).unwrap();
             self.output_buffer[screen_pos.x as usize + i][screen_pos.y as usize] = Glyph::from_char(character);
         }
+    }
+
+    pub fn get_char_at_screen_pos(&self, screen_pos: IPoint) -> char {
+        get_by_point(&self.output_on_screen, screen_pos).character
+
     }
 
     pub fn draw_player(&mut self, world_pos: IPoint) {

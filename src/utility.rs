@@ -28,3 +28,7 @@ pub fn sign2d(point: FPoint) -> FPoint {
 pub fn fraction_part(point: Point2D<f32>) -> Point2D<f32> {
     (point - point.round()).to_point()
 }
+
+pub fn get_by_point<T>(grid: &Vec<Vec<T>>, p: IPoint) -> &T {
+    &grid[p.x as usize][p.y as usize]
+}
