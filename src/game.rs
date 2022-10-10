@@ -21,37 +21,39 @@ pub struct Game {
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16) -> Game {
+        let board_width: usize = (terminal_width / 2) as usize;
+        let board_height: usize = terminal_height as usize;
         Game {
-            grid: vec![vec![0; terminal_height as usize]; terminal_width as usize],
+            grid: vec![vec![0; board_height]; board_width],
             //step_foes: Vec::<StepFoe>::new(),
             running: true,
-            player_position: point2((terminal_width / 2) as i32, (terminal_height / 2) as i32),
+            player_position: point2((board_width / 2) as i32, (board_height / 2) as i32),
             graphics: Graphics::new(terminal_width, terminal_height),
         }
     }
 
-    fn width(&self) -> usize {
+    pub fn board_width(&self) -> usize {
         self.grid.len()
     }
-    fn height(&self) -> usize {
+    pub fn board_height(&self) -> usize {
         self.grid[0].len()
     }
 
     fn mid_square(&self) -> IPoint {
-        point2(self.width() as i32 / 2, self.height() as i32 / 2)
+        point2(self.board_width() as i32 / 2, self.board_height() as i32 / 2)
     }
     fn x_max(&self) -> i32 {
-        self.width() as i32 - 1
+        self.board_width() as i32 - 1
     }
     fn y_max(&self) -> i32 {
-        self.height() as i32 - 1
+        self.board_height() as i32 - 1
     }
 
     fn square_is_in_world(&self, pos: &Point2D<i32, WorldSpace>) -> bool {
         pos.x >= 0
-            && pos.x < self.width() as i32
+            && pos.x < self.board_width() as i32
             && pos.y >= 0
-            && pos.y < self.height() as i32
+            && pos.y < self.board_height() as i32
     }
 
     pub fn quit(&mut self) {

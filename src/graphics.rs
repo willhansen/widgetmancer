@@ -43,7 +43,7 @@ impl Graphics {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         point2(
-            world_position.x + 1,
+            world_position.x * 2 + 1,
             self.terminal_height as i32 - world_position.y,
         )
     }
