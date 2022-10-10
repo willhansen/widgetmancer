@@ -437,7 +437,7 @@ impl Glyph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert2::assert;
+    use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
     fn test_colored_square_with_half_step_offsets() {

@@ -85,7 +85,7 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
-        self.graphics.fill_output_buffer_with_black();
+        self.graphics.fill_output_buffer_with_checker();
         self.graphics.draw_player(self.player_position);
         self.graphics.display(&mut writer);
 

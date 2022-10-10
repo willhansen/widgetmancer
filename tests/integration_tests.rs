@@ -2,8 +2,10 @@ mod integration_utils;
 
 use euclid::*;
 
-use rust_roguelike::utility::{DOWN_I, RIGHT_I};
+use rust_roguelike::utility::{DOWN_I, RIGHT_I, UP_I};
 use crate::integration_utils::make_game;
+
+use pretty_assertions::{assert_eq, assert_ne};
 
 #[test]
 fn test_walk_in_circle() {
@@ -22,7 +24,7 @@ fn test_player_drawn_to_screen() {
     let start_pos = game.get_player_position();
     game.draw_headless();
     let graphics = game.borrow_graphics_mut();
-    let screen_player_pos = graphics.world_to_screen(start_pos);
+    let screen_player_pos = graphics.world_pos_to_screen_pos(start_pos);
     let drawn_player_string: String = graphics.get_char_at_screen_pos(screen_player_pos).to_string();
     dbg!(start_pos, screen_player_pos);
     assert_eq!("@", drawn_player_string)
@@ -44,7 +46,7 @@ fn test_player_can_not_move_off_high_edge() {
 
     game.draw_headless();
 
-    let bottom_right = point2((game.board_width()-1) as i32, 0);
+    let bottom_right = point2((game.board_width() - 1) as i32, 0);
 
     game.set_player_position(&bottom_right).expect("Failed to set player pos");
 
@@ -55,5 +57,24 @@ fn test_player_can_not_move_off_high_edge() {
     assert!(result.is_err());
 
     game.draw_headless();
+}
+
+#[test]
+fn test_checkerboard_background() {
+    let mut game = make_game();
+
+    game.draw_headless();
+
+    let graphics = game.borrow_graphics_mut();
+
+    let base_point = point2(0, 0);
+
+    let steps = vec![RIGHT_I, UP_I];
+
+    for step in steps {
+        assert_eq!(graphics.get_buffered_glyphs_for_square(base_point), graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 2));
+        assert_ne!(graphics.get_buffered_glyphs_for_square(base_point), graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 1));
+        assert_eq!(graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 1), graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 3));
+    }
 }
 
