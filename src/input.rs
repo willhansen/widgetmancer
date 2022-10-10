@@ -9,11 +9,12 @@ pub struct InputMap {
     prev_mouse_pos: Point2D<i32>,
     terminal_size: (u16, u16),  // (width, height)
 }
+
 impl InputMap {
     pub fn new(width: u16, height: u16) -> InputMap {
         InputMap {
             prev_mouse_pos: point2((width / 2) as i32, (height / 2) as i32),
-            terminal_size: (width, height)
+            terminal_size: (width, height),
         }
     }
 
@@ -21,10 +22,17 @@ impl InputMap {
         match evt {
             Event::Key(ke) => match ke {
                 Key::Char('q') => game.quit(),
+
                 Key::Char('k') | Key::Char('w') | Key::Up => game.move_player(UP_I.cast_unit()).unwrap_or_default(),
                 Key::Char('h') | Key::Char('a') | Key::Left => game.move_player(LEFT_I.cast_unit()).unwrap_or_default(),
                 Key::Char('j') | Key::Char('s') | Key::Down => game.move_player(DOWN_I.cast_unit()).unwrap_or_default(),
                 Key::Char('l') | Key::Char('d') | Key::Right => game.move_player(RIGHT_I.cast_unit()).unwrap_or_default(),
+
+                Key::Char('y') => game.move_player((UP_I + LEFT_I).cast_unit()).unwrap_or_default(),
+                Key::Char('u') => game.move_player((UP_I + RIGHT_I).cast_unit()).unwrap_or_default(),
+                Key::Char('b') => game.move_player((DOWN_I + LEFT_I).cast_unit()).unwrap_or_default(),
+                Key::Char('n') => game.move_player((DOWN_I + RIGHT_I).cast_unit()).unwrap_or_default(),
+
                 _ => {}
             },
             Event::Mouse(me) => match me {
@@ -54,6 +62,5 @@ impl InputMap {
             self.terminal_size.1 as i32 - terminal_position.1 as i32,
         )
     }
-
 }
 
