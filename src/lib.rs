@@ -71,7 +71,7 @@ fn set_up_input_thread() -> Receiver<Event> {
 
 pub fn do_everything() {
     //let (width, height) = termion::terminal_size().unwrap();
-    let (width, height) = (10, 10);
+    let (width, height) = (20, 10);
     let mut game = Game::new(width, height);
     let mut input_map = InputMap::new(width, height);
      //let mut game = init_platformer_test_world(width, height);
