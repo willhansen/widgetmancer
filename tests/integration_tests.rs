@@ -51,12 +51,3 @@ fn test_player_can_not_move_off_high_edge() {
     game.draw_headless();
 }
 
-#[test]
-fn test_moving_up_makes_player_character_go_up_on_screen() {
-    let mut game = Game::new(10, 10);
-    let start_pos = point2(9, 9);
-    game.set_player_position(&start_pos).expect("Failed to set player pos");
-
-
-
-}

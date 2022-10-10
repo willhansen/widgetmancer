@@ -219,6 +219,7 @@ impl Graphics {
 
 #[cfg(test)]
 mod tests {
+    use crate::RIGHT_I;
     use super::*;
 
     #[test]
@@ -232,5 +233,15 @@ mod tests {
         let world_pos = point2(0, 19);
         let screen_pos = point2(1, 1);
         assert_eq!(screen_pos, g.world_to_screen(world_pos));
+    }
+
+    #[test]
+    fn test_one_world_square_is_two_characters() {
+        let g = Graphics::new(20, 20);
+
+        let world_pos = point2(5, 5); // arbitrary
+        let screen_pos1 = g.world_to_screen(world_pos + RIGHT_I.cast_unit());
+        let screen_pos2 = g.world_to_screen(world_pos) + RIGHT_I.cast_unit() * 2;
+        assert_eq!(screen_pos1, screen_pos2);
     }
 }
