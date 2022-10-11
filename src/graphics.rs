@@ -237,10 +237,10 @@ impl Graphics {
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
+    use super::*;
 
     use crate::RIGHT_I;
 
-    use super::*;
 
     #[test]
     fn test_world_to_screen() {

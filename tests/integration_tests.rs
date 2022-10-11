@@ -1,9 +1,9 @@
-mod integration_utils;
+mod utils_for_tests;
 
 use euclid::*;
 
 use rust_roguelike::utility::{DOWN_I, RIGHT_I, UP_I};
-use crate::integration_utils::make_game;
+use crate::utils_for_tests::make_game;
 
 use pretty_assertions::{assert_eq, assert_ne};
 
@@ -26,7 +26,6 @@ fn test_player_drawn_to_screen() {
     let graphics = game.borrow_graphics_mut();
     let screen_player_pos = graphics.world_pos_to_screen_pos(start_pos);
     let drawn_player_string: String = graphics.get_char_at_screen_pos(screen_player_pos).to_string();
-    dbg!(start_pos, screen_player_pos);
     assert_eq!("@", drawn_player_string)
 }
 

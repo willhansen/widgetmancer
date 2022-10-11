@@ -1,34 +1,27 @@
 //#![allow(non_snake_case)]
 #![feature(is_sorted)]
 #![allow(warnings)]
-mod glyph;
-pub mod utility;
-pub mod game;
-mod graphics;
-mod input;
 
+#[macro_use]
+extern crate approx;
 extern crate line_drawing;
 extern crate num;
 extern crate std;
 extern crate termion;
-#[macro_use]
-extern crate approx;
 
-use ntest::timeout;
-
-// use assert2::{assert, check};
-use enum_as_inner::EnumAsInner;
-use num::traits::FloatConst;
 use std::char;
 use std::cmp::{max, min};
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
+use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use enum_as_inner::EnumAsInner;
 use euclid::default::Point2D;
+use ntest::timeout;
 use num::Integer;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -38,18 +31,18 @@ use termion::raw::{IntoRawMode, RawTerminal};
 
 use glyph::*;
 use utility::*;
+
 use crate::game::Game;
 use crate::graphics::Graphics;
 use crate::input::InputMap;
 
-//const DEFAULT_PARTICLE_DENSITY_FOR_AMALGAMATION: i32 = 6; // just more than a diagonal line
+mod glyph;
+pub mod utility;
+pub mod game;
+mod graphics;
+mod input;
+mod piece;
 
-
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-struct StepFoe {
-    square: IPoint,
-}
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -74,7 +67,7 @@ pub fn do_everything() {
     let (width, height) = (20, 10);
     let mut game = Game::new(width, height);
     let mut input_map = InputMap::new(width, height);
-     //let mut game = init_platformer_test_world(width, height);
+    //let mut game = init_platformer_test_world(width, height);
 
     let mut terminal = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
         MouseTerminal::from(stdout().into_raw_mode().unwrap()),
@@ -85,7 +78,7 @@ pub fn do_everything() {
     // Separate thread for reading input
     let event_receiver = set_up_input_thread();
 
-    let mut wrapped_terminal:  &mut Option::<Box<dyn Write> > = &mut Some(Box::new(terminal));
+    let mut wrapped_terminal: &mut Option::<Box<dyn Write>> = &mut Some(Box::new(terminal));
 
     let mut prev_start_time = Instant::now();
     while game.running {
@@ -99,6 +92,6 @@ pub fn do_everything() {
             input_map.handle_event(&mut game, event);
         }
         game.draw(&mut wrapped_terminal);
-        thread::sleep(Duration::from_millis(100 ));
+        thread::sleep(Duration::from_millis(100));
     }
 }

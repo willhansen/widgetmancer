@@ -4,10 +4,6 @@ use euclid::*;
 use crate::{ColorName, Glyph, IPoint, IVector, WorldSpace};
 use crate::graphics::Graphics;
 
-enum Pieces {
-    Player,
-    Pawn,
-}
 
 pub struct Game {
     grid: Vec<Vec<i32>>,
