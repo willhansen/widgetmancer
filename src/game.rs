@@ -4,7 +4,7 @@ use std::io::Write;
 
 use euclid::*;
 
-use crate::{ColorName, Glyph, IPoint, IVector, WorldSpace};
+use crate::{ColorName, Glyph, IPoint, IVector, point_to_string, WorldSpace};
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 
@@ -95,7 +95,13 @@ impl Game {
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         self.graphics.fill_output_buffer_with_checker();
-        self.graphics.draw_player(self.player_position);
+        self.graphics.draw_player(&self.player_position);
+        for (pos, piece) in &self.pieces {
+            if !self.square_is_on_board(&pos) {
+                panic!("Found piece out of bounds: {}", point_to_string(&pos));
+            }
+            self.graphics.draw_piece(piece, pos);
+        }
         self.graphics.display(&mut writer);
     }
 

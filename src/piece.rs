@@ -15,6 +15,13 @@ pub enum PieceType {
     King,
 }
 
+pub enum AiType {
+    TowardsPlayer,
+    AwayFromPlayer,
+    Random,
+
+}
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Piece {
     piece_type: PieceType,

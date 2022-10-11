@@ -1,5 +1,6 @@
 extern crate num;
 
+use std::fmt::Display;
 use std::ops::Neg;
 use euclid::*;
 use num::traits::Signed;
@@ -89,4 +90,8 @@ pub fn get_4_rotations<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T
         all_4.push(quarter_turns_counter_clockwise(&v, i))
     }
     all_4
+}
+
+pub fn point_to_string<T: Display, U>(point: &Point2D<T, U>) -> String {
+    format!("(x: {}, y: {})", point.x, point.y)
 }

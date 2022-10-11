@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashMap;
 use std::io::Write;
 use std::mem::swap;
 
@@ -8,7 +9,7 @@ use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
 
-use crate::{BrailleWorldSpace, ColorName, Game, get_by_point, Glyph, IPoint, RIGHT_I, ScreenBufferCharacterSpace, ScreenCharacterSpace, WorldSpace};
+use crate::{BrailleWorldSpace, ColorName, Game, get_by_point, Glyph, IPoint, PieceType, RIGHT_I, ScreenBufferCharacterSpace, ScreenCharacterSpace, WorldSpace};
 
 pub struct Graphics {
     output_buffer: Vec<Vec<Glyph>>,
@@ -41,7 +42,7 @@ impl Graphics {
         return square.x >= 0 && square.x < self.terminal_width as i32 && square.y >= 0 && square.y < self.terminal_height as i32;
     }
 
-    pub fn world_pos_to_screen_pos(&self, world_position: Point2D<i32, WorldSpace>) -> Point2D<i32, ScreenCharacterSpace> {
+    pub fn world_pos_to_screen_pos(&self, world_position: &Point2D<i32, WorldSpace>) -> Point2D<i32, ScreenCharacterSpace> {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         point2(
@@ -69,7 +70,7 @@ impl Graphics {
         )
     }
     pub fn world_pos_to_buffer_pos(&self, world_position: Point2D<i32, WorldSpace>) -> Point2D<i32, ScreenBufferCharacterSpace> {
-        self.screen_pos_to_buffer_pos(self.world_pos_to_screen_pos(world_position))
+        self.screen_pos_to_buffer_pos(self.world_pos_to_screen_pos(&world_position))
     }
 
     fn braille_bresenham_line_points(
@@ -206,8 +207,11 @@ impl Graphics {
         get_by_point(&self.output_on_screen, buffer_pos).character
     }
 
-    pub fn draw_player(&mut self, world_pos: Point2D<i32, WorldSpace>) {
+    pub fn draw_player(&mut self, world_pos: &Point2D<i32, WorldSpace>) {
         self.draw_string_to_screen(self.world_pos_to_screen_pos(world_pos), "@@");
+    }
+    pub fn draw_piece(&mut self, piece: &PieceType, pos: &Point2D<i32, WorldSpace>) {
+        self.draw_string_to_screen(self.world_pos_to_screen_pos(pos), "Pa");
     }
 
 
@@ -248,11 +252,11 @@ mod tests {
 
         let world_pos = point2(0, 0);
         let screen_pos = point2(1, 20);
-        assert_eq!(screen_pos, g.world_pos_to_screen_pos(world_pos));
+        assert_eq!(screen_pos, g.world_pos_to_screen_pos(&world_pos));
 
         let world_pos = point2(0, 19);
         let screen_pos = point2(1, 1);
-        assert_eq!(screen_pos, g.world_pos_to_screen_pos(world_pos));
+        assert_eq!(screen_pos, g.world_pos_to_screen_pos(&world_pos));
     }
 
     #[test]
@@ -260,8 +264,8 @@ mod tests {
         let g = Graphics::new(20, 20);
 
         let world_pos = point2(5, 5); // arbitrary
-        let screen_pos1 = g.world_pos_to_screen_pos(world_pos + RIGHT_I.cast_unit());
-        let screen_pos2 = g.world_pos_to_screen_pos(world_pos) + RIGHT_I.cast_unit() * 2;
+        let screen_pos1 = g.world_pos_to_screen_pos(&(world_pos + RIGHT_I.cast_unit()));
+        let screen_pos2 = g.world_pos_to_screen_pos(&world_pos) + RIGHT_I.cast_unit() * 2;
         assert_eq!(screen_pos1, screen_pos2);
     }
 }
