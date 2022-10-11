@@ -1,8 +1,10 @@
 use std::cmp::{max, min};
+use std::collections::HashMap;
 use std::io::Write;
 use euclid::*;
 use crate::{ColorName, Glyph, IPoint, IVector, WorldSpace};
 use crate::graphics::Graphics;
+use crate::piece::{Pawn, Piece, PieceType};
 
 
 pub struct Game {
@@ -13,6 +15,7 @@ pub struct Game {
     // set false to quit
     player_position: Point2D<i32, WorldSpace>,
     graphics: Graphics,
+    pieces: HashMap<Point2D<i32, WorldSpace>, PieceType>,
 }
 
 impl Game {
@@ -84,6 +87,10 @@ impl Game {
         self.graphics.fill_output_buffer_with_checker();
         self.graphics.draw_player(self.player_position);
         self.graphics.display(&mut writer);
+
+    }
+
+    pub fn place_piece(piece_type: PieceType, pos: Vector2D<i32, WorldSpace>) {
 
     }
 }
