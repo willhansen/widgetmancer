@@ -41,7 +41,7 @@ pub mod utility;
 pub mod game;
 mod graphics;
 mod input;
-mod piece;
+pub mod piece;
 
 
 fn set_up_panic_hook() {

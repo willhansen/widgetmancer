@@ -5,7 +5,7 @@ use euclid::*;
 
 use crate::{get_4_rotations, quarter_turns_counter_clockwise, WorldSpace};
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -15,51 +15,50 @@ pub enum PieceType {
     King,
 }
 
-pub fn make_piece(piece_type: PieceType, position: Point2D<i32, WorldSpace>) -> Box<dyn Piece> {
-    Box::new(
-        match piece_type {
-            PieceType::Pawn => Pawn { position },
-            _ => panic!("tried to make bad piece type {}", piece_type.to_string())
-        })
-}
-
-pub trait Piece {
-    fn get_position(&self) -> Point2D<i32, WorldSpace>;
-    fn get_piece_type(&self) -> PieceType;
-    fn get_move_squares(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        vec![]
-    }
-    fn get_capture_squares(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        self.get_move_squares()
-    }
-    fn get_move_directions(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        vec![]
-    }
-    fn get_capture_directions(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        self.get_move_directions()
-    }
-}
-
-#[derive(PartialEq, Debug, Copy, Clone, Default)]
-pub struct Pawn {
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub struct Piece {
+    piece_type: PieceType,
     position: Point2D<i32, WorldSpace>,
 }
 
-impl Piece for Pawn {
+impl Piece {
+    pub fn new(piece_type: PieceType, position: Point2D<i32, WorldSpace>) -> Piece {
+        Piece {
+            piece_type,
+            position,
+        }
+    }
+
     fn get_position(&self) -> Point2D<i32, WorldSpace> {
         self.position.clone()
     }
 
     fn get_piece_type(&self) -> PieceType {
-        PieceType::Pawn
+        self.piece_type
     }
 
-    fn get_move_squares(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 0))
+    fn get_relative_move_steps(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+        match piece_type {
+            PieceType::Pawn => get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 0)),
+            _ => vec![],
+        }
     }
 
-    fn get_capture_squares(&self) -> Vec<Vector2D<i32, WorldSpace>> {
-        get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 1))
+    fn get_relative_capture_steps(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+        match piece_type {
+            PieceType::Pawn => get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 1)),
+            _ => Self::get_relative_move_steps(piece_type),
+        }
+    }
+    fn get_move_directions(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+        match piece_type {
+            _ => vec![],
+        }
+    }
+    fn get_capture_directions(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+        match piece_type {
+            _ => Self::get_move_directions(piece_type),
+        }
     }
 }
 
@@ -72,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_pawn_moveset() {
-        let pawn_moveset = HashSet::from_iter(Pawn::default().get_move_squares());
+        let pawn_moveset = HashSet::from_iter(Piece::get_relative_move_steps(PieceType::Pawn));
         let correct_moveset = HashSet::from([
             vec2(1, 0),
             vec2(-1, 0),
@@ -84,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(Pawn::get_capture_squares());
+        let pawn_captureset = HashSet::from_iter(Piece::get_relative_capture_steps(PieceType::Pawn));
         let correct_captureset = HashSet::from([
             vec2(1, 1),
             vec2(-1, 1),

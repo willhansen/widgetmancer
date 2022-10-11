@@ -2,7 +2,8 @@ mod utils_for_tests;
 
 use euclid::*;
 
-use rust_roguelike::utility::{DOWN_I, LEFT_I, RIGHT_I, UP_I, WorldSpace};
+use rust_roguelike::utility::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use rust_roguelike::piece::PieceType;
 use crate::utils_for_tests::make_game;
 
 use pretty_assertions::{assert_eq, assert_ne};
@@ -81,12 +82,12 @@ fn test_checkerboard_background() {
 fn test_capture_pawn() {
     let mut game = make_game();
     let one_left = game.get_player_position() + LEFT_I.cast_unit();
-    game.place_piece(PieceType.Pawn, one_left);
+    game.place_piece(PieceType::Pawn, one_left).expect("Failed to place pawn");
 
-    assert_eq!(1, game.piece_count(PieceType.Pawn));
+    assert_eq!(1, game.piece_count(PieceType::Pawn));
 
     game.move_player(LEFT_I.cast_unit()).unwrap();
 
-    assert_eq!(0, game.piece_count(PieceType.Pawn));
+    assert_eq!(0, game.piece_count(PieceType::Pawn));
 }
 
