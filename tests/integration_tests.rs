@@ -77,17 +77,25 @@ fn test_checkerboard_background() {
         assert_eq!(graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 1), graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 3));
     }
 }
+#[test]
+fn test_draw_placed_pawn() {
+    let mut game = make_game();
+    let one_left = game.get_player_position() + LEFT_I.cast_unit();
+    game.place_piece(PieceType::Pawn, &one_left).expect("Failed to place pawn");
+    let pawn_glyphs = game.borrow_graphics_mut().get_buffered_glyphs_for_square(one_left);
+    assert_ne!(pawn_glyphs.0.character, ' ');
+}
 
 #[test]
 fn test_capture_pawn() {
     let mut game = make_game();
     let one_left = game.get_player_position() + LEFT_I.cast_unit();
-    game.place_piece(PieceType::Pawn, one_left).expect("Failed to place pawn");
+    game.place_piece(PieceType::Pawn, &one_left).expect("Failed to place pawn");
 
-    assert_eq!(1, game.piece_count(PieceType::Pawn));
+    assert_eq!(1, game.piece_count(PieceType::Pawn), "Should be one pawn");
 
-    game.move_player(LEFT_I.cast_unit()).unwrap();
+    game.move_player(LEFT_I.cast_unit()).expect("Failed to move player");
 
-    assert_eq!(0, game.piece_count(PieceType::Pawn));
+    assert_eq!(0, game.piece_count(PieceType::Pawn), "Should have captured pawn");
 }
 

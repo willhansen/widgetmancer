@@ -35,6 +35,7 @@ use utility::*;
 use crate::game::Game;
 use crate::graphics::Graphics;
 use crate::input::InputMap;
+use crate::piece::PieceType;
 
 mod glyph;
 pub mod utility;
@@ -79,6 +80,9 @@ pub fn do_everything() {
     let event_receiver = set_up_input_thread();
 
     let mut wrapped_terminal: &mut Option::<Box<dyn Write>> = &mut Some(Box::new(terminal));
+
+    let one_left = game.get_player_position() + LEFT_I.cast_unit();
+    game.place_piece(PieceType::Pawn, &one_left).expect("Failed to place pawn");
 
     let mut prev_start_time = Instant::now();
     while game.running {

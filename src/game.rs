@@ -1,11 +1,12 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::io::Write;
+
 use euclid::*;
+
 use crate::{ColorName, Glyph, IPoint, IVector, WorldSpace};
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
-
 
 pub struct Game {
     board_width: usize,
@@ -62,7 +63,7 @@ impl Game {
         self.running = false;
     }
 
-    pub fn move_player(&mut self, movement: Vector2D<i32, WorldSpace>) -> Result<(), ()>{
+    pub fn move_player(&mut self, movement: Vector2D<i32, WorldSpace>) -> Result<(), ()> {
         let new_pos = self.player_position + movement;
         self.set_player_position(&new_pos)
     }
@@ -70,12 +71,18 @@ impl Game {
         return self.player_position.clone();
     }
     pub fn set_player_position(&mut self, pos: &Point2D<i32, WorldSpace>) -> Result<(), ()> {
+
+        if self.pieces.contains_key(pos) {
+            self.pieces.remove(pos);
+        }
+
         if self.square_is_on_board(pos) {
             self.player_position = pos.clone();
-            Ok(())
         } else {
-            Err(())
+            return Err(());
         }
+
+        return Ok(())
     }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
@@ -90,19 +97,22 @@ impl Game {
         self.graphics.fill_output_buffer_with_checker();
         self.graphics.draw_player(self.player_position);
         self.graphics.display(&mut writer);
-
     }
 
-    fn square_is_empty(&self, pos: Point2D<i32, WorldSpace>) -> bool {
-        self.player_position != pos && !self.pieces.contains_key(&pos)
+    fn square_is_empty(&self, pos: &Point2D<i32, WorldSpace>) -> bool {
+        self.player_position != *pos && !self.pieces.contains_key(pos)
     }
 
-    pub fn place_piece(&mut self, piece_type: PieceType, pos: Point2D<i32, WorldSpace>) -> Result<(),()> {
-        if !self.square_is_empty(pos) || !self.square_is_on_board(&pos) {
+    pub fn place_piece(&mut self, piece_type: PieceType, pos: &Point2D<i32, WorldSpace>) -> Result<(), ()> {
+        if !self.square_is_empty(pos) || !self.square_is_on_board(pos) {
             return Err(());
         }
-        self.pieces.insert(pos, piece_type);
+        self.pieces.insert(*pos, piece_type);
         Ok(())
+    }
+
+    pub fn piece_count(&self, piece_type: PieceType) -> u32 {
+        self.pieces.values().filter(|&&found_type| found_type == piece_type).count() as u32
     }
 }
 
