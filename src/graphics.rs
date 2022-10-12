@@ -10,6 +10,7 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::{BrailleWorldSpace, ColorName, Game, get_by_point, Glyph, IPoint, PieceType, RIGHT_I, ScreenBufferCharacterSpace, ScreenCharacterSpace, WorldSpace};
+use crate::piece::Piece;
 
 pub struct Graphics {
     output_buffer: Vec<Vec<Glyph>>,
@@ -210,7 +211,7 @@ impl Graphics {
     pub fn draw_player(&mut self, world_pos: &Point2D<i32, WorldSpace>) {
         self.draw_string_to_screen(self.world_pos_to_screen_pos(world_pos), "@@");
     }
-    pub fn draw_piece(&mut self, piece: &PieceType, pos: &Point2D<i32, WorldSpace>) {
+    pub fn draw_piece(&mut self, piece: &Piece, pos: &Point2D<i32, WorldSpace>) {
         self.draw_string_to_screen(self.world_pos_to_screen_pos(pos), "Pa");
     }
 

@@ -11,8 +11,8 @@ extern crate termion;
 
 use std::char;
 use std::cmp::{max, min};
-use std::collections::{HashMap, VecDeque};
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -35,15 +35,14 @@ use utility::*;
 use crate::game::Game;
 use crate::graphics::Graphics;
 use crate::input::InputMap;
-use crate::piece::PieceType;
+use crate::piece::{Piece, PieceType};
 
-mod glyph;
-pub mod utility;
 pub mod game;
+mod glyph;
 mod graphics;
 mod input;
 pub mod piece;
-
+pub mod utility;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -79,10 +78,11 @@ pub fn do_everything() {
     // Separate thread for reading input
     let event_receiver = set_up_input_thread();
 
-    let mut wrapped_terminal: &mut Option::<Box<dyn Write>> = &mut Some(Box::new(terminal));
+    let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
 
-    let one_left = game.get_player_position() + LEFT_I.cast_unit();
-    game.place_piece(PieceType::Pawn, &one_left).expect("Failed to place pawn");
+    let pawn_pos = game.get_player_position() + LEFT_I.cast_unit() * 3;
+    game.place_piece(Piece::pawn(), &pawn_pos)
+        .expect("Failed to place pawn");
 
     let mut prev_start_time = Instant::now();
     while game.running {
@@ -91,9 +91,9 @@ pub fn do_everything() {
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
         //prev_start_time = start_time;
 
-
         while let Ok(event) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
+            game.move_all_pieces();
         }
         game.draw(&mut wrapped_terminal);
         thread::sleep(Duration::from_millis(100));

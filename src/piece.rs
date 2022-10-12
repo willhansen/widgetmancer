@@ -3,7 +3,7 @@ use strum_macros::Display;
 
 use euclid::*;
 
-use crate::{get_4_rotations, quarter_turns_counter_clockwise, WorldSpace};
+use crate::{get_4_rotations, quarter_turns_counter_clockwise, Step, StepList, WorldSpace};
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
 pub enum PieceType {
@@ -15,88 +15,93 @@ pub enum PieceType {
     King,
 }
 
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
 pub enum AiType {
     TowardsPlayer,
     AwayFromPlayer,
     Random,
-
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Piece {
-    piece_type: PieceType,
-    position: Point2D<i32, WorldSpace>,
+    pub piece_type: PieceType,
+    pub ai_type: AiType,
 }
 
 impl Piece {
-    pub fn new(piece_type: PieceType, position: Point2D<i32, WorldSpace>) -> Piece {
+    pub fn new(piece_type: PieceType, ai_type: AiType) -> Piece {
         Piece {
             piece_type,
-            position,
+            ai_type,
         }
     }
 
-    fn get_position(&self) -> Point2D<i32, WorldSpace> {
-        self.position.clone()
+    pub fn pawn() -> Piece {
+        Piece {
+            piece_type: PieceType::Pawn,
+            ai_type: AiType::TowardsPlayer,
+        }
     }
 
-    fn get_piece_type(&self) -> PieceType {
-        self.piece_type
-    }
-
-    fn get_relative_move_steps(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+    pub fn relative_move_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 0)),
+            PieceType::Pawn => get_4_rotations(Step::new(1, 0)),
             _ => vec![],
         }
     }
+    pub fn relative_move_steps(&self) -> StepList {
+        Self::relative_move_steps_for_type(self.piece_type)
+    }
 
-    fn get_relative_capture_steps(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+    pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
             PieceType::Pawn => get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 1)),
-            _ => Self::get_relative_move_steps(piece_type),
+            _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
-    fn get_move_directions(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+    pub fn get_relative_capture_steps(&self) -> StepList {
+        Self::relative_capture_steps_for_type(self.piece_type)
+    }
+
+    pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
             _ => vec![],
         }
     }
-    fn get_capture_directions(piece_type: PieceType) -> Vec<Vector2D<i32, WorldSpace>> {
+    pub fn move_directions(&self) -> StepList {
+        Self::move_directions_for_type(self.piece_type)
+    }
+
+    pub fn capture_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            _ => Self::get_move_directions(piece_type),
+            _ => Self::move_directions_for_type(piece_type),
         }
+    }
+
+    pub fn capture_directions(&self) -> StepList {
+        Self::capture_directions_for_type(self.piece_type)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use pretty_assertions::{assert_eq, assert_ne};
+    use std::collections::HashSet;
 
     use super::*;
 
     #[test]
     fn test_pawn_moveset() {
-        let pawn_moveset = HashSet::from_iter(Piece::get_relative_move_steps(PieceType::Pawn));
-        let correct_moveset = HashSet::from([
-            vec2(1, 0),
-            vec2(-1, 0),
-            vec2(0, 1),
-            vec2(0, -1),
-        ]);
+        let pawn_moveset = HashSet::from_iter(Piece::pawn().relative_move_steps());
+        let correct_moveset = HashSet::from([vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1)]);
         assert_eq!(correct_moveset, pawn_moveset);
     }
 
     #[test]
     fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(Piece::get_relative_capture_steps(PieceType::Pawn));
-        let correct_captureset = HashSet::from([
-            vec2(1, 1),
-            vec2(-1, 1),
-            vec2(1, -1),
-            vec2(-1, -1),
-        ]);
+        let pawn_captureset = HashSet::from_iter(Piece::pawn().get_relative_capture_steps());
+        let correct_captureset =
+            HashSet::from([vec2(1, 1), vec2(-1, 1), vec2(1, -1), vec2(-1, -1)]);
         assert_eq!(correct_captureset, pawn_captureset);
     }
 }
