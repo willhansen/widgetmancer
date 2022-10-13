@@ -7,7 +7,10 @@ use line_drawing::Point;
 
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
-use crate::{point_to_string, ColorName, Glyph, IPoint, IVector, Square, SquareList, WorldSpace};
+use crate::{
+    point_to_string, ColorName, Glyph, IPoint, IVector, Square, SquareList, Step, WorldSpace,
+    LEFT_I,
+};
 
 pub struct Game {
     board_width: usize,
@@ -16,7 +19,8 @@ pub struct Game {
     //step_foes: Vec<StepFoe>,
     pub(crate) running: bool,
     // set false to quit
-    player_position: Point2D<i32, WorldSpace>,
+    player_position: Square,
+    player_faced_direction: Step,
     player_is_dead: bool,
     graphics: Graphics,
     pieces: HashMap<Point2D<i32, WorldSpace>, Piece>,
@@ -29,9 +33,9 @@ impl Game {
         Game {
             board_width,
             board_height,
-            //step_foes: Vec::<StepFoe>::new(),
             running: true,
             player_position: point2((board_width / 2) as i32, (board_height / 2) as i32),
+            player_faced_direction: LEFT_I.cast_unit(),
             player_is_dead: false,
             graphics: Graphics::new(terminal_width, terminal_height),
             pieces: HashMap::new(),
@@ -76,12 +80,14 @@ impl Game {
         let new_pos = self.player_position + movement;
         self.set_player_position(&new_pos)
     }
-    pub fn get_player_position(&self) -> Point2D<i32, WorldSpace> {
+
+    pub fn player_position(&self) -> Point2D<i32, WorldSpace> {
         return self.player_position.clone();
     }
+
     pub fn set_player_position(&mut self, pos: &Point2D<i32, WorldSpace>) -> Result<(), ()> {
-        if self.pieces.contains_key(pos) {
-            self.pieces.remove(pos);
+        if self.is_piece_at(pos) {
+            self.capture_piece_at(pos);
         }
 
         if self.square_is_on_board(pos) {
@@ -91,6 +97,13 @@ impl Game {
         }
 
         return Ok(());
+    }
+
+    pub fn player_faced_direction(&self) -> Step {
+        self.player_faced_direction
+    }
+    pub fn set_player_faced_direction(&mut self, new_dir: &Step) {
+        self.player_faced_direction = new_dir.clone()
     }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
@@ -203,5 +216,24 @@ impl Game {
         }
 
         None
+    }
+
+    pub fn player_shoot(&mut self) {
+        let range = 5;
+        let line_start = self.player_position();
+        let line_end = line_start + self.player_faced_direction() * range;
+
+        for (x, y) in line_drawing::Bresenham::new(line_start.to_tuple(), line_end.to_tuple()) {
+            let square = Square::new(x, y);
+            self.capture_piece_at(&square);
+        }
+    }
+
+    pub fn capture_piece_at(&mut self, square: &Square) -> Result<(), ()> {
+        if !self.square_is_on_board(square) || !self.is_piece_at(square) {
+            return Err(());
+        }
+        self.pieces.remove(square);
+        Ok(())
     }
 }

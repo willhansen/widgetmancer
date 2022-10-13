@@ -34,13 +34,13 @@ use utility::*;
 
 use crate::game::Game;
 use crate::graphics::Graphics;
-use crate::input::InputMap;
+use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
 pub mod game;
 mod glyph;
 mod graphics;
-mod input;
+mod inputmap;
 pub mod piece;
 pub mod utility;
 
@@ -64,7 +64,7 @@ fn set_up_input_thread() -> Receiver<Event> {
 
 pub fn do_everything() {
     //let (width, height) = termion::terminal_size().unwrap();
-    let (width, height) = (20, 10);
+    let (width, height) = (80, 40);
     let mut game = Game::new(width, height);
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
@@ -80,7 +80,7 @@ pub fn do_everything() {
 
     let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
 
-    let pawn_pos = game.get_player_position() + LEFT_I.cast_unit() * 3;
+    let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3;
     game.place_piece(Piece::pawn(), &pawn_pos)
         .expect("Failed to place pawn");
 

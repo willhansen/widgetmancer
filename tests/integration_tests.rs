@@ -4,25 +4,25 @@ use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
-use crate::utils_for_tests::make_game;
+use crate::utils_for_tests::{make_game, set_up_player_facing_pawn_on_left};
 
 mod utils_for_tests;
 
 #[test]
 fn test_walk_in_circle() {
     let mut game = make_game();
-    let start_pos = game.get_player_position();
+    let start_pos = game.player_position();
     game.move_player(vec2(1, 0)).expect("");
     game.move_player(vec2(0, 1)).expect("");
     game.move_player(vec2(-1, 0)).expect("");
     game.move_player(vec2(0, -1)).expect("");
-    assert_eq!(game.get_player_position(), start_pos)
+    assert_eq!(game.player_position(), start_pos)
 }
 
 #[test]
 fn test_player_drawn_to_screen() {
     let mut game = make_game();
-    let start_pos = game.get_player_position();
+    let start_pos = game.player_position();
     game.draw_headless();
     let graphics = game.borrow_graphics_mut();
     let screen_player_pos = graphics.world_pos_to_screen_pos(&start_pos);
@@ -94,7 +94,7 @@ fn test_checkerboard_background() {
 #[test]
 fn test_draw_placed_pawn() {
     let mut game = make_game();
-    let one_left = game.get_player_position() + LEFT_I.cast_unit();
+    let one_left = game.player_position() + LEFT_I.cast_unit();
     game.place_piece(Piece::pawn(), &one_left)
         .expect("Failed to place pawn");
     game.draw_headless();
@@ -107,7 +107,7 @@ fn test_draw_placed_pawn() {
 #[test]
 fn test_capture_pawn() {
     let mut game = make_game();
-    let one_left = game.get_player_position() + LEFT_I.cast_unit();
+    let one_left = game.player_position() + LEFT_I.cast_unit();
     game.place_piece(Piece::pawn(), &one_left)
         .expect("Failed to place pawn");
 
@@ -130,13 +130,13 @@ fn test_capture_pawn() {
 #[test]
 fn test_pawn_capture_player() {
     let mut game = make_game();
-    let one_upleft = game.get_player_position() + (UP_I + LEFT_I).cast_unit();
+    let one_upleft = game.player_position() + (UP_I + LEFT_I).cast_unit();
     game.place_piece(Piece::pawn(), &one_upleft)
         .expect("Failed to place pawn");
     game.move_piece_at(&one_upleft);
     assert!(game.player_is_dead());
     assert_eq!(
-        *game.get_piece_at(&game.get_player_position()).unwrap(),
+        *game.get_piece_at(&game.player_position()).unwrap(),
         Piece::pawn()
     );
 }
@@ -144,10 +144,19 @@ fn test_pawn_capture_player() {
 #[test]
 fn test_pawn_move_towards_player() {
     let mut game = make_game();
-    let two_left = game.get_player_position() + (LEFT_I * 2).cast_unit();
-    let one_left = game.get_player_position() + (LEFT_I).cast_unit();
+    let two_left = game.player_position() + (LEFT_I * 2).cast_unit();
+    let one_left = game.player_position() + (LEFT_I).cast_unit();
     game.place_piece(Piece::pawn(), &two_left)
         .expect("Failed to place pawn");
     game.move_all_pieces();
     assert_eq!(*game.get_piece_at(&one_left).unwrap(), Piece::pawn());
+}
+
+#[test]
+fn test_shoot_pawn() {
+    let mut game = set_up_player_facing_pawn_on_left();
+
+    assert_eq!(1, game.piece_type_count(PieceType::Pawn));
+    game.player_shoot();
+    assert_eq!(0, game.piece_type_count(PieceType::Pawn));
 }
