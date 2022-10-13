@@ -2,6 +2,7 @@ extern crate num;
 
 use euclid::*;
 use num::traits::Signed;
+use std::f32::consts::TAU;
 use std::fmt::Display;
 use std::ops::Neg;
 
@@ -97,4 +98,52 @@ pub fn get_4_rotations<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T
 
 pub fn point_to_string<T: Display, U>(point: &Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
+}
+
+pub fn round_to_king_step(step: &Step) -> Step {
+    if *step == Step::new(0, 0) {
+        return Step::new(0, 0);
+    }
+    let radians_from_plus_x = step.to_f32().angle_from_x_axis();
+    let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
+    let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
+
+    let float_step =
+        Vector2D::<f32, WorldSpace>::from_angle_and_length(rounded_radians_from_plus_x, 1.5);
+    // 1.5 length to allow truncating down to 1 i32 in the diagonal case
+    // because 1.5/sqrt(2) > 1.0
+
+    // truncate towards zero intentionally
+    float_step.to_i32()
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
+
+    #[test]
+    fn test_round_to_kingstep() {
+        assert_eq!(
+            Step::new(0, 0),
+            round_to_king_step(&Step::new(0, 0)),
+            "zero to zero"
+        );
+        assert_eq!(
+            Step::new(1, 0),
+            round_to_king_step(&Step::new(5, 0)),
+            "reduce length"
+        );
+        assert_eq!(
+            Step::new(0, -1),
+            round_to_king_step(&Step::new(5, -300)),
+            "snap to orthogonal"
+        );
+        assert_eq!(
+            Step::new(-1, 1),
+            round_to_king_step(&Step::new(-30, 25)),
+            "snap to diagonal"
+        );
+    }
 }

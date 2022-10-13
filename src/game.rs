@@ -8,8 +8,8 @@ use line_drawing::Point;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, ColorName, Glyph, IPoint, IVector, Square, SquareList, Step, WorldSpace,
-    LEFT_I,
+    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, Square, SquareList,
+    Step, WorldSpace, LEFT_I,
 };
 
 pub struct Game {
@@ -76,8 +76,9 @@ impl Game {
         self.running = false;
     }
 
-    pub fn move_player(&mut self, movement: Vector2D<i32, WorldSpace>) -> Result<(), ()> {
-        let new_pos = self.player_position + movement;
+    pub fn move_player(&mut self, movement: &Step) -> Result<(), ()> {
+        let new_pos = self.player_position + *movement;
+        self.set_player_faced_direction(&round_to_king_step(movement));
         self.set_player_position(&new_pos)
     }
 

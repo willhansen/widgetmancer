@@ -24,29 +24,29 @@ impl InputMap {
                 Key::Char(' ') => game.player_shoot(),
 
                 Key::Char('k') | Key::Char('w') | Key::Up => {
-                    game.move_player(UP_I.cast_unit()).ok();
+                    game.move_player(&UP_I.cast_unit()).ok();
                 }
                 Key::Char('h') | Key::Char('a') | Key::Left => {
-                    game.move_player(LEFT_I.cast_unit()).ok();
+                    game.move_player(&LEFT_I.cast_unit()).ok();
                 }
                 Key::Char('j') | Key::Char('s') | Key::Down => {
-                    game.move_player(DOWN_I.cast_unit()).ok();
+                    game.move_player(&DOWN_I.cast_unit()).ok();
                 }
                 Key::Char('l') | Key::Char('d') | Key::Right => {
-                    game.move_player(RIGHT_I.cast_unit()).ok();
+                    game.move_player(&RIGHT_I.cast_unit()).ok();
                 }
 
                 Key::Char('y') => {
-                    game.move_player((UP_I + LEFT_I).cast_unit()).ok();
+                    game.move_player(&(UP_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('u') => {
-                    game.move_player((UP_I + RIGHT_I).cast_unit()).ok();
+                    game.move_player(&(UP_I + RIGHT_I).cast_unit()).ok();
                 }
                 Key::Char('b') => {
-                    game.move_player((DOWN_I + LEFT_I).cast_unit()).ok();
+                    game.move_player(&(DOWN_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('n') => {
-                    game.move_player((DOWN_I + RIGHT_I).cast_unit()).ok();
+                    game.move_player(&(DOWN_I + RIGHT_I).cast_unit()).ok();
                 }
 
                 _ => {}

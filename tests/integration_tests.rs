@@ -12,10 +12,10 @@ mod utils_for_tests;
 fn test_walk_in_circle() {
     let mut game = make_game();
     let start_pos = game.player_position();
-    game.move_player(vec2(1, 0)).expect("");
-    game.move_player(vec2(0, 1)).expect("");
-    game.move_player(vec2(-1, 0)).expect("");
-    game.move_player(vec2(0, -1)).expect("");
+    game.move_player(&vec2(1, 0)).expect("");
+    game.move_player(&vec2(0, 1)).expect("");
+    game.move_player(&vec2(-1, 0)).expect("");
+    game.move_player(&vec2(0, -1)).expect("");
     assert_eq!(game.player_position(), start_pos)
 }
 
@@ -39,7 +39,7 @@ fn test_player_can_not_move_off_low_edge() {
     game.set_player_position(&start_pos)
         .expect("Failed to set player pos");
 
-    let result = game.move_player(DOWN_I.cast_unit());
+    let result = game.move_player(&DOWN_I.cast_unit());
     assert!(result.is_err());
 }
 
@@ -54,10 +54,10 @@ fn test_player_can_not_move_off_high_edge() {
     game.set_player_position(&bottom_right)
         .expect("Failed to set player pos");
 
-    let result = game.move_player(RIGHT_I.cast_unit());
+    let result = game.move_player(&RIGHT_I.cast_unit());
     assert!(result.is_err());
 
-    let result = game.move_player(DOWN_I.cast_unit());
+    let result = game.move_player(&DOWN_I.cast_unit());
     assert!(result.is_err());
 
     game.draw_headless();
@@ -117,7 +117,7 @@ fn test_capture_pawn() {
         "Should be one pawn"
     );
 
-    game.move_player(LEFT_I.cast_unit())
+    game.move_player(&LEFT_I.cast_unit())
         .expect("Failed to move player");
 
     assert_eq!(
@@ -159,4 +159,30 @@ fn test_shoot_pawn() {
     assert_eq!(1, game.piece_type_count(PieceType::Pawn));
     game.player_shoot();
     assert_eq!(0, game.piece_type_count(PieceType::Pawn));
+}
+#[test]
+fn test_move_to_turn() {
+    let mut game = make_game();
+    game.move_player(&UP_I.cast_unit()).expect("step");
+    assert_eq!(
+        game.player_faced_direction(),
+        UP_I.cast_unit(),
+        "turn with step"
+    );
+
+    game.move_player(&((DOWN_I + RIGHT_I) * 3).cast_unit())
+        .expect("step");
+    assert_eq!(
+        game.player_faced_direction(),
+        (DOWN_I + RIGHT_I).cast_unit(),
+        "only face directions with length one"
+    );
+
+    game.move_player(&(UP_I + LEFT_I * 4).cast_unit())
+        .expect("step");
+    assert_eq!(
+        game.player_faced_direction(),
+        LEFT_I.cast_unit(),
+        "round to the standard 8 directions"
+    );
 }
