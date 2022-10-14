@@ -1,31 +1,28 @@
 extern crate num;
 
-use euclid::*;
-use num::traits::Signed;
 use std::f32::consts::TAU;
 use std::fmt::Display;
 use std::ops::Neg;
 
+use euclid::*;
+use num::traits::Signed;
+
 // empty enums for euclid typing
-pub enum WorldSpace {}
-
-pub enum BrailleWorldSpace {}
-
-pub enum CharacterWorldSpace {}
-
-pub enum ScreenBufferCharacterSpace {}
-
-pub enum ScreenCharacterSpace {}
+pub enum SquareGridInWorldFrame {}
+pub enum BrailleGridInWorldFrame {}
+pub enum CharacterGridInWorldFrame {}
+pub enum CharacterGridInBufferFrame {}
+pub enum CharacterGridInScreenFrame {}
 
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;
 pub type FVector = default::Vector2D<f32>;
 
-pub type Square = Point2D<i32, WorldSpace>;
-pub type Step = Vector2D<i32, WorldSpace>;
-pub type SquareList = Vec<Point2D<i32, WorldSpace>>;
-pub type StepList = Vec<Vector2D<i32, WorldSpace>>;
+pub type Square = Point2D<i32, SquareGridInWorldFrame>;
+pub type Step = Vector2D<i32, SquareGridInWorldFrame>;
+pub type SquareList = Vec<Point2D<i32, SquareGridInWorldFrame>>;
+pub type StepList = Vec<Vector2D<i32, SquareGridInWorldFrame>>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);
@@ -62,6 +59,7 @@ pub fn int_to_T<T: Signed>(x: i32) -> T {
         _ => panic!(),
     }
 }
+
 pub fn quarter_turns_counter_clockwise<T: Signed + Copy, U>(
     v: &Vector2D<T, U>,
     quarter_periods: i32,
@@ -71,6 +69,7 @@ pub fn quarter_turns_counter_clockwise<T: Signed + Copy, U>(
         v.x * int_to_T(int_sin(quarter_periods)) + v.y * int_to_T(int_cos(quarter_periods)),
     )
 }
+
 pub fn int_cos(quarter_periods: i32) -> i32 {
     match quarter_periods.rem_euclid(4) {
         0 => 1,
@@ -79,6 +78,7 @@ pub fn int_cos(quarter_periods: i32) -> i32 {
         _ => panic!(),
     }
 }
+
 pub fn int_sin(quarter_periods: i32) -> i32 {
     match quarter_periods.rem_euclid(4) {
         0 | 2 => 0,
@@ -108,8 +108,10 @@ pub fn round_to_king_step(step: Step) -> Step {
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
     let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
 
-    let float_step =
-        Vector2D::<f32, WorldSpace>::from_angle_and_length(rounded_radians_from_plus_x, 1.5);
+    let float_step = Vector2D::<f32, SquareGridInWorldFrame>::from_angle_and_length(
+        rounded_radians_from_plus_x,
+        1.5,
+    );
     // 1.5 length to allow truncating down to 1 i32 in the diagonal case
     // because 1.5/sqrt(2) > 1.0
 

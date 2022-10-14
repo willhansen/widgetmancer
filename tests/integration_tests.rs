@@ -27,7 +27,7 @@ fn test_player_drawn_to_screen() {
     let start_pos = game.player_position();
     game.draw_headless(Duration::from_millis(100));
     let graphics = game.borrow_graphics_mut();
-    let screen_player_pos = graphics.world_pos_to_screen_pos(start_pos);
+    let screen_player_pos = graphics.world_square_to_left_screen_square(start_pos);
     let drawn_player_string: String = graphics
         .get_char_at_screen_pos(screen_player_pos)
         .to_string();

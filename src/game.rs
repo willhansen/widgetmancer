@@ -9,8 +9,8 @@ use line_drawing::Point;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, Square, SquareList,
-    Step, WorldSpace, LEFT_I,
+    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, Square,
+    SquareGridInWorldFrame, SquareList, Step, LEFT_I,
 };
 
 pub struct Laser {

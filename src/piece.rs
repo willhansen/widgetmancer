@@ -1,9 +1,11 @@
 use std::f32::consts::PI;
-use strum_macros::Display;
 
 use euclid::*;
+use strum_macros::Display;
 
-use crate::{get_4_rotations, quarter_turns_counter_clockwise, Step, StepList, WorldSpace};
+use crate::{
+    get_4_rotations, quarter_turns_counter_clockwise, SquareGridInWorldFrame, Step, StepList,
+};
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
 pub enum PieceType {
@@ -55,7 +57,7 @@ impl Piece {
 
     pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations(Vector2D::<i32, WorldSpace>::new(1, 1)),
+            PieceType::Pawn => get_4_rotations(Vector2D::<i32, SquareGridInWorldFrame>::new(1, 1)),
             _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
@@ -85,8 +87,9 @@ impl Piece {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq, assert_ne};
     use std::collections::HashSet;
+
+    use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
 
