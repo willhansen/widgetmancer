@@ -96,12 +96,12 @@ pub fn get_4_rotations<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T
     all_4
 }
 
-pub fn point_to_string<T: Display, U>(point: &Point2D<T, U>) -> String {
+pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
 
-pub fn round_to_king_step(step: &Step) -> Step {
-    if *step == Step::new(0, 0) {
+pub fn round_to_king_step(step: Step) -> Step {
+    if step == Step::new(0, 0) {
         return Step::new(0, 0);
     }
     let radians_from_plus_x = step.to_f32().angle_from_x_axis();
@@ -127,22 +127,22 @@ mod tests {
     fn test_round_to_kingstep() {
         assert_eq!(
             Step::new(0, 0),
-            round_to_king_step(&Step::new(0, 0)),
+            round_to_king_step(Step::new(0, 0)),
             "zero to zero"
         );
         assert_eq!(
             Step::new(1, 0),
-            round_to_king_step(&Step::new(5, 0)),
+            round_to_king_step(Step::new(5, 0)),
             "reduce length"
         );
         assert_eq!(
             Step::new(0, -1),
-            round_to_king_step(&Step::new(5, -300)),
+            round_to_king_step(Step::new(5, -300)),
             "snap to orthogonal"
         );
         assert_eq!(
             Step::new(-1, 1),
-            round_to_king_step(&Step::new(-30, 25)),
+            round_to_king_step(Step::new(-30, 25)),
             "snap to diagonal"
         );
     }

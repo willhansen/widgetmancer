@@ -1,8 +1,9 @@
-use crate::game::Game;
-use crate::{Square, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 use euclid::default::Point2D;
 use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
+
+use crate::game::Game;
+use crate::{Square, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
     prev_mouse_square: Square,
@@ -24,29 +25,29 @@ impl InputMap {
                 Key::Char(' ') => game.player_shoot(),
 
                 Key::Char('k') | Key::Char('w') | Key::Up => {
-                    game.move_player(&UP_I.cast_unit()).ok();
+                    game.move_player(UP_I.cast_unit()).ok();
                 }
                 Key::Char('h') | Key::Char('a') | Key::Left => {
-                    game.move_player(&LEFT_I.cast_unit()).ok();
+                    game.move_player(LEFT_I.cast_unit()).ok();
                 }
                 Key::Char('j') | Key::Char('s') | Key::Down => {
-                    game.move_player(&DOWN_I.cast_unit()).ok();
+                    game.move_player(DOWN_I.cast_unit()).ok();
                 }
                 Key::Char('l') | Key::Char('d') | Key::Right => {
-                    game.move_player(&RIGHT_I.cast_unit()).ok();
+                    game.move_player(RIGHT_I.cast_unit()).ok();
                 }
 
                 Key::Char('y') => {
-                    game.move_player(&(UP_I + LEFT_I).cast_unit()).ok();
+                    game.move_player((UP_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('u') => {
-                    game.move_player(&(UP_I + RIGHT_I).cast_unit()).ok();
+                    game.move_player((UP_I + RIGHT_I).cast_unit()).ok();
                 }
                 Key::Char('b') => {
-                    game.move_player(&(DOWN_I + LEFT_I).cast_unit()).ok();
+                    game.move_player((DOWN_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('n') => {
-                    game.move_player(&(DOWN_I + RIGHT_I).cast_unit()).ok();
+                    game.move_player((DOWN_I + RIGHT_I).cast_unit()).ok();
                 }
 
                 _ => {}
@@ -54,7 +55,7 @@ impl InputMap {
             Event::Mouse(me) => match me {
                 MouseEvent::Press(MouseButton::Left, term_x, term_y) => {
                     let square = self.screen_to_world(&(term_x, term_y));
-                    game.set_player_position(&square).unwrap_or_default();
+                    game.set_player_position(square).unwrap_or_default();
                 }
                 MouseEvent::Press(MouseButton::Right, term_x, term_y) => {
                     self.prev_mouse_square = self.screen_to_world(&(term_x, term_y));
@@ -81,8 +82,9 @@ impl InputMap {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
 
     #[test]
     fn test_screen_to_world__lower_left() {
@@ -102,6 +104,7 @@ mod tests {
         let correct_world_pos = Square::new(0, 49);
         assert_eq!(correct_world_pos, world_pos);
     }
+
     #[test]
     fn test_screen_to_world__lower_right() {
         let input_map = InputMap::new(100, 50);
@@ -110,6 +113,7 @@ mod tests {
         let correct_world_pos = Square::new(49, 0);
         assert_eq!(correct_world_pos, world_pos);
     }
+
     #[test]
     fn test_screen_to_world__upper_right() {
         let input_map = InputMap::new(100, 50);
@@ -118,6 +122,7 @@ mod tests {
         let correct_world_pos = Square::new(49, 49);
         assert_eq!(correct_world_pos, world_pos);
     }
+
     #[test]
     fn test_screen_to_world__two_characters_one_square() {
         let input_map = InputMap::new(100, 50);

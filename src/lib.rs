@@ -1,5 +1,6 @@
 //#![allow(non_snake_case)]
 #![feature(is_sorted)]
+#![feature(drain_filter)]
 #![allow(warnings)]
 
 #[macro_use]
@@ -38,7 +39,7 @@ use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
 pub mod game;
-mod glyph;
+pub mod glyph;
 mod graphics;
 mod inputmap;
 pub mod piece;
@@ -81,7 +82,7 @@ pub fn do_everything() {
     let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
 
     let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3;
-    game.place_piece(Piece::pawn(), &pawn_pos)
+    game.place_piece(Piece::pawn(), pawn_pos)
         .expect("Failed to place pawn");
 
     let mut prev_start_time = Instant::now();
@@ -95,7 +96,8 @@ pub fn do_everything() {
             input_map.handle_event(&mut game, event);
             game.move_all_pieces();
         }
-        game.draw(&mut wrapped_terminal);
-        thread::sleep(Duration::from_millis(100));
+        let delta = Duration::from_millis(100);
+        game.draw(&mut wrapped_terminal, delta);
+        thread::sleep(delta);
     }
 }

@@ -1,14 +1,13 @@
-use termion::color;
 use crate::utility::sign;
+use termion::color;
 
 use euclid::*;
 use euclid::{point2, vec2};
-use std::cmp::min;
 use line_drawing::Point;
+use std::cmp::min;
 
 use crate::utility::*;
 
-// "heighth", "reighth"
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
@@ -170,10 +169,7 @@ impl Glyph {
             }
         };
     }
-    pub fn colored_square_with_half_step_offset(
-        offset: FVector,
-        color_name: ColorName,
-    ) -> Glyph {
+    pub fn colored_square_with_half_step_offset(offset: FVector, color_name: ColorName) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
         Glyph {
             character: quarter_block_by_offset(step),
@@ -209,7 +205,6 @@ impl Glyph {
         Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
 
-
     pub fn get_smooth_horizontal_glyphs_for_colored_floating_square(
         pos: FPoint,
         color: ColorName,
@@ -236,9 +231,7 @@ impl Glyph {
         return output;
     }
     #[allow(dead_code)]
-    pub fn get_smooth_vertical_glyphs_for_floating_square(
-        pos: FPoint,
-    ) -> Vec<Vec<Option<Glyph>>> {
+    pub fn get_smooth_vertical_glyphs_for_floating_square(pos: FPoint) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
     pub fn get_smooth_vertical_glyphs_for_colored_floating_square(
@@ -265,7 +258,9 @@ impl Glyph {
         return output;
     }
 
-    pub fn get_half_grid_glyphs_for_floating_square(pos: default::Point2D<f32>) -> Vec<Vec<Option<Glyph>>> {
+    pub fn get_half_grid_glyphs_for_floating_square(
+        pos: default::Point2D<f32>,
+    ) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, ColorName::White)
     }
 
@@ -284,8 +279,10 @@ impl Glyph {
                 let y = j as i32 - 1;
                 let square = point2(x, y);
                 if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                    let glyph =
-                        Glyph::colored_square_with_half_step_offset((grid_offset - square.to_f32()), color);
+                    let glyph = Glyph::colored_square_with_half_step_offset(
+                        (grid_offset - square.to_f32()),
+                        color,
+                    );
                     if glyph.character != ' ' {
                         output[i][j] = Some(glyph);
                     }
@@ -344,25 +341,44 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_braille_line(
-        start_pos: Point2D<f32, WorldSpace>,
-        end_pos: Point2D<f32, WorldSpace>,
+        start_pos: Point2D<f32, CharacterWorldSpace>,
+        end_pos: Point2D<f32, CharacterWorldSpace>,
     ) -> Vec<Vec<Option<Glyph>>> {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, ColorName::White)
     }
 
-    pub fn world_pos_to_braille_pos(pos: Point2D<f32, WorldSpace>) -> Point2D<f32, BrailleWorldSpace> {
+    pub fn character_world_pos_to_braille_pos(
+        pos: Point2D<f32, CharacterWorldSpace>,
+    ) -> Point2D<f32, BrailleWorldSpace> {
         point2(pos.x * 2.0 + 0.5, pos.y * 4.0 + 1.5)
     }
 
-    pub fn braille_pos_to_world_pos(pos: Point2D<f32, BrailleWorldSpace>) -> Point2D<f32, WorldSpace> {
+    pub fn braille_pos_to_character_world_pos(
+        pos: Point2D<f32, BrailleWorldSpace>,
+    ) -> Point2D<f32, CharacterWorldSpace> {
         point2((pos.x - 0.5) / 2.0, (pos.y - 1.5) / 4.0)
     }
 
-    pub fn braille_square_to_dot_in_character(pos: Point2D<i32, BrailleWorldSpace>) -> Point2D<i32, BrailleWorldSpace> {
+    pub fn world_pos_to_character_world_pos(
+        pos: Point2D<f32, WorldSpace>,
+    ) -> Point2D<f32, CharacterWorldSpace> {
+        point2(pos.x * 2.0 + 0.5, pos.y)
+    }
+    pub fn world_pos_to_braille_pos(
+        pos: Point2D<f32, WorldSpace>,
+    ) -> Point2D<f32, BrailleWorldSpace> {
+        Glyph::character_world_pos_to_braille_pos(Glyph::world_pos_to_character_world_pos(pos))
+    }
+
+    pub fn braille_square_to_dot_in_character(
+        pos: Point2D<i32, BrailleWorldSpace>,
+    ) -> Point2D<i32, BrailleWorldSpace> {
         point2((pos.x % 2).abs(), (pos.y % 4).abs())
     }
 
-    pub fn braille_grid_to_character_grid(braille_square: Point2D<i32, BrailleWorldSpace>) -> Point2D<i32, CharacterWorldSpace> {
+    pub fn braille_grid_to_character_grid(
+        braille_square: Point2D<i32, BrailleWorldSpace>,
+    ) -> Point2D<i32, CharacterWorldSpace> {
         point2(
             ((braille_square.x as f32 - 0.5) / 2.0).round() as i32,
             ((braille_square.y as f32 - 1.5) / 4.0).round() as i32,
@@ -370,14 +386,18 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_colored_braille_line(
-        start_pos: Point2D<f32, WorldSpace>,
-        end_pos: Point2D<f32, WorldSpace>,
+        start_pos: Point2D<f32, CharacterWorldSpace>,
+        end_pos: Point2D<f32, CharacterWorldSpace>,
         color: ColorName,
     ) -> Vec<Vec<Option<Glyph>>> {
         let start_grid_square = start_pos.round().to_i32();
         let end_grid_square = end_pos.round().to_i32();
-        let start_braille_grid_square = Glyph::world_pos_to_braille_pos(start_pos).round().to_i32();
-        let end_braille_grid_square = Glyph::world_pos_to_braille_pos(end_pos).round().to_i32();
+        let start_braille_grid_square = Glyph::character_world_pos_to_braille_pos(start_pos)
+            .round()
+            .to_i32();
+        let end_braille_grid_square = Glyph::character_world_pos_to_braille_pos(end_pos)
+            .round()
+            .to_i32();
 
         let grid_diagonal = end_grid_square - start_grid_square;
         let grid_width = grid_diagonal.x.abs() + 1;
@@ -415,19 +435,26 @@ impl Glyph {
         return output_grid;
     }
 
-    pub fn world_pos_to_braille_char(world_pos: Point2D<f32, WorldSpace>) -> char {
+    pub fn character_world_pos_to_braille_char(
+        world_pos: Point2D<f32, CharacterWorldSpace>,
+    ) -> char {
         let character = Glyph::empty_braille();
         Glyph::add_braille_dot(
             character,
             Glyph::braille_square_to_dot_in_character(
-                Glyph::world_pos_to_braille_pos(world_pos
-                ).round().to_i32()),
+                Glyph::character_world_pos_to_braille_pos(world_pos)
+                    .round()
+                    .to_i32(),
+            ),
         )
     }
 
-    pub fn world_pos_to_colored_braille_glyph(world_pos: Point2D<f32, WorldSpace>, color: ColorName) -> Glyph {
+    pub fn character_world_pos_to_colored_braille_glyph(
+        world_pos: Point2D<f32, CharacterWorldSpace>,
+        color: ColorName,
+    ) -> Glyph {
         Glyph {
-            character: Glyph::world_pos_to_braille_char(world_pos),
+            character: Glyph::character_world_pos_to_braille_char(world_pos),
             fg_color: color,
             bg_color: ColorName::Black,
         }
@@ -441,22 +468,71 @@ mod tests {
 
     #[test]
     fn test_colored_square_with_half_step_offsets() {
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(0, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).fg_color, ColorName::Red);
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).bg_color, ColorName::Black);
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), ColorName::Red).character, quarter_block_by_offset(vec2(0, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(0, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(0, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(-1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), ColorName::Red).character, quarter_block_by_offset(vec2(0, 1)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), ColorName::Red).character, quarter_block_by_offset(vec2(-1, 1)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(1, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), ColorName::Red).character, quarter_block_by_offset(vec2(2, 0)));
-        assert_eq!(Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), ColorName::Red).character, quarter_block_by_offset(vec2(1, -1)));
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).fg_color,
+            ColorName::Red
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).bg_color,
+            ColorName::Black
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), ColorName::Red).character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(-1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), ColorName::Red).character,
+            quarter_block_by_offset(vec2(0, 1))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), ColorName::Red)
+                .character,
+            quarter_block_by_offset(vec2(-1, 1))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), ColorName::Red).character,
+            quarter_block_by_offset(vec2(2, 0))
+        );
+        assert_eq!(
+            Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), ColorName::Red).character,
+            quarter_block_by_offset(vec2(1, -1))
+        );
     }
 
     #[test]
@@ -467,7 +543,10 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(0, 0)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -482,8 +561,14 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(0, 1)));
-        assert_eq!(glyphs[1][2].clone().unwrap().character, quarter_block_by_offset(vec2(0, -1)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, 1))
+        );
+        assert_eq!(
+            glyphs[1][2].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, -1))
+        );
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
         assert!(glyphs[2][2] == None);
@@ -498,8 +583,14 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(0, 1)));
-        assert_eq!(glyphs[1][2].clone().unwrap().character, quarter_block_by_offset(vec2(0, -1)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, 1))
+        );
+        assert_eq!(
+            glyphs[1][2].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, -1))
+        );
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
         assert!(glyphs[2][2] == None);
@@ -513,7 +604,10 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(0, 0)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(0, 0))
+        );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -528,10 +622,16 @@ mod tests {
         assert!(glyphs[0][1] == None);
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(1, 0)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
-        assert_eq!(glyphs[2][1].clone().unwrap().character, quarter_block_by_offset(vec2(-1, 0)));
+        assert_eq!(
+            glyphs[2][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(-1, 0))
+        );
         assert!(glyphs[2][2] == None);
     }
 
@@ -540,10 +640,16 @@ mod tests {
         let test_pos = point2(-0.3, 0.2);
         let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
         assert!(glyphs[0][0] == None);
-        assert_eq!(glyphs[0][1].clone().unwrap().character, quarter_block_by_offset(vec2(1, 0)));
+        assert_eq!(
+            glyphs[0][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(1, 0))
+        );
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
-        assert_eq!(glyphs[1][1].clone().unwrap().character, quarter_block_by_offset(vec2(-1, 0)));
+        assert_eq!(
+            glyphs[1][1].clone().unwrap().character,
+            quarter_block_by_offset(vec2(-1, 0))
+        );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -650,33 +756,78 @@ mod tests {
 
     #[test]
     fn test_braille_grid_to_character_grid() {
-        assert_eq!(Glyph::braille_grid_to_character_grid(point2(0, 0)), point2(0, 0));
-        assert_eq!(Glyph::braille_grid_to_character_grid(point2(1, 3)), point2(0, 0));
-        assert_eq!(Glyph::braille_grid_to_character_grid(point2(-1, -1)), point2(-1, -1));
-        assert_eq!(Glyph::braille_grid_to_character_grid(point2(2, 8)), point2(1, 2));
-        assert_eq!(Glyph::braille_grid_to_character_grid(point2(21, 80)), point2(10, 20));
+        assert_eq!(
+            Glyph::braille_grid_to_character_grid(point2(0, 0)),
+            point2(0, 0)
+        );
+        assert_eq!(
+            Glyph::braille_grid_to_character_grid(point2(1, 3)),
+            point2(0, 0)
+        );
+        assert_eq!(
+            Glyph::braille_grid_to_character_grid(point2(-1, -1)),
+            point2(-1, -1)
+        );
+        assert_eq!(
+            Glyph::braille_grid_to_character_grid(point2(2, 8)),
+            point2(1, 2)
+        );
+        assert_eq!(
+            Glyph::braille_grid_to_character_grid(point2(21, 80)),
+            point2(10, 20)
+        );
     }
 
     #[test]
     fn test_world_pos_to_braille_pos() {
-        assert_eq!(Glyph::world_pos_to_braille_pos(point2(0.0, 0.0)), point2(0.5, 1.5));
-        assert_eq!(Glyph::world_pos_to_braille_pos(point2(1.0, 0.0)), point2(2.5, 1.5));
-        assert_eq!(Glyph::world_pos_to_braille_pos(point2(0.25, 0.375)), point2(1.0, 3.0));
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_pos(point2(0.0, 0.0)),
+            point2(0.5, 1.5)
+        );
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_pos(point2(1.0, 0.0)),
+            point2(2.5, 1.5)
+        );
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_pos(point2(0.25, 0.375)),
+            point2(1.0, 3.0)
+        );
     }
 
     #[test]
     fn test_braille_pos_to_world_pos() {
-        assert_eq!(Glyph::braille_pos_to_world_pos(point2(0.5, 1.5)), point2(0.0, 0.0));
-        assert_eq!(Glyph::braille_pos_to_world_pos(point2(2.5, 1.5)), point2(1.0, 0.0));
-        assert_eq!(Glyph::braille_pos_to_world_pos(point2(1.0, 3.0)), point2(0.25, 0.375));
+        assert_eq!(
+            Glyph::braille_pos_to_character_world_pos(point2(0.5, 1.5)),
+            point2(0.0, 0.0)
+        );
+        assert_eq!(
+            Glyph::braille_pos_to_character_world_pos(point2(2.5, 1.5)),
+            point2(1.0, 0.0)
+        );
+        assert_eq!(
+            Glyph::braille_pos_to_character_world_pos(point2(1.0, 3.0)),
+            point2(0.25, 0.375)
+        );
     }
 
     #[test]
     fn test_braille_square_to_dot_in_character() {
-        assert_eq!(Glyph::braille_square_to_dot_in_character(point2(0, 0)), point2(0, 0));
-        assert_eq!(Glyph::braille_square_to_dot_in_character(point2(1, 3)), point2(1, 3));
-        assert_eq!(Glyph::braille_square_to_dot_in_character(point2(25, 4)), point2(1, 0));
-        assert_eq!(Glyph::braille_square_to_dot_in_character(point2(-3, 4)), point2(1, 0));
+        assert_eq!(
+            Glyph::braille_square_to_dot_in_character(point2(0, 0)),
+            point2(0, 0)
+        );
+        assert_eq!(
+            Glyph::braille_square_to_dot_in_character(point2(1, 3)),
+            point2(1, 3)
+        );
+        assert_eq!(
+            Glyph::braille_square_to_dot_in_character(point2(25, 4)),
+            point2(1, 0)
+        );
+        assert_eq!(
+            Glyph::braille_square_to_dot_in_character(point2(-3, 4)),
+            point2(1, 0)
+        );
     }
 
     #[test]
@@ -687,9 +838,18 @@ mod tests {
 
     #[test]
     fn test_world_point_to_braille_char() {
-        assert_eq!(Glyph::world_pos_to_braille_char(point2(0.0, 0.0)), '\u{2810}');
-        assert_eq!(Glyph::world_pos_to_braille_char(point2(-0.4, -0.4)), '\u{2840}');
-        assert_eq!(Glyph::world_pos_to_braille_char(point2(0.2, 0.4)), '\u{2808}');
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_char(point2(0.0, 0.0)),
+            '\u{2810}'
+        );
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_char(point2(-0.4, -0.4)),
+            '\u{2840}'
+        );
+        assert_eq!(
+            Glyph::character_world_pos_to_braille_char(point2(0.2, 0.4)),
+            '\u{2808}'
+        );
     }
 
     #[test]
@@ -698,9 +858,9 @@ mod tests {
             //let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
             let random_point = point2(23.2273, 2.05);
 
-            assert!(Glyph::is_braille(Glyph::world_pos_to_braille_char(
-                random_point
-            )));
+            assert!(Glyph::is_braille(
+                Glyph::character_world_pos_to_braille_char(random_point)
+            ));
         }
     }
 
@@ -708,7 +868,10 @@ mod tests {
     fn test_world_point_to_braille_glyph() {
         let points = [point2(0.0, 0.0), point2(-0.4, -0.4), point2(0.2, 0.4)];
         for p1 in points {
-            assert_eq!(Glyph::world_pos_to_colored_braille_glyph(p1, ColorName::Black).character, Glyph::world_pos_to_braille_char(p1));
+            assert_eq!(
+                Glyph::character_world_pos_to_colored_braille_glyph(p1, ColorName::Black).character,
+                Glyph::character_world_pos_to_braille_char(p1)
+            );
         }
     }
 
@@ -720,5 +883,19 @@ mod tests {
         assert_eq!(Glyph::count_braille_dots('\u{28FF}'), 8);
         assert_eq!(Glyph::count_braille_dots('A'), 0);
         assert_eq!(Glyph::count_braille_dots('#'), 0);
+    }
+
+    #[test]
+    fn test_world_pos_to_character_world_pos() {
+        assert_eq!(
+            Point2D::<f32, CharacterWorldSpace>::new(0.5, 0.0),
+            Glyph::world_pos_to_character_world_pos(Point2D::<f32, WorldSpace>::new(0.0, 0.0)),
+            "zero is actually between two characters"
+        );
+        assert_eq!(
+            Point2D::<f32, CharacterWorldSpace>::new(2.5, 1.0),
+            Glyph::world_pos_to_character_world_pos(Point2D::<f32, WorldSpace>::new(1.0, 1.0)),
+            "diagonal a bit"
+        );
     }
 }
