@@ -242,14 +242,13 @@ impl Graphics {
 
     pub fn print_output_buffer(&self) {
         for y in 0..self.terminal_height() as usize {
-            let reverse_y: usize = self.terminal_height() as usize - 1 - y;
             let mut row_string = String::new();
             for x in 0..self.terminal_width() as usize {
-                row_string += &self.output_buffer[x][reverse_y].to_string();
+                row_string += &self.output_buffer[x][y].to_string();
             }
             row_string += &Glyph::reset_colors();
-            if reverse_y % 5 == 0 || y == 0 {
-                row_string += &format!("――{}", reverse_y);
+            if y % 5 == 0 || y == self.terminal_height() as usize - 1 {
+                row_string += &format!("――{}", y);
             }
             println!("{}", row_string);
         }
