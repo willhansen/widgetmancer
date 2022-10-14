@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::io::Write;
@@ -211,10 +212,25 @@ impl Graphics {
             }
             row_string += &Glyph::reset_colors();
             if reverse_y % 5 == 0 || y == 0 {
-                row_string += &format!("-- {}", reverse_y);
+                row_string += &format!("――{}", reverse_y);
             }
             println!("{}", row_string);
         }
+
+        let mut x_markings = " ".repeat(self.terminal_width() as usize);
+        let mut x_numbers = " ".repeat(self.terminal_width() as usize);
+
+        for x in 0..self.terminal_width() as usize {
+            if x % 5 == 0 || x == self.terminal_width() as usize - 1 {
+                x_markings.insert_str(x, "|");
+                x_numbers.insert_str(x, &(x.to_string()));
+            }
+        }
+        println!("{}", x_markings);
+        println!("{}", x_numbers);
+    }
+    pub fn display_headless(&mut self) {
+        self.display(&mut None);
     }
 
     pub fn display(&mut self, optional_writer: &mut Option<Box<dyn Write>>) {
@@ -318,5 +334,21 @@ mod tests {
         let screen_pos1 = g.world_pos_to_screen_pos(world_pos + RIGHT_I.cast_unit());
         let screen_pos2 = g.world_pos_to_screen_pos(world_pos) + RIGHT_I.cast_unit() * 2;
         assert_eq!(screen_pos1, screen_pos2);
+    }
+
+    #[test]
+    fn test_draw_diagonal_braille_line() {
+        let mut g = Graphics::new(40, 20);
+        let line_start = Square::new(2, 2);
+        let line_end = Square::new(7, 7);
+
+        g.draw_laser(line_start, line_end);
+
+        let test_square = Square::new(4, 4);
+
+        let (glyph_left, glyph_right) = g.get_buffered_glyphs_for_square(test_square);
+        g.print_output_buffer();
+
+        assert_eq!(glyph_left.fg_color, ColorName::Red);
     }
 }
