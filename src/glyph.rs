@@ -348,6 +348,32 @@ impl Glyph {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, ColorName::White)
     }
 
+    pub fn get_glyphs_for_player(world_pos: Square, faced_direction: Step) -> (Glyph, Glyph) {
+        let mut arrow_step_map: HashMap<Step, char> = HashMap::new();
+
+        // ⭠⭢⭡⭣ ⭦⭧⭨⭩
+        let arrows = "🢀🢂🢁🢃🢄🢅🢆🢇";
+        let king_steps_in_arrow_order = vec![
+            vec2(-1, 0),
+            vec2(1, 0),
+            vec2(0, 1),
+            vec2(0, -1),
+            vec2(-1, 1),
+            vec2(1, 1),
+            vec2(1, -1),
+            vec2(-1, -1),
+        ];
+        for i in 0..king_steps_in_arrow_order.len() {
+            let arrow_char = arrows.chars().nth(i).unwrap();
+            arrow_step_map.insert(*king_steps_in_arrow_order.get(i).unwrap(), arrow_char);
+        }
+
+        return (
+            Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
+            Glyph::from_char(' '),
+        );
+    }
+
     pub fn character_world_pos_to_braille_pos(
         pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> Point2D<f32, BrailleGridInWorldFrame> {

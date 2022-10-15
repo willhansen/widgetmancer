@@ -126,7 +126,8 @@ impl Game {
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, delta: Duration) {
         self.graphics.fill_output_buffer_with_checker();
-        self.graphics.draw_player(self.player_position());
+        self.graphics
+            .draw_player(self.player_position(), self.player_faced_direction());
         for (&square, &piece) in &self.pieces {
             if !self.square_is_on_board(square) {
                 panic!("Found piece out of bounds: {}", point_to_string(square));

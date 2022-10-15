@@ -25,13 +25,11 @@ fn test_walk_in_circle() {
 fn test_player_drawn_to_screen() {
     let mut game = make_game();
     let start_pos = game.player_position();
+    game.set_player_faced_direction(RIGHT_I.cast_unit());
     game.draw_headless(Duration::from_millis(100));
     let graphics = game.borrow_graphics_mut();
-    let screen_player_pos = graphics.world_square_to_left_screen_square(start_pos);
-    let drawn_player_string: String = graphics
-        .get_char_at_screen_pos(screen_player_pos)
-        .to_string();
-    assert_eq!("@", drawn_player_string)
+    let drawn_glyphs = graphics.get_buffered_glyphs_for_square(start_pos);
+    assert_ne!(drawn_glyphs.0.character, ' ');
 }
 
 #[test]

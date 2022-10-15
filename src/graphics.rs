@@ -13,9 +13,9 @@ use termion::terminal_size;
 
 use crate::piece::Piece;
 use crate::{
-    get_by_point, BrailleGridInWorldFrame, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
-    CharacterGridInWorldFrame, ColorName, Game, Glyph, IPoint, PieceType, Square,
-    SquareGridInWorldFrame, RIGHT_I,
+    get_by_point, point_to_string, BrailleGridInWorldFrame, CharacterGridInBufferFrame,
+    CharacterGridInScreenFrame, CharacterGridInWorldFrame, ColorName, Game, Glyph, IPoint,
+    PieceType, Square, SquareGridInWorldFrame, Step, RIGHT_I,
 };
 
 pub struct Graphics {
@@ -73,6 +73,12 @@ impl Graphics {
             && buffer_char_pos.x < self.terminal_width as i32
             && buffer_char_pos.y >= 0
             && buffer_char_pos.y < self.terminal_height as i32;
+    }
+    pub fn world_square_to_left_buffer_square(
+        &self,
+        world_position: Square,
+    ) -> Point2D<i32, CharacterGridInBufferFrame> {
+        self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
 
     pub fn world_square_to_left_screen_square(
@@ -276,12 +282,12 @@ impl Graphics {
         self.output_on_screen = self.output_buffer.clone();
     }
 
-    pub fn draw_string_to_screen(
+    pub fn draw_string(
         &mut self,
         screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
         the_string: &str,
     ) {
-        for i in 0..the_string.len() {
+        for i in 0..the_string.chars().count() {
             let character: char = the_string.chars().nth(i).unwrap();
             let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
             self.output_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
@@ -297,11 +303,35 @@ impl Graphics {
         get_by_point(&self.output_on_screen, buffer_pos).character
     }
 
-    pub fn draw_player(&mut self, world_pos: Square) {
-        self.draw_string_to_screen(self.world_square_to_left_screen_square(world_pos), "@@");
+    pub fn draw_player(&mut self, world_pos: Square, faced_direction: Step) {
+        self.draw_glyphs_at_square(
+            world_pos,
+            Glyph::get_glyphs_for_player(world_pos, faced_direction),
+        );
     }
+
+    pub fn draw_glyphs_at_square(&mut self, world_pos: Square, glyphs: (Glyph, Glyph)) {
+        if !self.square_is_on_screen(world_pos) {
+            panic!(
+                "Tried to draw square off screen: {}",
+                point_to_string(world_pos)
+            );
+        }
+        let buffer_square = self.world_square_to_left_buffer_square(world_pos);
+        self.draw_glyph(buffer_square, glyphs.0);
+        self.draw_glyph(buffer_square + RIGHT_I.cast_unit(), glyphs.1);
+    }
+
+    pub fn draw_glyph(
+        &mut self,
+        buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
+        glyph: Glyph,
+    ) {
+        self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize] = glyph;
+    }
+
     pub fn draw_piece(&mut self, piece: Piece, pos: Square) {
-        self.draw_string_to_screen(self.world_square_to_left_screen_square(pos), "Pa");
+        self.draw_string(self.world_square_to_left_screen_square(pos), "Pa");
     }
     pub fn draw_laser(&mut self, start: Square, end: Square) {
         self.draw_visual_braille_line(start.to_f32(), end.to_f32(), ColorName::Red);
@@ -386,7 +416,7 @@ mod tests {
         let test_square = Square::new(4, 4);
 
         let (glyph_left, glyph_right) = g.get_buffered_glyphs_for_square(test_square);
-        g.print_output_buffer();
+        //g.print_output_buffer();
 
         assert_eq!(glyph_left.fg_color, ColorName::Red);
     }
