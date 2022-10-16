@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use rust_roguelike::glyph::ColorName;
 use rust_roguelike::piece::{Piece, PieceType};
-use rust_roguelike::utility::{Square, DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use rust_roguelike::utility::{WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 use crate::utils_for_tests::{make_game, set_up_player_facing_pawn_on_left};
 
@@ -191,7 +191,7 @@ fn test_move_to_turn() {
 #[test]
 fn test_visible_laser() {
     let mut game = make_game();
-    let inspection_square: Square = game.player_position() + game.player_faced_direction();
+    let inspection_square: WorldSquare = game.player_position() + game.player_faced_direction();
     game.player_shoot();
     game.draw_headless(Duration::from_millis(100));
 

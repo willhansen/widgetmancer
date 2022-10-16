@@ -3,10 +3,10 @@ use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
 use crate::game::Game;
-use crate::{Square, DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use crate::{WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
-    prev_mouse_square: Square,
+    prev_mouse_square: WorldSquare,
     terminal_size: (u16, u16), // (width, height)
 }
 
@@ -71,9 +71,9 @@ impl InputMap {
         }
     }
 
-    fn screen_to_world(&self, terminal_position: &(u16, u16)) -> Square {
+    fn screen_to_world(&self, terminal_position: &(u16, u16)) -> WorldSquare {
         // terminal indexes from 1, and the y axis goes top to bottom
-        Square::new(
+        WorldSquare::new(
             (terminal_position.0 as i32 - 1) / 2,
             self.terminal_size.1 as i32 - terminal_position.1 as i32,
         )
@@ -91,7 +91,7 @@ mod tests {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 50);
         let world_pos = input_map.screen_to_world(&terminal_pos);
-        let correct_world_pos = Square::new(0, 0);
+        let correct_world_pos = WorldSquare::new(0, 0);
         assert_eq!(correct_world_pos, world_pos);
     }
 
@@ -101,7 +101,7 @@ mod tests {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 1);
         let world_pos = input_map.screen_to_world(&terminal_pos);
-        let correct_world_pos = Square::new(0, 49);
+        let correct_world_pos = WorldSquare::new(0, 49);
         assert_eq!(correct_world_pos, world_pos);
     }
 
@@ -110,7 +110,7 @@ mod tests {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 50);
         let world_pos = input_map.screen_to_world(&terminal_pos);
-        let correct_world_pos = Square::new(49, 0);
+        let correct_world_pos = WorldSquare::new(49, 0);
         assert_eq!(correct_world_pos, world_pos);
     }
 
@@ -119,7 +119,7 @@ mod tests {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 1);
         let world_pos = input_map.screen_to_world(&terminal_pos);
-        let correct_world_pos = Square::new(49, 49);
+        let correct_world_pos = WorldSquare::new(49, 49);
         assert_eq!(correct_world_pos, world_pos);
     }
 

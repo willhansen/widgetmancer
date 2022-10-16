@@ -13,10 +13,17 @@ use termion::terminal_size;
 
 use crate::piece::Piece;
 use crate::{
-    get_by_point, point_to_string, BrailleGridInWorldFrame, CharacterGridInBufferFrame,
-    CharacterGridInScreenFrame, CharacterGridInWorldFrame, ColorName, Game, Glyph, IPoint,
-    PieceType, Square, SquareGridInWorldFrame, Step, RIGHT_I,
+    get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
+    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, ColorName,
+    Game, Glyph, IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, Step, WorldCharacterPoint,
+    WorldPoint, WorldSquare, RIGHT_I,
 };
+
+pub struct Laser {
+    start: WorldPoint,
+    end: WorldPoint,
+    age: Duration,
+}
 
 pub struct Graphics {
     output_buffer: Vec<Vec<Glyph>>,
@@ -25,6 +32,7 @@ pub struct Graphics {
     // (x,y), left to right, top to bottom
     terminal_width: u16,
     terminal_height: u16,
+    lasers: Vec<Laser>,
 }
 
 impl Graphics {
@@ -40,6 +48,7 @@ impl Graphics {
             ],
             terminal_width,
             terminal_height,
+            lasers: vec![],
         }
     }
 
@@ -56,13 +65,13 @@ impl Graphics {
         character_square: Point2D<i32, CharacterGridInWorldFrame>,
     ) -> bool {
         self.square_is_on_screen(
-            Glyph::character_world_pos_to_exact_world_pos(character_square.to_f32())
+            Glyph::world_character_point_to_world_point(character_square.to_f32())
                 .round()
                 .to_i32(),
         )
     }
-    fn square_is_on_screen(&self, square: Square) -> bool {
-        self.buffer_character_is_on_screen(self.world_square_to_buffer_character_square(square))
+    fn square_is_on_screen(&self, square: WorldSquare) -> bool {
+        self.buffer_character_is_on_screen(self.world_square_to_buffer_square(square))
     }
 
     fn buffer_character_is_on_screen(
@@ -74,35 +83,70 @@ impl Graphics {
             && buffer_char_pos.y >= 0
             && buffer_char_pos.y < self.terminal_height as i32;
     }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // CONVERSIONS START
+    ////////////////////////////////////////////////////////////////////////////////
+
+    // world point -> world character point -> buffer point -> screen point
+    //       ↓                 ↓                    ↓               ↓
+    // world square   world_character square   buffer square   screen square
+
+    pub fn world_character_point_to_buffer_point(
+        &self,
+        world_character_point: WorldCharacterPoint,
+    ) -> BufferPoint {
+        // buffer indexes from 0, and the y axis goes top to bottom
+        // world indexes from 0, origin at bottom left
+        point2(
+            world_character_point.x,
+            self.terminal_height as f32 - (world_character_point.y + 1.0),
+        )
+    }
+
+    pub fn world_character_square_to_buffer_square(
+        &self,
+        world_character_square: Point2D<i32, CharacterGridInWorldFrame>,
+    ) -> Point2D<i32, CharacterGridInBufferFrame> {
+        self.world_character_point_to_buffer_point(world_character_square.to_f32())
+            .round()
+            .to_i32()
+    }
+
     pub fn world_square_to_left_buffer_square(
         &self,
-        world_position: Square,
+        world_position: WorldSquare,
     ) -> Point2D<i32, CharacterGridInBufferFrame> {
         self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
 
-    pub fn world_square_to_left_screen_square(
-        &self,
-        world_position: Square,
-    ) -> Point2D<i32, CharacterGridInScreenFrame> {
-        // terminal indexes from 1, and the y axis goes top to bottom
-        // world indexes from 0, origin at bottom left
-        point2(
-            world_position.x * 2 + 1,
-            self.terminal_height as i32 - world_position.y,
-        )
+    pub fn world_point_to_buffer_point(&self, world_point: WorldPoint) -> BufferPoint {
+        self.world_character_point_to_buffer_point(Glyph::world_point_to_world_character_point(
+            world_point,
+        ))
     }
 
-    pub fn world_pos_to_exact_screen_pos(
+    pub fn world_square_to_buffer_square(
         &self,
-        world_position: Point2D<f32, SquareGridInWorldFrame>,
-    ) -> Point2D<f32, CharacterGridInScreenFrame> {
-        // terminal indexes from 1, and the y axis goes top to bottom
-        // world indexes from 0, origin at bottom left
-        point2(
-            world_position.x * 2.0 + 1.5,
-            self.terminal_height as f32 - world_position.y,
-        )
+        world_position: WorldSquare,
+    ) -> Point2D<i32, CharacterGridInBufferFrame> {
+        self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
+    }
+
+    pub fn buffer_point_to_screen_point(buffer_point: BufferPoint) -> ScreenPoint {
+        // Buffer indexes from 0
+        // Screen indexes from 1
+        point2(buffer_point.x + 1.0, buffer_point.y + 1.0)
+    }
+
+    pub fn buffer_square_to_screen_square(
+        &self,
+        buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
+    ) -> Point2D<i32, CharacterGridInScreenFrame> {
+        // Terminal indexes from 1, and the y axis goes top to bottom
+        // The screen buffer indexes from 0, but the y axis also goes top to bottom
+        // End result is just an off-by-one offset on both axes
+        point2(buffer_pos.x + 1, buffer_pos.y + 1)
     }
 
     pub fn screen_square_to_buffer_square(
@@ -114,32 +158,33 @@ impl Graphics {
         // End result is just an off-by-one offset on both axes
         point2(screen_pos.x - 1, screen_pos.y - 1)
     }
-    pub fn buffer_square_to_screen_square(
+
+    pub fn world_point_to_screen_point(
         &self,
-        buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
-    ) -> Point2D<i32, CharacterGridInScreenFrame> {
-        // Terminal indexes from 1, and the y axis goes top to bottom
-        // The screen buffer indexes from 0, but the y axis also goes top to bottom
-        // End result is just an off-by-one offset on both axes
-        point2(buffer_pos.x + 1, buffer_pos.y + 1)
-    }
-    pub fn world_square_to_buffer_character_square(
-        &self,
-        world_position: Square,
-    ) -> Point2D<i32, CharacterGridInBufferFrame> {
-        self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
+        world_position: Point2D<f32, SquareGridInWorldFrame>,
+    ) -> Point2D<f32, CharacterGridInScreenFrame> {
+        // terminal indexes from 1, and the y axis goes top to bottom
+        // world indexes from 0, origin at bottom left
+        Graphics::buffer_point_to_screen_point(self.world_character_point_to_buffer_point(
+            Glyph::world_point_to_world_character_point(world_position),
+        ))
     }
 
-    pub fn world_character_square_to_buffer_character_square(
+    pub fn world_square_to_left_screen_square(
         &self,
-        world_character_square: Point2D<i32, CharacterGridInWorldFrame>,
-    ) -> Point2D<i32, CharacterGridInBufferFrame> {
-        let point_in_screen_space = self.world_pos_to_exact_screen_pos(
-            Glyph::character_world_pos_to_exact_world_pos(world_character_square.to_f32()),
-        );
-        let screen_square = point_in_screen_space.round().to_i32();
-        self.screen_square_to_buffer_square(screen_square)
+        world_position: WorldSquare,
+    ) -> Point2D<i32, CharacterGridInScreenFrame> {
+        // terminal indexes from 1, and the y axis goes top to bottom
+        // world indexes from 0, origin at bottom left
+        point2(
+            world_position.x * 2 + 1,
+            self.terminal_height as i32 - world_position.y,
+        )
     }
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // CONVERSIONS END
+    ////////////////////////////////////////////////////////////////////////////////
 
     fn braille_bresenham_line_points(
         start_pos: Point2D<f32, SquareGridInWorldFrame>,
@@ -153,10 +198,10 @@ impl Graphics {
             .collect()
     }
 
-    fn count_braille_dots_in_square(&self, square: Square) -> i32 {
+    fn count_braille_dots_in_square(&self, square: WorldSquare) -> i32 {
         return if self.square_is_on_screen(square) {
             Glyph::count_braille_dots(
-                self.get_buffered_glyph(self.world_square_to_buffer_character_square(square))
+                self.get_buffered_glyph(self.world_square_to_buffer_square(square))
                     .character,
             )
         } else {
@@ -164,28 +209,24 @@ impl Graphics {
         };
     }
 
-    fn draw_visual_braille_point(
-        &mut self,
-        pos: Point2D<f32, SquareGridInWorldFrame>,
-        color: ColorName,
-    ) {
-        self.draw_visual_braille_line(pos, pos, color);
+    fn draw_braille_point(&mut self, pos: Point2D<f32, SquareGridInWorldFrame>, color: ColorName) {
+        self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_visual_braille_line(
+    fn draw_braille_line(
         &mut self,
         start_pos: Point2D<f32, SquareGridInWorldFrame>,
         end_pos: Point2D<f32, SquareGridInWorldFrame>,
         color: ColorName,
     ) {
-        let start_char = Glyph::world_pos_to_character_world_pos(start_pos);
-        let end_char = Glyph::world_pos_to_character_world_pos(end_pos);
+        let start_char = Glyph::world_point_to_world_character_point(start_pos);
+        let end_char = Glyph::world_point_to_world_character_point(end_pos);
         let map_of_line_glyphs =
             Glyph::get_glyphs_for_colored_braille_line(start_char, end_char, color);
 
         for (world_character_square, new_glyph) in map_of_line_glyphs {
             let buffer_character_square =
-                self.world_character_square_to_buffer_character_square(world_character_square);
+                self.world_character_square_to_buffer_square(world_character_square);
             if !self.world_character_is_on_screen(world_character_square) {
                 continue;
             }
@@ -221,8 +262,8 @@ impl Graphics {
         }
     }
 
-    pub fn get_buffered_glyphs_for_square(&self, world_pos: Square) -> (Glyph, Glyph) {
-        let buffer_pos = self.world_square_to_buffer_character_square(world_pos);
+    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> (Glyph, Glyph) {
+        let buffer_pos = self.world_square_to_buffer_square(world_pos);
         (
             self.get_buffered_glyph(buffer_pos).clone(),
             self.get_buffered_glyph(buffer_pos + RIGHT_I.cast_unit())
@@ -303,14 +344,14 @@ impl Graphics {
         get_by_point(&self.output_on_screen, buffer_pos).character
     }
 
-    pub fn draw_player(&mut self, world_pos: Square, faced_direction: Step) {
+    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: Step) {
         self.draw_glyphs_at_square(
             world_pos,
             Glyph::get_glyphs_for_player(world_pos, faced_direction),
         );
     }
 
-    pub fn draw_glyphs_at_square(&mut self, world_pos: Square, glyphs: (Glyph, Glyph)) {
+    pub fn draw_glyphs_at_square(&mut self, world_pos: WorldSquare, glyphs: (Glyph, Glyph)) {
         if !self.square_is_on_screen(world_pos) {
             panic!(
                 "Tried to draw square off screen: {}",
@@ -330,11 +371,40 @@ impl Graphics {
         self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize] = glyph;
     }
 
-    pub fn draw_piece(&mut self, piece: Piece, pos: Square) {
+    pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
         self.draw_string(self.world_square_to_left_screen_square(pos), "Pa");
     }
-    pub fn draw_laser(&mut self, start: Square, end: Square) {
-        self.draw_visual_braille_line(start.to_f32(), end.to_f32(), ColorName::Red);
+
+    pub fn add_laser(&mut self, start: WorldPoint, end: WorldPoint) {
+        self.lasers.push(Laser {
+            start,
+            end,
+            age: Duration::from_millis(0),
+        });
+    }
+
+    pub fn draw_laser(&mut self, start: WorldPoint, end: WorldPoint) {
+        self.draw_braille_line(start, end, ColorName::Red);
+    }
+
+    pub fn draw_all_lasers(&mut self, delta: Duration) {
+        let mut lines_to_draw: Vec<(WorldPoint, WorldPoint)> = vec![];
+
+        for mut laser in &mut self.lasers {
+            lines_to_draw.push((laser.start, laser.end));
+            laser.age += delta;
+        }
+
+        for (start, end) in lines_to_draw {
+            self.draw_laser(start, end);
+        }
+
+        self.cull_dead_lasers();
+    }
+
+    fn cull_dead_lasers(&mut self) {
+        self.lasers
+            .drain_filter(|laser| laser.age > Duration::from_millis(500));
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
@@ -408,12 +478,12 @@ mod tests {
     #[test]
     fn test_draw_diagonal_braille_line() {
         let mut g = Graphics::new(40, 20);
-        let line_start = Square::new(2, 2);
-        let line_end = Square::new(7, 7);
+        let line_start = WorldSquare::new(2, 2);
+        let line_end = WorldSquare::new(7, 7);
 
-        g.draw_laser(line_start, line_end);
+        g.draw_laser(line_start.to_f32(), line_end.to_f32());
 
-        let test_square = Square::new(4, 4);
+        let test_square = WorldSquare::new(4, 4);
 
         let (glyph_left, glyph_right) = g.get_buffered_glyphs_for_square(test_square);
         //g.print_output_buffer();

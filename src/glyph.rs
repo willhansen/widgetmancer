@@ -348,7 +348,7 @@ impl Glyph {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, ColorName::White)
     }
 
-    pub fn get_glyphs_for_player(world_pos: Square, faced_direction: Step) -> (Glyph, Glyph) {
+    pub fn get_glyphs_for_player(world_pos: WorldSquare, faced_direction: Step) -> (Glyph, Glyph) {
         let mut arrow_step_map: HashMap<Step, char> = HashMap::new();
 
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
@@ -386,13 +386,13 @@ impl Glyph {
         point2((pos.x - 0.5) / 2.0, (pos.y - 1.5) / 4.0)
     }
 
-    pub fn world_pos_to_character_world_pos(
+    pub fn world_point_to_world_character_point(
         pos: Point2D<f32, SquareGridInWorldFrame>,
     ) -> Point2D<f32, CharacterGridInWorldFrame> {
         point2(pos.x * 2.0 + 0.5, pos.y)
     }
 
-    pub fn character_world_pos_to_exact_world_pos(
+    pub fn world_character_point_to_world_point(
         pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> Point2D<f32, SquareGridInWorldFrame> {
         point2((pos.x - 0.5) / 2.0, pos.y)
@@ -401,7 +401,7 @@ impl Glyph {
     pub fn world_pos_to_braille_pos(
         pos: Point2D<f32, SquareGridInWorldFrame>,
     ) -> Point2D<f32, BrailleGridInWorldFrame> {
-        Glyph::character_world_pos_to_braille_pos(Glyph::world_pos_to_character_world_pos(pos))
+        Glyph::character_world_pos_to_braille_pos(Glyph::world_point_to_world_character_point(pos))
     }
 
     pub fn braille_square_to_dot_in_character(
@@ -931,16 +931,16 @@ mod tests {
     fn test_world_pos_to_character_world_pos() {
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
-            Glyph::world_pos_to_character_world_pos(Point2D::<f32, SquareGridInWorldFrame>::new(
-                0.0, 0.0,
-            )),
+            Glyph::world_point_to_world_character_point(
+                Point2D::<f32, SquareGridInWorldFrame>::new(0.0, 0.0,)
+            ),
             "zero is actually between two characters"
         );
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
-            Glyph::world_pos_to_character_world_pos(Point2D::<f32, SquareGridInWorldFrame>::new(
-                1.0, 1.0,
-            )),
+            Glyph::world_point_to_world_character_point(
+                Point2D::<f32, SquareGridInWorldFrame>::new(1.0, 1.0,)
+            ),
             "diagonal a bit"
         );
     }

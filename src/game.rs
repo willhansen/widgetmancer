@@ -9,15 +9,9 @@ use line_drawing::Point;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, Square,
-    SquareGridInWorldFrame, SquareList, Step, LEFT_I,
+    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, SquareGridInWorldFrame,
+    SquareList, Step, WorldSquare, LEFT_I,
 };
-
-pub struct Laser {
-    start: Square,
-    end: Square,
-    age: Duration,
-}
 
 pub struct Game {
     board_width: usize,
@@ -26,12 +20,11 @@ pub struct Game {
     //step_foes: Vec<StepFoe>,
     pub(crate) running: bool,
     // set false to quit
-    player_position: Square,
+    player_position: WorldSquare,
     player_faced_direction: Step,
     player_is_dead: bool,
     graphics: Graphics,
-    pieces: HashMap<Square, Piece>,
-    lasers: Vec<Laser>,
+    pieces: HashMap<WorldSquare, Piece>,
 }
 
 impl Game {
@@ -47,7 +40,6 @@ impl Game {
             player_is_dead: false,
             graphics: Graphics::new(terminal_width, terminal_height),
             pieces: HashMap::new(),
-            lasers: vec![],
         }
     }
 
@@ -74,7 +66,7 @@ impl Game {
         self.board_height() as i32 - 1
     }
 
-    fn square_is_on_board(&self, pos: Square) -> bool {
+    fn square_is_on_board(&self, pos: WorldSquare) -> bool {
         pos.x >= 0
             && pos.x < self.board_width() as i32
             && pos.y >= 0
@@ -91,11 +83,11 @@ impl Game {
         self.set_player_position(new_pos)
     }
 
-    pub fn player_position(&self) -> Square {
+    pub fn player_position(&self) -> WorldSquare {
         return self.player_position.clone();
     }
 
-    pub fn set_player_position(&mut self, pos: Square) -> Result<(), ()> {
+    pub fn set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
         if self.is_piece_at(pos) {
             self.capture_piece_at(pos);
         }
@@ -126,47 +118,31 @@ impl Game {
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, delta: Duration) {
         self.graphics.fill_output_buffer_with_checker();
-        self.graphics
-            .draw_player(self.player_position(), self.player_faced_direction());
         for (&square, &piece) in &self.pieces {
-            if !self.square_is_on_board(square) {
-                panic!("Found piece out of bounds: {}", point_to_string(square));
-            }
             self.graphics.draw_piece(piece, square);
         }
-        self.draw_lasers(delta);
+        self.graphics.draw_all_lasers(delta);
+        self.graphics
+            .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);
     }
 
-    fn draw_lasers(&mut self, delta: Duration) {
-        for mut laser in &mut self.lasers {
-            self.graphics.draw_laser(laser.start, laser.end);
-            laser.age += delta;
-        }
-        self.cull_dead_lasers();
-    }
-
-    fn cull_dead_lasers(&mut self) {
-        self.lasers
-            .drain_filter(|laser| laser.age > Duration::from_millis(500));
-    }
-
-    fn square_is_empty(&self, pos: Square) -> bool {
+    fn square_is_empty(&self, pos: WorldSquare) -> bool {
         (self.player_position != pos || self.player_is_dead) && !self.is_piece_at(pos)
     }
 
-    pub fn place_piece(&mut self, piece: Piece, square: Square) -> Result<(), ()> {
+    pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) -> Result<(), ()> {
         if !self.square_is_empty(square) || !self.square_is_on_board(square) {
             return Err(());
         }
         self.pieces.insert(square, piece);
         Ok(())
     }
-    pub fn get_piece_at(&self, square: Square) -> Option<&Piece> {
+    pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
         self.pieces.get(&square)
     }
 
-    pub fn is_piece_at(&self, square: Square) -> bool {
+    pub fn is_piece_at(&self, square: WorldSquare) -> bool {
         self.get_piece_at(square).is_some()
     }
 
@@ -178,7 +154,7 @@ impl Game {
     }
 
     pub fn move_all_pieces(&mut self) {
-        let mut moved_piece_locations = HashSet::<Square>::new();
+        let mut moved_piece_locations = HashSet::<WorldSquare>::new();
         let piece_start_locations: SquareList = self.pieces.keys().cloned().collect();
         for piece_square in piece_start_locations {
             // already moved this one
@@ -191,7 +167,7 @@ impl Game {
         }
     }
 
-    fn move_piece(&mut self, start: Square, end: Square) {
+    fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
         if !self.is_piece_at(start) {
             panic!("No piece at {}", point_to_string(start));
         }
@@ -204,7 +180,7 @@ impl Game {
     }
 
     // returns where the piece moves to, if applicable
-    pub fn move_piece_at(&mut self, pos: Square) -> Option<Square> {
+    pub fn move_piece_at(&mut self, pos: WorldSquare) -> Option<WorldSquare> {
         if !self.is_piece_at(pos) {
             return None;
         }
@@ -212,7 +188,7 @@ impl Game {
         let piece = self.get_piece_at(pos).unwrap().clone();
 
         // want to capture the player
-        let capture_option: Option<Square> = piece
+        let capture_option: Option<WorldSquare> = piece
             .get_relative_capture_steps()
             .into_iter()
             .map(|step| pos + step)
@@ -225,7 +201,7 @@ impl Game {
         }
 
         // want to move closer to player
-        let move_option: Option<Square> = piece
+        let move_option: Option<WorldSquare> = piece
             .relative_move_steps()
             .into_iter()
             .map(|step| pos + step)
@@ -246,18 +222,15 @@ impl Game {
         let line_end = line_start + self.player_faced_direction() * range;
 
         for (x, y) in line_drawing::Bresenham::new(line_start.to_tuple(), line_end.to_tuple()) {
-            let square = Square::new(x, y);
+            let square = WorldSquare::new(x, y);
             self.capture_piece_at(square).ok();
         }
 
-        self.lasers.push(Laser {
-            start: line_start,
-            end: line_end,
-            age: Duration::from_millis(0),
-        });
+        self.graphics
+            .add_laser(line_start.to_f32(), line_end.to_f32());
     }
 
-    pub fn capture_piece_at(&mut self, square: Square) -> Result<(), ()> {
+    pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
         if !self.square_is_on_board(square) || !self.is_piece_at(square) {
             return Err(());
         }

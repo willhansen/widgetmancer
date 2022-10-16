@@ -19,10 +19,21 @@ pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;
 pub type FVector = default::Vector2D<f32>;
 
-pub type Square = Point2D<i32, SquareGridInWorldFrame>;
+pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
+pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
+
 pub type Step = Vector2D<i32, SquareGridInWorldFrame>;
 pub type SquareList = Vec<Point2D<i32, SquareGridInWorldFrame>>;
 pub type StepList = Vec<Vector2D<i32, SquareGridInWorldFrame>>;
+
+pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
+pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
+
+pub type BufferSquare = Point2D<i32, CharacterGridInBufferFrame>;
+pub type BufferPoint = Point2D<f32, CharacterGridInBufferFrame>;
+
+pub type ScreenSquare = Point2D<i32, CharacterGridInScreenFrame>;
+pub type ScreenPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);
