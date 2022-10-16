@@ -33,6 +33,16 @@ fn test_player_drawn_to_screen() {
 }
 
 #[test]
+fn test_player_is_green() {
+    let mut game = make_game();
+    let start_pos = game.player_position();
+    game.draw_headless(Duration::from_millis(100));
+    let graphics = game.borrow_graphics_mut();
+    let drawn_glyphs = graphics.get_buffered_glyphs_for_square(start_pos);
+    assert_eq!(drawn_glyphs.0.fg_color, ColorName::Green);
+}
+
+#[test]
 fn test_player_can_not_move_off_low_edge() {
     let mut game = make_game();
     let start_pos = point2(0, 0);

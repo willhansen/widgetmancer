@@ -368,10 +368,13 @@ impl Glyph {
             arrow_step_map.insert(*king_steps_in_arrow_order.get(i).unwrap(), arrow_char);
         }
 
-        return (
+        let mut glyphs = (
             Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
             Glyph::from_char(' '),
         );
+        glyphs.0.fg_color = ColorName::Green;
+
+        glyphs
     }
 
     pub fn character_world_pos_to_braille_pos(
