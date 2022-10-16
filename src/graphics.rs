@@ -250,15 +250,22 @@ impl Graphics {
             }
         }
     }
-    pub fn fill_output_buffer_with_checker(&mut self) {
-        for x in 0..self.terminal_width as usize {
-            for y in 0..self.terminal_height as usize {
+    pub fn draw_empty_board(&mut self, width: usize, height: usize) {
+        for x in 0..width {
+            for y in 0..height {
                 let mut glyph = Glyph::from_char(' ');
-                if (x / 2 + y) % 2 == 0 {
-                    swap(&mut glyph.bg_color, &mut glyph.fg_color);
-                }
-                self.output_buffer[x][y] = glyph;
+                let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
+                glyph.bg_color = Graphics::board_color_at_square(world_square);
+                self.draw_glyphs_at_square(world_square, (glyph, glyph));
             }
+        }
+    }
+
+    pub fn board_color_at_square(square: WorldSquare) -> ColorName {
+        if (square.x + square.y) % 2 == 0 {
+            ColorName::White
+        } else {
+            ColorName::Black
         }
     }
 
@@ -345,10 +352,11 @@ impl Graphics {
     }
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: Step) {
-        self.draw_glyphs_at_square(
-            world_pos,
-            Glyph::get_glyphs_for_player(world_pos, faced_direction),
-        );
+        let mut player_glyphs = Glyph::get_glyphs_for_player(world_pos, faced_direction);
+        let square_color = Graphics::board_color_at_square(world_pos);
+        player_glyphs.0.bg_color = square_color;
+        player_glyphs.1.bg_color = square_color;
+        self.draw_glyphs_at_square(world_pos, player_glyphs);
     }
 
     pub fn draw_glyphs_at_square(&mut self, world_pos: WorldSquare, glyphs: (Glyph, Glyph)) {

@@ -117,7 +117,8 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, delta: Duration) {
-        self.graphics.fill_output_buffer_with_checker();
+        self.graphics
+            .draw_empty_board(self.board_width, self.board_height);
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }

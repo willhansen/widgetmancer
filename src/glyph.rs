@@ -33,6 +33,7 @@ pub fn quarter_block_by_offset(half_steps: IVector) -> char {
 pub enum ColorName {
     Red,
     Green,
+    LightGreen,
     Blue,
     LightBlue,
     Cyan,
@@ -91,6 +92,7 @@ impl Glyph {
         match color_name {
             ColorName::Red => color::Fg(color::Red).to_string(),
             ColorName::Green => color::Fg(color::Green).to_string(),
+            ColorName::LightGreen => color::Fg(color::LightGreen).to_string(),
             ColorName::Blue => color::Fg(color::Blue).to_string(),
             ColorName::LightBlue => color::Fg(color::LightBlue).to_string(),
             ColorName::Cyan => color::Fg(color::Cyan).to_string(),
@@ -105,6 +107,7 @@ impl Glyph {
         match color_name {
             ColorName::Red => color::Bg(color::Red).to_string(),
             ColorName::Green => color::Bg(color::Green).to_string(),
+            ColorName::LightGreen => color::Fg(color::LightGreen).to_string(),
             ColorName::Blue => color::Bg(color::Blue).to_string(),
             ColorName::LightBlue => color::Bg(color::LightBlue).to_string(),
             ColorName::Cyan => color::Bg(color::Cyan).to_string(),

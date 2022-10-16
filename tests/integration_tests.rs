@@ -33,16 +33,6 @@ fn test_player_drawn_to_screen() {
 }
 
 #[test]
-fn test_player_is_green() {
-    let mut game = make_game();
-    let start_pos = game.player_position();
-    game.draw_headless(Duration::from_millis(100));
-    let graphics = game.borrow_graphics_mut();
-    let drawn_glyphs = graphics.get_buffered_glyphs_for_square(start_pos);
-    assert_eq!(drawn_glyphs.0.fg_color, ColorName::Green);
-}
-
-#[test]
 fn test_player_can_not_move_off_low_edge() {
     let mut game = make_game();
     let start_pos = point2(0, 0);
@@ -76,29 +66,31 @@ fn test_player_can_not_move_off_high_edge() {
 #[test]
 fn test_checkerboard_background() {
     let mut game = make_game();
+    game.set_player_position(point2(0, 0)).expect("move player"); // out of the way
 
     game.draw_headless(Duration::from_millis(100));
 
     let graphics = game.borrow_graphics_mut();
 
-    let base_point = point2(0, 0);
+    let start_square = WorldSquare::new(5, 5);
+    let left_square = start_square + LEFT_I.cast_unit();
+    let up_square = start_square + UP_I.cast_unit();
 
-    let steps = vec![RIGHT_I, UP_I];
+    let start_square_glyphs = graphics.get_buffered_glyphs_for_square(start_square);
+    let left_square_glyphs = graphics.get_buffered_glyphs_for_square(left_square);
+    let up_square_glyphs = graphics.get_buffered_glyphs_for_square(up_square);
 
-    for step in steps {
-        assert_eq!(
-            graphics.get_buffered_glyphs_for_square(base_point),
-            graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 2)
-        );
-        assert_ne!(
-            graphics.get_buffered_glyphs_for_square(base_point),
-            graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 1)
-        );
-        assert_eq!(
-            graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 1),
-            graphics.get_buffered_glyphs_for_square(base_point + step.cast_unit() * 3)
-        );
-    }
+    // same color within square
+    assert_eq!(start_square_glyphs.0, start_square_glyphs.1);
+    assert_eq!(left_square_glyphs.0, left_square_glyphs.1);
+    assert_eq!(up_square_glyphs.0, up_square_glyphs.1);
+
+    assert_eq!(left_square_glyphs, up_square_glyphs);
+
+    assert_ne!(
+        start_square_glyphs.0.bg_color,
+        left_square_glyphs.0.bg_color
+    );
 }
 
 #[test]
@@ -210,4 +202,30 @@ fn test_visible_laser() {
         .get_buffered_glyphs_for_square(inspection_square);
 
     assert_eq!(drawn_glyphs.0.fg_color, ColorName::Red);
+}
+
+#[test]
+fn test_player_background_is_transparent() {
+    let mut game = make_game();
+    let inspection_square: WorldSquare = game.player_position();
+
+    game.draw_headless(Duration::from_millis(100));
+
+    let drawn_glyphs_at_pos_1 = game
+        .borrow_graphics_mut()
+        .get_buffered_glyphs_for_square(inspection_square);
+
+    game.move_player(RIGHT_I.cast_unit()).expect("move player");
+    game.draw_headless(Duration::from_millis(100));
+
+    let inspection_square: WorldSquare = game.player_position();
+    let drawn_glyphs_at_pos_2 = game
+        .borrow_graphics_mut()
+        .get_buffered_glyphs_for_square(inspection_square);
+
+    // one horizontal step -> different checker color
+    assert_ne!(
+        drawn_glyphs_at_pos_1.0.bg_color,
+        drawn_glyphs_at_pos_2.0.bg_color
+    );
 }
