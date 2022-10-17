@@ -4,10 +4,16 @@ use std::collections::HashMap;
 use euclid::*;
 use euclid::{point2, vec2};
 use line_drawing::Point;
+use rgb::*;
 use termion::color;
 
 use crate::utility::sign;
 use crate::utility::*;
+
+pub const GREEN: RGB8 = RGB8::new(0, 128, 0);
+pub const RED: RGB8 = RGB8::new(255, 0, 0);
+pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
+pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -30,43 +36,34 @@ pub fn quarter_block_by_offset(half_steps: IVector) -> char {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
-pub enum ColorName {
-    Red,
-    Green,
-    LightGreen,
-    Blue,
-    LightBlue,
-    Cyan,
-    LightCyan,
-    Black,
-    White,
-    Reset,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct Glyph {
     pub character: char,
-    pub fg_color: ColorName,
-    pub bg_color: ColorName,
+    pub fg_color: RGB8,
+    pub bg_color: RGB8,
 }
 
 impl Glyph {
     pub fn to_string(&self) -> String {
         let mut output = self.character.to_string();
-        //if self.fg_color != ColorName::White {
         output = format!(
             "{}{}{}",
-            Glyph::fg_color_from_name(self.fg_color),
+            color::Fg(color::Rgb(
+                self.fg_color.r,
+                self.fg_color.g,
+                self.fg_color.b
+            )),
             output,
-            Glyph::fg_color_from_name(ColorName::White),
+            color::Fg(color::Reset),
         );
-        //}
-        //if self.bg_color != ColorName::Black {
         output = format!(
             "{}{}{}",
-            Glyph::bg_color_from_name(self.bg_color),
+            color::Bg(color::Rgb(
+                self.bg_color.r,
+                self.bg_color.g,
+                self.bg_color.b
+            )),
             output,
-            Glyph::bg_color_from_name(ColorName::Black),
+            color::Bg(color::Reset),
         );
         //}
         return output;
@@ -75,57 +72,23 @@ impl Glyph {
     pub fn from_char(character: char) -> Glyph {
         Glyph {
             character,
-            fg_color: ColorName::White,
-            bg_color: ColorName::Black,
+            fg_color: WHITE,
+            bg_color: BLACK,
         }
     }
 
     pub fn reset_colors() -> String {
-        format!(
-            "{}{}",
-            Glyph::fg_color_from_name(ColorName::Reset),
-            Glyph::bg_color_from_name(ColorName::Reset)
-        )
-    }
-
-    pub fn fg_color_from_name(color_name: ColorName) -> String {
-        match color_name {
-            ColorName::Red => color::Fg(color::Red).to_string(),
-            ColorName::Green => color::Fg(color::Green).to_string(),
-            ColorName::LightGreen => color::Fg(color::LightGreen).to_string(),
-            ColorName::Blue => color::Fg(color::Blue).to_string(),
-            ColorName::LightBlue => color::Fg(color::LightBlue).to_string(),
-            ColorName::Cyan => color::Fg(color::Cyan).to_string(),
-            ColorName::LightCyan => color::Fg(color::LightCyan).to_string(),
-            ColorName::White => color::Fg(color::White).to_string(),
-            ColorName::Black => color::Fg(color::Black).to_string(),
-            ColorName::Reset => color::Fg(color::Reset).to_string(),
-        }
-    }
-
-    pub fn bg_color_from_name(color_name: ColorName) -> String {
-        match color_name {
-            ColorName::Red => color::Bg(color::Red).to_string(),
-            ColorName::Green => color::Bg(color::Green).to_string(),
-            ColorName::LightGreen => color::Fg(color::LightGreen).to_string(),
-            ColorName::Blue => color::Bg(color::Blue).to_string(),
-            ColorName::LightBlue => color::Bg(color::LightBlue).to_string(),
-            ColorName::Cyan => color::Bg(color::Cyan).to_string(),
-            ColorName::LightCyan => color::Bg(color::LightCyan).to_string(),
-            ColorName::White => color::Bg(color::White).to_string(),
-            ColorName::Black => color::Bg(color::Black).to_string(),
-            ColorName::Reset => color::Bg(color::Reset).to_string(),
-        }
+        format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
 
     #[allow(dead_code)]
     pub fn square_with_horizontal_offset(fraction_of_square_offset: f32) -> Glyph {
-        Glyph::colored_square_with_horizontal_offset(fraction_of_square_offset, ColorName::White)
+        Glyph::colored_square_with_horizontal_offset(fraction_of_square_offset, WHITE)
     }
 
     pub fn colored_square_with_horizontal_offset(
         fraction_of_square_offset: f32,
-        color_name: ColorName,
+        color: RGB8,
     ) -> Glyph {
         let offset_in_eighths_rounded_towards_inf = (fraction_of_square_offset * 8.0).ceil() as i32;
         assert!(offset_in_eighths_rounded_towards_inf.abs() <= 8);
@@ -133,27 +96,24 @@ impl Glyph {
             Glyph {
                 character: EIGHTH_BLOCKS_FROM_LEFT
                     [(8 + offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: color_name,
-                bg_color: ColorName::Black,
+                fg_color: color,
+                bg_color: BLACK,
             }
         } else {
             Glyph {
                 character: EIGHTH_BLOCKS_FROM_LEFT[offset_in_eighths_rounded_towards_inf as usize],
-                fg_color: ColorName::Black,
-                bg_color: color_name,
+                fg_color: BLACK,
+                bg_color: color,
             }
         };
     }
     #[allow(dead_code)]
     pub fn square_with_vertical_offset(fraction_of_square_offset: f32) -> Glyph {
-        return Glyph::colored_square_with_vertical_offset(
-            fraction_of_square_offset,
-            ColorName::White,
-        );
+        return Glyph::colored_square_with_vertical_offset(fraction_of_square_offset, WHITE);
     }
     pub fn colored_square_with_vertical_offset(
         fraction_of_square_offset: f32,
-        color_name: ColorName,
+        color: RGB8,
     ) -> Glyph {
         let offset_in_eighths_rounded_towards_inf = (fraction_of_square_offset * 8.0).ceil() as i32;
         assert!(offset_in_eighths_rounded_towards_inf.abs() <= 8);
@@ -161,35 +121,35 @@ impl Glyph {
             Glyph {
                 character: EIGHTH_BLOCKS_FROM_BOTTOM
                     [(8 + offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: color_name,
-                bg_color: ColorName::Black,
+                fg_color: color,
+                bg_color: BLACK,
             }
         } else {
             Glyph {
                 character: EIGHTH_BLOCKS_FROM_BOTTOM
                     [(offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: ColorName::Black,
-                bg_color: color_name,
+                fg_color: BLACK,
+                bg_color: color,
             }
         };
     }
-    pub fn colored_square_with_half_step_offset(offset: FVector, color_name: ColorName) -> Glyph {
+    pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
         Glyph {
             character: quarter_block_by_offset(step),
-            fg_color: color_name,
-            bg_color: ColorName::Black,
+            fg_color: color,
+            bg_color: BLACK,
         }
     }
 
     #[allow(dead_code)]
     pub fn get_glyphs_for_floating_square(pos: FPoint) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_glyphs_for_colored_floating_square(pos, ColorName::White)
+        Glyph::get_glyphs_for_colored_floating_square(pos, WHITE)
     }
 
     pub fn get_glyphs_for_colored_floating_square(
         pos: FPoint,
-        color: ColorName,
+        color: RGB8,
     ) -> Vec<Vec<Option<Glyph>>> {
         let grid_offset = fraction_part(pos);
         let x_offset = grid_offset.x;
@@ -206,12 +166,12 @@ impl Glyph {
     pub fn get_smooth_horizontal_glyphs_for_floating_square(
         pos: FPoint,
     ) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, ColorName::White)
+        Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, WHITE)
     }
 
     pub fn get_smooth_horizontal_glyphs_for_colored_floating_square(
         pos: FPoint,
-        color: ColorName,
+        color: RGB8,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
         let mut output = vec![vec![None; width]; width];
@@ -236,11 +196,11 @@ impl Glyph {
     }
     #[allow(dead_code)]
     pub fn get_smooth_vertical_glyphs_for_floating_square(pos: FPoint) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, ColorName::White)
+        Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, WHITE)
     }
     pub fn get_smooth_vertical_glyphs_for_colored_floating_square(
         pos: FPoint,
-        color: ColorName,
+        color: RGB8,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
         let mut output = vec![vec![None; width]; width];
@@ -265,12 +225,12 @@ impl Glyph {
     pub fn get_half_grid_glyphs_for_floating_square(
         pos: default::Point2D<f32>,
     ) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, ColorName::White)
+        Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, WHITE)
     }
 
     pub fn get_half_grid_glyphs_for_colored_floating_square(
         pos: FPoint,
-        color: ColorName,
+        color: RGB8,
     ) -> Vec<Vec<Option<Glyph>>> {
         let width = 3;
         let mut output = vec![vec![None; width]; width];
@@ -348,10 +308,10 @@ impl Glyph {
         start_pos: Point2D<f32, CharacterGridInWorldFrame>,
         end_pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> HashMap<Point2D<i32, CharacterGridInWorldFrame>, Glyph> {
-        Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, ColorName::White)
+        Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 
-    pub fn get_glyphs_for_player(world_pos: WorldSquare, faced_direction: Step) -> (Glyph, Glyph) {
+    pub fn get_glyphs_for_player(faced_direction: Step) -> (Glyph, Glyph) {
         let mut arrow_step_map: HashMap<Step, char> = HashMap::new();
 
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
@@ -375,7 +335,7 @@ impl Glyph {
             Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
             Glyph::from_char(' '),
         );
-        glyphs.0.fg_color = ColorName::Green;
+        glyphs.0.fg_color = GREEN;
 
         glyphs
     }
@@ -428,7 +388,7 @@ impl Glyph {
     pub fn get_glyphs_for_colored_braille_line(
         start_pos: Point2D<f32, CharacterGridInWorldFrame>,
         end_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        color: ColorName,
+        color: RGB8,
     ) -> HashMap<Point2D<i32, CharacterGridInWorldFrame>, Glyph> {
         let mut glyph_map = HashMap::<Point2D<i32, CharacterGridInWorldFrame>, Glyph>::new();
 
@@ -451,7 +411,7 @@ impl Glyph {
                     Glyph {
                         character: Glyph::empty_braille(),
                         fg_color: color,
-                        bg_color: ColorName::Black,
+                        bg_color: BLACK,
                     },
                 );
             }
@@ -481,12 +441,12 @@ impl Glyph {
 
     pub fn character_world_pos_to_colored_braille_glyph(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        color: ColorName,
+        color: RGB8,
     ) -> Glyph {
         Glyph {
             character: Glyph::character_world_pos_to_braille_char(world_pos),
             fg_color: color,
-            bg_color: ColorName::Black,
+            bg_color: BLACK,
         }
     }
 }
@@ -500,68 +460,67 @@ mod tests {
     #[test]
     fn test_colored_square_with_half_step_offsets() {
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).character,
             quarter_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).fg_color,
-            ColorName::Red
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).fg_color,
+            RED
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), ColorName::Red).bg_color,
-            ColorName::Black
+            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).bg_color,
+            BLACK
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), RED).character,
             quarter_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), RED).character,
             quarter_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), RED).character,
             quarter_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), RED).character,
             quarter_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), RED).character,
             quarter_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), RED).character,
             quarter_block_by_offset(vec2(-1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), RED).character,
             quarter_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), RED).character,
             quarter_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), RED).character,
             quarter_block_by_offset(vec2(0, 1))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), ColorName::Red)
-                .character,
+            Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), RED).character,
             quarter_block_by_offset(vec2(-1, 1))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), RED).character,
             quarter_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), RED).character,
             quarter_block_by_offset(vec2(2, 0))
         );
         assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), ColorName::Red).character,
+            Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), RED).character,
             quarter_block_by_offset(vec2(1, -1))
         );
     }
@@ -917,7 +876,7 @@ mod tests {
         let points = [point2(0.0, 0.0), point2(-0.4, -0.4), point2(0.2, 0.4)];
         for p1 in points {
             assert_eq!(
-                Glyph::character_world_pos_to_colored_braille_glyph(p1, ColorName::Black).character,
+                Glyph::character_world_pos_to_colored_braille_glyph(p1, BLACK).character,
                 Glyph::character_world_pos_to_braille_char(p1)
             );
         }

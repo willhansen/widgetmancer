@@ -1,8 +1,8 @@
 use euclid::*;
 use pretty_assertions::{assert_eq, assert_ne};
+use rust_roguelike::glyph::RED;
 use std::time::Duration;
 
-use rust_roguelike::glyph::ColorName;
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
@@ -201,7 +201,7 @@ fn test_visible_laser() {
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(inspection_square);
 
-    assert_eq!(drawn_glyphs.0.fg_color, ColorName::Red);
+    assert_eq!(drawn_glyphs.0.fg_color, RED);
 }
 
 #[test]

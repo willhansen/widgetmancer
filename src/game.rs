@@ -9,7 +9,7 @@ use line_drawing::Point;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, round_to_king_step, ColorName, Glyph, IPoint, IVector, SquareGridInWorldFrame,
+    point_to_string, round_to_king_step, Glyph, IPoint, IVector, SquareGridInWorldFrame,
     SquareList, Step, WorldSquare, LEFT_I,
 };
 

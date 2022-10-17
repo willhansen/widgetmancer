@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use euclid::*;
 use line_drawing::Point;
+use rgb::RGB8;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
@@ -14,9 +15,9 @@ use termion::terminal_size;
 use crate::piece::Piece;
 use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
-    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, ColorName,
-    Game, Glyph, IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, Step, WorldCharacterPoint,
-    WorldPoint, WorldSquare, RIGHT_I,
+    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, Game, Glyph,
+    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, Step, WorldCharacterPoint, WorldPoint,
+    WorldSquare, BLACK, RED, RIGHT_I, WHITE,
 };
 
 pub struct Laser {
@@ -209,7 +210,7 @@ impl Graphics {
         };
     }
 
-    fn draw_braille_point(&mut self, pos: Point2D<f32, SquareGridInWorldFrame>, color: ColorName) {
+    fn draw_braille_point(&mut self, pos: Point2D<f32, SquareGridInWorldFrame>, color: RGB8) {
         self.draw_braille_line(pos, pos, color);
     }
 
@@ -217,7 +218,7 @@ impl Graphics {
         &mut self,
         start_pos: Point2D<f32, SquareGridInWorldFrame>,
         end_pos: Point2D<f32, SquareGridInWorldFrame>,
-        color: ColorName,
+        color: RGB8,
     ) {
         let start_char = Glyph::world_point_to_world_character_point(start_pos);
         let end_char = Glyph::world_point_to_world_character_point(end_pos);
@@ -261,11 +262,11 @@ impl Graphics {
         }
     }
 
-    pub fn board_color_at_square(square: WorldSquare) -> ColorName {
+    pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
         if (square.x + square.y) % 2 == 0 {
-            ColorName::White
+            WHITE
         } else {
-            ColorName::Black
+            BLACK
         }
     }
 
@@ -352,7 +353,7 @@ impl Graphics {
     }
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: Step) {
-        let mut player_glyphs = Glyph::get_glyphs_for_player(world_pos, faced_direction);
+        let mut player_glyphs = Glyph::get_glyphs_for_player(faced_direction);
         let square_color = Graphics::board_color_at_square(world_pos);
         player_glyphs.0.bg_color = square_color;
         player_glyphs.1.bg_color = square_color;
@@ -392,7 +393,7 @@ impl Graphics {
     }
 
     pub fn draw_laser(&mut self, start: WorldPoint, end: WorldPoint) {
-        self.draw_braille_line(start, end, ColorName::Red);
+        self.draw_braille_line(start, end, RED);
     }
 
     pub fn draw_all_lasers(&mut self, delta: Duration) {
@@ -496,6 +497,6 @@ mod tests {
         let (glyph_left, glyph_right) = g.get_buffered_glyphs_for_square(test_square);
         //g.print_output_buffer();
 
-        assert_eq!(glyph_left.fg_color, ColorName::Red);
+        assert_eq!(glyph_left.fg_color, RED);
     }
 }
