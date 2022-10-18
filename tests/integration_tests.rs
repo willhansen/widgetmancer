@@ -242,17 +242,17 @@ fn test_laser_background_is_transparent() {
 
     game.draw_headless(Duration::from_millis(100));
 
-    let test_point_A = left_point.round().to_i32() + RIGHT_I.cast_unit();
-    let test_point_B = test_point_A + RIGHT_I.cast_unit();
+    let test_point_a = left_point.round().to_i32() + RIGHT_I.cast_unit();
+    let test_point_b = test_point_a + RIGHT_I.cast_unit();
 
-    let glyphs_A = game
+    let glyphs_a = game
         .borrow_graphics_mut()
-        .get_buffered_glyphs_for_square(test_point_A);
-    let glyphs_B = game
+        .get_buffered_glyphs_for_square(test_point_a);
+    let glyphs_b = game
         .borrow_graphics_mut()
-        .get_buffered_glyphs_for_square(test_point_B);
+        .get_buffered_glyphs_for_square(test_point_b);
 
-    assert_ne!(glyphs_A.0.bg_color, glyphs_B.0.bg_color);
+    assert_ne!(glyphs_a.0.bg_color, glyphs_b.0.bg_color);
 }
 
 #[test]

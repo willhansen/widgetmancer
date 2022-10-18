@@ -1,6 +1,6 @@
 use euclid::point2;
 use rust_roguelike::game::Game;
-use rust_roguelike::piece::{Piece, PieceType};
+use rust_roguelike::piece::{Piece};
 use rust_roguelike::utility::{WorldSquare, LEFT_I, RIGHT_I, UP_I};
 
 pub fn make_game() -> Game {
