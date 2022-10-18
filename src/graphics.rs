@@ -1,12 +1,16 @@
 use std::borrow::Borrow;
 use std::cmp::min;
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use std::io::Write;
 use std::mem::swap;
+use std::ptr::hash;
 use std::time::Duration;
 
+use crate::num::ToPrimitive;
 use euclid::*;
 use line_drawing::Point;
+use rand::SeedableRng;
 use rgb::RGB8;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
@@ -20,19 +24,17 @@ use crate::{
     WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, RED, RIGHT_I, WHITE,
 };
 
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Laser {
     start: WorldPoint,
     end: WorldPoint,
     age: Duration,
 }
 
-// TODO
-pub struct Particle {
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub struct Explosion {
     position: WorldPoint,
-    velocity: WorldPoint,
-    acceleration: WorldPoint,
     age: Duration,
-    color: RGB8,
 }
 
 pub struct Graphics {
@@ -43,6 +45,7 @@ pub struct Graphics {
     terminal_width: u16,
     terminal_height: u16,
     lasers: Vec<Laser>,
+    explosions: Vec<Explosion>,
 }
 
 impl Graphics {
@@ -59,6 +62,7 @@ impl Graphics {
             terminal_width,
             terminal_height,
             lasers: vec![],
+            explosions: vec![],
         }
     }
 
@@ -406,12 +410,27 @@ impl Graphics {
         });
     }
 
-    pub fn add_explosion(&mut self, pos: WorldPoint) {
-        //TODO
+    pub fn add_explosion(&mut self, position: WorldPoint) {
+        self.explosions.push(Explosion {
+            position,
+            age: Duration::from_millis(0),
+        });
     }
 
     pub fn draw_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.draw_braille_line(start, end, RED);
+    }
+    pub fn draw_explosion(&mut self, explosion: &Explosion) {
+        // TODO: fix
+        let hash = ((explosion.position.x * PI + explosion.position.y) * 1000.0)
+            .abs()
+            .floor()
+            .to_u64()
+            .unwrap()
+            + explosion.age.as_micros().to_u64().unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
+
+        // TODO
     }
 
     pub fn draw_all_lasers(&mut self, delta: Duration) {
@@ -429,9 +448,25 @@ impl Graphics {
         self.cull_dead_lasers();
     }
 
+    pub fn draw_all_explosions(&mut self, delta: Duration) {
+        for mut explosion in &mut self.explosions {
+            explosion.age += delta;
+        }
+
+        for explosion in self.explosions.clone() {
+            self.draw_explosion(&explosion);
+        }
+
+        self.cull_dead_explosions();
+    }
+
     fn cull_dead_lasers(&mut self) {
         self.lasers
             .drain_filter(|laser| laser.age > Duration::from_millis(500));
+    }
+    fn cull_dead_explosions(&mut self) {
+        self.explosions
+            .drain_filter(|explosion| explosion.age > Duration::from_millis(500));
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
@@ -474,10 +509,11 @@ impl Graphics {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::RIGHT_I;
+
+    use super::*;
 
     #[test]
     fn test_world_to_screen() {
