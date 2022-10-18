@@ -256,7 +256,7 @@ fn test_laser_background_is_transparent() {
 }
 
 #[test]
-fn test_shotgun() {
+fn test_shotgun_spread() {
     let start_pawns = 5;
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
     game.player_shoot();
