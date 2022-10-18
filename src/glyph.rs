@@ -10,11 +10,11 @@ use termion::color;
 use crate::utility::sign;
 use crate::utility::*;
 
-pub const MID_GREEN: RGB8 = RGB8::new(0, 128, 0);
+pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
 pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
-pub const BOARD_WHITE: RGB8 = RGB8::new(200, 200, 180);
+pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
@@ -353,7 +353,7 @@ impl Glyph {
             Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
             Glyph::from_char(' '),
         ];
-        glyphs[0].fg_color = MID_GREEN;
+        glyphs[0].fg_color = PLAYER_GREEN;
 
         glyphs
     }
