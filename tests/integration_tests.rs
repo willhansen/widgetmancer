@@ -32,7 +32,7 @@ fn test_player_drawn_to_screen() {
     game.draw_headless(Duration::from_millis(100));
     let graphics = game.borrow_graphics_mut();
     let drawn_glyphs = graphics.get_buffered_glyphs_for_square(start_pos);
-    assert_ne!(drawn_glyphs.0.character, ' ');
+    assert_ne!(drawn_glyphs[0].character, ' ');
 }
 
 #[test]
@@ -84,15 +84,15 @@ fn test_checkerboard_background() {
     let up_square_glyphs = graphics.get_buffered_glyphs_for_square(up_square);
 
     // same color within square
-    assert_eq!(start_square_glyphs.0, start_square_glyphs.1);
-    assert_eq!(left_square_glyphs.0, left_square_glyphs.1);
-    assert_eq!(up_square_glyphs.0, up_square_glyphs.1);
+    assert_eq!(start_square_glyphs[0], start_square_glyphs[1]);
+    assert_eq!(left_square_glyphs[0], left_square_glyphs[1]);
+    assert_eq!(up_square_glyphs[0], up_square_glyphs[1]);
 
     assert_eq!(left_square_glyphs, up_square_glyphs);
 
     assert_ne!(
-        start_square_glyphs.0.bg_color,
-        left_square_glyphs.0.bg_color
+        start_square_glyphs[0].bg_color,
+        left_square_glyphs[0].bg_color
     );
 }
 
@@ -106,7 +106,7 @@ fn test_draw_placed_pawn() {
     let pawn_glyphs = game
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(one_left);
-    assert_ne!(pawn_glyphs.0.character, ' ', "There should be a ");
+    assert_ne!(pawn_glyphs[0].character, ' ', "There should be a ");
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn test_visible_laser() {
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(inspection_square);
 
-    assert_eq!(drawn_glyphs.0.fg_color, RED);
+    assert_eq!(drawn_glyphs[0].fg_color, RED);
 }
 
 #[test]
@@ -228,8 +228,8 @@ fn test_player_background_is_transparent() {
 
     // one horizontal step -> different checker color
     assert_ne!(
-        drawn_glyphs_at_pos_1.0.bg_color,
-        drawn_glyphs_at_pos_2.0.bg_color
+        drawn_glyphs_at_pos_1[0].bg_color,
+        drawn_glyphs_at_pos_2[0].bg_color
     );
 }
 
@@ -255,7 +255,7 @@ fn test_laser_background_is_transparent() {
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(test_point_b);
 
-    assert_ne!(glyphs_a.0.bg_color, glyphs_b.0.bg_color);
+    assert_ne!(glyphs_a[0].bg_color, glyphs_b[0].bg_color);
 }
 
 #[test]
@@ -272,7 +272,7 @@ fn test_pawn_background_is_transparent() {
 
     let pawn1_glyphs = gr.get_buffered_glyphs_for_square(square1);
     let pawn2_glyphs = gr.get_buffered_glyphs_for_square(square2);
-    assert_ne!(pawn1_glyphs.0.bg_color, pawn2_glyphs.0.bg_color,);
+    assert_ne!(pawn1_glyphs[0].bg_color, pawn2_glyphs[0].bg_color,);
 }
 
 #[test]
@@ -283,4 +283,19 @@ fn test_shotgun_spread() {
     let end_pawns = game.piece_type_count(PieceType::Pawn);
 
     assert!(end_pawns < start_pawns - 1);
+}
+
+#[test]
+fn test_particles_on_piece_death() {
+    let mut game = set_up_game_with_player_in_corner();
+    let pawn_square = point2(5, 5);
+    game.place_piece(Piece::pawn(), pawn_square)
+        .expect("place_pawn");
+    game.capture_piece_at(pawn_square).expect("capture pawn");
+    game.draw_headless(Duration::from_millis(0));
+
+    let graphics = game.borrow_graphics_mut();
+
+    let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
+    assert!(Glyph::is_braille(glyphs[0].character) || Glyph::is_braille(glyphs[1].character))
 }

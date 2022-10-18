@@ -282,13 +282,13 @@ impl Graphics {
         }
     }
 
-    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> (Glyph, Glyph) {
+    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> [Glyph; 2] {
         let buffer_pos = self.world_square_to_buffer_square(world_pos);
-        (
+        [
             self.get_buffered_glyph(buffer_pos).clone(),
             self.get_buffered_glyph(buffer_pos + RIGHT_I.cast_unit())
                 .clone(),
-        )
+        ]
     }
 
     fn get_buffered_glyph(&self, pos: Point2D<i32, CharacterGridInBufferFrame>) -> &Glyph {
@@ -406,6 +406,10 @@ impl Graphics {
         });
     }
 
+    pub fn add_explosion(&mut self, pos: WorldPoint) {
+        //TODO
+    }
+
     pub fn draw_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.draw_braille_line(start, end, RED);
     }
@@ -508,7 +512,7 @@ mod tests {
 
         let test_square = WorldSquare::new(4, 4);
 
-        let (glyph_left, glyph_right) = g.get_buffered_glyphs_for_square(test_square);
+        let [glyph_left, glyph_right] = g.get_buffered_glyphs_for_square(test_square);
         //g.print_output_buffer();
 
         assert_eq!(glyph_left.fg_color, RED);

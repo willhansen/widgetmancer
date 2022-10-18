@@ -89,7 +89,7 @@ impl Game {
 
     pub fn set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
         if self.is_piece_at(pos) {
-            self.capture_piece_at(pos);
+            self.capture_piece_at(pos).expect("capture failed");
         }
 
         if self.square_is_on_board(pos) {
@@ -245,6 +245,7 @@ impl Game {
             return Err(());
         }
         self.pieces.remove(&square);
+        self.graphics.add_explosion(square.to_f32());
         Ok(())
     }
 }
