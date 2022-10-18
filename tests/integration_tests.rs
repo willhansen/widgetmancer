@@ -1,6 +1,6 @@
 use euclid::*;
 use pretty_assertions::{assert_eq, assert_ne};
-use rust_roguelike::glyph::RED;
+use rust_roguelike::glyph::{Glyph, RED};
 use std::time::Duration;
 
 use rust_roguelike::piece::{Piece, PieceType};
@@ -253,6 +253,23 @@ fn test_laser_background_is_transparent() {
         .get_buffered_glyphs_for_square(test_point_b);
 
     assert_ne!(glyphs_a.0.bg_color, glyphs_b.0.bg_color);
+}
+
+#[test]
+fn test_pawn_background_is_transparent() {
+    let mut game = set_up_game_with_player_in_corner();
+    let square1 = point2(2, 3);
+    let square2 = point2(2, 4);
+    game.place_piece(Piece::pawn(), square1).expect("pawn1");
+    game.place_piece(Piece::pawn(), square2).expect("pawn2");
+
+    game.draw_headless(Duration::from_millis(100));
+
+    let gr = game.borrow_graphics_mut();
+
+    let pawn1_glyphs = gr.get_buffered_glyphs_for_square(square1);
+    let pawn2_glyphs = gr.get_buffered_glyphs_for_square(square2);
+    assert_ne!(pawn1_glyphs.0.bg_color, pawn2_glyphs.0.bg_color,);
 }
 
 #[test]
