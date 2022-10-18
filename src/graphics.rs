@@ -16,14 +16,23 @@ use crate::piece::Piece;
 use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
     CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, Game, Glyph,
-    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, Step, WorldCharacterPoint, WorldPoint,
-    WorldSquare, BLACK, RED, RIGHT_I, WHITE,
+    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, WorldCharacterPoint, WorldMove,
+    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, RED, RIGHT_I, WHITE,
 };
 
 pub struct Laser {
     start: WorldPoint,
     end: WorldPoint,
     age: Duration,
+}
+
+// TODO
+pub struct Particle {
+    position: WorldPoint,
+    velocity: WorldPoint,
+    acceleration: WorldPoint,
+    age: Duration,
+    color: RGB8,
 }
 
 pub struct Graphics {
@@ -264,9 +273,9 @@ impl Graphics {
 
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
         if (square.x + square.y) % 2 == 0 {
-            WHITE
+            BOARD_WHITE
         } else {
-            BLACK
+            BOARD_BLACK
         }
     }
 
@@ -352,7 +361,7 @@ impl Graphics {
         get_by_point(&self.output_on_screen, buffer_pos).character
     }
 
-    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: Step) {
+    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
         let mut player_glyphs = Glyph::get_glyphs_for_player(faced_direction);
         let square_color = Graphics::board_color_at_square(world_pos);
         player_glyphs.0.bg_color = square_color;

@@ -10,10 +10,12 @@ use termion::color;
 use crate::utility::sign;
 use crate::utility::*;
 
-pub const GREEN: RGB8 = RGB8::new(0, 128, 0);
+pub const MID_GREEN: RGB8 = RGB8::new(0, 128, 0);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
-pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
+pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
+pub const BOARD_WHITE: RGB8 = RGB8::new(200, 200, 180);
+pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -311,8 +313,8 @@ impl Glyph {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 
-    pub fn get_glyphs_for_player(faced_direction: Step) -> (Glyph, Glyph) {
-        let mut arrow_step_map: HashMap<Step, char> = HashMap::new();
+    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> (Glyph, Glyph) {
+        let mut arrow_step_map: HashMap<WorldStep, char> = HashMap::new();
 
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
         let arrows = "🢀🢂🢁🢃🢄🢅🢆🢇";
@@ -335,7 +337,7 @@ impl Glyph {
             Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
             Glyph::from_char(' '),
         );
-        glyphs.0.fg_color = GREEN;
+        glyphs.0.fg_color = MID_GREEN;
 
         glyphs
     }

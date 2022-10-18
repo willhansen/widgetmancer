@@ -4,9 +4,12 @@ use rust_roguelike::glyph::RED;
 use std::time::Duration;
 
 use rust_roguelike::piece::{Piece, PieceType};
-use rust_roguelike::utility::{WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use rust_roguelike::utility::{WorldPoint, WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
-use crate::utils_for_tests::{make_game, set_up_player_facing_pawn_on_left};
+use crate::utils_for_tests::{
+    make_game, set_up_game_with_player_in_corner, set_up_player_facing_n_pawns_m_blocks_up,
+    set_up_player_facing_pawn_on_left,
+};
 
 mod utils_for_tests;
 
@@ -228,4 +231,36 @@ fn test_player_background_is_transparent() {
         drawn_glyphs_at_pos_1.0.bg_color,
         drawn_glyphs_at_pos_2.0.bg_color
     );
+}
+
+#[test]
+fn test_laser_background_is_transparent() {
+    let mut game = set_up_game_with_player_in_corner();
+    let left_point: WorldPoint = point2(2.0, 2.0);
+    game.borrow_graphics_mut()
+        .add_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
+
+    game.draw_headless(Duration::from_millis(100));
+
+    let test_point_A = left_point.round().to_i32() + RIGHT_I.cast_unit();
+    let test_point_B = test_point_A + RIGHT_I.cast_unit();
+
+    let glyphs_A = game
+        .borrow_graphics_mut()
+        .get_buffered_glyphs_for_square(test_point_A);
+    let glyphs_B = game
+        .borrow_graphics_mut()
+        .get_buffered_glyphs_for_square(test_point_B);
+
+    assert_ne!(glyphs_A.0.bg_color, glyphs_B.0.bg_color);
+}
+
+#[test]
+fn test_shotgun() {
+    let start_pawns = 5;
+    let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
+    game.player_shoot();
+    let end_pawns = game.piece_type_count(PieceType::Pawn);
+
+    assert!(end_pawns < start_pawns - 1);
 }

@@ -4,7 +4,7 @@ use euclid::*;
 use strum_macros::Display;
 
 use crate::{
-    get_4_rotations, quarter_turns_counter_clockwise, SquareGridInWorldFrame, Step, StepList,
+    get_4_rotations, quarter_turns_counter_clockwise, SquareGridInWorldFrame, StepList, WorldStep,
 };
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
@@ -47,7 +47,7 @@ impl Piece {
 
     pub fn relative_move_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations(Step::new(1, 0)),
+            PieceType::Pawn => get_4_rotations(WorldStep::new(1, 0)),
             _ => vec![],
         }
     }

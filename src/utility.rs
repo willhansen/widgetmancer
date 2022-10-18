@@ -22,7 +22,9 @@ pub type FVector = default::Vector2D<f32>;
 pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
 pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
 
-pub type Step = Vector2D<i32, SquareGridInWorldFrame>;
+pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
+pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
+
 pub type SquareList = Vec<Point2D<i32, SquareGridInWorldFrame>>;
 pub type StepList = Vec<Vector2D<i32, SquareGridInWorldFrame>>;
 
@@ -111,9 +113,9 @@ pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
 
-pub fn round_to_king_step(step: Step) -> Step {
-    if step == Step::new(0, 0) {
-        return Step::new(0, 0);
+pub fn round_to_king_step(step: WorldStep) -> WorldStep {
+    if step == WorldStep::new(0, 0) {
+        return WorldStep::new(0, 0);
     }
     let radians_from_plus_x = step.to_f32().angle_from_x_axis();
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
@@ -139,23 +141,23 @@ mod tests {
     #[test]
     fn test_round_to_kingstep() {
         assert_eq!(
-            Step::new(0, 0),
-            round_to_king_step(Step::new(0, 0)),
+            WorldStep::new(0, 0),
+            round_to_king_step(WorldStep::new(0, 0)),
             "zero to zero"
         );
         assert_eq!(
-            Step::new(1, 0),
-            round_to_king_step(Step::new(5, 0)),
+            WorldStep::new(1, 0),
+            round_to_king_step(WorldStep::new(5, 0)),
             "reduce length"
         );
         assert_eq!(
-            Step::new(0, -1),
-            round_to_king_step(Step::new(5, -300)),
+            WorldStep::new(0, -1),
+            round_to_king_step(WorldStep::new(5, -300)),
             "snap to orthogonal"
         );
         assert_eq!(
-            Step::new(-1, 1),
-            round_to_king_step(Step::new(-30, 25)),
+            WorldStep::new(-1, 1),
+            round_to_king_step(WorldStep::new(-30, 25)),
             "snap to diagonal"
         );
     }

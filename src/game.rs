@@ -10,7 +10,7 @@ use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
     point_to_string, round_to_king_step, Glyph, IPoint, IVector, SquareGridInWorldFrame,
-    SquareList, Step, WorldSquare, LEFT_I,
+    SquareList, WorldSquare, WorldStep, LEFT_I,
 };
 
 pub struct Game {
@@ -21,7 +21,7 @@ pub struct Game {
     pub(crate) running: bool,
     // set false to quit
     player_position: WorldSquare,
-    player_faced_direction: Step,
+    player_faced_direction: WorldStep,
     player_is_dead: bool,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
@@ -77,7 +77,7 @@ impl Game {
         self.running = false;
     }
 
-    pub fn move_player(&mut self, movement: Step) -> Result<(), ()> {
+    pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         let new_pos = self.player_position + movement;
         self.set_player_faced_direction(round_to_king_step(movement));
         self.set_player_position(new_pos)
@@ -101,10 +101,11 @@ impl Game {
         return Ok(());
     }
 
-    pub fn player_faced_direction(&self) -> Step {
+    pub fn player_faced_direction(&self) -> WorldStep {
         self.player_faced_direction
     }
-    pub fn set_player_faced_direction(&mut self, new_dir: Step) {
+    pub fn set_player_faced_direction(&mut self, new_dir: WorldStep) {
+        assert_eq!(max(new_dir.x.abs(), new_dir.y.abs()), 1, "bad input vector");
         self.player_faced_direction = new_dir.clone()
     }
 
@@ -147,11 +148,11 @@ impl Game {
         self.get_piece_at(square).is_some()
     }
 
-    pub fn piece_type_count(&self, piece_type: PieceType) -> u32 {
+    pub fn piece_type_count(&self, piece_type: PieceType) -> i32 {
         self.pieces
             .values()
             .filter(|&&piece| piece.piece_type == piece_type)
-            .count() as u32
+            .count() as i32
     }
 
     pub fn move_all_pieces(&mut self) {
