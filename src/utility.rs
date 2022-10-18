@@ -4,6 +4,7 @@ use std::f32::consts::TAU;
 use std::fmt::Display;
 use std::ops::Neg;
 
+use crate::Glyph;
 use euclid::*;
 use num::traits::Signed;
 

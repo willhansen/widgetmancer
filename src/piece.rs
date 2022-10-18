@@ -4,7 +4,8 @@ use euclid::*;
 use strum_macros::Display;
 
 use crate::{
-    get_4_rotations, quarter_turns_counter_clockwise, SquareGridInWorldFrame, StepList, WorldStep,
+    get_4_rotations, quarter_turns_counter_clockwise, Glyph, SquareGridInWorldFrame, StepList,
+    WorldStep,
 };
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
@@ -42,6 +43,17 @@ impl Piece {
         Piece {
             piece_type: PieceType::Pawn,
             ai_type: AiType::TowardsPlayer,
+        }
+    }
+
+    pub fn glyphs(&self) -> [Glyph; 2] {
+        Piece::chars_for_type(self.piece_type).map(|character| Glyph::from_char(character))
+    }
+
+    pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
+        match piece_type {
+            PieceType::Pawn => ['P', 'a'],
+            _ => panic!("invalid type"),
         }
     }
 

@@ -266,7 +266,7 @@ impl Graphics {
                 let mut glyph = Glyph::from_char(' ');
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
                 glyph.bg_color = Graphics::board_color_at_square(world_square);
-                self.draw_glyphs_at_square(world_square, (glyph, glyph));
+                self.draw_glyphs_at_square(world_square, [glyph, glyph]);
             }
         }
     }
@@ -364,12 +364,12 @@ impl Graphics {
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
         let mut player_glyphs = Glyph::get_glyphs_for_player(faced_direction);
         let square_color = Graphics::board_color_at_square(world_pos);
-        player_glyphs.0.bg_color = square_color;
-        player_glyphs.1.bg_color = square_color;
+        player_glyphs[0].bg_color = square_color;
+        player_glyphs[1].bg_color = square_color;
         self.draw_glyphs_at_square(world_pos, player_glyphs);
     }
 
-    pub fn draw_glyphs_at_square(&mut self, world_pos: WorldSquare, glyphs: (Glyph, Glyph)) {
+    pub fn draw_glyphs_at_square(&mut self, world_pos: WorldSquare, glyphs: [Glyph; 2]) {
         if !self.square_is_on_screen(world_pos) {
             panic!(
                 "Tried to draw square off screen: {}",
@@ -377,8 +377,8 @@ impl Graphics {
             );
         }
         let buffer_square = self.world_square_to_left_buffer_square(world_pos);
-        self.draw_glyph(buffer_square, glyphs.0);
-        self.draw_glyph(buffer_square + RIGHT_I.cast_unit(), glyphs.1);
+        self.draw_glyph(buffer_square, *glyphs.get(0).unwrap());
+        self.draw_glyph(buffer_square + RIGHT_I.cast_unit(), *glyphs.get(1).unwrap());
     }
 
     pub fn draw_glyph(
@@ -390,7 +390,9 @@ impl Graphics {
     }
 
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
-        self.draw_string(self.world_square_to_left_screen_square(pos), "Pa");
+        let bg_color = Graphics::board_color_at_square(pos);
+        let mut glyphs = piece.glyphs().map(|glyph| glyph.with_bg(bg_color));
+        self.draw_glyphs_at_square(pos, glyphs);
     }
 
     pub fn add_laser(&mut self, start: WorldPoint, end: WorldPoint) {

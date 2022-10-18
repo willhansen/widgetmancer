@@ -79,6 +79,22 @@ impl Glyph {
         }
     }
 
+    pub fn with_char(&self, new_char: char) -> Glyph {
+        let mut dup = self.clone();
+        dup.character = new_char;
+        dup
+    }
+    pub fn with_fg(&self, new_fg: RGB8) -> Glyph {
+        let mut dup = self.clone();
+        dup.fg_color = new_fg;
+        dup
+    }
+    pub fn with_bg(&self, new_bg: RGB8) -> Glyph {
+        let mut dup = self.clone();
+        dup.bg_color = new_bg;
+        dup
+    }
+
     pub fn reset_colors() -> String {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
@@ -313,7 +329,7 @@ impl Glyph {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 
-    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> (Glyph, Glyph) {
+    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> [Glyph; 2] {
         let mut arrow_step_map: HashMap<WorldStep, char> = HashMap::new();
 
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
@@ -333,11 +349,11 @@ impl Glyph {
             arrow_step_map.insert(*king_steps_in_arrow_order.get(i).unwrap(), arrow_char);
         }
 
-        let mut glyphs = (
+        let mut glyphs = [
             Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
             Glyph::from_char(' '),
-        );
-        glyphs.0.fg_color = MID_GREEN;
+        ];
+        glyphs[0].fg_color = MID_GREEN;
 
         glyphs
     }
