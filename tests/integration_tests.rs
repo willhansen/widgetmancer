@@ -237,8 +237,11 @@ fn test_player_background_is_transparent() {
 fn test_laser_background_is_transparent() {
     let mut game = set_up_game_with_player_in_corner();
     let left_point: WorldPoint = point2(2.0, 2.0);
-    game.borrow_graphics_mut()
-        .add_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
+    // Two lasers, because it can make a difference
+    for _ in 0..2 {
+        game.borrow_graphics_mut()
+            .add_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
+    }
 
     game.draw_headless(Duration::from_millis(100));
 

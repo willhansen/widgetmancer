@@ -7,6 +7,7 @@ use std::ops::Neg;
 use crate::Glyph;
 use euclid::*;
 use num::traits::Signed;
+use rand::Rng;
 
 // empty enums for euclid typing
 pub enum SquareGridInWorldFrame {}
@@ -131,6 +132,15 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
 
     // truncate towards zero intentionally
     float_step.to_i32()
+}
+
+pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+    let mut v = vec2(10.0, 10.0);
+    while v.square_length() > 1.0 {
+        v.x = rand::thread_rng().gen_range(-1.0..=1.0);
+        v.y = rand::thread_rng().gen_range(-1.0..=1.0);
+    }
+    v * radius
 }
 
 #[cfg(test)]

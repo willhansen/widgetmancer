@@ -382,6 +382,12 @@ impl Glyph {
         point2((pos.x - 0.5) / 2.0, pos.y)
     }
 
+    pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
+        Glyph::world_character_point_to_world_point(pos.to_f32())
+            .round()
+            .to_i32()
+    }
+
     pub fn world_pos_to_braille_pos(
         pos: Point2D<f32, SquareGridInWorldFrame>,
     ) -> Point2D<f32, BrailleGridInWorldFrame> {

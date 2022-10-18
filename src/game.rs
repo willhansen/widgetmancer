@@ -9,8 +9,8 @@ use line_drawing::Point;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, round_to_king_step, Glyph, IPoint, IVector, SquareGridInWorldFrame,
-    SquareList, WorldSquare, WorldStep, LEFT_I,
+    point_to_string, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector,
+    SquareGridInWorldFrame, SquareList, WorldPoint, WorldSquare, WorldStep, LEFT_I,
 };
 
 pub struct Game {
@@ -219,17 +219,25 @@ impl Game {
     }
 
     pub fn player_shoot(&mut self) {
-        let range = 5;
-        let line_start = self.player_position();
-        let line_end = line_start + self.player_faced_direction() * range;
+        let num_lasers = 5;
+        let range = 5.0;
+        let spread_radius = 3.0;
+        for _ in 0..num_lasers {
+            let line_start: WorldSquare = self.player_position();
+            let line_end: WorldPoint = line_start.to_f32()
+                + self.player_faced_direction().to_f32() * range
+                + rand_radial_offset(spread_radius).cast_unit();
 
-        for (x, y) in line_drawing::Bresenham::new(line_start.to_tuple(), line_end.to_tuple()) {
-            let square = WorldSquare::new(x, y);
-            self.capture_piece_at(square).ok();
+            for (x, y) in line_drawing::Bresenham::new(
+                line_start.to_tuple(),
+                line_end.round().to_i32().to_tuple(),
+            ) {
+                let square = WorldSquare::new(x, y);
+                self.capture_piece_at(square).ok();
+            }
+
+            self.graphics.add_laser(line_start.to_f32(), line_end);
         }
-
-        self.graphics
-            .add_laser(line_start.to_f32(), line_end.to_f32());
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
