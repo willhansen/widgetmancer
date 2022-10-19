@@ -427,12 +427,11 @@ impl Graphics {
             .abs()
             .floor()
             .to_u64()
-            .unwrap()
-            + explosion.age.as_micros().to_u64().unwrap();
+            .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        let num_particles = 30;
+        let num_particles = 10;
         for _ in 0..num_particles {
-            let speed_in_squares_per_second = 5.0 + rng.gen_range(-2.0..=2.0);
+            let speed_in_squares_per_second = 10.0 + rng.gen_range(-2.0..=2.0);
             let distance_in_squares = speed_in_squares_per_second * explosion.age.as_secs_f32();
             let angle = Angle::radians(rng.gen_range(0.0..TAU));
             let relative_position = WorldMove::from_angle_and_length(angle, distance_in_squares);
@@ -474,7 +473,7 @@ impl Graphics {
     }
     fn cull_dead_explosions(&mut self) {
         self.explosions
-            .drain_filter(|explosion| explosion.age > Duration::from_millis(500));
+            .drain_filter(|explosion| explosion.age > Duration::from_millis(200));
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {

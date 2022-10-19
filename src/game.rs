@@ -10,7 +10,7 @@ use rand::{thread_rng, Rng};
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector,
+    point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector,
     SquareGridInWorldFrame, SquareList, WorldPoint, WorldSquare, WorldStep, LEFT_I,
 };
 
@@ -242,13 +242,18 @@ impl Game {
     }
 
     pub fn player_shoot(&mut self) {
-        let num_lasers = 5;
+        let num_lasers = 10;
         let range = 5.0;
-        let spread_radius = 3.0;
+        let spread_radians = 1.0;
+        let spread_radius = 1.0;
         for _ in 0..num_lasers {
             let line_start: WorldSquare = self.player_position();
             let line_end: WorldPoint = line_start.to_f32()
-                + self.player_faced_direction().to_f32() * range
+                + rotate_vect(
+                    self.player_faced_direction().to_f32() * range,
+                    rand::thread_rng().gen_range(-spread_radians / 2.0..=spread_radians / 2.0),
+                )
+                .cast_unit()
                 + rand_radial_offset(spread_radius).cast_unit();
 
             // Orthogonal steps only

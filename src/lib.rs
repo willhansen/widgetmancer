@@ -100,7 +100,7 @@ pub fn do_everything() {
                     .expect("random placement");
             }
         }
-        let delta = Duration::from_millis(100);
+        let delta = Duration::from_millis(20);
         game.draw(&mut wrapped_terminal, delta);
         thread::sleep(delta);
     }

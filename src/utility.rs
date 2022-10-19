@@ -143,6 +143,12 @@ pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     v * radius
 }
 
+pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U> {
+    let angle = vector.angle_from_x_axis();
+    let new_angle = angle + Angle::radians(radians);
+    Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
