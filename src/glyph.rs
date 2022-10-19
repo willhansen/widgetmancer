@@ -16,6 +16,7 @@ pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
+pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];

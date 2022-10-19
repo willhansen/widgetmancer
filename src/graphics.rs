@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::cmp::min;
 use std::collections::HashMap;
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 use std::io::Write;
 use std::mem::swap;
 use std::ptr::hash;
@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::num::ToPrimitive;
 use euclid::*;
 use line_drawing::Point;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
@@ -21,7 +21,8 @@ use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
     CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, Game, Glyph,
     IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, WorldCharacterPoint, WorldMove,
-    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, RED, RIGHT_I, WHITE,
+    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
+    RIGHT_I, WHITE,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -429,8 +430,15 @@ impl Graphics {
             .unwrap()
             + explosion.age.as_micros().to_u64().unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-
-        // TODO
+        let num_particles = 30;
+        for _ in 0..num_particles {
+            let speed_in_squares_per_second = 5.0 + rng.gen_range(-2.0..=2.0);
+            let distance_in_squares = speed_in_squares_per_second * explosion.age.as_secs_f32();
+            let angle = Angle::radians(rng.gen_range(0.0..TAU));
+            let relative_position = WorldMove::from_angle_and_length(angle, distance_in_squares);
+            let particle_pos = explosion.position + relative_position;
+            self.draw_braille_point(particle_pos, EXPLOSION_COLOR);
+        }
     }
 
     pub fn draw_all_lasers(&mut self, delta: Duration) {

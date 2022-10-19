@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use euclid::*;
 use line_drawing::Point;
+use rand::{thread_rng, Rng};
 
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
@@ -25,6 +26,7 @@ pub struct Game {
     player_is_dead: bool,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
+    turn_count: u32,
 }
 
 impl Game {
@@ -40,6 +42,7 @@ impl Game {
             player_is_dead: false,
             graphics: Graphics::new(terminal_width, terminal_height),
             pieces: HashMap::new(),
+            turn_count: 0,
         }
     }
 
@@ -51,6 +54,9 @@ impl Game {
     }
     pub fn player_is_dead(&self) -> bool {
         self.player_is_dead
+    }
+    pub fn turn_count(&self) -> u32 {
+        self.turn_count
     }
 
     fn mid_square(&self) -> IPoint {
@@ -124,6 +130,7 @@ impl Game {
             self.graphics.draw_piece(piece, square);
         }
         self.graphics.draw_all_lasers(delta);
+        self.graphics.draw_all_explosions(delta);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);
@@ -139,6 +146,21 @@ impl Game {
         }
         self.pieces.insert(square, piece);
         Ok(())
+    }
+
+    pub fn place_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+        // only try n times
+        for _ in 0..40 {
+            let rand_pos = WorldSquare::new(
+                thread_rng().gen_range(0..self.board_width() as i32),
+                thread_rng().gen_range(0..self.board_height() as i32),
+            );
+            let place_result = self.place_piece(piece, rand_pos);
+            if place_result.is_ok() {
+                return place_result;
+            }
+        }
+        return Err(());
     }
     pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
         self.pieces.get(&square)
@@ -167,6 +189,7 @@ impl Game {
                 moved_piece_locations.insert(end_pos);
             }
         }
+        self.turn_count += 1;
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
@@ -228,7 +251,8 @@ impl Game {
                 + self.player_faced_direction().to_f32() * range
                 + rand_radial_offset(spread_radius).cast_unit();
 
-            for (x, y) in line_drawing::Bresenham::new(
+            // Orthogonal steps only
+            for (x, y) in line_drawing::WalkGrid::new(
                 line_start.to_tuple(),
                 line_end.round().to_i32().to_tuple(),
             ) {
