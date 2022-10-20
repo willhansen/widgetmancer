@@ -380,6 +380,7 @@ impl Graphics {
         buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
         glyph: Glyph,
     ) {
+        // TODO: account for alpha colors and braille combinations
         self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize] = glyph;
     }
 
@@ -399,39 +400,26 @@ impl Graphics {
             .push(Box::new(Explosion::new(position)));
     }
 
-    pub fn draw_explosion(&mut self, explosion: &Explosion) {}
-
-    pub fn draw_all_lasers(&mut self, delta: Duration) {
-        for mut laser in &mut self.lasers {
-            laser.advance(delta);
+    pub fn draw_animations(&mut self, delta: Duration) {
+        for mut animation in &mut self.active_animations {
+            animation.advance(delta);
         }
 
-        let laser_copies = self.lasers.clone();
-        for laser in laser_copies {
-            self.draw_laser(&laser);
+        let mut glyphs_to_draw = vec![];
+        for animation in &self.active_animations {
+            glyphs_to_draw.push(animation.glyphs());
         }
 
-        self.cull_dead_lasers();
+        for glyph_map in glyphs_to_draw {
+            self.draw_glyphs(glyph_map);
+        }
+
+        self.cull_dead_animations();
     }
 
-    pub fn draw_all_explosions(&mut self, delta: Duration) {
-        for mut explosion in &mut self.explosions {
-            explosion.advance(delta);
-        }
-
-        for explosion in self.explosions.clone() {
-            self.draw_explosion(&explosion);
-        }
-
-        self.cull_dead_explosions();
-    }
-
-    fn cull_dead_lasers(&mut self) {
-        self.lasers.drain_filter(|laser| laser.finished());
-    }
-    fn cull_dead_explosions(&mut self) {
-        self.explosions
-            .drain_filter(|explosion| explosion.finished());
+    fn cull_dead_animations(&mut self) {
+        self.active_animations
+            .drain_filter(|animation| animation.finished());
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {

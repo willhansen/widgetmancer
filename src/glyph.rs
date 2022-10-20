@@ -327,9 +327,9 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_braille_line(
-        start_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        end_pos: Point2D<f32, CharacterGridInWorldFrame>,
-    ) -> HashMap<Point2D<i32, CharacterGridInWorldFrame>, Glyph> {
+        start_pos: WorldPoint,
+        end_pos: WorldPoint,
+    ) -> WorldGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 

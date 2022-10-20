@@ -129,8 +129,7 @@ impl Game {
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
-        self.graphics.draw_all_lasers(delta);
-        self.graphics.draw_all_explosions(delta);
+        self.graphics.draw_animations(delta);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);
