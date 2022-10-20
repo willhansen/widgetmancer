@@ -7,6 +7,7 @@ use std::mem::swap;
 use std::ptr::hash;
 use std::time::Duration;
 
+use crate::animations::*;
 use crate::num::ToPrimitive;
 use euclid::*;
 use line_drawing::Point;
@@ -20,23 +21,10 @@ use crate::piece::Piece;
 use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
     CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, Game, Glyph,
-    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, WorldCharacterPoint, WorldMove,
-    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
-    RIGHT_I, WHITE,
+    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, WorldCharacterPoint, WorldGlyphMap,
+    WorldMove, WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
+    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
-
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct Laser {
-    start: WorldPoint,
-    end: WorldPoint,
-    age: Duration,
-}
-
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct Explosion {
-    position: WorldPoint,
-    age: Duration,
-}
 
 pub struct Graphics {
     output_buffer: Vec<Vec<Glyph>>,
@@ -45,8 +33,7 @@ pub struct Graphics {
     // (x,y), left to right, top to bottom
     terminal_width: u16,
     terminal_height: u16,
-    lasers: Vec<Laser>,
-    explosions: Vec<Explosion>,
+    active_animations: Vec<Box<dyn Animation>>,
 }
 
 impl Graphics {
@@ -62,8 +49,7 @@ impl Graphics {
             ],
             terminal_width,
             terminal_height,
-            lasers: vec![],
-            explosions: vec![],
+            active_animations: vec![],
         }
     }
 
@@ -228,18 +214,8 @@ impl Graphics {
         self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_braille_line(
-        &mut self,
-        start_pos: Point2D<f32, SquareGridInWorldFrame>,
-        end_pos: Point2D<f32, SquareGridInWorldFrame>,
-        color: RGB8,
-    ) {
-        let start_char = Glyph::world_point_to_world_character_point(start_pos);
-        let end_char = Glyph::world_point_to_world_character_point(end_pos);
-        let map_of_line_glyphs =
-            Glyph::get_glyphs_for_colored_braille_line(start_char, end_char, color);
-
-        for (world_character_square, new_glyph) in map_of_line_glyphs {
+    fn draw_glyphs(&mut self, glyph_map: WorldGlyphMap) {
+        for (world_character_square, new_glyph) in glyph_map {
             let buffer_character_square =
                 self.world_character_square_to_buffer_square(world_character_square);
             if !self.world_character_is_on_screen(world_character_square) {
@@ -259,6 +235,16 @@ impl Graphics {
                 Glyph::world_character_square_to_world_square(world_character_square),
             );
         }
+    }
+
+    fn draw_braille_line(
+        &mut self,
+        start_pos: Point2D<f32, SquareGridInWorldFrame>,
+        end_pos: Point2D<f32, SquareGridInWorldFrame>,
+        color: RGB8,
+    ) {
+        let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
+        self.draw_glyphs(line_glyphs);
     }
 
     pub fn fill_output_buffer_with_black(&mut self) {
@@ -404,52 +390,25 @@ impl Graphics {
     }
 
     pub fn add_laser(&mut self, start: WorldPoint, end: WorldPoint) {
-        self.lasers.push(Laser {
-            start,
-            end,
-            age: Duration::from_millis(0),
-        });
+        self.active_animations
+            .push(Box::new(Laser::new(start, end)));
     }
 
     pub fn add_explosion(&mut self, position: WorldPoint) {
-        self.explosions.push(Explosion {
-            position,
-            age: Duration::from_millis(0),
-        });
+        self.active_animations
+            .push(Box::new(Explosion::new(position)));
     }
 
-    pub fn draw_laser(&mut self, start: WorldPoint, end: WorldPoint) {
-        self.draw_braille_line(start, end, RED);
-    }
-    pub fn draw_explosion(&mut self, explosion: &Explosion) {
-        // TODO: fix
-        let hash = ((explosion.position.x * PI + explosion.position.y) * 1000.0)
-            .abs()
-            .floor()
-            .to_u64()
-            .unwrap();
-        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        let num_particles = 10;
-        for _ in 0..num_particles {
-            let speed_in_squares_per_second = 10.0 + rng.gen_range(-2.0..=2.0);
-            let distance_in_squares = speed_in_squares_per_second * explosion.age.as_secs_f32();
-            let angle = Angle::radians(rng.gen_range(0.0..TAU));
-            let relative_position = WorldMove::from_angle_and_length(angle, distance_in_squares);
-            let particle_pos = explosion.position + relative_position;
-            self.draw_braille_point(particle_pos, EXPLOSION_COLOR);
-        }
-    }
+    pub fn draw_explosion(&mut self, explosion: &Explosion) {}
 
     pub fn draw_all_lasers(&mut self, delta: Duration) {
-        let mut lines_to_draw: Vec<(WorldPoint, WorldPoint)> = vec![];
-
         for mut laser in &mut self.lasers {
-            lines_to_draw.push((laser.start, laser.end));
-            laser.age += delta;
+            laser.advance(delta);
         }
 
-        for (start, end) in lines_to_draw {
-            self.draw_laser(start, end);
+        let laser_copies = self.lasers.clone();
+        for laser in laser_copies {
+            self.draw_laser(&laser);
         }
 
         self.cull_dead_lasers();
@@ -457,7 +416,7 @@ impl Graphics {
 
     pub fn draw_all_explosions(&mut self, delta: Duration) {
         for mut explosion in &mut self.explosions {
-            explosion.age += delta;
+            explosion.advance(delta);
         }
 
         for explosion in self.explosions.clone() {
@@ -468,12 +427,11 @@ impl Graphics {
     }
 
     fn cull_dead_lasers(&mut self) {
-        self.lasers
-            .drain_filter(|laser| laser.age > Duration::from_millis(500));
+        self.lasers.drain_filter(|laser| laser.finished());
     }
     fn cull_dead_explosions(&mut self) {
         self.explosions
-            .drain_filter(|explosion| explosion.age > Duration::from_millis(200));
+            .drain_filter(|explosion| explosion.finished());
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
@@ -551,7 +509,7 @@ mod tests {
         let line_start = WorldSquare::new(2, 2);
         let line_end = WorldSquare::new(7, 7);
 
-        g.draw_laser(line_start.to_f32(), line_end.to_f32());
+        g.draw_braille_line(line_start.to_f32(), line_end.to_f32(), RED);
 
         let test_square = WorldSquare::new(4, 4);
 

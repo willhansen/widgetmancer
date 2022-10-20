@@ -23,6 +23,9 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄'
 
 pub type BrailleArray = [[bool; 4]; 2];
 
+// All the braille unicode consecutively for easy reference
+//⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
+
 pub fn quarter_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
         (1, -1) => '▗',
@@ -411,16 +414,19 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_colored_braille_line(
-        start_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        end_pos: Point2D<f32, CharacterGridInWorldFrame>,
+        start_pos: WorldPoint,
+        end_pos: WorldPoint,
         color: RGB8,
-    ) -> HashMap<Point2D<i32, CharacterGridInWorldFrame>, Glyph> {
+    ) -> WorldGlyphMap {
+        let start_char_point = Glyph::world_point_to_world_character_point(start_pos);
+        let end_char_point = Glyph::world_point_to_world_character_point(end_pos);
+
         let mut glyph_map = HashMap::<Point2D<i32, CharacterGridInWorldFrame>, Glyph>::new();
 
-        let start_braille_grid_square = Glyph::character_world_pos_to_braille_pos(start_pos)
+        let start_braille_grid_square = Glyph::character_world_pos_to_braille_pos(start_char_point)
             .round()
             .to_i32();
-        let end_braille_grid_square = Glyph::character_world_pos_to_braille_pos(end_pos)
+        let end_braille_grid_square = Glyph::character_world_pos_to_braille_pos(end_char_point)
             .round()
             .to_i32();
 
@@ -473,6 +479,10 @@ impl Glyph {
             fg_color: color,
             bg_color: BLACK,
         }
+    }
+
+    pub fn points_to_braille_glyphs(points: Vec<WorldPoint>, color: RGB8) -> WorldGlyphMap {
+        todo!()
     }
 }
 
@@ -933,5 +943,32 @@ mod tests {
             ),
             "diagonal a bit"
         );
+    }
+
+    //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
+
+    #[test]
+    fn test_points_to_braille_glyphs() {
+        // ┌──┬──┐┌──┬──┐
+        // │  │  ││  │  │
+        // │  │o ││  │oo│
+        // │ o│  ││  │  │
+        // │  │  ││  │  │
+        // └──┴──┘└──┴──┘
+
+        let points = vec![
+            WorldPoint::new(0.1, 0.1),
+            WorldPoint::new(0.1, 0.1), // duplicate for funsies
+            WorldPoint::new(-0.1, -0.1),
+            WorldPoint::new(1.1, 0.1),
+            WorldPoint::new(1.4, 0.1),
+        ];
+
+        let glyphs = Glyph::points_to_braille_glyphs(points, WHITE);
+
+        assert_eq!(glyphs.len(), 3);
+        assert_eq!(glyphs.get(&point2(0, 0)).unwrap().character, '⠠');
+        assert_eq!(glyphs.get(&point2(1, 0)).unwrap().character, '⠂');
+        assert_eq!(glyphs.get(&point2(3, 0)).unwrap().character, '⠒');
     }
 }

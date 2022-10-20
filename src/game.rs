@@ -241,7 +241,7 @@ impl Game {
         None
     }
 
-    pub fn player_shoot(&mut self) {
+    pub fn player_shoot_shotgun(&mut self) {
         let num_lasers = 10;
         let range = 5.0;
         let spread_radians = 1.0;
@@ -267,6 +267,10 @@ impl Game {
 
             self.graphics.add_laser(line_start.to_f32(), line_end);
         }
+    }
+
+    pub fn player_shoot_sniper(&mut self) {
+        // TODO
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {

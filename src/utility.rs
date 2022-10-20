@@ -1,19 +1,25 @@
 extern crate num;
 
+use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::fmt::Display;
 use std::ops::Neg;
 
-use crate::Glyph;
 use euclid::*;
 use num::traits::Signed;
 use rand::Rng;
 
+use crate::Glyph;
+
 // empty enums for euclid typing
 pub enum SquareGridInWorldFrame {}
+
 pub enum BrailleGridInWorldFrame {}
+
 pub enum CharacterGridInWorldFrame {}
+
 pub enum CharacterGridInBufferFrame {}
+
 pub enum CharacterGridInScreenFrame {}
 
 pub type IPoint = default::Point2D<i32>;
@@ -38,6 +44,9 @@ pub type BufferPoint = Point2D<f32, CharacterGridInBufferFrame>;
 
 pub type ScreenSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenPoint = Point2D<f32, CharacterGridInScreenFrame>;
+
+pub type BufferGlyphMap = HashMap<BufferSquare, Glyph>;
+pub type WorldGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);

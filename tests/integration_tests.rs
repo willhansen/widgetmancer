@@ -162,7 +162,7 @@ fn test_shoot_pawn() {
     let mut game = set_up_player_facing_pawn_on_left();
 
     assert_eq!(1, game.piece_type_count(PieceType::Pawn));
-    game.player_shoot();
+    game.player_shoot_shotgun();
     assert_eq!(0, game.piece_type_count(PieceType::Pawn));
 }
 
@@ -197,7 +197,7 @@ fn test_move_to_turn() {
 fn test_visible_laser() {
     let mut game = make_game();
     let inspection_square: WorldSquare = game.player_position() + game.player_faced_direction();
-    game.player_shoot();
+    game.player_shoot_shotgun();
     game.draw_headless(Duration::from_millis(100));
 
     let drawn_glyphs = game
@@ -279,7 +279,7 @@ fn test_pawn_background_is_transparent() {
 fn test_shotgun_spread() {
     let start_pawns = 5;
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
-    game.player_shoot();
+    game.player_shoot_shotgun();
     let end_pawns = game.piece_type_count(PieceType::Pawn);
 
     assert!(end_pawns < start_pawns - 1);
@@ -298,4 +298,13 @@ fn test_particles_on_piece_death() {
 
     let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
     assert!(Glyph::is_braille(glyphs[0].character) || Glyph::is_braille(glyphs[1].character))
+}
+
+#[test]
+fn test_sniper_one_shot_one_kill() {
+    let mut game = set_up_player_facing_n_pawns_m_blocks_up(3, 20);
+    game.player_shoot_sniper();
+    game.player_shoot_sniper();
+    game.player_shoot_sniper();
+    assert_eq!(game.piece_type_count(PieceType::Pawn), 0);
 }

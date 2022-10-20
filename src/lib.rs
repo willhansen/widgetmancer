@@ -10,6 +10,11 @@ extern crate num;
 extern crate std;
 extern crate termion;
 
+use enum_as_inner::EnumAsInner;
+use euclid::default::Point2D;
+use glyph::*;
+use ntest::timeout;
+use num::Integer;
 use std::char;
 use std::cmp::{max, min};
 use std::collections::hash_map::Entry;
@@ -19,18 +24,11 @@ use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
-
-use enum_as_inner::EnumAsInner;
-use euclid::default::Point2D;
-use ntest::timeout;
-use num::Integer;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
-
-use glyph::*;
 use utility::*;
 
 use crate::game::Game;
@@ -38,6 +36,7 @@ use crate::graphics::Graphics;
 use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
+pub mod animations;
 pub mod game;
 pub mod glyph;
 mod graphics;
