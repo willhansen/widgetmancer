@@ -463,6 +463,24 @@ impl Graphics {
         //.unwrap();
         writer.flush().unwrap();
     }
+
+    pub fn count_buffered_braille_dots_in_rect(
+        &self,
+        rect: Box2D<i32, SquareGridInWorldFrame>,
+    ) -> i32 {
+        let mut count = 0;
+        for x in rect.min.x..=rect.max.x {
+            for y in rect.min.y..=rect.max.y {
+                let square = WorldSquare::new(x, y);
+                let glyphs = self.get_buffered_glyphs_for_square(square);
+                for glyph in glyphs {
+                    let character = glyph.character;
+                    count += Glyph::count_braille_dots(character);
+                }
+            }
+        }
+        count
+    }
 }
 
 #[cfg(test)]

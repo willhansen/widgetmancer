@@ -4,7 +4,9 @@ use rust_roguelike::glyph::{Glyph, RED};
 use std::time::Duration;
 
 use rust_roguelike::piece::{Piece, PieceType};
-use rust_roguelike::utility::{WorldPoint, WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use rust_roguelike::utility::{
+    SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldStep, DOWN_I, LEFT_I, RIGHT_I, UP_I,
+};
 
 use crate::utils_for_tests::{
     make_game, set_up_game_with_player_in_corner, set_up_player_facing_n_pawns_m_blocks_up,
@@ -318,6 +320,15 @@ fn test_selector() {
     game.select_all_pieces();
     game.draw_headless(Duration::from_millis(0));
 
-    todo!()
-    //assert!(game.borrow_graphics_mut().count_particles_in_rect(Rect2D))
+    let diagonal = WorldStep::new(2, 2);
+    let test_area: Box2D<i32, SquareGridInWorldFrame> = Box2D {
+        min: test_square - diagonal,
+        max: test_square + diagonal,
+    };
+
+    assert!(
+        game.borrow_graphics_mut()
+            .count_buffered_braille_dots_in_rect(test_area)
+            > 0
+    );
 }
