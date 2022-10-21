@@ -39,13 +39,16 @@ pub type StepList = Vec<Vector2D<i32, SquareGridInWorldFrame>>;
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
 
-pub type BufferSquare = Point2D<i32, CharacterGridInBufferFrame>;
-pub type BufferPoint = Point2D<f32, CharacterGridInBufferFrame>;
+pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
+pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
 
-pub type ScreenSquare = Point2D<i32, CharacterGridInScreenFrame>;
-pub type ScreenPoint = Point2D<f32, CharacterGridInScreenFrame>;
+pub type BufferCharacterSquare = Point2D<i32, CharacterGridInBufferFrame>;
+pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
 
-pub type BufferGlyphMap = HashMap<BufferSquare, Glyph>;
+pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
+pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
+
+pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
 pub type WorldGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub const DOWN_I: IVector = vec2(0, -1);

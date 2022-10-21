@@ -1,5 +1,5 @@
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use euclid::*;
 use euclid::{point2, vec2};
@@ -278,7 +278,7 @@ impl Glyph {
         return output;
     }
 
-    pub fn array_to_braille(input: BrailleArray) -> char {
+    pub fn braille_array_to_braille_char(input: BrailleArray) -> char {
         let mut dot_val: u32 = 0;
         for x in 0..2 {
             for y in 0..4 {
@@ -362,7 +362,7 @@ impl Glyph {
         glyphs
     }
 
-    pub fn character_world_pos_to_braille_pos(
+    pub fn world_character_point_to_braille_point(
         pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> Point2D<f32, BrailleGridInWorldFrame> {
         point2(pos.x * 2.0 + 0.5, pos.y * 4.0 + 1.5)
@@ -395,7 +395,9 @@ impl Glyph {
     pub fn world_pos_to_braille_pos(
         pos: Point2D<f32, SquareGridInWorldFrame>,
     ) -> Point2D<f32, BrailleGridInWorldFrame> {
-        Glyph::character_world_pos_to_braille_pos(Glyph::world_point_to_world_character_point(pos))
+        Glyph::world_character_point_to_braille_point(Glyph::world_point_to_world_character_point(
+            pos,
+        ))
     }
 
     pub fn braille_square_to_dot_in_character(
@@ -404,7 +406,7 @@ impl Glyph {
         point2((pos.x % 2).abs(), (pos.y % 4).abs())
     }
 
-    pub fn braille_grid_to_character_grid(
+    pub fn world_braille_square_to_world_character_square(
         braille_square: Point2D<i32, BrailleGridInWorldFrame>,
     ) -> Point2D<i32, CharacterGridInWorldFrame> {
         point2(
@@ -423,10 +425,11 @@ impl Glyph {
 
         let mut glyph_map = HashMap::<Point2D<i32, CharacterGridInWorldFrame>, Glyph>::new();
 
-        let start_braille_grid_square = Glyph::character_world_pos_to_braille_pos(start_char_point)
-            .round()
-            .to_i32();
-        let end_braille_grid_square = Glyph::character_world_pos_to_braille_pos(end_char_point)
+        let start_braille_grid_square =
+            Glyph::world_character_point_to_braille_point(start_char_point)
+                .round()
+                .to_i32();
+        let end_braille_grid_square = Glyph::world_character_point_to_braille_point(end_char_point)
             .round()
             .to_i32();
 
@@ -435,7 +438,8 @@ impl Glyph {
             end_braille_grid_square.to_tuple(),
         ) {
             let braille_pos = Point2D::<i32, BrailleGridInWorldFrame>::new(x, y);
-            let character_grid_square = Glyph::braille_grid_to_character_grid(braille_pos);
+            let character_grid_square =
+                Glyph::world_braille_square_to_world_character_square(braille_pos);
             if !glyph_map.contains_key(&character_grid_square) {
                 glyph_map.insert(
                     character_grid_square,
@@ -463,7 +467,7 @@ impl Glyph {
         Glyph::add_braille_dot(
             character,
             Glyph::braille_square_to_dot_in_character(
-                Glyph::character_world_pos_to_braille_pos(world_pos)
+                Glyph::world_character_point_to_braille_point(world_pos)
                     .round()
                     .to_i32(),
             ),
@@ -482,7 +486,56 @@ impl Glyph {
     }
 
     pub fn points_to_braille_glyphs(points: Vec<WorldPoint>, color: RGB8) -> WorldGlyphMap {
-        todo!()
+        // bin braille squares by world character squares
+        let mut local_braille_squares_by_character_square =
+            HashMap::<WorldCharacterSquare, HashSet<WorldBrailleSquare>>::new();
+
+        for point in points {
+            let char_point = Glyph::world_point_to_world_character_point(point);
+            let char_square = char_point.round().to_i32();
+            let braille_square = Glyph::world_character_point_to_braille_point(char_point)
+                .round()
+                .to_i32();
+            let local_braille_square = Glyph::braille_square_to_dot_in_character(braille_square);
+
+            if !local_braille_squares_by_character_square.contains_key(&char_square) {
+                local_braille_squares_by_character_square
+                    .insert(char_square, HashSet::<WorldBrailleSquare>::new());
+            }
+            local_braille_squares_by_character_square
+                .get_mut(&char_square)
+                .unwrap()
+                .insert(local_braille_square);
+        }
+
+        let mut output_map = WorldGlyphMap::new();
+
+        for (char_square, braille_square_set) in local_braille_squares_by_character_square {
+            let braille_char: char = Glyph::local_braille_squares_to_braille_char(
+                braille_square_set.into_iter().collect(),
+            );
+            let braille_glyph = Glyph {
+                character: braille_char,
+                fg_color: color,
+                bg_color: BLACK,
+            };
+            output_map.insert(char_square, braille_glyph);
+        }
+        output_map
+    }
+
+    fn local_braille_squares_to_braille_array(squares: Vec<WorldBrailleSquare>) -> BrailleArray {
+        let mut output_array: BrailleArray = [[false; 4]; 2];
+        for square in squares {
+            assert!(square.x >= 0 || square.x < 2);
+            assert!(square.y >= 0 || square.y < 4);
+            output_array[square.x as usize][square.y as usize] = true;
+        }
+        output_array
+    }
+
+    fn local_braille_squares_to_braille_char(squares: Vec<WorldBrailleSquare>) -> char {
+        Glyph::braille_array_to_braille_char(Glyph::local_braille_squares_to_braille_array(squares))
     }
 }
 
@@ -688,14 +741,14 @@ mod tests {
         // 01
         // 01
         let input = [[false, false, false, true], [true, true, false, false]];
-        assert_eq!(Glyph::array_to_braille(input), '⢡');
+        assert_eq!(Glyph::braille_array_to_braille_char(input), '⢡');
 
         // 00
         // 11
         // 01
         // 00
         let input = [[false, false, true, false], [false, true, true, false]];
-        assert_eq!(Glyph::array_to_braille(input), '⠲');
+        assert_eq!(Glyph::braille_array_to_braille_char(input), '⠲');
     }
 
     #[test]
@@ -713,8 +766,8 @@ mod tests {
 
     #[test]
     fn test_chars_for_horizontal_braille_line_without_rounding() {
-        let start = point2(-0.25, -0.4);
-        let end = point2(1.75, -0.4);
+        let start: WorldCharacterPoint = point2(-0.25, -0.4);
+        let end: WorldCharacterPoint = point2(1.75, -0.4);
 
         // Expected braille:
         // 00 00 00
@@ -722,7 +775,10 @@ mod tests {
         // 00 00 00
         // 11 11 10
 
-        let line_glyphs = Glyph::get_glyphs_for_braille_line(start, end);
+        let line_glyphs = Glyph::get_glyphs_for_braille_line(
+            Glyph::world_character_point_to_world_point(start),
+            Glyph::world_character_point_to_world_point(end),
+        );
         assert_eq!(line_glyphs.len(), 3);
 
         assert_eq!(
@@ -741,8 +797,8 @@ mod tests {
 
     #[test]
     fn test_chars_for_horizontal_braille_line_with_offset_without_rounding() {
-        let start = point2(-0.25, 0.4);
-        let end = point2(1.75, 0.4);
+        let start = WorldCharacterPoint::new(-0.25, 0.4);
+        let end = WorldCharacterPoint::new(1.75, 0.4);
 
         // Expected braille:
         // 11 11 10
@@ -750,7 +806,10 @@ mod tests {
         // 00 00 00
         // 00 00 00
 
-        let line_glyphs = Glyph::get_glyphs_for_braille_line(start, end);
+        let line_glyphs = Glyph::get_glyphs_for_braille_line(
+            Glyph::world_character_point_to_world_point(start),
+            Glyph::world_character_point_to_world_point(end),
+        );
         assert_eq!(line_glyphs.len(), 3);
 
         assert_eq!(
@@ -769,8 +828,8 @@ mod tests {
 
     #[test]
     fn test_chars_for_vertical_braille_line_without_rounding() {
-        let start = point2(-0.25, -0.4);
-        let end = point2(-0.25, 0.875);
+        let start = WorldCharacterPoint::new(-0.25, -0.4);
+        let end = WorldCharacterPoint::new(-0.25, 0.875);
 
         // Expected braille:
         // 00
@@ -783,7 +842,10 @@ mod tests {
         // 10
         // 10
 
-        let line_glyphs = Glyph::get_glyphs_for_braille_line(start, end);
+        let line_glyphs = Glyph::get_glyphs_for_braille_line(
+            Glyph::world_character_point_to_world_point(start),
+            Glyph::world_character_point_to_world_point(end),
+        );
         assert_eq!(line_glyphs.len(), 2);
 
         assert_eq!(
@@ -799,23 +861,23 @@ mod tests {
     #[test]
     fn test_braille_grid_to_character_grid() {
         assert_eq!(
-            Glyph::braille_grid_to_character_grid(point2(0, 0)),
+            Glyph::world_braille_square_to_world_character_square(point2(0, 0)),
             point2(0, 0)
         );
         assert_eq!(
-            Glyph::braille_grid_to_character_grid(point2(1, 3)),
+            Glyph::world_braille_square_to_world_character_square(point2(1, 3)),
             point2(0, 0)
         );
         assert_eq!(
-            Glyph::braille_grid_to_character_grid(point2(-1, -1)),
+            Glyph::world_braille_square_to_world_character_square(point2(-1, -1)),
             point2(-1, -1)
         );
         assert_eq!(
-            Glyph::braille_grid_to_character_grid(point2(2, 8)),
+            Glyph::world_braille_square_to_world_character_square(point2(2, 8)),
             point2(1, 2)
         );
         assert_eq!(
-            Glyph::braille_grid_to_character_grid(point2(21, 80)),
+            Glyph::world_braille_square_to_world_character_square(point2(21, 80)),
             point2(10, 20)
         );
     }
@@ -823,15 +885,15 @@ mod tests {
     #[test]
     fn test_world_pos_to_braille_pos() {
         assert_eq!(
-            Glyph::character_world_pos_to_braille_pos(point2(0.0, 0.0)),
+            Glyph::world_character_point_to_braille_point(point2(0.0, 0.0)),
             point2(0.5, 1.5)
         );
         assert_eq!(
-            Glyph::character_world_pos_to_braille_pos(point2(1.0, 0.0)),
+            Glyph::world_character_point_to_braille_point(point2(1.0, 0.0)),
             point2(2.5, 1.5)
         );
         assert_eq!(
-            Glyph::character_world_pos_to_braille_pos(point2(0.25, 0.375)),
+            Glyph::world_character_point_to_braille_point(point2(0.25, 0.375)),
             point2(1.0, 3.0)
         );
     }
@@ -955,6 +1017,11 @@ mod tests {
         // │ o│  ││  │  │
         // │  │  ││  │  │
         // └──┴──┘└──┴──┘
+
+        // 00 00  00 00
+        // 00 10  00 11
+        // 01 00  00 00
+        // 00 00  00 00
 
         let points = vec![
             WorldPoint::new(0.1, 0.1),

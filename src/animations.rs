@@ -6,7 +6,8 @@ use std::f32::consts::{PI, TAU};
 use std::time::Duration;
 
 use crate::{
-    BufferSquare, Glyph, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare, EXPLOSION_COLOR, RED,
+    BufferCharacterSquare, Glyph, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
+    EXPLOSION_COLOR, RED,
 };
 
 pub trait Animation {

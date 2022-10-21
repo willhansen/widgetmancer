@@ -19,11 +19,11 @@ use termion::terminal_size;
 
 use crate::piece::Piece;
 use crate::{
-    get_by_point, point_to_string, BrailleGridInWorldFrame, BufferPoint, BufferSquare,
-    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, Game, Glyph,
-    IPoint, PieceType, ScreenPoint, SquareGridInWorldFrame, WorldCharacterPoint, WorldGlyphMap,
-    WorldMove, WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
-    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    get_by_point, point_to_string, BrailleGridInWorldFrame, BufferCharacterPoint,
+    BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
+    CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
+    SquareGridInWorldFrame, WorldCharacterPoint, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
+    WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -96,7 +96,7 @@ impl Graphics {
     pub fn world_character_point_to_buffer_point(
         &self,
         world_character_point: WorldCharacterPoint,
-    ) -> BufferPoint {
+    ) -> BufferCharacterPoint {
         // buffer indexes from 0, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         point2(
@@ -121,7 +121,7 @@ impl Graphics {
         self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
 
-    pub fn world_point_to_buffer_point(&self, world_point: WorldPoint) -> BufferPoint {
+    pub fn world_point_to_buffer_point(&self, world_point: WorldPoint) -> BufferCharacterPoint {
         self.world_character_point_to_buffer_point(Glyph::world_point_to_world_character_point(
             world_point,
         ))
@@ -134,7 +134,9 @@ impl Graphics {
         self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
 
-    pub fn buffer_point_to_screen_point(buffer_point: BufferPoint) -> ScreenPoint {
+    pub fn buffer_point_to_screen_point(
+        buffer_point: BufferCharacterPoint,
+    ) -> ScreenCharacterPoint {
         // Buffer indexes from 0
         // Screen indexes from 1
         point2(buffer_point.x + 1.0, buffer_point.y + 1.0)
