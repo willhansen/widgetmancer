@@ -401,6 +401,9 @@ impl Graphics {
         self.active_animations
             .push(Box::new(Explosion::new(position)));
     }
+    pub fn add_selector(&mut self, square: WorldSquare) {
+        self.active_animations.push(Box::new(Selector::new(square)));
+    }
 
     pub fn draw_animations(&mut self, delta: Duration) {
         for mut animation in &mut self.active_animations {

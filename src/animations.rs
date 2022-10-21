@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use crate::{
     BufferCharacterSquare, Glyph, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    EXPLOSION_COLOR, RED,
+    EXPLOSION_COLOR, RED, SELECTOR_COLOR,
 };
 
 pub trait Animation {
@@ -109,7 +109,22 @@ impl Selector {
 
 impl Animation for Selector {
     fn glyphs(&self) -> WorldGlyphMap {
-        todo!()
+        let num_dots = 3;
+        let radius_in_squares = 1.0;
+
+        let rotation_rate_rad_per_s = 3.0;
+
+        let base_angle = Angle::radians(rotation_rate_rad_per_s * self.age.as_secs_f32());
+        let mut points = vec![];
+        for i in 0..num_dots {
+            let radians: f32 = (base_angle * i as f32).radians;
+            let point = WorldPoint::new(
+                radius_in_squares * radians.cos(),
+                radius_in_squares * radians.sin(),
+            );
+            points.push(point);
+        }
+        Glyph::points_to_braille_glyphs(points, SELECTOR_COLOR)
     }
 
     fn advance(&mut self, delta: Duration) {
@@ -117,6 +132,7 @@ impl Animation for Selector {
     }
 
     fn finished(&self) -> bool {
-        false
+        true
+        //self.age > Duration::from_millis(200)
     }
 }

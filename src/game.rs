@@ -176,6 +176,12 @@ impl Game {
             .count() as i32
     }
 
+    pub fn select_all_pieces(&mut self) {
+        for square in self.pieces.keys().cloned() {
+            self.graphics.add_selector(square);
+        }
+    }
+
     pub fn move_all_pieces(&mut self) {
         let mut moved_piece_locations = HashSet::<WorldSquare>::new();
         let piece_start_locations: SquareList = self.pieces.keys().cloned().collect();

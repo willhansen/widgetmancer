@@ -308,3 +308,16 @@ fn test_sniper_one_shot_one_kill() {
     game.player_shoot_sniper();
     assert_eq!(game.piece_type_count(PieceType::Pawn), 0);
 }
+
+#[test]
+fn test_selector() {
+    let mut game = set_up_game_with_player_in_corner();
+    let test_square = point2(5, 5);
+    game.place_piece(Piece::pawn(), test_square)
+        .expect("place piece");
+    game.select_all_pieces();
+    game.draw_headless(Duration::from_millis(0));
+
+    todo!()
+    //assert!(game.borrow_graphics_mut().count_particles_in_rect(Rect2D))
+}
