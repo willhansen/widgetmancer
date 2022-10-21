@@ -118,11 +118,11 @@ impl Animation for Selector {
         let mut points = vec![];
         for i in 0..num_dots {
             let radians: f32 = (base_angle * i as f32).radians;
-            let point = WorldPoint::new(
+            let relative_point = WorldMove::new(
                 radius_in_squares * radians.cos(),
                 radius_in_squares * radians.sin(),
             );
-            points.push(point);
+            points.push(self.square.to_f32() + relative_point);
         }
         Glyph::points_to_braille_glyphs(points, SELECTOR_COLOR)
     }
