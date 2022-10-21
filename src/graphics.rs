@@ -5,7 +5,7 @@ use std::f32::consts::{PI, TAU};
 use std::io::Write;
 use std::mem::swap;
 use std::ptr::hash;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::animations::*;
 use crate::num::ToPrimitive;
@@ -34,6 +34,7 @@ pub struct Graphics {
     terminal_width: u16,
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
+    start_time: Instant,
 }
 
 impl Graphics {
@@ -50,7 +51,12 @@ impl Graphics {
             terminal_width,
             terminal_height,
             active_animations: vec![],
+            start_time: Instant::now(),
         }
+    }
+
+    fn time_from_start(&self) -> Duration {
+        Instant::now().duration_since(self.start_time)
     }
 
     fn terminal_width(&self) -> i32 {

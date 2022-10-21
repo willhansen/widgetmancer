@@ -109,15 +109,15 @@ impl Selector {
 
 impl Animation for Selector {
     fn glyphs(&self) -> WorldGlyphMap {
-        let num_dots = 3;
-        let radius_in_squares = 1.0;
+        let num_dots = 5;
+        let radius_in_squares = f32::sqrt(2.0) / 2.0;
 
         let rotation_rate_rad_per_s = 3.0;
 
         let base_angle = Angle::radians(rotation_rate_rad_per_s * self.age.as_secs_f32());
         let mut points = vec![];
         for i in 0..num_dots {
-            let radians: f32 = (base_angle * i as f32).radians;
+            let radians: f32 = (base_angle).radians + i as f32 / num_dots as f32 * TAU;
             let relative_point = WorldMove::new(
                 radius_in_squares * radians.cos(),
                 radius_in_squares * radians.sin(),
@@ -132,7 +132,7 @@ impl Animation for Selector {
     }
 
     fn finished(&self) -> bool {
-        true
+        false
         //self.age > Duration::from_millis(200)
     }
 }
