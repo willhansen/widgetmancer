@@ -310,6 +310,8 @@ impl Game {
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square).expect("capture with sniper");
+                self.graphics
+                    .add_sniper_shot(self.player_position.to_f32(), square.to_f32());
             }
         }
     }

@@ -48,6 +48,37 @@ impl Animation for Laser {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
+pub struct SniperShot {
+    start: WorldPoint,
+    end: WorldPoint,
+    age: Duration,
+}
+
+impl SniperShot {
+    pub fn new(start: WorldPoint, end: WorldPoint) -> SniperShot {
+        SniperShot {
+            start,
+            end,
+            age: Duration::from_millis(0),
+        }
+    }
+}
+
+impl Animation for SniperShot {
+    fn glyphs(&self) -> WorldGlyphMap {
+        Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
+    }
+
+    fn advance(&mut self, delta: Duration) {
+        self.age += delta;
+    }
+
+    fn finished(&self) -> bool {
+        self.age > Duration::from_millis(100)
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Explosion {
     position: WorldPoint,
     age: Duration,

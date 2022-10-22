@@ -405,6 +405,10 @@ impl Graphics {
         self.active_animations
             .push(Box::new(Laser::new(start, end)));
     }
+    pub fn add_sniper_shot(&mut self, start: WorldPoint, end: WorldPoint) {
+        self.active_animations
+            .push(Box::new(SniperShot::new(start, end)));
+    }
 
     pub fn add_explosion(&mut self, position: WorldPoint) {
         self.active_animations
