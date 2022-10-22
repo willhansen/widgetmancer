@@ -305,8 +305,11 @@ fn test_particles_on_piece_death() {
 #[test]
 fn test_sniper_one_shot_one_kill() {
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(3, 20);
+    game.select_closest_piece();
     game.player_shoot_sniper();
+    game.select_closest_piece();
     game.player_shoot_sniper();
+    game.select_closest_piece();
     game.player_shoot_sniper();
     assert_eq!(game.piece_type_count(PieceType::Pawn), 0);
 }
