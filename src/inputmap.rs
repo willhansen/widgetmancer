@@ -23,6 +23,7 @@ impl InputMap {
             Event::Key(ke) => match ke {
                 Key::Char('q') => game.quit(),
                 Key::Char(' ') => game.player_shoot_shotgun(),
+                Key::Char('f') => game.player_shoot_sniper(),
 
                 Key::Char('k') | Key::Char('w') | Key::Up => {
                     game.move_player(UP_I.cast_unit()).ok();

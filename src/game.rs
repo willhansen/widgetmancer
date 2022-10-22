@@ -29,6 +29,7 @@ pub struct Game {
     pieces: HashMap<WorldSquare, Piece>,
     turn_count: u32,
     selectors: Vec<Selector>,
+    selected_square: Option<WorldSquare>,
 }
 
 impl Game {
@@ -46,6 +47,7 @@ impl Game {
             pieces: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
+            selected_square: None,
         }
     }
 
@@ -189,6 +191,7 @@ impl Game {
     pub fn select_closest_piece(&mut self) {
         let closest_piece_square: Option<WorldSquare> = self.square_of_closest_piece_to_player();
 
+        self.selected_square = closest_piece_square;
         if let Some(square) = closest_piece_square {
             self.graphics.select_squares(vec![square]);
         } else {
@@ -304,7 +307,11 @@ impl Game {
     }
 
     pub fn player_shoot_sniper(&mut self) {
-        // TODO
+        if let Some(square) = self.selected_square {
+            if self.pieces.contains_key(&square) {
+                self.capture_piece_at(square).expect("capture with sniper");
+            }
+        }
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
