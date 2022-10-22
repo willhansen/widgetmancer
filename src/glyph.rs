@@ -23,6 +23,7 @@ pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', 
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
 pub type BrailleArray = [[bool; 4]; 2];
+pub type TwoGlyphs = [Glyph; 2];
 
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
@@ -393,12 +394,15 @@ impl Glyph {
             .to_i32()
     }
 
-    pub fn world_pos_to_braille_pos(
-        pos: Point2D<f32, SquareGridInWorldFrame>,
-    ) -> Point2D<f32, BrailleGridInWorldFrame> {
+    pub fn world_point_to_world_braille_point(pos: WorldPoint) -> WorldBraillePoint {
         Glyph::world_character_point_to_braille_point(Glyph::world_point_to_world_character_point(
             pos,
         ))
+    }
+    pub fn world_braille_point_to_world_point(pos: WorldBraillePoint) -> WorldPoint {
+        Glyph::world_character_point_to_world_point(
+            Glyph::world_braille_point_to_world_character_point(pos),
+        )
     }
 
     pub fn braille_square_to_dot_in_character(
@@ -407,13 +411,41 @@ impl Glyph {
         point2((pos.x % 2).abs(), (pos.y % 4).abs())
     }
 
-    pub fn world_braille_square_to_world_character_square(
-        braille_square: Point2D<i32, BrailleGridInWorldFrame>,
-    ) -> Point2D<i32, CharacterGridInWorldFrame> {
+    pub fn world_braille_point_to_world_character_point(
+        braille_point: WorldBraillePoint,
+    ) -> WorldCharacterPoint {
         point2(
-            ((braille_square.x as f32 - 0.5) / 2.0).round() as i32,
-            ((braille_square.y as f32 - 1.5) / 4.0).round() as i32,
+            (braille_point.x as f32 - 0.5) / 2.0,
+            (braille_point.y as f32 - 1.5) / 4.0,
         )
+    }
+
+    pub fn world_braille_square_to_world_character_square(
+        braille_square: WorldBrailleSquare,
+    ) -> WorldCharacterSquare {
+        Glyph::world_braille_point_to_world_character_point(braille_square.to_f32())
+            .round()
+            .to_i32()
+    }
+
+    pub fn world_points_for_braille_line(
+        start_pos: WorldPoint,
+        end_pos: WorldPoint,
+    ) -> Vec<WorldPoint> {
+        let braille_start_square = Glyph::world_point_to_world_braille_point(start_pos)
+            .round()
+            .to_i32();
+        let braille_end_square = Glyph::world_point_to_world_braille_point(end_pos)
+            .round()
+            .to_i32();
+
+        line_drawing::Bresenham::new(
+            braille_start_square.to_tuple(),
+            braille_end_square.to_tuple(),
+        )
+        .map(|(x, y)| WorldBraillePoint::new(x as f32, y as f32))
+        .map(Glyph::world_braille_point_to_world_point)
+        .collect()
     }
 
     pub fn get_glyphs_for_colored_braille_line(

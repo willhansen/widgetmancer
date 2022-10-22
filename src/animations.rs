@@ -66,7 +66,10 @@ impl SniperShot {
 
 impl Animation for SniperShot {
     fn glyphs(&self) -> WorldGlyphMap {
-        Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
+        let line_points: Vec<WorldPoint> =
+            Glyph::world_points_for_braille_line(self.start, self.end);
+        Glyph::points_to_braille_glyphs(line_points, RED)
+        //Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
     fn advance(&mut self, delta: Duration) {

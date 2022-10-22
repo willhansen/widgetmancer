@@ -47,7 +47,7 @@ impl Piece {
     }
 
     pub fn glyphs(&self) -> [Glyph; 2] {
-        Piece::chars_for_type(self.piece_type).map(|character| Glyph::from_char(character))
+        Piece::chars_for_type(self.piece_type).map(Glyph::from_char)
     }
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {

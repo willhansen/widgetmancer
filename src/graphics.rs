@@ -23,8 +23,9 @@ use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferCharacterPoint,
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    SquareGridInWorldFrame, WorldCharacterPoint, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterPoint, WorldGlyphMap, WorldMove,
+    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
+    RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -197,18 +198,6 @@ impl Graphics {
     ////////////////////////////////////////////////////////////////////////////////
     // CONVERSIONS END
     ////////////////////////////////////////////////////////////////////////////////
-
-    fn braille_bresenham_line_points(
-        start_pos: Point2D<f32, SquareGridInWorldFrame>,
-        end_pos: Point2D<f32, SquareGridInWorldFrame>,
-    ) -> Vec<Point2D<f32, BrailleGridInWorldFrame>> {
-        let braille_pos0 = Glyph::world_pos_to_braille_pos(start_pos).round().to_i32();
-        let braille_pos1 = Glyph::world_pos_to_braille_pos(end_pos).round().to_i32();
-
-        line_drawing::Bresenham::new(braille_pos0.to_tuple(), braille_pos1.to_tuple())
-            .map(|(x, y)| Point2D::<f32, BrailleGridInWorldFrame>::new(x as f32, y as f32))
-            .collect()
-    }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> i32 {
         return if self.square_is_on_screen(square) {
