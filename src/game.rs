@@ -12,7 +12,7 @@ use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
     point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector,
-    SquareGridInWorldFrame, SquareList, WorldPoint, WorldSquare, WorldStep, LEFT_I,
+    SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare, WorldStep, LEFT_I,
 };
 
 pub struct Game {
@@ -185,6 +185,29 @@ impl Game {
     pub fn select_all_pieces(&mut self) {
         self.graphics
             .select_squares(self.pieces.keys().cloned().collect());
+    }
+    pub fn select_closest_piece(&mut self) {
+        let closest_piece_square: Option<WorldSquare> = self.square_of_closest_piece_to_player();
+
+        if let Some(square) = closest_piece_square {
+            self.graphics.select_squares(vec![square]);
+        } else {
+            self.graphics.select_squares(vec![]);
+        }
+    }
+
+    fn square_of_closest_piece_to_player(&self) -> Option<WorldSquare> {
+        let slightly_right_of_player_position: WorldPoint =
+            self.player_position.to_f32() + WorldMove::new(0.01, 0.0);
+
+        self.pieces
+            .keys()
+            .min_by_key(|square| {
+                ordered_float::OrderedFloat(
+                    (square.to_f32() - slightly_right_of_player_position).length(),
+                )
+            })
+            .cloned()
     }
 
     pub fn move_all_pieces(&mut self) {

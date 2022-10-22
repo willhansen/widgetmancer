@@ -94,7 +94,7 @@ pub fn do_everything() {
         while let Ok(event) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
             game.move_all_pieces();
-            game.select_all_pieces();
+            game.select_closest_piece();
             if game.turn_count() % 5 == 0 {
                 game.place_randomly(Piece::pawn())
                     .expect("random placement");
