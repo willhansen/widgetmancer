@@ -2,12 +2,12 @@ use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::{E, PI, TAU};
 use std::time::Duration;
 
 use crate::{
     BufferCharacterSquare, Glyph, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    EXPLOSION_COLOR, RED, SELECTOR_COLOR,
+    EXPLOSION_COLOR, RED, SELECTOR_COLOR, UP_I,
 };
 
 pub trait Animation {
@@ -66,8 +66,30 @@ impl SniperShot {
 
 impl Animation for SniperShot {
     fn glyphs(&self) -> WorldGlyphMap {
-        let line_points: Vec<WorldPoint> =
+        let mut line_points: Vec<WorldPoint> =
             Glyph::world_points_for_braille_line(self.start, self.end);
+        // pretty arbitrary
+        let hash = ((self.start.x * PI + self.start.y)
+            * 1000.0
+            * (self.end.x * E + self.end.y * TAU * 5.0))
+            .abs()
+            .floor()
+            .to_u64()
+            .unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
+        let vertical_drift_speed_blocks_per_s = 3.0;
+        let random_drift_speed_blocks_per_s = 1.0;
+        for mut point in &mut line_points {
+            let vertical_displacement: WorldMove = WorldMove::new(0.0, 1.0)
+                * vertical_drift_speed_blocks_per_s
+                * self.age.as_secs_f32();
+            let random_angle = Angle::radians(rng.gen_range(0.0..=TAU));
+            let random_displacement = WorldMove::from_angle_and_length(
+                random_angle,
+                random_drift_speed_blocks_per_s * self.age.as_secs_f32(),
+            );
+            *point += vertical_displacement + random_displacement;
+        }
         Glyph::points_to_braille_glyphs(line_points, RED)
         //Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
@@ -77,7 +99,7 @@ impl Animation for SniperShot {
     }
 
     fn finished(&self) -> bool {
-        self.age > Duration::from_millis(100)
+        self.age > Duration::from_millis(500)
     }
 }
 
@@ -98,6 +120,7 @@ impl Explosion {
 
 impl Animation for Explosion {
     fn glyphs(&self) -> WorldGlyphMap {
+        // rather arbitrary
         let hash = ((self.position.x * PI + self.position.y) * 1000.0)
             .abs()
             .floor()
