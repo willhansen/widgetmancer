@@ -7,6 +7,7 @@ use euclid::*;
 use line_drawing::Point;
 use rand::{thread_rng, Rng};
 
+use crate::animations::Selector;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
@@ -19,7 +20,7 @@ pub struct Game {
     board_height: usize,
     // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
-    pub(crate) running: bool,
+    running: bool,
     // set false to quit
     player_position: WorldSquare,
     player_faced_direction: WorldStep,
@@ -27,6 +28,7 @@ pub struct Game {
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
     turn_count: u32,
+    selectors: Vec<Selector>,
 }
 
 impl Game {
@@ -43,6 +45,7 @@ impl Game {
             graphics: Graphics::new(terminal_width, terminal_height),
             pieces: HashMap::new(),
             turn_count: 0,
+            selectors: vec![],
         }
     }
 
@@ -81,6 +84,9 @@ impl Game {
 
     pub fn quit(&mut self) {
         self.running = false;
+    }
+    pub fn running(&self) -> bool {
+        self.running
     }
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
@@ -129,7 +135,7 @@ impl Game {
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
-        self.graphics.draw_animations(delta);
+        self.graphics.play_animations(delta);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);
@@ -177,9 +183,8 @@ impl Game {
     }
 
     pub fn select_all_pieces(&mut self) {
-        for square in self.pieces.keys().cloned() {
-            self.graphics.add_selector(square);
-        }
+        self.graphics
+            .select_squares(self.pieces.keys().cloned().collect());
     }
 
     pub fn move_all_pieces(&mut self) {
@@ -226,6 +231,7 @@ impl Game {
 
         if let Some(square) = capture_option {
             self.player_is_dead = true;
+            self.quit();
             self.move_piece(pos, square);
             return Some(square);
         }

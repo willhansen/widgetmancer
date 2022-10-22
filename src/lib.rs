@@ -85,7 +85,7 @@ pub fn do_everything() {
         .expect("Failed to place pawn");
 
     let mut prev_start_time = Instant::now();
-    while game.running {
+    while game.running() {
         //let start_time = Instant::now();
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;

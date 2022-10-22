@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::borrow::Borrow;
 use std::cmp::min;
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ pub struct Graphics {
     terminal_width: u16,
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
+    selectors: Vec<Selector>,
     start_time: Instant,
 }
 
@@ -51,6 +53,7 @@ impl Graphics {
             terminal_width,
             terminal_height,
             active_animations: vec![],
+            selectors: vec![],
             start_time: Instant::now(),
         }
     }
@@ -411,26 +414,39 @@ impl Graphics {
         self.active_animations.push(Box::new(Selector::new(square)));
     }
 
-    pub fn draw_animations(&mut self, delta: Duration) {
-        for mut animation in &mut self.active_animations {
-            animation.advance(delta);
-        }
+    pub fn play_animations(&mut self, delta: Duration) {
+        self.draw_animations();
+        self.advance_animations(delta);
+    }
 
+    fn draw_animations(&mut self) {
         let mut glyphs_to_draw = vec![];
         for animation in &self.active_animations {
             glyphs_to_draw.push(animation.glyphs());
         }
+        for selector in &self.selectors {
+            glyphs_to_draw.push(selector.glyphs())
+        }
 
         for glyph_map in glyphs_to_draw {
             self.draw_glyphs(glyph_map);
+        }
+    }
+
+    fn advance_animations(&mut self, delta: Duration) {
+        for mut animation in &mut self.active_animations {
+            animation.advance(delta);
+        }
+        for mut selector in &mut self.selectors {
+            selector.advance(delta);
         }
 
         self.cull_dead_animations();
     }
 
     fn cull_dead_animations(&mut self) {
-        self.active_animations
-            .drain_filter(|animation| animation.finished());
+        self.active_animations.drain_filter(|x| x.finished());
+        self.selectors.drain_filter(|x| x.finished());
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
@@ -486,6 +502,13 @@ impl Graphics {
             }
         }
         count
+    }
+
+    pub fn select_squares(&mut self, squares: Vec<WorldSquare>) {
+        self.selectors = squares
+            .into_iter()
+            .map(|square| Selector::new(square))
+            .collect();
     }
 }
 
