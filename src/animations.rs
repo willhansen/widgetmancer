@@ -102,9 +102,11 @@ impl Animation for Explosion {
             .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
         let mut points_to_draw: Vec<WorldPoint> = vec![];
-        let num_particles = 10;
+        let num_particles = 20;
         for _ in 0..num_particles {
-            let speed_in_squares_per_second = 10.0 + rng.gen_range(-2.0..=2.0);
+            let radius: f32 = 10.0;
+            let speed_in_squares_per_second = rng.gen_range(0.0..=(radius.powi(2))).sqrt();
+
             let distance_in_squares = speed_in_squares_per_second * self.age.as_secs_f32();
             let angle = Angle::radians(rng.gen_range(0.0..TAU));
             let relative_position = WorldMove::from_angle_and_length(angle, distance_in_squares);
@@ -119,7 +121,7 @@ impl Animation for Explosion {
     }
 
     fn finished(&self) -> bool {
-        self.age > Duration::from_millis(200)
+        self.age > Duration::from_millis(500)
     }
 }
 
