@@ -83,7 +83,7 @@ impl Animation for SniperShot {
             let vertical_displacement: WorldMove = WorldMove::new(0.0, 1.0)
                 * vertical_drift_speed_blocks_per_s
                 * self.age.as_secs_f32();
-            let random_angle = Angle::radians(rng.gen_range(0.0..=TAU));
+            let random_angle = Angle::radians(rng.gen_range(0.0..TAU));
             let random_displacement = WorldMove::from_angle_and_length(
                 random_angle,
                 random_drift_speed_blocks_per_s * self.age.as_secs_f32(),

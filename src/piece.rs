@@ -46,6 +46,13 @@ impl Piece {
         }
     }
 
+    pub fn rook() -> Piece {
+        Piece {
+            piece_type: PieceType::Rook,
+            ai_type: AiType::TowardsPlayer,
+        }
+    }
+
     pub fn glyphs(&self) -> [Glyph; 2] {
         Piece::chars_for_type(self.piece_type).map(Glyph::from_char)
     }
@@ -53,6 +60,7 @@ impl Piece {
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
             PieceType::Pawn => ['♟', ' '],
+            PieceType::Rook => ['♜', ' '],
             _ => panic!("invalid type"),
         }
     }
@@ -79,6 +87,7 @@ impl Piece {
 
     pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
+            PieceType::Rook => get_4_rotations(Vector2D::<i32, SquareGridInWorldFrame>::new(1, 0)),
             _ => vec![],
         }
     }

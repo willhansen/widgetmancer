@@ -343,3 +343,16 @@ fn test_game_over_on_capture_player() {
     game.move_all_pieces();
     assert!(!game.running());
 }
+#[test]
+fn test_rook() {
+    let mut game = set_up_game();
+    game.place_piece(
+        Piece::rook(),
+        game.player_position() + RIGHT_I.cast_unit() * 3,
+    )
+    .expect("place rook");
+
+    assert!(game.running());
+    game.move_all_pieces();
+    assert!(!game.running());
+}
