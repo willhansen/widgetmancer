@@ -52,7 +52,7 @@ impl Piece {
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
-            PieceType::Pawn => ['P', 'a'],
+            PieceType::Pawn => ['♟', ' '],
             _ => panic!("invalid type"),
         }
     }
