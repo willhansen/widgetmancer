@@ -255,12 +255,29 @@ impl Graphics {
         }
     }
     pub fn draw_empty_board(&mut self, width: usize, height: usize) {
+        self.draw_empty_board_with_offset(width, height, 0.2, false)
+    }
+
+    pub fn draw_empty_board_with_offset(
+        &mut self,
+        width: usize,
+        height: usize,
+        offset_fraction: f32,
+        vertical_instead_of_horizontal: bool,
+    ) {
         for x in 0..width {
             for y in 0..height {
-                let mut glyph = Glyph::from_char(' ');
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
-                glyph.bg_color = Graphics::board_color_at_square(world_square);
-                self.draw_glyphs_at_square(world_square, [glyph, glyph]);
+                let square_color = Graphics::board_color_at_square(world_square);
+                let other_square_color =
+                    Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
+                let glyphs = Glyph::double_colored_square_with_offset(
+                    offset_fraction,
+                    vertical_instead_of_horizontal,
+                    square_color,
+                    other_square_color,
+                );
+                self.draw_glyphs_at_square(world_square, glyphs);
             }
         }
     }

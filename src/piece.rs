@@ -81,7 +81,7 @@ impl Piece {
             _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
-    pub fn get_relative_capture_steps(&self) -> StepList {
+    pub fn relative_capture_steps(&self) -> StepList {
         Self::relative_capture_steps_for_type(self.piece_type)
     }
 
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(Piece::pawn().get_relative_capture_steps());
+        let pawn_captureset = HashSet::from_iter(Piece::pawn().relative_capture_steps());
         let correct_captureset =
             HashSet::from([vec2(1, 1), vec2(-1, 1), vec2(1, -1), vec2(-1, -1)]);
         assert_eq!(correct_captureset, pawn_captureset);

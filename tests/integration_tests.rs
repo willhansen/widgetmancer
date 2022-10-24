@@ -344,7 +344,22 @@ fn test_game_over_on_capture_player() {
     assert!(!game.running());
 }
 #[test]
-fn test_rook() {
+fn test_rook_move() {
+    let mut game = set_up_game();
+    game.place_piece(
+        Piece::rook(),
+        // three right, one up
+        game.player_position() + RIGHT_I.cast_unit() * 3 + UP_I.cast_unit() * 1,
+    )
+    .expect("place rook");
+
+    let one_up = game.player_position() + UP_I.cast_unit();
+    assert_eq!(game.get_piece_at(one_up), None);
+    game.move_all_pieces();
+    assert_eq!(game.get_piece_at(one_up), Some(&Piece::rook()));
+}
+#[test]
+fn test_rook_capture() {
     let mut game = set_up_game();
     game.place_piece(
         Piece::rook(),

@@ -240,6 +240,28 @@ impl Game {
         self.pieces.insert(end, piece);
     }
 
+    pub fn steps_in_direction_including_hit(
+        &self,
+        piece_square: WorldSquare,
+        repeating_step: WorldStep,
+    ) -> SquareList {
+        let mut valid_squares: SquareList = vec![];
+        let mut i = 1;
+        loop {
+            let square_in_question = piece_square + repeating_step * i;
+            if !self.square_is_on_board(square_in_question) {
+                break;
+            }
+            valid_squares.push(square_in_question);
+            if !self.square_is_empty(square_in_question) {
+                break;
+            }
+
+            i += 1;
+        }
+        valid_squares
+    }
+
     // returns where the piece moves to, if applicable
     pub fn move_piece_at(&mut self, pos: WorldSquare) -> Option<WorldSquare> {
         if !self.is_piece_at(pos) {
@@ -249,10 +271,9 @@ impl Game {
         let piece = self.get_piece_at(pos).unwrap().clone();
 
         // want to capture the player
-        let capture_option: Option<WorldSquare> = piece
-            .get_relative_capture_steps()
+        let capture_option: Option<WorldSquare> = self
+            .capture_options_for_piece_at(pos)
             .into_iter()
-            .map(|step| pos + step)
             .find(|&square| square == self.player_position);
 
         if let Some(square) = capture_option {
@@ -263,10 +284,9 @@ impl Game {
         }
 
         // want to move closer to player
-        let move_option: Option<WorldSquare> = piece
-            .relative_move_steps()
+        let move_option: Option<WorldSquare> = self
+            .move_options_for_piece_at(pos)
             .into_iter()
-            .map(|step| pos + step)
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
             .min_by_key(|&square| (square - self.player_position).square_length());
 
@@ -276,6 +296,62 @@ impl Game {
         }
 
         None
+    }
+
+    fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
+        if !self.is_piece_at(piece_square) {
+            return vec![]; // should be error instead?
+        }
+
+        let mut move_squares: SquareList = vec![];
+
+        if let Some(piece) = self.get_piece_at(piece_square) {
+            for move_step in piece.relative_move_steps() {
+                let target_square = piece_square + move_step;
+                if self.square_is_on_board(target_square) && self.square_is_empty(target_square) {
+                    move_squares.push(target_square);
+                }
+            }
+
+            for move_direction in piece.move_directions() {
+                let mut squares_to_collision =
+                    self.steps_in_direction_including_hit(piece_square, move_direction);
+                if let Some(last_square) = squares_to_collision.last() {
+                    if !self.square_is_empty(*last_square) {
+                        squares_to_collision.pop();
+                    }
+                }
+                move_squares.append(&mut squares_to_collision);
+            }
+        }
+        move_squares
+    }
+    fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
+        if !self.is_piece_at(piece_square) {
+            return vec![]; // should be error instead?
+        }
+
+        let mut capture_squares: SquareList = vec![];
+
+        if let Some(piece) = self.get_piece_at(piece_square) {
+            for move_step in piece.relative_capture_steps() {
+                let target_square = piece_square + move_step;
+                if self.square_is_on_board(target_square) && !self.square_is_empty(target_square) {
+                    capture_squares.push(target_square);
+                }
+            }
+
+            for move_direction in piece.move_directions() {
+                let mut squares_to_collision =
+                    self.steps_in_direction_including_hit(piece_square, move_direction);
+                if let Some(&last_square) = squares_to_collision.last() {
+                    if !self.square_is_empty(last_square) {
+                        capture_squares.push(last_square);
+                    }
+                }
+            }
+        }
+        capture_squares
     }
 
     pub fn player_shoot_shotgun(&mut self) {

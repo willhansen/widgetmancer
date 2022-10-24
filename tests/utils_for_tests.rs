@@ -1,4 +1,4 @@
-use euclid::{point2, vec2};
+use euclid::point2;
 use rust_roguelike::game::Game;
 use rust_roguelike::piece::Piece;
 use rust_roguelike::utility::{WorldSquare, WorldStep, LEFT_I, RIGHT_I, UP_I};

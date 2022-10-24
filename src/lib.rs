@@ -10,11 +10,6 @@ extern crate num;
 extern crate std;
 extern crate termion;
 
-use enum_as_inner::EnumAsInner;
-use euclid::default::Point2D;
-use glyph::*;
-use ntest::timeout;
-use num::Integer;
 use std::char;
 use std::cmp::{max, min};
 use std::collections::hash_map::Entry;
@@ -24,11 +19,18 @@ use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use enum_as_inner::EnumAsInner;
+use euclid::default::Point2D;
+use ntest::timeout;
+use num::Integer;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
+
+use glyph::*;
 use utility::*;
 
 use crate::game::Game;
@@ -84,6 +86,14 @@ pub fn do_everything() {
     game.place_piece(Piece::pawn(), pawn_pos)
         .expect("Failed to place pawn");
 
+    for _ in 0..5 {
+        game.place_randomly(Piece::pawn())
+            .expect("random placement");
+    }
+    for _ in 0..2 {
+        //game.place_randomly(Piece::rook()).expect("random placement");
+    }
+
     let mut prev_start_time = Instant::now();
     while game.running() {
         //let start_time = Instant::now();
@@ -94,10 +104,6 @@ pub fn do_everything() {
         while let Ok(event) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
             game.move_all_pieces();
-            if game.turn_count() % 5 == 0 {
-                game.place_randomly(Piece::pawn())
-                    .expect("random placement");
-            }
             game.select_closest_piece();
         }
         let delta = Duration::from_millis(20);
