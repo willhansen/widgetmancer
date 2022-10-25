@@ -36,7 +36,7 @@ impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16) -> Game {
         let board_width: usize = (terminal_width / 2) as usize;
         let board_height: usize = terminal_height as usize;
-        Game {
+        let mut game = Game {
             board_width,
             board_height,
             running: true,
@@ -48,7 +48,9 @@ impl Game {
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
-        }
+        };
+        game.graphics.draw_empty_board(board_width, board_height);
+        game
     }
 
     pub fn board_width(&self) -> usize {
@@ -137,7 +139,7 @@ impl Game {
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
-        self.graphics.play_animations(delta);
+        self.graphics.play_all_animations(delta);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);

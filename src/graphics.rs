@@ -23,9 +23,9 @@ use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferCharacterPoint,
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterPoint, WorldGlyphMap, WorldMove,
-    WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
-    RIGHT_I, WHITE,
+    ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterPoint,
+    WorldGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
+    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -37,6 +37,7 @@ pub struct Graphics {
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<Selector>,
+    board_animation: Option<Box<dyn Animation>>,
     start_time: Instant,
 }
 
@@ -55,10 +56,12 @@ impl Graphics {
             terminal_height,
             active_animations: vec![],
             selectors: vec![],
+            board_animation: None,
             start_time: Instant::now(),
         }
     }
 
+    // todo: use, probably
     fn time_from_start(&self) -> Duration {
         Instant::now().duration_since(self.start_time)
     }
@@ -261,13 +264,13 @@ impl Graphics {
 
     pub fn draw_empty_board_with_offset(
         &mut self,
-        width: usize,
-        height: usize,
+        width_in_squares: usize,
+        height_in_squares: usize,
         offset_fraction: f32,
         vertical_instead_of_horizontal: bool,
     ) {
-        for x in 0..width {
-            for y in 0..height {
+        for x in 0..width_in_squares {
+            for y in 0..height_in_squares {
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
                 let square_color = Graphics::board_color_at_square(world_square);
                 let other_square_color =
@@ -425,13 +428,16 @@ impl Graphics {
         self.active_animations.push(Box::new(Selector::new(square)));
     }
 
-    pub fn play_animations(&mut self, delta: Duration) {
-        self.draw_animations();
-        self.advance_animations(delta);
+    pub fn play_all_animations(&mut self, delta: Duration) {
+        self.draw_all_animations();
+        self.advance_all_animations(delta);
     }
 
-    fn draw_animations(&mut self) {
+    fn draw_all_animations(&mut self) {
         let mut glyphs_to_draw = vec![];
+        if let Some(board_animation) = &self.board_animation {
+            glyphs_to_draw.push(board_animation.glyphs());
+        }
         for animation in &self.active_animations {
             glyphs_to_draw.push(animation.glyphs());
         }
@@ -444,7 +450,10 @@ impl Graphics {
         }
     }
 
-    fn advance_animations(&mut self, delta: Duration) {
+    fn advance_all_animations(&mut self, delta: Duration) {
+        if let Some(board_animation) = &mut self.board_animation {
+            board_animation.advance(delta);
+        }
         for mut animation in &mut self.active_animations {
             animation.advance(delta);
         }
@@ -452,10 +461,13 @@ impl Graphics {
             selector.advance(delta);
         }
 
-        self.cull_dead_animations();
+        self.cull_all_dead_animations();
     }
 
-    fn cull_dead_animations(&mut self) {
+    fn cull_all_dead_animations(&mut self) {
+        if let Some(board_animation) = &mut self.board_animation {
+            self.reset_board_animation();
+        }
         self.active_animations.drain_filter(|x| x.finished());
         self.selectors.drain_filter(|x| x.finished());
     }

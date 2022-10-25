@@ -29,6 +29,7 @@ pub type FVector = default::Vector2D<f32>;
 
 pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
 pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
+pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
 
 pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
 pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;

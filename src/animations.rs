@@ -1,13 +1,15 @@
-use euclid::Angle;
-use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::f32::consts::{E, PI, TAU};
 use std::time::Duration;
 
+use euclid::{vec2, Angle};
+use num::ToPrimitive;
+use rand::{Rng, SeedableRng};
+use termion::color::Black;
+
 use crate::{
-    BufferCharacterSquare, Glyph, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    EXPLOSION_COLOR, RED, SELECTOR_COLOR, UP_I,
+    BufferCharacterSquare, Glyph, Graphics, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
+    BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
 };
 
 pub trait Animation {
@@ -193,5 +195,46 @@ impl Animation for Selector {
     fn finished(&self) -> bool {
         false
         //self.age > Duration::from_millis(200)
+    }
+}
+
+pub struct StaticBoard {
+    width: u32,
+    height: u32,
+}
+
+impl StaticBoard {
+    pub fn new(width: u32, height: u32) -> StaticBoard {
+        StaticBoard { width, height }
+    }
+}
+
+impl Animation for StaticBoard {
+    fn glyphs(&self) -> WorldGlyphMap {
+        let mut glyphs = WorldGlyphMap::new();
+        for x in 0..self.width {
+            for y in 0..self.height {
+                let world_square = WorldSquare::new(x as i32, y as i32);
+                let glyph = Glyph {
+                    character: ' ',
+                    fg_color: BLACK,
+                    bg_color: Graphics::board_color_at_square(world_square),
+                };
+                let left_character_square =
+                    Glyph::world_square_to_left_world_character_square(world_square);
+                let right_character_square = left_character_square + vec2(1, 0);
+                glyphs.insert(left_character_square, glyph);
+                glyphs.insert(right_character_square, glyph);
+            }
+        }
+        glyphs
+    }
+
+    fn advance(&mut self, _delta: Duration) {
+        // pass
+    }
+
+    fn finished(&self) -> bool {
+        false
     }
 }

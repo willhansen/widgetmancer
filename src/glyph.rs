@@ -432,6 +432,14 @@ impl Glyph {
             .to_i32()
     }
 
+    pub fn world_square_to_left_world_character_square(
+        world_square: WorldSquare,
+    ) -> WorldCharacterSquare {
+        (Glyph::world_point_to_world_character_point(world_square.to_f32()) + vec2(-0.5, 0.0))
+            .round()
+            .to_i32()
+    }
+
     pub fn world_point_to_world_braille_point(pos: WorldPoint) -> WorldBraillePoint {
         Glyph::world_character_point_to_braille_point(Glyph::world_point_to_world_character_point(
             pos,
