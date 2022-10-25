@@ -17,15 +17,15 @@ pub trait Animation {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct Laser {
+pub struct SimpleLaser {
     start: WorldPoint,
     end: WorldPoint,
     age: Duration,
 }
 
-impl Laser {
-    pub fn new(start: WorldPoint, end: WorldPoint) -> Laser {
-        Laser {
+impl SimpleLaser {
+    pub fn new(start: WorldPoint, end: WorldPoint) -> SimpleLaser {
+        SimpleLaser {
             start,
             end,
             age: Duration::from_millis(0),
@@ -33,7 +33,7 @@ impl Laser {
     }
 }
 
-impl Animation for Laser {
+impl Animation for SimpleLaser {
     fn glyphs(&self) -> WorldGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
@@ -48,15 +48,15 @@ impl Animation for Laser {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct SniperShot {
+pub struct FloatyLaser {
     start: WorldPoint,
     end: WorldPoint,
     age: Duration,
 }
 
-impl SniperShot {
-    pub fn new(start: WorldPoint, end: WorldPoint) -> SniperShot {
-        SniperShot {
+impl FloatyLaser {
+    pub fn new(start: WorldPoint, end: WorldPoint) -> FloatyLaser {
+        FloatyLaser {
             start,
             end,
             age: Duration::from_millis(0),
@@ -64,7 +64,7 @@ impl SniperShot {
     }
 }
 
-impl Animation for SniperShot {
+impl Animation for FloatyLaser {
     fn glyphs(&self) -> WorldGlyphMap {
         let mut line_points: Vec<WorldPoint> =
             Glyph::world_points_for_braille_line(self.start, self.end);

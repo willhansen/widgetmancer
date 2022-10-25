@@ -378,7 +378,8 @@ impl Game {
                 self.capture_piece_at(square).ok();
             }
 
-            self.graphics.add_laser(line_start.to_f32(), line_end);
+            self.graphics
+                .add_simple_laser(line_start.to_f32(), line_end);
         }
     }
 
@@ -387,7 +388,7 @@ impl Game {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square).expect("capture with sniper");
                 self.graphics
-                    .add_sniper_shot(self.player_position.to_f32(), square.to_f32());
+                    .add_floaty_laser(self.player_position.to_f32(), square.to_f32());
             }
         }
     }

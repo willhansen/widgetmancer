@@ -255,7 +255,8 @@ impl Graphics {
         }
     }
     pub fn draw_empty_board(&mut self, width: usize, height: usize) {
-        self.draw_empty_board_with_offset(width, height, 0.2, false)
+        //self.draw_empty_board_with_offset(width, height, -0.2, false)
+        self.draw_empty_board_with_offset(width, height, 0.0, false)
     }
 
     pub fn draw_empty_board_with_offset(
@@ -407,13 +408,13 @@ impl Graphics {
         self.draw_glyphs_at_square(pos, glyphs);
     }
 
-    pub fn add_laser(&mut self, start: WorldPoint, end: WorldPoint) {
+    pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations
-            .push(Box::new(Laser::new(start, end)));
+            .push(Box::new(SimpleLaser::new(start, end)));
     }
-    pub fn add_sniper_shot(&mut self, start: WorldPoint, end: WorldPoint) {
+    pub fn add_floaty_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations
-            .push(Box::new(SniperShot::new(start, end)));
+            .push(Box::new(FloatyLaser::new(start, end)));
     }
 
     pub fn add_explosion(&mut self, position: WorldPoint) {

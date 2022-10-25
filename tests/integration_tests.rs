@@ -242,7 +242,7 @@ fn test_laser_background_is_transparent() {
     // Two lasers, because it can make a difference
     for _ in 0..2 {
         game.borrow_graphics_mut()
-            .add_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
+            .add_simple_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
     }
 
     game.draw_headless(Duration::from_millis(100));
