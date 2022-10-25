@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::f32::consts::{E, PI, TAU};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use euclid::{vec2, Angle};
 use num::ToPrimitive;
@@ -14,8 +14,12 @@ use crate::{
 
 pub trait Animation {
     fn glyphs(&self) -> WorldGlyphMap;
-    fn advance(&mut self, delta: Duration);
+    fn age(&self, current_time: Instant) -> Duration;
     fn finished(&self) -> bool;
+}
+
+pub trait BoardAnimation: Animation {
+    fn next_animation(&self) -> Box<dyn BoardAnimation>;
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -40,8 +44,10 @@ impl Animation for SimpleLaser {
         Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
-    fn advance(&mut self, delta: Duration) {
-        self.age += delta;
+    fn advanced(&mut self, delta: Duration) -> Self {
+        let mut the_copy = self.copy();
+        the_copy.age += delta;
+        the_copy
     }
 
     fn finished(&self) -> bool {
@@ -96,8 +102,10 @@ impl Animation for FloatyLaser {
         //Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
-    fn advance(&mut self, delta: Duration) {
-        self.age += delta;
+    fn advanced(&mut self, delta: Duration) -> Self {
+        let mut the_copy = self.copy();
+        the_copy.age += delta;
+        the_copy
     }
 
     fn finished(&self) -> bool {
@@ -144,8 +152,10 @@ impl Animation for Explosion {
         Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)
     }
 
-    fn advance(&mut self, delta: Duration) {
-        self.age += delta;
+    fn advanced(&mut self, delta: Duration) -> Self {
+        let mut the_copy = self.copy();
+        the_copy.age += delta;
+        the_copy
     }
 
     fn finished(&self) -> bool {
@@ -188,8 +198,10 @@ impl Animation for Selector {
         Glyph::points_to_braille_glyphs(points, SELECTOR_COLOR)
     }
 
-    fn advance(&mut self, delta: Duration) {
-        self.age += delta;
+    fn advanced(&mut self, delta: Duration) -> Self {
+        let mut the_copy = self.copy();
+        the_copy.age += delta;
+        the_copy
     }
 
     fn finished(&self) -> bool {
@@ -198,6 +210,7 @@ impl Animation for Selector {
     }
 }
 
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct StaticBoard {
     width: u32,
     height: u32,
@@ -230,11 +243,17 @@ impl Animation for StaticBoard {
         glyphs
     }
 
-    fn advance(&mut self, _delta: Duration) {
-        // pass
+    fn advanced(&mut self, _delta: Duration) -> Self {
+        *self
     }
 
     fn finished(&self) -> bool {
         false
+    }
+}
+
+impl BoardAnimation for StaticBoard {
+    fn next_animation(&self) -> Box<dyn BoardAnimation> {
+        Box::new(*self)
     }
 }

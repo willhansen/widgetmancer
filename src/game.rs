@@ -49,7 +49,8 @@ impl Game {
             selectors: vec![],
             selected_square: None,
         };
-        game.graphics.draw_empty_board(board_width, board_height);
+        game.graphics
+            .set_empty_board_animation(board_width as u32, board_height as u32);
         game
     }
 
@@ -134,8 +135,6 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, delta: Duration) {
-        self.graphics
-            .draw_empty_board(self.board_width, self.board_height);
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }

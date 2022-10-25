@@ -37,7 +37,7 @@ pub struct Graphics {
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<Selector>,
-    board_animation: Option<Box<dyn Animation>>,
+    board_animation: Option<Box<dyn BoardAnimation>>,
     start_time: Instant,
 }
 
@@ -257,6 +257,11 @@ impl Graphics {
             }
         }
     }
+
+    pub fn set_empty_board_animation(&mut self, width: u32, height: u32) {
+        self.board_animation = Some(Box::new(StaticBoard::new(width, height)));
+    }
+
     pub fn draw_empty_board(&mut self, width: usize, height: usize) {
         //self.draw_empty_board_with_offset(width, height, -0.2, false)
         self.draw_empty_board_with_offset(width, height, 0.0, false)
@@ -428,9 +433,52 @@ impl Graphics {
         self.active_animations.push(Box::new(Selector::new(square)));
     }
 
+    pub fn play_board_animation(&mut self, delta: Duration) {
+        if let Some(board_animation) = self.board_animation {
+            self.play_animation(board_animation, delta);
+        }
+    }
+
+    pub fn play_animation(
+        &mut self,
+        animation: Box<dyn Animation>,
+        delta: Duration,
+    ) -> &Box<dyn Animation> {
+        self.play_animations(vec![animation], delta)
+            .first()
+            .unwrap()
+    }
+
+    pub fn play_animations(
+        &mut self,
+        animations: Vec<Box<dyn Animation>>,
+        delta: Duration,
+    ) -> Vec<Box<dyn Animation>> {
+        self.draw_animations(animations);
+        self.advance_animations(animations, delta)
+    }
+
+    fn draw_animations(&mut self, animations: Vec<Box<dyn Animation>>) {
+        animations
+            .into_iter()
+            .map(|animation| animation.glyphs())
+            .for_each(|glyph_map| self.draw_glyphs(glyph_map))
+    }
+
+    fn advance_animations(
+        &mut self,
+        animations: Vec<Box<dyn Animation>>,
+        delta: Duration,
+    ) -> Vec<Box<dyn Animation>> {
+        for mut animation in &mut self.active_animations {
+            animation.advanced(delta);
+        }
+    }
+
     pub fn play_all_animations(&mut self, delta: Duration) {
         self.draw_all_animations();
         self.advance_all_animations(delta);
+        self.cull_all_dead_animations();
     }
 
     fn draw_all_animations(&mut self) {
@@ -460,13 +508,13 @@ impl Graphics {
         for mut selector in &mut self.selectors {
             selector.advance(delta);
         }
-
-        self.cull_all_dead_animations();
     }
 
     fn cull_all_dead_animations(&mut self) {
         if let Some(board_animation) = &mut self.board_animation {
-            self.reset_board_animation();
+            if board_animation.finished() {
+                self.board_animation = Some(board_animation.next_animation())
+            }
         }
         self.active_animations.drain_filter(|x| x.finished());
         self.selectors.drain_filter(|x| x.finished());
