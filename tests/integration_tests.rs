@@ -31,7 +31,7 @@ fn test_player_drawn_to_screen() {
     let mut game = set_up_game();
     let start_pos = game.player_position();
     game.set_player_faced_direction(RIGHT_I.cast_unit());
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
     let graphics = game.borrow_graphics_mut();
     let drawn_glyphs = graphics.get_buffered_glyphs_for_square(start_pos);
     assert_ne!(drawn_glyphs[0].character, ' ');
@@ -52,7 +52,7 @@ fn test_player_can_not_move_off_low_edge() {
 fn test_player_can_not_move_off_high_edge() {
     let mut game = set_up_game();
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let bottom_right = point2((game.board_width() - 1) as i32, 0);
 
@@ -65,7 +65,7 @@ fn test_player_can_not_move_off_high_edge() {
     let result = game.move_player(DOWN_I.cast_unit());
     assert!(result.is_err());
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn test_checkerboard_background() {
     let mut game = set_up_game();
     game.set_player_position(point2(0, 0)).expect("move player"); // out of the way
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let graphics = game.borrow_graphics_mut();
 
@@ -104,7 +104,7 @@ fn test_draw_placed_pawn() {
     let one_left = game.player_position() + LEFT_I.cast_unit();
     game.place_piece(Piece::pawn(), one_left)
         .expect("Failed to place pawn");
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
     let pawn_glyphs = game
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(one_left);
@@ -200,7 +200,7 @@ fn test_visible_laser() {
     let mut game = set_up_game();
     let inspection_square: WorldSquare = game.player_position() + game.player_faced_direction();
     game.player_shoot_shotgun();
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let drawn_glyphs = game
         .borrow_graphics_mut()
@@ -214,14 +214,14 @@ fn test_player_background_is_transparent() {
     let mut game = set_up_game();
     let inspection_square: WorldSquare = game.player_position();
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let drawn_glyphs_at_pos_1 = game
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(inspection_square);
 
     game.move_player(RIGHT_I.cast_unit()).expect("move player");
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let inspection_square: WorldSquare = game.player_position();
     let drawn_glyphs_at_pos_2 = game
@@ -245,7 +245,7 @@ fn test_laser_background_is_transparent() {
             .add_simple_laser(left_point, left_point + RIGHT_I.cast_unit().to_f32() * 4.0);
     }
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let test_point_a = left_point.round().to_i32() + RIGHT_I.cast_unit();
     let test_point_b = test_point_a + RIGHT_I.cast_unit();
@@ -268,7 +268,7 @@ fn test_pawn_background_is_transparent() {
     game.place_piece(Piece::pawn(), square1).expect("pawn1");
     game.place_piece(Piece::pawn(), square2).expect("pawn2");
 
-    game.draw_headless(Duration::from_millis(100));
+    game.draw_headless_now();
 
     let gr = game.borrow_graphics_mut();
 
@@ -294,7 +294,7 @@ fn test_particles_on_piece_death() {
     game.place_piece(Piece::pawn(), pawn_square)
         .expect("place_pawn");
     game.capture_piece_at(pawn_square).expect("capture pawn");
-    game.draw_headless(Duration::from_millis(0));
+    game.draw_headless_now();
 
     let graphics = game.borrow_graphics_mut();
 
@@ -321,7 +321,7 @@ fn test_selector() {
     game.place_piece(Piece::pawn(), test_square)
         .expect("place piece");
     game.select_all_pieces();
-    game.draw_headless(Duration::from_millis(0));
+    game.draw_headless_now();
 
     let diagonal = WorldStep::new(2, 2);
     let test_area: Box2D<i32, SquareGridInWorldFrame> = Box2D {

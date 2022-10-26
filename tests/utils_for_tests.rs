@@ -2,9 +2,14 @@ use euclid::point2;
 use rust_roguelike::game::Game;
 use rust_roguelike::piece::Piece;
 use rust_roguelike::utility::{WorldSquare, WorldStep, LEFT_I, RIGHT_I, UP_I};
+use std::time::Instant;
 
 pub fn set_up_game() -> Game {
-    Game::new(20, 10)
+    Game::new(20, 10, Instant::now())
+}
+pub fn set_up_game_at_time() -> (Game, Instant) {
+    let start_time = Instant::now();
+    (Game::new(20, 10, start_time), start_time)
 }
 pub fn set_up_pawn_threatening_player() -> Game {
     let mut game = set_up_game();
@@ -32,7 +37,7 @@ pub fn set_up_player_facing_pawn_on_left() -> Game {
 }
 
 pub fn set_up_player_facing_n_pawns_m_blocks_up(num_pawns: i32, blocks_up: i32) -> Game {
-    let mut game = Game::new(20, 10 + blocks_up as u16);
+    let mut game = Game::new(20, 10 + blocks_up as u16, Instant::now());
     game.set_player_position(point2(5, 5))
         .expect("set player position");
     game.set_player_faced_direction(UP_I.cast_unit());

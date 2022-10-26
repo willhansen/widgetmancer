@@ -68,7 +68,7 @@ fn set_up_input_thread() -> Receiver<Event> {
 pub fn do_everything() {
     //let (width, height) = termion::terminal_size().unwrap();
     let (width, height) = (80, 40);
-    let mut game = Game::new(width, height);
+    let mut game = Game::new(width, height, Instant::now());
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
@@ -107,8 +107,7 @@ pub fn do_everything() {
             game.move_all_pieces();
             game.select_closest_piece();
         }
-        let delta = Duration::from_millis(20);
-        game.draw(&mut wrapped_terminal, delta);
-        thread::sleep(delta);
+        game.draw(&mut wrapped_terminal, Instant::now());
+        thread::sleep(Duration::from_millis(20));
     }
 }

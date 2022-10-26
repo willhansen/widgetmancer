@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use euclid::*;
 use line_drawing::Point;
@@ -33,7 +33,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(terminal_width: u16, terminal_height: u16) -> Game {
+    pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
         let board_width: usize = (terminal_width / 2) as usize;
         let board_height: usize = terminal_height as usize;
         let mut game = Game {
@@ -43,7 +43,7 @@ impl Game {
             player_position: point2((board_width / 2) as i32, (board_height / 2) as i32),
             player_faced_direction: LEFT_I.cast_unit(),
             player_is_dead: false,
-            graphics: Graphics::new(terminal_width, terminal_height),
+            graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
@@ -130,15 +130,19 @@ impl Game {
         return &mut self.graphics;
     }
 
-    pub fn draw_headless(&mut self, delta: Duration) {
-        self.draw(&mut None, delta)
+    pub fn draw_headless_at_duration_from_start(&mut self, delta: Duration) {
+        let draw_time = self.graphics.start_time() + delta;
+        self.draw(&mut None, draw_time);
+    }
+    pub fn draw_headless_now(&mut self) {
+        self.draw(&mut None, Instant::now());
     }
 
-    pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, delta: Duration) {
+    pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
-        self.graphics.draw_all_animations(delta);
+        self.graphics.draw_all_animations(time);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);

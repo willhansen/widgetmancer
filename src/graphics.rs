@@ -42,7 +42,7 @@ pub struct Graphics {
 }
 
 impl Graphics {
-    pub(crate) fn new(terminal_width: u16, terminal_height: u16) -> Graphics {
+    pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         Graphics {
             output_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
@@ -57,13 +57,12 @@ impl Graphics {
             active_animations: vec![],
             selectors: vec![],
             board_animation: None,
-            start_time: Instant::now(),
+            start_time,
         }
     }
 
-    // todo: use, probably
-    fn time_from_start(&self) -> Duration {
-        Instant::now().duration_since(self.start_time)
+    pub fn start_time(&self) -> Instant {
+        self.start_time
     }
 
     fn terminal_width(&self) -> i32 {
@@ -435,27 +434,19 @@ impl Graphics {
 
     pub fn draw_board_animation(&mut self, time: Instant) {
         if let Some(board_animation) = &self.board_animation {
-            self.draw_animation(*board_animation, time);
+            self.draw_animation(board_animation.clone(), time);
         }
     }
 
-    fn draw_animation(
-        &mut self,
-        animation: AnimationObject,
-        time: Instant,
-    ) -> Option<AnimationObject> {
-        self.draw_animations(vec![animation], time).first().cloned()
+    fn draw_animation(&mut self, animation: AnimationObject, time: Instant) {
+        self.draw_animations(vec![animation], time)
     }
 
-    fn draw_animations(&mut self, animations: AnimationList, time: Instant) -> AnimationList {
+    fn draw_animations(&mut self, animations: AnimationList, time: Instant) {
         animations
             .into_iter()
             .map(|animation| animation.glyphs_at_time(time))
             .for_each(|glyph_map| self.draw_glyphs(glyph_map));
-        animations
-            .filter(|animation| !animation.finished_at_time(time))
-            .cloned()
-            .collect()
     }
 
     pub fn draw_all_animations(&mut self, time: Instant) {
@@ -561,7 +552,7 @@ mod tests {
 
     #[test]
     fn test_world_to_screen() {
-        let g = Graphics::new(20, 20);
+        let g = Graphics::new(20, 20, Instant::now());
 
         let world_pos = point2(0, 0);
         let screen_pos = point2(1, 20);
@@ -574,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_one_world_square_is_two_characters() {
-        let g = Graphics::new(20, 20);
+        let g = Graphics::new(20, 20, Instant::now());
 
         let world_pos = point2(5, 5); // arbitrary
         let screen_pos1 = g.world_square_to_left_screen_square(world_pos + RIGHT_I.cast_unit());
@@ -584,7 +575,7 @@ mod tests {
 
     #[test]
     fn test_draw_diagonal_braille_line() {
-        let mut g = Graphics::new(40, 20);
+        let mut g = Graphics::new(40, 20, Instant::now());
         let line_start = WorldSquare::new(2, 2);
         let line_end = WorldSquare::new(7, 7);
 

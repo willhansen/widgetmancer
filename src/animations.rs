@@ -27,6 +27,7 @@ dyn_clone::clone_trait_object!(Animation);
 pub trait BoardAnimation: Animation {
     fn next_animation(&self) -> Box<dyn BoardAnimation>;
 }
+dyn_clone::clone_trait_object!(BoardAnimation);
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SimpleLaser {
