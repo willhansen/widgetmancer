@@ -24,8 +24,8 @@ use crate::{
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
     ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterPoint,
-    WorldGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
-    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    WorldGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, BLACK,
+    BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -201,7 +201,7 @@ impl Graphics {
     // CONVERSIONS END
     ////////////////////////////////////////////////////////////////////////////////
 
-    fn count_braille_dots_in_square(&self, square: WorldSquare) -> i32 {
+    fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
         return if self.square_is_on_screen(square) {
             Glyph::count_braille_dots(
                 self.get_buffered_glyph(self.world_square_to_buffer_square(square))
@@ -511,11 +511,8 @@ impl Graphics {
         writer.flush().unwrap();
     }
 
-    pub fn count_buffered_braille_dots_in_rect(
-        &self,
-        rect: Box2D<i32, SquareGridInWorldFrame>,
-    ) -> i32 {
-        let mut count = 0;
+    pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {
+        let mut count: u32 = 0;
         for x in rect.min.x..=rect.max.x {
             for y in rect.min.y..=rect.max.y {
                 let square = WorldSquare::new(x, y);

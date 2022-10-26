@@ -144,10 +144,10 @@ impl Game {
             self.graphics.draw_piece(piece, square);
         }
         self.graphics.draw_non_board_animations(time);
-        self.graphics.remove_finished_animations(time);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);
+        self.graphics.remove_finished_animations(time);
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
@@ -200,10 +200,17 @@ impl Game {
 
         self.selected_square = closest_piece_square;
         if let Some(square) = closest_piece_square {
-            self.graphics.select_squares(vec![square]);
+            self.select_square(square);
         } else {
-            self.graphics.select_squares(vec![]);
+            self.clear_selectors();
         }
+    }
+
+    pub fn select_square(&mut self, square: WorldSquare) {
+        self.graphics.select_squares(vec![square]);
+    }
+    pub fn clear_selectors(&mut self) {
+        self.graphics.select_squares(vec![]);
     }
 
     fn square_of_closest_piece_to_player(&self) -> Option<WorldSquare> {

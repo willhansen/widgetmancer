@@ -349,7 +349,7 @@ impl Glyph {
         x >= 0x2800 && x <= 0x28FF
     }
 
-    pub fn count_braille_dots(character: char) -> i32 {
+    pub fn count_braille_dots(character: char) -> u32 {
         if !Glyph::is_braille(character) {
             return 0;
         }
@@ -359,7 +359,7 @@ impl Glyph {
         for i in 0..num_good_bits {
             sum += (bits >> i) & 1;
         }
-        return sum as i32;
+        return sum as u32;
     }
 
     pub fn add_braille(c1: char, c2: char) -> char {

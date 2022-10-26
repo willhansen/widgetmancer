@@ -1,11 +1,13 @@
 use euclid::*;
 use pretty_assertions::{assert_eq, assert_ne};
+use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::glyph::{Glyph, RED};
 use std::time::Duration;
 
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
-    SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldStep, DOWN_I, LEFT_I, RIGHT_I, UP_I,
+    SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
+    RIGHT_I, UP_I,
 };
 
 use crate::utils_for_tests::{
@@ -370,4 +372,26 @@ fn test_rook_capture() {
     assert!(game.running());
     game.move_all_pieces();
     assert!(!game.running());
+}
+
+#[test]
+fn test_correct_amount_of_braille_in_selector() {
+    let mut game = set_up_game_with_player_in_corner();
+    let test_square = point2(5, 5);
+    let diag = vec2(1, 1);
+    let test_rectangle = WorldSquareRect::new(test_square - diag, test_square + diag);
+    game.select_square(test_square);
+    game.draw_headless_now();
+    assert_eq!(
+        game.borrow_graphics_mut()
+            .count_buffered_braille_dots_in_rect(test_rectangle),
+        DOTS_IN_SELECTOR
+    );
+    game.clear_selectors();
+    game.draw_headless_now();
+    assert_eq!(
+        game.borrow_graphics_mut()
+            .count_buffered_braille_dots_in_rect(test_rectangle),
+        0
+    );
 }
