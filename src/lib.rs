@@ -2,6 +2,7 @@
 #![feature(is_sorted)]
 #![feature(drain_filter)]
 #![allow(warnings)]
+#![feature(trait_upcasting)]
 
 #[macro_use]
 extern crate approx;

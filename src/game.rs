@@ -138,7 +138,7 @@ impl Game {
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
-        self.graphics.play_all_animations(delta);
+        self.graphics.draw_all_animations(delta);
         self.graphics
             .draw_player(self.player_position(), self.player_faced_direction());
         self.graphics.display(&mut writer);

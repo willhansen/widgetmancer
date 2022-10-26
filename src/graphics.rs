@@ -8,8 +8,6 @@ use std::mem::swap;
 use std::ptr::hash;
 use std::time::{Duration, Instant};
 
-use crate::animations::*;
-use crate::num::ToPrimitive;
 use euclid::*;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
@@ -18,6 +16,8 @@ use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
 
+use crate::animations::*;
+use crate::num::ToPrimitive;
 use crate::piece::Piece;
 use crate::{
     get_by_point, point_to_string, BrailleGridInWorldFrame, BufferCharacterPoint,
@@ -433,91 +433,59 @@ impl Graphics {
         self.active_animations.push(Box::new(Selector::new(square)));
     }
 
-    pub fn play_board_animation(&mut self, delta: Duration) {
-        if let Some(board_animation) = self.board_animation {
-            self.play_animation(board_animation, delta);
+    pub fn draw_board_animation(&mut self, time: Instant) {
+        if let Some(board_animation) = &self.board_animation {
+            self.draw_animation(*board_animation, time);
         }
     }
 
-    pub fn play_animation(
+    fn draw_animation(
         &mut self,
-        animation: Box<dyn Animation>,
-        delta: Duration,
-    ) -> &Box<dyn Animation> {
-        self.play_animations(vec![animation], delta)
-            .first()
-            .unwrap()
+        animation: AnimationObject,
+        time: Instant,
+    ) -> Option<AnimationObject> {
+        self.draw_animations(vec![animation], time).first().cloned()
     }
 
-    pub fn play_animations(
-        &mut self,
-        animations: Vec<Box<dyn Animation>>,
-        delta: Duration,
-    ) -> Vec<Box<dyn Animation>> {
-        self.draw_animations(animations);
-        self.advance_animations(animations, delta)
-    }
-
-    fn draw_animations(&mut self, animations: Vec<Box<dyn Animation>>) {
+    fn draw_animations(&mut self, animations: AnimationList, time: Instant) -> AnimationList {
         animations
             .into_iter()
-            .map(|animation| animation.glyphs())
-            .for_each(|glyph_map| self.draw_glyphs(glyph_map))
+            .map(|animation| animation.glyphs_at_time(time))
+            .for_each(|glyph_map| self.draw_glyphs(glyph_map));
+        animations
+            .filter(|animation| !animation.finished_at_time(time))
+            .cloned()
+            .collect()
     }
 
-    fn advance_animations(
-        &mut self,
-        animations: Vec<Box<dyn Animation>>,
-        delta: Duration,
-    ) -> Vec<Box<dyn Animation>> {
-        for mut animation in &mut self.active_animations {
-            animation.advanced(delta);
-        }
-    }
-
-    pub fn play_all_animations(&mut self, delta: Duration) {
-        self.draw_all_animations();
-        self.advance_all_animations(delta);
-        self.cull_all_dead_animations();
-    }
-
-    fn draw_all_animations(&mut self) {
+    pub fn draw_all_animations(&mut self, time: Instant) {
         let mut glyphs_to_draw = vec![];
         if let Some(board_animation) = &self.board_animation {
-            glyphs_to_draw.push(board_animation.glyphs());
+            glyphs_to_draw.push(board_animation.glyphs_at_time(time));
         }
         for animation in &self.active_animations {
-            glyphs_to_draw.push(animation.glyphs());
+            glyphs_to_draw.push(animation.glyphs_at_time(time));
         }
         for selector in &self.selectors {
-            glyphs_to_draw.push(selector.glyphs())
+            glyphs_to_draw.push(selector.glyphs_at_time(time))
         }
 
         for glyph_map in glyphs_to_draw {
             self.draw_glyphs(glyph_map);
         }
+
+        self.cull_all_dead_animations(time);
     }
 
-    fn advance_all_animations(&mut self, delta: Duration) {
+    fn cull_all_dead_animations(&mut self, time: Instant) {
         if let Some(board_animation) = &mut self.board_animation {
-            board_animation.advance(delta);
-        }
-        for mut animation in &mut self.active_animations {
-            animation.advance(delta);
-        }
-        for mut selector in &mut self.selectors {
-            selector.advance(delta);
-        }
-    }
-
-    fn cull_all_dead_animations(&mut self) {
-        if let Some(board_animation) = &mut self.board_animation {
-            if board_animation.finished() {
+            if board_animation.finished_at_time(time) {
                 self.board_animation = Some(board_animation.next_animation())
             }
         }
-        self.active_animations.drain_filter(|x| x.finished());
-        self.selectors.drain_filter(|x| x.finished());
+        self.active_animations
+            .drain_filter(|x| x.finished_at_time(time));
+        self.selectors.drain_filter(|x| x.finished_at_time(time));
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
