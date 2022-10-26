@@ -449,11 +449,8 @@ impl Graphics {
             .for_each(|glyph_map| self.draw_glyphs(glyph_map));
     }
 
-    pub fn draw_all_animations(&mut self, time: Instant) {
+    pub fn draw_non_board_animations(&mut self, time: Instant) {
         let mut glyphs_to_draw = vec![];
-        if let Some(board_animation) = &self.board_animation {
-            glyphs_to_draw.push(board_animation.glyphs_at_time(time));
-        }
         for animation in &self.active_animations {
             glyphs_to_draw.push(animation.glyphs_at_time(time));
         }
@@ -464,11 +461,9 @@ impl Graphics {
         for glyph_map in glyphs_to_draw {
             self.draw_glyphs(glyph_map);
         }
-
-        self.cull_all_dead_animations(time);
     }
 
-    fn cull_all_dead_animations(&mut self, time: Instant) {
+    pub fn remove_finished_animations(&mut self, time: Instant) {
         if let Some(board_animation) = &mut self.board_animation {
             if board_animation.finished_at_time(time) {
                 self.board_animation = Some(board_animation.next_animation())
