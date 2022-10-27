@@ -20,11 +20,11 @@ use crate::animations::*;
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
 use crate::{
-    get_by_point, point_to_string, BrailleGridInWorldFrame, BufferCharacterPoint,
+    get_by_point, point_to_string, BoardSize, BrailleGridInWorldFrame, BufferCharacterPoint,
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterPoint,
-    WorldGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, BLACK,
+    ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterGlyphMap,
+    WorldCharacterPoint, WorldMove, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, BLACK,
     BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
@@ -216,7 +216,7 @@ impl Graphics {
         self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs(&mut self, glyph_map: WorldGlyphMap) {
+    fn draw_glyphs(&mut self, glyph_map: WorldCharacterGlyphMap) {
         for (world_character_square, new_glyph) in glyph_map {
             let buffer_character_square =
                 self.world_character_square_to_buffer_square(world_character_square);
@@ -257,13 +257,8 @@ impl Graphics {
         }
     }
 
-    pub fn set_empty_board_animation(&mut self, width: u32, height: u32) {
-        self.board_animation = Some(Box::new(StaticBoard::new(width, height)));
-    }
-
-    pub fn draw_empty_board(&mut self, width: usize, height: usize) {
-        //self.draw_empty_board_with_offset(width, height, -0.2, false)
-        self.draw_empty_board_with_offset(width, height, 0.0, false)
+    pub fn set_empty_board_animation(&mut self, board_size: BoardSize) {
+        self.board_animation = Some(Box::new(StaticBoard::new(board_size)));
     }
 
     pub fn draw_empty_board_with_offset(
@@ -273,21 +268,6 @@ impl Graphics {
         offset_fraction: f32,
         vertical_instead_of_horizontal: bool,
     ) {
-        for x in 0..width_in_squares {
-            for y in 0..height_in_squares {
-                let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
-                let square_color = Graphics::board_color_at_square(world_square);
-                let other_square_color =
-                    Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
-                let glyphs = Glyph::double_colored_square_with_offset(
-                    offset_fraction,
-                    vertical_instead_of_horizontal,
-                    square_color,
-                    other_square_color,
-                );
-                self.draw_glyphs_at_square(world_square, glyphs);
-            }
-        }
     }
 
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
@@ -430,6 +410,10 @@ impl Graphics {
     }
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));
+    }
+
+    pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
+        self.board_animation = Some(Box::new(RecoilingBoard::new(board_size, shot_direction)));
     }
 
     pub fn draw_board_animation(&mut self, time: Instant) {

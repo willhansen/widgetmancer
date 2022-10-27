@@ -369,7 +369,7 @@ impl Glyph {
     pub fn get_glyphs_for_braille_line(
         start_pos: WorldPoint,
         end_pos: WorldPoint,
-    ) -> WorldGlyphMap {
+    ) -> WorldCharacterGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 
@@ -498,7 +498,7 @@ impl Glyph {
         start_pos: WorldPoint,
         end_pos: WorldPoint,
         color: RGB8,
-    ) -> WorldGlyphMap {
+    ) -> WorldCharacterGlyphMap {
         let start_char_point = Glyph::world_point_to_world_character_point(start_pos);
         let end_char_point = Glyph::world_point_to_world_character_point(end_pos);
 
@@ -564,7 +564,10 @@ impl Glyph {
         }
     }
 
-    pub fn points_to_braille_glyphs(points: Vec<WorldPoint>, color: RGB8) -> WorldGlyphMap {
+    pub fn points_to_braille_glyphs(
+        points: Vec<WorldPoint>,
+        color: RGB8,
+    ) -> WorldCharacterGlyphMap {
         // bin braille squares by world character squares
         let mut local_braille_squares_by_character_square =
             HashMap::<WorldCharacterSquare, HashSet<WorldBrailleSquare>>::new();
@@ -587,7 +590,7 @@ impl Glyph {
                 .insert(local_braille_square);
         }
 
-        let mut output_map = WorldGlyphMap::new();
+        let mut output_map = WorldCharacterGlyphMap::new();
 
         for (char_square, braille_square_set) in local_braille_squares_by_character_square {
             let braille_char: char = Glyph::local_braille_squares_to_braille_char(

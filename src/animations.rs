@@ -10,15 +10,17 @@ use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
 use crate::{
-    BufferCharacterSquare, Glyph, Graphics, WorldGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
+    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step,
+    world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
+    Graphics, WorldCharacterGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap,
+    WorldStep, BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
 };
 
 pub type AnimationObject = Box<dyn Animation>;
 pub type AnimationList = Vec<AnimationObject>;
 
 pub trait Animation: DynClone {
-    fn glyphs_at_time(&self, time: Instant) -> WorldGlyphMap;
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap;
     fn finished_at_time(&self, time: Instant) -> bool;
 }
 // This is kinda magic.  Not great, but if it works, it works.
@@ -47,7 +49,7 @@ impl SimpleLaser {
 }
 
 impl Animation for SimpleLaser {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldGlyphMap {
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
@@ -74,7 +76,7 @@ impl FloatyLaser {
 }
 
 impl Animation for FloatyLaser {
-    fn glyphs_at_time(&self, time: Instant) -> WorldGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
         let mut line_points: Vec<WorldPoint> =
             Glyph::world_points_for_braille_line(self.start, self.end);
         // pretty arbitrary
@@ -124,7 +126,7 @@ impl Explosion {
 }
 
 impl Animation for Explosion {
-    fn glyphs_at_time(&self, time: Instant) -> WorldGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
         // rather arbitrary
         let hash = ((self.position.x * PI + self.position.y) * 1000.0)
             .abs()
@@ -171,7 +173,7 @@ impl Selector {
 }
 
 impl Animation for Selector {
-    fn glyphs_at_time(&self, time: Instant) -> WorldGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
         let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = f32::sqrt(2.0) / 2.0;
 
@@ -198,21 +200,20 @@ impl Animation for Selector {
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct StaticBoard {
-    width: u32,
-    height: u32,
+    board_size: BoardSize,
 }
 
 impl StaticBoard {
-    pub fn new(width: u32, height: u32) -> StaticBoard {
-        StaticBoard { width, height }
+    pub fn new(board_size: BoardSize) -> StaticBoard {
+        StaticBoard { board_size }
     }
 }
 
 impl Animation for StaticBoard {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldGlyphMap {
-        let mut glyphs = WorldGlyphMap::new();
-        for x in 0..self.width {
-            for y in 0..self.height {
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterGlyphMap {
+        let mut glyphs = WorldCharacterGlyphMap::new();
+        for x in 0..self.board_size.width {
+            for y in 0..self.board_size.height {
                 let world_square = WorldSquare::new(x as i32, y as i32);
                 let glyph = Glyph {
                     character: ' ',
@@ -237,5 +238,71 @@ impl Animation for StaticBoard {
 impl BoardAnimation for StaticBoard {
     fn next_animation(&self) -> Box<dyn BoardAnimation> {
         Box::new(*self)
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub struct RecoilingBoard {
+    board_size: BoardSize,
+    orthogonal_shot_direction: WorldStep,
+    creation_time: Instant,
+}
+
+impl RecoilingBoard {
+    pub fn new(board_size: BoardSize, shot_direction: WorldStep) -> RecoilingBoard {
+        let mut orthogonalized_step = round_to_king_step(shot_direction);
+        if is_diagonal_king_step(orthogonalized_step) {
+            orthogonalized_step.y = 0;
+        }
+
+        RecoilingBoard {
+            board_size,
+            orthogonal_shot_direction: orthogonalized_step,
+            creation_time: Instant::now(),
+        }
+    }
+}
+
+impl Animation for RecoilingBoard {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
+        let age = time.duration_since(self.creation_time);
+
+        let mut offset_fraction: f32 = self.recoil_distance_in_squares_at_age(age);
+        let shot_in_negative_direction =
+            self.orthogonal_shot_direction.x + self.orthogonal_shot_direction.y < 0;
+        if shot_in_negative_direction {
+            offset_fraction *= -1.0;
+        }
+
+        let is_vertical_motion = self.orthogonal_shot_direction.y != 0;
+
+        let mut glyph_map = WorldSquareGlyphMap::new();
+
+        for x in 0..self.board_size.width {
+            for y in 0..self.board_size.height {
+                let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
+                let square_color = Graphics::board_color_at_square(world_square);
+                let other_square_color =
+                    Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
+                let glyphs = Glyph::double_colored_square_with_offset(
+                    offset_fraction,
+                    is_vertical_motion,
+                    square_color,
+                    other_square_color,
+                );
+                glyph_map.insert(world_square, glyphs);
+            }
+        }
+        world_square_glyph_map_to_world_character_glyph_map(glyph_map)
+    }
+
+    fn finished_at_time(&self, time: Instant) -> bool {
+        todo!()
+    }
+}
+
+impl BoardAnimation for RecoilingBoard {
+    fn next_animation(&self) -> Box<dyn BoardAnimation> {
+        Box::new(StaticBoard::new(self.board_size))
     }
 }

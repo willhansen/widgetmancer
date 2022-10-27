@@ -9,7 +9,7 @@ use euclid::*;
 use num::traits::Signed;
 use rand::Rng;
 
-use crate::Glyph;
+use crate::{Glyph, TwoGlyphs};
 
 // empty enums for euclid typing
 pub enum SquareGridInWorldFrame {}
@@ -30,6 +30,7 @@ pub type FVector = default::Vector2D<f32>;
 pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
 pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
 pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
+pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
 
 pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
 pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
@@ -49,8 +50,9 @@ pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
 pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
+pub type WorldSquareGlyphMap = HashMap<WorldSquare, TwoGlyphs>;
+pub type WorldCharacterGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
-pub type WorldGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);
@@ -129,8 +131,8 @@ pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
 }
 
 pub fn round_to_king_step(step: WorldStep) -> WorldStep {
-    if step == WorldStep::new(0, 0) {
-        return WorldStep::new(0, 0);
+    if step.square_length() == 0 {
+        return step;
     }
     let radians_from_plus_x = step.to_f32().angle_from_x_axis();
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
@@ -147,6 +149,18 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
     float_step.to_i32()
 }
 
+pub fn is_king_step(step: WorldStep) -> bool {
+    is_orthogonal_king_step(step) || is_diagonal_king_step(step)
+}
+
+pub fn is_orthogonal_king_step(step: WorldStep) -> bool {
+    step.square_length() == 1
+}
+
+pub fn is_diagonal_king_step(step: WorldStep) -> bool {
+    step.square_length() == 2
+}
+
 pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
@@ -160,6 +174,21 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U
     let angle = vector.angle_from_x_axis();
     let new_angle = angle + Angle::radians(radians);
     Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
+}
+
+pub fn world_square_glyph_map_to_world_character_glyph_map(
+    world_square_glyph_map: WorldSquareGlyphMap,
+) -> WorldCharacterGlyphMap {
+    let mut world_character_glyph_map = WorldCharacterGlyphMap::new();
+    world_square_glyph_map
+        .into_iter()
+        .for_each(|(world_square, two_glyphs)| {
+            let left_char_square = Glyph::world_square_to_left_world_character_square(world_square);
+            let right_char_square = left_char_square + RIGHT_I.cast_unit();
+            world_character_glyph_map.insert(left_char_square, two_glyphs[0]);
+            world_character_glyph_map.insert(right_char_square, two_glyphs[1]);
+        });
+    world_character_glyph_map
 }
 
 #[cfg(test)]

@@ -11,13 +11,13 @@ use crate::animations::Selector;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector,
-    SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare, WorldStep, LEFT_I,
+    point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph, IPoint,
+    IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    LEFT_I,
 };
 
 pub struct Game {
-    board_width: usize,
-    board_height: usize,
+    board_size: BoardSize,
     // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
     running: bool,
@@ -34,13 +34,14 @@ pub struct Game {
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
-        let board_width: usize = (terminal_width / 2) as usize;
-        let board_height: usize = terminal_height as usize;
+        let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
         let mut game = Game {
-            board_width,
-            board_height,
+            board_size,
             running: true,
-            player_position: point2((board_width / 2) as i32, (board_height / 2) as i32),
+            player_position: point2(
+                (board_size.width / 2) as i32,
+                (board_size.height / 2) as i32,
+            ),
             player_faced_direction: LEFT_I.cast_unit(),
             player_is_dead: false,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
@@ -49,17 +50,13 @@ impl Game {
             selectors: vec![],
             selected_square: None,
         };
-        game.graphics
-            .set_empty_board_animation(board_width as u32, board_height as u32);
+        game.graphics.set_empty_board_animation(board_size);
         game
     }
+    pub fn board_size(&self) -> BoardSize {
+        self.board_size
+    }
 
-    pub fn board_width(&self) -> usize {
-        self.board_width
-    }
-    pub fn board_height(&self) -> usize {
-        self.board_height
-    }
     pub fn player_is_dead(&self) -> bool {
         self.player_is_dead
     }
@@ -69,22 +66,16 @@ impl Game {
 
     fn mid_square(&self) -> IPoint {
         point2(
-            self.board_width() as i32 / 2,
-            self.board_height() as i32 / 2,
+            self.board_size().width as i32 / 2,
+            self.board_size().height as i32 / 2,
         )
-    }
-    fn x_max(&self) -> i32 {
-        self.board_width() as i32 - 1
-    }
-    fn y_max(&self) -> i32 {
-        self.board_height() as i32 - 1
     }
 
     fn square_is_on_board(&self, pos: WorldSquare) -> bool {
         pos.x >= 0
-            && pos.x < self.board_width() as i32
+            && pos.x < self.board_size().width as i32
             && pos.y >= 0
-            && pos.y < self.board_height() as i32
+            && pos.y < self.board_size().height as i32
     }
 
     pub fn quit(&mut self) {
@@ -167,8 +158,8 @@ impl Game {
         // only try n times
         for _ in 0..40 {
             let rand_pos = WorldSquare::new(
-                thread_rng().gen_range(0..self.board_width() as i32),
-                thread_rng().gen_range(0..self.board_height() as i32),
+                thread_rng().gen_range(0..self.board_size().width as i32),
+                thread_rng().gen_range(0..self.board_size().height as i32),
             );
             let place_result = self.place_piece(piece, rand_pos);
             if place_result.is_ok() {
@@ -396,6 +387,8 @@ impl Game {
             self.graphics
                 .add_simple_laser(line_start.to_f32(), line_end);
         }
+        self.graphics
+            .start_recoil_animation(self.board_size, self.player_faced_direction());
     }
 
     pub fn player_shoot_sniper(&mut self) {
