@@ -139,6 +139,7 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
+        self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);

@@ -212,7 +212,7 @@ impl Graphics {
         };
     }
 
-    fn draw_braille_point(&mut self, pos: Point2D<f32, SquareGridInWorldFrame>, color: RGB8) {
+    fn draw_braille_point(&mut self, pos: WorldPoint, color: RGB8) {
         self.draw_braille_line(pos, pos, color);
     }
 
@@ -542,22 +542,32 @@ mod tests {
 
     use super::*;
 
+    fn set_up_graphics() -> Graphics {
+        Graphics::new(40, 20, Instant::now())
+    }
+
     #[test]
     fn test_world_to_screen() {
-        let g = Graphics::new(20, 20, Instant::now());
+        let g = set_up_graphics();
 
-        let world_pos = point2(0, 0);
-        let screen_pos = point2(1, 20);
-        assert_eq!(screen_pos, g.world_square_to_left_screen_square(world_pos));
+        let world_square: WorldSquare = point2(0, 0);
+        let screen_character_square: ScreenCharacterSquare = point2(1, g.terminal_height());
+        assert_eq!(
+            screen_character_square,
+            g.world_square_to_left_screen_square(world_square)
+        );
 
-        let world_pos = point2(0, 19);
-        let screen_pos = point2(1, 1);
-        assert_eq!(screen_pos, g.world_square_to_left_screen_square(world_pos));
+        let world_square: WorldSquare = point2(0, g.terminal_height() - 1);
+        let screen_character_square: ScreenCharacterSquare = point2(1, 1);
+        assert_eq!(
+            screen_character_square,
+            g.world_square_to_left_screen_square(world_square)
+        );
     }
 
     #[test]
     fn test_one_world_square_is_two_characters() {
-        let g = Graphics::new(20, 20, Instant::now());
+        let g = set_up_graphics();
 
         let world_pos = point2(5, 5); // arbitrary
         let screen_pos1 = g.world_square_to_left_screen_square(world_pos + RIGHT_I.cast_unit());
@@ -567,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_draw_diagonal_braille_line() {
-        let mut g = Graphics::new(40, 20, Instant::now());
+        let mut g = set_up_graphics();
         let line_start = WorldSquare::new(2, 2);
         let line_end = WorldSquare::new(7, 7);
 
@@ -579,5 +589,16 @@ mod tests {
         //g.print_output_buffer();
 
         assert_eq!(glyph_left.fg_color, RED);
+    }
+    #[test]
+    fn test_single_braille_point() {
+        let mut g = set_up_graphics();
+        let test_square = point2(5, 5);
+        let diag = vec2(1, 1);
+        let test_rectangle = WorldSquareRect::new(test_square - diag, test_square + diag);
+        let test_point = test_square.to_f32();
+
+        g.draw_braille_point(test_point, RED);
+        assert_eq!(g.count_buffered_braille_dots_in_rect(test_rectangle), 1)
     }
 }
