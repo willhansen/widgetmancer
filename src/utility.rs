@@ -191,6 +191,10 @@ pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_character_glyph_map
 }
 
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a * (1.0 - t) + b * t
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};

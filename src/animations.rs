@@ -10,7 +10,7 @@ use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
 use crate::{
-    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step,
+    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step,
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
     Graphics, WorldCharacterGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap,
     WorldStep, BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
@@ -261,17 +261,35 @@ impl RecoilingBoard {
             creation_time: Instant::now(),
         }
     }
+
+    fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
+        // shot in positive direction, so recoil position should start negative at a fixed velocity
+        // linear negative triangle
+        let peak_dist = -1.0;
+        let time_to_peak = 0.1;
+
+        if age < time_to_peak {
+            let t = age / time_to_peak;
+            lerp(0.0, peak_dist, t)
+        } else if age < 2.0 * time_to_peak {
+            let t = (age - time_to_peak) / time_to_peak;
+            lerp(peak_dist, 0.0, t)
+        } else {
+            0.0
+        }
+    }
 }
 
 impl Animation for RecoilingBoard {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
         let age = time.duration_since(self.creation_time);
 
-        let mut offset_fraction: f32 = self.recoil_distance_in_squares_at_age(age);
+        let mut offset_distance_in_squares: f32 =
+            RecoilingBoard::recoil_distance_in_squares_at_age(age.as_secs_f32());
         let shot_in_negative_direction =
             self.orthogonal_shot_direction.x + self.orthogonal_shot_direction.y < 0;
         if shot_in_negative_direction {
-            offset_fraction *= -1.0;
+            offset_distance_in_squares *= -1.0;
         }
 
         let is_vertical_motion = self.orthogonal_shot_direction.y != 0;
@@ -285,7 +303,7 @@ impl Animation for RecoilingBoard {
                 let other_square_color =
                     Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
                 let glyphs = Glyph::double_colored_square_with_offset(
-                    offset_fraction,
+                    offset_distance_in_squares,
                     is_vertical_motion,
                     square_color,
                     other_square_color,
@@ -297,7 +315,7 @@ impl Animation for RecoilingBoard {
     }
 
     fn finished_at_time(&self, time: Instant) -> bool {
-        todo!()
+        time.duration_since(self.creation_time) > Duration::from_millis(600)
     }
 }
 

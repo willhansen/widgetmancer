@@ -261,15 +261,6 @@ impl Graphics {
         self.board_animation = Some(Box::new(StaticBoard::new(board_size)));
     }
 
-    pub fn draw_empty_board_with_offset(
-        &mut self,
-        width_in_squares: usize,
-        height_in_squares: usize,
-        offset_fraction: f32,
-        vertical_instead_of_horizontal: bool,
-    ) {
-    }
-
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
         if (square.x + square.y) % 2 == 0 {
             BOARD_WHITE

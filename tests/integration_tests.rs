@@ -2,7 +2,6 @@ use euclid::*;
 use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::glyph::{Glyph, RED};
-use std::time::Duration;
 
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
@@ -56,7 +55,7 @@ fn test_player_can_not_move_off_high_edge() {
 
     game.draw_headless_now();
 
-    let bottom_right = point2((game.board_width() - 1) as i32, 0);
+    let bottom_right = point2((game.board_size().width - 1) as i32, 0);
 
     game.set_player_position(bottom_right)
         .expect("Failed to set player pos");
