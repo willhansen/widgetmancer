@@ -392,13 +392,20 @@ impl Game {
     }
 
     pub fn player_shoot_sniper(&mut self) {
+        let mut graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square).expect("capture with sniper");
-                self.graphics
-                    .add_floaty_laser(self.player_position.to_f32(), square.to_f32());
             }
+            graphical_laser_end = square;
+        } else {
+            graphical_laser_end = self.player_position + self.player_faced_direction * 300;
         }
+        // laser should start at edge of player square, where player is facing
+        let graphical_laser_start =
+            self.player_position.to_f32() + self.player_faced_direction().to_f32() * 0.5;
+        self.graphics
+            .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {

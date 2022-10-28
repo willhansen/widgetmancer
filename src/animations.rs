@@ -265,8 +265,8 @@ impl RecoilingBoard {
     fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let peak_dist = -1.0;
-        let time_to_peak = 0.1;
+        let peak_dist = -3.0;
+        let time_to_peak = 3.0;
 
         if age < time_to_peak {
             let t = age / time_to_peak;

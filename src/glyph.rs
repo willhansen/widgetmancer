@@ -109,10 +109,14 @@ impl Glyph {
     }
 
     pub fn square_with_horizontal_offset(fraction_of_square_offset: f32) -> Glyph {
-        Glyph::colored_square_with_horizontal_offset(fraction_of_square_offset, WHITE, BLACK)
+        Glyph::colored_character_square_with_horizontal_offset(
+            fraction_of_square_offset,
+            WHITE,
+            BLACK,
+        )
     }
 
-    pub fn colored_square_with_horizontal_offset(
+    pub fn colored_character_square_with_horizontal_offset(
         fraction_of_square_offset: f32,
         square_color: RGB8,
         background_color: RGB8,
@@ -135,9 +139,13 @@ impl Glyph {
         };
     }
     pub fn square_with_vertical_offset(fraction_of_square_offset: f32) -> Glyph {
-        return Glyph::colored_square_with_vertical_offset(fraction_of_square_offset, WHITE, BLACK);
+        return Glyph::colored_character_square_with_vertical_offset(
+            fraction_of_square_offset,
+            WHITE,
+            BLACK,
+        );
     }
-    pub fn colored_square_with_vertical_offset(
+    pub fn colored_character_square_with_vertical_offset(
         fraction_of_square_offset: f32,
         square_color: RGB8,
         background_color: RGB8,
@@ -176,28 +184,57 @@ impl Glyph {
         square_color: RGB8,
         background_color: RGB8,
     ) -> TwoGlyphs {
+        // limit the domain of the shifting to two squares (one period)
+        let one_period_fraction = offset_fraction.rem_euclid(2.0);
+        let swap_colors = one_period_fraction >= 1.0;
+        let half_period_fraction = one_period_fraction.rem_euclid(1.0);
+
+        let effective_square_color = if !swap_colors {
+            square_color
+        } else {
+            background_color
+        };
+        let effective_background_color = if !swap_colors {
+            background_color
+        } else {
+            square_color
+        };
+
         if vertical_instead_of_horizontal {
-            return [Glyph::colored_square_with_vertical_offset(
-                offset_fraction,
-                square_color,
-                background_color,
+            return [Glyph::colored_character_square_with_vertical_offset(
+                half_period_fraction,
+                effective_square_color,
+                effective_background_color,
             ); 2];
         } else {
-            // TODO: account for offset larger than half a square
-            let right_glyph_is_solid = offset_fraction > 0.0;
-            let offset_within_character = (offset_fraction % 0.5) * 2.0;
-            let glyph_with_offset = Glyph::colored_square_with_horizontal_offset(
-                offset_within_character,
-                square_color,
-                background_color,
+            let right_glyph_is_solid = half_period_fraction <= 0.5;
+            let quarter_period_fraction = half_period_fraction.rem_euclid(0.5);
+            let fraction_of_partial_glyph = quarter_period_fraction * 2.0;
+            let offset_glyph = Glyph::colored_character_square_with_horizontal_offset(
+                fraction_of_partial_glyph,
+                effective_square_color,
+                effective_background_color,
             );
-            let glyph_solid_block =
-                Glyph::colored_square_with_horizontal_offset(0.0, square_color, background_color);
+            let solid_glyph_color = if right_glyph_is_solid {
+                effective_square_color
+            } else {
+                effective_background_color
+            };
+            let background_color_of_solid_block_that_does_not_matter = if right_glyph_is_solid {
+                effective_background_color
+            } else {
+                effective_square_color
+            };
+            let solid_glyph = Glyph::colored_character_square_with_horizontal_offset(
+                0.0,
+                solid_glyph_color,
+                background_color_of_solid_block_that_does_not_matter,
+            );
 
             if right_glyph_is_solid {
-                [glyph_with_offset, glyph_solid_block]
+                [offset_glyph, solid_glyph]
             } else {
-                [glyph_solid_block, glyph_with_offset]
+                [solid_glyph, offset_glyph]
             }
         }
     }
@@ -245,7 +282,7 @@ impl Glyph {
         for i in 0..3 {
             let x = i as i32 - 1;
             if offset_dir.x == x || x == 0 {
-                output[i][c] = Some(Glyph::colored_square_with_horizontal_offset(
+                output[i][c] = Some(Glyph::colored_character_square_with_horizontal_offset(
                     x_offset - x as f32,
                     color,
                     BLACK,
@@ -274,7 +311,7 @@ impl Glyph {
         for j in 0..3 {
             let y = j as i32 - 1;
             if offset_dir.y == y || y == 0 {
-                output[c][j] = Some(Glyph::colored_square_with_vertical_offset(
+                output[c][j] = Some(Glyph::colored_character_square_with_vertical_offset(
                     y_offset - y as f32,
                     color,
                     BLACK,
@@ -1133,6 +1170,17 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, RED);
     }
     #[test]
+    fn test_double_glyph_square_offset__one_and_a_half_up() {
+        // offset up
+        let glyphs = Glyph::double_colored_square_with_offset(1.5, true, RED, BLACK);
+        assert_eq!(glyphs[0].character, '▄');
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[1].character, '▄');
+        assert_eq!(glyphs[1].fg_color, RED);
+        assert_eq!(glyphs[1].bg_color, BLACK);
+    }
+    #[test]
     fn test_double_glyph_square_offset__down() {
         // offset down
         let glyphs = Glyph::double_colored_square_with_offset(-0.5, true, RED, BLACK);
@@ -1155,6 +1203,17 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
     #[test]
+    fn test_double_glyph_square_offset__more_left() {
+        // offset left
+        let glyphs = Glyph::double_colored_square_with_offset(-0.75, false, RED, BLACK);
+        assert_eq!(glyphs[0].character, '▌');
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[1].character, '█');
+        assert_eq!(glyphs[1].fg_color, BLACK);
+        assert_eq!(glyphs[1].bg_color, RED);
+    }
+    #[test]
     fn test_double_glyph_square_offset__right() {
         // offset right
         let glyphs = Glyph::double_colored_square_with_offset(0.25, false, RED, BLACK);
@@ -1164,5 +1223,16 @@ mod tests {
         assert_eq!(glyphs[1].character, '█');
         assert_eq!(glyphs[1].fg_color, RED);
         assert_eq!(glyphs[1].bg_color, BLACK);
+    }
+    #[test]
+    fn test_double_glyph_square_offset__more_right() {
+        // offset right
+        let glyphs = Glyph::double_colored_square_with_offset(0.75, false, RED, BLACK);
+        assert_eq!(glyphs[0].character, '█');
+        assert_eq!(glyphs[0].fg_color, BLACK);
+        assert_eq!(glyphs[0].bg_color, RED);
+        assert_eq!(glyphs[1].character, '▌');
+        assert_eq!(glyphs[1].fg_color, BLACK);
+        assert_eq!(glyphs[1].bg_color, RED);
     }
 }
