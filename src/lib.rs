@@ -3,6 +3,7 @@
 #![feature(drain_filter)]
 #![allow(warnings)]
 #![feature(trait_upcasting)]
+#![feature(duration_consts_float)]
 
 #[macro_use]
 extern crate approx;

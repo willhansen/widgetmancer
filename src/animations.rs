@@ -248,6 +248,7 @@ pub struct RecoilingBoard {
     creation_time: Instant,
 }
 
+const RECOIL_DURATION: Duration = Duration::from_secs_f32(6.0);
 impl RecoilingBoard {
     pub fn new(board_size: BoardSize, shot_direction: WorldStep) -> RecoilingBoard {
         let mut orthogonalized_step = round_to_king_step(shot_direction);
@@ -266,7 +267,7 @@ impl RecoilingBoard {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
         let peak_dist = -3.0;
-        let time_to_peak = 3.0;
+        let time_to_peak = RECOIL_DURATION.as_secs_f32() / 2.0;
 
         if age < time_to_peak {
             let t = age / time_to_peak;
@@ -315,7 +316,7 @@ impl Animation for RecoilingBoard {
     }
 
     fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.creation_time) > Duration::from_millis(600)
+        time.duration_since(self.creation_time) > RECOIL_DURATION
     }
 }
 
