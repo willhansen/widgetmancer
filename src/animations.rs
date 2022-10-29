@@ -248,8 +248,8 @@ pub struct RecoilingBoard {
     creation_time: Instant,
 }
 
-const RECOIL_DURATION: Duration = Duration::from_secs_f32(6.0);
-const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(3.0);
+const RECOIL_DURATION: Duration = Duration::from_secs_f32(10.0);
+const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(10.0);
 
 impl RecoilingBoard {
     pub fn new(board_size: BoardSize, shot_direction: WorldStep) -> RecoilingBoard {
@@ -336,7 +336,7 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::WorldCharacterSquare;
+    use crate::{WorldCharacterSquare, LEFT_I};
 
     use super::*;
 
@@ -391,7 +391,7 @@ mod tests {
         let board_length = 4;
         let animation = RecoilingBoard::new(
             BoardSize::new(board_length, board_length),
-            RIGHT_I.cast_unit(),
+            LEFT_I.cast_unit(),
         );
         let start_time = animation.creation_time();
 

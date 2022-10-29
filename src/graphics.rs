@@ -525,14 +525,14 @@ impl Graphics {
             for x in left_column..=right_column {
                 let square = WorldCharacterSquare::new(x, y);
                 let new_part = if let Some(glyph) = glyph_map.get(&square) {
-                    glyph.character
+                    glyph.to_string()
                 } else {
-                    ' '
+                    " ".to_string()
                 };
 
-                string.push(new_part);
+                string += &new_part;
             }
-            string.push('\n');
+            string += "\n";
         }
         string
     }
