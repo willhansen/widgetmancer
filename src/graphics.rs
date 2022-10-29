@@ -24,8 +24,8 @@ use crate::{
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
     ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterGlyphMap,
-    WorldCharacterPoint, WorldMove, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, BLACK,
-    BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint, WorldSquare, WorldSquareRect,
+    WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -237,6 +237,12 @@ impl Graphics {
                 Glyph::world_character_square_to_world_square(world_character_square),
             );
         }
+    }
+
+    pub fn draw_string_below_board(&mut self, string: String) {
+        let left_of_screen_under_board =
+            self.world_square_to_left_screen_square(point2(0, 0)) + vec2(0, -1);
+        self.draw_string(left_of_screen_under_board, &string);
     }
 
     fn draw_braille_line(
@@ -507,6 +513,29 @@ impl Graphics {
             .map(|square| Selector::new(square))
             .collect();
     }
+
+    pub fn glyph_map_to_string(glyph_map: WorldCharacterGlyphMap) -> String {
+        let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
+        let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
+        let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
+        let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
+        let mut string = String::new();
+        for bottom_to_top_y in bottom_row..=top_row {
+            let y = top_row + bottom_row - bottom_to_top_y;
+            for x in left_column..=right_column {
+                let square = WorldCharacterSquare::new(x, y);
+                let new_part = if let Some(glyph) = glyph_map.get(&square) {
+                    glyph.character
+                } else {
+                    ' '
+                };
+
+                string.push(new_part);
+            }
+            string.push('\n');
+        }
+        string
+    }
 }
 
 #[cfg(test)]
@@ -565,6 +594,7 @@ mod tests {
 
         assert_eq!(glyph_left.fg_color, RED);
     }
+
     #[test]
     fn test_single_braille_point() {
         let mut g = set_up_graphics();

@@ -1,9 +1,9 @@
-use dyn_clone::DynClone;
 use std::collections::HashMap;
 use std::f32::consts::{E, PI, TAU};
 use std::time;
 use std::time::{Duration, Instant};
 
+use dyn_clone::DynClone;
 use euclid::{vec2, Angle, Length};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
@@ -331,11 +331,14 @@ impl BoardAnimation for RecoilingBoard {
         Box::new(StaticBoard::new(self.board_size))
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::WorldCharacterSquare;
     use pretty_assertions::{assert_eq, assert_ne};
+
+    use crate::WorldCharacterSquare;
+
+    use super::*;
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
@@ -351,6 +354,7 @@ mod tests {
             prev_d = d;
         }
     }
+
     #[test]
     fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
         let board_length = 5;
@@ -380,5 +384,33 @@ mod tests {
                 assert!(false, "bad character found");
             }
         }
+    }
+
+    #[test]
+    fn test_tiny_board_recoil() {
+        let board_length = 4;
+        let animation = RecoilingBoard::new(
+            BoardSize::new(board_length, board_length),
+            RIGHT_I.cast_unit(),
+        );
+        let start_time = animation.creation_time();
+
+        let steps = 10;
+        for i in 0..steps {
+            let fraction_of_second = i as f32 / steps as f32;
+            let age = Duration::from_secs_f32(fraction_of_second);
+            let animation_time = start_time + age;
+            let glyph_map = animation.glyphs_at_time(animation_time);
+            println!("{}", Graphics::glyph_map_to_string(glyph_map));
+        }
+        assert!(false);
+    }
+    #[test]
+    fn test_print_static_board() {
+        let board = StaticBoard::new(BoardSize::new(3, 3));
+        let board_as_string = Graphics::glyph_map_to_string(board.glyphs_at_time(Instant::now()));
+        dbg!(&board_as_string);
+        assert!(board_as_string.starts_with("   "));
+        assert!(false);
     }
 }

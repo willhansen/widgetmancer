@@ -1170,7 +1170,7 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, RED);
     }
     #[test]
-    fn test_double_glyph_square_offset__one_and_a_half_up() {
+    fn test_double_glyph_square_offset__150_up() {
         // offset up
         let glyphs = Glyph::double_colored_square_with_offset(1.5, true, RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
@@ -1181,7 +1181,7 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
     #[test]
-    fn test_double_glyph_square_offset__down() {
+    fn test_double_glyph_square_offset__50_down() {
         // offset down
         let glyphs = Glyph::double_colored_square_with_offset(-0.5, true, RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
@@ -1248,5 +1248,23 @@ mod tests {
         assert_eq!(glyphs[1].character, '▌');
         assert_eq!(glyphs[1].fg_color, BLACK);
         assert_eq!(glyphs[1].bg_color, RED);
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__periodicity__horizontal() {
+        let fraction_pairs = vec![
+            (0.0, 2.0),
+            (0.0, -2.0),
+            (8.0, -2.0),
+            (0.1, 2.1),
+            (0.2, -1.8),
+            (0.7, 2.7),
+            (1.7, 3.7),
+        ];
+        for (f1, f2) in fraction_pairs {
+            let g1 = Glyph::double_colored_square_with_offset(f1, false, RED, BLACK);
+            let g2 = Glyph::double_colored_square_with_offset(f2, false, RED, BLACK);
+            assert_eq!(g1, g2);
+        }
     }
 }
