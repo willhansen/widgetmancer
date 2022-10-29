@@ -336,22 +336,26 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{WorldCharacterSquare, LEFT_I};
+    use crate::{WorldCharacterSquare, DOWN_I, LEFT_I};
 
     use super::*;
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
         let half_time = RECOIL_DURATION.as_secs_f32() / 2.0;
-        let steps = 100;
         let mut prev_d = 0.0;
-        for i in 0..steps {
-            let t = i as f32 / steps as f32 * half_time;
+        let mut t = 0.0;
+        loop {
             let d = RecoilingBoard::recoil_distance_in_squares_at_age(t);
-            if i != 0 {
+            if t >= half_time {
+                break;
+            }
+            if t != 0.0 {
+                //dbg!(&d, &prev_d);
                 assert!(d < prev_d);
             }
             prev_d = d;
+            t += 0.125;
         }
     }
 
@@ -387,30 +391,27 @@ mod tests {
     }
 
     #[test]
-    fn test_tiny_board_recoil() {
-        let board_length = 4;
+    #[ignore] // more for visual debugging than an actual test
+    fn test_draw_tiny_board_recoil() {
+        let board_length = 2;
         let animation = RecoilingBoard::new(
             BoardSize::new(board_length, board_length),
-            LEFT_I.cast_unit(),
+            RIGHT_I.cast_unit(),
         );
         let start_time = animation.creation_time();
 
-        let steps = 10;
+        let steps = 110;
         for i in 0..steps {
-            let fraction_of_second = i as f32 / steps as f32;
-            let age = Duration::from_secs_f32(fraction_of_second);
+            let seconds = 0.11 * i as f32;
+            let age = Duration::from_secs_f32(seconds);
             let animation_time = start_time + age;
             let glyph_map = animation.glyphs_at_time(animation_time);
-            println!("{}", Graphics::glyph_map_to_string(glyph_map));
+            println!(
+                "v-- seconds: {}\n{}",
+                age.as_secs_f32(),
+                Graphics::glyph_map_to_string(glyph_map)
+            );
         }
-        assert!(false);
-    }
-    #[test]
-    fn test_print_static_board() {
-        let board = StaticBoard::new(BoardSize::new(3, 3));
-        let board_as_string = Graphics::glyph_map_to_string(board.glyphs_at_time(Instant::now()));
-        dbg!(&board_as_string);
-        assert!(board_as_string.starts_with("   "));
         assert!(false);
     }
 }

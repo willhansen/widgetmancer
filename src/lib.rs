@@ -109,6 +109,6 @@ pub fn do_everything() {
             game.select_closest_piece();
         }
         game.draw(&mut wrapped_terminal, Instant::now());
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(21));
     }
 }
