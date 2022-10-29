@@ -1191,8 +1191,22 @@ mod tests {
         assert_eq!(glyphs[1].fg_color, RED);
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
+    //                      |<--halfway
+    // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    fn test_double_glyph_square_offset__left() {
+    fn test_double_glyph_square_offset__14_left() {
+        // offset left
+        let glyphs = Glyph::double_colored_square_with_offset(-0.14, false, RED, BLACK);
+        assert_eq!(glyphs[0].character, '█');
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        //assert_eq!(glyphs[1].character, '▏');
+        assert_eq!(glyphs[1].character, '▊');
+        assert_eq!(glyphs[1].fg_color, RED);
+        assert_eq!(glyphs[1].bg_color, BLACK);
+    }
+    #[test]
+    fn test_double_glyph_square_offset__25_left() {
         // offset left
         let glyphs = Glyph::double_colored_square_with_offset(-0.25, false, RED, BLACK);
         assert_eq!(glyphs[0].character, '█');
@@ -1203,7 +1217,7 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
     #[test]
-    fn test_double_glyph_square_offset__more_left() {
+    fn test_double_glyph_square_offset__75_left() {
         // offset left
         let glyphs = Glyph::double_colored_square_with_offset(-0.75, false, RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
@@ -1214,7 +1228,7 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, RED);
     }
     #[test]
-    fn test_double_glyph_square_offset__right() {
+    fn test_double_glyph_square_offset__25_right() {
         // offset right
         let glyphs = Glyph::double_colored_square_with_offset(0.25, false, RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
@@ -1225,7 +1239,7 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
     #[test]
-    fn test_double_glyph_square_offset__more_right() {
+    fn test_double_glyph_square_offset__75_right() {
         // offset right
         let glyphs = Glyph::double_colored_square_with_offset(0.75, false, RED, BLACK);
         assert_eq!(glyphs[0].character, '█');

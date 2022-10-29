@@ -4,7 +4,7 @@ use std::f32::consts::{E, PI, TAU};
 use std::time;
 use std::time::{Duration, Instant};
 
-use euclid::{vec2, Angle};
+use euclid::{vec2, Angle, Length};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use termion::color::Black;
@@ -249,6 +249,8 @@ pub struct RecoilingBoard {
 }
 
 const RECOIL_DURATION: Duration = Duration::from_secs_f32(6.0);
+const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(3.0);
+
 impl RecoilingBoard {
     pub fn new(board_size: BoardSize, shot_direction: WorldStep) -> RecoilingBoard {
         let mut orthogonalized_step = round_to_king_step(shot_direction);
@@ -266,7 +268,7 @@ impl RecoilingBoard {
     fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let peak_dist = -3.0;
+        let peak_dist = -RECOIL_DISTANCE.0;
         let time_to_peak = RECOIL_DURATION.as_secs_f32() / 2.0;
 
         if age < time_to_peak {
@@ -278,6 +280,10 @@ impl RecoilingBoard {
         } else {
             0.0
         }
+    }
+
+    pub fn creation_time(&self) -> Instant {
+        self.creation_time
     }
 }
 
@@ -323,5 +329,56 @@ impl Animation for RecoilingBoard {
 impl BoardAnimation for RecoilingBoard {
     fn next_animation(&self) -> Box<dyn BoardAnimation> {
         Box::new(StaticBoard::new(self.board_size))
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::WorldCharacterSquare;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    #[test]
+    fn test_recoil_distance_function_increasing_for_first_half() {
+        let half_time = RECOIL_DURATION.as_secs_f32() / 2.0;
+        let steps = 100;
+        let mut prev_d = 0.0;
+        for i in 0..steps {
+            let t = i as f32 / steps as f32 * half_time;
+            let d = RecoilingBoard::recoil_distance_in_squares_at_age(t);
+            if i != 0 {
+                assert!(d < prev_d);
+            }
+            prev_d = d;
+        }
+    }
+    #[test]
+    fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
+        let board_length = 5;
+        let animation = RecoilingBoard::new(
+            BoardSize::new(board_length, board_length),
+            RIGHT_I.cast_unit(),
+        );
+        let start_time = animation.creation_time();
+
+        let steps = 100;
+        for i in 0..steps {
+            let fraction_of_second = i as f32 / steps as f32;
+            let age = Duration::from_secs_f32(fraction_of_second);
+            let animation_time = start_time + age;
+            let glyph_map = animation.glyphs_at_time(animation_time);
+            let right_half_of_top_left_square =
+                WorldCharacterSquare::new(1, board_length as i32 - 1);
+            let test_glyph = glyph_map.get(&right_half_of_top_left_square).unwrap();
+            let target_char = '▉'; // one left of solid
+            let bad_char = '▊'; // two left of solid
+            if test_glyph.character == target_char {
+                // test pass
+                println!("good character detected");
+                break;
+            }
+            if test_glyph.character == bad_char {
+                assert!(false, "bad character found");
+            }
+        }
     }
 }
