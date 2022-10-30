@@ -275,7 +275,7 @@ impl RecoilingBoard {
             let t = age / time_to_peak;
             lerp(0.0, peak_dist, t)
         } else if age < 2.0 * time_to_peak {
-            let t = (age - time_to_peak) / time_to_peak;
+            let t = age / time_to_peak - 1.0;
             lerp(peak_dist, 0.0, t)
         } else {
             0.0
@@ -298,7 +298,7 @@ impl Animation for RecoilingBoard {
 
         assert!(is_orthogonal_king_step(self.orthogonal_shot_direction));
         let offset_vector: WorldMove =
-            -self.orthogonal_shot_direction.to_f32() * offset_distance_in_squares;
+            self.orthogonal_shot_direction.to_f32() * offset_distance_in_squares;
 
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
@@ -306,8 +306,9 @@ impl Animation for RecoilingBoard {
                 let square_color = Graphics::board_color_at_square(world_square);
                 let other_square_color =
                     Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
+                let y_fraction = y as f32 / self.board_size.height as f32; // TODO: remove
                 let glyphs = Glyph::offset_board_square_glyphs(
-                    offset_vector,
+                    offset_vector * y_fraction,
                     square_color,
                     other_square_color,
                 );
@@ -387,9 +388,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // more for visual debugging than an actual test
+    //#[ignore] // more for visual debugging than an actual test
     fn test_draw_tiny_board_recoil() {
-        let board_length = 1;
+        let board_length = 3;
         let animation = RecoilingBoard::new(
             BoardSize::new(board_length, board_length),
             RIGHT_I.cast_unit(),

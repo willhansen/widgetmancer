@@ -84,13 +84,10 @@ pub fn do_everything() {
 
     let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
 
-    let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3;
-    game.place_piece(Piece::pawn(), pawn_pos)
-        .expect("Failed to place pawn");
+    //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
     for _ in 0..5 {
-        game.place_randomly(Piece::pawn())
-            .expect("random placement");
+        //game.place_randomly(Piece::pawn()) .expect("random placement");
     }
     for _ in 0..2 {
         //game.place_randomly(Piece::rook()).expect("random placement");

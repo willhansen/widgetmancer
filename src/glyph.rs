@@ -22,6 +22,8 @@ pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
+pub const HORIZONTAL_HALF_BLOCK: char = EIGHTH_BLOCKS_FROM_LEFT[4];
+
 pub type BrailleArray = [[bool; 4]; 2];
 pub type TwoGlyphs = [Glyph; 2];
 
@@ -140,31 +142,22 @@ impl Glyph {
             }
         };
     }
-    pub fn square_with_vertical_offset(fraction_of_square_offset: f32) -> Glyph {
-        return Glyph::colored_character_square_with_vertical_offset(
-            fraction_of_square_offset,
-            WHITE,
-            BLACK,
-        );
-    }
     pub fn colored_character_square_with_vertical_offset(
         fraction_of_square_offset: f32,
         square_color: RGB8,
         background_color: RGB8,
     ) -> Glyph {
-        let offset_in_eighths_rounded_towards_inf = (fraction_of_square_offset * 8.0).ceil() as i32;
-        assert!(offset_in_eighths_rounded_towards_inf.abs() <= 8);
-        return if offset_in_eighths_rounded_towards_inf <= 0 {
+        let offset_in_eighths = (fraction_of_square_offset * 8.0).round() as i32;
+        assert!(offset_in_eighths.abs() <= 8);
+        return if offset_in_eighths <= 0 {
             Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM
-                    [(8 + offset_in_eighths_rounded_towards_inf) as usize],
+                character: EIGHTH_BLOCKS_FROM_BOTTOM[(8 + offset_in_eighths) as usize],
                 fg_color: square_color,
                 bg_color: background_color,
             }
         } else {
             Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM
-                    [(offset_in_eighths_rounded_towards_inf) as usize],
+                character: EIGHTH_BLOCKS_FROM_BOTTOM[(offset_in_eighths) as usize],
                 fg_color: background_color,
                 bg_color: square_color,
             }
@@ -186,6 +179,7 @@ impl Glyph {
     ) -> TwoGlyphs {
         assert!(is_orthogonal(offset_vector));
         let is_vertical = offset_vector.x == 0.0;
+        // because sign
         let offset_magnitude = if is_vertical {
             offset_vector.y
         } else {
@@ -1294,6 +1288,40 @@ mod tests {
         assert_eq!(glyphs[1].bg_color, RED);
     }
 
+    #[test]
+    fn test_double_glyph_square_offset__slightly_past_full_square_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
+        assert!(
+            glyphs[0].looks_solid(BLACK),
+            "glyph: {}",
+            &glyphs[0].to_string()
+        );
+        assert!(
+            glyphs[1].looks_solid(BLACK),
+            "glyph: {}",
+            &glyphs[1].to_string()
+        );
+    }
+    #[test]
+    fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
+        assert_eq!(
+            glyphs[0],
+            Glyph {
+                character: HORIZONTAL_HALF_BLOCK,
+                fg_color: RED,
+                bg_color: BLACK
+            }
+        );
+        assert!(
+            glyphs[1].looks_solid(BLACK),
+            "glyph: {}",
+            &glyphs[1].to_string()
+        );
+    }
+
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
@@ -1365,6 +1393,17 @@ mod tests {
                 fg_color: BLACK,
                 bg_color: RED
             }
+        );
+    }
+    #[test]
+    fn test_character_square_horizontal_offset__match_opposite_ends() {
+        assert!(
+            Glyph::colored_character_square_with_horizontal_offset(-1.0, RED, BLACK)
+                .looks_solid(BLACK)
+        );
+        assert!(
+            Glyph::colored_character_square_with_horizontal_offset(1.0, RED, BLACK)
+                .looks_solid(BLACK)
         );
     }
 
