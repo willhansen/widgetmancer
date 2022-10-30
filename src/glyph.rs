@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 
+use ::num::clamp;
 use euclid::*;
 use euclid::{point2, vec2};
 use line_drawing::Point;
@@ -12,6 +13,11 @@ use crate::utility::*;
 
 pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
+pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
+pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
+pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
+pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
+pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
 pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
@@ -63,7 +69,7 @@ impl Glyph {
             color::Fg(color::Rgb(
                 self.fg_color.r,
                 self.fg_color.g,
-                self.fg_color.b
+                self.fg_color.b,
             )),
             output,
             color::Fg(color::Reset),
@@ -73,7 +79,7 @@ impl Glyph {
             color::Bg(color::Rgb(
                 self.bg_color.r,
                 self.bg_color.g,
-                self.bg_color.b
+                self.bg_color.b,
             )),
             output,
             color::Bg(color::Reset),
@@ -110,58 +116,37 @@ impl Glyph {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
 
-    pub fn colored_character_square_with_horizontal_offset(
-        fraction_of_square_offset: f32,
-        square_color: RGB8,
-        background_color: RGB8,
-    ) -> Glyph {
-        let offset_in_eighths = (fraction_of_square_offset * 8.0).round() as i32;
-        return if offset_in_eighths <= -(EIGHTH_BLOCKS_FROM_LEFT.len() as i32) {
-            Glyph {
-                character: ' ',
-                fg_color: square_color,
-                bg_color: background_color,
-            }
-        } else if offset_in_eighths <= 0 {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_LEFT[(8 + offset_in_eighths) as usize],
-                fg_color: square_color,
-                bg_color: background_color,
-            }
-        } else if offset_in_eighths < EIGHTH_BLOCKS_FROM_LEFT.len() as i32 {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_LEFT[offset_in_eighths as usize],
-                fg_color: background_color,
-                bg_color: square_color,
-            }
+    pub fn partial_block(vertical: bool, fraction: f32) -> char {
+        let eighths = (fraction * 8.0).round() as usize;
+        let clamped_eighths = clamp(eighths, 0, 8);
+        if vertical {
+            EIGHTH_BLOCKS_FROM_BOTTOM[clamped_eighths]
         } else {
-            Glyph {
-                character: '█',
-                fg_color: background_color,
-                bg_color: square_color,
-            }
-        };
+            EIGHTH_BLOCKS_FROM_LEFT[clamped_eighths]
+        }
     }
-    pub fn colored_character_square_with_vertical_offset(
+
+    pub fn colored_character_square_with_offset(
+        is_vertical: bool,
         fraction_of_square_offset: f32,
         square_color: RGB8,
         background_color: RGB8,
     ) -> Glyph {
-        let offset_in_eighths = (fraction_of_square_offset * 8.0).round() as i32;
-        assert!(offset_in_eighths.abs() <= 8);
-        return if offset_in_eighths <= 0 {
+        if fraction_of_square_offset < 0.0 {
+            let character = Glyph::partial_block(is_vertical, 1.0 + fraction_of_square_offset);
             Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM[(8 + offset_in_eighths) as usize],
+                character,
                 fg_color: square_color,
                 bg_color: background_color,
             }
         } else {
+            let character = Glyph::partial_block(is_vertical, fraction_of_square_offset);
             Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM[(offset_in_eighths) as usize],
+                character,
                 fg_color: background_color,
                 bg_color: square_color,
             }
-        };
+        }
     }
     pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
@@ -193,7 +178,8 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             )
             .map(|character_offset| {
-                Glyph::colored_character_square_with_vertical_offset(
+                Glyph::colored_character_square_with_offset(
+                    true,
                     character_offset,
                     square_color,
                     background_color,
@@ -204,7 +190,8 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             );
             character_offsets.map(|character_offset| {
-                Glyph::colored_character_square_with_horizontal_offset(
+                Glyph::colored_character_square_with_offset(
+                    false,
                     character_offset,
                     square_color,
                     background_color,
@@ -284,7 +271,8 @@ impl Glyph {
         for i in 0..3 {
             let x = i as i32 - 1;
             if offset_dir.x == x || x == 0 {
-                output[i][c] = Some(Glyph::colored_character_square_with_horizontal_offset(
+                output[i][c] = Some(Glyph::colored_character_square_with_offset(
+                    false,
                     x_offset - x as f32,
                     color,
                     BLACK,
@@ -313,7 +301,8 @@ impl Glyph {
         for j in 0..3 {
             let y = j as i32 - 1;
             if offset_dir.y == y || y == 0 {
-                output[c][j] = Some(Glyph::colored_character_square_with_vertical_offset(
+                output[c][j] = Some(Glyph::colored_character_square_with_offset(
+                    true,
                     y_offset - y as f32,
                     color,
                     BLACK,
@@ -1121,14 +1110,14 @@ mod tests {
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
             Glyph::world_point_to_world_character_point(
-                Point2D::<f32, SquareGridInWorldFrame>::new(0.0, 0.0,)
+                Point2D::<f32, SquareGridInWorldFrame>::new(0.0, 0.0)
             ),
             "zero is actually between two characters"
         );
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
             Glyph::world_point_to_world_character_point(
-                Point2D::<f32, SquareGridInWorldFrame>::new(1.0, 1.0,)
+                Point2D::<f32, SquareGridInWorldFrame>::new(1.0, 1.0)
             ),
             "diagonal a bit"
         );
@@ -1227,7 +1216,7 @@ mod tests {
             Glyph {
                 character: '▊',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
     }
@@ -1303,6 +1292,7 @@ mod tests {
             &glyphs[1].to_string()
         );
     }
+
     #[test]
     fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
         // offset right
@@ -1312,7 +1302,7 @@ mod tests {
             Glyph {
                 character: HORIZONTAL_HALF_BLOCK,
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
         assert!(
@@ -1327,11 +1317,11 @@ mod tests {
     #[test]
     fn test_character_square_horizontal_offset__base_case() {
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(0.0, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK),
             Glyph {
                 character: '█',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
     }
@@ -1339,19 +1329,19 @@ mod tests {
     #[test]
     fn test_character_square_horizontal_offset__round_to_zero() {
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(-0.001, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK),
             Glyph {
                 character: '█',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(0.001, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK),
             Glyph {
                 character: '█',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
     }
@@ -1359,19 +1349,19 @@ mod tests {
     #[test]
     fn test_character_square_horizontal_offset__out_of_range() {
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(-1.5, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, -1.5, RED, BLACK),
             Glyph {
                 character: ' ',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(1.5, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, 1.5, RED, BLACK),
             Glyph {
                 character: '█',
                 fg_color: BLACK,
-                bg_color: RED
+                bg_color: RED,
             }
         );
     }
@@ -1379,31 +1369,30 @@ mod tests {
     #[test]
     fn test_character_square_horizontal_offset__halfway() {
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(-0.5, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, -0.5, RED, BLACK),
             Glyph {
                 character: '▌',
                 fg_color: RED,
-                bg_color: BLACK
+                bg_color: BLACK,
             }
         );
         assert_eq!(
-            Glyph::colored_character_square_with_horizontal_offset(0.5, RED, BLACK),
+            Glyph::colored_character_square_with_offset(false, 0.5, RED, BLACK),
             Glyph {
                 character: '▌',
                 fg_color: BLACK,
-                bg_color: RED
+                bg_color: RED,
             }
         );
     }
+
     #[test]
     fn test_character_square_horizontal_offset__match_opposite_ends() {
         assert!(
-            Glyph::colored_character_square_with_horizontal_offset(-1.0, RED, BLACK)
-                .looks_solid(BLACK)
+            Glyph::colored_character_square_with_offset(false, -1.0, RED, BLACK).looks_solid(BLACK)
         );
         assert!(
-            Glyph::colored_character_square_with_horizontal_offset(1.0, RED, BLACK)
-                .looks_solid(BLACK)
+            Glyph::colored_character_square_with_offset(false, 1.0, RED, BLACK).looks_solid(BLACK)
         );
     }
 

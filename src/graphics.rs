@@ -233,9 +233,7 @@ impl Graphics {
             } else {
                 *grid_glyph = new_glyph;
             }
-            grid_glyph.bg_color = Graphics::board_color_at_square(
-                Glyph::world_character_square_to_world_square(world_character_square),
-            );
+            //grid_glyph.bg_color = Graphics::board_color_at_square( Glyph::world_character_square_to_world_square(world_character_square), );
         }
     }
 

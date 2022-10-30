@@ -306,6 +306,7 @@ impl Animation for RecoilingBoard {
                 let square_color = Graphics::board_color_at_square(world_square);
                 let other_square_color =
                     Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
+
                 let y_fraction = y as f32 / self.board_size.height as f32; // TODO: remove
                 let glyphs = Glyph::offset_board_square_glyphs(
                     offset_vector * y_fraction,
@@ -388,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    //#[ignore] // more for visual debugging than an actual test
+    #[ignore] // more for visual debugging than an actual test
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
         let animation = RecoilingBoard::new(
