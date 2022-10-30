@@ -365,7 +365,8 @@ mod tests {
         );
         let start_time = animation.creation_time();
 
-        let steps = 100;
+        // TODO: binary search instead, if this is slow
+        let steps = 1000;
         for i in 0..steps {
             let fraction_of_second = i as f32 / steps as f32;
             let age = Duration::from_secs_f32(fraction_of_second);

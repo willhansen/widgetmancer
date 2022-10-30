@@ -1248,21 +1248,15 @@ mod tests {
         assert_eq!(glyphs[0].character, '▌');
         assert_eq!(glyphs[0].fg_color, BLACK);
         assert_eq!(glyphs[0].bg_color, RED);
-        assert_eq!(glyphs[1].character, '█');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert!(glyphs[1].looks_solid(RED));
     }
 
     #[test]
     fn test_double_glyph_square_offset__50_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0].character, '█');
-        assert_eq!(glyphs[0].fg_color, BLACK);
-        assert_eq!(glyphs[0].bg_color, RED);
-        assert_eq!(glyphs[1].character, '█');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert!(glyphs[0].looks_solid(BLACK));
+        assert!(glyphs[1].looks_solid(RED));
     }
 
     #[test]
@@ -1316,33 +1310,19 @@ mod tests {
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
     fn test_character_square_horizontal_offset__base_case() {
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK),
-            Glyph {
-                character: '█',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
+        assert!(
+            Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK).looks_solid(RED)
         );
     }
 
     #[test]
     fn test_character_square_horizontal_offset__round_to_zero() {
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK),
-            Glyph {
-                character: '█',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
+        assert!(
+            Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK).looks_solid(RED)
         );
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK),
-            Glyph {
-                character: '█',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
+
+        assert!(
+            Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK).looks_solid(RED)
         );
     }
 
