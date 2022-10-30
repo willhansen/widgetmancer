@@ -215,11 +215,7 @@ impl Animation for StaticBoard {
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
                 let world_square = WorldSquare::new(x as i32, y as i32);
-                let glyph = Glyph {
-                    character: ' ',
-                    fg_color: BLACK,
-                    bg_color: Graphics::board_color_at_square(world_square),
-                };
+                let glyph = Glyph::new(' ', BLACK, Graphics::board_color_at_square(world_square));
                 let left_character_square =
                     Glyph::world_square_to_left_world_character_square(world_square);
                 let right_character_square = left_character_square + vec2(1, 0);

@@ -59,9 +59,20 @@ pub struct Glyph {
     pub character: char,
     pub fg_color: RGB8,
     pub bg_color: RGB8,
+    pub fg_alpha: u8,
+    pub bg_alpha: u8,
 }
 
 impl Glyph {
+    pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
+        Glyph {
+            character,
+            fg_color,
+            bg_color,
+            fg_alpha: 255,
+            bg_alpha: 255,
+        }
+    }
     pub fn to_string(&self) -> String {
         let mut output = self.character.to_string();
         output = format!(
@@ -89,11 +100,7 @@ impl Glyph {
     }
 
     pub fn from_char(character: char) -> Glyph {
-        Glyph {
-            character,
-            fg_color: WHITE,
-            bg_color: BLACK,
-        }
+        Glyph::new(character, WHITE, BLACK)
     }
 
     pub fn with_char(&self, new_char: char) -> Glyph {
@@ -134,27 +141,15 @@ impl Glyph {
     ) -> Glyph {
         if fraction_of_square_offset < 0.0 {
             let character = Glyph::partial_block(is_vertical, 1.0 + fraction_of_square_offset);
-            Glyph {
-                character,
-                fg_color: square_color,
-                bg_color: background_color,
-            }
+            Glyph::new(character, square_color, background_color)
         } else {
             let character = Glyph::partial_block(is_vertical, fraction_of_square_offset);
-            Glyph {
-                character,
-                fg_color: background_color,
-                bg_color: square_color,
-            }
+            Glyph::new(character, background_color, square_color)
         }
     }
     pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
-        Glyph {
-            character: quarter_block_by_offset(step),
-            fg_color: color,
-            bg_color: BLACK,
-        }
+        Glyph::new(quarter_block_by_offset(step), color, BLACK)
     }
 
     pub fn offset_board_square_glyphs(
@@ -550,11 +545,7 @@ impl Glyph {
             if !glyph_map.contains_key(&character_grid_square) {
                 glyph_map.insert(
                     character_grid_square,
-                    Glyph {
-                        character: Glyph::empty_braille(),
-                        fg_color: color,
-                        bg_color: BLACK,
-                    },
+                    Glyph::new(Glyph::empty_braille(), color, BLACK),
                 );
             }
             let braille_character =
@@ -585,11 +576,11 @@ impl Glyph {
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,
     ) -> Glyph {
-        Glyph {
-            character: Glyph::character_world_pos_to_braille_char(world_pos),
-            fg_color: color,
-            bg_color: BLACK,
-        }
+        Glyph::new(
+            Glyph::character_world_pos_to_braille_char(world_pos),
+            color,
+            BLACK,
+        )
     }
 
     pub fn points_to_braille_glyphs(
@@ -624,11 +615,7 @@ impl Glyph {
             let braille_char: char = Glyph::local_braille_squares_to_braille_char(
                 braille_square_set.into_iter().collect(),
             );
-            let braille_glyph = Glyph {
-                character: braille_char,
-                fg_color: color,
-                bg_color: BLACK,
-            };
+            let braille_glyph = Glyph::new(braille_char, color, BLACK);
             output_map.insert(char_square, braille_glyph);
         }
         output_map
@@ -1211,14 +1198,7 @@ mod tests {
             &glyphs[0].to_string()
         );
         //assert_eq!(glyphs[1].character, '▏');
-        assert_eq!(
-            glyphs[1],
-            Glyph {
-                character: '▊',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
-        );
+        assert_eq!(glyphs[1], Glyph::new('▊', RED, BLACK,));
     }
 
     #[test]
@@ -1291,14 +1271,7 @@ mod tests {
     fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
-        assert_eq!(
-            glyphs[0],
-            Glyph {
-                character: HORIZONTAL_HALF_BLOCK,
-                fg_color: RED,
-                bg_color: BLACK,
-            }
-        );
+        assert_eq!(glyphs[0], Glyph::new(HORIZONTAL_HALF_BLOCK, RED, BLACK,));
         assert!(
             glyphs[1].looks_solid(BLACK),
             "glyph: {}",
@@ -1330,19 +1303,11 @@ mod tests {
     fn test_character_square_horizontal_offset__out_of_range() {
         assert_eq!(
             Glyph::colored_character_square_with_offset(false, -1.5, RED, BLACK),
-            Glyph {
-                character: ' ',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
+            Glyph::new(' ', RED, BLACK,)
         );
         assert_eq!(
             Glyph::colored_character_square_with_offset(false, 1.5, RED, BLACK),
-            Glyph {
-                character: '█',
-                fg_color: BLACK,
-                bg_color: RED,
-            }
+            Glyph::new('█', BLACK, RED,)
         );
     }
 
@@ -1350,19 +1315,11 @@ mod tests {
     fn test_character_square_horizontal_offset__halfway() {
         assert_eq!(
             Glyph::colored_character_square_with_offset(false, -0.5, RED, BLACK),
-            Glyph {
-                character: '▌',
-                fg_color: RED,
-                bg_color: BLACK,
-            }
+            Glyph::new('▌', RED, BLACK,)
         );
         assert_eq!(
             Glyph::colored_character_square_with_offset(false, 0.5, RED, BLACK),
-            Glyph {
-                character: '▌',
-                fg_color: BLACK,
-                bg_color: RED,
-            }
+            Glyph::new('▌', BLACK, RED,)
         );
     }
 
