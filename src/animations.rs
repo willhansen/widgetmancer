@@ -293,15 +293,12 @@ impl Animation for RecoilingBoard {
 
         let mut offset_distance_in_squares: f32 =
             RecoilingBoard::recoil_distance_in_squares_at_age(age.as_secs_f32());
-        let shot_in_negative_direction =
-            self.orthogonal_shot_direction.x + self.orthogonal_shot_direction.y < 0;
-        if shot_in_negative_direction {
-            offset_distance_in_squares *= -1.0;
-        }
-
-        let is_vertical_motion = self.orthogonal_shot_direction.y != 0;
 
         let mut glyph_map = WorldSquareGlyphMap::new();
+
+        assert!(is_orthogonal_king_step(self.orthogonal_shot_direction));
+        let offset_vector: WorldMove =
+            -self.orthogonal_shot_direction.to_f32() * offset_distance_in_squares;
 
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
@@ -309,9 +306,8 @@ impl Animation for RecoilingBoard {
                 let square_color = Graphics::board_color_at_square(world_square);
                 let other_square_color =
                     Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
-                let glyphs = Glyph::double_colored_square_with_offset(
-                    offset_distance_in_squares,
-                    is_vertical_motion,
+                let glyphs = Glyph::offset_board_square_glyphs(
+                    offset_vector,
                     square_color,
                     other_square_color,
                 );
@@ -364,7 +360,7 @@ mod tests {
         let board_length = 5;
         let animation = RecoilingBoard::new(
             BoardSize::new(board_length, board_length),
-            RIGHT_I.cast_unit(),
+            LEFT_I.cast_unit(),
         );
         let start_time = animation.creation_time();
 
@@ -393,7 +389,7 @@ mod tests {
     #[test]
     #[ignore] // more for visual debugging than an actual test
     fn test_draw_tiny_board_recoil() {
-        let board_length = 2;
+        let board_length = 1;
         let animation = RecoilingBoard::new(
             BoardSize::new(board_length, board_length),
             RIGHT_I.cast_unit(),

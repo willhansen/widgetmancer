@@ -161,6 +161,10 @@ pub fn is_diagonal_king_step(step: WorldStep) -> bool {
     step.square_length() == 2
 }
 
+pub fn is_orthogonal(v: WorldMove) -> bool {
+    v.x == 0.0 || v.y == 0.0
+}
+
 pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
