@@ -248,8 +248,8 @@ pub struct RecoilingBoard {
     creation_time: Instant,
 }
 
-const RECOIL_DURATION: Duration = Duration::from_secs_f32(10.0);
-const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(10.0);
+const RECOIL_DURATION: Duration = Duration::from_secs_f32(0.2);
+const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(1.0);
 
 impl RecoilingBoard {
     pub fn new(board_size: BoardSize, shot_direction: WorldStep) -> RecoilingBoard {
@@ -268,7 +268,7 @@ impl RecoilingBoard {
     fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let peak_dist = -RECOIL_DISTANCE.0;
+        let peak_dist = RECOIL_DISTANCE.0;
         let time_to_peak = RECOIL_DURATION.as_secs_f32() / 2.0;
 
         if age < time_to_peak {
@@ -307,9 +307,8 @@ impl Animation for RecoilingBoard {
                 let other_square_color =
                     Graphics::board_color_at_square(world_square + RIGHT_I.cast_unit());
 
-                let y_fraction = y as f32 / self.board_size.height as f32; // TODO: remove
                 let glyphs = Glyph::offset_board_square_glyphs(
-                    offset_vector * y_fraction,
+                    offset_vector,
                     square_color,
                     other_square_color,
                 );
