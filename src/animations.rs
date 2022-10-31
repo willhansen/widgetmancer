@@ -408,4 +408,12 @@ mod tests {
         }
         assert!(false);
     }
+
+    #[test]
+    fn test_simple_laser_transparent_background() {
+        let animation = SimpleLaser::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
+        let glyph_map =
+            animation.glyphs_at_time(animation.creation_time + Duration::from_millis(1));
+        assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0));
+    }
 }

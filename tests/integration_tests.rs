@@ -300,7 +300,9 @@ fn test_particles_on_piece_death() {
     let graphics = game.borrow_graphics_mut();
 
     let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
-    assert!(Glyph::is_braille(glyphs[0].character) || Glyph::is_braille(glyphs[1].character))
+    assert!(
+        Glyph::char_is_braille(glyphs[0].character) || Glyph::char_is_braille(glyphs[1].character)
+    )
 }
 
 #[test]

@@ -223,17 +223,8 @@ impl Graphics {
             if !self.world_character_is_on_screen(world_character_square) {
                 continue;
             }
-            let grid_glyph = &mut self.output_buffer[buffer_character_square.x as usize]
-                [buffer_character_square.y as usize];
-            if Glyph::is_braille(grid_glyph.character) {
-                let combined_braille =
-                    Glyph::add_braille(grid_glyph.character, new_glyph.character);
-                *grid_glyph = new_glyph;
-                grid_glyph.character = combined_braille;
-            } else {
-                *grid_glyph = new_glyph;
-            }
-            //grid_glyph.bg_color = Graphics::board_color_at_square( Glyph::world_character_square_to_world_square(world_character_square), );
+
+            self.draw_glyph(buffer_character_square, new_glyph);
         }
     }
 
@@ -254,9 +245,12 @@ impl Graphics {
     }
 
     pub fn fill_output_buffer_with_black(&mut self) {
+        self.fill_output_buffer_with_solid_color(BLACK);
+    }
+    pub fn fill_output_buffer_with_solid_color(&mut self, color: RGB8) {
         for x in 0..self.terminal_width as usize {
             for y in 0..self.terminal_height as usize {
-                self.output_buffer[x][y] = Glyph::from_char(' ');
+                self.output_buffer[x][y] = Glyph::new(' ', WHITE, color);
             }
         }
     }
@@ -378,10 +372,22 @@ impl Graphics {
     pub fn draw_glyph(
         &mut self,
         buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
-        glyph: Glyph,
+        mut new_glyph: Glyph,
     ) {
         // TODO: account for alpha colors and braille combinations
-        self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize] = glyph;
+        let old_glyph = self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize];
+
+        if new_glyph.bg_alpha == 0 {
+            if old_glyph.is_solid() {
+                new_glyph.bg_color = old_glyph.get_solid_color().unwrap();
+            }
+            if old_glyph.is_braille() {
+                new_glyph.bg_color = old_glyph.bg_color;
+                new_glyph.character =
+                    Glyph::combine_braille_characters(new_glyph.character, old_glyph.character);
+            }
+        }
+        self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize] = new_glyph;
     }
 
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
@@ -540,7 +546,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::RIGHT_I;
+    use crate::{BLUE, RIGHT_I};
 
     use super::*;
 
@@ -603,5 +609,23 @@ mod tests {
 
         g.draw_braille_point(test_point, RED);
         assert_eq!(g.count_buffered_braille_dots_in_rect(test_rectangle), 1)
+    }
+
+    #[test]
+    fn test_laser_has_transparent_background() {
+        let mut g = set_up_graphics();
+        g.fill_output_buffer_with_solid_color(BLUE);
+        assert_eq!(
+            g.get_buffered_glyphs_for_square(point2(5, 0))[0].bg_color,
+            BLUE
+        );
+        g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
+        g.draw_non_board_animations(Instant::now());
+        g.print_output_buffer();
+        assert_eq!(
+            g.get_buffered_glyphs_for_square(point2(5, 0))[0].bg_color,
+            BLUE
+        );
+        g.print_output_buffer();
     }
 }

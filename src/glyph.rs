@@ -30,6 +30,13 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄'
 
 pub const HORIZONTAL_HALF_BLOCK: char = EIGHTH_BLOCKS_FROM_LEFT[4];
 
+pub const FULL_BLOCK: char = '█';
+pub const SPACE: char = ' ';
+pub const EMPTY_BRAILLE: char = '\u{2800}';
+
+pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
+pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
+
 pub type BrailleArray = [[bool; 4]; 2];
 pub type TwoGlyphs = [Glyph; 2];
 
@@ -362,18 +369,18 @@ impl Glyph {
         char::from_u32(character as u32 | Glyph::braille_bit_for_pos(p)).unwrap()
     }
 
-    pub fn empty_braille() -> char {
-        '\u{2800}'
+    pub fn is_braille(&self) -> bool {
+        Glyph::char_is_braille(self.character)
     }
 
-    pub fn is_braille(c: char) -> bool {
+    pub fn char_is_braille(c: char) -> bool {
         let x = c as u32;
         // The unicode braille block
         x >= 0x2800 && x <= 0x28FF
     }
 
     pub fn count_braille_dots(character: char) -> u32 {
-        if !Glyph::is_braille(character) {
+        if !Glyph::char_is_braille(character) {
             return 0;
         }
         let num_good_bits = 8;
@@ -385,7 +392,9 @@ impl Glyph {
         return sum as u32;
     }
 
-    pub fn add_braille(c1: char, c2: char) -> char {
+    pub fn combine_braille_characters(c1: char, c2: char) -> char {
+        assert!(Glyph::char_is_braille(c1));
+        assert!(Glyph::char_is_braille(c2));
         char::from_u32(c1 as u32 | c2 as u32).unwrap()
     }
 
@@ -543,10 +552,9 @@ impl Glyph {
             let character_grid_square =
                 Glyph::world_braille_square_to_world_character_square(braille_pos);
             if !glyph_map.contains_key(&character_grid_square) {
-                glyph_map.insert(
-                    character_grid_square,
-                    Glyph::new(Glyph::empty_braille(), color, BLACK),
-                );
+                let mut new_glyph = Glyph::new(EMPTY_BRAILLE, color, BLACK);
+                new_glyph.bg_alpha = 0;
+                glyph_map.insert(character_grid_square, new_glyph);
             }
             let braille_character =
                 &mut glyph_map.get_mut(&character_grid_square).unwrap().character;
@@ -561,7 +569,7 @@ impl Glyph {
     pub fn character_world_pos_to_braille_char(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> char {
-        let character = Glyph::empty_braille();
+        let character = EMPTY_BRAILLE;
         Glyph::add_braille_dot(
             character,
             Glyph::braille_square_to_dot_in_character(
@@ -636,9 +644,25 @@ impl Glyph {
     }
 
     pub fn looks_solid(&self, color: RGB8) -> bool {
-        ((self.character == ' ' || self.character == Glyph::empty_braille())
-            && self.bg_color == color)
-            || (self.character == '█' && self.fg_color == color)
+        if let Some(solid_color) = self.get_solid_color() {
+            color == solid_color
+        } else {
+            false
+        }
+    }
+
+    pub fn is_solid(&self) -> bool {
+        self.get_solid_color() != None
+    }
+
+    pub fn get_solid_color(&self) -> Option<RGB8> {
+        if KNOWN_FG_ONLY_CHARS.contains(&self.character) {
+            Some(self.fg_color)
+        } else if KNOWN_BG_ONLY_CHARS.contains(&self.character) {
+            Some(self.bg_color)
+        } else {
+            None
+        }
     }
 }
 
@@ -855,13 +879,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_empty_braille_character() {
-        assert_eq!(Glyph::empty_braille(), '\u{2800}');
-    }
-
-    #[test]
     fn test_set_braille_dot() {
-        let mut b = Glyph::empty_braille();
+        let mut b = EMPTY_BRAILLE;
         b = Glyph::add_braille_dot(b, point2(0, 0));
         b = Glyph::add_braille_dot(b, point2(1, 1));
         assert_eq!(b, '⡠');
@@ -1039,8 +1058,14 @@ mod tests {
 
     #[test]
     fn test_combine_braille_character() {
-        assert_eq!(Glyph::add_braille('\u{2800}', '\u{2820}'), '\u{2820}');
-        assert_eq!(Glyph::add_braille('\u{2801}', '\u{28C0}'), '\u{28C1}');
+        assert_eq!(
+            Glyph::combine_braille_characters('\u{2800}', '\u{2820}'),
+            '\u{2820}'
+        );
+        assert_eq!(
+            Glyph::combine_braille_characters('\u{2801}', '\u{28C0}'),
+            '\u{28C1}'
+        );
     }
 
     #[test]
@@ -1065,7 +1090,7 @@ mod tests {
             //let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
             let random_point = point2(23.2273, 2.05);
 
-            assert!(Glyph::is_braille(
+            assert!(Glyph::char_is_braille(
                 Glyph::character_world_pos_to_braille_char(random_point)
             ));
         }
@@ -1387,5 +1412,26 @@ mod tests {
             Glyph::horizontal_square_offset_to_character_offsets(1.0),
             [1.0, 1.0]
         );
+    }
+
+    #[test]
+    fn test_get_solid_color_if_there_is_one() {
+        let glyph = Glyph::new(' ', BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), Some(RED));
+        let glyph = Glyph::new(FULL_BLOCK, BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), Some(BLUE));
+    }
+
+    #[test]
+    fn test_can_not_get_solid_color_if_there_is_not_one() {
+        let glyph = Glyph::new('a', BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), None);
+    }
+
+    #[test]
+    fn test_braille_line_has_transparent_background() {
+        let glyph_map =
+            Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
+        assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0))
     }
 }
