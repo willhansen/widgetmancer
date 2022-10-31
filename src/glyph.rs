@@ -623,7 +623,8 @@ impl Glyph {
             let braille_char: char = Glyph::local_braille_squares_to_braille_char(
                 braille_square_set.into_iter().collect(),
             );
-            let braille_glyph = Glyph::new(braille_char, color, BLACK);
+            let mut braille_glyph = Glyph::new(braille_char, color, BLACK);
+            braille_glyph.bg_alpha = 0;
             output_map.insert(char_square, braille_glyph);
         }
         output_map
