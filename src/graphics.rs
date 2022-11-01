@@ -23,9 +23,10 @@ use crate::{
     get_by_point, point_to_string, BoardSize, BrailleGridInWorldFrame, BufferCharacterPoint,
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
     CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    ScreenCharacterSquare, SquareGridInWorldFrame, WorldBraillePoint, WorldCharacterGlyphMap,
-    WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint, WorldSquare, WorldSquareRect,
-    WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    ScreenCharacterSquare, SquareGridInWorldFrame, SquareList, WorldBraillePoint,
+    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
+    WorldSquare, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
+    RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -394,6 +395,12 @@ impl Graphics {
         let bg_color = Graphics::board_color_at_square(pos);
         let mut glyphs = piece.glyphs().map(|glyph| glyph.with_bg(bg_color));
         self.draw_glyphs_at_square(pos, glyphs);
+    }
+
+    pub fn draw_danger_squares(&mut self, danger_squares: SquareList) {
+        danger_squares
+            .into_iter()
+            .for_each(|square| self.draw_glyphs_at_square(square, Glyph::danger_square_glyphs()));
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {

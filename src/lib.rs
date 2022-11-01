@@ -67,8 +67,8 @@ fn set_up_input_thread() -> Receiver<Event> {
 }
 
 pub fn do_everything() {
-    //let (width, height) = termion::terminal_size().unwrap();
-    let (width, height) = (40, 20);
+    let (width, height) = termion::terminal_size().unwrap();
+    //let (width, height) = (40, 20);
     let mut game = Game::new(width, height, Instant::now());
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
@@ -86,11 +86,11 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    for _ in 0..5 {
-        //game.place_randomly(Piece::pawn()) .expect("random placement");
-    }
     for _ in 0..2 {
-        //game.place_randomly(Piece::rook()).expect("random placement");
+        game.place_randomly(Piece::rook())
+            .expect("random placement");
+        game.place_randomly(Piece::pawn())
+            .expect("random placement");
     }
 
     let mut prev_start_time = Instant::now();

@@ -1,7 +1,7 @@
 use euclid::*;
 use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
-use rust_roguelike::glyph::{Glyph, RED};
+use rust_roguelike::glyph::{Glyph, DANGER_SQUARE_CHARS, RED};
 
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
@@ -395,4 +395,30 @@ fn test_correct_amount_of_braille_in_selector() {
             .count_buffered_braille_dots_in_rect(test_rectangle),
         0
     );
+}
+
+#[test]
+fn test_no_move_into_check() {
+    let mut game = set_up_game();
+    let rook_square = game.player_position() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
+    game.place_piece(Piece::rook(), rook_square)
+        .expect("place rook");
+    game.move_player(LEFT_I.cast_unit())
+        .expect_err("no move into check");
+}
+
+#[test]
+fn test_draw_danger_squares() {
+    let mut game = set_up_game();
+    let rook_square = game.player_position() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
+    game.place_piece(Piece::rook(), rook_square)
+        .expect("place rook");
+    let danger_square = game.player_position() + LEFT_I.cast_unit();
+    game.draw_headless_now();
+    let actual_glyphs = game
+        .borrow_graphics_mut()
+        .get_buffered_glyphs_for_square(danger_square);
+
+    assert_eq!(actual_glyphs[0].character, DANGER_SQUARE_CHARS[0]);
+    assert_eq!(actual_glyphs[1].character, DANGER_SQUARE_CHARS[1]);
 }

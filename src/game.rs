@@ -87,6 +87,10 @@ impl Game {
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         let new_pos = self.player_position + movement;
+        if self.danger_squares().contains(&new_pos) {
+            return Err(());
+        }
+
         self.set_player_faced_direction(round_to_king_step(movement));
         self.set_player_position(new_pos)
     }
@@ -107,6 +111,16 @@ impl Game {
         }
 
         return Ok(());
+    }
+
+    fn danger_squares(&self) -> SquareList {
+        let mut squares_of_danger = HashSet::<WorldSquare>::new();
+        for &piece_square in self.pieces.keys() {
+            for guarded_square in self.guarded_squares_for_piece_at(piece_square) {
+                squares_of_danger.insert(guarded_square);
+            }
+        }
+        squares_of_danger.into_iter().collect()
     }
 
     pub fn player_faced_direction(&self) -> WorldStep {
@@ -132,6 +146,7 @@ impl Game {
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
+        self.graphics.draw_danger_squares(self.danger_squares());
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
@@ -332,29 +347,36 @@ impl Game {
         }
         move_squares
     }
-    fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        if !self.is_piece_at(piece_square) {
-            return vec![]; // should be error instead?
+
+    fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
+        assert!(self.is_piece_at(piece_square));
+
+        let mut guarded_squares: SquareList = vec![];
+        let piece = self.get_piece_at(piece_square).unwrap();
+
+        for move_step in piece.relative_capture_steps() {
+            let target_square = piece_square + move_step;
+            if self.square_is_on_board(target_square) {
+                guarded_squares.push(target_square);
+            }
         }
+
+        for move_direction in piece.capture_directions() {
+            let mut squares_to_collision =
+                self.steps_in_direction_including_hit(piece_square, move_direction);
+            guarded_squares.append(&mut squares_to_collision);
+        }
+        guarded_squares
+    }
+
+    fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
+        assert!(self.is_piece_at(piece_square));
 
         let mut capture_squares: SquareList = vec![];
 
-        if let Some(piece) = self.get_piece_at(piece_square) {
-            for move_step in piece.relative_capture_steps() {
-                let target_square = piece_square + move_step;
-                if self.square_is_on_board(target_square) && !self.square_is_empty(target_square) {
-                    capture_squares.push(target_square);
-                }
-            }
-
-            for move_direction in piece.move_directions() {
-                let mut squares_to_collision =
-                    self.steps_in_direction_including_hit(piece_square, move_direction);
-                if let Some(&last_square) = squares_to_collision.last() {
-                    if !self.square_is_empty(last_square) {
-                        capture_squares.push(last_square);
-                    }
-                }
+        for square in self.guarded_squares_for_piece_at(piece_square) {
+            if !self.square_is_empty(square) {
+                capture_squares.push(square);
             }
         }
         capture_squares
