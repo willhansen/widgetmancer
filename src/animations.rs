@@ -244,7 +244,12 @@ pub struct RecoilingBoard {
     creation_time: Instant,
 }
 
-const RECOIL_DURATION: Duration = Duration::from_secs_f32(0.2);
+const RECOIL_TIME_TO_PEAK: Duration = Duration::from_secs_f32(2.0);
+const RECOIL_RELAX_DURATION: Duration =
+    Duration::from_secs_f32(RECOIL_TIME_TO_PEAK.as_secs_f32() * 3.0);
+const RECOIL_DURATION: Duration = Duration::from_secs_f32(
+    RECOIL_TIME_TO_PEAK.as_secs_f32() + RECOIL_RELAX_DURATION.as_secs_f32(),
+);
 const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(1.0);
 
 impl RecoilingBoard {
@@ -260,21 +265,39 @@ impl RecoilingBoard {
             creation_time: Instant::now(),
         }
     }
+    fn recoil_start(seconds: f32, end_height: f32, end_time: f32) -> f32 {
+        // f(0.0)=0
+        // f'(0.0)>0
+        // f(1.0)=1
+        // f'(1.0)=0
+        ((seconds / end_time) / (PI / 2.0)).sin() * end_height
+    }
+    fn recoil_end(seconds: f32, start_height: f32, start_time: f32, end_time: f32) -> f32 {
+        // f(0.0)=1
+        // f'(0.0)=0
+        // f(1.0)=0
+        // f'(1.0)=0
+        fn normalized_cos_ease_in_and_out(x: f32) -> f32 {
+            ((x / PI).cos() + 1.0) / 2.0
+        }
 
-    fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
+        let duration = end_time - start_time;
+        normalized_cos_ease_in_and_out((seconds - start_time) / duration) * start_height
+    }
+
+    pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let peak_dist = RECOIL_DISTANCE.0;
-        let time_to_peak = RECOIL_DURATION.as_secs_f32() / 2.0;
-
-        if age < time_to_peak {
-            let t = age / time_to_peak;
-            lerp(0.0, peak_dist, t)
-        } else if age < 2.0 * time_to_peak {
-            let t = age / time_to_peak - 1.0;
-            lerp(peak_dist, 0.0, t)
+        let fraction_done = age / RECOIL_DURATION.as_secs_f32();
+        if age < RECOIL_TIME_TO_PEAK.as_secs_f32() {
+            RecoilingBoard::recoil_start(age, RECOIL_DISTANCE.0, RECOIL_TIME_TO_PEAK.as_secs_f32())
         } else {
-            0.0
+            RecoilingBoard::recoil_end(
+                age,
+                RECOIL_DISTANCE.0,
+                RECOIL_TIME_TO_PEAK.as_secs_f32(),
+                RECOIL_DURATION.as_secs_f32(),
+            )
         }
     }
 
@@ -329,7 +352,7 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{WorldCharacterSquare, DOWN_I, LEFT_I};
+    use crate::{derivative, WorldCharacterSquare, DOWN_I, LEFT_I};
 
     use super::*;
 
@@ -423,5 +446,55 @@ mod tests {
         let glyph_map =
             animation.glyphs_at_time(animation.creation_time + Duration::from_millis(1));
         assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0));
+    }
+
+    #[test]
+    fn test_recoil_function__start_at_zero() {
+        assert_eq!(RecoilingBoard::recoil_distance_in_squares_at_age(0.0), 0.0);
+    }
+
+    #[test]
+    fn test_recoil_function__start_fast() {
+        assert!(
+            derivative(
+                RecoilingBoard::recoil_distance_in_squares_at_age,
+                0.0,
+                0.0001
+            ) > 0.0
+        );
+    }
+    #[test]
+    fn test_recoil_function__hit_peak() {
+        assert_eq!(
+            RecoilingBoard::recoil_distance_in_squares_at_age(RECOIL_TIME_TO_PEAK.as_secs_f32()),
+            RECOIL_DISTANCE.0
+        );
+    }
+    #[test]
+    fn test_recoil_function__flat_peak() {
+        assert!(
+            derivative(
+                RecoilingBoard::recoil_distance_in_squares_at_age,
+                RECOIL_TIME_TO_PEAK.as_secs_f32(),
+                0.0001
+            )
+            .abs()
+                < 0.0001
+        );
+    }
+    #[test]
+    fn test_recoil_function__fully_relax() {
+        let height =
+            RecoilingBoard::recoil_distance_in_squares_at_age(RECOIL_DURATION.as_secs_f32());
+        assert!(height.abs() < 0.01, "height: {}", height);
+    }
+    #[test]
+    fn test_recoil_function__relax_flat() {
+        let slope = derivative(
+            RecoilingBoard::recoil_distance_in_squares_at_age,
+            RECOIL_DURATION.as_secs_f32(),
+            0.0001,
+        );
+        assert!(slope.abs() < 0.01, "slope: {}", slope);
     }
 }

@@ -6,6 +6,8 @@ use std::time::{Duration, Instant};
 use euclid::*;
 use line_drawing::Point;
 use rand::{thread_rng, Rng};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::animations::Selector;
 use crate::graphics::Graphics;
@@ -468,5 +470,20 @@ impl Game {
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
         self.blocks.contains(&square)
+    }
+
+    pub fn set_up_labyrinth_hunt(&mut self) {
+        let board_squares_total = self.board_size().width * self.board_size().height;
+        let num_blocks = board_squares_total / 3;
+        for _ in 0..num_blocks {
+            self.place_block_randomly();
+        }
+
+        for piece_type in PieceType::iter() {
+            for _ in 0..2 {
+                self.place_piece_randomly(Piece::from_type(piece_type))
+                    .expect("random placement");
+            }
+        }
     }
 }
