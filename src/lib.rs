@@ -86,6 +86,12 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
+    let board_squares_total = game.board_size().width * game.board_size().height;
+    let num_blocks = board_squares_total / 3;
+    for _ in 0..num_blocks {
+        game.place_block_randomly();
+    }
+
     for piece_type in PieceType::iter() {
         for _ in 0..2 {
             game.place_piece_randomly(Piece::from_type(piece_type))

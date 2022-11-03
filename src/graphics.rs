@@ -402,6 +402,9 @@ impl Graphics {
             .into_iter()
             .for_each(|square| self.draw_glyphs_at_square(square, Glyph::danger_square_glyphs()));
     }
+    pub fn draw_block(&mut self, block_square: WorldSquare) {
+        self.draw_glyphs_at_square(block_square, Glyph::block_glyphs());
+    }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations

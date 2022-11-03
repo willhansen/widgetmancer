@@ -149,6 +149,9 @@ impl Game {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
         self.graphics.draw_danger_squares(self.danger_squares());
+        for &square in &self.blocks {
+            self.graphics.draw_block(square);
+        }
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
@@ -173,20 +176,37 @@ impl Game {
         Ok(())
     }
 
-    pub fn place_piece_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+    pub fn random_empty_square(&self) -> Result<WorldSquare, ()> {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
                 thread_rng().gen_range(0..self.board_size().width as i32),
                 thread_rng().gen_range(0..self.board_size().height as i32),
             );
-            let place_result = self.place_piece(piece, rand_pos);
-            if place_result.is_ok() {
-                return place_result;
+            if self.square_is_empty(rand_pos) {
+                return Ok(rand_pos);
             }
+        }
+        Err(())
+    }
+
+    pub fn place_piece_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+        let rand_pos = self
+            .random_empty_square()
+            .expect("failed to get random square");
+        let place_result = self.place_piece(piece, rand_pos);
+        if place_result.is_ok() {
+            return place_result;
         }
         return Err(());
     }
+    pub fn place_block_randomly(&mut self) {
+        let rand_pos = self
+            .random_empty_square()
+            .expect("failed to get random square");
+        self.place_block(rand_pos);
+    }
+
     pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
         self.pieces.get(&square)
     }

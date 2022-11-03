@@ -19,6 +19,7 @@ pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
 pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
 pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
 pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
+pub const GREY: RGB8 = RGB8::new(100, 100, 125);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
@@ -598,13 +599,6 @@ impl Glyph {
         return glyph_map;
     }
 
-    pub fn danger_square_glyphs() -> TwoGlyphs {
-        [
-            Glyph::fg_only(DANGER_SQUARE_CHARS[0], RED),
-            Glyph::fg_only(' ', RED),
-        ]
-    }
-
     pub fn character_world_pos_to_braille_char(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> char {
@@ -703,6 +697,17 @@ impl Glyph {
         } else {
             None
         }
+    }
+
+    pub fn danger_square_glyphs() -> TwoGlyphs {
+        [
+            Glyph::fg_only(DANGER_SQUARE_CHARS[0], RED),
+            Glyph::fg_only(' ', RED),
+        ]
+    }
+
+    pub fn block_glyphs() -> TwoGlyphs {
+        [Glyph::new('x', BLACK, GREY); 2]
     }
 }
 
