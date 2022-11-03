@@ -88,7 +88,7 @@ pub fn do_everything() {
 
     for piece_type in PieceType::iter() {
         for _ in 0..2 {
-            game.place_randomly(Piece::from_type(piece_type))
+            game.place_piece_randomly(Piece::from_type(piece_type))
                 .expect("random placement");
         }
     }

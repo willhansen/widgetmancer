@@ -453,3 +453,28 @@ fn test_draw_danger_squares() {
     assert_eq!(actual_glyphs[0].character, DANGER_SQUARE_CHARS[0]);
     assert_eq!(actual_glyphs[1].character, DANGER_SQUARE_CHARS[1]);
 }
+
+#[test]
+fn test_no_step_on_block() {
+    let mut game = set_up_game();
+    let block_square = game.player_position() + RIGHT_I.cast_unit();
+    game.place_block(block_square);
+    assert!(game.is_block_at(block_square));
+    game.move_player(RIGHT_I.cast_unit())
+        .expect_err("no step on blok");
+}
+
+#[test]
+fn test_rook_stopped_by_block() {
+    let mut game = set_up_game();
+    let rook_start_square = game.player_position() + RIGHT_I.cast_unit() * 4;
+    let rook_end_square = game.player_position() + RIGHT_I.cast_unit() * 2;
+    let block_square = game.player_position() + RIGHT_I.cast_unit();
+    game.place_block(block_square);
+    game.place_piece(Piece::rook(), rook_start_square)
+        .expect("place rook");
+
+    assert_eq!(game.get_piece_at(rook_end_square), None);
+    game.move_all_pieces();
+    assert_eq!(game.get_piece_at(rook_end_square), Some(&Piece::rook()));
+}

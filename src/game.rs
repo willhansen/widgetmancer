@@ -27,6 +27,7 @@ pub struct Game {
     player_is_dead: bool,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
+    blocks: HashSet<WorldSquare>,
     turn_count: u32,
     selectors: Vec<Selector>,
     selected_square: Option<WorldSquare>,
@@ -46,6 +47,7 @@ impl Game {
             player_is_dead: false,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
+            blocks: HashSet::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -169,7 +171,7 @@ impl Game {
         Ok(())
     }
 
-    pub fn place_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+    pub fn place_piece_randomly(&mut self, piece: Piece) -> Result<(), ()> {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
@@ -437,5 +439,12 @@ impl Game {
         self.pieces.remove(&square);
         self.graphics.add_explosion(square.to_f32());
         Ok(())
+    }
+
+    pub fn place_block(&mut self, square: WorldSquare) {
+        self.blocks.insert(square);
+    }
+    pub fn is_block_at(&self, square: WorldSquare) -> bool {
+        self.blocks.contains(&square)
     }
 }
