@@ -170,8 +170,8 @@ impl Game {
     }
 
     pub fn place_randomly(&mut self, piece: Piece) -> Result<(), ()> {
-        // only try n times
-        for _ in 0..40 {
+        let num_attempts = 40;
+        for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
                 thread_rng().gen_range(0..self.board_size().width as i32),
                 thread_rng().gen_range(0..self.board_size().height as i32),

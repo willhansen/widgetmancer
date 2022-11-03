@@ -50,8 +50,8 @@ pub mod utility;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
-        write!(stdout(), "{}", termion::screen::ToMainScreen);
-        write!(stdout(), "{:?}", panic_info);
+        write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
+        write!(stdout(), "{:?}", panic_info).expect("display panic info");
     }));
 }
 
@@ -73,7 +73,7 @@ pub fn do_everything() {
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut terminal = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
+    let mut writable = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
         MouseTerminal::from(stdout().into_raw_mode().unwrap()),
     ));
 
@@ -82,15 +82,15 @@ pub fn do_everything() {
     // Separate thread for reading input
     let event_receiver = set_up_input_thread();
 
-    let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
+    let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(writable));
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    for _ in 0..2 {
-        game.place_randomly(Piece::rook())
-            .expect("random placement");
-        game.place_randomly(Piece::pawn())
-            .expect("random placement");
+    for piece_type in PieceType::iter() {
+        for _ in 0..2 {
+            game.place_randomly(Piece::from_type(piece_type))
+                .expect("random placement");
+        }
     }
 
     let mut prev_start_time = Instant::now();

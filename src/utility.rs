@@ -118,12 +118,18 @@ pub fn int_sin(quarter_periods: i32) -> i32 {
     }
 }
 
-pub fn get_4_rotations<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
-    let mut all_4 = vec![];
-    for i in 0..4 {
-        all_4.push(quarter_turns_counter_clockwise(&v, i))
-    }
-    all_4
+pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
+    (0..4)
+        .map(|i| quarter_turns_counter_clockwise(&v, i))
+        .collect()
+}
+pub fn get_8_quadrants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
+    let transpose = Vector2D::<T, U>::new(v.y, v.x);
+    vec![v, transpose]
+        .into_iter()
+        .map(get_4_rotations_of)
+        .flatten()
+        .collect()
 }
 
 pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {

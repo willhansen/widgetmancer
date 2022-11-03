@@ -374,6 +374,37 @@ fn test_rook_capture() {
     game.move_all_pieces();
     assert!(!game.running());
 }
+#[test]
+fn test_king_move() {
+    let mut game = set_up_game();
+    let diag_up_right: WorldStep = RIGHT_I.cast_unit() + UP_I.cast_unit();
+    game.place_piece(
+        Piece::king(),
+        // three right, one up
+        game.player_position() + diag_up_right * 2,
+    )
+    .expect("place king");
+
+    let king_end_square = game.player_position() + diag_up_right;
+    assert_eq!(game.get_piece_at(king_end_square), None);
+    game.move_all_pieces();
+    assert_eq!(game.get_piece_at(king_end_square), Some(&Piece::king()));
+}
+#[test]
+fn test_knight_move() {
+    let mut game = set_up_game();
+    game.place_piece(
+        Piece::knight(),
+        // three right, one up
+        game.player_position() + RIGHT_I.cast_unit() * 3 + UP_I.cast_unit(),
+    )
+    .expect("place knight");
+
+    let end_square = game.player_position() + RIGHT_I.cast_unit();
+    assert_eq!(game.get_piece_at(end_square), None);
+    game.move_all_pieces();
+    assert_eq!(game.get_piece_at(end_square), Some(&Piece::knight()));
+}
 
 #[test]
 fn test_correct_amount_of_braille_in_selector() {
