@@ -89,7 +89,7 @@ impl Game {
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         let new_pos = self.player_position + movement;
-        if self.danger_squares().contains(&new_pos) {
+        if self.danger_squares().contains(&new_pos) || self.is_block_at(new_pos) {
             return Err(());
         }
 
@@ -160,7 +160,9 @@ impl Game {
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
-        (self.player_position != pos || self.player_is_dead) && !self.is_piece_at(pos)
+        (self.player_position != pos || self.player_is_dead)
+            && !self.is_piece_at(pos)
+            && !self.is_block_at(pos)
     }
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) -> Result<(), ()> {
