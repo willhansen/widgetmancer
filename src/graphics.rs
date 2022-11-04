@@ -370,12 +370,7 @@ impl Graphics {
         self.draw_glyph(buffer_square + RIGHT_I.cast_unit(), *glyphs.get(1).unwrap());
     }
 
-    pub fn draw_glyph(
-        &mut self,
-        buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
-        mut new_glyph: Glyph,
-    ) {
-        // TODO: account for alpha colors and braille combinations
+    pub fn draw_glyph(&mut self, buffer_pos: BufferCharacterSquare, mut new_glyph: Glyph) {
         let old_glyph = self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize];
 
         if new_glyph.bg_alpha == 0 {
@@ -637,5 +632,11 @@ mod tests {
             BLUE
         );
         //g.print_output_buffer();
+    }
+    #[test]
+    fn test_draw_on_far_right_square_in_odd_width_terminal() {
+        let mut g = Graphics::new(41, 20, Instant::now());
+        g.add_simple_laser(point2(0.0, 0.0), point2(50.0, 0.0));
+        g.draw_non_board_animations(Instant::now());
     }
 }

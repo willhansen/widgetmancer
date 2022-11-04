@@ -9,7 +9,7 @@ use euclid::*;
 use num::traits::Signed;
 use rand::Rng;
 
-use crate::{Glyph, TwoGlyphs};
+use crate::{DoubleGlyph, Glyph};
 
 // empty enums for euclid typing
 pub enum SquareGridInWorldFrame {}
@@ -50,7 +50,7 @@ pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
 pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
-pub type WorldSquareGlyphMap = HashMap<WorldSquare, TwoGlyphs>;
+pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
 pub type WorldCharacterGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
 

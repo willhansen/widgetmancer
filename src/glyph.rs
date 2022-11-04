@@ -29,6 +29,8 @@ pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
+pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
+
 pub const HORIZONTAL_HALF_BLOCK: char = EIGHTH_BLOCKS_FROM_LEFT[4];
 
 pub const FULL_BLOCK: char = '█';
@@ -41,7 +43,7 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 pub const DANGER_SQUARE_CHARS: &[char; 2] = &['▪', ' '];
 
 pub type BrailleArray = [[bool; 4]; 2];
-pub type TwoGlyphs = [Glyph; 2];
+pub type DoubleGlyph = [Glyph; 2];
 
 // Fun unicode for later
 // ↈ ▴ ⚠ 🞁 🢑  🛆  𝅉  ⏹  ᙮ ⸼  ▪
@@ -196,7 +198,7 @@ impl Glyph {
         offset_vector: WorldMove,
         square_color: RGB8,
         background_color: RGB8,
-    ) -> TwoGlyphs {
+    ) -> DoubleGlyph {
         assert!(is_orthogonal(offset_vector));
         let is_vertical = offset_vector.x == 0.0;
         // because sign
@@ -699,15 +701,25 @@ impl Glyph {
         }
     }
 
-    pub fn danger_square_glyphs() -> TwoGlyphs {
+    pub fn danger_square_glyphs() -> DoubleGlyph {
         [
             Glyph::fg_only(DANGER_SQUARE_CHARS[0], RED),
             Glyph::fg_only(' ', RED),
         ]
     }
 
-    pub fn block_glyphs() -> TwoGlyphs {
+    pub fn block_glyphs() -> DoubleGlyph {
         [Glyph::new('x', BLACK, GREY); 2]
+    }
+}
+
+pub trait DoubleGlyphFunctions {
+    fn solid_color_if_backgroundified(&self) -> RGB8;
+}
+
+impl DoubleGlyphFunctions for DoubleGlyph {
+    fn solid_color_if_backgroundified(&self) -> RGB8 {
+        RED
     }
 }
 
