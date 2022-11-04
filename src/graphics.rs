@@ -631,11 +631,11 @@ mod tests {
         );
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
         g.draw_non_board_animations(Instant::now());
-        g.print_output_buffer();
+        //g.print_output_buffer();
         assert_eq!(
             g.get_buffered_glyphs_for_square(point2(5, 0))[0].bg_color,
             BLUE
         );
-        g.print_output_buffer();
+        //g.print_output_buffer();
     }
 }

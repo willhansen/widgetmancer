@@ -244,7 +244,7 @@ pub struct RecoilingBoard {
     creation_time: Instant,
 }
 
-const RECOIL_TIME_TO_PEAK: Duration = Duration::from_secs_f32(2.0);
+const RECOIL_TIME_TO_PEAK: Duration = Duration::from_secs_f32(0.1);
 const RECOIL_RELAX_DURATION: Duration =
     Duration::from_secs_f32(RECOIL_TIME_TO_PEAK.as_secs_f32() * 3.0);
 const RECOIL_DURATION: Duration = Duration::from_secs_f32(
@@ -265,24 +265,28 @@ impl RecoilingBoard {
             creation_time: Instant::now(),
         }
     }
-    fn recoil_start(seconds: f32, end_height: f32, end_time: f32) -> f32 {
+    fn recoil_start(age: f32, end_height: f32, end_time: f32) -> f32 {
         // f(0.0)=0
         // f'(0.0)>0
         // f(1.0)=1
         // f'(1.0)=0
-        ((seconds / end_time) / (PI / 2.0)).sin() * end_height
+        fn normalized_sin_rise(t: f32) -> f32 {
+            (t * (PI / 2.0)).sin()
+        }
+
+        normalized_sin_rise(age / end_time) * end_height
     }
-    fn recoil_end(seconds: f32, start_height: f32, start_time: f32, end_time: f32) -> f32 {
+    fn recoil_end(age: f32, start_height: f32, start_time: f32, end_time: f32) -> f32 {
         // f(0.0)=1
         // f'(0.0)=0
         // f(1.0)=0
         // f'(1.0)=0
-        fn normalized_cos_ease_in_and_out(x: f32) -> f32 {
-            ((x / PI).cos() + 1.0) / 2.0
+        fn normalized_cos_ease_in_and_out(t: f32) -> f32 {
+            ((t * PI).cos() + 1.0) / 2.0
         }
 
         let duration = end_time - start_time;
-        normalized_cos_ease_in_and_out((seconds - start_time) / duration) * start_height
+        normalized_cos_ease_in_and_out(((age - start_time) / duration)) * start_height
     }
 
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
@@ -358,17 +362,20 @@ mod tests {
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
-        let half_time = RECOIL_DURATION.as_secs_f32() / 2.0;
+        let peak_time = RECOIL_TIME_TO_PEAK.as_secs_f32();
         let mut prev_d = 0.0;
         let mut t = 0.0;
         loop {
-            let d = RecoilingBoard::recoil_distance_in_squares_at_age(t);
-            if t >= half_time {
+            let d = RecoilingBoard::recoil_distance_in_squares_at_age(t).abs();
+            if t >= peak_time {
                 break;
             }
             if t != 0.0 {
                 //dbg!(&d, &prev_d);
-                assert!(d < prev_d);
+                assert!(
+                    d > prev_d,
+                    "t_peak: {peak_time}\nt: {t}\nd: {d}\nprev_d: {prev_d}"
+                );
             }
             prev_d = d;
             t += 0.125;
