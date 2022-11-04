@@ -209,7 +209,7 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     if dx == 0.0 {
         panic!("approximate derivatives only!");
     }
-    (f(x + dx) - f(x)) / dx
+    (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
 #[cfg(test)]
