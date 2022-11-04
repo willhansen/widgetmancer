@@ -22,11 +22,11 @@ use crate::piece::Piece;
 use crate::{
     get_by_point, point_to_string, BoardSize, BrailleGridInWorldFrame, BufferCharacterPoint,
     BufferCharacterSquare, CharacterGridInBufferFrame, CharacterGridInScreenFrame,
-    CharacterGridInWorldFrame, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    ScreenCharacterSquare, SquareGridInWorldFrame, SquareList, WorldBraillePoint,
-    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
-    WorldSquare, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED,
-    RIGHT_I, WHITE,
+    CharacterGridInWorldFrame, DoubleGlyph, DoubleGlyphFunctions, Game, Glyph, IPoint, PieceType,
+    ScreenCharacterPoint, ScreenCharacterSquare, SquareGridInWorldFrame, SquareList,
+    WorldBraillePoint, WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare,
+    WorldMove, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK,
+    BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -74,14 +74,9 @@ impl Graphics {
         self.terminal_height as i32
     }
 
-    fn world_character_is_on_screen(
-        &self,
-        character_square: Point2D<i32, CharacterGridInWorldFrame>,
-    ) -> bool {
-        self.square_is_on_screen(
-            Glyph::world_character_point_to_world_point(character_square.to_f32())
-                .round()
-                .to_i32(),
+    fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
+        self.buffer_character_is_on_screen(
+            self.world_character_square_to_buffer_square(character_square),
         )
     }
     fn square_is_on_screen(&self, square: WorldSquare) -> bool {
@@ -358,22 +353,27 @@ impl Graphics {
         self.draw_glyphs_at_square(world_pos, player_glyphs);
     }
 
-    pub fn draw_glyphs_at_square(&mut self, world_pos: WorldSquare, glyphs: [Glyph; 2]) {
-        if !self.square_is_on_screen(world_pos) {
+    pub fn draw_glyphs_at_square(&mut self, world_square: WorldSquare, glyphs: DoubleGlyph) {
+        if !self.square_is_on_screen(world_square) {
             panic!(
                 "Tried to draw square off screen: {}",
-                point_to_string(world_pos)
+                point_to_string(world_square)
             );
         }
-        let buffer_square = self.world_square_to_left_buffer_square(world_pos);
-        self.draw_glyph(buffer_square, *glyphs.get(0).unwrap());
-        self.draw_glyph(buffer_square + RIGHT_I.cast_unit(), *glyphs.get(1).unwrap());
+        let background_glyphs = self.get_buffered_glyphs_for_square(world_square);
+
+        let glyphs_to_draw = glyphs.drawn_over(background_glyphs);
+
+        let left_buffer_square = self.world_square_to_left_buffer_square(world_square);
+        let right_buffer_square = left_buffer_square + RIGHT_I.cast_unit();
+        self.draw_glyph(left_buffer_square, glyphs_to_draw[0]);
+        self.draw_glyph(right_buffer_square, glyphs_to_draw[1]);
     }
 
     pub fn draw_glyph(&mut self, buffer_pos: BufferCharacterSquare, mut new_glyph: Glyph) {
         let old_glyph = self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize];
 
-        if new_glyph.bg_alpha == 0 {
+        if new_glyph.bg_transparent == true {
             if old_glyph.is_solid() {
                 new_glyph.bg_color = old_glyph.get_solid_color().unwrap();
             }
@@ -387,9 +387,7 @@ impl Graphics {
     }
 
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
-        let bg_color = Graphics::board_color_at_square(pos);
-        let mut glyphs = piece.glyphs().map(|glyph| glyph.with_bg(bg_color));
-        self.draw_glyphs_at_square(pos, glyphs);
+        self.draw_glyphs_at_square(pos, piece.glyphs());
     }
 
     pub fn draw_danger_squares(&mut self, danger_squares: SquareList) {
@@ -551,12 +549,15 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{BLUE, RIGHT_I};
+    use crate::{BLUE, ENEMY_PIECE_COLOR, GREEN, LEFT_I, RIGHT_I};
 
     use super::*;
 
     fn set_up_graphics() -> Graphics {
         Graphics::new(40, 20, Instant::now())
+    }
+    fn set_up_graphics_with_nxn_squares(board_length: u16) -> Graphics {
+        Graphics::new(board_length * 2, board_length, Instant::now())
     }
 
     #[test]
@@ -638,5 +639,54 @@ mod tests {
         let mut g = Graphics::new(41, 20, Instant::now());
         g.add_simple_laser(point2(0.0, 0.0), point2(50.0, 0.0));
         g.draw_non_board_animations(Instant::now());
+    }
+
+    #[test]
+    fn test_overlapped_glyphs_change_background_color() {
+        let mut g = set_up_graphics_with_nxn_squares(6);
+        let test_square = WorldSquare::new(3, 4);
+        let glyphs_at_start = g.get_buffered_glyphs_for_square(test_square);
+        assert_ne!(glyphs_at_start[0].bg_color, ENEMY_PIECE_COLOR);
+        assert_ne!(glyphs_at_start[1].bg_color, ENEMY_PIECE_COLOR);
+
+        g.draw_piece(Piece::pawn(), test_square);
+        let line_color = GREEN;
+        assert_ne!(line_color, ENEMY_PIECE_COLOR);
+        g.draw_braille_line(
+            test_square.to_f32() + vec2(-1.0, 0.0),
+            test_square.to_f32() + vec2(1.0, 0.0),
+            line_color,
+        );
+        let glyphs_at_end = g.get_buffered_glyphs_for_square(test_square);
+
+        assert_eq!(glyphs_at_end[0].bg_color, ENEMY_PIECE_COLOR);
+        assert_eq!(glyphs_at_end[1].bg_color, ENEMY_PIECE_COLOR);
+
+        assert_eq!(glyphs_at_end[0].fg_color, line_color);
+        assert_eq!(glyphs_at_end[1].fg_color, line_color);
+    }
+    #[test]
+    fn test_world_character_is_on_screen() {
+        let mut g = Graphics::new(41, 20, Instant::now());
+
+        assert!(g.world_character_is_on_screen(point2(0, 0)), "bottom_left");
+        assert!(
+            !g.world_character_is_on_screen(point2(-1, 0)),
+            "one step left of bottom left"
+        );
+        assert!(
+            !g.world_character_is_on_screen(point2(0, -1)),
+            "one step down of bottom left"
+        );
+
+        assert!(g.world_character_is_on_screen(point2(40, 19)), "top right");
+        assert!(
+            !g.world_character_is_on_screen(point2(40, 20)),
+            "one step up of top right"
+        );
+        assert!(
+            !g.world_character_is_on_screen(point2(41, 19)),
+            "one step right of top right"
+        );
     }
 }

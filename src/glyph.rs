@@ -25,6 +25,7 @@ pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
+pub const ENEMY_PIECE_COLOR: RGB8 = RED;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -91,8 +92,7 @@ pub struct Glyph {
     pub character: char,
     pub fg_color: RGB8,
     pub bg_color: RGB8,
-    pub fg_alpha: u8,
-    pub bg_alpha: u8,
+    pub bg_transparent: bool,
 }
 
 impl Glyph {
@@ -101,8 +101,7 @@ impl Glyph {
             character,
             fg_color,
             bg_color,
-            fg_alpha: 255,
-            bg_alpha: 255,
+            bg_transparent: false,
         }
     }
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
@@ -110,8 +109,7 @@ impl Glyph {
             character,
             fg_color,
             bg_color: BLACK,
-            fg_alpha: 255,
-            bg_alpha: 0,
+            bg_transparent: true,
         }
     }
 
@@ -411,6 +409,7 @@ impl Glyph {
     pub fn char_is_braille(c: char) -> bool {
         let x = c as u32;
         // The unicode braille block
+        // TODO: This includes empty braille.  Bad?
         x >= 0x2800 && x <= 0x28FF
     }
 
@@ -588,7 +587,7 @@ impl Glyph {
                 Glyph::world_braille_square_to_world_character_square(braille_pos);
             if !glyph_map.contains_key(&character_grid_square) {
                 let mut new_glyph = Glyph::new(EMPTY_BRAILLE, color, BLACK);
-                new_glyph.bg_alpha = 0;
+                new_glyph.bg_transparent = true;
                 glyph_map.insert(character_grid_square, new_glyph);
             }
             let braille_character =
@@ -659,7 +658,7 @@ impl Glyph {
                 braille_square_set.into_iter().collect(),
             );
             let mut braille_glyph = Glyph::new(braille_char, color, BLACK);
-            braille_glyph.bg_alpha = 0;
+            braille_glyph.bg_transparent = true;
             output_map.insert(char_square, braille_glyph);
         }
         output_map
@@ -701,11 +700,12 @@ impl Glyph {
         }
     }
 
+    pub fn is_chess(&self) -> bool {
+        SOLID_CHESS_PIECES.contains(&self.character)
+    }
+
     pub fn danger_square_glyphs() -> DoubleGlyph {
-        [
-            Glyph::fg_only(DANGER_SQUARE_CHARS[0], RED),
-            Glyph::fg_only(' ', RED),
-        ]
+        DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, RED))
     }
 
     pub fn block_glyphs() -> DoubleGlyph {
@@ -714,12 +714,32 @@ impl Glyph {
 }
 
 pub trait DoubleGlyphFunctions {
-    fn solid_color_if_backgroundified(&self) -> RGB8;
+    fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
+    fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
+    fn to_string(&self) -> String;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
-    fn solid_color_if_backgroundified(&self) -> RGB8 {
-        RED
+    fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
+        if self[0].is_chess() {
+            [self[0].fg_color; 2]
+        } else {
+            self.map(|g| g.fg_color)
+        }
+    }
+    fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
+        let mut combined_glyphs = self.clone();
+        let bg_colors = background_glyphs.solid_color_if_backgroundified();
+        for i in 0..=1 {
+            if self[i].bg_transparent == true {
+                combined_glyphs[i].bg_color = bg_colors[i];
+                combined_glyphs[i].bg_transparent = false;
+            }
+        }
+        combined_glyphs
+    }
+    fn to_string(&self) -> String {
+        self[0].to_string() + &self[1].to_string()
     }
 }
 
@@ -1489,6 +1509,33 @@ mod tests {
     fn test_braille_line_has_transparent_background() {
         let glyph_map =
             Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
-        assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0))
+        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true))
+    }
+    #[test]
+    fn test_drawn_over() {
+        let bottom_glyphs = [Glyph {
+            character: 'b',
+            fg_color: BLUE,
+            bg_color: RED,
+            bg_transparent: false,
+        }; 2];
+        let top_glyphs = [Glyph {
+            character: 'a',
+            fg_color: GREEN,
+            bg_color: WHITE,
+            bg_transparent: true,
+        }; 2];
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+        // not true in all cases
+        assert_eq!(combo_glyphs[0], combo_glyphs[1]);
+        assert_eq!(
+            combo_glyphs[0],
+            Glyph {
+                character: 'a',
+                fg_color: GREEN,
+                bg_color: BLUE,
+                bg_transparent: false
+            }
+        );
     }
 }

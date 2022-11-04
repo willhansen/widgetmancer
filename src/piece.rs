@@ -7,7 +7,7 @@ use strum_macros::EnumIter;
 
 use crate::{
     get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph,
-    SquareGridInWorldFrame, StepList, WorldStep,
+    SquareGridInWorldFrame, StepList, WorldStep, ENEMY_PIECE_COLOR,
 };
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
@@ -83,7 +83,8 @@ impl Piece {
     }
 
     pub fn glyphs(&self) -> [Glyph; 2] {
-        Piece::chars_for_type(self.piece_type).map(Glyph::from_char)
+        Piece::chars_for_type(self.piece_type)
+            .map(|character| Glyph::fg_only(character, ENEMY_PIECE_COLOR))
     }
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {

@@ -449,7 +449,7 @@ mod tests {
         let animation = SimpleLaser::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
         let glyph_map =
             animation.glyphs_at_time(animation.creation_time + Duration::from_millis(1));
-        assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0));
+        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
     }
 
     #[test]
@@ -457,7 +457,7 @@ mod tests {
         let animation = FloatyLaser::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
         let glyph_map =
             animation.glyphs_at_time(animation.creation_time + Duration::from_millis(1));
-        assert!(glyph_map.values().all(|glyph| glyph.bg_alpha == 0));
+        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
     }
 
     #[test]
