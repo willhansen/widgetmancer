@@ -711,6 +711,26 @@ impl Glyph {
     pub fn block_glyphs() -> DoubleGlyph {
         [Glyph::new('x', BLACK, GREY); 2]
     }
+
+    pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {
+        let position_index = if is_left_glyph { 0 } else { 1 };
+        let mut output_glyph = self.clone();
+        if self.bg_transparent == true {
+            let glyph_directly_below = background_glyphs[position_index];
+            if self.is_braille() && glyph_directly_below.is_braille() {
+                output_glyph.character = Glyph::combine_braille_characters(
+                    self.character,
+                    glyph_directly_below.character,
+                );
+                output_glyph.bg_color = glyph_directly_below.bg_color;
+            } else {
+                let bg_colors = background_glyphs.solid_color_if_backgroundified();
+                output_glyph.bg_color = bg_colors[position_index];
+            }
+        }
+        output_glyph.bg_transparent = false;
+        output_glyph
+    }
 }
 
 pub trait DoubleGlyphFunctions {
@@ -721,6 +741,7 @@ pub trait DoubleGlyphFunctions {
 
 impl DoubleGlyphFunctions for DoubleGlyph {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
+        // TODO: maybe use the get_solid_color function here
         if self[0].is_chess() {
             [self[0].fg_color; 2]
         } else {
@@ -728,15 +749,10 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         }
     }
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
-        let mut combined_glyphs = self.clone();
-        let bg_colors = background_glyphs.solid_color_if_backgroundified();
-        for i in 0..=1 {
-            if self[i].bg_transparent == true {
-                combined_glyphs[i].bg_color = bg_colors[i];
-                combined_glyphs[i].bg_transparent = false;
-            }
-        }
-        combined_glyphs
+        [
+            self[0].drawn_over(background_glyphs, true),
+            self[1].drawn_over(background_glyphs, false),
+        ]
     }
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()
