@@ -13,9 +13,9 @@ use crate::animations::Selector;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
 use crate::{
-    point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph, IPoint,
-    IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare, WorldStep,
-    LEFT_I,
+    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
+    IPoint, IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare,
+    WorldStep, LEFT_I,
 };
 
 pub struct Game {
@@ -412,16 +412,21 @@ impl Game {
         let num_lasers = 10;
         let range = 5.0;
         let spread_radians = 1.0;
-        let spread_radius = 1.0;
-        for _ in 0..num_lasers {
+        let random_spread_radius = 1.0;
+        for i in 0..num_lasers {
             let line_start: WorldSquare = self.player_position();
+            let rotation_if_uniform = lerp(
+                -spread_radians / 2.0,
+                spread_radians / 2.0,
+                i as f32 / num_lasers as f32,
+            );
             let line_end: WorldPoint = line_start.to_f32()
                 + rotate_vect(
                     self.player_faced_direction().to_f32() * range,
-                    rand::thread_rng().gen_range(-spread_radians / 2.0..=spread_radians / 2.0),
+                    rotation_if_uniform,
                 )
                 .cast_unit()
-                + rand_radial_offset(spread_radius).cast_unit();
+                + rand_radial_offset(random_spread_radius).cast_unit();
 
             // Orthogonal steps only
             for (x, y) in line_drawing::WalkGrid::new(
