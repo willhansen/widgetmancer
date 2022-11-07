@@ -86,7 +86,7 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    //game.set_up_labyrinth_hunt();
+    game.set_up_labyrinth_hunt();
 
     let mut prev_start_time = Instant::now();
     while game.running() {

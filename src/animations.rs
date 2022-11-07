@@ -361,7 +361,7 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{derivative, WorldCharacterSquare, DOWN_I, LEFT_I};
+    use crate::{derivative, glyph_map_to_string, WorldCharacterSquare, DOWN_I, LEFT_I};
 
     use super::*;
 
@@ -438,7 +438,7 @@ mod tests {
             println!(
                 "v-- seconds: {}\n{}",
                 age.as_secs_f32(),
-                Graphics::glyph_map_to_string(glyph_map)
+                glyph_map_to_string(&glyph_map)
             );
         }
         assert!(false);

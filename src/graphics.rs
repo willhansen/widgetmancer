@@ -20,13 +20,14 @@ use crate::animations::*;
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
 use crate::{
-    get_by_point, pair_up_glyph_map, point_to_string, BoardSize, BrailleGridInWorldFrame,
-    BufferCharacterPoint, BufferCharacterSquare, CharacterGridInBufferFrame,
-    CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyph, DoubleGlyphFunctions, Game,
-    Glyph, IPoint, PieceType, ScreenCharacterPoint, ScreenCharacterSquare, SquareGridInWorldFrame,
-    SquareList, WorldBraillePoint, WorldCharacterGlyphMap, WorldCharacterPoint,
-    WorldCharacterSquare, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap, WorldSquareRect,
-    WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE, EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    get_by_point, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
+    BrailleGridInWorldFrame, BufferCharacterPoint, BufferCharacterSquare,
+    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyph,
+    DoubleGlyphFunctions, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
+    ScreenCharacterSquare, SquareGridInWorldFrame, SquareList, WorldBraillePoint,
+    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
+    WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
+    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
 };
 
 pub struct Graphics {
@@ -567,29 +568,6 @@ impl Graphics {
             .map(|square| Selector::new(square))
             .collect();
     }
-
-    pub fn glyph_map_to_string(glyph_map: WorldCharacterGlyphMap) -> String {
-        let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
-        let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
-        let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
-        let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
-        let mut string = String::new();
-        for bottom_to_top_y in bottom_row..=top_row {
-            let y = top_row + bottom_row - bottom_to_top_y;
-            for x in left_column..=right_column {
-                let square = WorldCharacterSquare::new(x, y);
-                let new_part = if let Some(glyph) = glyph_map.get(&square) {
-                    glyph.to_string()
-                } else {
-                    " ".to_string()
-                };
-
-                string += &new_part;
-            }
-            string += "\n";
-        }
-        string
-    }
 }
 
 #[cfg(test)]
@@ -603,6 +581,7 @@ mod tests {
     fn set_up_graphics() -> Graphics {
         Graphics::new(40, 20, Instant::now())
     }
+
     fn set_up_graphics_with_nxn_squares(board_length: u16) -> Graphics {
         Graphics::new(board_length * 2, board_length, Instant::now())
     }
@@ -681,6 +660,7 @@ mod tests {
         );
         //g.print_output_buffer();
     }
+
     #[test]
     fn test_draw_on_far_right_square_in_odd_width_terminal() {
         let mut g = Graphics::new(41, 20, Instant::now());
@@ -712,6 +692,7 @@ mod tests {
         assert_eq!(glyphs_at_end[0].fg_color, line_color);
         assert_eq!(glyphs_at_end[1].fg_color, line_color);
     }
+
     #[test]
     fn test_world_character_is_on_screen() {
         let mut g = Graphics::new(41, 20, Instant::now());
@@ -747,13 +728,16 @@ mod tests {
             "one step right of top right of screen"
         );
     }
+
     #[test]
     fn test_draw_piece_on_board() {
         let mut g = set_up_graphics_with_nxn_squares(1);
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
+        g.print_output_buffer();
         g.draw_piece(Piece::pawn(), the_square);
+        g.print_output_buffer();
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);

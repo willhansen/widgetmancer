@@ -123,6 +123,7 @@ pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2
         .map(|i| quarter_turns_counter_clockwise(&v, i))
         .collect()
 }
+
 pub fn get_8_quadrants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     let transpose = Vector2D::<T, U>::new(v.y, v.x);
     vec![v, transpose]
@@ -222,7 +223,8 @@ pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSq
                 Glyph::is_world_character_square_left_square_of_world_square(character_square);
             let position_index = if is_left_glyph { 0 } else { 1 };
 
-            if let Some(&mut mut existing_glyph) = output_map.get_mut(&world_square) {
+            if output_map.contains_key(&world_square) {
+                let mut existing_glyph = output_map.get_mut(&world_square).unwrap();
                 existing_glyph[position_index] = glyph;
             } else {
                 let mut new_double_glyph = [Glyph::default_transparent(); 2];
@@ -234,9 +236,37 @@ pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSq
     output_map
 }
 
+pub fn glyph_map_to_string(glyph_map: &WorldCharacterGlyphMap) -> String {
+    let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
+    let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
+    let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
+    let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
+    let mut string = String::new();
+    for bottom_to_top_y in bottom_row..=top_row {
+        let y = top_row + bottom_row - bottom_to_top_y;
+        for x in left_column..=right_column {
+            let square = WorldCharacterSquare::new(x, y);
+            let new_part = if let Some(glyph) = glyph_map.get(&square) {
+                glyph.to_string()
+            } else {
+                " ".to_string()
+            };
+
+            string += &new_part;
+        }
+        string += "\n";
+    }
+    string
+}
+
+pub fn print_glyph_map(glyph_map: &WorldCharacterGlyphMap) {
+    print!("{}", glyph_map_to_string(glyph_map));
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
+    use rgb::RGB8;
 
     use super::*;
 
@@ -263,8 +293,9 @@ mod tests {
             "snap to diagonal"
         );
     }
+
     #[test]
-    fn test_pair_up_glyph_map() {
+    fn test_pair_up_glyph_map__positions() {
         let character_squares: Vec<WorldCharacterSquare> = vec![
             point2(0, 0),
             point2(1, 0),
@@ -283,5 +314,24 @@ mod tests {
         for square in correct_squares {
             assert!(square_glyph_map.contains_key(&square));
         }
+    }
+
+    #[test]
+    fn test_pair_up_glyph_map__glyphs() {
+        let mut character_glyph_map = WorldCharacterGlyphMap::new();
+        let test_glyph = Glyph {
+            character: ' ',
+            fg_color: RGB8::new(0, 0, 0),
+            bg_color: RGB8::new(100, 100, 150),
+            bg_transparent: false,
+        };
+        character_glyph_map.insert(point2(0, 0), test_glyph);
+        character_glyph_map.insert(point2(1, 0), test_glyph);
+        let square_glyph_map = pair_up_glyph_map(character_glyph_map);
+        assert_eq!(square_glyph_map.len(), 1);
+        assert_eq!(
+            *square_glyph_map.get(&point2(0, 0)).unwrap(),
+            [test_glyph; 2]
+        );
     }
 }
