@@ -212,6 +212,28 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
+pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSquareGlyphMap {
+    let mut output_map = WorldSquareGlyphMap::new();
+    character_glyph_map
+        .into_iter()
+        .for_each(|(character_square, glyph)| {
+            let world_square = Glyph::world_character_square_to_world_square(character_square);
+            let is_left_glyph =
+                Glyph::is_world_character_square_left_square_of_world_square(character_square);
+            let position_index = if is_left_glyph { 0 } else { 1 };
+
+            if let Some(&mut mut existing_glyph) = output_map.get_mut(&world_square) {
+                existing_glyph[position_index] = glyph;
+            } else {
+                let mut new_double_glyph = [Glyph::default_transparent(); 2];
+                new_double_glyph[position_index] = glyph;
+                output_map.insert(world_square, new_double_glyph);
+            }
+        });
+
+    output_map
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
@@ -240,5 +262,26 @@ mod tests {
             round_to_king_step(WorldStep::new(-30, 25)),
             "snap to diagonal"
         );
+    }
+    #[test]
+    fn test_pair_up_glyph_map() {
+        let character_squares: Vec<WorldCharacterSquare> = vec![
+            point2(0, 0),
+            point2(1, 0),
+            point2(1, 1),
+            point2(2, 0),
+            point2(2, 1),
+        ];
+
+        let mut character_glyph_map = WorldCharacterGlyphMap::new();
+        for square in character_squares {
+            character_glyph_map.insert(square, Glyph::default_transparent());
+        }
+        let square_glyph_map = pair_up_glyph_map(character_glyph_map);
+        let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
+        assert_eq!(square_glyph_map.len(), correct_squares.len());
+        for square in correct_squares {
+            assert!(square_glyph_map.contains_key(&square));
+        }
     }
 }

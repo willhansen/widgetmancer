@@ -13,19 +13,20 @@ use crate::utility::*;
 
 pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
+pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
 pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
 pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
 pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
 pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
 pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
-pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
-pub const GREY: RGB8 = RGB8::new(100, 100, 125);
+pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
+pub const GREY: RGB8 = RGB8::new(127, 127, 127);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
-pub const ENEMY_PIECE_COLOR: RGB8 = RED;
+pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -104,6 +105,10 @@ impl Glyph {
             bg_transparent: false,
         }
     }
+    pub fn default_transparent() -> Glyph {
+        Glyph::fg_only(' ', WHITE)
+    }
+
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
         Glyph {
             character,
@@ -708,8 +713,17 @@ impl Glyph {
         DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, RED))
     }
 
+    // ╳
     pub fn block_glyphs() -> DoubleGlyph {
-        [Glyph::new('x', BLACK, GREY); 2]
+        [Glyph::new(' ', WHITE, WHITE); 2]
+    }
+
+    pub fn is_world_character_square_left_square_of_world_square(
+        character_square: WorldCharacterSquare,
+    ) -> bool {
+        Glyph::world_square_to_left_world_character_square(
+            Glyph::world_character_square_to_world_square(character_square),
+        ) == character_square
     }
 
     pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {
@@ -741,18 +755,27 @@ pub trait DoubleGlyphFunctions {
 
 impl DoubleGlyphFunctions for DoubleGlyph {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
-        // TODO: maybe use the get_solid_color function here
         if self[0].is_chess() {
             [self[0].fg_color; 2]
         } else {
-            self.map(|g| g.fg_color)
+            // TODO: check for fullwidth vs halfwidth here
+
+            // halfwidth case
+            self.map(|glyph| {
+                if let Some(solid_color) = glyph.get_solid_color() {
+                    solid_color
+                } else {
+                    glyph.fg_color
+                }
+            })
         }
     }
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
-        [
+        let glyphs = [
             self[0].drawn_over(background_glyphs, true),
             self[1].drawn_over(background_glyphs, false),
-        ]
+        ];
+        glyphs
     }
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()
@@ -1528,7 +1551,7 @@ mod tests {
         assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true))
     }
     #[test]
-    fn test_drawn_over() {
+    fn test_basic_drawn_over_case() {
         let bottom_glyphs = [Glyph {
             character: 'b',
             fg_color: BLUE,
