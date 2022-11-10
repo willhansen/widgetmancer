@@ -1,7 +1,8 @@
 use euclid::*;
+use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
-use rust_roguelike::glyph::{Glyph, DANGER_SQUARE_CHARS, RED};
+use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph, DANGER_SQUARE_CHARS, RED};
 
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
@@ -479,4 +480,21 @@ fn test_rook_stopped_by_block() {
     assert_eq!(game.get_piece_at(rook_end_square), None);
     game.move_all_pieces();
     assert_eq!(game.get_piece_at(rook_end_square), Some(&Piece::rook()));
+}
+
+#[test]
+fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediately_before_that_rook_moves(
+) {
+    let mut game = set_up_game_with_player();
+    let pawn_square = game.player_square() + RIGHT_I.cast_unit() * 3;
+    let rook_square = game.player_square() + RIGHT_I.cast_unit() * 4;
+    let square_to_check = game.player_square() + RIGHT_I.cast_unit() * 1;
+    game.place_piece(Piece::pawn(), pawn_square).ok();
+    game.place_piece(Piece::rook(), rook_square).ok();
+
+    game.draw_headless_now();
+
+    let graphics = game.borrow_graphics_mut();
+    let test_square_glyphs = graphics.get_buffered_glyphs_for_square(square_to_check);
+    assert_false!(test_square_glyphs.looks_solid());
 }

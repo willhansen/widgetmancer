@@ -306,7 +306,7 @@ impl Graphics {
         }
     }
 
-    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> [Glyph; 2] {
+    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> DoubleGlyph {
         let buffer_pos = self.world_square_to_left_buffer_square(world_pos);
         [
             self.get_buffered_glyph(buffer_pos).clone(),
