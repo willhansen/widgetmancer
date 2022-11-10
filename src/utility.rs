@@ -1,6 +1,6 @@
 extern crate num;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::f32::consts::TAU;
 use std::fmt::Display;
 use std::ops::Neg;
@@ -35,8 +35,10 @@ pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
 pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
 pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
 
-pub type SquareList = Vec<Point2D<i32, SquareGridInWorldFrame>>;
-pub type StepList = Vec<Vector2D<i32, SquareGridInWorldFrame>>;
+pub type SquareList = Vec<WorldSquare>;
+pub type StepList = Vec<WorldStep>;
+
+pub type SquareSet = HashSet<WorldSquare>;
 
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;

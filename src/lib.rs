@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use enum_as_inner::EnumAsInner;
 use euclid::default::Point2D;
+use euclid::point2;
 use ntest::timeout;
 use num::Integer;
 use strum::IntoEnumIterator;
@@ -70,6 +71,7 @@ pub fn do_everything() {
     let (width, height) = termion::terminal_size().unwrap();
     //let (width, height) = (40, 20);
     let mut game = Game::new(width, height, Instant::now());
+    game.place_player(point2(width as i32 / 4, height as i32 / 2));
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
