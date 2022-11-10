@@ -56,7 +56,7 @@ impl InputMap {
             Event::Mouse(me) => match me {
                 MouseEvent::Press(MouseButton::Left, term_x, term_y) => {
                     let square = self.screen_to_world(&(term_x, term_y));
-                    game.set_player_position(square).unwrap_or_default();
+                    game.try_set_player_position(square).unwrap_or_default();
                 }
                 MouseEvent::Press(MouseButton::Right, term_x, term_y) => {
                     self.prev_mouse_square = self.screen_to_world(&(term_x, term_y));

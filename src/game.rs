@@ -18,15 +18,18 @@ use crate::{
     WorldStep, LEFT_I,
 };
 
+pub struct Player {
+    pub position: WorldSquare,
+    pub faced_direction: WorldStep,
+}
+
 pub struct Game {
     board_size: BoardSize,
     // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
     running: bool,
     // set false to quit
-    player_position: WorldSquare,
-    player_faced_direction: WorldStep,
-    player_is_dead: bool,
+    player_optional: Option<Player>,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
     blocks: HashSet<WorldSquare>,
@@ -41,12 +44,13 @@ impl Game {
         let mut game = Game {
             board_size,
             running: true,
-            player_position: point2(
-                (board_size.width / 2) as i32,
-                (board_size.height / 2) as i32,
-            ),
-            player_faced_direction: LEFT_I.cast_unit(),
-            player_is_dead: false,
+            player_optional: Some(Player {
+                position: point2(
+                    (board_size.width / 2) as i32,
+                    (board_size.height / 2) as i32,
+                ),
+                faced_direction: LEFT_I.cast_unit(),
+            }),
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
             blocks: HashSet::new(),
@@ -62,7 +66,7 @@ impl Game {
     }
 
     pub fn player_is_dead(&self) -> bool {
-        self.player_is_dead
+        self.player_optional.is_none()
     }
     pub fn turn_count(&self) -> u32 {
         self.turn_count
@@ -90,31 +94,43 @@ impl Game {
     }
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
-        let new_pos = self.player_position + movement;
+        let new_pos = self.player_square() + movement;
         if self.danger_squares().contains(&new_pos) || self.is_block_at(new_pos) {
             return Err(());
         }
 
-        self.set_player_faced_direction(round_to_king_step(movement));
-        self.set_player_position(new_pos)
+        self.raw_set_player_faced_direction(round_to_king_step(movement));
+        self.try_set_player_position(new_pos)
     }
 
-    pub fn player_position(&self) -> WorldSquare {
-        return self.player_position.clone();
+    pub fn player_square(&self) -> WorldSquare {
+        if let Some(player) = &self.player_optional {
+            player.position
+        } else {
+            panic!("Can't get square; player is dead")
+        }
     }
 
-    pub fn set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
+    pub fn try_set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
         if self.is_piece_at(pos) {
             self.capture_piece_at(pos).expect("capture failed");
         }
 
-        if self.square_is_on_board(pos) {
-            self.player_position = pos.clone();
-        } else {
+        if !self.square_is_on_board(pos) {
             return Err(());
         }
 
+        self.raw_set_player_position(pos);
+
         return Ok(());
+    }
+
+    fn raw_set_player_position(&mut self, square: WorldSquare) {
+        if let Some(player) = &mut self.player_optional {
+            player.position = square
+        } else {
+            panic!("Player is too dead to move")
+        }
     }
 
     fn danger_squares(&self) -> SquareList {
@@ -128,11 +144,25 @@ impl Game {
     }
 
     pub fn player_faced_direction(&self) -> WorldStep {
-        self.player_faced_direction
+        if let Some(player) = &self.player_optional {
+            player.faced_direction
+        } else {
+            panic!("player is dead")
+        }
     }
-    pub fn set_player_faced_direction(&mut self, new_dir: WorldStep) {
-        assert_eq!(max(new_dir.x.abs(), new_dir.y.abs()), 1, "bad input vector");
-        self.player_faced_direction = new_dir.clone()
+
+    pub fn raw_set_player_faced_direction(&mut self, new_dir: WorldStep) {
+        assert_eq!(
+            max(new_dir.x.abs(), new_dir.y.abs()),
+            1,
+            "bad input vector{:?}",
+            new_dir
+        );
+        if let Some(player) = &mut self.player_optional {
+            player.faced_direction = new_dir
+        } else {
+            panic!("Player is too dead to rotate")
+        }
     }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
@@ -159,13 +189,13 @@ impl Game {
         }
         self.graphics.draw_non_board_animations(time);
         self.graphics
-            .draw_player(self.player_position(), self.player_faced_direction());
+            .draw_player(self.player_square(), self.player_faced_direction());
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
-        (self.player_position != pos || self.player_is_dead)
+        (self.player_is_dead() || self.player_square() != pos)
             && !self.is_piece_at(pos)
             && !self.is_block_at(pos)
     }
@@ -248,7 +278,7 @@ impl Game {
 
     fn square_of_closest_piece_to_player(&self) -> Option<WorldSquare> {
         let slightly_right_of_player_position: WorldPoint =
-            self.player_position.to_f32() + WorldMove::new(0.01, 0.0);
+            self.player_square().to_f32() + WorldMove::new(0.01, 0.0);
 
         self.pieces
             .keys()
@@ -321,10 +351,10 @@ impl Game {
         let capture_option: Option<WorldSquare> = self
             .capture_options_for_piece_at(pos)
             .into_iter()
-            .find(|&square| square == self.player_position);
+            .find(|&square| square == self.player_square());
 
         if let Some(square) = capture_option {
-            self.player_is_dead = true;
+            self.player_optional = None;
             self.quit();
             self.move_piece(pos, square);
             return Some(square);
@@ -335,7 +365,7 @@ impl Game {
             .move_options_for_piece_at(pos)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_position).square_length());
+            .min_by_key(|&square| (square - self.player_square()).square_length());
 
         if let Some(square) = move_option {
             self.move_piece(pos, square);
@@ -414,7 +444,7 @@ impl Game {
         let spread_radians = 1.0;
         let random_spread_radius = 1.0;
         for i in 0..num_lasers {
-            let line_start: WorldSquare = self.player_position();
+            let line_start: WorldSquare = self.player_square();
             let rotation_if_uniform = lerp(
                 -spread_radians / 2.0,
                 spread_radians / 2.0,
@@ -452,11 +482,11 @@ impl Game {
             }
             graphical_laser_end = square;
         } else {
-            graphical_laser_end = self.player_position + self.player_faced_direction * 300;
+            graphical_laser_end = self.player_square() + self.player_faced_direction() * 300;
         }
         // laser should start at edge of player square, where player is facing
         let graphical_laser_start =
-            self.player_position.to_f32() + self.player_faced_direction().to_f32() * 0.5;
+            self.player_square().to_f32() + self.player_faced_direction().to_f32() * 0.5;
         self.graphics
             .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
