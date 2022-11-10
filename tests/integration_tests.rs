@@ -10,7 +10,7 @@ use rust_roguelike::utility::{
 };
 
 use crate::utils_for_tests::{
-    set_up_game, set_up_game_with_player_in_corner, set_up_pawn_threatening_player,
+    set_up_game_with_player, set_up_game_with_player_in_corner, set_up_pawn_threatening_player,
     set_up_player_facing_n_pawns_m_blocks_up, set_up_player_facing_pawn_on_left,
 };
 
@@ -18,7 +18,7 @@ mod utils_for_tests;
 
 #[test]
 fn test_walk_in_circle() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let start_pos = game.player_square();
     game.move_player(vec2(1, 0)).expect("");
     game.move_player(vec2(0, 1)).expect("");
@@ -29,7 +29,7 @@ fn test_walk_in_circle() {
 
 #[test]
 fn test_player_drawn_to_screen() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let start_pos = game.player_square();
     game.raw_set_player_faced_direction(RIGHT_I.cast_unit());
     game.draw_headless_now();
@@ -40,7 +40,7 @@ fn test_player_drawn_to_screen() {
 
 #[test]
 fn test_player_can_not_move_off_low_edge() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let start_pos = point2(0, 0);
     game.try_set_player_position(start_pos)
         .expect("Failed to set player pos");
@@ -51,7 +51,7 @@ fn test_player_can_not_move_off_low_edge() {
 
 #[test]
 fn test_player_can_not_move_off_high_edge() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
 
     game.draw_headless_now();
 
@@ -71,7 +71,7 @@ fn test_player_can_not_move_off_high_edge() {
 
 #[test]
 fn test_checkerboard_background() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     game.try_set_player_position(point2(0, 0))
         .expect("move player"); // out of the way
 
@@ -102,7 +102,7 @@ fn test_checkerboard_background() {
 
 #[test]
 fn test_draw_placed_pawn() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
     game.place_piece(Piece::pawn(), one_left)
         .expect("Failed to place pawn");
@@ -115,7 +115,7 @@ fn test_draw_placed_pawn() {
 
 #[test]
 fn test_capture_pawn() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
     game.place_piece(Piece::pawn(), one_left)
         .expect("Failed to place pawn");
@@ -138,7 +138,7 @@ fn test_capture_pawn() {
 
 #[test]
 fn test_pawn_capture_player() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let player_start_square = game.player_square();
     let one_upleft = game.player_square() + (UP_I + LEFT_I).cast_unit();
     game.place_piece(Piece::pawn(), one_upleft)
@@ -153,7 +153,7 @@ fn test_pawn_capture_player() {
 
 #[test]
 fn test_pawn_move_towards_player() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let two_left = game.player_square() + (LEFT_I * 2).cast_unit();
     let one_left = game.player_square() + (LEFT_I).cast_unit();
     game.place_piece(Piece::pawn(), two_left)
@@ -173,7 +173,7 @@ fn test_shoot_pawn() {
 
 #[test]
 fn test_move_to_turn() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     game.move_player(UP_I.cast_unit()).expect("step");
     assert_eq!(
         game.player_faced_direction(),
@@ -200,7 +200,7 @@ fn test_move_to_turn() {
 
 #[test]
 fn test_visible_laser() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let inspection_square: WorldSquare = game.player_square() + game.player_faced_direction();
     game.player_shoot_shotgun();
     game.draw_headless_now();
@@ -214,7 +214,7 @@ fn test_visible_laser() {
 
 #[test]
 fn test_player_background_is_transparent() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let inspection_square: WorldSquare = game.player_square();
 
     game.draw_headless_now();
@@ -350,7 +350,7 @@ fn test_game_over_on_capture_player() {
 }
 #[test]
 fn test_rook_move() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     game.place_piece(
         Piece::rook(),
         // three right, one up
@@ -365,7 +365,7 @@ fn test_rook_move() {
 }
 #[test]
 fn test_rook_capture() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     game.place_piece(
         Piece::rook(),
         game.player_square() + RIGHT_I.cast_unit() * 3,
@@ -378,7 +378,7 @@ fn test_rook_capture() {
 }
 #[test]
 fn test_king_move() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let diag_up_right: WorldStep = RIGHT_I.cast_unit() + UP_I.cast_unit();
     game.place_piece(
         Piece::king(),
@@ -394,7 +394,7 @@ fn test_king_move() {
 }
 #[test]
 fn test_knight_move() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     game.place_piece(
         Piece::knight(),
         // three right, one up
@@ -432,7 +432,7 @@ fn test_correct_amount_of_braille_in_selector() {
 
 #[test]
 fn test_no_move_into_check() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
     game.place_piece(Piece::rook(), rook_square)
         .expect("place rook");
@@ -442,7 +442,7 @@ fn test_no_move_into_check() {
 
 #[test]
 fn test_draw_danger_squares() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
     game.place_piece(Piece::rook(), rook_square)
         .expect("place rook");
@@ -458,7 +458,7 @@ fn test_draw_danger_squares() {
 
 #[test]
 fn test_no_step_on_block() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let block_square = game.player_square() + RIGHT_I.cast_unit();
     game.place_block(block_square);
     assert!(game.is_block_at(block_square));
@@ -468,7 +468,7 @@ fn test_no_step_on_block() {
 
 #[test]
 fn test_rook_stopped_by_block() {
-    let mut game = set_up_game();
+    let mut game = set_up_game_with_player();
     let rook_start_square = game.player_square() + RIGHT_I.cast_unit() * 4;
     let rook_end_square = game.player_square() + RIGHT_I.cast_unit() * 2;
     let block_square = game.player_square() + RIGHT_I.cast_unit();

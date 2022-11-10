@@ -44,13 +44,7 @@ impl Game {
         let mut game = Game {
             board_size,
             running: true,
-            player_optional: Some(Player {
-                position: point2(
-                    (board_size.width / 2) as i32,
-                    (board_size.height / 2) as i32,
-                ),
-                faced_direction: LEFT_I.cast_unit(),
-            }),
+            player_optional: None,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
             blocks: HashSet::new(),
@@ -70,6 +64,13 @@ impl Game {
     }
     pub fn turn_count(&self) -> u32 {
         self.turn_count
+    }
+
+    pub fn place_player(&mut self, square: WorldSquare) {
+        self.player_optional = Some(Player {
+            position: square,
+            faced_direction: LEFT_I.cast_unit(),
+        });
     }
 
     fn mid_square(&self) -> IPoint {
