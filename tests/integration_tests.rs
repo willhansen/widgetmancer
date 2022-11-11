@@ -3,7 +3,7 @@ use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::glyph::{
-    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_CHARS, DANGER_SQUARE_COLOR, RED,
+    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_COLOR, MOVE_AND_CAPTURE_SQUARE_CHARS, RED,
 };
 
 use rust_roguelike::piece::{Piece, PieceType};
@@ -13,8 +13,9 @@ use rust_roguelike::utility::{
 };
 
 use crate::utils_for_tests::{
-    set_up_game_with_player, set_up_game_with_player_in_corner, set_up_pawn_threatening_player,
-    set_up_player_facing_n_pawns_m_blocks_up, set_up_player_facing_pawn_on_left,
+    set_up_game, set_up_game_with_player, set_up_game_with_player_in_corner,
+    set_up_pawn_threatening_player, set_up_player_facing_n_pawns_m_blocks_up,
+    set_up_player_facing_pawn_on_left,
 };
 
 mod utils_for_tests;
@@ -455,8 +456,8 @@ fn test_draw_danger_squares() {
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(danger_square);
 
-    assert_eq!(actual_glyphs[0].character, DANGER_SQUARE_CHARS[0]);
-    assert_eq!(actual_glyphs[1].character, DANGER_SQUARE_CHARS[1]);
+    assert_eq!(actual_glyphs[0].character, MOVE_AND_CAPTURE_SQUARE_CHARS[0]);
+    assert_eq!(actual_glyphs[1].character, MOVE_AND_CAPTURE_SQUARE_CHARS[1]);
 }
 
 #[test]
@@ -502,4 +503,24 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
     assert_false!(test_square_glyphs.looks_solid());
     assert_eq!(pawn_square_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
     assert_eq!(pawn_square_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
+}
+
+#[test]
+fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
+    let mut game = set_up_game();
+    let pawn_square = game.mid_square();
+    game.place_piece(Piece::pawn(), pawn_square);
+    let move_square = pawn_square + RIGHT_I.cast_unit();
+    let capture_square = pawn_square + RIGHT_I.cast_unit() + UP_I.cast_unit();
+
+    game.draw_headless_now();
+
+    let move_glyphs = game.graphics().get_buffered_glyphs_for_square(move_square);
+    let capture_glyphs = game
+        .graphics()
+        .get_buffered_glyphs_for_square(capture_square);
+
+    assert_false!(move_glyphs.looks_solid());
+    assert_false!(capture_glyphs.looks_solid());
+    assert_ne!(move_glyphs, capture_glyphs);
 }

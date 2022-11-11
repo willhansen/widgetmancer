@@ -4,9 +4,13 @@ use rust_roguelike::piece::Piece;
 use rust_roguelike::utility::{WorldSquare, WorldStep, LEFT_I, RIGHT_I, UP_I};
 use std::time::Instant;
 
-pub fn set_up_game_with_player() -> Game {
+pub fn set_up_game() -> Game {
     let mut game = Game::new(20, 10, Instant::now());
-    game.place_player(WorldSquare::new(5, 5));
+    game
+}
+pub fn set_up_game_with_player() -> Game {
+    let mut game = set_up_game();
+    game.place_player(game.mid_square());
     game
 }
 pub fn set_up_game_at_time() -> (Game, Instant) {

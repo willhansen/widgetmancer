@@ -44,8 +44,10 @@ pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
 pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 
 // ●○ ⚬⦁⚫⚪
-pub const DANGER_SQUARE_CHARS: &[char; 2] = &['●', ' '];
-pub const TRICKY_DANGER_SQUARE_CHARS: &[char; 2] = &['○', ' '];
+pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
+pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['✕', ' '];
+pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
+pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
 
 pub type BrailleArray = [[bool; 4]; 2];
 pub type DoubleGlyph = [Glyph; 2];
@@ -709,8 +711,8 @@ impl Glyph {
     }
     pub fn is_fullwidth(&self) -> bool {
         self.is_chess()
-            || self.character == DANGER_SQUARE_CHARS[0]
-            || self.character == TRICKY_DANGER_SQUARE_CHARS[0]
+            || self.character == MOVE_AND_CAPTURE_SQUARE_CHARS[0]
+            || self.character == CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS[0]
     }
 
     pub fn is_chess(&self) -> bool {
@@ -718,11 +720,11 @@ impl Glyph {
     }
 
     pub fn danger_square_glyphs() -> DoubleGlyph {
-        DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+        MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
     }
 
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
-        TRICKY_DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+        CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
     }
 
     // ╳

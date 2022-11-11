@@ -74,7 +74,7 @@ impl Game {
         });
     }
 
-    fn mid_square(&self) -> IPoint {
+    pub fn mid_square(&self) -> WorldSquare {
         point2(
             self.board_size().width as i32 / 2,
             self.board_size().height as i32 / 2,
@@ -182,6 +182,9 @@ impl Game {
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
         return &mut self.graphics;
     }
+    pub fn graphics(&self) -> &Graphics {
+        return &self.graphics;
+    }
 
     pub fn draw_headless_at_duration_from_start(&mut self, delta: Duration) {
         let draw_time = self.graphics.start_time() + delta;
@@ -204,8 +207,10 @@ impl Game {
             self.graphics.draw_piece(piece, square);
         }
         self.graphics.draw_non_board_animations(time);
-        self.graphics
-            .draw_player(self.player_square(), self.player_faced_direction());
+        if !self.player_is_dead() {
+            self.graphics
+                .draw_player(self.player_square(), self.player_faced_direction());
+        }
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
