@@ -27,6 +27,7 @@ pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
+pub const DANGER_SQUARE_COLOR: RGB8 = RED;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -42,7 +43,9 @@ pub const EMPTY_BRAILLE: char = '\u{2800}';
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
 pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 
-pub const DANGER_SQUARE_CHARS: &[char; 2] = &['▪', ' '];
+// ●○ ⚬⦁⚫⚪
+pub const DANGER_SQUARE_CHARS: &[char; 2] = &['●', ' '];
+pub const TRICKY_DANGER_SQUARE_CHARS: &[char; 2] = &['○', ' '];
 
 pub type BrailleArray = [[bool; 4]; 2];
 pub type DoubleGlyph = [Glyph; 2];
@@ -704,13 +707,22 @@ impl Glyph {
             None
         }
     }
+    pub fn is_fullwidth(&self) -> bool {
+        self.is_chess()
+            || self.character == DANGER_SQUARE_CHARS[0]
+            || self.character == TRICKY_DANGER_SQUARE_CHARS[0]
+    }
 
     pub fn is_chess(&self) -> bool {
         SOLID_CHESS_PIECES.contains(&self.character)
     }
 
     pub fn danger_square_glyphs() -> DoubleGlyph {
-        DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, RED))
+        DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+
+    pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
+        TRICKY_DANGER_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
     }
 
     // ╳
@@ -756,11 +768,9 @@ pub trait DoubleGlyphFunctions {
 
 impl DoubleGlyphFunctions for DoubleGlyph {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
-        if self[0].is_chess() {
+        if self[0].is_fullwidth() {
             [self[0].fg_color; 2]
         } else {
-            // TODO: check for fullwidth vs halfwidth here
-
             // halfwidth case
             self.map(|glyph| {
                 if let Some(solid_color) = glyph.get_solid_color() {

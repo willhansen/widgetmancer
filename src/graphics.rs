@@ -19,6 +19,7 @@ use termion::terminal_size;
 use crate::animations::*;
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
+use crate::utility::SquareSet;
 use crate::{
     get_by_point, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
     BrailleGridInWorldFrame, BufferCharacterPoint, BufferCharacterSquare,
@@ -438,9 +439,17 @@ impl Graphics {
         self.draw_glyphs_at_square_with_transparency(pos, piece.glyphs());
     }
 
-    pub fn draw_danger_squares(&mut self, danger_squares: SquareList) {
+    pub fn draw_danger_squares(&mut self, danger_squares: SquareSet) {
         danger_squares.into_iter().for_each(|square| {
             self.draw_glyphs_at_square_with_transparency(square, Glyph::danger_square_glyphs())
+        });
+    }
+    pub fn draw_tricky_danger_squares(&mut self, danger_squares: SquareSet) {
+        danger_squares.into_iter().for_each(|square| {
+            self.draw_glyphs_at_square_with_transparency(
+                square,
+                Glyph::tricky_danger_square_glyphs(),
+            )
         });
     }
     pub fn draw_block(&mut self, block_square: WorldSquare) {

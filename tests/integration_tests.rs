@@ -2,7 +2,9 @@ use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
-use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph, DANGER_SQUARE_CHARS, RED};
+use rust_roguelike::glyph::{
+    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_CHARS, DANGER_SQUARE_COLOR, RED,
+};
 
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
@@ -496,5 +498,8 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
 
     let graphics = game.borrow_graphics_mut();
     let test_square_glyphs = graphics.get_buffered_glyphs_for_square(square_to_check);
+    let pawn_square_glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
     assert_false!(test_square_glyphs.looks_solid());
+    assert_eq!(pawn_square_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
+    assert_eq!(pawn_square_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
 }

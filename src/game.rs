@@ -136,17 +136,25 @@ impl Game {
     }
 
     fn danger_squares(&self) -> SquareSet {
-        let mut squares_of_danger = HashSet::<WorldSquare>::new();
-        for &piece_square in self.pieces.keys() {
-            for guarded_square in self.guarded_squares_for_piece_at(piece_square) {
-                squares_of_danger.insert(guarded_square);
-            }
-        }
-        squares_of_danger
+        self.pieces
+            .keys()
+            .map(|&square| self.guarded_squares_for_piece_at(square))
+            .flatten()
+            .collect()
     }
 
     fn tricky_danger_squares(&self) -> SquareSet {
-        todo!()
+        // squares protected by all enemy pieces, ignoring being blocked by pieces
+        let all_danger_squares_including_tricky_ones: SquareSet = self
+            .pieces
+            .keys()
+            .map(|&square| self.guarded_squares_passing_through_pieces_for_piece_at(square))
+            .flatten()
+            .collect();
+        all_danger_squares_including_tricky_ones
+            .difference(&self.danger_squares())
+            .copied()
+            .collect()
     }
 
     pub fn player_faced_direction(&self) -> WorldStep {
@@ -187,6 +195,8 @@ impl Game {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
         self.graphics.draw_danger_squares(self.danger_squares());
+        self.graphics
+            .draw_tricky_danger_squares(self.tricky_danger_squares());
         for &square in &self.blocks {
             self.graphics.draw_block(square);
         }
