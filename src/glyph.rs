@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 
+use ::num::clamp;
 use euclid::*;
 use euclid::{point2, vec2};
 use line_drawing::Point;
@@ -12,21 +13,68 @@ use crate::utility::*;
 
 pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
-pub const WHITE: RGB8 = RGB8::new(200, 200, 150);
+pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
+pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
+pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
+pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
+pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
+pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
+pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
+pub const GREY: RGB8 = RGB8::new(127, 127, 127);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
 pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
+pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
+pub const DANGER_SQUARE_COLOR: RGB8 = RED;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
+pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
+
+pub const HORIZONTAL_HALF_BLOCK: char = EIGHTH_BLOCKS_FROM_LEFT[4];
+
+pub const FULL_BLOCK: char = '█';
+pub const SPACE: char = ' ';
+pub const EMPTY_BRAILLE: char = '\u{2800}';
+
+pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
+pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
+
+// ●○ ⚬⦁⚫⚪ ✕ ✕
+// ✕ ⨉ ⨯ 🞨 🞮 ×
+pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
+pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['⨯', ' '];
+pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
+pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
+
 pub type BrailleArray = [[bool; 4]; 2];
-pub type TwoGlyphs = [Glyph; 2];
+pub type DoubleGlyph = [Glyph; 2];
 
 // Fun unicode for later
-// ↈ
+// ↈ ▴ ⚠ 🞁 🢑  🛆  𝅉  ⏹  ᙮ ⸼  ▪
+// ☠⯃⯄
+// ⨻🕱
+//   ⃤  ⟁   ⃠   ꙰
+//     ◌  𝨞
+// ◌  ⚿ ⯐
+//    𝩬   𝩫
+
+//  ♜ 	♞ 	♝ 	♛ 	♚ 	♝ 	♞ 	♜
+// 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎
+
+// 	♙ 	♙ 	♙ 	♙ 	♙ 	♙ 	♙ 	♙
+// 	♖ 	♘ 	♗ 	♕ 	♔ 	♗ 	♘ 	♖
+
+//  🨀 	🨁 	🨂 	🨃 	🨄 	🨅 	🨆 	🨇 	🨈 	🨉 	🨊 	🨋 	🨌 	🨍 	🨎 	🨏
+//	🨐 	🨑 	🨒 	🨓 	🨔 	🨕 	🨖 	🨗 	🨘 	🨙 	🨚 	🨛 	🨜 	🨝 	🨞 	🨟
+//	🨠 	🨡 	🨢 	🨣 	🨤 	🨥 	🨦 	🨧 	🨨 	🨩 	🨪 	🨫 	🨬 	🨭 	🨮 	🨯
+//	🨰 	🨱 	🨲 	🨳 	🨴 	🨵 	🨶 	🨷 	🨸 	🨹 	🨺 	🨻 	🨼 	🨽 	🨾 	🨿
+//	🩀 	🩁 	🩂 	🩃 	🩄 	🩅 	🩆 	🩇 	🩈 	🩉 	🩊 	🩋 	🩌 	🩍 	🩎 	🩏
+//	🩐 	🩑 	🩒 	🩓
+//	🩠 	🩡 	🩢 	🩣 	🩤 	🩥 	🩦 	🩧 	🩨 	🩩 	🩪 	🩫 	🩬 	🩭
 
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
@@ -51,9 +99,31 @@ pub struct Glyph {
     pub character: char,
     pub fg_color: RGB8,
     pub bg_color: RGB8,
+    pub bg_transparent: bool,
 }
 
 impl Glyph {
+    pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
+        Glyph {
+            character,
+            fg_color,
+            bg_color,
+            bg_transparent: false,
+        }
+    }
+    pub fn default_transparent() -> Glyph {
+        Glyph::fg_only(' ', WHITE)
+    }
+
+    pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
+        Glyph {
+            character,
+            fg_color,
+            bg_color: BLACK,
+            bg_transparent: true,
+        }
+    }
+
     pub fn to_string(&self) -> String {
         let mut output = self.character.to_string();
         output = format!(
@@ -61,7 +131,7 @@ impl Glyph {
             color::Fg(color::Rgb(
                 self.fg_color.r,
                 self.fg_color.g,
-                self.fg_color.b
+                self.fg_color.b,
             )),
             output,
             color::Fg(color::Reset),
@@ -71,7 +141,7 @@ impl Glyph {
             color::Bg(color::Rgb(
                 self.bg_color.r,
                 self.bg_color.g,
-                self.bg_color.b
+                self.bg_color.b,
             )),
             output,
             color::Bg(color::Reset),
@@ -81,11 +151,7 @@ impl Glyph {
     }
 
     pub fn from_char(character: char) -> Glyph {
-        Glyph {
-            character,
-            fg_color: WHITE,
-            bg_color: BLACK,
-        }
+        Glyph::new(character, WHITE, BLACK)
     }
 
     pub fn with_char(&self, new_char: char) -> Glyph {
@@ -108,98 +174,104 @@ impl Glyph {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
 
-    pub fn square_with_horizontal_offset(fraction_of_square_offset: f32) -> Glyph {
-        Glyph::colored_square_with_horizontal_offset(fraction_of_square_offset, WHITE, BLACK)
+    pub fn partial_block(vertical: bool, fraction: f32) -> char {
+        let eighths = (fraction * 8.0).round() as usize;
+        let clamped_eighths = clamp(eighths, 0, 8);
+        if vertical {
+            EIGHTH_BLOCKS_FROM_BOTTOM[clamped_eighths]
+        } else {
+            EIGHTH_BLOCKS_FROM_LEFT[clamped_eighths]
+        }
     }
 
-    pub fn colored_square_with_horizontal_offset(
+    pub fn colored_character_square_with_offset(
+        is_vertical: bool,
         fraction_of_square_offset: f32,
         square_color: RGB8,
         background_color: RGB8,
     ) -> Glyph {
-        let offset_in_eighths_rounded_towards_inf = (fraction_of_square_offset * 8.0).ceil() as i32;
-        assert!(offset_in_eighths_rounded_towards_inf.abs() <= 8);
-        return if offset_in_eighths_rounded_towards_inf <= 0 {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_LEFT
-                    [(8 + offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: square_color,
-                bg_color: background_color,
-            }
+        if fraction_of_square_offset < 0.0 {
+            let character = Glyph::partial_block(is_vertical, 1.0 + fraction_of_square_offset);
+            Glyph::new(character, square_color, background_color)
         } else {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_LEFT[offset_in_eighths_rounded_towards_inf as usize],
-                fg_color: background_color,
-                bg_color: square_color,
-            }
-        };
-    }
-    pub fn square_with_vertical_offset(fraction_of_square_offset: f32) -> Glyph {
-        return Glyph::colored_square_with_vertical_offset(fraction_of_square_offset, WHITE, BLACK);
-    }
-    pub fn colored_square_with_vertical_offset(
-        fraction_of_square_offset: f32,
-        square_color: RGB8,
-        background_color: RGB8,
-    ) -> Glyph {
-        let offset_in_eighths_rounded_towards_inf = (fraction_of_square_offset * 8.0).ceil() as i32;
-        assert!(offset_in_eighths_rounded_towards_inf.abs() <= 8);
-        return if offset_in_eighths_rounded_towards_inf <= 0 {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM
-                    [(8 + offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: square_color,
-                bg_color: background_color,
-            }
-        } else {
-            Glyph {
-                character: EIGHTH_BLOCKS_FROM_BOTTOM
-                    [(offset_in_eighths_rounded_towards_inf) as usize],
-                fg_color: background_color,
-                bg_color: square_color,
-            }
-        };
+            let character = Glyph::partial_block(is_vertical, fraction_of_square_offset);
+            Glyph::new(character, background_color, square_color)
+        }
     }
     pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
-        Glyph {
-            character: quarter_block_by_offset(step),
-            fg_color: color,
-            bg_color: BLACK,
+        Glyph::new(quarter_block_by_offset(step), color, BLACK)
+    }
+
+    pub fn offset_board_square_glyphs(
+        offset_vector: WorldMove,
+        square_color: RGB8,
+        background_color: RGB8,
+    ) -> DoubleGlyph {
+        assert!(is_orthogonal(offset_vector));
+        let is_vertical = offset_vector.x == 0.0;
+        // because sign
+        let offset_magnitude = if is_vertical {
+            offset_vector.y
+        } else {
+            offset_vector.x
+        };
+        let offset_magnitude_within_one_period_symmetric_about_zero =
+            (offset_magnitude + 1.0).rem_euclid(2.0) - 1.0;
+
+        if is_vertical {
+            Glyph::vertical_square_offset_to_character_offsets(
+                offset_magnitude_within_one_period_symmetric_about_zero,
+            )
+            .map(|character_offset| {
+                Glyph::colored_character_square_with_offset(
+                    true,
+                    character_offset,
+                    square_color,
+                    background_color,
+                )
+            })
+        } else {
+            let character_offsets = Glyph::horizontal_square_offset_to_character_offsets(
+                offset_magnitude_within_one_period_symmetric_about_zero,
+            );
+            character_offsets.map(|character_offset| {
+                Glyph::colored_character_square_with_offset(
+                    false,
+                    character_offset,
+                    square_color,
+                    background_color,
+                )
+            })
         }
     }
 
-    // TODO: account for greater than one square offset
-    pub fn double_colored_square_with_offset(
-        offset_fraction: f32,
-        vertical_instead_of_horizontal: bool,
-        square_color: RGB8,
-        background_color: RGB8,
-    ) -> TwoGlyphs {
-        if vertical_instead_of_horizontal {
-            return [Glyph::colored_square_with_vertical_offset(
-                offset_fraction,
-                square_color,
-                background_color,
-            ); 2];
-        } else {
-            // TODO: account for offset larger than half a square
-            let right_glyph_is_solid = offset_fraction > 0.0;
-            let offset_within_character = (offset_fraction % 0.5) * 2.0;
-            let glyph_with_offset = Glyph::colored_square_with_horizontal_offset(
-                offset_within_character,
-                square_color,
-                background_color,
-            );
-            let glyph_solid_block =
-                Glyph::colored_square_with_horizontal_offset(0.0, square_color, background_color);
+    pub fn horizontal_square_offset_to_character_offsets(offset_fraction: f32) -> [f32; 2] {
+        assert!(offset_fraction.abs() <= 1.0);
 
-            if right_glyph_is_solid {
-                [glyph_with_offset, glyph_solid_block]
+        let mut f_c = offset_fraction * 2.0;
+        if f_c.abs() >= 1.0 {
+            if f_c > 0.0 {
+                f_c -= 1.0;
             } else {
-                [glyph_solid_block, glyph_with_offset]
+                f_c += 1.0;
             }
         }
+
+        if offset_fraction <= -0.5 {
+            [f_c, -1.0]
+        } else if offset_fraction < 0.0 {
+            [0.0, f_c]
+        } else if offset_fraction < 0.5 {
+            [f_c, 0.0]
+        } else {
+            [1.0, f_c]
+        }
+    }
+    pub fn vertical_square_offset_to_character_offsets(offset_fraction: f32) -> [f32; 2] {
+        // outputs in range [-1.0, 1.0)
+        assert!(offset_fraction >= -1.0 && offset_fraction <= 1.0);
+        [offset_fraction, offset_fraction]
     }
 
     #[allow(dead_code)]
@@ -245,7 +317,8 @@ impl Glyph {
         for i in 0..3 {
             let x = i as i32 - 1;
             if offset_dir.x == x || x == 0 {
-                output[i][c] = Some(Glyph::colored_square_with_horizontal_offset(
+                output[i][c] = Some(Glyph::colored_character_square_with_offset(
+                    false,
                     x_offset - x as f32,
                     color,
                     BLACK,
@@ -274,7 +347,8 @@ impl Glyph {
         for j in 0..3 {
             let y = j as i32 - 1;
             if offset_dir.y == y || y == 0 {
-                output[c][j] = Some(Glyph::colored_square_with_vertical_offset(
+                output[c][j] = Some(Glyph::colored_character_square_with_offset(
+                    true,
                     y_offset - y as f32,
                     color,
                     BLACK,
@@ -339,18 +413,19 @@ impl Glyph {
         char::from_u32(character as u32 | Glyph::braille_bit_for_pos(p)).unwrap()
     }
 
-    pub fn empty_braille() -> char {
-        '\u{2800}'
+    pub fn is_braille(&self) -> bool {
+        Glyph::char_is_braille(self.character)
     }
 
-    pub fn is_braille(c: char) -> bool {
+    pub fn char_is_braille(c: char) -> bool {
         let x = c as u32;
         // The unicode braille block
+        // TODO: This includes empty braille.  Bad?
         x >= 0x2800 && x <= 0x28FF
     }
 
     pub fn count_braille_dots(character: char) -> u32 {
-        if !Glyph::is_braille(character) {
+        if !Glyph::char_is_braille(character) {
             return 0;
         }
         let num_good_bits = 8;
@@ -362,14 +437,16 @@ impl Glyph {
         return sum as u32;
     }
 
-    pub fn add_braille(c1: char, c2: char) -> char {
+    pub fn combine_braille_characters(c1: char, c2: char) -> char {
+        assert!(Glyph::char_is_braille(c1));
+        assert!(Glyph::char_is_braille(c2));
         char::from_u32(c1 as u32 | c2 as u32).unwrap()
     }
 
     pub fn get_glyphs_for_braille_line(
         start_pos: WorldPoint,
         end_pos: WorldPoint,
-    ) -> WorldGlyphMap {
+    ) -> WorldCharacterGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, WHITE)
     }
 
@@ -498,7 +575,7 @@ impl Glyph {
         start_pos: WorldPoint,
         end_pos: WorldPoint,
         color: RGB8,
-    ) -> WorldGlyphMap {
+    ) -> WorldCharacterGlyphMap {
         let start_char_point = Glyph::world_point_to_world_character_point(start_pos);
         let end_char_point = Glyph::world_point_to_world_character_point(end_pos);
 
@@ -520,14 +597,9 @@ impl Glyph {
             let character_grid_square =
                 Glyph::world_braille_square_to_world_character_square(braille_pos);
             if !glyph_map.contains_key(&character_grid_square) {
-                glyph_map.insert(
-                    character_grid_square,
-                    Glyph {
-                        character: Glyph::empty_braille(),
-                        fg_color: color,
-                        bg_color: BLACK,
-                    },
-                );
+                let mut new_glyph = Glyph::new(EMPTY_BRAILLE, color, BLACK);
+                new_glyph.bg_transparent = true;
+                glyph_map.insert(character_grid_square, new_glyph);
             }
             let braille_character =
                 &mut glyph_map.get_mut(&character_grid_square).unwrap().character;
@@ -542,7 +614,7 @@ impl Glyph {
     pub fn character_world_pos_to_braille_char(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
     ) -> char {
-        let character = Glyph::empty_braille();
+        let character = EMPTY_BRAILLE;
         Glyph::add_braille_dot(
             character,
             Glyph::braille_square_to_dot_in_character(
@@ -557,14 +629,17 @@ impl Glyph {
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,
     ) -> Glyph {
-        Glyph {
-            character: Glyph::character_world_pos_to_braille_char(world_pos),
-            fg_color: color,
-            bg_color: BLACK,
-        }
+        Glyph::new(
+            Glyph::character_world_pos_to_braille_char(world_pos),
+            color,
+            BLACK,
+        )
     }
 
-    pub fn points_to_braille_glyphs(points: Vec<WorldPoint>, color: RGB8) -> WorldGlyphMap {
+    pub fn points_to_braille_glyphs(
+        points: Vec<WorldPoint>,
+        color: RGB8,
+    ) -> WorldCharacterGlyphMap {
         // bin braille squares by world character squares
         let mut local_braille_squares_by_character_square =
             HashMap::<WorldCharacterSquare, HashSet<WorldBrailleSquare>>::new();
@@ -587,17 +662,14 @@ impl Glyph {
                 .insert(local_braille_square);
         }
 
-        let mut output_map = WorldGlyphMap::new();
+        let mut output_map = WorldCharacterGlyphMap::new();
 
         for (char_square, braille_square_set) in local_braille_squares_by_character_square {
             let braille_char: char = Glyph::local_braille_squares_to_braille_char(
                 braille_square_set.into_iter().collect(),
             );
-            let braille_glyph = Glyph {
-                character: braille_char,
-                fg_color: color,
-                bg_color: BLACK,
-            };
+            let mut braille_glyph = Glyph::new(braille_char, color, BLACK);
+            braille_glyph.bg_transparent = true;
             output_map.insert(char_square, braille_glyph);
         }
         output_map
@@ -615,6 +687,128 @@ impl Glyph {
 
     fn local_braille_squares_to_braille_char(squares: Vec<WorldBrailleSquare>) -> char {
         Glyph::braille_array_to_braille_char(Glyph::local_braille_squares_to_braille_array(squares))
+    }
+
+    pub fn looks_solid_specifically(&self, color: RGB8) -> bool {
+        if let Some(solid_color) = self.get_solid_color() {
+            color == solid_color
+        } else {
+            false
+        }
+    }
+
+    pub fn looks_solid(&self) -> bool {
+        self.get_solid_color() != None
+    }
+
+    pub fn get_solid_color(&self) -> Option<RGB8> {
+        if KNOWN_FG_ONLY_CHARS.contains(&self.character) {
+            Some(self.fg_color)
+        } else if KNOWN_BG_ONLY_CHARS.contains(&self.character) {
+            Some(self.bg_color)
+        } else {
+            None
+        }
+    }
+    pub fn is_fullwidth(&self) -> bool {
+        self.is_chess()
+            || self.character == MOVE_AND_CAPTURE_SQUARE_CHARS[0]
+            || self.character == CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS[0]
+            || self.character == MOVE_ONLY_SQUARE_CHARS[0]
+            || self.character == CAPTURE_ONLY_SQUARE_CHARS[0]
+    }
+
+    pub fn is_chess(&self) -> bool {
+        SOLID_CHESS_PIECES.contains(&self.character)
+    }
+
+    pub fn danger_square_glyphs() -> DoubleGlyph {
+        MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+
+    pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
+        CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+    pub fn move_only_square_glyphs() -> DoubleGlyph {
+        MOVE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+    pub fn capture_only_square_glyphs() -> DoubleGlyph {
+        CAPTURE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+
+    // ╳
+    pub fn block_glyphs() -> DoubleGlyph {
+        [Glyph::new(' ', WHITE, WHITE); 2]
+    }
+
+    pub fn is_world_character_square_left_square_of_world_square(
+        character_square: WorldCharacterSquare,
+    ) -> bool {
+        Glyph::world_square_to_left_world_character_square(
+            Glyph::world_character_square_to_world_square(character_square),
+        ) == character_square
+    }
+
+    pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {
+        let position_index = if is_left_glyph { 0 } else { 1 };
+        let mut output_glyph = self.clone();
+        if self.bg_transparent == true {
+            let glyph_directly_below = background_glyphs[position_index];
+            if self.is_braille() && glyph_directly_below.is_braille() {
+                output_glyph.character = Glyph::combine_braille_characters(
+                    self.character,
+                    glyph_directly_below.character,
+                );
+                output_glyph.bg_color = glyph_directly_below.bg_color;
+            } else {
+                let bg_colors = background_glyphs.solid_color_if_backgroundified();
+                output_glyph.bg_color = bg_colors[position_index];
+            }
+        }
+        output_glyph.bg_transparent = false;
+        output_glyph
+    }
+}
+
+pub trait DoubleGlyphFunctions {
+    fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
+    fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
+    fn to_string(&self) -> String;
+    fn looks_solid(&self) -> bool;
+}
+
+impl DoubleGlyphFunctions for DoubleGlyph {
+    fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
+        if self[0].is_fullwidth() {
+            // fullwidth case
+            [self[0].fg_color; 2]
+        } else {
+            // halfwidth case
+            self.map(|glyph| {
+                if let Some(solid_color) = glyph.get_solid_color() {
+                    solid_color
+                } else {
+                    glyph.fg_color
+                }
+            })
+        }
+    }
+    fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
+        let glyphs = [
+            self[0].drawn_over(background_glyphs, true),
+            self[1].drawn_over(background_glyphs, false),
+        ];
+        glyphs
+    }
+    fn to_string(&self) -> String {
+        self[0].to_string() + &self[1].to_string()
+    }
+
+    fn looks_solid(&self) -> bool {
+        let left_solid_color_optional = self[0].get_solid_color();
+        let right_solid_color_optional = self[1].get_solid_color();
+        left_solid_color_optional.is_some()
+            && left_solid_color_optional == right_solid_color_optional
     }
 }
 
@@ -831,13 +1025,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_empty_braille_character() {
-        assert_eq!(Glyph::empty_braille(), '\u{2800}');
-    }
-
-    #[test]
     fn test_set_braille_dot() {
-        let mut b = Glyph::empty_braille();
+        let mut b = EMPTY_BRAILLE;
         b = Glyph::add_braille_dot(b, point2(0, 0));
         b = Glyph::add_braille_dot(b, point2(1, 1));
         assert_eq!(b, '⡠');
@@ -1015,8 +1204,14 @@ mod tests {
 
     #[test]
     fn test_combine_braille_character() {
-        assert_eq!(Glyph::add_braille('\u{2800}', '\u{2820}'), '\u{2820}');
-        assert_eq!(Glyph::add_braille('\u{2801}', '\u{28C0}'), '\u{28C1}');
+        assert_eq!(
+            Glyph::combine_braille_characters('\u{2800}', '\u{2820}'),
+            '\u{2820}'
+        );
+        assert_eq!(
+            Glyph::combine_braille_characters('\u{2801}', '\u{28C0}'),
+            '\u{28C1}'
+        );
     }
 
     #[test]
@@ -1041,7 +1236,7 @@ mod tests {
             //let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
             let random_point = point2(23.2273, 2.05);
 
-            assert!(Glyph::is_braille(
+            assert!(Glyph::char_is_braille(
                 Glyph::character_world_pos_to_braille_char(random_point)
             ));
         }
@@ -1073,14 +1268,14 @@ mod tests {
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
             Glyph::world_point_to_world_character_point(
-                Point2D::<f32, SquareGridInWorldFrame>::new(0.0, 0.0,)
+                Point2D::<f32, SquareGridInWorldFrame>::new(0.0, 0.0)
             ),
             "zero is actually between two characters"
         );
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
             Glyph::world_point_to_world_character_point(
-                Point2D::<f32, SquareGridInWorldFrame>::new(1.0, 1.0,)
+                Point2D::<f32, SquareGridInWorldFrame>::new(1.0, 1.0)
             ),
             "diagonal a bit"
         );
@@ -1121,7 +1316,7 @@ mod tests {
     #[test]
     fn test_double_glyph_square_offset__up() {
         // offset up
-        let glyphs = Glyph::double_colored_square_with_offset(0.5, true, RED, BLACK);
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
         assert_eq!(glyphs[0].fg_color, BLACK);
         assert_eq!(glyphs[0].bg_color, RED);
@@ -1129,10 +1324,11 @@ mod tests {
         assert_eq!(glyphs[1].fg_color, BLACK);
         assert_eq!(glyphs[1].bg_color, RED);
     }
+
     #[test]
-    fn test_double_glyph_square_offset__down() {
-        // offset down
-        let glyphs = Glyph::double_colored_square_with_offset(-0.5, true, RED, BLACK);
+    fn test_double_glyph_square_offset__150_up() {
+        // offset up
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -1140,26 +1336,281 @@ mod tests {
         assert_eq!(glyphs[1].fg_color, RED);
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
+
     #[test]
-    fn test_double_glyph_square_offset__left() {
-        // offset left
-        let glyphs = Glyph::double_colored_square_with_offset(-0.25, false, RED, BLACK);
-        assert_eq!(glyphs[0].character, '█');
+    fn test_double_glyph_square_offset__50_down() {
+        // offset down
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
+        assert_eq!(glyphs[0].character, '▄');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[1].character, '▄');
+        assert_eq!(glyphs[1].fg_color, RED);
+        assert_eq!(glyphs[1].bg_color, BLACK);
+    }
+
+    //                      |<--halfway
+    // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
+    #[test]
+    fn test_double_glyph_square_offset__1_left() {
+        // offset left
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
+        assert!(glyphs[0].looks_solid_specifically(RED));
+        assert!(glyphs[1].looks_solid_specifically(RED));
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__14_left() {
+        // offset left
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
+        assert!(
+            glyphs[0].looks_solid_specifically(RED),
+            "glyph: {}",
+            &glyphs[0].to_string()
+        );
+        //assert_eq!(glyphs[1].character, '▏');
+        assert_eq!(glyphs[1], Glyph::new('▊', RED, BLACK));
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__25_left() {
+        // offset left
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
+        assert!(glyphs[0].looks_solid_specifically(RED));
         assert_eq!(glyphs[1].character, '▌');
         assert_eq!(glyphs[1].fg_color, RED);
         assert_eq!(glyphs[1].bg_color, BLACK);
     }
+
     #[test]
-    fn test_double_glyph_square_offset__right() {
+    fn test_double_glyph_square_offset__75_left() {
+        // offset left
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
+        assert_eq!(glyphs[0].character, '▌');
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert!(glyphs[1].looks_solid_specifically(BLACK));
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__25_right() {
         // offset right
-        let glyphs = Glyph::double_colored_square_with_offset(0.25, false, RED, BLACK);
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
         assert_eq!(glyphs[0].fg_color, BLACK);
         assert_eq!(glyphs[0].bg_color, RED);
-        assert_eq!(glyphs[1].character, '█');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert!(glyphs[1].looks_solid_specifically(RED));
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__50_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
+        assert!(glyphs[0].looks_solid_specifically(BLACK));
+        assert!(glyphs[1].looks_solid_specifically(RED));
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__75_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
+        assert_eq!(glyphs[0].character, '█');
+        assert_eq!(glyphs[0].fg_color, BLACK);
+        assert_eq!(glyphs[0].bg_color, RED);
+        assert_eq!(glyphs[1].character, '▌');
+        assert_eq!(glyphs[1].fg_color, BLACK);
+        assert_eq!(glyphs[1].bg_color, RED);
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__slightly_past_full_square_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
+        assert!(
+            glyphs[0].looks_solid_specifically(BLACK),
+            "glyph: {}",
+            &glyphs[0].to_string()
+        );
+        assert!(
+            glyphs[1].looks_solid_specifically(BLACK),
+            "glyph: {}",
+            &glyphs[1].to_string()
+        );
+    }
+
+    #[test]
+    fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
+        // offset right
+        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
+        assert_eq!(glyphs[0], Glyph::new(HORIZONTAL_HALF_BLOCK, RED, BLACK));
+        assert!(
+            glyphs[1].looks_solid_specifically(BLACK),
+            "glyph: {}",
+            &glyphs[1].to_string()
+        );
+    }
+
+    //                      |<--halfway
+    // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
+    #[test]
+    fn test_character_square_horizontal_offset__base_case() {
+        assert!(
+            Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK)
+                .looks_solid_specifically(RED)
+        );
+    }
+
+    #[test]
+    fn test_character_square_horizontal_offset__round_to_zero() {
+        assert!(
+            Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK)
+                .looks_solid_specifically(RED)
+        );
+
+        assert!(
+            Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK)
+                .looks_solid_specifically(RED)
+        );
+    }
+
+    #[test]
+    fn test_character_square_horizontal_offset__out_of_range() {
+        assert_eq!(
+            Glyph::colored_character_square_with_offset(false, -1.5, RED, BLACK),
+            Glyph::new(' ', RED, BLACK)
+        );
+        assert_eq!(
+            Glyph::colored_character_square_with_offset(false, 1.5, RED, BLACK),
+            Glyph::new('█', BLACK, RED)
+        );
+    }
+
+    #[test]
+    fn test_character_square_horizontal_offset__halfway() {
+        assert_eq!(
+            Glyph::colored_character_square_with_offset(false, -0.5, RED, BLACK),
+            Glyph::new('▌', RED, BLACK)
+        );
+        assert_eq!(
+            Glyph::colored_character_square_with_offset(false, 0.5, RED, BLACK),
+            Glyph::new('▌', BLACK, RED)
+        );
+    }
+
+    #[test]
+    fn test_character_square_horizontal_offset__match_opposite_ends() {
+        assert!(
+            Glyph::colored_character_square_with_offset(false, -1.0, RED, BLACK)
+                .looks_solid_specifically(BLACK)
+        );
+        assert!(
+            Glyph::colored_character_square_with_offset(false, 1.0, RED, BLACK)
+                .looks_solid_specifically(BLACK)
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__zeros() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(0.0),
+            [0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_4_left() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(-0.25),
+            [0.0, -0.5]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_4_right() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(0.25),
+            [0.5, 0.0]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_2_right() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(0.5),
+            [1.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_2_left() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(-0.5),
+            [0.0, -1.0]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_left() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(-1.0),
+            [-1.0, -1.0]
+        );
+    }
+
+    #[test]
+    fn test_square_offset_to_character_offsets__1_right() {
+        assert_eq!(
+            Glyph::horizontal_square_offset_to_character_offsets(1.0),
+            [1.0, 1.0]
+        );
+    }
+
+    #[test]
+    fn test_get_solid_color_if_there_is_one() {
+        let glyph = Glyph::new(' ', BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), Some(RED));
+        let glyph = Glyph::new(FULL_BLOCK, BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), Some(BLUE));
+    }
+
+    #[test]
+    fn test_can_not_get_solid_color_if_there_is_not_one() {
+        let glyph = Glyph::new('a', BLUE, RED);
+        assert_eq!(glyph.get_solid_color(), None);
+    }
+
+    #[test]
+    fn test_braille_line_has_transparent_background() {
+        let glyph_map =
+            Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
+        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true))
+    }
+
+    #[test]
+    fn test_basic_drawn_over_case() {
+        let bottom_glyphs = [Glyph {
+            character: 'b',
+            fg_color: BLUE,
+            bg_color: RED,
+            bg_transparent: false,
+        }; 2];
+        let top_glyphs = [Glyph {
+            character: 'a',
+            fg_color: GREEN,
+            bg_color: WHITE,
+            bg_transparent: true,
+        }; 2];
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+        // not true in all cases
+        assert_eq!(combo_glyphs[0], combo_glyphs[1]);
+        assert_eq!(
+            combo_glyphs[0],
+            Glyph {
+                character: 'a',
+                fg_color: GREEN,
+                bg_color: BLUE,
+                bg_transparent: false,
+            }
+        );
     }
 }

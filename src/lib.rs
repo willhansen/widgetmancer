@@ -3,6 +3,7 @@
 #![feature(drain_filter)]
 #![allow(warnings)]
 #![feature(trait_upcasting)]
+#![feature(duration_consts_float)]
 
 #[macro_use]
 extern crate approx;
@@ -23,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use enum_as_inner::EnumAsInner;
 use euclid::default::Point2D;
+use euclid::point2;
 use ntest::timeout;
 use num::Integer;
 use strum::IntoEnumIterator;
@@ -49,8 +51,8 @@ pub mod utility;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
-        write!(stdout(), "{}", termion::screen::ToMainScreen);
-        write!(stdout(), "{:?}", panic_info);
+        write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
+        write!(stdout(), "{:?}", panic_info).expect("display panic info");
     }));
 }
 
@@ -66,13 +68,14 @@ fn set_up_input_thread() -> Receiver<Event> {
 }
 
 pub fn do_everything() {
-    //let (width, height) = termion::terminal_size().unwrap();
-    let (width, height) = (80, 40);
+    let (width, height) = termion::terminal_size().unwrap();
+    //let (width, height) = (40, 20);
     let mut game = Game::new(width, height, Instant::now());
+    game.place_player(point2(width as i32 / 4, height as i32 / 2));
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut terminal = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
+    let mut writable = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
         MouseTerminal::from(stdout().into_raw_mode().unwrap()),
     ));
 
@@ -81,19 +84,11 @@ pub fn do_everything() {
     // Separate thread for reading input
     let event_receiver = set_up_input_thread();
 
-    let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(terminal));
+    let mut wrapped_terminal: &mut Option<Box<dyn Write>> = &mut Some(Box::new(writable));
 
-    let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3;
-    game.place_piece(Piece::pawn(), pawn_pos)
-        .expect("Failed to place pawn");
+    //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    for _ in 0..5 {
-        game.place_randomly(Piece::pawn())
-            .expect("random placement");
-    }
-    for _ in 0..2 {
-        //game.place_randomly(Piece::rook()).expect("random placement");
-    }
+    game.set_up_labyrinth_hunt();
 
     let mut prev_start_time = Instant::now();
     while game.running() {
@@ -108,6 +103,6 @@ pub fn do_everything() {
             game.select_closest_piece();
         }
         game.draw(&mut wrapped_terminal, Instant::now());
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(21));
     }
 }

@@ -1,14 +1,16 @@
 use std::f32::consts::PI;
 
 use euclid::*;
+use strum::IntoEnumIterator;
 use strum_macros::Display;
+use strum_macros::EnumIter;
 
 use crate::{
-    get_4_rotations, quarter_turns_counter_clockwise, Glyph, SquareGridInWorldFrame, StepList,
-    WorldStep,
+    get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph,
+    SquareGridInWorldFrame, StepList, WorldStep, ENEMY_PIECE_COLOR,
 };
 
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -39,35 +41,72 @@ impl Piece {
         }
     }
 
+    pub fn from_type(piece_type: PieceType) -> Piece {
+        Piece::new(piece_type, AiType::TowardsPlayer)
+    }
+
     pub fn pawn() -> Piece {
         Piece {
             piece_type: PieceType::Pawn,
             ai_type: AiType::TowardsPlayer,
         }
     }
-
+    pub fn knight() -> Piece {
+        Piece {
+            piece_type: PieceType::Knight,
+            ai_type: AiType::TowardsPlayer,
+        }
+    }
+    pub fn bishop() -> Piece {
+        Piece {
+            piece_type: PieceType::Bishop,
+            ai_type: AiType::TowardsPlayer,
+        }
+    }
     pub fn rook() -> Piece {
         Piece {
             piece_type: PieceType::Rook,
             ai_type: AiType::TowardsPlayer,
         }
     }
+    pub fn queen() -> Piece {
+        Piece {
+            piece_type: PieceType::Queen,
+            ai_type: AiType::TowardsPlayer,
+        }
+    }
+    pub fn king() -> Piece {
+        Piece {
+            piece_type: PieceType::King,
+            ai_type: AiType::TowardsPlayer,
+        }
+    }
 
     pub fn glyphs(&self) -> [Glyph; 2] {
-        Piece::chars_for_type(self.piece_type).map(Glyph::from_char)
+        Piece::chars_for_type(self.piece_type)
+            .map(|character| Glyph::fg_only(character, ENEMY_PIECE_COLOR))
     }
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
             PieceType::Pawn => ['♟', ' '],
+            PieceType::Knight => ['♞', ' '],
+            PieceType::Bishop => ['♝', ' '],
             PieceType::Rook => ['♜', ' '],
-            _ => panic!("invalid type"),
+            PieceType::Queen => ['♛', ' '],
+            PieceType::King => ['♚', ' '],
         }
     }
 
     pub fn relative_move_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations(WorldStep::new(1, 0)),
+            PieceType::Pawn => get_4_rotations_of(WorldStep::new(1, 0)),
+            PieceType::King => (0..=1)
+                .map(|y| WorldStep::new(1, y))
+                .map(get_4_rotations_of)
+                .flatten()
+                .collect(),
+            PieceType::Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
             _ => vec![],
         }
     }
@@ -77,7 +116,7 @@ impl Piece {
 
     pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations(Vector2D::<i32, SquareGridInWorldFrame>::new(1, 1)),
+            PieceType::Pawn => get_4_rotations_of(WorldStep::new(1, 1)),
             _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
@@ -87,7 +126,13 @@ impl Piece {
 
     pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Rook => get_4_rotations(Vector2D::<i32, SquareGridInWorldFrame>::new(1, 0)),
+            PieceType::Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
+            PieceType::Rook => get_4_rotations_of(WorldStep::new(1, 0)),
+            PieceType::Queen => (0..=1)
+                .map(|y| WorldStep::new(1, y))
+                .map(get_4_rotations_of)
+                .flatten()
+                .collect(),
             _ => vec![],
         }
     }

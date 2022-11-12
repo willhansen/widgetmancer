@@ -6,27 +6,34 @@ use std::time::{Duration, Instant};
 use euclid::*;
 use line_drawing::Point;
 use rand::{thread_rng, Rng};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::animations::Selector;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
+use crate::utility::SquareSet;
 use crate::{
-    point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector,
-    SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare, WorldStep, LEFT_I,
+    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
+    IPoint, IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare,
+    WorldStep, LEFT_I,
 };
 
+pub struct Player {
+    pub position: WorldSquare,
+    pub faced_direction: WorldStep,
+}
+
 pub struct Game {
-    board_width: usize,
-    board_height: usize,
+    board_size: BoardSize,
     // (x,y), left to right, top to bottom
     //step_foes: Vec<StepFoe>,
     running: bool,
     // set false to quit
-    player_position: WorldSquare,
-    player_faced_direction: WorldStep,
-    player_is_dead: bool,
+    player_optional: Option<Player>,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
+    blocks: HashSet<WorldSquare>,
     turn_count: u32,
     selectors: Vec<Selector>,
     selected_square: Option<WorldSquare>,
@@ -34,57 +41,51 @@ pub struct Game {
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
-        let board_width: usize = (terminal_width / 2) as usize;
-        let board_height: usize = terminal_height as usize;
+        let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
         let mut game = Game {
-            board_width,
-            board_height,
+            board_size,
             running: true,
-            player_position: point2((board_width / 2) as i32, (board_height / 2) as i32),
-            player_faced_direction: LEFT_I.cast_unit(),
-            player_is_dead: false,
+            player_optional: None,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
+            blocks: HashSet::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
         };
-        game.graphics
-            .set_empty_board_animation(board_width as u32, board_height as u32);
+        game.graphics.set_empty_board_animation(board_size);
         game
     }
+    pub fn board_size(&self) -> BoardSize {
+        self.board_size
+    }
 
-    pub fn board_width(&self) -> usize {
-        self.board_width
-    }
-    pub fn board_height(&self) -> usize {
-        self.board_height
-    }
     pub fn player_is_dead(&self) -> bool {
-        self.player_is_dead
+        self.player_optional.is_none()
     }
     pub fn turn_count(&self) -> u32 {
         self.turn_count
     }
 
-    fn mid_square(&self) -> IPoint {
+    pub fn place_player(&mut self, square: WorldSquare) {
+        self.player_optional = Some(Player {
+            position: square,
+            faced_direction: LEFT_I.cast_unit(),
+        });
+    }
+
+    pub fn mid_square(&self) -> WorldSquare {
         point2(
-            self.board_width() as i32 / 2,
-            self.board_height() as i32 / 2,
+            self.board_size().width as i32 / 2,
+            self.board_size().height as i32 / 2,
         )
-    }
-    fn x_max(&self) -> i32 {
-        self.board_width() as i32 - 1
-    }
-    fn y_max(&self) -> i32 {
-        self.board_height() as i32 - 1
     }
 
     fn square_is_on_board(&self, pos: WorldSquare) -> bool {
         pos.x >= 0
-            && pos.x < self.board_width() as i32
+            && pos.x < self.board_size().width as i32
             && pos.y >= 0
-            && pos.y < self.board_height() as i32
+            && pos.y < self.board_size().height as i32
     }
 
     pub fn quit(&mut self) {
@@ -95,39 +96,76 @@ impl Game {
     }
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
-        let new_pos = self.player_position + movement;
-        self.set_player_faced_direction(round_to_king_step(movement));
-        self.set_player_position(new_pos)
+        let new_pos = self.player_square() + movement;
+        if self
+            .capture_squares_for_all_pieces(false)
+            .contains(&new_pos)
+            || self.is_block_at(new_pos)
+        {
+            return Err(());
+        }
+
+        self.raw_set_player_faced_direction(round_to_king_step(movement));
+        self.try_set_player_position(new_pos)
     }
 
-    pub fn player_position(&self) -> WorldSquare {
-        return self.player_position.clone();
+    pub fn player_square(&self) -> WorldSquare {
+        if let Some(player) = &self.player_optional {
+            player.position
+        } else {
+            panic!("Can't get square; player is dead")
+        }
     }
 
-    pub fn set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
+    pub fn try_set_player_position(&mut self, pos: WorldSquare) -> Result<(), ()> {
         if self.is_piece_at(pos) {
             self.capture_piece_at(pos).expect("capture failed");
         }
 
-        if self.square_is_on_board(pos) {
-            self.player_position = pos.clone();
-        } else {
+        if !self.square_is_on_board(pos) {
             return Err(());
         }
+
+        self.raw_set_player_position(pos);
 
         return Ok(());
     }
 
-    pub fn player_faced_direction(&self) -> WorldStep {
-        self.player_faced_direction
+    fn raw_set_player_position(&mut self, square: WorldSquare) {
+        if let Some(player) = &mut self.player_optional {
+            player.position = square
+        } else {
+            panic!("Player is too dead to move")
+        }
     }
-    pub fn set_player_faced_direction(&mut self, new_dir: WorldStep) {
-        assert_eq!(max(new_dir.x.abs(), new_dir.y.abs()), 1, "bad input vector");
-        self.player_faced_direction = new_dir.clone()
+
+    pub fn player_faced_direction(&self) -> WorldStep {
+        if let Some(player) = &self.player_optional {
+            player.faced_direction
+        } else {
+            panic!("player is dead")
+        }
+    }
+
+    pub fn raw_set_player_faced_direction(&mut self, new_dir: WorldStep) {
+        assert_eq!(
+            max(new_dir.x.abs(), new_dir.y.abs()),
+            1,
+            "bad input vector{:?}",
+            new_dir
+        );
+        if let Some(player) = &mut self.player_optional {
+            player.faced_direction = new_dir
+        } else {
+            panic!("Player is too dead to rotate")
+        }
     }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
         return &mut self.graphics;
+    }
+    pub fn graphics(&self) -> &Graphics {
+        return &self.graphics;
     }
 
     pub fn draw_headless_at_duration_from_start(&mut self, delta: Duration) {
@@ -141,18 +179,32 @@ impl Game {
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
+
+        self.graphics.draw_move_marker_squares(
+            self.move_squares_for_all_pieces(false),
+            self.capture_squares_for_all_pieces(false),
+            self.move_squares_for_all_pieces(true),
+            self.capture_squares_for_all_pieces(true),
+        );
+
+        self.graphics.draw_blocks(&self.blocks);
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
         self.graphics.draw_non_board_animations(time);
-        self.graphics
-            .draw_player(self.player_position(), self.player_faced_direction());
+        if !self.player_is_dead() {
+            self.graphics
+                .draw_player(self.player_square(), self.player_faced_direction());
+        }
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
+    fn is_player_at(&self, square: WorldSquare) -> bool {
+        !self.player_is_dead() && self.player_square() == square
+    }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
-        (self.player_position != pos || self.player_is_dead) && !self.is_piece_at(pos)
+        !self.is_player_at(pos) && !self.is_piece_at(pos) && !self.is_block_at(pos)
     }
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) -> Result<(), ()> {
@@ -163,20 +215,37 @@ impl Game {
         Ok(())
     }
 
-    pub fn place_randomly(&mut self, piece: Piece) -> Result<(), ()> {
-        // only try n times
-        for _ in 0..40 {
+    pub fn random_empty_square(&self) -> Result<WorldSquare, ()> {
+        let num_attempts = 40;
+        for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
-                thread_rng().gen_range(0..self.board_width() as i32),
-                thread_rng().gen_range(0..self.board_height() as i32),
+                thread_rng().gen_range(0..self.board_size().width as i32),
+                thread_rng().gen_range(0..self.board_size().height as i32),
             );
-            let place_result = self.place_piece(piece, rand_pos);
-            if place_result.is_ok() {
-                return place_result;
+            if self.square_is_empty(rand_pos) {
+                return Ok(rand_pos);
             }
+        }
+        Err(())
+    }
+
+    pub fn place_piece_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+        let rand_pos = self
+            .random_empty_square()
+            .expect("failed to get random square");
+        let place_result = self.place_piece(piece, rand_pos);
+        if place_result.is_ok() {
+            return place_result;
         }
         return Err(());
     }
+    pub fn place_block_randomly(&mut self) {
+        let rand_pos = self
+            .random_empty_square()
+            .expect("failed to get random square");
+        self.place_block(rand_pos);
+    }
+
     pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
         self.pieces.get(&square)
     }
@@ -216,7 +285,7 @@ impl Game {
 
     fn square_of_closest_piece_to_player(&self) -> Option<WorldSquare> {
         let slightly_right_of_player_position: WorldPoint =
-            self.player_position.to_f32() + WorldMove::new(0.01, 0.0);
+            self.player_square().to_f32() + WorldMove::new(0.01, 0.0);
 
         self.pieces
             .keys()
@@ -254,27 +323,45 @@ impl Game {
         let piece = self.pieces.remove(&start).unwrap();
         self.pieces.insert(end, piece);
     }
+    fn range_cast(
+        &self,
+        start_square: WorldSquare,
+        repeating_step: WorldStep,
+        pass_through_pieces: bool,
+    ) -> SquareList {
+        let mut valid_squares: SquareList = vec![];
+        let mut i = 1;
+        loop {
+            let square = start_square + repeating_step * i;
+            if !self.square_is_on_board(square) {
+                break;
+            }
+            valid_squares.push(square);
+            if pass_through_pieces && self.is_piece_at(square) {
+                // keep going
+            } else {
+                if !self.square_is_empty(square) {
+                    break;
+                }
+            }
+            i += 1;
+        }
+        valid_squares
+    }
 
     pub fn steps_in_direction_including_hit(
         &self,
         piece_square: WorldSquare,
         repeating_step: WorldStep,
     ) -> SquareList {
-        let mut valid_squares: SquareList = vec![];
-        let mut i = 1;
-        loop {
-            let square_in_question = piece_square + repeating_step * i;
-            if !self.square_is_on_board(square_in_question) {
-                break;
-            }
-            valid_squares.push(square_in_question);
-            if !self.square_is_empty(square_in_question) {
-                break;
-            }
-
-            i += 1;
-        }
-        valid_squares
+        self.range_cast(piece_square, repeating_step, false)
+    }
+    pub fn steps_in_direction_passing_through_pieces_including_hit(
+        &self,
+        piece_square: WorldSquare,
+        repeating_step: WorldStep,
+    ) -> SquareList {
+        self.range_cast(piece_square, repeating_step, true)
     }
 
     // returns where the piece moves to, if applicable
@@ -289,10 +376,10 @@ impl Game {
         let capture_option: Option<WorldSquare> = self
             .capture_options_for_piece_at(pos)
             .into_iter()
-            .find(|&square| square == self.player_position);
+            .find(|&square| square == self.player_square());
 
         if let Some(square) = capture_option {
-            self.player_is_dead = true;
+            self.player_optional = None;
             self.quit();
             self.move_piece(pos, square);
             return Some(square);
@@ -303,7 +390,7 @@ impl Game {
             .move_options_for_piece_at(pos)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_position).square_length());
+            .min_by_key(|&square| (square - self.player_square()).square_length());
 
         if let Some(square) = move_option {
             self.move_piece(pos, square);
@@ -314,56 +401,90 @@ impl Game {
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        if !self.is_piece_at(piece_square) {
-            return vec![]; // should be error instead?
-        }
-
-        let mut move_squares: SquareList = vec![];
-
-        if let Some(piece) = self.get_piece_at(piece_square) {
-            for move_step in piece.relative_move_steps() {
-                let target_square = piece_square + move_step;
-                if self.square_is_on_board(target_square) && self.square_is_empty(target_square) {
-                    move_squares.push(target_square);
-                }
-            }
-
-            for move_direction in piece.move_directions() {
-                let mut squares_to_collision =
-                    self.steps_in_direction_including_hit(piece_square, move_direction);
-                if let Some(last_square) = squares_to_collision.last() {
-                    if !self.square_is_empty(*last_square) {
-                        squares_to_collision.pop();
-                    }
-                }
-                move_squares.append(&mut squares_to_collision);
-            }
-        }
-        move_squares
+        self.move_squares_for_piece_at(piece_square, false)
+            .into_iter()
+            .filter(|&square| self.square_is_empty(square))
+            .collect()
     }
-    fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        if !self.is_piece_at(piece_square) {
-            return vec![]; // should be error instead?
+
+    fn move_or_capture_squares_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+        capture_instead_of_move: bool,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
+        assert!(self.is_piece_at(piece_square));
+        let mut squares = SquareSet::new();
+        let piece = self.get_piece_at(piece_square).unwrap();
+
+        let function_for_steps = if capture_instead_of_move {
+            Piece::relative_capture_steps
+        } else {
+            Piece::relative_move_steps
+        };
+        let function_for_directions = if capture_instead_of_move {
+            Piece::capture_directions
+        } else {
+            Piece::move_directions
+        };
+
+        for single_step in function_for_steps(piece) {
+            let target_square = piece_square + single_step;
+            if self.square_is_on_board(target_square) {
+                squares.insert(target_square);
+            }
         }
+
+        for move_direction in function_for_directions(piece) {
+            let mut squares_to_collision =
+                self.range_cast(piece_square, move_direction, pass_through_pieces);
+            squares.extend(squares_to_collision);
+        }
+        squares
+    }
+
+    fn capture_squares_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
+        self.move_or_capture_squares_for_piece_at(piece_square, true, pass_through_pieces)
+    }
+    fn move_squares_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
+        self.move_or_capture_squares_for_piece_at(piece_square, false, pass_through_pieces)
+    }
+
+    fn move_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
+        self.pieces
+            .keys()
+            .map(|&square| self.move_squares_for_piece_at(square, pass_through_pieces))
+            .flatten()
+            .collect()
+    }
+    fn capture_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
+        self.pieces
+            .keys()
+            .map(|&square| self.capture_squares_for_piece_at(square, pass_through_pieces))
+            .flatten()
+            .collect()
+    }
+
+    fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareSet {
+        self.capture_squares_for_piece_at(piece_square, false)
+    }
+
+    fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
+        assert!(self.is_piece_at(piece_square));
 
         let mut capture_squares: SquareList = vec![];
 
-        if let Some(piece) = self.get_piece_at(piece_square) {
-            for move_step in piece.relative_capture_steps() {
-                let target_square = piece_square + move_step;
-                if self.square_is_on_board(target_square) && !self.square_is_empty(target_square) {
-                    capture_squares.push(target_square);
-                }
-            }
-
-            for move_direction in piece.move_directions() {
-                let mut squares_to_collision =
-                    self.steps_in_direction_including_hit(piece_square, move_direction);
-                if let Some(&last_square) = squares_to_collision.last() {
-                    if !self.square_is_empty(last_square) {
-                        capture_squares.push(last_square);
-                    }
-                }
+        for square in self.guarded_squares_for_piece_at(piece_square) {
+            if !self.square_is_empty(square) {
+                capture_squares.push(square);
             }
         }
         capture_squares
@@ -373,16 +494,21 @@ impl Game {
         let num_lasers = 10;
         let range = 5.0;
         let spread_radians = 1.0;
-        let spread_radius = 1.0;
-        for _ in 0..num_lasers {
-            let line_start: WorldSquare = self.player_position();
+        let random_spread_radius = 1.0;
+        for i in 0..num_lasers {
+            let line_start: WorldSquare = self.player_square();
+            let rotation_if_uniform = lerp(
+                -spread_radians / 2.0,
+                spread_radians / 2.0,
+                i as f32 / num_lasers as f32,
+            );
             let line_end: WorldPoint = line_start.to_f32()
                 + rotate_vect(
                     self.player_faced_direction().to_f32() * range,
-                    rand::thread_rng().gen_range(-spread_radians / 2.0..=spread_radians / 2.0),
+                    rotation_if_uniform,
                 )
                 .cast_unit()
-                + rand_radial_offset(spread_radius).cast_unit();
+                + rand_radial_offset(random_spread_radius).cast_unit();
 
             // Orthogonal steps only
             for (x, y) in line_drawing::WalkGrid::new(
@@ -396,16 +522,25 @@ impl Game {
             self.graphics
                 .add_simple_laser(line_start.to_f32(), line_end);
         }
+        self.graphics
+            .start_recoil_animation(self.board_size, self.player_faced_direction());
     }
 
     pub fn player_shoot_sniper(&mut self) {
+        let mut graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square).expect("capture with sniper");
-                self.graphics
-                    .add_floaty_laser(self.player_position.to_f32(), square.to_f32());
             }
+            graphical_laser_end = square;
+        } else {
+            graphical_laser_end = self.player_square() + self.player_faced_direction() * 300;
         }
+        // laser should start at edge of player square, where player is facing
+        let graphical_laser_start =
+            self.player_square().to_f32() + self.player_faced_direction().to_f32() * 0.5;
+        self.graphics
+            .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
@@ -415,5 +550,27 @@ impl Game {
         self.pieces.remove(&square);
         self.graphics.add_explosion(square.to_f32());
         Ok(())
+    }
+
+    pub fn place_block(&mut self, square: WorldSquare) {
+        self.blocks.insert(square);
+    }
+    pub fn is_block_at(&self, square: WorldSquare) -> bool {
+        self.blocks.contains(&square)
+    }
+
+    pub fn set_up_labyrinth_hunt(&mut self) {
+        let board_squares_total = self.board_size().width * self.board_size().height;
+        let num_blocks = board_squares_total / 3;
+        for _ in 0..num_blocks {
+            self.place_block_randomly();
+        }
+
+        for piece_type in PieceType::iter() {
+            for _ in 0..2 {
+                self.place_piece_randomly(Piece::from_type(piece_type))
+                    .expect("random placement");
+            }
+        }
     }
 }
