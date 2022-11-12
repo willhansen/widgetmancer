@@ -1,10 +1,11 @@
-use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
+use std::cmp::{max, min, Ordering};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::io::Write;
 use std::time::{Duration, Instant};
 
 use euclid::*;
 use line_drawing::Point;
+use priority_queue::DoublePriorityQueue;
 use rand::{thread_rng, Rng};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -12,7 +13,7 @@ use strum_macros::EnumIter;
 use crate::animations::Selector;
 use crate::graphics::Graphics;
 use crate::piece::{Piece, PieceType};
-use crate::utility::SquareSet;
+use crate::utility::{king_distance, reversed, SquareSet};
 use crate::{
     lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
     IPoint, IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare,
@@ -368,39 +369,45 @@ impl Game {
     }
 
     // returns where the piece moves to, if applicable
-    pub fn move_piece_at(&mut self, pos: WorldSquare) -> Option<WorldSquare> {
-        if !self.is_piece_at(pos) {
+    pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
+        if !self.is_piece_at(piece_square) {
             return None;
         }
 
-        let piece = self.get_piece_at(pos).unwrap().clone();
+        let piece = self.get_piece_at(piece_square).unwrap().clone();
+        let mut end_square;
 
-        // want to capture the player
-        let capture_option: Option<WorldSquare> = self
-            .capture_options_for_piece_at(pos)
+        if piece.piece_type == PieceType::King {
+            if let Some(path_to_player) = self.find_king_path(piece_square, self.player_square()) {
+                let first_step_square = *path_to_player.get(1).unwrap();
+                end_square = first_step_square;
+            } else {
+                return None;
+            }
+        } else if let Some(capture_square) = self
+            .capture_options_for_piece_at(piece_square)
             .into_iter()
-            .find(|&square| square == self.player_square());
-
-        if let Some(square) = capture_option {
-            self.player_optional = None;
-            self.quit();
-            self.move_piece(pos, square);
-            return Some(square);
-        }
-
-        // want to move closer to player
-        let move_option: Option<WorldSquare> = self
-            .move_options_for_piece_at(pos)
+            .find(|&square| square == self.player_square())
+        {
+            end_square = capture_square;
+        } else if let Some(square) = self
+            .move_options_for_piece_at(piece_square)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_square()).square_length());
-
-        if let Some(square) = move_option {
-            self.move_piece(pos, square);
-            return Some(square);
+            .min_by_key(|&square| (square - self.player_square()).square_length())
+        {
+            end_square = square;
+        } else {
+            return None;
         }
 
-        None
+        // capture player
+        if self.is_player_at(end_square) {
+            self.player_optional = None;
+            self.quit();
+        }
+        self.move_piece(piece_square, end_square);
+        Some(end_square)
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
@@ -478,6 +485,53 @@ impl Game {
 
     fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareSet {
         self.capture_squares_for_piece_at(piece_square, false)
+    }
+
+    fn find_king_path(
+        &self,
+        start_square: WorldSquare,
+        target_square: WorldSquare,
+    ) -> Option<Vec<WorldSquare>> {
+        fn cost_heuristic(a: WorldSquare, b: WorldSquare) -> u32 {
+            king_distance(a, b)
+        }
+        let relative_steps = Piece::relative_move_steps_for_type(PieceType::King);
+        let mut recorded_step_start_squares_by_step_end_squares =
+            HashMap::<WorldSquare, WorldSquare>::new();
+        let mut squares_to_check = DoublePriorityQueue::<WorldSquare, u32>::new();
+        squares_to_check.push(start_square, cost_heuristic(start_square, target_square));
+        while let Some((square_to_check, cost)) = squares_to_check.pop_min() {
+            let next_squares: SquareList = relative_steps
+                .clone()
+                .into_iter()
+                .map(|step_to_next_square| square_to_check + step_to_next_square)
+                .filter(|&next_square| {
+                    !recorded_step_start_squares_by_step_end_squares.contains_key(&next_square)
+                        && (self.square_is_empty(next_square) || self.is_player_at(next_square))
+                })
+                .collect();
+            next_squares.clone().into_iter().for_each(|next_square| {
+                let new_cost = cost + cost_heuristic(next_square, target_square);
+                squares_to_check.push(next_square, new_cost);
+                recorded_step_start_squares_by_step_end_squares
+                    .insert(next_square, square_to_check);
+            });
+            if next_squares.contains(&target_square) {
+                break;
+            }
+        }
+        if !recorded_step_start_squares_by_step_end_squares.contains_key(&target_square) {
+            return None;
+        }
+        let mut reverse_full_path = vec![target_square];
+        while *reverse_full_path.last().unwrap() != start_square {
+            reverse_full_path.push(
+                *recorded_step_start_squares_by_step_end_squares
+                    .get(reverse_full_path.last().unwrap())
+                    .unwrap(),
+            );
+        }
+        Some(reversed(reverse_full_path))
     }
 
     fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {

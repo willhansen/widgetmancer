@@ -61,6 +61,16 @@ pub const UP_I: IVector = vec2(0, 1);
 pub const LEFT_I: IVector = vec2(-1, 0);
 pub const RIGHT_I: IVector = vec2(1, 0);
 
+pub const STEP_UP: WorldStep = vec2(0, 1);
+pub const STEP_DOWN: WorldStep = vec2(0, -1);
+pub const STEP_RIGHT: WorldStep = vec2(1, 0);
+pub const STEP_LEFT: WorldStep = vec2(-1, 0);
+
+pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
+pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
+pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
+pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
+
 pub fn sign(x: f32) -> f32 {
     if x < 0.0 {
         -1.0
@@ -137,6 +147,17 @@ pub fn get_8_quadrants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2
 
 pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
+}
+pub fn king_distance(a: WorldSquare, b: WorldSquare) -> u32 {
+    let x_dist = a.x.abs_diff(b.x);
+    let y_dist = a.y.abs_diff(b.y);
+    x_dist.max(y_dist)
+}
+
+pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
+    let mut new_v = v.clone();
+    new_v.reverse();
+    new_v
 }
 
 pub fn round_to_king_step(step: WorldStep) -> WorldStep {

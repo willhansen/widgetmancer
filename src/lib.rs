@@ -4,6 +4,7 @@
 #![allow(warnings)]
 #![feature(trait_upcasting)]
 #![feature(duration_consts_float)]
+#![feature(int_abs_diff)]
 
 #[macro_use]
 extern crate approx;

@@ -532,13 +532,15 @@ fn test_king_pathfind() {
     let player_square = WorldSquare::new(3, 10);
     game.place_player(player_square);
     let u_center = WorldSquare::new(6, 10);
-    let king_square = u_center + RIGHT_I.cast_unit();
+    let king_square = u_center + vec2(1, 0);
     game.place_piece(Piece::king(), king_square).ok();
-    game.place_block(WorldSquare::new(5, 10));
-    game.place_block(WorldSquare::new(5, 9));
-    game.place_block(WorldSquare::new(5, 11));
-    game.place_block(WorldSquare::new(6, 11));
-    game.place_block(WorldSquare::new(6, 9));
+    game.place_block(u_center + vec2(-1, -1));
+    game.place_block(u_center + vec2(-1, 0));
+    game.place_block(u_center + vec2(-1, 1));
+    game.place_block(u_center + vec2(0, -1));
+    game.place_block(u_center + vec2(0, 1));
+    game.place_block(u_center + vec2(1, -1));
+    game.place_block(u_center + vec2(1, 1));
 
     game.move_all_pieces();
     let new_king_square = *game.pieces().keys().next().unwrap();
