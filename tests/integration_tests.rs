@@ -269,9 +269,9 @@ fn test_laser_background_is_transparent() {
 
 #[test]
 fn test_pawn_background_is_transparent() {
-    let mut game = set_up_game_with_player_in_corner();
+    let mut game = set_up_game();
     let square1 = point2(2, 3);
-    let square2 = point2(2, 4);
+    let square2 = square1 + UP_I.cast_unit() * 3;
     game.place_piece(Piece::pawn(), square1).expect("pawn1");
     game.place_piece(Piece::pawn(), square2).expect("pawn2");
 
@@ -281,6 +281,7 @@ fn test_pawn_background_is_transparent() {
 
     let pawn1_glyphs = gr.get_buffered_glyphs_for_square(square1);
     let pawn2_glyphs = gr.get_buffered_glyphs_for_square(square2);
+
     assert_ne!(pawn1_glyphs[0].bg_color, pawn2_glyphs[0].bg_color,);
 }
 

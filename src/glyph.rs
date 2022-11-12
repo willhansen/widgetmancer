@@ -43,9 +43,10 @@ pub const EMPTY_BRAILLE: char = '\u{2800}';
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
 pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 
-// ●○ ⚬⦁⚫⚪
+// ●○ ⚬⦁⚫⚪ ✕ ✕
+// ✕ ⨉ ⨯ 🞨 🞮 ×
 pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
-pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['✕', ' '];
+pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['⨯', ' '];
 pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
 pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
 
@@ -713,6 +714,8 @@ impl Glyph {
         self.is_chess()
             || self.character == MOVE_AND_CAPTURE_SQUARE_CHARS[0]
             || self.character == CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS[0]
+            || self.character == MOVE_ONLY_SQUARE_CHARS[0]
+            || self.character == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
 
     pub fn is_chess(&self) -> bool {
@@ -777,6 +780,7 @@ pub trait DoubleGlyphFunctions {
 impl DoubleGlyphFunctions for DoubleGlyph {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2] {
         if self[0].is_fullwidth() {
+            // fullwidth case
             [self[0].fg_color; 2]
         } else {
             // halfwidth case
