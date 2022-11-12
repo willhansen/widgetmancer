@@ -97,7 +97,11 @@ impl Game {
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         let new_pos = self.player_square() + movement;
-        if self.danger_squares().contains(&new_pos) || self.is_block_at(new_pos) {
+        if self
+            .capture_squares_for_all_pieces(false)
+            .contains(&new_pos)
+            || self.is_block_at(new_pos)
+        {
             return Err(());
         }
 
@@ -133,28 +137,6 @@ impl Game {
         } else {
             panic!("Player is too dead to move")
         }
-    }
-
-    fn danger_squares(&self) -> SquareSet {
-        self.pieces
-            .keys()
-            .map(|&square| self.guarded_squares_for_piece_at(square))
-            .flatten()
-            .collect()
-    }
-
-    fn tricky_danger_squares(&self) -> SquareSet {
-        // squares protected by all enemy pieces, ignoring being blocked by pieces
-        let all_danger_squares_including_tricky_ones: SquareSet = self
-            .pieces
-            .keys()
-            .map(|&square| self.guarded_squares_passing_through_pieces_for_piece_at(square))
-            .flatten()
-            .collect();
-        all_danger_squares_including_tricky_ones
-            .difference(&self.danger_squares())
-            .copied()
-            .collect()
     }
 
     pub fn player_faced_direction(&self) -> WorldStep {
@@ -197,12 +179,15 @@ impl Game {
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
-        self.graphics.draw_danger_squares(self.danger_squares());
-        self.graphics
-            .draw_tricky_danger_squares(self.tricky_danger_squares());
-        for &square in &self.blocks {
-            self.graphics.draw_block(square);
-        }
+
+        self.graphics.draw_move_marker_squares(
+            self.move_squares_for_all_pieces(false),
+            self.capture_squares_for_all_pieces(false),
+            self.move_squares_for_all_pieces(true),
+            self.capture_squares_for_all_pieces(true),
+        );
+
+        self.graphics.draw_blocks(&self.blocks);
         for (&square, &piece) in &self.pieces {
             self.graphics.draw_piece(piece, square);
         }
@@ -416,79 +401,80 @@ impl Game {
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        if !self.is_piece_at(piece_square) {
-            return vec![]; // should be error instead?
-        }
-
-        let mut move_squares: SquareList = vec![];
-
-        if let Some(piece) = self.get_piece_at(piece_square) {
-            for move_step in piece.relative_move_steps() {
-                let target_square = piece_square + move_step;
-                if self.square_is_on_board(target_square) && self.square_is_empty(target_square) {
-                    move_squares.push(target_square);
-                }
-            }
-
-            for move_direction in piece.move_directions() {
-                let mut squares_to_collision =
-                    self.steps_in_direction_including_hit(piece_square, move_direction);
-                if let Some(last_square) = squares_to_collision.last() {
-                    if !self.square_is_empty(*last_square) {
-                        squares_to_collision.pop();
-                    }
-                }
-                move_squares.append(&mut squares_to_collision);
-            }
-        }
-        move_squares
+        self.move_squares_for_piece_at(piece_square, false)
+            .into_iter()
+            .filter(|&square| self.square_is_empty(square))
+            .collect()
     }
 
-    fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        assert!(self.is_piece_at(piece_square));
-
-        let mut guarded_squares: SquareList = vec![];
-        let piece = self.get_piece_at(piece_square).unwrap();
-
-        for move_step in piece.relative_capture_steps() {
-            let target_square = piece_square + move_step;
-            if self.square_is_on_board(target_square) {
-                guarded_squares.push(target_square);
-            }
-        }
-
-        for move_direction in piece.capture_directions() {
-            let mut squares_to_collision =
-                self.steps_in_direction_including_hit(piece_square, move_direction);
-            guarded_squares.append(&mut squares_to_collision);
-        }
-        guarded_squares
-    }
-    fn guarded_squares_passing_through_pieces_for_piece_at(
+    fn move_or_capture_squares_for_piece_at(
         &self,
         piece_square: WorldSquare,
-    ) -> SquareList {
+        capture_instead_of_move: bool,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
         assert!(self.is_piece_at(piece_square));
-
-        let mut guarded_squares: SquareList = vec![];
+        let mut squares = SquareSet::new();
         let piece = self.get_piece_at(piece_square).unwrap();
 
-        for move_step in piece.relative_capture_steps() {
-            let target_square = piece_square + move_step;
+        let function_for_steps = if capture_instead_of_move {
+            Piece::relative_capture_steps
+        } else {
+            Piece::relative_move_steps
+        };
+        let function_for_directions = if capture_instead_of_move {
+            Piece::capture_directions
+        } else {
+            Piece::move_directions
+        };
+
+        for single_step in function_for_steps(piece) {
+            let target_square = piece_square + single_step;
             if self.square_is_on_board(target_square) {
-                guarded_squares.push(target_square);
+                squares.insert(target_square);
             }
         }
 
-        for move_direction in piece.capture_directions() {
-            let mut squares_to_collision = self
-                .steps_in_direction_passing_through_pieces_including_hit(
-                    piece_square,
-                    move_direction,
-                );
-            guarded_squares.append(&mut squares_to_collision);
+        for move_direction in function_for_directions(piece) {
+            let mut squares_to_collision =
+                self.range_cast(piece_square, move_direction, pass_through_pieces);
+            squares.extend(squares_to_collision);
         }
-        guarded_squares
+        squares
+    }
+
+    fn capture_squares_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
+        self.move_or_capture_squares_for_piece_at(piece_square, true, pass_through_pieces)
+    }
+    fn move_squares_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+        pass_through_pieces: bool,
+    ) -> SquareSet {
+        self.move_or_capture_squares_for_piece_at(piece_square, false, pass_through_pieces)
+    }
+
+    fn move_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
+        self.pieces
+            .keys()
+            .map(|&square| self.move_squares_for_piece_at(square, pass_through_pieces))
+            .flatten()
+            .collect()
+    }
+    fn capture_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
+        self.pieces
+            .keys()
+            .map(|&square| self.capture_squares_for_piece_at(square, pass_through_pieces))
+            .flatten()
+            .collect()
+    }
+
+    fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareSet {
+        self.capture_squares_for_piece_at(piece_square, false)
     }
 
     fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {

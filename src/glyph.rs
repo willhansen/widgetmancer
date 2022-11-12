@@ -726,6 +726,12 @@ impl Glyph {
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
         CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
     }
+    pub fn move_only_square_glyphs() -> DoubleGlyph {
+        MOVE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+    pub fn capture_only_square_glyphs() -> DoubleGlyph {
+        CAPTURE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
 
     // ╳
     pub fn block_glyphs() -> DoubleGlyph {

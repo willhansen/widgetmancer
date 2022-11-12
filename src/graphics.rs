@@ -438,22 +438,50 @@ impl Graphics {
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
         self.draw_glyphs_at_square_with_transparency(pos, piece.glyphs());
     }
+    pub fn draw_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
+        square_set
+            .into_iter()
+            .for_each(|&square| self.draw_glyphs_at_square_with_transparency(square, glyphs));
+    }
+    pub fn draw_move_marker_squares(
+        &mut self,
+        move_squares: SquareSet,
+        capture_squares: SquareSet,
+        move_squares_ignoring_pieces: SquareSet,
+        capture_squares_ignoring_pieces: SquareSet,
+    ) {
+        let move_and_capture_squares: SquareSet = move_squares
+            .intersection(&capture_squares)
+            .copied()
+            .collect();
+        let move_or_capture_squares: SquareSet =
+            move_squares.union(&capture_squares).copied().collect();
+        let move_only_squares: SquareSet =
+            move_squares.difference(&capture_squares).copied().collect();
+        let capture_only_squares: SquareSet =
+            capture_squares.difference(&move_squares).copied().collect();
+        let move_and_capture_squares_ignoring_pieces: SquareSet = move_squares_ignoring_pieces
+            .intersection(&capture_squares_ignoring_pieces)
+            .copied()
+            .collect();
+        // TODO: conditional move only and conditional capture only, when it becomes applicable.
+        let conditional_move_and_capture_squares: SquareSet =
+            move_and_capture_squares_ignoring_pieces
+                .difference(&move_or_capture_squares)
+                .copied()
+                .collect();
 
-    pub fn draw_danger_squares(&mut self, danger_squares: SquareSet) {
-        danger_squares.into_iter().for_each(|square| {
-            self.draw_glyphs_at_square_with_transparency(square, Glyph::danger_square_glyphs())
-        });
+        self.draw_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
+        self.draw_at_squares(
+            Glyph::tricky_danger_square_glyphs(),
+            &conditional_move_and_capture_squares,
+        );
+        self.draw_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
+        self.draw_at_squares(Glyph::capture_only_square_glyphs(), &capture_only_squares);
     }
-    pub fn draw_tricky_danger_squares(&mut self, danger_squares: SquareSet) {
-        danger_squares.into_iter().for_each(|square| {
-            self.draw_glyphs_at_square_with_transparency(
-                square,
-                Glyph::tricky_danger_square_glyphs(),
-            )
-        });
-    }
-    pub fn draw_block(&mut self, block_square: WorldSquare) {
-        self.draw_glyphs_at_square_with_transparency(block_square, Glyph::block_glyphs());
+
+    pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
+        self.draw_at_squares(Glyph::block_glyphs(), block_squares);
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
