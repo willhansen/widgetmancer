@@ -167,6 +167,9 @@ impl Game {
     pub fn graphics(&self) -> &Graphics {
         return &self.graphics;
     }
+    pub fn pieces(&mut self) -> &mut HashMap<WorldSquare, Piece> {
+        return &mut self.pieces;
+    }
 
     pub fn draw_headless_at_duration_from_start(&mut self, delta: Duration) {
         let draw_time = self.graphics.start_time() + delta;

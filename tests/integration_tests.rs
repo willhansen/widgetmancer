@@ -13,7 +13,7 @@ use rust_roguelike::utility::{
 };
 
 use crate::utils_for_tests::{
-    set_up_game, set_up_game_with_player, set_up_game_with_player_in_corner,
+    set_up_game, set_up_game_with_player, set_up_game_with_player_in_corner, set_up_nxn_game,
     set_up_pawn_threatening_player, set_up_player_facing_n_pawns_m_blocks_up,
     set_up_player_facing_pawn_on_left,
 };
@@ -524,4 +524,23 @@ fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
     assert_false!(move_glyphs.looks_solid());
     assert_false!(capture_glyphs.looks_solid());
     assert_ne!(move_glyphs, capture_glyphs);
+}
+
+#[test]
+fn test_king_pathfind() {
+    let mut game = set_up_nxn_game(20);
+    let player_square = WorldSquare::new(3, 10);
+    game.place_player(player_square);
+    let u_center = WorldSquare::new(6, 10);
+    let king_square = u_center + RIGHT_I.cast_unit();
+    game.place_piece(Piece::king(), king_square).ok();
+    game.place_block(WorldSquare::new(5, 10));
+    game.place_block(WorldSquare::new(5, 9));
+    game.place_block(WorldSquare::new(5, 11));
+    game.place_block(WorldSquare::new(6, 11));
+    game.place_block(WorldSquare::new(6, 9));
+
+    game.move_all_pieces();
+    let new_king_square = *game.pieces().keys().next().unwrap();
+    assert_ne!(new_king_square, u_center);
 }
