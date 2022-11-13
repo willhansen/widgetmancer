@@ -97,7 +97,7 @@ impl Game {
     }
 
     pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
-        let new_pos = self.player_square() + movement;
+        let new_pos = self.player_square().unwrap() + movement;
         if self
             .capture_squares_for_all_pieces(false)
             .contains(&new_pos)
@@ -110,11 +110,11 @@ impl Game {
         self.try_set_player_position(new_pos)
     }
 
-    pub fn player_square(&self) -> WorldSquare {
+    pub fn player_square(&self) -> Option<WorldSquare> {
         if let Some(player) = &self.player_optional {
-            player.position
+            Some(player.position)
         } else {
-            panic!("Can't get square; player is dead")
+            None
         }
     }
 
@@ -134,7 +134,6 @@ impl Game {
 
     fn raw_set_player_position(&mut self, square: WorldSquare) {
         if let Some(player) = &mut self.player_optional {
-            self.graphics.clear_paths();
             player.position = square
         } else {
             panic!("Player is too dead to move")
@@ -173,6 +172,14 @@ impl Game {
         return &mut self.pieces;
     }
 
+    fn find_pieces(&self, target_piece: Piece) -> SquareSet {
+        self.pieces
+            .iter()
+            .filter(|(&square, &piece)| piece == target_piece)
+            .map(|(&square, &piece)| square)
+            .collect()
+    }
+
     pub fn draw_headless_at_duration_from_start(&mut self, delta: Duration) {
         let draw_time = self.graphics.start_time() + delta;
         self.draw(&mut None, draw_time);
@@ -185,7 +192,16 @@ impl Game {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
 
-        self.graphics.draw_paths();
+        // TODO: fix redundant calculation
+        // TODO: make redundant calculation actually produce the same path every time
+        if let Some(player_square) = self.player_square() {
+            let king_squares = self.find_pieces(Piece::king());
+            let king_paths = king_squares
+                .iter()
+                .filter_map(|&king_square| self.find_king_path(king_square, player_square))
+                .collect();
+            self.graphics.draw_paths(king_paths);
+        }
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -201,13 +217,13 @@ impl Game {
         self.graphics.draw_non_board_animations(time);
         if !self.player_is_dead() {
             self.graphics
-                .draw_player(self.player_square(), self.player_faced_direction());
+                .draw_player(self.player_square().unwrap(), self.player_faced_direction());
         }
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
     fn is_player_at(&self, square: WorldSquare) -> bool {
-        !self.player_is_dead() && self.player_square() == square
+        !self.player_is_dead() && self.player_square() == Some(square)
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
@@ -292,7 +308,7 @@ impl Game {
 
     fn square_of_closest_piece_to_player(&self) -> Option<WorldSquare> {
         let slightly_right_of_player_position: WorldPoint =
-            self.player_square().to_f32() + WorldMove::new(0.01, 0.0);
+            self.player_square().unwrap().to_f32() + WorldMove::new(0.01, 0.0);
 
         self.pieces
             .keys()
@@ -302,6 +318,10 @@ impl Game {
                 )
             })
             .cloned()
+    }
+    pub fn on_turn_start(&mut self) {}
+    pub fn on_turn_end(&mut self) {
+        self.select_closest_piece();
     }
 
     pub fn move_all_pieces(&mut self) {
@@ -381,24 +401,25 @@ impl Game {
         let mut end_square;
 
         if piece.piece_type == PieceType::King {
-            if let Some(path_to_player) = self.find_king_path(piece_square, self.player_square()) {
+            if let Some(path_to_player) =
+                self.find_king_path(piece_square, self.player_square().unwrap())
+            {
                 let first_step_square = *path_to_player.get(1).unwrap();
                 end_square = first_step_square;
-                self.graphics.draw_path_later(path_to_player);
             } else {
                 return None;
             }
         } else if let Some(capture_square) = self
             .capture_options_for_piece_at(piece_square)
             .into_iter()
-            .find(|&square| square == self.player_square())
+            .find(|&square| square == self.player_square().unwrap())
         {
             end_square = capture_square;
         } else if let Some(square) = self
             .move_options_for_piece_at(piece_square)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_square()).square_length())
+            .min_by_key(|&square| (square - self.player_square().unwrap()).square_length())
         {
             end_square = square;
         } else {
@@ -557,7 +578,7 @@ impl Game {
         let spread_radians = 1.0;
         let random_spread_radius = 1.0;
         for i in 0..num_lasers {
-            let line_start: WorldSquare = self.player_square();
+            let line_start: WorldSquare = self.player_square().unwrap();
             let rotation_if_uniform = lerp(
                 -spread_radians / 2.0,
                 spread_radians / 2.0,
@@ -595,11 +616,12 @@ impl Game {
             }
             graphical_laser_end = square;
         } else {
-            graphical_laser_end = self.player_square() + self.player_faced_direction() * 300;
+            graphical_laser_end =
+                self.player_square().unwrap() + self.player_faced_direction() * 300;
         }
         // laser should start at edge of player square, where player is facing
         let graphical_laser_start =
-            self.player_square().to_f32() + self.player_faced_direction().to_f32() * 0.5;
+            self.player_square().unwrap().to_f32() + self.player_faced_direction().to_f32() * 0.5;
         self.graphics
             .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }

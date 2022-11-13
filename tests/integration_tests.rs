@@ -564,7 +564,6 @@ fn test_draw_pathfind_paths() {
     game.place_piece(Piece::king(), king_square).ok();
     game.draw_headless_now();
     let path_glyphs = game.graphics().get_buffered_glyphs_for_square(test_square);
-    game.graphics().print_output_buffer();
 
     assert_eq!(path_glyphs[0].character, KING_PATH_GLYPHS[0]);
     assert_eq!(path_glyphs[1].character, KING_PATH_GLYPHS[1]);

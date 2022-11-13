@@ -40,7 +40,6 @@ pub struct Graphics {
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<Selector>,
-    paths: Vec<SquareList>,
     board_animation: Option<Box<dyn BoardAnimation>>,
     start_time: Instant,
 }
@@ -60,7 +59,6 @@ impl Graphics {
             terminal_height,
             active_animations: vec![],
             selectors: vec![],
-            paths: vec![],
             board_animation: None,
             start_time,
         }
@@ -497,18 +495,12 @@ impl Graphics {
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));
     }
-    pub fn draw_path_later(&mut self, path: SquareList) {
-        self.paths.push(path);
-    }
-    pub fn draw_paths(&mut self) {
+    pub fn draw_paths(&mut self, paths: Vec<SquareList>) {
         let mut path_squares = HashSet::<WorldSquare>::new();
-        self.paths.clone().into_iter().flatten().for_each(|square| {
+        paths.iter().flatten().for_each(|&square| {
             path_squares.insert(square);
         });
         self.draw_at_squares(Glyph::path_glyphs(), &path_squares);
-    }
-    pub fn clear_paths(&mut self) {
-        self.paths.clear();
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {

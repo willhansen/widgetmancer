@@ -99,9 +99,12 @@ pub fn do_everything() {
         //prev_start_time = start_time;
 
         while let Ok(event) = event_receiver.try_recv() {
+            game.on_turn_start();
+
             input_map.handle_event(&mut game, event);
             game.move_all_pieces();
-            game.select_closest_piece();
+
+            game.on_turn_end();
         }
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
