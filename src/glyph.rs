@@ -13,6 +13,7 @@ use crate::utility::*;
 
 pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
+pub const MAROON: RGB8 = RGB8::new(127, 0, 0);
 pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
 pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
 pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
@@ -28,6 +29,7 @@ pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
 pub const DANGER_SQUARE_COLOR: RGB8 = RED;
+pub const PATH_COLOR: RGB8 = MAROON;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -736,6 +738,9 @@ impl Glyph {
     }
     pub fn capture_only_square_glyphs() -> DoubleGlyph {
         CAPTURE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+    pub fn path_glyphs() -> DoubleGlyph {
+        KING_PATH_GLYPHS.map(|c| Glyph::fg_only(c, PATH_COLOR))
     }
 
     // ╳

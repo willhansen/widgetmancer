@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::borrow::Borrow;
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::io::Write;
 use std::mem::swap;
@@ -40,6 +40,7 @@ pub struct Graphics {
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<Selector>,
+    paths: Vec<SquareList>,
     board_animation: Option<Box<dyn BoardAnimation>>,
     start_time: Instant,
 }
@@ -59,6 +60,7 @@ impl Graphics {
             terminal_height,
             active_animations: vec![],
             selectors: vec![],
+            paths: vec![],
             board_animation: None,
             start_time,
         }
@@ -274,14 +276,13 @@ impl Graphics {
         self.draw_string(left_of_screen_under_board, &string);
     }
 
-    fn draw_braille_line(
-        &mut self,
-        start_pos: Point2D<f32, SquareGridInWorldFrame>,
-        end_pos: Point2D<f32, SquareGridInWorldFrame>,
-        color: RGB8,
-    ) {
+    fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
         self.draw_glyphs(line_glyphs);
+    }
+
+    pub fn draw_path(&mut self, path: SquareList) {
+        self.draw_at_squares(Glyph::path_glyphs(), &HashSet::from_iter(path));
     }
 
     pub fn fill_output_buffer_with_black(&mut self) {
@@ -499,6 +500,18 @@ impl Graphics {
     }
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));
+    }
+    pub fn draw_path_later(&mut self, path: SquareList) {
+        self.paths.push(path);
+    }
+    pub fn draw_paths(&mut self) {
+        self.paths
+            .clone()
+            .into_iter()
+            .for_each(|path| self.draw_path(path));
+    }
+    pub fn clear_paths(&mut self) {
+        self.paths.clear();
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {

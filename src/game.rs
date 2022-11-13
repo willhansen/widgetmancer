@@ -134,6 +134,7 @@ impl Game {
 
     fn raw_set_player_position(&mut self, square: WorldSquare) {
         if let Some(player) = &mut self.player_optional {
+            self.graphics.clear_paths();
             player.position = square
         } else {
             panic!("Player is too dead to move")
@@ -183,6 +184,8 @@ impl Game {
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         self.graphics.fill_output_buffer_with_black();
         self.graphics.draw_board_animation(time);
+
+        self.graphics.draw_paths();
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -381,6 +384,7 @@ impl Game {
             if let Some(path_to_player) = self.find_king_path(piece_square, self.player_square()) {
                 let first_step_square = *path_to_player.get(1).unwrap();
                 end_square = first_step_square;
+                self.graphics.draw_path_later(path_to_player);
             } else {
                 return None;
             }
