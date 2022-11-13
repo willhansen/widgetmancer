@@ -281,10 +281,6 @@ impl Graphics {
         self.draw_glyphs(line_glyphs);
     }
 
-    pub fn draw_path(&mut self, path: SquareList) {
-        self.draw_at_squares(Glyph::path_glyphs(), &HashSet::from_iter(path));
-    }
-
     pub fn fill_output_buffer_with_black(&mut self) {
         self.fill_output_buffer_with_solid_color(BLACK);
     }
@@ -505,10 +501,11 @@ impl Graphics {
         self.paths.push(path);
     }
     pub fn draw_paths(&mut self) {
-        self.paths
-            .clone()
-            .into_iter()
-            .for_each(|path| self.draw_path(path));
+        let mut path_squares = HashSet::<WorldSquare>::new();
+        self.paths.clone().into_iter().flatten().for_each(|square| {
+            path_squares.insert(square);
+        });
+        self.draw_at_squares(Glyph::path_glyphs(), &path_squares);
     }
     pub fn clear_paths(&mut self) {
         self.paths.clear();

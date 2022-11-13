@@ -12,7 +12,7 @@ use rust_roguelike::glyph::{
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
-    RIGHT_I, UP_I,
+    RIGHT_I, STEP_UP_RIGHT, UP_I,
 };
 
 use crate::utils_for_tests::{
@@ -557,10 +557,14 @@ fn test_king_pathfind() {
 #[test]
 fn test_draw_pathfind_paths() {
     let mut game = set_up_nxn_game(20);
-    game.place_player(point2(5, 5));
-    game.place_piece(Piece::king(), point2(10, 5)).ok();
+    let player_square = point2(5, 5);
+    let king_square = player_square + STEP_UP_RIGHT * 5;
+    let test_square = player_square + STEP_UP_RIGHT * 2;
+    game.place_player(player_square);
+    game.place_piece(Piece::king(), king_square).ok();
     game.draw_headless_now();
-    let path_glyphs = game.graphics().get_buffered_glyphs_for_square(point2(7, 5));
+    let path_glyphs = game.graphics().get_buffered_glyphs_for_square(test_square);
+    game.graphics().print_output_buffer();
 
     assert_eq!(path_glyphs[0].character, KING_PATH_GLYPHS[0]);
     assert_eq!(path_glyphs[1].character, KING_PATH_GLYPHS[1]);
