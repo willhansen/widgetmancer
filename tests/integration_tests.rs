@@ -1,11 +1,14 @@
+use std::path::Path;
+
 use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
+
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::glyph::{
-    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_COLOR, MOVE_AND_CAPTURE_SQUARE_CHARS, RED,
+    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_COLOR, KING_PATH_GLYPHS,
+    MOVE_AND_CAPTURE_SQUARE_CHARS, RED,
 };
-
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
@@ -353,6 +356,7 @@ fn test_game_over_on_capture_player() {
     game.move_all_pieces();
     assert!(!game.running());
 }
+
 #[test]
 fn test_rook_move() {
     let mut game = set_up_game_with_player();
@@ -368,6 +372,7 @@ fn test_rook_move() {
     game.move_all_pieces();
     assert_eq!(game.get_piece_at(one_up), Some(&Piece::rook()));
 }
+
 #[test]
 fn test_rook_capture() {
     let mut game = set_up_game_with_player();
@@ -381,6 +386,7 @@ fn test_rook_capture() {
     game.move_all_pieces();
     assert!(!game.running());
 }
+
 #[test]
 fn test_king_move() {
     let mut game = set_up_game_with_player();
@@ -397,6 +403,7 @@ fn test_king_move() {
     game.move_all_pieces();
     assert_eq!(game.get_piece_at(king_end_square), Some(&Piece::king()));
 }
+
 #[test]
 fn test_knight_move() {
     let mut game = set_up_game_with_player();
@@ -545,4 +552,16 @@ fn test_king_pathfind() {
     game.move_all_pieces();
     let new_king_square = *game.pieces().keys().next().unwrap();
     assert_ne!(new_king_square, u_center);
+}
+
+#[test]
+fn test_draw_pathfind_paths() {
+    let mut game = set_up_nxn_game(20);
+    game.place_player(point2(5, 5));
+    game.place_piece(Piece::king(), point2(10, 5)).ok();
+    game.draw_headless_now();
+    let path_glyphs = game.graphics().get_buffered_glyphs_for_square(point2(7, 5));
+
+    assert_eq!(path_glyphs[0].character, KING_PATH_GLYPHS[0]);
+    assert_eq!(path_glyphs[1].character, KING_PATH_GLYPHS[1]);
 }

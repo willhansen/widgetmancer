@@ -49,6 +49,8 @@ pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
 pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['⨯', ' '];
 pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
 pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
+// ▴▵
+pub const KING_PATH_GLYPHS: &[char; 2] = &['▵', ' '];
 
 pub type BrailleArray = [[bool; 4]; 2];
 pub type DoubleGlyph = [Glyph; 2];
