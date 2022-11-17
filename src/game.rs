@@ -642,18 +642,28 @@ impl Game {
         self.blocks.contains(&square)
     }
 
-    pub fn set_up_labyrinth_hunt(&mut self) {
+    fn set_up_labyrinth(&mut self) {
         let board_squares_total = self.board_size().width * self.board_size().height;
         let num_blocks = board_squares_total / 3;
         for _ in 0..num_blocks {
             self.place_block_randomly();
         }
+    }
 
+    pub fn set_up_labyrinth_hunt(&mut self) {
+        self.set_up_labyrinth();
         for piece_type in PieceType::iter() {
             for _ in 0..2 {
                 self.place_piece_randomly(Piece::from_type(piece_type))
                     .expect("random placement");
             }
+        }
+    }
+    pub fn set_up_labyrinth_kings(&mut self) {
+        self.set_up_labyrinth();
+        for _ in 0..8 {
+            self.place_piece_randomly(Piece::king())
+                .expect("random king placement");
         }
     }
 }

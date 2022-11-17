@@ -29,7 +29,7 @@ pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
 pub const DANGER_SQUARE_COLOR: RGB8 = RED;
-pub const PATH_COLOR: RGB8 = MAROON;
+pub const PATH_COLOR: RGB8 = MAGENTA;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
