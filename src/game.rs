@@ -202,11 +202,8 @@ impl Game {
         // TODO: make redundant calculation actually produce the same path every time
         if let Some(player_square) = self.try_get_player_square() {
             let king_squares = self.find_pieces(Piece::king());
-            let king_paths = king_squares
-                .iter()
-                .filter_map(|&king_square| self.find_king_path(king_square, player_square))
-                .collect();
-            self.graphics.draw_paths(king_paths);
+            //let king_paths = king_squares .iter() .filter_map(|&king_square| self.find_king_path(king_square, player_square)) .collect();
+            //self.graphics.draw_paths(king_paths);
         }
 
         self.graphics.draw_move_marker_squares(

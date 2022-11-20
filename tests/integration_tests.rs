@@ -554,6 +554,7 @@ fn test_king_pathfind() {
 }
 
 #[test]
+#[ignore] // for now
 fn test_draw_pathfind_paths() {
     let mut game = set_up_nxn_game(20);
     let player_square = point2(5, 5);
