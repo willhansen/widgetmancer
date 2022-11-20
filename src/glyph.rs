@@ -22,6 +22,7 @@ pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
 pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
 pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
 pub const GREY: RGB8 = RGB8::new(127, 127, 127);
+pub const DARK_GREY: RGB8 = RGB8::new(63, 63, 63);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
 pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
 pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
@@ -30,6 +31,9 @@ pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
 pub const DANGER_SQUARE_COLOR: RGB8 = RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
+
+pub const BLOCK_BG: RGB8 = BLACK;
+pub const BLOCK_FG: RGB8 = DARK_GREY;
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -745,7 +749,7 @@ impl Glyph {
 
     // ╳
     pub fn block_glyphs() -> DoubleGlyph {
-        [Glyph::new(' ', WHITE, WHITE); 2]
+        [Glyph::new(' ', BLOCK_FG, BLOCK_BG); 2]
     }
 
     pub fn is_world_character_square_left_square_of_world_square(
