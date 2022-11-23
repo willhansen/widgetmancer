@@ -20,66 +20,55 @@ pub enum PieceType {
     King,
 }
 
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq)]
-pub enum AiType {
-    TowardsPlayer,
-    AwayFromPlayer,
-    Random,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct Faction {
+    id: u32,
+}
+
+impl Faction {
+    pub fn from_id(id: u32) -> Faction {
+        Faction { id }
+    }
+    pub fn default() -> Faction {
+        Faction::from_id(0)
+    }
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Piece {
     pub piece_type: PieceType,
-    pub ai_type: AiType,
+    pub faction: Faction,
 }
 
 impl Piece {
-    pub fn new(piece_type: PieceType, ai_type: AiType) -> Piece {
+    pub fn new(piece_type: PieceType, faction: Faction) -> Piece {
         Piece {
             piece_type,
-            ai_type,
+            faction,
         }
     }
 
     pub fn from_type(piece_type: PieceType) -> Piece {
-        Piece::new(piece_type, AiType::TowardsPlayer)
+        Piece::new(piece_type, Faction::default())
     }
 
     pub fn pawn() -> Piece {
-        Piece {
-            piece_type: PieceType::Pawn,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::Pawn)
     }
     pub fn knight() -> Piece {
-        Piece {
-            piece_type: PieceType::Knight,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::Knight)
     }
     pub fn bishop() -> Piece {
-        Piece {
-            piece_type: PieceType::Bishop,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::Bishop)
     }
     pub fn rook() -> Piece {
-        Piece {
-            piece_type: PieceType::Rook,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::Rook)
     }
     pub fn queen() -> Piece {
-        Piece {
-            piece_type: PieceType::Queen,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::Queen)
     }
     pub fn king() -> Piece {
-        Piece {
-            piece_type: PieceType::King,
-            ai_type: AiType::TowardsPlayer,
-        }
+        Piece::from_type(PieceType::King)
     }
 
     pub fn glyphs(&self) -> [Glyph; 2] {

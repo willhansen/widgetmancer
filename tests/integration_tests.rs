@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::collections::HashSet;
 
 use euclid::*;
 use ntest::assert_false;
@@ -9,7 +9,7 @@ use rust_roguelike::glyph::{
     DoubleGlyphFunctions, Glyph, DANGER_SQUARE_COLOR, KING_PATH_GLYPHS,
     MOVE_AND_CAPTURE_SQUARE_CHARS, RED,
 };
-use rust_roguelike::piece::{Piece, PieceType};
+use rust_roguelike::piece::{Faction, Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
     RIGHT_I, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
@@ -580,4 +580,26 @@ fn test_turn_if_move_into_wall() {
 
     assert_eq!(game.player_faced_direction(), STEP_RIGHT);
     assert_eq!(game.player_square(), start_square);
+}
+
+#[test]
+fn test_one_move_per_faction_per_turn() {
+    let mut game = set_up_game();
+    let pawn1 = Piece {
+        piece_type: PieceType::Pawn,
+        faction: Faction::from_id(0),
+    };
+    let pawn2 = Piece {
+        piece_type: PieceType::Pawn,
+        faction: Faction::from_id(1),
+    };
+    game.place_piece(pawn1, point2(2, 2)).ok();
+    game.place_piece(pawn1, point2(4, 2)).ok();
+    game.place_piece(pawn2, point2(2, 5)).ok();
+    game.place_piece(pawn2, point2(4, 5)).ok();
+    let positions_before: HashSet<WorldSquare> = HashSet::from_iter(game.pieces().keys().cloned());
+    game.move_all_factions();
+    let positions_after: HashSet<WorldSquare> = HashSet::from_iter(game.pieces().keys().cloned());
+
+    assert_eq!(positions_before.intersection(&positions_after).count(), 2);
 }

@@ -4,6 +4,7 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use euclid::*;
+use itertools::Itertools;
 use line_drawing::Point;
 use priority_queue::DoublePriorityQueue;
 use rand::{thread_rng, Rng};
@@ -12,7 +13,7 @@ use strum_macros::EnumIter;
 
 use crate::animations::Selector;
 use crate::graphics::Graphics;
-use crate::piece::{Piece, PieceType};
+use crate::piece::{Faction, Piece, PieceType};
 use crate::utility::{king_distance, reversed, SquareSet};
 use crate::{
     lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
@@ -340,6 +341,25 @@ impl Game {
             }
         }
         self.turn_count += 1;
+    }
+
+    pub fn move_all_factions(&mut self) {
+        for faction in self.get_all_living_factions() {
+            self.move_one_piece_of_faction(faction);
+        }
+    }
+
+    fn get_all_living_factions(&self) -> HashSet<Faction> {
+        self.pieces
+            .values()
+            .map(|piece| piece.faction)
+            .unique()
+            .collect()
+    }
+
+    fn move_one_piece_of_faction(&self, faction: Faction) {
+        let location_of_piece_to_move = self.pieces.iter().filter(|(square, piece)| piece.faction == faction).map(|(square, piece)|square)
+        todo!()
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
