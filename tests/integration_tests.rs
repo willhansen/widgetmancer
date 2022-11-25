@@ -585,6 +585,7 @@ fn test_turn_if_move_into_wall() {
 #[test]
 fn test_one_move_per_faction_per_turn() {
     let mut game = set_up_game();
+    game.place_player(point2(0, 0));
     let pawn1 = Piece {
         piece_type: PieceType::Pawn,
         faction: Faction::from_id(0),

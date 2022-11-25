@@ -103,7 +103,7 @@ pub fn do_everything() {
             game.on_turn_start();
 
             input_map.handle_event(&mut game, event);
-            game.move_all_pieces();
+            game.move_all_factions();
 
             game.on_turn_end();
         }

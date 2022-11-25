@@ -7,6 +7,7 @@ use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
 use priority_queue::DoublePriorityQueue;
+use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, Rng};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -357,9 +358,15 @@ impl Game {
             .collect()
     }
 
-    fn move_one_piece_of_faction(&self, faction: Faction) {
-        let location_of_piece_to_move = self.pieces.iter().filter(|(square, piece)| piece.faction == faction).map(|(square, piece)|square)
-        todo!()
+    fn move_one_piece_of_faction(&mut self, faction: Faction) {
+        let location_of_random_piece_in_faction: WorldSquare = self
+            .pieces
+            .iter()
+            .filter(|(square, piece)| piece.faction == faction)
+            .map(|(square, piece)| *square)
+            .choose(&mut rand::thread_rng())
+            .unwrap();
+        self.move_piece_at(location_of_random_piece_in_faction);
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
