@@ -21,11 +21,12 @@ pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
 pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
 pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
 pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
+pub const LIGHT_GREY: RGB8 = RGB8::new(191, 191, 191);
 pub const GREY: RGB8 = RGB8::new(127, 127, 127);
 pub const DARK_GREY: RGB8 = RGB8::new(63, 63, 63);
 pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
-pub const BOARD_WHITE: RGB8 = RGB8::new(100, 100, 80);
-pub const BOARD_BLACK: RGB8 = RGB8::new(50, 50, 70);
+pub const BOARD_WHITE: RGB8 = LIGHT_GREY;
+pub const BOARD_BLACK: RGB8 = GREY;
 pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
 pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
@@ -33,18 +34,32 @@ pub const DANGER_SQUARE_COLOR: RGB8 = RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
 
 pub const BLOCK_BG: RGB8 = BLACK;
-pub const BLOCK_FG: RGB8 = DARK_GREY;
+pub const BLOCK_FG: RGB8 = GREY;
 
-pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
-pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-
-pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
-
-pub const HORIZONTAL_HALF_BLOCK: char = EIGHTH_BLOCKS_FROM_LEFT[4];
+pub const LEFT_HALF_BLOCK: char = '▌';
+pub const RIGHT_HALF_BLOCK: char = '▐';
 
 pub const FULL_BLOCK: char = '█';
 pub const SPACE: char = ' ';
 pub const EMPTY_BRAILLE: char = '\u{2800}';
+pub const FIRST_HEXTANT: char = '🬀';
+pub const LAST_HEXTANT: char = '🬻';
+
+pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
+    SPACE,
+    '▏',
+    '▎',
+    '▍',
+    LEFT_HALF_BLOCK,
+    '▋',
+    '▊',
+    '▉',
+    FULL_BLOCK,
+];
+pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] =
+    &[SPACE, '▁', '▂', '▃', '▄', '▅', '▆', '▇', FULL_BLOCK];
+
+pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
 
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
 pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
@@ -59,7 +74,9 @@ pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
 pub const KING_PATH_GLYPHS: &[char; 2] = &['▵', ' '];
 
 pub type BrailleArray = [[bool; 4]; 2];
+// x, y
 pub type DoubleGlyph = [Glyph; 2];
+pub type HextantArray = [[bool; 2]; 3]; // row, column
 
 // Fun unicode for later
 // ↈ ▴ ⚠ 🞁 🢑  🛆  𝅉  ⏹  ᙮ ⸼  ▪
@@ -87,7 +104,15 @@ pub type DoubleGlyph = [Glyph; 2];
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
 
-pub fn quarter_block_by_offset(half_steps: IVector) -> char {
+// all hextant blocks
+// U+1FB0x 🬀 🬁 🬂 🬃 🬄 🬅 🬆 🬇 🬈 🬉 🬊 🬋 🬌 🬍 🬎 🬏
+// U+1FB1x 🬐 🬑 🬒 🬓 🬔 🬕 🬖 🬗 🬘 🬙 🬚 🬛 🬜 🬝 🬞 🬟
+// U+1FB2x 🬠 🬡 🬢 🬣 🬤 🬥 🬦 🬧 🬨 🬩 🬪 🬫 🬬 🬭 🬮 🬯
+// U+1FB3x 🬰 🬱 🬲 🬳 🬴 🬵 🬶 🬷 🬸 🬹 🬺 🬻
+// 2^6 = 64 = 4* 16
+// missing hextant blocks: empty, left half, right half, full
+
+pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
         (1, -1) => '▗',
         (1, 0) => '▐',
@@ -208,7 +233,7 @@ impl Glyph {
     }
     pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
         let step: IVector = (offset * 2.0).round().to_i32();
-        Glyph::new(quarter_block_by_offset(step), color, BLACK)
+        Glyph::new(quadrant_block_by_offset(step), color, BLACK)
     }
 
     pub fn offset_board_square_glyphs(
@@ -779,6 +804,85 @@ impl Glyph {
         output_glyph.bg_transparent = false;
         output_glyph
     }
+
+    pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
+        let as_binary = Glyph::hextant_array_as_binary(hextant_array);
+        let before_half_left = '🬓';
+        let after_half_left = '🬔';
+        let before_half_right = '🬧';
+        let after_half_right = '🬨';
+
+        match as_binary {
+            const { Glyph::hextant_character_as_binary(SPACE) } => SPACE,
+            const { Glyph::hextant_character_as_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
+            const { Glyph::hextant_character_as_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
+            const { Glyph::hextant_character_as_binary(FULL_BLOCK) } => FULL_BLOCK,
+            _ => {
+                let unadjusted_value = FIRST_HEXTANT as u32 + as_binary as u32;
+                let offset = if unadjusted_value
+                    < Glyph::hextant_character_to_value_it_damn_well_should_have(LEFT_HALF_BLOCK)
+                {
+                    1
+                } else if unadjusted_value
+                    < Glyph::hextant_character_to_value_it_damn_well_should_have(RIGHT_HALF_BLOCK)
+                {
+                    2
+                } else {
+                    3
+                };
+                char::from_u32(unadjusted_value - offset).unwrap()
+            }
+        }
+    }
+
+    const fn char_is_hextant(character: char) -> bool {
+        character == SPACE
+            || character == LEFT_HALF_BLOCK
+            || character == RIGHT_HALF_BLOCK
+            || character == FULL_BLOCK
+            || (FIRST_HEXTANT <= character && character <= LAST_HEXTANT)
+    }
+
+    fn hextant_array_as_binary(hextant_array: HextantArray) -> u8 {
+        let mut out = 0;
+        for row in 0..hextant_array.len() {
+            for column in 0..hextant_array[row].len() {
+                let position_value = 4u8.pow(row as u32) * 2u8.pow(column as u32);
+                if hextant_array[row][column] {
+                    out += position_value;
+                }
+            }
+        }
+        out
+    }
+    const fn hextant_character_as_binary(hextant_character: char) -> u8 {
+        assert!(Glyph::char_is_hextant(hextant_character));
+        let before_half_left = '🬓';
+        let before_half_right = '🬧';
+        match hextant_character {
+            SPACE => 0,
+            LEFT_HALF_BLOCK => 1 + 4 + 16,
+            RIGHT_HALF_BLOCK => 2 + 8 + 32,
+            FULL_BLOCK => 1 + 2 + 4 + 8 + 16 + 32,
+            _ => {
+                let raw_value = hextant_character as u32;
+                let offset = if raw_value <= before_half_left as u32 {
+                    1
+                } else if raw_value <= before_half_right as u32 {
+                    2
+                } else {
+                    3
+                };
+                (raw_value - FIRST_HEXTANT as u32 + offset) as u8
+            }
+        }
+    }
+
+    fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
+        // If its empty, full, and horizontal halfblocks weren't already taken
+        assert!(Glyph::char_is_hextant(character));
+        FIRST_HEXTANT as u32 + Glyph::hextant_character_as_binary(character) as u32
+    }
 }
 
 pub trait DoubleGlyphFunctions {
@@ -833,7 +937,7 @@ mod tests {
     fn test_colored_square_with_half_step_offsets() {
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).fg_color,
@@ -845,55 +949,55 @@ mod tests {
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), RED).character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), RED).character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), RED).character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), RED).character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), RED).character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), RED).character,
-            quarter_block_by_offset(vec2(-1, 0))
+            quadrant_block_by_offset(vec2(-1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), RED).character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), RED).character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), RED).character,
-            quarter_block_by_offset(vec2(0, 1))
+            quadrant_block_by_offset(vec2(0, 1))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), RED).character,
-            quarter_block_by_offset(vec2(-1, 1))
+            quadrant_block_by_offset(vec2(-1, 1))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), RED).character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), RED).character,
-            quarter_block_by_offset(vec2(2, 0))
+            quadrant_block_by_offset(vec2(2, 0))
         );
         assert_eq!(
             Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), RED).character,
-            quarter_block_by_offset(vec2(1, -1))
+            quadrant_block_by_offset(vec2(1, -1))
         );
     }
 
@@ -907,7 +1011,7 @@ mod tests {
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
@@ -925,11 +1029,11 @@ mod tests {
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, 1))
+            quadrant_block_by_offset(vec2(0, 1))
         );
         assert_eq!(
             glyphs[1][2].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, -1))
+            quadrant_block_by_offset(vec2(0, -1))
         );
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -947,11 +1051,11 @@ mod tests {
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, 1))
+            quadrant_block_by_offset(vec2(0, 1))
         );
         assert_eq!(
             glyphs[1][2].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, -1))
+            quadrant_block_by_offset(vec2(0, -1))
         );
         assert!(glyphs[2][0] == None);
         assert!(glyphs[2][1] == None);
@@ -968,7 +1072,7 @@ mod tests {
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(0, 0))
+            quadrant_block_by_offset(vec2(0, 0))
         );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
@@ -986,13 +1090,13 @@ mod tests {
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
         assert_eq!(
             glyphs[2][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(-1, 0))
+            quadrant_block_by_offset(vec2(-1, 0))
         );
         assert!(glyphs[2][2] == None);
     }
@@ -1004,13 +1108,13 @@ mod tests {
         assert!(glyphs[0][0] == None);
         assert_eq!(
             glyphs[0][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(1, 0))
+            quadrant_block_by_offset(vec2(1, 0))
         );
         assert!(glyphs[0][2] == None);
         assert!(glyphs[1][0] == None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
-            quarter_block_by_offset(vec2(-1, 0))
+            quadrant_block_by_offset(vec2(-1, 0))
         );
         assert!(glyphs[1][2] == None);
         assert!(glyphs[2][0] == None);
@@ -1453,7 +1557,7 @@ mod tests {
     fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0], Glyph::new(HORIZONTAL_HALF_BLOCK, RED, BLACK));
+        assert_eq!(glyphs[0], Glyph::new(LEFT_HALF_BLOCK, RED, BLACK));
         assert!(
             glyphs[1].looks_solid_specifically(BLACK),
             "glyph: {}",
@@ -1624,4 +1728,34 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn test_hextant_array_to_char() {
+        assert_eq!(
+            Glyph::hextant_array_to_char([[false, false], [false, false], [false, false],]),
+            SPACE
+        );
+        assert_eq!(
+            Glyph::hextant_array_to_char([[true, true], [true, true], [true, true],]),
+            FULL_BLOCK
+        );
+        assert_eq!(
+            Glyph::hextant_array_to_char([[true, false], [true, false], [true, false],]),
+            LEFT_HALF_BLOCK
+        );
+        assert_eq!(
+            Glyph::hextant_array_to_char([[false, true], [false, true], [false, true],]),
+            RIGHT_HALF_BLOCK
+        );
+        assert_eq!(
+            Glyph::hextant_array_to_char([[true, false], [false, false], [false, false],]),
+            '🬀'
+        );
+        assert_eq!(
+            Glyph::hextant_array_to_char([[false, true], [true, true], [false, false],]),
+            '🬍'
+        );
+    }
+    #[test]
+    fn test_line_and_inside_point_to_angled_block() {}
 }
