@@ -12,15 +12,12 @@ use rand::Rng;
 use crate::{DoubleGlyph, Glyph};
 
 // empty enums for euclid typing
-pub enum SquareGridInWorldFrame {}
-
-pub enum BrailleGridInWorldFrame {}
-
-pub enum CharacterGridInWorldFrame {}
-
-pub enum CharacterGridInBufferFrame {}
-
-pub enum CharacterGridInScreenFrame {}
+pub struct SquareGridInWorldFrame;
+pub struct BrailleGridInWorldFrame;
+pub struct CharacterGridInWorldFrame;
+pub struct CharacterGridInBufferFrame;
+pub struct CharacterGridInScreenFrame;
+pub struct CharacterGridInLocalCharacterFrame;
 
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
@@ -42,6 +39,9 @@ pub type SquareSet = HashSet<WorldSquare>;
 
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
+
+pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
+pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 
 pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
 pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
@@ -284,6 +284,57 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterGlyphMap) -> String {
 
 pub fn print_glyph_map(glyph_map: &WorldCharacterGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
+}
+
+pub fn line_intersections_with_centered_unit_square<U>(
+    line_point_A: Point2D<f32, U>,
+    line_point_B: Point2D<f32, U>,
+) -> Vec<Point2D<f32, U>> {
+    if line_point_A == line_point_B {
+        panic!("gave same point {}", point_to_string(line_point_A));
+    } else if line_point_A.x == line_point_B.x {
+        // vertical line case
+        let x = line_point_A.x;
+        if x.abs() <= 0.5 {
+            vec![point2(x, 0.5), point2(x, -0.5)]
+        } else {
+            vec![]
+        }
+    } else if line_point_A.y == line_point_B.y {
+        // horizontal line case
+        let y = line_point_A.y;
+        if y.abs() <= 0.5 {
+            vec![point2(y, 0.5), point2(y, -0.5)]
+        } else {
+            vec![]
+        }
+    } else {
+        // y = mx + b
+        let m = (line_point_B.y - line_point_A.y) / (line_point_B.x - line_point_A.x);
+        let b = line_point_A.y - m * line_point_A.x;
+
+        let side_values = vec![0.5, -0.5];
+
+        let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
+        for x in &side_values {
+            let y = m * x + b;
+            if y.abs() <= 0.5 {
+                candidate_intersections.push(point2(x, y));
+            }
+        }
+        for y in side_values {
+            let x = (y - b) / m;
+            if x.abs() <= 0.5 {
+                candidate_intersections.push(point2(x, y));
+            }
+        }
+        assert_eq!(candidate_intersections.len(), 2);
+        if candidate_intersections[0] == candidate_intersections[1] {
+            vec![candidate_intersections[0]]
+        } else {
+            candidate_intersections
+        }
+    }
 }
 
 #[cfg(test)]

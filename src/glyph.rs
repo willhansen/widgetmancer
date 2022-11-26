@@ -179,7 +179,6 @@ impl Glyph {
             output,
             color::Bg(color::Reset),
         );
-        //}
         return output;
     }
 
@@ -882,6 +881,41 @@ impl Glyph {
         // If its empty, full, and horizontal halfblocks weren't already taken
         assert!(Glyph::char_is_hextant(character));
         FIRST_HEXTANT as u32 + Glyph::hextant_character_as_binary(character) as u32
+    }
+
+    pub fn line_and_inside_point_to_angled_block_character(
+        line_point_A: LocalCharacterPoint,
+        line_point_B: LocalCharacterPoint,
+        inside_point: LocalCharacterPoint,
+    ) -> char {
+        // angle blocks have important edge points
+
+        //       0.5
+        //       |
+        // o──o──o -- 0.5
+        // │     │
+        // o     o -- 1/6
+        // │     │ -- 0
+        // o     o
+        // │     │
+        // o──o──o
+        let snap_points: Vec<LocalCharacterPoint> = vec![
+            point2(0.5, 1.0 / 6.0),
+            point2(0.5, 0.5),
+            point2(0.0, 0.5),
+            point2(-0.5, 0.5),
+            point2(-0.5, 1.0 / 6.0),
+            point2(-0.5, -1.0 / 6.0),
+            point2(-0.5, -0.5),
+            point2(0.0, -0.5),
+            point2(0.5, -0.5),
+            point2(0.5, -1.0 / 6.0),
+        ];
+
+        let raw_intersection_points =
+            line_intersections_with_centered_unit_square(line_point_A, line_point_B);
+
+        todo!()
     }
 }
 
@@ -1757,5 +1791,43 @@ mod tests {
         );
     }
     #[test]
-    fn test_line_and_inside_point_to_angled_block() {}
+    fn test_line_and_inside_point_to_angled_block_character() {
+        let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
+        assert_eq!(
+            Glyph::line_and_inside_point_to_angled_block_character(
+                point2(-0.5, -0.5),
+                point2(-0.5, 0.5),
+                point2(0.0, 0.0)
+            ),
+            FULL_BLOCK,
+            "on left edge, full block"
+        );
+        assert_eq!(
+            Glyph::line_and_inside_point_to_angled_block_character(
+                point2(-0.5, -0.5),
+                point2(-0.5, 0.5),
+                point2(-20.0, 0.0)
+            ),
+            SPACE,
+            "on left edge, empty block"
+        );
+        assert_eq!(
+            Glyph::line_and_inside_point_to_angled_block_character(
+                point2(-0.5, -0.5),
+                point2(-0.4, -0.4),
+                point2(2.0, 0.0)
+            ),
+            '◢',
+            "lower-right diagonal given short line"
+        );
+        assert_eq!(
+            Glyph::line_and_inside_point_to_angled_block_character(
+                point2(0.0, -0.5),
+                point2(0.5, -0.15),
+                point2(0.0, 0.0)
+            ),
+            '🭝',
+            "Notch off bottom-right"
+        );
+    }
 }
