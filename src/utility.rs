@@ -316,7 +316,7 @@ pub fn line_intersections_with_centered_unit_square<U>(
         let side_values = vec![0.5, -0.5];
 
         let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
-        for x in &side_values {
+        for &x in &side_values {
             let y = m * x + b;
             if y.abs() <= 0.5 {
                 candidate_intersections.push(point2(x, y));
@@ -336,9 +336,25 @@ pub fn line_intersections_with_centered_unit_square<U>(
         }
     }
 }
+pub fn same_side_of_line<U>(
+    line_point_A: Point2D<f32, U>,
+    line_point_B: Point2D<f32, U>,
+    test_point_C: Point2D<f32, U>,
+    test_point_D: Point2D<f32, U>,
+) -> bool {
+    is_clockwise(line_point_A, line_point_B, test_point_C)
+        == is_clockwise(line_point_A, line_point_B, test_point_D)
+}
+
+pub fn is_clockwise<U>(A: Point2D<f32, U>, B: Point2D<f32, U>, C: Point2D<f32, U>) -> bool {
+    let AB = B - A;
+    let AC = C - A;
+    AB.cross(AC) < 0.0
+}
 
 #[cfg(test)]
 mod tests {
+    use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
@@ -407,5 +423,18 @@ mod tests {
             *square_glyph_map.get(&point2(0, 0)).unwrap(),
             [test_glyph; 2]
         );
+    }
+    #[test]
+    fn test_clockwise() {
+        assert!(is_clockwise::<WorldPoint>(
+            point2(0.0, 0.0),
+            point2(0.0, 1.0),
+            point2(1.0, 0.0)
+        ));
+        assert_false!(is_clockwise::<WorldPoint>(
+            point2(0.0, 0.0),
+            point2(0.0, 1.0),
+            point2(-0.1, -10.0)
+        ));
     }
 }
