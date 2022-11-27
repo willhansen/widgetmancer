@@ -1,4 +1,9 @@
 use super::glyph_constants::*;
+use crate::utility::{
+    line_intersections_with_centered_unit_square, same_side_of_line, LocalCharacterPoint,
+};
+use euclid::{point2, Point2D};
+use ordered_float::OrderedFloat;
 
 pub const FIRST_HEXTANT: char = '🬀';
 pub const LAST_HEXTANT: char = '🬻';
@@ -90,4 +95,37 @@ fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
     // If its empty, full, and horizontal halfblocks weren't already taken
     assert!(char_is_hextant(character));
     FIRST_HEXTANT as u32 + hextant_character_as_binary(character) as u32
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    #[test]
+    fn test_hextant_array_to_char() {
+        assert_eq!(
+            hextant_array_to_char([[false, false], [false, false], [false, false],]),
+            SPACE
+        );
+        assert_eq!(
+            hextant_array_to_char([[true, true], [true, true], [true, true],]),
+            FULL_BLOCK
+        );
+        assert_eq!(
+            hextant_array_to_char([[true, false], [true, false], [true, false],]),
+            LEFT_HALF_BLOCK
+        );
+        assert_eq!(
+            hextant_array_to_char([[false, true], [false, true], [false, true],]),
+            RIGHT_HALF_BLOCK
+        );
+        assert_eq!(
+            hextant_array_to_char([[true, false], [false, false], [false, false],]),
+            '🬀'
+        );
+        assert_eq!(
+            hextant_array_to_char([[false, true], [true, true], [false, false],]),
+            '🬍'
+        );
+    }
 }

@@ -216,10 +216,9 @@ pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareT
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq, assert_ne};
-    use std::ops::Deref;
-
     use super::*;
+    use pretty_assertions::{assert_eq, assert_ne};
+
     #[test]
     fn test_array_to_braille_char() {
         // 10
