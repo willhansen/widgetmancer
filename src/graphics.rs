@@ -30,8 +30,8 @@ use crate::{
     BufferCharacterPoint, BufferCharacterSquare, CharacterGridInBufferFrame,
     CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyphFunctions, Game, IPoint,
     PieceType, ScreenCharacterPoint, ScreenCharacterSquare, SquareGridInWorldFrame, SquareList,
-    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
-    WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
+    WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToGlyphMap, WorldMove,
+    WorldPoint, WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
 };
 
 pub struct Graphics {
@@ -256,7 +256,7 @@ impl Graphics {
         self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs(&mut self, glyph_map: WorldCharacterGlyphMap) {
+    fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareToGlyphMap) {
         let world_square_glyph_map = pair_up_glyph_map(glyph_map);
         self.draw_glyphs_at_squares(world_square_glyph_map);
     }

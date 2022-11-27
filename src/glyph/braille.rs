@@ -1,5 +1,6 @@
 use crate::utility::*;
 use euclid::{point2, Point2D};
+use std::collections::{HashMap, HashSet};
 
 pub struct BrailleGridInWorldFrame;
 pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
@@ -146,9 +147,77 @@ pub fn local_braille_squares_to_braille_array(squares: Vec<WorldBrailleSquare>) 
 pub fn local_braille_squares_to_braille_char(squares: Vec<WorldBrailleSquare>) -> char {
     braille_array_to_braille_char(local_braille_squares_to_braille_array(squares))
 }
+
+pub fn get_chars_for_braille_line(
+    start_pos: WorldPoint,
+    end_pos: WorldPoint,
+) -> WorldCharacterSquareToCharMap {
+    let start_char_point = world_point_to_world_character_point(start_pos);
+    let end_char_point = world_point_to_world_character_point(end_pos);
+
+    let mut char_map = WorldCharacterSquareToCharMap::new();
+
+    let start_braille_grid_square = world_character_point_to_braille_point(start_char_point)
+        .round()
+        .to_i32();
+    let end_braille_grid_square = world_character_point_to_braille_point(end_char_point)
+        .round()
+        .to_i32();
+
+    for (x, y) in line_drawing::Bresenham::new(
+        start_braille_grid_square.to_tuple(),
+        end_braille_grid_square.to_tuple(),
+    ) {
+        let braille_pos = Point2D::<i32, BrailleGridInWorldFrame>::new(x, y);
+        let character_grid_square = world_braille_square_to_world_character_square(braille_pos);
+        if !char_map.contains_key(&character_grid_square) {
+            char_map.insert(character_grid_square, EMPTY_BRAILLE);
+        }
+        let braille_character = char_map.get_mut(&character_grid_square).unwrap();
+        *braille_character = add_braille_dot(
+            *braille_character,
+            braille_square_to_dot_in_character(braille_pos),
+        );
+    }
+    return char_map;
+}
+pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareToCharMap {
+    // bin braille squares by world character squares
+    let mut local_braille_squares_by_character_square =
+        HashMap::<WorldCharacterSquare, HashSet<WorldBrailleSquare>>::new();
+
+    for point in points {
+        let char_point = world_point_to_world_character_point(point);
+        let char_square = char_point.round().to_i32();
+        let braille_square = world_character_point_to_braille_point(char_point)
+            .round()
+            .to_i32();
+        let local_braille_square = braille_square_to_dot_in_character(braille_square);
+
+        if !local_braille_squares_by_character_square.contains_key(&char_square) {
+            local_braille_squares_by_character_square
+                .insert(char_square, HashSet::<WorldBrailleSquare>::new());
+        }
+        local_braille_squares_by_character_square
+            .get_mut(&char_square)
+            .unwrap()
+            .insert(local_braille_square);
+    }
+
+    let mut char_map = WorldCharacterSquareToCharMap::new();
+
+    for (char_square, braille_square_set) in local_braille_squares_by_character_square {
+        let braille_char: char =
+            local_braille_squares_to_braille_char(braille_square_set.into_iter().collect());
+        char_map.insert(char_square, braille_char);
+    }
+    char_map
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
+    use std::ops::Deref;
 
     use super::*;
     #[test]
@@ -301,4 +370,104 @@ mod tests {
         assert_eq!(count_braille_dots('A'), 0);
         assert_eq!(count_braille_dots('#'), 0);
     } //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
+
+    #[test]
+    fn test_chars_for_horizontal_braille_line_without_rounding() {
+        let start: WorldCharacterPoint = point2(-0.25, -0.4);
+        let end: WorldCharacterPoint = point2(1.75, -0.4);
+
+        // Expected braille:
+        // 00 00 00
+        // 00 00 00
+        // 00 00 00
+        // 11 11 10
+
+        let line_chars = get_chars_for_braille_line(
+            world_character_point_to_world_point(start),
+            world_character_point_to_world_point(end),
+        );
+        assert_eq!(line_chars.len(), 3);
+
+        assert_eq!(line_chars.get(&point2(0, 0)).unwrap(), &'\u{28C0}');
+        assert_eq!(line_chars.get(&point2(1, 0)).unwrap(), &'\u{28C0}');
+        assert_eq!(line_chars.get(&point2(2, 0)).unwrap(), &'\u{2840}');
+    }
+
+    #[test]
+    fn test_chars_for_horizontal_braille_line_with_offset_without_rounding() {
+        let start = WorldCharacterPoint::new(-0.25, 0.4);
+        let end = WorldCharacterPoint::new(1.75, 0.4);
+
+        // Expected braille:
+        // 11 11 10
+        // 00 00 00
+        // 00 00 00
+        // 00 00 00
+
+        let line_glyphs = get_chars_for_braille_line(
+            world_character_point_to_world_point(start),
+            world_character_point_to_world_point(end),
+        );
+        assert_eq!(line_glyphs.len(), 3);
+
+        assert_eq!(line_glyphs.get(&point2(0, 0)).unwrap(), &'\u{2809}');
+        assert_eq!(line_glyphs.get(&point2(1, 0)).unwrap(), &'\u{2809}');
+        assert_eq!(line_glyphs.get(&point2(2, 0)).unwrap(), &'\u{2801}');
+    }
+
+    #[test]
+    fn test_chars_for_vertical_braille_line_without_rounding() {
+        let start = WorldCharacterPoint::new(-0.25, -0.4);
+        let end = WorldCharacterPoint::new(-0.25, 0.875);
+
+        // Expected braille:
+        // 00
+        // 00
+        // 10
+        // 10
+
+        // 10
+        // 10
+        // 10
+        // 10
+
+        let line_glyphs = get_chars_for_braille_line(
+            world_character_point_to_world_point(start),
+            world_character_point_to_world_point(end),
+        );
+        assert_eq!(line_glyphs.len(), 2);
+
+        assert_eq!(line_glyphs.get(&point2(0, 0)).unwrap(), &'\u{2847}');
+        assert_eq!(line_glyphs.get(&point2(0, 1)).unwrap(), &'\u{2844}');
+    }
+
+    #[test]
+    fn test_points_to_braille_chars() {
+        // ┌──┬──┐┌──┬──┐
+        // │  │  ││  │  │
+        // │  │o ││  │oo│
+        // │ o│  ││  │  │
+        // │  │  ││  │  │
+        // └──┴──┘└──┴──┘
+
+        // 00 00  00 00
+        // 00 10  00 11
+        // 01 00  00 00
+        // 00 00  00 00
+
+        let points = vec![
+            WorldPoint::new(0.1, 0.1),
+            WorldPoint::new(0.1, 0.1), // duplicate for funsies
+            WorldPoint::new(-0.1, -0.1),
+            WorldPoint::new(1.1, 0.1),
+            WorldPoint::new(1.4, 0.1),
+        ];
+
+        let chars = points_to_braille_chars(points);
+
+        assert_eq!(chars.len(), 3);
+        assert_eq!(chars.get(&point2(0, 0)).unwrap(), &'⠠');
+        assert_eq!(chars.get(&point2(1, 0)).unwrap(), &'⠂');
+        assert_eq!(chars.get(&point2(3, 0)).unwrap(), &'⠒');
+    }
 }

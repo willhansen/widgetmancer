@@ -53,9 +53,9 @@ pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
-pub type WorldCharacterGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
+pub type WorldCharacterSquareToGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
-pub type WorldCharacterToCharMap = HashMap<WorldCharacterSquare, char>;
+pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
 pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
 
@@ -216,8 +216,8 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U
 
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
-) -> WorldCharacterGlyphMap {
-    let mut world_character_glyph_map = WorldCharacterGlyphMap::new();
+) -> WorldCharacterSquareToGlyphMap {
+    let mut world_character_glyph_map = WorldCharacterSquareToGlyphMap::new();
     world_square_glyph_map
         .into_iter()
         .for_each(|(world_square, two_glyphs)| {
@@ -240,7 +240,9 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
-pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSquareGlyphMap {
+pub fn pair_up_glyph_map(
+    character_glyph_map: WorldCharacterSquareToGlyphMap,
+) -> WorldSquareGlyphMap {
     let mut output_map = WorldSquareGlyphMap::new();
     character_glyph_map
         .into_iter()
@@ -263,7 +265,7 @@ pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSq
     output_map
 }
 
-pub fn glyph_map_to_string(glyph_map: &WorldCharacterGlyphMap) -> String {
+pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareToGlyphMap) -> String {
     let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
     let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
     let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
@@ -286,7 +288,7 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterGlyphMap) -> String {
     string
 }
 
-pub fn print_glyph_map(glyph_map: &WorldCharacterGlyphMap) {
+pub fn print_glyph_map(glyph_map: &WorldCharacterSquareToGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
 }
 
@@ -433,7 +435,7 @@ mod tests {
             point2(2, 1),
         ];
 
-        let mut character_glyph_map = WorldCharacterGlyphMap::new();
+        let mut character_glyph_map = WorldCharacterSquareToGlyphMap::new();
         for square in character_squares {
             character_glyph_map.insert(square, Glyph::default_transparent());
         }
@@ -447,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_pair_up_glyph_map__glyphs() {
-        let mut character_glyph_map = WorldCharacterGlyphMap::new();
+        let mut character_glyph_map = WorldCharacterSquareToGlyphMap::new();
         let test_glyph = Glyph {
             character: ' ',
             fg_color: RGB8::new(0, 0, 0),
