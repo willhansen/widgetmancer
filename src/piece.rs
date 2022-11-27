@@ -5,9 +5,11 @@ use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
+use crate::glyph_constants::*;
+
 use crate::{
     get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph,
-    SquareGridInWorldFrame, StepList, WorldStep, ENEMY_PIECE_COLOR,
+    SquareGridInWorldFrame, StepList, WorldStep,
 };
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]

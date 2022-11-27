@@ -3,6 +3,7 @@ use std::f32::consts::{E, PI, TAU};
 use std::time;
 use std::time::{Duration, Instant};
 
+use crate::glyph_constants::*;
 use dyn_clone::DynClone;
 use euclid::{vec2, Angle, Length};
 use num::ToPrimitive;
@@ -13,7 +14,7 @@ use crate::{
     is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step,
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
     Graphics, WorldCharacterGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap,
-    WorldStep, BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
+    WorldStep, RIGHT_I, UP_I,
 };
 
 pub type AnimationObject = Box<dyn Animation>;

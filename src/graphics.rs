@@ -9,6 +9,7 @@ use std::ptr::hash;
 use std::time::{Duration, Instant};
 
 use euclid::*;
+use glyph::glyph_constants::*;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
@@ -17,18 +18,18 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::*;
+use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
 use crate::utility::SquareSet;
 use crate::{
-    get_by_point, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
+    get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
     BrailleGridInWorldFrame, BufferCharacterPoint, BufferCharacterSquare,
-    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyph,
-    DoubleGlyphFunctions, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    ScreenCharacterSquare, SquareGridInWorldFrame, SquareList, WorldBraillePoint,
-    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
-    WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
-    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame,
+    DoubleGlyphFunctions, Game, IPoint, PieceType, ScreenCharacterPoint, ScreenCharacterSquare,
+    SquareGridInWorldFrame, SquareList, WorldBraillePoint, WorldCharacterGlyphMap,
+    WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint, WorldSquare,
+    WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
 };
 
 pub struct Graphics {
@@ -613,7 +614,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{BLUE, ENEMY_PIECE_COLOR, GREEN, LEFT_I, RIGHT_I};
+    use crate::{LEFT_I, RIGHT_I};
 
     use super::*;
 

@@ -1,6 +1,12 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 
+pub mod glyph_constants;
+pub mod hextant_blocks;
+
+use glyph_constants::*;
+use hextant_blocks::*;
+
 use ::num::clamp;
 use euclid::*;
 use euclid::{point2, vec2};
@@ -12,72 +18,9 @@ use termion::color;
 use crate::utility::sign;
 use crate::utility::*;
 
-pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
-pub const RED: RGB8 = RGB8::new(255, 0, 0);
-pub const MAROON: RGB8 = RGB8::new(127, 0, 0);
-pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
-pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
-pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
-pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
-pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
-pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
-pub const WHITE: RGB8 = RGB8::new(255, 255, 255);
-pub const LIGHT_GREY: RGB8 = RGB8::new(191, 191, 191);
-pub const GREY: RGB8 = RGB8::new(127, 127, 127);
-pub const DARK_GREY: RGB8 = RGB8::new(63, 63, 63);
-pub const BLACK: RGB8 = RGB8::new(0, 0, 0);
-pub const BOARD_WHITE: RGB8 = LIGHT_GREY;
-pub const BOARD_BLACK: RGB8 = GREY;
-pub const EXPLOSION_COLOR: RGB8 = RGB8::new(200, 200, 255);
-pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
-pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
-pub const DANGER_SQUARE_COLOR: RGB8 = RED;
-pub const PATH_COLOR: RGB8 = MAGENTA;
-
-pub const BLOCK_BG: RGB8 = BLACK;
-pub const BLOCK_FG: RGB8 = GREY;
-
-pub const LEFT_HALF_BLOCK: char = '▌';
-pub const RIGHT_HALF_BLOCK: char = '▐';
-
-pub const FULL_BLOCK: char = '█';
-pub const SPACE: char = ' ';
-pub const EMPTY_BRAILLE: char = '\u{2800}';
-pub const FIRST_HEXTANT: char = '🬀';
-pub const LAST_HEXTANT: char = '🬻';
-
-pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
-    SPACE,
-    '▏',
-    '▎',
-    '▍',
-    LEFT_HALF_BLOCK,
-    '▋',
-    '▊',
-    '▉',
-    FULL_BLOCK,
-];
-pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] =
-    &[SPACE, '▁', '▂', '▃', '▄', '▅', '▆', '▇', FULL_BLOCK];
-
-pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
-
-pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
-pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
-
-// ●○ ⚬⦁⚫⚪ ✕ ✕
-// ✕ ⨉ ⨯ 🞨 🞮 ×
-pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
-pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['⨯', ' '];
-pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
-pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
-// ▴▵
-pub const KING_PATH_GLYPHS: &[char; 2] = &['▵', ' '];
-
 pub type BrailleArray = [[bool; 4]; 2];
 // x, y
 pub type DoubleGlyph = [Glyph; 2];
-pub type HextantArray = [[bool; 2]; 3]; // row, column
 
 // Fun unicode for later
 // ↈ ▴ ⚠ 🞁 🢑  🛆  𝅉  ⏹  ᙮ ⸼  ▪
@@ -104,14 +47,6 @@ pub type HextantArray = [[bool; 2]; 3]; // row, column
 
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
-
-// all hextant blocks
-// U+1FB0x 🬀 🬁 🬂 🬃 🬄 🬅 🬆 🬇 🬈 🬉 🬊 🬋 🬌 🬍 🬎 🬏
-// U+1FB1x 🬐 🬑 🬒 🬓 🬔 🬕 🬖 🬗 🬘 🬙 🬚 🬛 🬜 🬝 🬞 🬟
-// U+1FB2x 🬠 🬡 🬢 🬣 🬤 🬥 🬦 🬧 🬨 🬩 🬪 🬫 🬬 🬭 🬮 🬯
-// U+1FB3x 🬰 🬱 🬲 🬳 🬴 🬵 🬶 🬷 🬸 🬹 🬺 🬻
-// 2^6 = 64 = 4* 16
-// missing hextant blocks: empty, left half, right half, full
 
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
@@ -803,85 +738,6 @@ impl Glyph {
         }
         output_glyph.bg_transparent = false;
         output_glyph
-    }
-
-    pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
-        let as_binary = Glyph::hextant_array_as_binary(hextant_array);
-        let before_half_left = '🬓';
-        let after_half_left = '🬔';
-        let before_half_right = '🬧';
-        let after_half_right = '🬨';
-
-        match as_binary {
-            const { Glyph::hextant_character_as_binary(SPACE) } => SPACE,
-            const { Glyph::hextant_character_as_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
-            const { Glyph::hextant_character_as_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
-            const { Glyph::hextant_character_as_binary(FULL_BLOCK) } => FULL_BLOCK,
-            _ => {
-                let unadjusted_value = FIRST_HEXTANT as u32 + as_binary as u32;
-                let offset = if unadjusted_value
-                    < Glyph::hextant_character_to_value_it_damn_well_should_have(LEFT_HALF_BLOCK)
-                {
-                    1
-                } else if unadjusted_value
-                    < Glyph::hextant_character_to_value_it_damn_well_should_have(RIGHT_HALF_BLOCK)
-                {
-                    2
-                } else {
-                    3
-                };
-                char::from_u32(unadjusted_value - offset).unwrap()
-            }
-        }
-    }
-
-    const fn char_is_hextant(character: char) -> bool {
-        character == SPACE
-            || character == LEFT_HALF_BLOCK
-            || character == RIGHT_HALF_BLOCK
-            || character == FULL_BLOCK
-            || (FIRST_HEXTANT <= character && character <= LAST_HEXTANT)
-    }
-
-    fn hextant_array_as_binary(hextant_array: HextantArray) -> u8 {
-        let mut out = 0;
-        for row in 0..hextant_array.len() {
-            for column in 0..hextant_array[row].len() {
-                let position_value = 4u8.pow(row as u32) * 2u8.pow(column as u32);
-                if hextant_array[row][column] {
-                    out += position_value;
-                }
-            }
-        }
-        out
-    }
-    const fn hextant_character_as_binary(hextant_character: char) -> u8 {
-        assert!(Glyph::char_is_hextant(hextant_character));
-        let before_half_left = '🬓';
-        let before_half_right = '🬧';
-        match hextant_character {
-            SPACE => 0,
-            LEFT_HALF_BLOCK => 1 + 4 + 16,
-            RIGHT_HALF_BLOCK => 2 + 8 + 32,
-            FULL_BLOCK => 1 + 2 + 4 + 8 + 16 + 32,
-            _ => {
-                let raw_value = hextant_character as u32;
-                let offset = if raw_value <= before_half_left as u32 {
-                    1
-                } else if raw_value <= before_half_right as u32 {
-                    2
-                } else {
-                    3
-                };
-                (raw_value - FIRST_HEXTANT as u32 + offset) as u8
-            }
-        }
-    }
-
-    fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
-        // If its empty, full, and horizontal halfblocks weren't already taken
-        assert!(Glyph::char_is_hextant(character));
-        FIRST_HEXTANT as u32 + Glyph::hextant_character_as_binary(character) as u32
     }
 
     pub fn line_and_inside_point_to_angled_block_character(
@@ -1816,27 +1672,27 @@ mod tests {
     #[test]
     fn test_hextant_array_to_char() {
         assert_eq!(
-            Glyph::hextant_array_to_char([[false, false], [false, false], [false, false],]),
+            hextant_array_to_char([[false, false], [false, false], [false, false],]),
             SPACE
         );
         assert_eq!(
-            Glyph::hextant_array_to_char([[true, true], [true, true], [true, true],]),
+            hextant_array_to_char([[true, true], [true, true], [true, true],]),
             FULL_BLOCK
         );
         assert_eq!(
-            Glyph::hextant_array_to_char([[true, false], [true, false], [true, false],]),
+            hextant_array_to_char([[true, false], [true, false], [true, false],]),
             LEFT_HALF_BLOCK
         );
         assert_eq!(
-            Glyph::hextant_array_to_char([[false, true], [false, true], [false, true],]),
+            hextant_array_to_char([[false, true], [false, true], [false, true],]),
             RIGHT_HALF_BLOCK
         );
         assert_eq!(
-            Glyph::hextant_array_to_char([[true, false], [false, false], [false, false],]),
+            hextant_array_to_char([[true, false], [false, false], [false, false],]),
             '🬀'
         );
         assert_eq!(
-            Glyph::hextant_array_to_char([[false, true], [true, true], [false, false],]),
+            hextant_array_to_char([[false, true], [true, true], [false, false],]),
             '🬍'
         );
     }
