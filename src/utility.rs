@@ -13,9 +13,13 @@ use crate::{DoubleGlyph, Glyph};
 
 // empty enums for euclid typing
 pub struct SquareGridInWorldFrame;
+
 pub struct CharacterGridInWorldFrame;
+
 pub struct CharacterGridInBufferFrame;
+
 pub struct CharacterGridInScreenFrame;
+
 pub struct CharacterGridInLocalCharacterFrame;
 
 pub type IPoint = default::Point2D<i32>;
@@ -50,6 +54,9 @@ pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
 pub type WorldCharacterGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
+
+pub type WorldCharacterToCharMap = HashMap<WorldCharacterSquare, char>;
+
 pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
@@ -144,6 +151,7 @@ pub fn get_8_quadrants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2
 pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
+
 pub fn king_distance(a: WorldSquare, b: WorldSquare) -> u32 {
     let x_dist = a.x.abs_diff(b.x);
     let y_dist = a.y.abs_diff(b.y);
@@ -239,7 +247,7 @@ pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSq
         .for_each(|(character_square, glyph)| {
             let world_square = world_character_square_to_world_square(character_square);
             let is_left_glyph =
-                Glyph::is_world_character_square_left_square_of_world_square(character_square);
+                is_world_character_square_left_square_of_world_square(character_square);
             let position_index = if is_left_glyph { 0 } else { 1 };
 
             if output_map.contains_key(&world_square) {
@@ -332,6 +340,7 @@ pub fn line_intersections_with_centered_unit_square<U>(
         }
     }
 }
+
 pub fn same_side_of_line<U>(
     line_point_A: Point2D<f32, U>,
     line_point_B: Point2D<f32, U>,
@@ -372,6 +381,14 @@ pub fn world_square_to_left_world_character_square(
     (world_point_to_world_character_point(world_square.to_f32()) + vec2(-0.5, 0.0))
         .round()
         .to_i32()
+}
+
+pub fn is_world_character_square_left_square_of_world_square(
+    character_square: WorldCharacterSquare,
+) -> bool {
+    world_square_to_left_world_character_square(world_character_square_to_world_square(
+        character_square,
+    )) == character_square
 }
 
 #[cfg(test)]
@@ -446,12 +463,13 @@ mod tests {
             [test_glyph; 2]
         );
     }
+
     #[test]
     fn test_clockwise() {
         assert!(is_clockwise::<WorldPoint>(
             point2(0.0, 0.0),
             point2(0.0, 1.0),
-            point2(1.0, 0.0)
+            point2(1.0, 0.0),
         ));
         assert_false!(is_clockwise::<WorldPoint>(
             point2(0.0, 0.0),

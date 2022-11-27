@@ -449,14 +449,6 @@ impl Glyph {
         [Glyph::new(' ', BLOCK_FG, BLOCK_BG); 2]
     }
 
-    pub fn is_world_character_square_left_square_of_world_square(
-        character_square: WorldCharacterSquare,
-    ) -> bool {
-        world_square_to_left_world_character_square(world_character_square_to_world_square(
-            character_square,
-        )) == character_square
-    }
-
     pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {
         let position_index = if is_left_glyph { 0 } else { 1 };
         let mut output_glyph = self.clone();
