@@ -18,18 +18,20 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::*;
+use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
-use crate::utility::SquareSet;
+use crate::utility::{
+    world_character_square_to_world_square, world_point_to_world_character_point, SquareSet,
+};
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
-    BrailleGridInWorldFrame, BufferCharacterPoint, BufferCharacterSquare,
-    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame,
-    DoubleGlyphFunctions, Game, IPoint, PieceType, ScreenCharacterPoint, ScreenCharacterSquare,
-    SquareGridInWorldFrame, SquareList, WorldBraillePoint, WorldCharacterGlyphMap,
-    WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint, WorldSquare,
-    WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
+    BufferCharacterPoint, BufferCharacterSquare, CharacterGridInBufferFrame,
+    CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyphFunctions, Game, IPoint,
+    PieceType, ScreenCharacterPoint, ScreenCharacterSquare, SquareGridInWorldFrame, SquareList,
+    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
+    WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
 };
 
 pub struct Graphics {
@@ -78,9 +80,7 @@ impl Graphics {
     }
 
     fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
-        self.square_is_on_screen(Glyph::world_character_square_to_world_square(
-            character_square,
-        ))
+        self.square_is_on_screen(world_character_square_to_world_square(character_square))
     }
     fn square_is_on_screen(&self, square: WorldSquare) -> bool {
         self.world_square_to_multiple_buffer_squares(square)
@@ -167,7 +167,7 @@ impl Graphics {
         &self,
         buffer_square: BufferCharacterSquare,
     ) -> WorldSquare {
-        Glyph::world_character_square_to_world_square(
+        world_character_square_to_world_square(
             self.buffer_square_to_world_character_square(buffer_square),
         )
     }
@@ -181,7 +181,7 @@ impl Graphics {
     }
 
     pub fn world_point_to_buffer_point(&self, world_point: WorldPoint) -> BufferCharacterPoint {
-        self.world_character_point_to_buffer_point(Glyph::world_point_to_world_character_point(
+        self.world_character_point_to_buffer_point(world_point_to_world_character_point(
             world_point,
         ))
     }
@@ -221,7 +221,7 @@ impl Graphics {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         Graphics::buffer_point_to_screen_point(self.world_character_point_to_buffer_point(
-            Glyph::world_point_to_world_character_point(world_position),
+            world_point_to_world_character_point(world_position),
         ))
     }
 
@@ -243,7 +243,7 @@ impl Graphics {
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
         return if self.square_is_on_screen(square) {
-            Glyph::count_braille_dots(
+            count_braille_dots(
                 self.get_buffered_glyph(self.world_square_to_left_buffer_square(square))
                     .character,
             )
@@ -595,7 +595,7 @@ impl Graphics {
                 let glyphs = self.get_buffered_glyphs_for_square(square);
                 for glyph in glyphs {
                     let character = glyph.character;
-                    count += Glyph::count_braille_dots(character);
+                    count += count_braille_dots(character);
                 }
             }
         }

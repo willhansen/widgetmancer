@@ -13,7 +13,6 @@ use crate::{DoubleGlyph, Glyph};
 
 // empty enums for euclid typing
 pub struct SquareGridInWorldFrame;
-pub struct BrailleGridInWorldFrame;
 pub struct CharacterGridInWorldFrame;
 pub struct CharacterGridInBufferFrame;
 pub struct CharacterGridInScreenFrame;
@@ -42,9 +41,6 @@ pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
-
-pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
-pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
 
 pub type BufferCharacterSquare = Point2D<i32, CharacterGridInBufferFrame>;
 pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
@@ -217,7 +213,7 @@ pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map
         .into_iter()
         .for_each(|(world_square, two_glyphs)| {
-            let left_char_square = Glyph::world_square_to_left_world_character_square(world_square);
+            let left_char_square = world_square_to_left_world_character_square(world_square);
             let right_char_square = left_char_square + RIGHT_I.cast_unit();
             world_character_glyph_map.insert(left_char_square, two_glyphs[0]);
             world_character_glyph_map.insert(right_char_square, two_glyphs[1]);
@@ -241,7 +237,7 @@ pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterGlyphMap) -> WorldSq
     character_glyph_map
         .into_iter()
         .for_each(|(character_square, glyph)| {
-            let world_square = Glyph::world_character_square_to_world_square(character_square);
+            let world_square = world_character_square_to_world_square(character_square);
             let is_left_glyph =
                 Glyph::is_world_character_square_left_square_of_world_square(character_square);
             let position_index = if is_left_glyph { 0 } else { 1 };
@@ -350,6 +346,32 @@ pub fn is_clockwise<U>(A: Point2D<f32, U>, B: Point2D<f32, U>, C: Point2D<f32, U
     let AB = B - A;
     let AC = C - A;
     AB.cross(AC) < 0.0
+}
+
+pub fn world_point_to_world_character_point(
+    pos: Point2D<f32, SquareGridInWorldFrame>,
+) -> Point2D<f32, CharacterGridInWorldFrame> {
+    point2(pos.x * 2.0 + 0.5, pos.y)
+}
+
+pub fn world_character_point_to_world_point(
+    pos: Point2D<f32, CharacterGridInWorldFrame>,
+) -> Point2D<f32, SquareGridInWorldFrame> {
+    point2((pos.x - 0.5) / 2.0, pos.y)
+}
+
+pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
+    world_character_point_to_world_point(pos.to_f32())
+        .round()
+        .to_i32()
+}
+
+pub fn world_square_to_left_world_character_square(
+    world_square: WorldSquare,
+) -> WorldCharacterSquare {
+    (world_point_to_world_character_point(world_square.to_f32()) + vec2(-0.5, 0.0))
+        .round()
+        .to_i32()
 }
 
 #[cfg(test)]

@@ -5,10 +5,8 @@ use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
-use rust_roguelike::glyph::{
-    DoubleGlyphFunctions, Glyph, DANGER_SQUARE_COLOR, KING_PATH_GLYPHS,
-    MOVE_AND_CAPTURE_SQUARE_CHARS, RED,
-};
+use rust_roguelike::glyph::glyph_constants::*;
+use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph};
 use rust_roguelike::piece::{Faction, Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
@@ -309,9 +307,7 @@ fn test_particles_on_piece_death() {
     let graphics = game.borrow_graphics_mut();
 
     let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
-    assert!(
-        Glyph::char_is_braille(glyphs[0].character) || Glyph::char_is_braille(glyphs[1].character)
-    )
+    assert!(glyphs[0].is_braille() || (glyphs[1].is_braille()))
 }
 
 #[test]

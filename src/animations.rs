@@ -10,6 +10,8 @@ use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
+use crate::glyph::braille::world_points_for_braille_line;
+use crate::utility::world_square_to_left_world_character_square;
 use crate::{
     is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step,
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
@@ -78,8 +80,7 @@ impl FloatyLaser {
 
 impl Animation for FloatyLaser {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
-        let mut line_points: Vec<WorldPoint> =
-            Glyph::world_points_for_braille_line(self.start, self.end);
+        let mut line_points: Vec<WorldPoint> = world_points_for_braille_line(self.start, self.end);
         // pretty arbitrary
         let hash = ((self.start.x * PI + self.start.y)
             * 1000.0
@@ -218,7 +219,7 @@ impl Animation for StaticBoard {
                 let world_square = WorldSquare::new(x as i32, y as i32);
                 let glyph = Glyph::new(' ', BLACK, Graphics::board_color_at_square(world_square));
                 let left_character_square =
-                    Glyph::world_square_to_left_world_character_square(world_square);
+                    world_square_to_left_world_character_square(world_square);
                 let right_character_square = left_character_square + vec2(1, 0);
                 glyphs.insert(left_character_square, glyph);
                 glyphs.insert(right_character_square, glyph);

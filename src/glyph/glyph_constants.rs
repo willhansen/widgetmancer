@@ -30,7 +30,6 @@ pub const RIGHT_HALF_BLOCK: char = '▐';
 
 pub const FULL_BLOCK: char = '█';
 pub const SPACE: char = ' ';
-pub const EMPTY_BRAILLE: char = '\u{2800}';
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
     SPACE,
@@ -47,9 +46,6 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] =
     &[SPACE, '▁', '▂', '▃', '▄', '▅', '▆', '▇', FULL_BLOCK];
 
 pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
-
-pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
-pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 
 // ●○ ⚬⦁⚫⚪ ✕ ✕
 // ✕ ⨉ ⨯ 🞨 🞮 ×
