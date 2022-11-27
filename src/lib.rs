@@ -34,6 +34,7 @@ use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
+use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 
 use glyph::*;
 use utility::*;
@@ -77,9 +78,10 @@ pub fn do_everything() {
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut writable = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
-        MouseTerminal::from(stdout().into_raw_mode().unwrap()),
-    ));
+    let mut writable =
+        termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
+            .into_alternate_screen()
+            .unwrap();
 
     set_up_panic_hook();
 
