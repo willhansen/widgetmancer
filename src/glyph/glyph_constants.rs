@@ -27,6 +27,15 @@ pub const BLOCK_FG: RGB8 = GREY;
 
 pub const LEFT_HALF_BLOCK: char = '▌';
 pub const RIGHT_HALF_BLOCK: char = '▐';
+pub const UPPER_ONE_THIRD_BLOCK: char = '🬂';
+pub const UPPER_TWO_THIRD_BLOCK: char = '🬎';
+pub const LOWER_ONE_THIRD_BLOCK: char = '🬭';
+pub const LOWER_TWO_THIRD_BLOCK: char = '🬹';
+
+pub const UPPER_RIGHT_HALF_BLOCK_TRIANGLE: char = '◥';
+pub const UPPER_LEFT_HALF_BLOCK_TRIANGLE: char = '◤';
+pub const LOWER_RIGHT_HALF_BLOCK_TRIANGLE: char = '◢';
+pub const LOWER_LEFT_HALF_BLOCK_TRIANGLE: char = '◣';
 
 pub const FULL_BLOCK: char = '█';
 pub const SPACE: char = ' ';

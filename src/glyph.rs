@@ -740,24 +740,6 @@ mod tests {
     }
 
     #[test]
-    fn test_world_pos_to_character_world_pos() {
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                0.0, 0.0,
-            )),
-            "zero is actually between two characters"
-        );
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                1.0, 1.0,
-            )),
-            "diagonal a bit"
-        );
-    }
-
-    #[test]
     fn test_double_glyph_square_offset__up() {
         // offset up
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
