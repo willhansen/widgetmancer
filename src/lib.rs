@@ -6,11 +6,13 @@
 #![feature(duration_consts_float)]
 #![feature(int_abs_diff)]
 #![feature(inline_const_pat)]
+#![feature(is_some_with)]
 
 #[macro_use]
 extern crate approx;
 extern crate line_drawing;
 extern crate num;
+extern crate shrinkwraprs;
 extern crate std;
 extern crate termion;
 
@@ -51,6 +53,7 @@ mod graphics;
 mod inputmap;
 pub mod piece;
 pub mod utility;
+pub mod utils_for_tests;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {

@@ -13,12 +13,7 @@ use rust_roguelike::utility::{
     RIGHT_I, STEP_DOWN, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
 };
 
-use crate::utils_for_tests::{
-    set_up_game, set_up_game_with_player, set_up_nxn_game, set_up_pawn_threatening_player,
-    set_up_player_facing_n_pawns_m_blocks_up, set_up_player_facing_pawn_on_left,
-};
-
-mod utils_for_tests;
+use rust_roguelike::utils_for_tests::*;
 
 #[test]
 fn test_walk_in_circle() {

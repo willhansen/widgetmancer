@@ -13,9 +13,13 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
+use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};
-use crate::utility::{king_distance, reversed, SquareSet};
+use crate::utility::{
+    king_distance, reversed, SquareSet, WorldCharacterSquare, WorldCharacterSquareToCharMap,
+    WorldSquareGlyphMap,
+};
 use crate::{
     lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
     IPoint, IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare,
@@ -25,6 +29,22 @@ use crate::{
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: WorldStep,
+}
+
+// trying out the newtype pattern
+#[derive(shrinkwraprs::Shrinkwrap)]
+pub struct FOVMask(WorldSquareGlyphMap);
+impl FOVMask {
+    pub fn square_is_fully_visible(&self, square: WorldSquare) -> bool {
+        self.get(&square).is_some_with(|glyphs| {
+            glyphs
+                .iter()
+                .all(|g| g.character == SPACE && g.bg_transparent)
+        })
+    }
+    pub fn square_is_not_visible(&self, square: WorldSquare) -> bool {
+        self.get(&square).is_none()
+    }
 }
 
 pub struct Game {
@@ -696,10 +716,17 @@ impl Game {
     fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
         todo!()
     }
+    fn fov_mask_for_player(&self) -> FOVMask {
+        todo!()
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utility::{
+        STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
+    };
+    use crate::utils_for_tests::*;
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -713,10 +740,50 @@ mod tests {
 
     #[test]
     fn test_blocks_block_view() {
-        let mut game = Game::new(20, 10, Instant::now());
+        let mut game = set_up_game();
         game.place_player(point2(5, 5));
         game.place_block(point2(5, 4));
         let test_square = point2(5, 3);
         assert_false!(game.square_is_fully_visible_to_player(test_square));
+    }
+
+    #[test]
+    fn test_fov_mask_non_partials() {
+        let mut game = set_up_game();
+        game.place_player(point2(5, 5));
+        for i in 0..4 {
+            game.place_block(game.player_square() + STEP_DOWN + STEP_RIGHT * i);
+        }
+        let fov_mask = game.fov_mask_for_player();
+        let relative_squares_that_should_be_fully_visible = vec![
+            STEP_RIGHT,
+            STEP_UP_RIGHT,
+            STEP_UP,
+            STEP_RIGHT * 2,
+            STEP_UP_LEFT,
+            STEP_LEFT,
+        ];
+        let relative_squares_that_should_be_fully_blocked = vec![
+            STEP_DOWN * 2,
+            STEP_DOWN * 2 + STEP_RIGHT,
+            STEP_DOWN * 2 + STEP_RIGHT * 2,
+            STEP_DOWN * 2 + STEP_RIGHT * 3,
+        ];
+        for step in relative_squares_that_should_be_fully_visible {
+            let square = game.player_square() + step;
+            assert!(
+                fov_mask.square_is_fully_visible(square),
+                "should be fully visible.  square: {}",
+                point_to_string(square)
+            );
+        }
+        for step in relative_squares_that_should_be_fully_blocked {
+            let square = game.player_square() + step;
+            assert!(
+                fov_mask.square_is_not_visible(square),
+                "should be fully blocked.  square: {}",
+                point_to_string(square)
+            );
+        }
     }
 }

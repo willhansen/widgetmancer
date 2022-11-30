@@ -1,7 +1,7 @@
+use crate::game::Game;
+use crate::piece::Piece;
+use crate::utility::{WorldSquare, WorldStep, LEFT_I, RIGHT_I, UP_I};
 use euclid::point2;
-use rust_roguelike::game::Game;
-use rust_roguelike::piece::Piece;
-use rust_roguelike::utility::{WorldSquare, WorldStep, LEFT_I, RIGHT_I, UP_I};
 use std::time::Instant;
 
 pub fn set_up_nxn_game(board_size: u32) -> Game {
