@@ -224,7 +224,17 @@ pub fn line_and_inside_point_to_angled_block_character(
             SPACE
         }
     } else {
-        todo!()
+        if is_clockwise(snapped_points[0], snapped_points[1], inside_point) {
+            get_character_from_snap_points(
+                snap_to_grid(snapped_points[0]),
+                snap_to_grid(snapped_points[1]),
+            )
+        } else {
+            get_character_from_snap_points(
+                snap_to_grid(snapped_points[1]),
+                snap_to_grid(snapped_points[0]),
+            )
+        }
     }
 }
 

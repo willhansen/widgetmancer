@@ -21,6 +21,7 @@ pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
 pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
 pub const DANGER_SQUARE_COLOR: RGB8 = RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
+pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
 
 pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = GREY;

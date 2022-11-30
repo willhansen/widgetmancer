@@ -693,10 +693,14 @@ impl Game {
                 .expect("random king placement");
         }
     }
+    fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
+        todo!()
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
@@ -705,5 +709,14 @@ mod tests {
         game.place_player(point2(5, 5));
         game.place_block(point2(3, 3));
         assert!(game.try_set_player_position(point2(3, 3)).is_err());
+    }
+
+    #[test]
+    fn test_blocks_block_view() {
+        let mut game = Game::new(20, 10, Instant::now());
+        game.place_player(point2(5, 5));
+        game.place_block(point2(5, 4));
+        let test_square = point2(5, 3);
+        assert_false!(game.square_is_fully_visible_to_player(test_square));
     }
 }

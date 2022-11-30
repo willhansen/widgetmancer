@@ -10,7 +10,7 @@ use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph};
 use rust_roguelike::piece::{Faction, Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
-    RIGHT_I, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
+    RIGHT_I, STEP_DOWN, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
 };
 
 use crate::utils_for_tests::{
@@ -599,4 +599,20 @@ fn test_one_move_per_faction_per_turn() {
     let positions_after: HashSet<WorldSquare> = HashSet::from_iter(game.pieces().keys().cloned());
 
     assert_eq!(positions_before.intersection(&positions_after).count(), 2);
+}
+
+#[test]
+fn test_blocks_block_view_visibly() {
+    let mut game = set_up_game();
+    game.place_player(point2(5, 5));
+    game.place_block(point2(5, 4));
+    let test_square = point2(5, 3);
+    game.draw_headless_now();
+    for dy in 0..3 {
+        assert!(game
+            .graphics()
+            .get_buffered_glyphs_for_square(test_square + STEP_DOWN * dy)
+            .iter()
+            .all(|g| g.looks_solid_color(OUT_OF_SIGHT_COLOR)));
+    }
 }

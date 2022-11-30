@@ -6,6 +6,7 @@ use std::fmt::Display;
 use std::ops::Neg;
 
 use euclid::*;
+use itertools::Itertools;
 use num::traits::Signed;
 use rand::Rng;
 
@@ -316,25 +317,39 @@ pub fn line_intersections_with_centered_unit_square<U>(
         }
     } else {
         // y = mx + b
-        let m = (line_point_B.y - line_point_A.y) / (line_point_B.x - line_point_A.x);
+        let dy = line_point_B.y - line_point_A.y;
+        let dx = line_point_B.x - line_point_A.x;
+        let m = dy / dx;
+        // b = y - m*x
         let b = line_point_A.y - m * line_point_A.x;
 
-        let side_values = vec![0.5, -0.5];
+        let side_positions = vec![0.5, -0.5];
 
         let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
-        for &x in &side_values {
+        for &x in &side_positions {
             let y = m * x + b;
             if y.abs() <= 0.5 {
                 candidate_intersections.push(point2(x, y));
             }
         }
-        for y in side_values {
+        for y in side_positions {
             let x = (y - b) / m;
-            if x.abs() <= 0.5 {
+            // top and bottom don't catch corners, sides do
+            if x.abs() < 0.5 {
                 candidate_intersections.push(point2(x, y));
             }
         }
-        assert_eq!(candidate_intersections.len(), 2);
+        // this captures the edge case of corners
+        // remove duplicates
+        assert_eq!(
+            candidate_intersections.len(),
+            2,
+            "wrong number of intersections {}",
+            candidate_intersections
+                .iter()
+                .map(|&point| point_to_string(point))
+                .join(", ")
+        );
         if candidate_intersections[0] == candidate_intersections[1] {
             vec![candidate_intersections[0]]
         } else {

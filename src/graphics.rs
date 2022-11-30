@@ -775,9 +775,9 @@ mod tests {
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
-        g.print_output_buffer();
+        //g.print_output_buffer();
         g.draw_piece(Piece::pawn(), the_square);
-        g.print_output_buffer();
+        //g.print_output_buffer();
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);

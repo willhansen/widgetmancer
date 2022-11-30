@@ -396,7 +396,7 @@ impl Glyph {
         glyphs
     }
 
-    pub fn looks_solid_specifically(&self, color: RGB8) -> bool {
+    pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
             color == solid_color
         } else {
@@ -781,8 +781,8 @@ mod tests {
     fn test_double_glyph_square_offset__1_left() {
         // offset left
         let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
-        assert!(glyphs[0].looks_solid_specifically(RED));
-        assert!(glyphs[1].looks_solid_specifically(RED));
+        assert!(glyphs[0].looks_solid_color(RED));
+        assert!(glyphs[1].looks_solid_color(RED));
     }
 
     #[test]
@@ -790,7 +790,7 @@ mod tests {
         // offset left
         let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
         assert!(
-            glyphs[0].looks_solid_specifically(RED),
+            glyphs[0].looks_solid_color(RED),
             "glyph: {}",
             &glyphs[0].to_string()
         );
@@ -802,7 +802,7 @@ mod tests {
     fn test_double_glyph_square_offset__25_left() {
         // offset left
         let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
-        assert!(glyphs[0].looks_solid_specifically(RED));
+        assert!(glyphs[0].looks_solid_color(RED));
         assert_eq!(glyphs[1].character, '▌');
         assert_eq!(glyphs[1].fg_color, RED);
         assert_eq!(glyphs[1].bg_color, BLACK);
@@ -815,7 +815,7 @@ mod tests {
         assert_eq!(glyphs[0].character, '▌');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
-        assert!(glyphs[1].looks_solid_specifically(BLACK));
+        assert!(glyphs[1].looks_solid_color(BLACK));
     }
 
     #[test]
@@ -825,15 +825,15 @@ mod tests {
         assert_eq!(glyphs[0].character, '▌');
         assert_eq!(glyphs[0].fg_color, BLACK);
         assert_eq!(glyphs[0].bg_color, RED);
-        assert!(glyphs[1].looks_solid_specifically(RED));
+        assert!(glyphs[1].looks_solid_color(RED));
     }
 
     #[test]
     fn test_double_glyph_square_offset__50_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
-        assert!(glyphs[0].looks_solid_specifically(BLACK));
-        assert!(glyphs[1].looks_solid_specifically(RED));
+        assert!(glyphs[0].looks_solid_color(BLACK));
+        assert!(glyphs[1].looks_solid_color(RED));
     }
 
     #[test]
@@ -853,12 +853,12 @@ mod tests {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
         assert!(
-            glyphs[0].looks_solid_specifically(BLACK),
+            glyphs[0].looks_solid_color(BLACK),
             "glyph: {}",
             &glyphs[0].to_string()
         );
         assert!(
-            glyphs[1].looks_solid_specifically(BLACK),
+            glyphs[1].looks_solid_color(BLACK),
             "glyph: {}",
             &glyphs[1].to_string()
         );
@@ -870,7 +870,7 @@ mod tests {
         let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0], Glyph::new(LEFT_HALF_BLOCK, RED, BLACK));
         assert!(
-            glyphs[1].looks_solid_specifically(BLACK),
+            glyphs[1].looks_solid_color(BLACK),
             "glyph: {}",
             &glyphs[1].to_string()
         );
@@ -882,7 +882,7 @@ mod tests {
     fn test_character_square_horizontal_offset__base_case() {
         assert!(
             Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK)
-                .looks_solid_specifically(RED)
+                .looks_solid_color(RED)
         );
     }
 
@@ -890,12 +890,12 @@ mod tests {
     fn test_character_square_horizontal_offset__round_to_zero() {
         assert!(
             Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK)
-                .looks_solid_specifically(RED)
+                .looks_solid_color(RED)
         );
 
         assert!(
             Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK)
-                .looks_solid_specifically(RED)
+                .looks_solid_color(RED)
         );
     }
 
@@ -927,11 +927,11 @@ mod tests {
     fn test_character_square_horizontal_offset__match_opposite_ends() {
         assert!(
             Glyph::colored_character_square_with_offset(false, -1.0, RED, BLACK)
-                .looks_solid_specifically(BLACK)
+                .looks_solid_color(BLACK)
         );
         assert!(
             Glyph::colored_character_square_with_offset(false, 1.0, RED, BLACK)
-                .looks_solid_specifically(BLACK)
+                .looks_solid_color(BLACK)
         );
     }
 
