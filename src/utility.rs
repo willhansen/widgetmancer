@@ -408,6 +408,22 @@ pub fn is_world_character_square_left_square_of_world_square(
     )) == character_square
 }
 
+pub fn octant_to_outward_and_across_directions(octant_number: i32) -> (WorldStep, WorldStep) {
+    let reduced_octant = octant_number.rem_euclid(8);
+    // TODO: probably make this an actual equation
+    match reduced_octant {
+        0 => (STEP_RIGHT, STEP_UP),
+        1 => (STEP_UP, STEP_RIGHT),
+        2 => (STEP_UP, STEP_LEFT),
+        3 => (STEP_LEFT, STEP_UP),
+        4 => (STEP_LEFT, STEP_DOWN),
+        5 => (STEP_DOWN, STEP_LEFT),
+        6 => (STEP_DOWN, STEP_RIGHT),
+        7 => (STEP_RIGHT, STEP_DOWN),
+        _ => panic!("bad octant: {}", reduced_octant),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::assert_false;

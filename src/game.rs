@@ -13,12 +13,13 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
+use crate::fov_stuff::FOVMask;
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};
 use crate::utility::{
-    king_distance, reversed, SquareSet, WorldCharacterSquare, WorldCharacterSquareToCharMap,
-    WorldSquareGlyphMap,
+    king_distance, octant_to_outward_and_across_directions, reversed, SquareSet,
+    WorldCharacterSquare, WorldCharacterSquareToCharMap, WorldSquareGlyphMap,
 };
 use crate::{
     lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
@@ -29,22 +30,6 @@ use crate::{
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: WorldStep,
-}
-
-// trying out the newtype pattern
-#[derive(shrinkwraprs::Shrinkwrap)]
-pub struct FOVMask(WorldSquareGlyphMap);
-impl FOVMask {
-    pub fn square_is_fully_visible(&self, square: WorldSquare) -> bool {
-        self.get(&square).is_some_with(|glyphs| {
-            glyphs
-                .iter()
-                .all(|g| g.character == SPACE && g.bg_transparent)
-        })
-    }
-    pub fn square_is_not_visible(&self, square: WorldSquare) -> bool {
-        self.get(&square).is_none()
-    }
 }
 
 pub struct Game {
@@ -713,10 +698,21 @@ impl Game {
                 .expect("random king placement");
         }
     }
-    fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
-        todo!()
+    pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
+        self.fov_mask_for_player()
+            .get(&square)
+            .is_some_and(|glyphs| {
+                glyphs
+                    .iter()
+                    .all(|g| g.character == SPACE && g.bg_transparent)
+            })
     }
-    fn fov_mask_for_player(&self) -> FOVMask {
+    pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
+        self.fov_mask_for_player().get(&square).is_none()
+    }
+    fn fov_mask_for_player(&self) -> WorldSquareGlyphMap {
+        let view_range = 7;
+        let start_square = self.player_square();
         todo!()
     }
 }
@@ -754,7 +750,6 @@ mod tests {
         for i in 0..4 {
             game.place_block(game.player_square() + STEP_DOWN + STEP_RIGHT * i);
         }
-        let fov_mask = game.fov_mask_for_player();
         let relative_squares_that_should_be_fully_visible = vec![
             STEP_RIGHT,
             STEP_UP_RIGHT,
@@ -772,7 +767,7 @@ mod tests {
         for step in relative_squares_that_should_be_fully_visible {
             let square = game.player_square() + step;
             assert!(
-                fov_mask.square_is_fully_visible(square),
+                game.square_is_fully_visible_to_player(square),
                 "should be fully visible.  square: {}",
                 point_to_string(square)
             );
@@ -780,7 +775,7 @@ mod tests {
         for step in relative_squares_that_should_be_fully_blocked {
             let square = game.player_square() + step;
             assert!(
-                fov_mask.square_is_not_visible(square),
+                game.square_is_not_visible_to_player(square),
                 "should be fully blocked.  square: {}",
                 point_to_string(square)
             );

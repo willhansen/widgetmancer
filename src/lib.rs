@@ -6,7 +6,7 @@
 #![feature(duration_consts_float)]
 #![feature(int_abs_diff)]
 #![feature(inline_const_pat)]
-#![feature(is_some_with)]
+#![feature(is_some_and)]
 
 #[macro_use]
 extern crate approx;
@@ -47,6 +47,7 @@ use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
 pub mod animations;
+mod fov_stuff;
 pub mod game;
 pub mod glyph;
 mod graphics;
