@@ -13,7 +13,6 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
-use crate::fov_stuff::FOVMask;
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};

@@ -597,7 +597,7 @@ fn test_one_move_per_faction_per_turn() {
 }
 
 #[test]
-fn test_blocks_block_view_visibly() {
+fn test_blocks_visibly_block_view() {
     let mut game = set_up_game();
     game.place_player(point2(5, 5));
     game.place_block(point2(5, 4));
