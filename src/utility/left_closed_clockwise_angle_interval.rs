@@ -96,11 +96,25 @@ impl AngleIntervalSet {
     }
 
     fn standardize(&mut self) {
+        if self.intervals.is_empty() {
+            return;
+        }
         // sort by start angle
         self.intervals
             .sort_by_key(|i| OrderedFloat(i.start_angle.radians));
         while !self.is_valid() {
-            todo!()
+            let mut next_intervals = vec![];
+            let mut combined_interval = self.intervals[0];
+            for i in 1..self.intervals.len() {
+                let interval = self.intervals[i];
+                if combined_interval.overlaps_or_touches(interval) {
+                    combined_interval = combined_interval.union(interval);
+                } else {
+                    next_intervals.push(combined_interval);
+                    combined_interval = interval;
+                }
+            }
+            self.intervals = next_intervals;
         }
     }
 
@@ -287,5 +301,18 @@ mod tests {
         assert!(!base_interval.fully_contains_interval(complementary));
         assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_top));
         assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_bottom));
+    }
+    #[test]
+    fn test_standardize_angle_interval_set__no_change_required() {
+        let mut the_set = AngleIntervalSet {
+            intervals: vec![
+                LeftClosedClockwiseAngleInterval::from_degrees(80.0, 70.0),
+                LeftClosedClockwiseAngleInterval::from_degrees(60.0, 50.0),
+                LeftClosedClockwiseAngleInterval::from_degrees(40.0, 30.0),
+            ],
+        };
+        let the_clone = the_set.clone();
+        the_set.add_interval(LeftClosedClockwiseAngleInterval::from_degrees(35.0, 33.0));
+        assert_eq!(the_clone, the_set);
     }
 }
