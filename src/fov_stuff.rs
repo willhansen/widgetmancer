@@ -4,7 +4,7 @@ use euclid::{vec2, Angle};
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::SPACE;
-use crate::utility::closed_clockwise_angle_interval::{
+use crate::utility::left_closed_clockwise_angle_interval::{
     AngleIntervalSet, LeftClosedClockwiseAngleInterval,
 };
 use crate::utility::{
