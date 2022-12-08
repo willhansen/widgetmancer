@@ -1,4 +1,4 @@
-pub mod left_closed_clockwise_angle_interval;
+pub mod angle_interval;
 
 extern crate num;
 

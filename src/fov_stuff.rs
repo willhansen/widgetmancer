@@ -4,9 +4,7 @@ use euclid::{vec2, Angle};
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::SPACE;
-use crate::utility::left_closed_clockwise_angle_interval::{
-    AngleIntervalSet, LeftClosedClockwiseAngleInterval,
-};
+use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::{
     octant_to_outward_and_across_directions, SquareSet, WorldMove, WorldPoint, WorldSquare,
     WorldSquareGlyphMap, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
@@ -72,7 +70,7 @@ pub fn field_of_view_from_square(
 pub fn angle_interval_of_square(
     sight_center: WorldSquare,
     blocking_square: WorldSquare,
-) -> LeftClosedClockwiseAngleInterval {
+) -> AngleInterval {
     assert_ne!(sight_center, blocking_square);
     let relative_square = blocking_square - sight_center;
     let rel_square_center = relative_square.to_f32();
@@ -98,11 +96,12 @@ pub fn angle_interval_of_square(
         .max_by_key(|&&c| OrderedFloat(center_angle.angle_to(c).radians))
         .unwrap();
 
-    LeftClosedClockwiseAngleInterval {
-        start_angle: *least_clockwise,
-        end_angle: *most_clockwise,
+    AngleInterval {
+        anticlockwise_end: *least_clockwise,
+        clockwise_end: *most_clockwise,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use euclid::point2;
@@ -118,8 +117,11 @@ mod tests {
         let correct_start_angle = WorldMove::new(2.5, 0.5).angle_from_x_axis();
         let correct_end_angle = WorldMove::new(2.5, -0.5).angle_from_x_axis();
 
-        assert_about_eq!(view_angle.start_angle.radians, correct_start_angle.radians);
-        assert_about_eq!(view_angle.end_angle.radians, correct_end_angle.radians);
+        assert_about_eq!(
+            view_angle.anticlockwise_end.radians,
+            correct_start_angle.radians
+        );
+        assert_about_eq!(view_angle.clockwise_end.radians, correct_end_angle.radians);
     }
 
     #[test]
@@ -128,7 +130,10 @@ mod tests {
         let correct_start_angle = WorldMove::new(4.5, 3.5).angle_from_x_axis();
         let correct_end_angle = WorldMove::new(5.5, 2.5).angle_from_x_axis();
 
-        assert_about_eq!(view_angle.start_angle.radians, correct_start_angle.radians);
-        assert_about_eq!(view_angle.end_angle.radians, correct_end_angle.radians);
+        assert_about_eq!(
+            view_angle.anticlockwise_end.radians,
+            correct_start_angle.radians
+        );
+        assert_about_eq!(view_angle.clockwise_end.radians, correct_end_angle.radians);
     }
 }

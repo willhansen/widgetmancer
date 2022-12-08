@@ -1,0 +1,393 @@
+use std::fmt::{Display, Formatter};
+use std::ops::{Add, Sub};
+
+use euclid::Angle;
+use itertools::Itertools;
+use ordered_float::OrderedFloat;
+use termion::cursor::Left;
+
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct AngleInterval {
+    pub anticlockwise_end: Angle<f32>,
+    pub clockwise_end: Angle<f32>,
+}
+
+impl AngleInterval {
+    fn new(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
+        AngleInterval {
+            anticlockwise_end,
+            clockwise_end,
+        }
+    }
+    fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
+        Self::new(
+            Angle::degrees(clockwise_end_in_degrees),
+            Angle::degrees(anticlockwise_end_in_degrees),
+        )
+    }
+    fn union(&self, other: AngleInterval) -> Self {
+        assert!(self.overlaps(other) || self.exactly_touches(other));
+        let result = AngleInterval {
+            anticlockwise_end: if self.contains_or_touches_angle(other.anticlockwise_end) {
+                self.anticlockwise_end
+            } else {
+                other.anticlockwise_end
+            },
+            clockwise_end: if self.contains_or_touches_angle(other.clockwise_end) {
+                self.clockwise_end
+            } else {
+                other.clockwise_end
+            },
+        };
+        //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
+        result
+    }
+    fn overlaps(&self, other: AngleInterval) -> bool {
+        self.contains_angle(other.anticlockwise_end)
+            || (self.contains_angle(other.clockwise_end)
+                && self.anticlockwise_end != other.clockwise_end)
+            || other.contains_angle(self.anticlockwise_end)
+            || (other.contains_angle(self.clockwise_end)
+                && other.anticlockwise_end != self.clockwise_end)
+    }
+    fn exactly_touches(&self, other: AngleInterval) -> bool {
+        self.clockwise_end == other.anticlockwise_end
+            || other.clockwise_end == self.anticlockwise_end
+    }
+    fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
+        self.overlaps(other) || self.exactly_touches(other)
+    }
+    fn contains_angle(&self, angle: Angle<f32>) -> bool {
+        // special case for zero length interval
+        // TODO: full circle arc instead?
+        if self.anticlockwise_end == self.clockwise_end {
+            return angle == self.anticlockwise_end;
+        }
+
+        let interval_is_less_than_half_circle =
+            self.anticlockwise_end.angle_to(self.clockwise_end).radians < 0.0;
+        if interval_is_less_than_half_circle {
+            self.anticlockwise_end.angle_to(angle).radians <= 0.0
+                && self.clockwise_end.angle_to(angle).radians > 0.0
+        } else {
+            self.anticlockwise_end.angle_to(angle).radians <= 0.0
+                || self.clockwise_end.angle_to(angle).radians > 0.0
+        }
+    }
+    fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
+        self.contains_angle(angle) || self.clockwise_end == angle
+    }
+
+    fn fully_contains_interval(&self, other: AngleInterval) -> bool {
+        let contains_other_edges = self.contains_angle(other.anticlockwise_end)
+            && self.contains_or_touches_angle(other.clockwise_end);
+        let other_firmly_contains_any_of_these_edges = (other
+            .contains_angle(self.anticlockwise_end)
+            && other.anticlockwise_end != self.anticlockwise_end)
+            || other.contains_angle(self.clockwise_end);
+        contains_other_edges && !other_firmly_contains_any_of_these_edges
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct AngleIntervalSet {
+    intervals: Vec<AngleInterval>,
+}
+
+impl AngleIntervalSet {
+    pub fn new() -> Self {
+        AngleIntervalSet { intervals: vec![] }
+    }
+
+    fn standardize(&mut self) {
+        if self.intervals.is_empty() {
+            return;
+        }
+        // sort by start angle
+        self.intervals
+            .sort_by_key(|i| OrderedFloat(i.clockwise_end.radians));
+        let mut new_intervals = vec![];
+        let mut accumulating_interval = self.intervals[0];
+        println!("-------");
+        for i in 1..self.intervals.len() {
+            println!("{}", accumulating_interval);
+            let interval = self.intervals[i];
+            if accumulating_interval.overlaps_or_touches(interval) {
+                accumulating_interval = accumulating_interval.union(interval);
+            } else {
+                new_intervals.push(accumulating_interval);
+                accumulating_interval = interval;
+            }
+            let is_last_interval = i == self.intervals.len() - 1;
+            let is_only_interval = new_intervals.is_empty();
+            if is_last_interval {
+                if !is_only_interval && accumulating_interval.overlaps_or_touches(new_intervals[0])
+                {
+                    new_intervals[0] = new_intervals[0].union(accumulating_interval);
+                } else {
+                    new_intervals.push(accumulating_interval);
+                }
+            }
+        }
+        self.intervals = new_intervals;
+    }
+
+    fn is_valid(&self) -> bool {
+        let sorted = self.intervals.is_sorted_by_key(|i| i.clockwise_end);
+        if !sorted {
+            return false;
+        }
+        if self.intervals.len() < 2 {
+            return true;
+        }
+        let has_bad_overlap = self
+            .intervals
+            .iter()
+            .circular_tuple_windows()
+            .any(|(&interval, &next_interval)| interval.overlaps_or_touches(next_interval));
+        !has_bad_overlap
+    }
+
+    pub fn add_interval(&mut self, interval: AngleInterval) {
+        self.intervals.push(interval);
+        println!("{}", self);
+        self.standardize();
+    }
+    pub fn fully_contains_interval(&self, interval: AngleInterval) -> bool {
+        self.intervals
+            .iter()
+            .any(|i| i.fully_contains_interval(interval))
+    }
+    pub fn overlaps_interval(&self, interval: AngleInterval) -> bool {
+        self.intervals.iter().any(|i| i.overlaps(interval))
+    }
+}
+
+impl Display for AngleInterval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "From {:.1}° to {:.1}°",
+            self.clockwise_end.to_degrees(),
+            self.anticlockwise_end.to_degrees()
+        )
+    }
+}
+
+impl Display for AngleIntervalSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "contained_intervals:")?;
+        if self.intervals.is_empty() {
+            write!(f, "\n    none")?;
+        }
+        for interval in &self.intervals {
+            write!(f, "\n    {}", interval)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ntest::assert_false;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
+
+    #[test]
+    fn test_interval_overlap() {
+        let interval_b = AngleInterval::from_degrees(5.0, 15.0);
+        let interval_a = AngleInterval::from_degrees(0.0, 10.0);
+
+        assert!(interval_a.overlaps(interval_a), "self overlap");
+        assert!(interval_b.overlaps(interval_b), "other self overlap");
+        assert!(interval_a.overlaps(interval_b), "basic overlap");
+        assert!(interval_b.overlaps(interval_a), "commutative");
+    }
+
+    #[test]
+    fn test_interval_overlap_edges() {
+        let interval_a = AngleInterval::from_degrees(0.0, 10.0);
+        let interval_c = AngleInterval::from_degrees(10.0, 50.0);
+        assert!(
+            !interval_a.overlaps(interval_c),
+            "touching edges should not count as overlap"
+        );
+    }
+
+    #[test]
+    fn test_interval_contains_angle() {
+        assert!(
+            AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(5.0)),
+            "simple case"
+        );
+        assert!(
+            !AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(15.0)),
+            "simple outside bounds case"
+        );
+        assert!(
+            AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(10.0)),
+            "On left bound should be inside"
+        );
+        assert!(
+            !AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(0.0)),
+            "On right bound should NOT be inside"
+        );
+        assert!(
+            !AngleInterval::from_degrees(10.0, 0.0).contains_angle(Angle::degrees(5.0)),
+            "outside a large arc"
+        );
+        assert!(
+            AngleInterval::from_degrees(10.0, 0.0).contains_angle(Angle::degrees(180.0)),
+            "inside a large arc"
+        );
+        assert!(
+            !AngleInterval::from_degrees(0.0, 0.0).contains_angle(Angle::degrees(180.0)),
+            "directly across from zero width interval"
+        );
+    }
+
+    #[test]
+    fn test_angle_interval_union() {
+        assert_eq!(
+            AngleInterval::from_degrees(80.0, 100.0).union(AngleInterval::from_degrees(40.0, 90.0)),
+            AngleInterval::from_degrees(40.0, 100.0),
+            "from overlap"
+        );
+
+        assert_eq!(
+            AngleInterval::from_degrees(80.0, 100.0).union(AngleInterval::from_degrees(40.0, 80.0)),
+            AngleInterval::from_degrees(40.0, 100.0),
+            "from exactly touching"
+        );
+    }
+
+    #[test]
+    fn test_angle_interval_set__standardization() {
+        let mut angle_interval_set = AngleIntervalSet {
+            intervals: vec![
+                AngleInterval::from_degrees(10.0, 15.0),
+                AngleInterval::from_degrees(15.0, 30.0),
+            ],
+        };
+        println!("{}", angle_interval_set);
+        assert!(!angle_interval_set.is_valid());
+        angle_interval_set.standardize();
+        println!("{}", angle_interval_set);
+        assert!(angle_interval_set.is_valid());
+        assert_eq!(
+            angle_interval_set,
+            AngleIntervalSet {
+                intervals: vec![AngleInterval::from_degrees(10.0, 30.0)]
+            }
+        );
+    }
+
+    #[test]
+    fn test_angle_interval_set__overlap_and_adding() {
+        let mut angle_interval_set = AngleIntervalSet::default();
+        let interval = AngleInterval::from_degrees(30.0, 45.0);
+        assert_false!(angle_interval_set.overlaps_interval(interval));
+        angle_interval_set.add_interval(AngleInterval::from_degrees(10.0, 35.0));
+
+        println!("{}", interval);
+        println!("{}", angle_interval_set);
+        assert!(angle_interval_set.overlaps_interval(interval));
+        assert_false!(angle_interval_set.fully_contains_interval(interval));
+
+        angle_interval_set.add_interval(interval);
+
+        assert!(angle_interval_set.overlaps_interval(interval));
+        assert!(angle_interval_set.fully_contains_interval(interval));
+    }
+
+    #[test]
+    fn test_interval_fully_contain_other_interval() {
+        assert!(
+            AngleInterval::from_degrees(-10.0, 10.0)
+                .fully_contains_interval(AngleInterval::from_degrees(-5.0, 5.0)),
+            "simple positive"
+        );
+
+        assert!(
+            !AngleInterval::from_degrees(-10.0, 10.0)
+                .fully_contains_interval(AngleInterval::from_degrees(5.0, -5.0)),
+            "contains endpoints, but not the middle"
+        );
+
+        assert!(
+            AngleInterval::from_degrees(5.0, -5.0)
+                .fully_contains_interval(AngleInterval::from_degrees(10.0, -10.0)),
+            "big angle fully contained"
+        );
+    }
+
+    #[test]
+    fn test_interval_fully_contain_other_interval__edge_cases() {
+        let z = 70.374;
+        let a = 50.342;
+        let aa = 30.342;
+        let ab = 20.342;
+        let b = 3.14567;
+        let c = 1.2345;
+        let base_interval = AngleInterval::from_degrees(b, a);
+        let touching_below = AngleInterval::from_degrees(c, b);
+        let touching_above = AngleInterval::from_degrees(a, z);
+        let overlapping_below = AngleInterval::from_degrees(c, aa);
+        let overlapping_above = AngleInterval::from_degrees(aa, z);
+        let inside_touching_start = AngleInterval::from_degrees(aa, a);
+        let inside_touching_end = AngleInterval::from_degrees(b, aa);
+        let edges_in_but_wraparound = AngleInterval::from_degrees(aa, ab);
+        let complementary = AngleInterval::from_degrees(a, b);
+        let complementary_but_overlapping_top = AngleInterval::from_degrees(aa, b);
+        let complementary_but_overlapping_bottom = AngleInterval::from_degrees(a, ab);
+
+        assert!(base_interval.fully_contains_interval(base_interval));
+        assert!(!base_interval.fully_contains_interval(touching_below));
+        assert!(!base_interval.fully_contains_interval(touching_above));
+        assert!(!base_interval.fully_contains_interval(overlapping_below));
+        assert!(!base_interval.fully_contains_interval(overlapping_above));
+        assert!(base_interval.fully_contains_interval(inside_touching_start));
+        assert!(base_interval.fully_contains_interval(inside_touching_end));
+        assert!(!base_interval.fully_contains_interval(edges_in_but_wraparound));
+        assert!(!base_interval.fully_contains_interval(complementary));
+        assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_top));
+        assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_bottom));
+    }
+
+    #[test]
+    fn test_angle_interval_set__standardize_but_no_change_required() {
+        let mut the_set = AngleIntervalSet {
+            intervals: vec![
+                AngleInterval::from_degrees(30.0, 40.0),
+                AngleInterval::from_degrees(50.0, 60.0),
+                AngleInterval::from_degrees(70.0, 80.0),
+            ],
+        };
+        let before_adding = the_set.clone();
+        the_set.add_interval(AngleInterval::from_degrees(33.0, 35.0));
+        assert_eq!(before_adding, the_set);
+    }
+    #[test]
+    fn test_angle_interval_set_validity() {
+        assert!(AngleIntervalSet {
+            intervals: vec![AngleInterval::from_degrees(10.0, 20.0)]
+        }
+        .is_valid());
+
+        assert!(AngleIntervalSet {
+            intervals: vec![
+                AngleInterval::from_degrees(10.0, 20.0),
+                AngleInterval::from_degrees(30.0, 50.0),
+            ]
+        }
+        .is_valid());
+        assert!(!AngleIntervalSet {
+            intervals: vec![
+                AngleInterval::from_degrees(10.0, 20.0),
+                AngleInterval::from_degrees(20.0, 50.0),
+            ]
+        }
+        .is_valid());
+    }
+}
