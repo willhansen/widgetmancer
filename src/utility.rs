@@ -3,7 +3,7 @@ pub mod angle_interval;
 extern crate num;
 
 use std::collections::{HashMap, HashSet};
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 use std::fmt::Display;
 use std::ops::Neg;
 
@@ -76,6 +76,15 @@ pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
 pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
 pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
+
+#[derive(Copy, Clone)]
+pub struct Line<U> {
+    pub p1: Point2D<f32, U>,
+    pub p2: Point2D<f32, U>,
+}
+
+pub type WorldLine = Line<SquareGridInWorldFrame>;
+pub type LocalCharacterLine = Line<CharacterGridInLocalCharacterFrame>;
 
 pub fn sign(x: f32) -> f32 {
     if x < 0.0 {
@@ -402,6 +411,13 @@ pub fn world_square_to_left_world_character_square(
         .to_i32()
 }
 
+pub fn world_point_to_local_character_point(
+    world_point: WorldPoint,
+    origin_character_square: WorldCharacterSquare,
+) -> LocalCharacterPoint {
+    todo!()
+}
+
 pub fn is_world_character_square_left_square_of_world_square(
     character_square: WorldCharacterSquare,
 ) -> bool {
@@ -424,6 +440,10 @@ pub fn octant_to_outward_and_across_directions(octant_number: i32) -> (WorldStep
         7 => (STEP_RIGHT, STEP_DOWN),
         _ => panic!("bad octant: {}", reduced_octant),
     }
+}
+
+pub fn point_clockwise_of_line(line: &WorldLine) -> WorldPoint {
+    line.p1 + rotate_vect((line.p2 - line.p1), -PI / 2.0)
 }
 
 #[cfg(test)]

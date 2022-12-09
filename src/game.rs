@@ -13,6 +13,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
+use crate::fov_stuff::field_of_view_from_square;
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};
@@ -712,7 +713,7 @@ impl Game {
     fn fov_mask_for_player(&self) -> WorldSquareGlyphMap {
         let view_range = 7;
         let start_square = self.player_square();
-        todo!()
+        field_of_view_from_square(start_square, &self.blocks).as_glyph_mask()
     }
 }
 #[cfg(test)]

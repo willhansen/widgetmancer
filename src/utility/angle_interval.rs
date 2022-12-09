@@ -100,7 +100,7 @@ impl AngleIntervalSet {
     }
 
     fn standardize(&mut self) {
-        if self.intervals.is_empty() {
+        if (0..=1).contains(&self.intervals.len()) {
             return;
         }
         // sort by start angle
@@ -282,23 +282,39 @@ mod tests {
             }
         );
     }
+    #[test]
+    fn test_angle_interval_set__standardize_with_one() {
+        let interval = AngleInterval::from_degrees(15.0, 30.0);
+        let mut angle_interval_set = AngleIntervalSet {
+            intervals: vec![interval],
+        };
+        assert_false!(angle_interval_set.intervals.is_empty());
+        angle_interval_set.standardize();
+        assert_false!(angle_interval_set.intervals.is_empty());
+    }
 
     #[test]
     fn test_angle_interval_set__overlap_and_adding() {
         let mut angle_interval_set = AngleIntervalSet::default();
-        let interval = AngleInterval::from_degrees(30.0, 45.0);
-        assert_false!(angle_interval_set.overlaps_interval(interval));
-        angle_interval_set.add_interval(AngleInterval::from_degrees(10.0, 35.0));
+        assert!(angle_interval_set.intervals.is_empty());
 
-        println!("{}", interval);
-        println!("{}", angle_interval_set);
-        assert!(angle_interval_set.overlaps_interval(interval));
-        assert_false!(angle_interval_set.fully_contains_interval(interval));
+        let interval_a = AngleInterval::from_degrees(30.0, 45.0);
+        let interval_b = AngleInterval::from_degrees(10.0, 35.0);
+        assert_false!(angle_interval_set.overlaps_interval(interval_a));
+        angle_interval_set.add_interval(interval_b);
 
-        angle_interval_set.add_interval(interval);
+        assert_false!(angle_interval_set.intervals.is_empty());
 
-        assert!(angle_interval_set.overlaps_interval(interval));
-        assert!(angle_interval_set.fully_contains_interval(interval));
+        println!("interval a: {}", interval_a);
+        println!("interval b: {}", interval_b);
+        println!("the set: {}", angle_interval_set);
+        assert!(angle_interval_set.overlaps_interval(interval_a));
+        assert_false!(angle_interval_set.fully_contains_interval(interval_a));
+
+        angle_interval_set.add_interval(interval_a);
+
+        assert!(angle_interval_set.overlaps_interval(interval_a));
+        assert!(angle_interval_set.fully_contains_interval(interval_a));
     }
 
     #[test]

@@ -1,23 +1,22 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::glyph::angled_blocks::line_and_inside_point_to_angled_block_character;
+use crate::glyph::{DoubleGlyph, Glyph};
 use euclid::{vec2, Angle};
 use ordered_float::OrderedFloat;
 
-use crate::glyph::glyph_constants::SPACE;
+use crate::glyph::glyph_constants::{BLACK, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::{
-    octant_to_outward_and_across_directions, SquareSet, WorldMove, WorldPoint, WorldSquare,
-    WorldSquareGlyphMap, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    octant_to_outward_and_across_directions, point_clockwise_of_line,
+    world_point_to_local_character_point, world_square_to_left_world_character_square, SquareSet,
+    WorldLine, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
-pub struct Line {
-    p1: WorldPoint,
-    p2: WorldPoint,
-}
-
 pub struct PartialVisibilityOfASquare {
-    chosen_dividing_line_on_left_char: Option<Line>,
-    chosen_dividing_line_on_right_char: Option<Line>,
+    pub chosen_dividing_line_on_left_char: Option<WorldLine>,
+    pub chosen_dividing_line_on_right_char: Option<WorldLine>,
 }
 
 #[derive(Default)]
@@ -28,13 +27,61 @@ pub struct FovResult {
 
 impl FovResult {
     pub fn as_glyph_mask(&self) -> WorldSquareGlyphMap {
-        todo!()
+        let mut the_map = WorldSquareGlyphMap::new();
+        self.fully_visible_squares.iter().for_each(|&square| {
+            the_map.insert(square, Glyph::transparent_square_glyphs());
+        });
+
+        self.partially_visible_squares
+            .iter()
+            .for_each(|(&square, partial_visibility)| {
+                the_map.insert(
+                    square,
+                    square_and_partial_visibility_to_glyphs(square, partial_visibility),
+                );
+            });
+        the_map
     }
+}
+
+pub fn square_and_partial_visibility_to_glyphs(
+    square: WorldSquare,
+    partial_visibility: &PartialVisibilityOfASquare,
+) -> DoubleGlyph {
+    let optional_lines = vec![
+        &partial_visibility.chosen_dividing_line_on_left_char,
+        &partial_visibility.chosen_dividing_line_on_right_char,
+    ];
+    let left_character_square = world_square_to_left_world_character_square(square);
+    let character_squares = vec![
+        left_character_square,
+        left_character_square + STEP_RIGHT.cast_unit(),
+    ];
+    (0..2)
+        .map(|i| {
+            let optional_line = &optional_lines[i];
+            let character_square = character_squares[i];
+
+            if let Some(line) = optional_line {
+                let clockwise_point = point_clockwise_of_line(line);
+                let angle_char = line_and_inside_point_to_angled_block_character(
+                    world_point_to_local_character_point(line.p1, character_square),
+                    world_point_to_local_character_point(line.p2, character_square),
+                    world_point_to_local_character_point(clockwise_point, character_square),
+                );
+                Glyph::fg_only(angle_char, RED)
+            } else {
+                Glyph::transparent_glyph()
+            }
+        })
+        .collect::<Vec<Glyph>>()
+        .try_into()
+        .unwrap()
 }
 
 pub fn field_of_view_from_square(
     start_square: WorldSquare,
-    sight_blockers: SquareSet,
+    sight_blockers: &HashSet<WorldSquare>,
 ) -> FovResult {
     let sight_radius = 8;
 

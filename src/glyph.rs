@@ -367,7 +367,7 @@ impl Glyph {
         char_is_braille(self.character)
     }
 
-    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> [Glyph; 2] {
+    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> DoubleGlyph {
         let mut arrow_step_map: HashMap<WorldStep, char> = HashMap::new();
 
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
@@ -431,6 +431,12 @@ impl Glyph {
 
     pub fn danger_square_glyphs() -> DoubleGlyph {
         MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+    }
+    pub fn transparent_glyph() -> Glyph {
+        Glyph::fg_only(' ', BLACK)
+    }
+    pub fn transparent_square_glyphs() -> DoubleGlyph {
+        [Glyph::fg_only(' ', BLACK); 2]
     }
 
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
