@@ -9,6 +9,7 @@ use line_drawing::Point;
 use ordered_float::OrderedFloat;
 use rgb::*;
 use termion::color;
+use termion::color::Black;
 
 use braille::*;
 use glyph_constants::*;
@@ -437,6 +438,12 @@ impl Glyph {
     }
     pub fn transparent_square_glyphs() -> DoubleGlyph {
         [Glyph::fg_only(' ', BLACK); 2]
+    }
+    pub fn out_of_sight_glyphs() -> DoubleGlyph {
+        let mut out_of_sight_glyph = Glyph::from_char(FULL_BLOCK);
+        out_of_sight_glyph.fg_color = BLACK;
+        out_of_sight_glyph.bg_transparent = false;
+        [out_of_sight_glyph; 2]
     }
 
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {

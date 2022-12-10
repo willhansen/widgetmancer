@@ -229,6 +229,8 @@ impl Game {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
         }
+        self.graphics
+            .draw_field_of_view_mask(self.fov_mask_for_player());
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
@@ -711,6 +713,7 @@ impl Game {
         self.fov_mask_for_player().get(&square).is_none()
     }
     fn fov_mask_for_player(&self) -> WorldSquareGlyphMap {
+        todo!();
         let view_range = 7;
         let start_square = self.player_square();
         field_of_view_from_square(start_square, &self.blocks).as_glyph_mask()

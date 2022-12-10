@@ -264,7 +264,7 @@ impl Graphics {
     fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
         for (world_square, glyph) in glyph_map {
             if self.square_is_on_screen(world_square) {
-                self.draw_glyphs_at_square_with_transparency(world_square, glyph);
+                self.draw_glyphs_for_square(world_square, glyph);
             }
         }
     }
@@ -390,14 +390,10 @@ impl Graphics {
         let square_color = Graphics::board_color_at_square(world_pos);
         player_glyphs[0].bg_color = square_color;
         player_glyphs[1].bg_color = square_color;
-        self.draw_glyphs_at_square_with_transparency(world_pos, player_glyphs);
+        self.draw_glyphs_for_square(world_pos, player_glyphs);
     }
 
-    pub fn draw_glyphs_at_square_with_transparency(
-        &mut self,
-        world_square: WorldSquare,
-        glyphs: DoubleGlyph,
-    ) {
+    pub fn draw_glyphs_for_square(&mut self, world_square: WorldSquare, glyphs: DoubleGlyph) {
         if !self.square_is_on_screen(world_square) {
             panic!(
                 "Tried to draw square off screen: {}",
@@ -432,12 +428,12 @@ impl Graphics {
     }
 
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
-        self.draw_glyphs_at_square_with_transparency(pos, piece.glyphs());
+        self.draw_glyphs_for_square(pos, piece.glyphs());
     }
-    pub fn draw_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
+    pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set
             .into_iter()
-            .for_each(|&square| self.draw_glyphs_at_square_with_transparency(square, glyphs));
+            .for_each(|&square| self.draw_glyphs_for_square(square, glyphs));
     }
     pub fn draw_move_marker_squares(
         &mut self,
@@ -467,17 +463,49 @@ impl Graphics {
                 .copied()
                 .collect();
 
-        self.draw_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
-        self.draw_at_squares(
+        self.draw_same_glyphs_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
+        self.draw_same_glyphs_at_squares(
             Glyph::tricky_danger_square_glyphs(),
             &conditional_move_and_capture_squares,
         );
-        self.draw_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
-        self.draw_at_squares(Glyph::capture_only_square_glyphs(), &capture_only_squares);
+        self.draw_same_glyphs_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
+        self.draw_same_glyphs_at_squares(
+            Glyph::capture_only_square_glyphs(),
+            &capture_only_squares,
+        );
     }
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
-        self.draw_at_squares(Glyph::block_glyphs(), block_squares);
+        self.draw_same_glyphs_at_squares(Glyph::block_glyphs(), block_squares);
+    }
+
+    pub fn all_squares_on_screen(&self) -> SquareSet {
+        let mut all_squares = SquareSet::new();
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let buffer_square: Point2D<i32, CharacterGridInBufferFrame> =
+                    point2(buffer_x, buffer_y);
+                let world_square = self.buffer_square_to_world_square(buffer_square);
+                if self.square_is_on_screen(world_square) {
+                    all_squares.insert(world_square);
+                }
+            }
+        }
+        all_squares
+    }
+
+    pub fn draw_field_of_view_mask(&mut self, fov_mask: WorldSquareGlyphMap) {
+        let squares_on_screen = self.all_squares_on_screen();
+        let squares_in_sight = fov_mask.keys().copied().collect();
+        let squares_on_screen_but_out_of_sight = squares_on_screen
+            .difference(&squares_in_sight)
+            .copied()
+            .collect();
+        self.draw_glyphs_at_squares(fov_mask);
+        self.draw_same_glyphs_at_squares(
+            Glyph::out_of_sight_glyphs(),
+            &squares_on_screen_but_out_of_sight,
+        );
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
@@ -501,7 +529,7 @@ impl Graphics {
         paths.iter().flatten().for_each(|&square| {
             path_squares.insert(square);
         });
-        self.draw_at_squares(Glyph::path_glyphs(), &path_squares);
+        self.draw_same_glyphs_at_squares(Glyph::path_glyphs(), &path_squares);
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
