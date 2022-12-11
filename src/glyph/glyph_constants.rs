@@ -24,7 +24,7 @@ pub const PATH_COLOR: RGB8 = MAGENTA;
 pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
 
 pub const BLOCK_BG: RGB8 = BLACK;
-pub const BLOCK_FG: RGB8 = GREY;
+pub const BLOCK_FG: RGB8 = BLACK;
 
 pub const LEFT_HALF_BLOCK: char = '▌';
 pub const RIGHT_HALF_BLOCK: char = '▐';

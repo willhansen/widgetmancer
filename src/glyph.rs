@@ -440,10 +440,7 @@ impl Glyph {
         [Glyph::fg_only(' ', BLACK); 2]
     }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
-        let mut out_of_sight_glyph = Glyph::from_char(FULL_BLOCK);
-        out_of_sight_glyph.fg_color = BLACK;
-        out_of_sight_glyph.bg_transparent = false;
-        [out_of_sight_glyph; 2]
+        [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, RED); 2]
     }
 
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
@@ -461,7 +458,7 @@ impl Glyph {
 
     // ╳
     pub fn block_glyphs() -> DoubleGlyph {
-        [Glyph::new(' ', BLOCK_FG, BLOCK_BG); 2]
+        [Glyph::new(FULL_BLOCK, BLOCK_FG, BLOCK_BG); 2]
     }
 
     pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {

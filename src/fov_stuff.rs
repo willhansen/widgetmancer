@@ -96,7 +96,7 @@ pub fn field_of_view_from_square(
         let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
         let mut blocked_arcs = AngleIntervalSet::new();
         // skip the central square
-        for outward_steps in 1..SIGHT_RADIUS {
+        for outward_steps in 1..=SIGHT_RADIUS {
             for across_steps in 0..=outward_steps {
                 let square = start_square
                     + outward_dir * outward_steps as i32
@@ -107,10 +107,12 @@ pub fn field_of_view_from_square(
                 } else if sight_blockers.contains(&square) {
                     blocked_arcs.add_interval(square_angle_interval);
                     // TODO: partially visible blocks (just see one side)
-                    //fov_result.fully_visible_squares.insert(square);
+                    // fully in view for now
+                    fov_result.fully_visible_squares.insert(square);
                 } else if blocked_arcs.overlaps_interval(square_angle_interval) {
                     // TODO: partial visibility
-                    //fov_result.fully_visible_squares.insert(square);
+                    // fully in view for now
+                    fov_result.fully_visible_squares.insert(square);
                 } else {
                     // fully visible
                     fov_result.fully_visible_squares.insert(square);
@@ -158,6 +160,7 @@ pub fn angle_interval_of_square(
 
 #[cfg(test)]
 mod tests {
+    use crate::utility::{STEP_DOWN, STEP_UP};
     use euclid::point2;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -199,5 +202,19 @@ mod tests {
         assert!(fov_result.fully_visible_squares.contains(&start_square));
         let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
         assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
+    }
+    #[test]
+    fn test_field_of_view_includes_blocks() {
+        let start_square = point2(5, 5);
+        let block_square = point2(5, 7);
+        let blocks = SquareSet::from([block_square]);
+        let fov_result = field_of_view_from_square(start_square, &blocks);
+        assert!(fov_result.fully_visible_squares.contains(&block_square));
+        assert!(fov_result
+            .fully_visible_squares
+            .contains(&(block_square + STEP_DOWN)));
+        assert!(!fov_result
+            .fully_visible_squares
+            .contains(&(block_square + STEP_UP)));
     }
 }
