@@ -18,6 +18,7 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::*;
+use crate::fov_stuff::FovResult;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
@@ -494,14 +495,15 @@ impl Graphics {
         all_squares
     }
 
-    pub fn draw_field_of_view_mask(&mut self, fov_mask: WorldSquareGlyphMap) {
+    pub fn draw_field_of_view_mask(&mut self, fov_mask: FovResult) {
+        let glyph_mask_for_partially_visible_squares: WorldSquareGlyphMap =
+            fov_mask.partially_visible_squares_as_glyph_mask();
         let squares_on_screen = self.all_squares_on_screen();
-        let squares_in_sight = fov_mask.keys().copied().collect();
         let squares_on_screen_but_out_of_sight = squares_on_screen
-            .difference(&squares_in_sight)
+            .difference(&fov_mask.at_least_partially_visible_squares())
             .copied()
             .collect();
-        self.draw_glyphs_at_squares(fov_mask);
+        self.draw_glyphs_at_squares(glyph_mask_for_partially_visible_squares);
         self.draw_same_glyphs_at_squares(
             Glyph::out_of_sight_glyphs(),
             &squares_on_screen_but_out_of_sight,
@@ -814,5 +816,21 @@ mod tests {
         assert_eq!(drawn_glyphs[1].character, ' ');
         assert_eq!(drawn_glyphs[1].bg_color, BOARD_WHITE);
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
+    }
+    #[test]
+    fn test_field_of_view_mask_is_fully_transparent() {
+        let mut g = set_up_graphics_with_nxn_squares(1);
+        let the_square = WorldSquare::new(0, 0);
+        g.draw_piece(Piece::pawn(), the_square);
+
+        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        assert_eq!(drawn_glyphs[0].character, '♟');
+
+        let mut fov_mask = FovResult::default();
+        fov_mask.fully_visible_squares.insert(the_square);
+        g.draw_field_of_view_mask(fov_mask);
+
+        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        assert_eq!(drawn_glyphs[0].character, '♟');
     }
 }

@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
-use crate::fov_stuff::field_of_view_from_square;
+use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};
@@ -228,9 +228,9 @@ impl Game {
         if !self.player_is_dead() {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
+            self.graphics
+                .draw_field_of_view_mask(self.fov_mask_for_player());
         }
-        self.graphics
-            .draw_field_of_view_mask(self.fov_mask_for_player());
         self.graphics.display(&mut writer);
         self.graphics.remove_finished_animations(time);
     }
@@ -702,21 +702,18 @@ impl Game {
     }
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
         self.fov_mask_for_player()
-            .get(&square)
-            .is_some_and(|glyphs| {
-                glyphs
-                    .iter()
-                    .all(|g| g.character == SPACE && g.bg_transparent)
-            })
+            .fully_visible_squares
+            .contains(&square)
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
-        self.fov_mask_for_player().get(&square).is_none()
+        let fov_mask = self.fov_mask_for_player();
+        !fov_mask.fully_visible_squares.contains(&square)
+            && !fov_mask.partially_visible_squares.contains_key(&square)
     }
-    fn fov_mask_for_player(&self) -> WorldSquareGlyphMap {
-        todo!();
+    fn fov_mask_for_player(&self) -> FovResult {
         let view_range = 7;
         let start_square = self.player_square();
-        field_of_view_from_square(start_square, &self.blocks).as_glyph_mask()
+        field_of_view_from_square(start_square, &self.blocks)
     }
 }
 #[cfg(test)]

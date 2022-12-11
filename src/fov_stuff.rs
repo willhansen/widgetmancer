@@ -19,18 +19,17 @@ pub struct PartialVisibilityOfASquare {
     pub chosen_dividing_line_on_right_char: Option<WorldLine>,
 }
 
+const SIGHT_RADIUS: u32 = 8;
+
 #[derive(Default)]
 pub struct FovResult {
-    fully_visible_squares: SquareSet,
-    partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
+    pub fully_visible_squares: SquareSet,
+    pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
 }
 
 impl FovResult {
-    pub fn as_glyph_mask(&self) -> WorldSquareGlyphMap {
+    pub fn partially_visible_squares_as_glyph_mask(&self) -> WorldSquareGlyphMap {
         let mut the_map = WorldSquareGlyphMap::new();
-        self.fully_visible_squares.iter().for_each(|&square| {
-            the_map.insert(square, Glyph::transparent_square_glyphs());
-        });
 
         self.partially_visible_squares
             .iter()
@@ -41,6 +40,13 @@ impl FovResult {
                 );
             });
         the_map
+    }
+    pub fn at_least_partially_visible_squares(&self) -> SquareSet {
+        let partial_vis: SquareSet = self.partially_visible_squares.keys().copied().collect();
+        self.fully_visible_squares
+            .union(&partial_vis)
+            .copied()
+            .collect()
     }
 }
 
@@ -83,27 +89,28 @@ pub fn field_of_view_from_square(
     start_square: WorldSquare,
     sight_blockers: &HashSet<WorldSquare>,
 ) -> FovResult {
-    let sight_radius = 8;
-
     let mut fov_result = FovResult::default();
+    fov_result.fully_visible_squares.insert(start_square);
 
     for octant_number in 0..8 {
         let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
         let mut blocked_arcs = AngleIntervalSet::new();
         // skip the central square
-        for outward_steps in 1..sight_radius {
+        for outward_steps in 1..SIGHT_RADIUS {
             for across_steps in 0..=outward_steps {
-                let square = start_square + outward_dir * outward_steps + across_dir * across_steps;
+                let square = start_square
+                    + outward_dir * outward_steps as i32
+                    + across_dir * across_steps as i32;
                 let square_angle_interval = angle_interval_of_square(start_square, square);
                 if blocked_arcs.fully_contains_interval(square_angle_interval) {
                     continue;
                 } else if sight_blockers.contains(&square) {
                     blocked_arcs.add_interval(square_angle_interval);
                     // TODO: partially visible blocks (just see one side)
-                    fov_result.fully_visible_squares.insert(square);
+                    //fov_result.fully_visible_squares.insert(square);
                 } else if blocked_arcs.overlaps_interval(square_angle_interval) {
                     // TODO: partial visibility
-                    fov_result.fully_visible_squares.insert(square);
+                    //fov_result.fully_visible_squares.insert(square);
                 } else {
                     // fully visible
                     fov_result.fully_visible_squares.insert(square);
@@ -182,5 +189,15 @@ mod tests {
             correct_start_angle.radians
         );
         assert_about_eq!(view_angle.clockwise_end.radians, correct_end_angle.radians);
+    }
+
+    #[test]
+    fn test_field_of_view_with_no_obstacles() {
+        let start_square = point2(5, 5);
+        let fov_result = field_of_view_from_square(start_square, &SquareSet::default());
+        assert!(fov_result.partially_visible_squares.is_empty());
+        assert!(fov_result.fully_visible_squares.contains(&start_square));
+        let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
+        assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
     }
 }

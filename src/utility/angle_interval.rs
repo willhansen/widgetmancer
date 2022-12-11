@@ -108,9 +108,7 @@ impl AngleIntervalSet {
             .sort_by_key(|i| OrderedFloat(i.clockwise_end.radians));
         let mut new_intervals = vec![];
         let mut accumulating_interval = self.intervals[0];
-        println!("-------");
         for i in 1..self.intervals.len() {
-            println!("{}", accumulating_interval);
             let interval = self.intervals[i];
             if accumulating_interval.overlaps_or_touches(interval) {
                 accumulating_interval = accumulating_interval.union(interval);
@@ -150,7 +148,6 @@ impl AngleIntervalSet {
 
     pub fn add_interval(&mut self, interval: AngleInterval) {
         self.intervals.push(interval);
-        println!("{}", self);
         self.standardize();
     }
     pub fn fully_contains_interval(&self, interval: AngleInterval) -> bool {
@@ -270,10 +267,8 @@ mod tests {
                 AngleInterval::from_degrees(15.0, 30.0),
             ],
         };
-        println!("{}", angle_interval_set);
         assert!(!angle_interval_set.is_valid());
         angle_interval_set.standardize();
-        println!("{}", angle_interval_set);
         assert!(angle_interval_set.is_valid());
         assert_eq!(
             angle_interval_set,
@@ -305,9 +300,9 @@ mod tests {
 
         assert_false!(angle_interval_set.intervals.is_empty());
 
-        println!("interval a: {}", interval_a);
-        println!("interval b: {}", interval_b);
-        println!("the set: {}", angle_interval_set);
+        //println!("interval a: {}", interval_a);
+        //println!("interval b: {}", interval_b);
+        //println!("the set: {}", angle_interval_set);
         assert!(angle_interval_set.overlaps_interval(interval_a));
         assert_false!(angle_interval_set.fully_contains_interval(interval_a));
 
