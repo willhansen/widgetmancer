@@ -15,14 +15,19 @@ use rand::Rng;
 use crate::{DoubleGlyph, Glyph};
 
 // empty enums for euclid typing
+#[derive(Copy, Clone)]
 pub struct SquareGridInWorldFrame;
 
+#[derive(Copy, Clone)]
 pub struct CharacterGridInWorldFrame;
 
+#[derive(Copy, Clone)]
 pub struct CharacterGridInBufferFrame;
 
+#[derive(Copy, Clone)]
 pub struct CharacterGridInScreenFrame;
 
+#[derive(Copy, Clone)]
 pub struct CharacterGridInLocalCharacterFrame;
 
 pub type IPoint = default::Point2D<i32>;
@@ -87,7 +92,7 @@ impl<U> Line<U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         in_line(self.p1, self.p2, point)
     }
-    pub fn point_clockwise_of_line(&self) -> WorldPoint {
+    pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
 }
@@ -98,7 +103,7 @@ pub struct HalfPlane<U> {
     pub point_on_half_plane: Point2D<f32, U>,
 }
 
-impl<U> HalfPlane<U> {
+impl<U: Copy> HalfPlane<U> {
     pub fn new(line: Line<U>, point: Point2D<f32, U>) -> Self {
         assert!(!line.point_is_on_line(point));
         HalfPlane {
@@ -444,7 +449,9 @@ pub fn world_point_to_local_character_point(
     world_point: WorldPoint,
     origin_character_square: WorldCharacterSquare,
 ) -> LocalCharacterPoint {
-    todo!()
+    (world_point_to_world_character_point(world_point) - origin_character_square.to_f32())
+        .to_point()
+        .cast_unit()
 }
 
 pub fn is_world_character_square_left_square_of_world_square(
