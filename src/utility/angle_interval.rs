@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
+use crate::fov_stuff::PartialVisibilityOfASquare;
 use euclid::Angle;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -26,7 +27,7 @@ impl AngleInterval {
         )
     }
     fn union(&self, other: AngleInterval) -> Self {
-        assert!(self.overlaps(other) || self.exactly_touches(other));
+        assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches(other));
         let result = AngleInterval {
             anticlockwise_end: if self.contains_or_touches_angle(other.anticlockwise_end) {
                 self.anticlockwise_end
@@ -42,7 +43,7 @@ impl AngleInterval {
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
     }
-    fn overlaps(&self, other: AngleInterval) -> bool {
+    fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
         self.contains_angle(other.anticlockwise_end)
             || (self.contains_angle(other.clockwise_end)
                 && self.anticlockwise_end != other.clockwise_end)
@@ -50,12 +51,39 @@ impl AngleInterval {
             || (other.contains_angle(self.clockwise_end)
                 && other.anticlockwise_end != self.clockwise_end)
     }
+    fn num_contained_edges(&self, other: AngleInterval) -> u32 {
+        let mut sum = 0;
+        if self.contains_angle(other.anticlockwise_end) {
+            sum += 1;
+        }
+        if self.contains_angle(other.clockwise_end) {
+            sum += 1;
+        }
+        sum
+    }
+    fn partially_overlaps(&self, other: AngleInterval) -> bool {
+        self.num_contained_edges(other) == 1 && other.num_contained_edges(*self) == 1
+    }
+    fn edge_of_this_overlapped_by(&self, other: AngleInterval) -> Option<DirectionalAngleEdge> {
+        if !self.partially_overlaps(other) {
+            return None;
+        }
+        let is_clockwise_end = other.contains_angle(self.clockwise_end);
+        Some(DirectionalAngleEdge {
+            end_angle: if is_clockwise_end {
+                self.clockwise_end
+            } else {
+                self.anticlockwise_end
+            },
+            is_clockwise_end,
+        })
+    }
     fn exactly_touches(&self, other: AngleInterval) -> bool {
         self.clockwise_end == other.anticlockwise_end
             || other.clockwise_end == self.anticlockwise_end
     }
     fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
-        self.overlaps(other) || self.exactly_touches(other)
+        self.partially_or_fully_overlaps(other) || self.exactly_touches(other)
     }
     fn contains_angle(&self, angle: Angle<f32>) -> bool {
         // special case for zero length interval
@@ -87,6 +115,12 @@ impl AngleInterval {
             || other.contains_angle(self.clockwise_end);
         contains_other_edges && !other_firmly_contains_any_of_these_edges
     }
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct DirectionalAngleEdge {
+    pub end_angle: Angle<f32>,
+    pub is_clockwise_end: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -156,7 +190,21 @@ impl AngleIntervalSet {
             .any(|i| i.fully_contains_interval(interval))
     }
     pub fn overlaps_interval(&self, interval: AngleInterval) -> bool {
-        self.intervals.iter().any(|i| i.overlaps(interval))
+        self.intervals
+            .iter()
+            .any(|i: &AngleInterval| i.partially_or_fully_overlaps(interval))
+    }
+    pub fn most_overlapped_edge_of_set(
+        &self,
+        interval: AngleInterval,
+    ) -> Option<DirectionalAngleEdge> {
+        // TODO: don't just get the first one
+        self.intervals
+            .iter()
+            .filter_map(|set_interval: &AngleInterval| {
+                set_interval.edge_of_this_overlapped_by(interval)
+            })
+            .next()
     }
 }
 
@@ -196,10 +244,35 @@ mod tests {
         let interval_b = AngleInterval::from_degrees(5.0, 15.0);
         let interval_a = AngleInterval::from_degrees(0.0, 10.0);
 
-        assert!(interval_a.overlaps(interval_a), "self overlap");
-        assert!(interval_b.overlaps(interval_b), "other self overlap");
-        assert!(interval_a.overlaps(interval_b), "basic overlap");
-        assert!(interval_b.overlaps(interval_a), "commutative");
+        assert!(
+            interval_a.partially_or_fully_overlaps(interval_a),
+            "self overlap"
+        );
+        assert!(
+            interval_b.partially_or_fully_overlaps(interval_b),
+            "other self overlap"
+        );
+        assert!(
+            interval_a.partially_or_fully_overlaps(interval_b),
+            "basic overlap"
+        );
+        assert!(
+            interval_b.partially_or_fully_overlaps(interval_a),
+            "commutative"
+        );
+    }
+    #[test]
+    fn test_interval_overlap_does_not_include_full_overlap() {
+        let interval_b = AngleInterval::from_degrees(5.0, 15.0);
+        let interval_a = AngleInterval::from_degrees(7.0, 10.0);
+        assert!(
+            !interval_a.partially_overlaps(interval_b),
+            "should not count full overlaps"
+        );
+        assert!(
+            !interval_b.partially_overlaps(interval_a),
+            "should not count full overlaps"
+        );
     }
 
     #[test]
@@ -207,7 +280,7 @@ mod tests {
         let interval_a = AngleInterval::from_degrees(0.0, 10.0);
         let interval_c = AngleInterval::from_degrees(10.0, 50.0);
         assert!(
-            !interval_a.overlaps(interval_c),
+            !interval_a.partially_or_fully_overlaps(interval_c),
             "touching edges should not count as overlap"
         );
     }
@@ -400,5 +473,39 @@ mod tests {
             ]
         }
         .is_valid());
+    }
+    #[test]
+    fn test_get_angle_endpoint_of_overlapped_region() {
+        let interval_set = AngleIntervalSet {
+            intervals: vec![AngleInterval::from_degrees(0.0, 20.0)],
+        };
+        let single_interval = AngleInterval::from_degrees(-25.0, 5.0);
+
+        assert_eq!(
+            interval_set.most_overlapped_edge_of_set(single_interval),
+            Some(DirectionalAngleEdge {
+                end_angle: Angle::degrees(0.0),
+                is_clockwise_end: true
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_angle_endpoint_of_more_overlapped_region() {
+        let interval_set = AngleIntervalSet {
+            intervals: vec![
+                AngleInterval::from_degrees(0.0, 20.0),
+                AngleInterval::from_degrees(22.0, 50.0),
+            ],
+        };
+        let single_interval = AngleInterval::from_degrees(10.0, 25.0);
+
+        assert_eq!(
+            interval_set.most_overlapped_edge_of_set(single_interval),
+            Some(DirectionalAngleEdge {
+                end_angle: Angle::degrees(20.0),
+                is_clockwise_end: false
+            })
+        );
     }
 }

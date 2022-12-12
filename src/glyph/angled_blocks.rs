@@ -11,7 +11,7 @@ use crate::glyph::glyph_constants::{
 };
 use crate::utility::{
     is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    LocalCharacterPoint,
+    CharacterGridInLocalCharacterFrame, HalfPlane, LocalCharacterPoint,
 };
 
 struct AngleBlockSnapGridInLocalFrame;
@@ -177,10 +177,8 @@ fn get_character_from_snap_points(pointA: SnapGridPoint, pointB: SnapGridPoint) 
     }
 }
 
-pub fn line_and_inside_point_to_angled_block_character(
-    line_point_A: LocalCharacterPoint,
-    line_point_B: LocalCharacterPoint,
-    inside_point: LocalCharacterPoint,
+pub fn half_plane_to_angled_block_character(
+    half_plane: HalfPlane<CharacterGridInLocalCharacterFrame>,
 ) -> char {
     // angle blocks have important edge points
 
@@ -194,9 +192,9 @@ pub fn line_and_inside_point_to_angled_block_character(
     // │     │
     // o──o──o
 
-    assert_ne!(line_point_A, line_point_B);
-    assert_ne!(inside_point, line_point_B);
-    assert_ne!(line_point_A, inside_point);
+    let line_point_A: LocalCharacterPoint = half_plane.dividing_line.p1;
+    let line_point_B: LocalCharacterPoint = half_plane.dividing_line.p2;
+    let inside_point: LocalCharacterPoint = half_plane.point_on_half_plane;
 
     let snap_points: Vec<LocalCharacterPoint> = valid_snap_points_on_angle_block()
         .into_iter()
@@ -241,6 +239,7 @@ pub fn line_and_inside_point_to_angled_block_character(
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
+    use crate::utility::{Line, SquareGridInWorldFrame};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
@@ -249,38 +248,46 @@ mod tests {
     fn test_line_and_inside_point_to_angled_block_character() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
-            line_and_inside_point_to_angled_block_character(
-                point2(-0.5, -0.5),
-                point2(-0.5, 0.5),
+            half_plane_to_angled_block_character(HalfPlane::new(
+                Line {
+                    p1: point2(-0.5, -0.5),
+                    p2: point2(-0.5, 0.5),
+                },
                 point2(0.0, 0.0),
-            ),
+            )),
             FULL_BLOCK,
             "on left edge, full block"
         );
         assert_eq!(
-            line_and_inside_point_to_angled_block_character(
-                point2(-0.5, -0.5),
-                point2(-0.5, 0.5),
+            half_plane_to_angled_block_character(HalfPlane::new(
+                Line {
+                    p1: point2(-0.5, -0.5),
+                    p2: point2(-0.5, 0.5)
+                },
                 point2(-20.0, 0.0),
-            ),
+            )),
             SPACE,
             "on left edge, empty block"
         );
         assert_eq!(
-            line_and_inside_point_to_angled_block_character(
-                point2(-0.5, -0.5),
-                point2(-0.4, -0.4),
+            half_plane_to_angled_block_character(HalfPlane::new(
+                Line {
+                    p1: point2(-0.5, -0.5),
+                    p2: point2(-0.4, -0.4)
+                },
                 point2(2.0, 0.0),
-            ),
+            )),
             '◢',
             "lower-right diagonal given short line"
         );
         assert_eq!(
-            line_and_inside_point_to_angled_block_character(
-                point2(0.0, -0.5),
-                point2(0.5, -0.15),
+            half_plane_to_angled_block_character(HalfPlane::new(
+                Line {
+                    p1: point2(0.0, -0.5),
+                    p2: point2(0.5, -0.15),
+                },
                 point2(0.0, 0.0),
-            ),
+            )),
             '🭝',
             "Notch off bottom-right"
         );

@@ -83,6 +83,31 @@ pub struct Line<U> {
     pub p2: Point2D<f32, U>,
 }
 
+impl<U> Line<U> {
+    pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
+        in_line(self.p1, self.p2, point)
+    }
+    pub fn point_clockwise_of_line(&self) -> WorldPoint {
+        rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct HalfPlane<U> {
+    pub dividing_line: Line<U>,
+    pub point_on_half_plane: Point2D<f32, U>,
+}
+
+impl<U> HalfPlane<U> {
+    pub fn new(line: Line<U>, point: Point2D<f32, U>) -> Self {
+        assert!(!line.point_is_on_line(point));
+        HalfPlane {
+            dividing_line: line,
+            point_on_half_plane: point,
+        }
+    }
+}
+
 pub type WorldLine = Line<SquareGridInWorldFrame>;
 pub type LocalCharacterLine = Line<CharacterGridInLocalCharacterFrame>;
 
@@ -370,19 +395,23 @@ pub fn line_intersections_with_centered_unit_square<U>(
 }
 
 pub fn same_side_of_line<U>(
-    line_point_A: Point2D<f32, U>,
-    line_point_B: Point2D<f32, U>,
-    test_point_C: Point2D<f32, U>,
-    test_point_D: Point2D<f32, U>,
+    point_a: Point2D<f32, U>,
+    point_b: Point2D<f32, U>,
+    point_c: Point2D<f32, U>,
+    point_d: Point2D<f32, U>,
 ) -> bool {
-    is_clockwise(line_point_A, line_point_B, test_point_C)
-        == is_clockwise(line_point_A, line_point_B, test_point_D)
+    is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
 }
 
-pub fn is_clockwise<U>(A: Point2D<f32, U>, B: Point2D<f32, U>, C: Point2D<f32, U>) -> bool {
-    let AB = B - A;
-    let AC = C - A;
-    AB.cross(AC) < 0.0
+pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) < 0.0
+}
+pub fn in_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) == 0.0
 }
 
 pub fn world_point_to_world_character_point(
@@ -442,8 +471,12 @@ pub fn octant_to_outward_and_across_directions(octant_number: i32) -> (WorldStep
     }
 }
 
-pub fn point_clockwise_of_line(line: &WorldLine) -> WorldPoint {
-    line.p1 + rotate_vect((line.p2 - line.p1), -PI / 2.0)
+pub fn rotate_point_around_point<U>(
+    axis_point: Point2D<f32, U>,
+    moving_point: Point2D<f32, U>,
+    angle: Angle<f32>,
+) -> Point2D<f32, U> {
+    axis_point + rotate_vect((moving_point - axis_point), angle.radians)
 }
 
 #[cfg(test)]

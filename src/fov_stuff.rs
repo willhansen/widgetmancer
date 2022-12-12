@@ -1,22 +1,31 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::glyph::angled_blocks::line_and_inside_point_to_angled_block_character;
+use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::{DoubleGlyph, Glyph};
-use euclid::{vec2, Angle};
+use euclid::{point2, vec2, Angle};
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::{BLACK, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::{
-    octant_to_outward_and_across_directions, point_clockwise_of_line,
-    world_point_to_local_character_point, world_square_to_left_world_character_square, SquareSet,
-    WorldLine, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    octant_to_outward_and_across_directions, rotate_point_around_point,
+    world_point_to_local_character_point, world_square_to_left_world_character_square, HalfPlane,
+    Line, SquareGridInWorldFrame, SquareSet, WorldLine, WorldMove, WorldPoint, WorldSquare,
+    WorldSquareGlyphMap, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 pub struct PartialVisibilityOfASquare {
-    pub chosen_dividing_line_on_left_char: Option<WorldLine>,
-    pub chosen_dividing_line_on_right_char: Option<WorldLine>,
+    pub right_char_shadow: HalfPlane<SquareGridInWorldFrame>,
+    pub left_char_shadow: HalfPlane<SquareGridInWorldFrame>,
+}
+impl PartialVisibilityOfASquare {
+    pub fn get(&self, i: usize) -> &HalfPlane<SquareGridInWorldFrame> {
+        match i {
+            0 => &self.right_char_shadow,
+            1 => &self.left_char_shadow,
+            _ => panic!("tried getting invalid character of square: {}", i),
+        }
+    }
 }
 
 const SIGHT_RADIUS: u32 = 8;
@@ -54,10 +63,6 @@ pub fn square_and_partial_visibility_to_glyphs(
     square: WorldSquare,
     partial_visibility: &PartialVisibilityOfASquare,
 ) -> DoubleGlyph {
-    let optional_lines = vec![
-        &partial_visibility.chosen_dividing_line_on_left_char,
-        &partial_visibility.chosen_dividing_line_on_right_char,
-    ];
     let left_character_square = world_square_to_left_world_character_square(square);
     let character_squares = vec![
         left_character_square,
@@ -65,20 +70,26 @@ pub fn square_and_partial_visibility_to_glyphs(
     ];
     (0..2)
         .map(|i| {
-            let optional_line = &optional_lines[i];
+            let half_plane = partial_visibility.get(i);
             let character_square = character_squares[i];
 
-            if let Some(line) = optional_line {
-                let clockwise_point = point_clockwise_of_line(line);
-                let angle_char = line_and_inside_point_to_angled_block_character(
-                    world_point_to_local_character_point(line.p1, character_square),
-                    world_point_to_local_character_point(line.p2, character_square),
-                    world_point_to_local_character_point(clockwise_point, character_square),
-                );
-                Glyph::fg_only(angle_char, RED)
-            } else {
-                Glyph::transparent_glyph()
-            }
+            let angle_char = half_plane_to_angled_block_character(HalfPlane::new(
+                Line {
+                    p1: world_point_to_local_character_point(
+                        half_plane.dividing_line.p1,
+                        character_square,
+                    ),
+                    p2: world_point_to_local_character_point(
+                        half_plane.dividing_line.p2,
+                        character_square,
+                    ),
+                },
+                world_point_to_local_character_point(
+                    half_plane.point_on_half_plane,
+                    character_square,
+                ),
+            ));
+            Glyph::fg_only(angle_char, RED)
         })
         .collect::<Vec<Glyph>>()
         .try_into()
@@ -94,7 +105,7 @@ pub fn field_of_view_from_square(
 
     for octant_number in 0..8 {
         let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
-        let mut blocked_arcs = AngleIntervalSet::new();
+        let mut shadow_arcs = AngleIntervalSet::new();
         // skip the central square
         for outward_steps in 1..=SIGHT_RADIUS {
             for across_steps in 0..=outward_steps {
@@ -102,17 +113,47 @@ pub fn field_of_view_from_square(
                     + outward_dir * outward_steps as i32
                     + across_dir * across_steps as i32;
                 let square_angle_interval = angle_interval_of_square(start_square, square);
-                if blocked_arcs.fully_contains_interval(square_angle_interval) {
+                if shadow_arcs.fully_contains_interval(square_angle_interval) {
                     continue;
                 } else if sight_blockers.contains(&square) {
-                    blocked_arcs.add_interval(square_angle_interval);
+                    shadow_arcs.add_interval(square_angle_interval);
                     // TODO: partially visible blocks (just see one side)
                     // fully in view for now
                     fov_result.fully_visible_squares.insert(square);
-                } else if blocked_arcs.overlaps_interval(square_angle_interval) {
-                    // TODO: partial visibility
-                    // fully in view for now
-                    fov_result.fully_visible_squares.insert(square);
+                } else if let Some(overlapped_shadow_edge) =
+                    shadow_arcs.most_overlapped_edge_of_set(square_angle_interval)
+                {
+                    let shadow_line_from_center = Line {
+                        p1: point2(0.0, 0.0),
+                        p2: point2(
+                            overlapped_shadow_edge.end_angle.radians.cos(),
+                            overlapped_shadow_edge.end_angle.radians.sin(),
+                        ),
+                    };
+                    let extra_rotation_for_shadow_point = Angle::degrees(1.0)
+                        * if overlapped_shadow_edge.is_clockwise_end {
+                            1.0
+                        } else {
+                            -1.0
+                        };
+                    let point_in_shadow = rotate_point_around_point(
+                        shadow_line_from_center.p1,
+                        shadow_line_from_center.p2,
+                        extra_rotation_for_shadow_point,
+                    );
+
+                    let shadow_half_plane =
+                        HalfPlane::new(shadow_line_from_center, point_in_shadow);
+
+                    let shadows_on_characters = PartialVisibilityOfASquare {
+                        left_char_shadow: shadow_half_plane,
+                        right_char_shadow: shadow_half_plane,
+                    };
+
+                    // partially visible
+                    fov_result
+                        .partially_visible_squares
+                        .insert(square, shadows_on_characters);
                 } else {
                     // fully visible
                     fov_result.fully_visible_squares.insert(square);

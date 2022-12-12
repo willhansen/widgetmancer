@@ -10,6 +10,7 @@
 
 #[macro_use]
 extern crate approx;
+extern crate core;
 extern crate line_drawing;
 extern crate num;
 extern crate shrinkwraprs;
