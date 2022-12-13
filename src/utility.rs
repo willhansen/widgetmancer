@@ -334,22 +334,22 @@ pub fn print_glyph_map(glyph_map: &WorldCharacterSquareToGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
 }
 
-pub fn line_intersections_with_centered_unit_square<U>(
-    line_point_A: Point2D<f32, U>,
-    line_point_B: Point2D<f32, U>,
-) -> Vec<Point2D<f32, U>> {
-    if line_point_A == line_point_B {
+pub fn line_intersections_with_centered_unit_square<U>(line: Line<U>) -> Vec<Point2D<f32, U>> {
+    let line_point_A = line.p1;
+    let line_point_B = line.p2;
+    let is_same_point = line_point_A == line_point_B;
+    let is_vertical_line = line_point_A.x == line_point_B.x;
+    let is_horizontal_line = line_point_A.y == line_point_B.y;
+    if is_same_point {
         panic!("gave same point {}", point_to_string(line_point_A));
-    } else if line_point_A.x == line_point_B.x {
-        // vertical line case
+    } else if is_vertical_line {
         let x = line_point_A.x;
         if x.abs() <= 0.5 {
             vec![point2(x, 0.5), point2(x, -0.5)]
         } else {
             vec![]
         }
-    } else if line_point_A.y == line_point_B.y {
-        // horizontal line case
+    } else if is_horizontal_line {
         let y = line_point_A.y;
         if y.abs() <= 0.5 {
             vec![point2(y, 0.5), point2(y, -0.5)]
@@ -382,29 +382,36 @@ pub fn line_intersections_with_centered_unit_square<U>(
         }
         // this captures the edge case of corners
         // remove duplicates
-        assert_eq!(
-            candidate_intersections.len(),
-            2,
-            "wrong number of intersections {}",
-            candidate_intersections
-                .iter()
-                .map(|&point| point_to_string(point))
-                .join(", ")
-        );
-        if candidate_intersections[0] == candidate_intersections[1] {
-            vec![candidate_intersections[0]]
-        } else {
-            candidate_intersections
+        match candidate_intersections.len() {
+            2 => {
+                if candidate_intersections[0] == candidate_intersections[1] {
+                    vec![candidate_intersections[0]]
+                } else {
+                    candidate_intersections
+                }
+            }
+            1 => candidate_intersections,
+            0 => vec![],
+            _ => {
+                panic!(
+                    "Too many intersections {}",
+                    candidate_intersections
+                        .iter()
+                        .map(|&point| point_to_string(point))
+                        .join(", ")
+                );
+            }
         }
     }
 }
 
 pub fn same_side_of_line<U>(
-    point_a: Point2D<f32, U>,
-    point_b: Point2D<f32, U>,
+    line: Line<U>,
     point_c: Point2D<f32, U>,
     point_d: Point2D<f32, U>,
 ) -> bool {
+    let point_a = line.p1;
+    let point_b = line.p2;
     is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
 }
 

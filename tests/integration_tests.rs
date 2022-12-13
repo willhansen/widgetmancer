@@ -599,9 +599,10 @@ fn test_one_move_per_faction_per_turn() {
 #[test]
 fn test_blocks_visibly_block_view() {
     let mut game = set_up_game();
-    game.place_player(point2(5, 5));
-    game.place_block(point2(5, 4));
-    let test_square = point2(5, 3);
+    let player_pos = point2(5, 5);
+    game.place_player(player_pos);
+    game.place_block(player_pos + STEP_DOWN);
+    let test_square = player_pos + STEP_DOWN * 2;
     game.draw_headless_now();
     for dy in 0..3 {
         assert!(game

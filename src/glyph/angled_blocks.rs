@@ -11,7 +11,7 @@ use crate::glyph::glyph_constants::{
 };
 use crate::utility::{
     is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    CharacterGridInLocalCharacterFrame, HalfPlane, LocalCharacterPoint,
+    CharacterGridInLocalCharacterFrame, HalfPlane, Line, LocalCharacterPoint,
 };
 
 struct AngleBlockSnapGridInLocalFrame;
@@ -192,17 +192,13 @@ pub fn half_plane_to_angled_block_character(
     // │     │
     // o──o──o
 
-    let line_point_A: LocalCharacterPoint = half_plane.dividing_line.p1;
-    let line_point_B: LocalCharacterPoint = half_plane.dividing_line.p2;
-    let inside_point: LocalCharacterPoint = half_plane.point_on_half_plane;
-
     let snap_points: Vec<LocalCharacterPoint> = valid_snap_points_on_angle_block()
         .into_iter()
         .map(local_snap_grid_to_local_character_frame)
         .collect();
 
     let raw_intersection_points =
-        line_intersections_with_centered_unit_square(line_point_A, line_point_B);
+        line_intersections_with_centered_unit_square(half_plane.dividing_line);
     assert!(raw_intersection_points.len() <= 2);
 
     let snapped_points: Vec<LocalCharacterPoint> = raw_intersection_points
@@ -216,13 +212,21 @@ pub fn half_plane_to_angled_block_character(
         .collect();
 
     if snapped_points.len() < 2 {
-        if same_side_of_line(line_point_A, line_point_B, inside_point, point2(0.0, 0.0)) {
+        if same_side_of_line(
+            half_plane.dividing_line,
+            half_plane.point_on_half_plane,
+            point2(0.0, 0.0),
+        ) {
             FULL_BLOCK
         } else {
             SPACE
         }
     } else {
-        if is_clockwise(snapped_points[0], snapped_points[1], inside_point) {
+        if is_clockwise(
+            snapped_points[0],
+            snapped_points[1],
+            half_plane.point_on_half_plane,
+        ) {
             get_character_from_snap_points(
                 snap_to_grid(snapped_points[0]),
                 snap_to_grid(snapped_points[1]),

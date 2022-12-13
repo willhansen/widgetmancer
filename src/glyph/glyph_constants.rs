@@ -1,12 +1,13 @@
 use rgb::*;
 
-pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 200, 50);
+pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 170, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
 pub const MAROON: RGB8 = RGB8::new(127, 0, 0);
 pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
 pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
 pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
 pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
+pub const DARK_CYAN: RGB8 = RGB8::new(0, 127, 127);
 pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
 pub const YELLOW: RGB8 = RGB8::new(255, 255, 0);
 pub const WHITE: RGB8 = RGB8::new(255, 255, 255);

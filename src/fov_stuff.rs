@@ -5,7 +5,7 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use euclid::{point2, vec2, Angle};
 use ordered_float::OrderedFloat;
 
-use crate::glyph::glyph_constants::{BLACK, RED, SPACE};
+use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::{
     octant_to_outward_and_across_directions, rotate_point_around_point,
@@ -89,7 +89,7 @@ pub fn square_and_partial_visibility_to_glyphs(
                     character_square,
                 ),
             ));
-            Glyph::fg_only(angle_char, RED)
+            Glyph::fg_only(angle_char, DARK_CYAN)
         })
         .collect::<Vec<Glyph>>()
         .try_into()
