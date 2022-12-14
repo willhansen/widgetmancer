@@ -711,10 +711,10 @@ mod tests {
     fn test_half_grid_glyphs_when_rounding_to_zero_for_y_and_half_step_right_for_x() {
         let test_pos = point2(0.3, 0.1);
         let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1] == None);
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
+        assert_eq!(glyphs[0][0], None);
+        assert_eq!(glyphs[0][1], None);
+        assert_eq!(glyphs[0][2], None);
+        assert_eq!(glyphs[1][0], None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
             quadrant_block_by_offset(vec2(1, 0))
@@ -732,21 +732,21 @@ mod tests {
     fn test_half_grid_glyphs_when_rounding_to_zero_for_y_and_half_step_left_for_x() {
         let test_pos = point2(-0.3, 0.2);
         let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
+        assert_eq!(glyphs[0][0], None);
         assert_eq!(
             glyphs[0][1].clone().unwrap().character,
             quadrant_block_by_offset(vec2(1, 0))
         );
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
+        assert_eq!(glyphs[0][2], None);
+        assert_eq!(glyphs[1][0], None);
         assert_eq!(
             glyphs[1][1].clone().unwrap().character,
             quadrant_block_by_offset(vec2(-1, 0))
         );
-        assert!(glyphs[1][2] == None);
-        assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1] == None);
-        assert!(glyphs[2][2] == None);
+        assert_eq!(glyphs[1][2], None);
+        assert_eq!(glyphs[2][0], None);
+        assert_eq!(glyphs[2][1], None);
+        assert_eq!(glyphs[2][2], None);
     }
 
     #[test]

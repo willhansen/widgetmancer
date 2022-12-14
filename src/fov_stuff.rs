@@ -26,6 +26,9 @@ impl PartialVisibilityOfASquare {
             _ => panic!("tried getting invalid character of square: {}", i),
         }
     }
+    pub fn as_glyphs(&self, square: WorldSquare) -> DoubleGlyph {
+        square_and_partial_visibility_to_glyphs(square, self)
+    }
 }
 
 const SIGHT_RADIUS: u32 = 8;
@@ -129,7 +132,7 @@ pub fn field_of_view_from_square(
                             overlapped_shadow_edge.end_angle.radians.cos(),
                             overlapped_shadow_edge.end_angle.radians.sin(),
                         ),
-                    };
+                    } + start_square.to_f32().to_vector();
                     let extra_rotation_for_shadow_point = Angle::degrees(1.0)
                         * if overlapped_shadow_edge.is_clockwise_end {
                             1.0
@@ -203,6 +206,7 @@ pub fn angle_interval_of_square(
 mod tests {
     use crate::utility::{STEP_DOWN, STEP_UP};
     use euclid::point2;
+    use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
@@ -257,5 +261,21 @@ mod tests {
         assert!(!fov_result
             .fully_visible_squares
             .contains(&(block_square + STEP_UP)));
+    }
+    #[test]
+    fn test_partial_squares_look_partial() {
+        let start_square = point2(5, 5);
+        let block_square = start_square + STEP_DOWN * 2;
+        let blocks = SquareSet::from([block_square]);
+        let fov_result = field_of_view_from_square(start_square, &blocks);
+        assert!(!fov_result.partially_visible_squares.is_empty());
+        assert!(fov_result.partially_visible_squares.iter().all(
+            |(&square, partial_visibility): (&WorldSquare, &PartialVisibilityOfASquare)| {
+                partial_visibility
+                    .as_glyphs(square)
+                    .iter()
+                    .any(|glyph: &Glyph| !glyph.looks_solid())
+            }
+        ));
     }
 }

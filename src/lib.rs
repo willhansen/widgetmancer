@@ -32,6 +32,7 @@ use euclid::default::Point2D;
 use euclid::point2;
 use ntest::timeout;
 use num::Integer;
+use rand::SeedableRng;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
@@ -97,8 +98,11 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
+    let mut rng = rand::rngs::StdRng::seed_from_u64(5);
     //game.set_up_labyrinth_hunt();
-    game.set_up_labyrinth_kings();
+    //game.set_up_labyrinth_kings();
+    //game.set_up_labyrinth(&mut rng);
+    game.place_block(game.player_square() + STEP_RIGHT * 4);
 
     let mut prev_start_time = Instant::now();
     while game.running() {

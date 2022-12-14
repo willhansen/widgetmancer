@@ -1,16 +1,19 @@
 use std::collections::HashSet;
+use std::time::Instant;
 
 use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
+use rand::SeedableRng;
 
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
+use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph};
 use rust_roguelike::piece::{Faction, Piece, PieceType};
 use rust_roguelike::utility::{
     SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
-    RIGHT_I, STEP_DOWN, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
+    RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
 };
 
 use rust_roguelike::utils_for_tests::*;
@@ -611,4 +614,15 @@ fn test_blocks_visibly_block_view() {
             .iter()
             .all(|g| g.looks_solid_color(OUT_OF_SIGHT_COLOR)));
     }
+}
+
+#[test]
+fn test_mystery_labyrinth_death() {
+    let (width, height) = (50, 50);
+    let mut game = Game::new(width, height, Instant::now());
+    game.place_player(point2(width as i32 / 4, height as i32 / 2));
+    let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    game.set_up_labyrinth(&mut rng);
+    game.move_player(STEP_DOWN_LEFT).ok();
+    game.draw_headless_now();
 }

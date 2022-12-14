@@ -112,7 +112,7 @@ fn get_character_from_snap_points(pointA: SnapGridPoint, pointB: SnapGridPoint) 
     block_map.insert((point2(2, 1), point2(1, 3)), '🭤');
     block_map.insert((point2(2, 1), point2(0, 3)), '🭥');
     block_map.insert((point2(2, 0), point2(1, 3)), '🭦');
-    block_map.insert((point2(2, 1), point2(0, 1)), '🭧');
+    block_map.insert((point2(2, 1), point2(0, 2)), '🭧');
 
     block_map.insert((point2(1, 0), point2(1, 3)), RIGHT_HALF_BLOCK);
     block_map.insert((point2(1, 3), point2(1, 0)), LEFT_HALF_BLOCK);

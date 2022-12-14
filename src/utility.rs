@@ -1,11 +1,9 @@
-pub mod angle_interval;
-
 extern crate num;
 
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::Display;
-use std::ops::Neg;
+use std::ops::{Add, Neg};
 
 use euclid::*;
 use itertools::Itertools;
@@ -13,6 +11,8 @@ use num::traits::Signed;
 use rand::Rng;
 
 use crate::{DoubleGlyph, Glyph};
+
+pub mod angle_interval;
 
 // empty enums for euclid typing
 #[derive(Copy, Clone)]
@@ -94,6 +94,17 @@ impl<U> Line<U> {
     }
     pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
+    }
+}
+
+impl<U> Add<Vector2D<f32, U>> for Line<U> {
+    type Output = Line<U>;
+
+    fn add(self, rhs: Vector2D<f32, U>) -> Self::Output {
+        Line {
+            p1: self.p1 + rhs,
+            p2: self.p2 + rhs,
+        }
     }
 }
 
@@ -420,6 +431,7 @@ pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U
     let ac = c - a;
     ab.cross(ac) < 0.0
 }
+
 pub fn in_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
     let ab = b - a;
     let ac = c - a;
@@ -579,6 +591,7 @@ mod tests {
             point2(-0.1, -10.0)
         ));
     }
+
     #[test]
     fn test_world_pos_to_character_world_pos() {
         assert_eq!(

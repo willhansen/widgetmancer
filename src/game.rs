@@ -7,8 +7,9 @@ use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
 use priority_queue::DoublePriorityQueue;
+use rand::rngs::StdRng;
 use rand::seq::{IteratorRandom, SliceRandom};
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, SeedableRng};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -250,12 +251,12 @@ impl Game {
         Ok(())
     }
 
-    pub fn random_empty_square(&self) -> Result<WorldSquare, ()> {
+    pub fn random_empty_square(&self, rng: &mut StdRng) -> Result<WorldSquare, ()> {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
-                thread_rng().gen_range(0..self.board_size().width as i32),
-                thread_rng().gen_range(0..self.board_size().height as i32),
+                rng.gen_range(0..self.board_size().width as i32),
+                rng.gen_range(0..self.board_size().height as i32),
             );
             if self.square_is_empty(rand_pos) {
                 return Ok(rand_pos);
@@ -264,9 +265,9 @@ impl Game {
         Err(())
     }
 
-    pub fn place_piece_randomly(&mut self, piece: Piece) -> Result<(), ()> {
+    pub fn place_piece_randomly(&mut self, piece: Piece, rng: &mut StdRng) -> Result<(), ()> {
         let rand_pos = self
-            .random_empty_square()
+            .random_empty_square(rng)
             .expect("failed to get random square");
         let place_result = self.place_piece(piece, rand_pos);
         if place_result.is_ok() {
@@ -274,9 +275,9 @@ impl Game {
         }
         return Err(());
     }
-    pub fn place_block_randomly(&mut self) {
+    pub fn place_block_randomly(&mut self, rng: &mut StdRng) {
         let rand_pos = self
-            .random_empty_square()
+            .random_empty_square(rng)
             .expect("failed to get random square");
         self.place_block(rand_pos);
     }
@@ -676,27 +677,27 @@ impl Game {
         self.blocks.contains(&square)
     }
 
-    fn set_up_labyrinth(&mut self) {
+    pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
         let board_squares_total = self.board_size().width * self.board_size().height;
         let num_blocks = board_squares_total / 3;
         for _ in 0..num_blocks {
-            self.place_block_randomly();
+            self.place_block_randomly(rng);
         }
     }
 
-    pub fn set_up_labyrinth_hunt(&mut self) {
-        self.set_up_labyrinth();
+    pub fn set_up_labyrinth_hunt(&mut self, rng: &mut StdRng) {
+        self.set_up_labyrinth(rng);
         for piece_type in PieceType::iter() {
             for _ in 0..2 {
-                self.place_piece_randomly(Piece::from_type(piece_type))
+                self.place_piece_randomly(Piece::from_type(piece_type), rng)
                     .expect("random placement");
             }
         }
     }
-    pub fn set_up_labyrinth_kings(&mut self) {
-        self.set_up_labyrinth();
+    pub fn set_up_labyrinth_kings(&mut self, rng: &mut StdRng) {
+        self.set_up_labyrinth(rng);
         for _ in 0..8 {
-            self.place_piece_randomly(Piece::king())
+            self.place_piece_randomly(Piece::king(), rng)
                 .expect("random king placement");
         }
     }
@@ -711,7 +712,6 @@ impl Game {
             && !fov_mask.partially_visible_squares.contains_key(&square)
     }
     fn fov_mask_for_player(&self) -> FovResult {
-        let view_range = 7;
         let start_square = self.player_square();
         field_of_view_from_square(start_square, &self.blocks)
     }
