@@ -186,6 +186,7 @@ pub fn angle_interval_of_square(
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{STEP_DOWN, STEP_UP};
     use euclid::point2;
     use itertools::Itertools;
@@ -259,5 +260,19 @@ mod tests {
                     .any(|glyph: &Glyph| !glyph.looks_solid())
             }
         ));
+    }
+    #[test]
+    fn test_diagonal_shadow_looks_diagonal_right() {
+        let start_square = point2(5, 5);
+        let block_square = start_square + STEP_RIGHT;
+        let blocks = SquareSet::from([block_square]);
+        let fov_result = field_of_view_from_square(start_square, &blocks);
+        for i in 1..=5 {
+            let square = start_square + STEP_UP_RIGHT * i;
+            let partial_visibility = fov_result.partially_visible_squares.get(&square).unwrap();
+            let string = partial_visibility.to_glyphs().to_clean_string();
+            //🭈🭄 🭊🭂
+            assert_eq!(string, "🭊🭂");
+        }
     }
 }
