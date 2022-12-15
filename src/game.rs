@@ -18,14 +18,11 @@ use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::{Faction, Piece, PieceType};
-use crate::utility::{
-    king_distance, octant_to_outward_and_across_directions, reversed, SquareSet,
-    WorldCharacterSquare, WorldCharacterSquareToCharMap, WorldSquareGlyphMap,
-};
+use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::{king_distance, octant_to_outward_and_across_directions, reversed};
 use crate::{
-    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, BoardSize, Glyph,
-    IPoint, IVector, SquareGridInWorldFrame, SquareList, WorldMove, WorldPoint, WorldSquare,
-    WorldStep, LEFT_I,
+    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint,
+    IVector, LEFT_I,
 };
 
 pub struct Player {

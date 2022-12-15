@@ -23,16 +23,10 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
-use crate::utility::{
-    world_character_square_to_world_square, world_point_to_world_character_point, SquareSet,
-};
+use crate::utility::coordinate_frame_conversions::*;
 use crate::{
-    get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
-    BufferCharacterPoint, BufferCharacterSquare, CharacterGridInBufferFrame,
-    CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyphFunctions, Game, IPoint,
-    PieceType, ScreenCharacterPoint, ScreenCharacterSquare, SquareGridInWorldFrame, SquareList,
-    WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToGlyphMap, WorldMove,
-    WorldPoint, WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, RIGHT_I,
+    get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
+    Game, IPoint, PieceType, RIGHT_I,
 };
 
 pub struct Graphics {

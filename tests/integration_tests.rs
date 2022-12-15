@@ -11,9 +11,9 @@ use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph};
 use rust_roguelike::piece::{Faction, Piece, PieceType};
+use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
-    SquareGridInWorldFrame, WorldPoint, WorldSquare, WorldSquareRect, WorldStep, DOWN_I, LEFT_I,
-    RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
+    DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
 };
 
 use rust_roguelike::utils_for_tests::*;

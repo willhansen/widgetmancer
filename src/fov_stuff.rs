@@ -7,13 +7,10 @@ use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
+use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    octant_to_outward_and_across_directions, rotate_point_around_point,
-    world_half_plane_to_local_character_half_plane, world_point_to_local_character_point,
-    world_point_to_local_square_point, world_square_to_left_world_character_square,
-    CharacterGridInLocalCharacterFrame, HalfPlane, Line, SquareGridInLocalSquareFrame,
-    SquareGridInWorldFrame, SquareSet, WorldLine, WorldMove, WorldPoint, WorldSquare,
-    WorldSquareGlyphMap, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    octant_to_outward_and_across_directions, rotate_point_around_point, HalfPlane, Line, WorldLine,
+    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 pub struct PartialVisibilityOfASquare {

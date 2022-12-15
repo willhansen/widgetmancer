@@ -9,9 +9,10 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
+use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    CharacterGridInLocalCharacterFrame, HalfPlane, Line, LocalCharacterPoint,
+    HalfPlane, Line,
 };
 
 struct AngleBlockSnapGridInLocalFrame;
@@ -243,7 +244,7 @@ pub fn half_plane_to_angled_block_character(
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
-    use crate::utility::{Line, SquareGridInWorldFrame};
+    use crate::utility::Line;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;

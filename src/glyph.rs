@@ -15,6 +15,7 @@ use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
 
+use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::sign;
 use crate::utility::*;
 

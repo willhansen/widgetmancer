@@ -11,12 +11,11 @@ use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
 use crate::glyph::braille::world_points_for_braille_line;
-use crate::utility::world_square_to_left_world_character_square;
+use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::*;
 use crate::{
-    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step,
-    world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
-    Graphics, WorldCharacterSquareToGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    WorldSquareGlyphMap, WorldStep, RIGHT_I, UP_I,
+    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics,
+    RIGHT_I, UP_I,
 };
 
 pub type AnimationObject = Box<dyn Animation>;
@@ -363,7 +362,7 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{derivative, glyph_map_to_string, WorldCharacterSquare, DOWN_I, LEFT_I};
+    use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
 
     use super::*;
 

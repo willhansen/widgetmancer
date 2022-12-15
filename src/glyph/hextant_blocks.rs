@@ -1,7 +1,5 @@
 use super::glyph_constants::*;
-use crate::utility::{
-    line_intersections_with_centered_unit_square, same_side_of_line, LocalCharacterPoint,
-};
+use crate::utility::{line_intersections_with_centered_unit_square, same_side_of_line};
 use euclid::{point2, Point2D};
 use ordered_float::OrderedFloat;
 

@@ -7,10 +7,8 @@ use strum_macros::EnumIter;
 
 use crate::glyph_constants::*;
 
-use crate::{
-    get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph,
-    SquareGridInWorldFrame, StepList, WorldStep,
-};
+use crate::utility::coordinate_frame_conversions::*;
+use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
 pub enum PieceType {
