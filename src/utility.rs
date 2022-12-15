@@ -13,6 +13,7 @@ use rand::Rng;
 use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
+pub mod coordinate_frame_conversions;
 
 // empty enums for euclid typing
 #[derive(Copy, Clone)]
@@ -29,6 +30,9 @@ pub struct CharacterGridInScreenFrame;
 
 #[derive(Copy, Clone)]
 pub struct CharacterGridInLocalCharacterFrame;
+
+#[derive(Copy, Clone)]
+pub struct SquareGridInLocalSquareFrame;
 
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
@@ -53,6 +57,9 @@ pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
+
+pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
+pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
 pub type BufferCharacterSquare = Point2D<i32, CharacterGridInBufferFrame>;
 pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
@@ -473,6 +480,38 @@ pub fn world_point_to_local_character_point(
         .cast_unit()
 }
 
+pub fn world_point_to_local_square_point(
+    world_point: WorldPoint,
+    origin_square: WorldSquare,
+) -> LocalSquarePoint {
+    (world_point - origin_square.to_f32())
+        .to_point()
+        .cast_unit()
+}
+
+pub fn local_square_point_to_world_point(
+    local_square_point: LocalSquarePoint,
+    square: WorldSquare,
+) -> WorldPoint {
+    (local_square_point.cast_unit() + square.to_f32().to_vector())
+}
+
+pub fn local_square_point_to_local_character_point(
+    local_square_point: LocalSquarePoint,
+    character_index_in_square: usize,
+) -> LocalCharacterPoint {
+    assert!([0, 1].contains(&character_index_in_square));
+    let ref_square = point2(0, 0);
+    let world_point = local_square_point_to_world_point(local_square_point, ref_square);
+    let ref_character_square = world_square_to_left_world_character_square(ref_square)
+        + if character_index_in_square == 0 {
+            vec2(0, 0)
+        } else {
+            STEP_RIGHT.cast_unit()
+        };
+    world_point_to_local_character_point(world_point, ref_character_square)
+}
+
 pub fn is_world_character_square_left_square_of_world_square(
     character_square: WorldCharacterSquare,
 ) -> bool {
@@ -503,6 +542,26 @@ pub fn rotate_point_around_point<U>(
     angle: Angle<f32>,
 ) -> Point2D<f32, U> {
     axis_point + rotate_vect((moving_point - axis_point), angle.radians)
+}
+
+// TODO: make this more general
+pub fn world_half_plane_to_local_character_half_plane(
+    world_half_plane: HalfPlane<SquareGridInWorldFrame>,
+    ref_char_square: WorldCharacterSquare,
+) -> HalfPlane<CharacterGridInLocalCharacterFrame> {
+    HalfPlane::new(
+        Line {
+            p1: world_point_to_local_character_point(
+                world_half_plane.dividing_line.p1,
+                ref_char_square,
+            ),
+            p2: world_point_to_local_character_point(
+                world_half_plane.dividing_line.p2,
+                ref_char_square,
+            ),
+        },
+        world_point_to_local_character_point(world_half_plane.point_on_half_plane, ref_char_square),
+    )
 }
 
 #[cfg(test)]
@@ -607,6 +666,17 @@ mod tests {
                 1.0, 1.0,
             )),
             "diagonal a bit"
+        );
+    }
+    #[test]
+    fn test_local_square_point_to_local_character_point() {
+        assert_eq!(
+            local_square_point_to_local_character_point(point2(0.0, 0.0), 0),
+            point2(0.5, 0.0)
+        );
+        assert_eq!(
+            local_square_point_to_local_character_point(point2(0.0, 0.0), 1),
+            point2(-0.5, 0.0)
         );
     }
 }

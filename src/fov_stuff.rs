@@ -9,25 +9,42 @@ use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::{
     octant_to_outward_and_across_directions, rotate_point_around_point,
-    world_point_to_local_character_point, world_square_to_left_world_character_square, HalfPlane,
-    Line, SquareGridInWorldFrame, SquareSet, WorldLine, WorldMove, WorldPoint, WorldSquare,
+    world_half_plane_to_local_character_half_plane, world_point_to_local_character_point,
+    world_point_to_local_square_point, world_square_to_left_world_character_square,
+    CharacterGridInLocalCharacterFrame, HalfPlane, Line, SquareGridInLocalSquareFrame,
+    SquareGridInWorldFrame, SquareSet, WorldLine, WorldMove, WorldPoint, WorldSquare,
     WorldSquareGlyphMap, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 pub struct PartialVisibilityOfASquare {
-    pub right_char_shadow: HalfPlane<SquareGridInWorldFrame>,
-    pub left_char_shadow: HalfPlane<SquareGridInWorldFrame>,
+    pub right_char_shadow: HalfPlane<CharacterGridInLocalCharacterFrame>,
+    pub left_char_shadow: HalfPlane<CharacterGridInLocalCharacterFrame>,
 }
 impl PartialVisibilityOfASquare {
-    pub fn get(&self, i: usize) -> &HalfPlane<SquareGridInWorldFrame> {
+    pub fn get(&self, i: usize) -> &HalfPlane<CharacterGridInLocalCharacterFrame> {
         match i {
-            0 => &self.right_char_shadow,
-            1 => &self.left_char_shadow,
+            0 => &self.left_char_shadow,
+            1 => &self.right_char_shadow,
             _ => panic!("tried getting invalid character of square: {}", i),
         }
     }
-    pub fn as_glyphs(&self, square: WorldSquare) -> DoubleGlyph {
-        square_and_partial_visibility_to_glyphs(square, self)
+    pub fn to_glyphs(&self) -> DoubleGlyph {
+        let left_character_square = world_square_to_left_world_character_square(point2(0, 0));
+        let character_squares = vec![
+            left_character_square,
+            left_character_square + STEP_RIGHT.cast_unit(),
+        ];
+        (0..2)
+            .map(|i| {
+                let half_plane = self.get(i);
+                let character_square = character_squares[i];
+
+                let angle_char = half_plane_to_angled_block_character(*half_plane);
+                Glyph::fg_only(angle_char, DARK_CYAN)
+            })
+            .collect::<Vec<Glyph>>()
+            .try_into()
+            .unwrap()
     }
 }
 
@@ -46,10 +63,7 @@ impl FovResult {
         self.partially_visible_squares
             .iter()
             .for_each(|(&square, partial_visibility)| {
-                the_map.insert(
-                    square,
-                    square_and_partial_visibility_to_glyphs(square, partial_visibility),
-                );
+                the_map.insert(square, partial_visibility.to_glyphs());
             });
         the_map
     }
@@ -60,43 +74,6 @@ impl FovResult {
             .copied()
             .collect()
     }
-}
-
-pub fn square_and_partial_visibility_to_glyphs(
-    square: WorldSquare,
-    partial_visibility: &PartialVisibilityOfASquare,
-) -> DoubleGlyph {
-    let left_character_square = world_square_to_left_world_character_square(square);
-    let character_squares = vec![
-        left_character_square,
-        left_character_square + STEP_RIGHT.cast_unit(),
-    ];
-    (0..2)
-        .map(|i| {
-            let half_plane = partial_visibility.get(i);
-            let character_square = character_squares[i];
-
-            let angle_char = half_plane_to_angled_block_character(HalfPlane::new(
-                Line {
-                    p1: world_point_to_local_character_point(
-                        half_plane.dividing_line.p1,
-                        character_square,
-                    ),
-                    p2: world_point_to_local_character_point(
-                        half_plane.dividing_line.p2,
-                        character_square,
-                    ),
-                },
-                world_point_to_local_character_point(
-                    half_plane.point_on_half_plane,
-                    character_square,
-                ),
-            ));
-            Glyph::fg_only(angle_char, DARK_CYAN)
-        })
-        .collect::<Vec<Glyph>>()
-        .try_into()
-        .unwrap()
 }
 
 pub fn field_of_view_from_square(
@@ -147,10 +124,18 @@ pub fn field_of_view_from_square(
 
                     let shadow_half_plane =
                         HalfPlane::new(shadow_line_from_center, point_in_shadow);
+                    let left_character_square = world_square_to_left_world_character_square(square);
+                    let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
 
                     let shadows_on_characters = PartialVisibilityOfASquare {
-                        left_char_shadow: shadow_half_plane,
-                        right_char_shadow: shadow_half_plane,
+                        left_char_shadow: world_half_plane_to_local_character_half_plane(
+                            shadow_half_plane,
+                            left_character_square,
+                        ),
+                        right_char_shadow: world_half_plane_to_local_character_half_plane(
+                            shadow_half_plane,
+                            right_character_square,
+                        ),
                     };
 
                     // partially visible
@@ -272,7 +257,7 @@ mod tests {
         assert!(fov_result.partially_visible_squares.iter().all(
             |(&square, partial_visibility): (&WorldSquare, &PartialVisibilityOfASquare)| {
                 partial_visibility
-                    .as_glyphs(square)
+                    .to_glyphs()
                     .iter()
                     .any(|glyph: &Glyph| !glyph.looks_solid())
             }
