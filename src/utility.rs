@@ -36,7 +36,7 @@ pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
 pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
 
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Line<U> {
     pub p1: Point2D<f32, U>,
     pub p2: Point2D<f32, U>,
@@ -62,7 +62,7 @@ impl<U> Add<Vector2D<f32, U>> for Line<U> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct HalfPlane<U> {
     pub dividing_line: Line<U>,
     pub point_on_half_plane: Point2D<f32, U>,

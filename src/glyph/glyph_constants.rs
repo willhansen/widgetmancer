@@ -41,6 +41,7 @@ pub const LOWER_LEFT_HALF_BLOCK_TRIANGLE: char = '◣';
 
 pub const FULL_BLOCK: char = '█';
 pub const SPACE: char = ' ';
+pub const GOOMBA: char = '⍾';
 
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
     SPACE,
@@ -58,10 +59,20 @@ pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] =
 
 pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
 
+// tiny squid: ᵜ
+// big squid: ᴥ (or a jelly thing from zelda)
+// pac-ish man: ᗢᗣᗤᗧ
+// bullets: ᗜ (plus rotations)
+
 // ●○ ⚬⦁⚫⚪ ✕ ✕
 // ✕ ⨉ ⨯ 🞨 🞮 ×
+
+// best x yet: ᳵ
+const EX: char = 'ᳵ';
+//const EX: char ='⨯' ;
+
 pub const MOVE_ONLY_SQUARE_CHARS: &[char; 2] = &['○', ' '];
-pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &['⨯', ' '];
+pub const CAPTURE_ONLY_SQUARE_CHARS: &[char; 2] = &[EX, ' '];
 pub const MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['●', ' '];
 pub const CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS: &[char; 2] = &['◌', ' '];
 // ▴▵

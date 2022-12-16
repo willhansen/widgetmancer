@@ -38,6 +38,7 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 //     ◌  𝨞
 // ◌  ⚿ ⯐
 //    𝩬   𝩫
+// ⍾
 
 //  ♜ 	♞ 	♝ 	♛ 	♚ 	♝ 	♞ 	♜
 // 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎ 	♟︎

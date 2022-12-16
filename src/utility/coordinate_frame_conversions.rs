@@ -1,22 +1,17 @@
 use crate::utility::*;
 
 // empty enums for euclid typing
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInWorldFrame;
-
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInWorldFrame;
-
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInBufferFrame;
-
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenFrame;
-
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInLocalCharacterFrame;
-
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInLocalSquareFrame;
 
 pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
