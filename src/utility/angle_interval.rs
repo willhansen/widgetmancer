@@ -75,7 +75,7 @@ impl AngleInterval {
             } else {
                 self.anticlockwise_end
             },
-            is_clockwise_end,
+            is_low_end: is_clockwise_end,
         })
     }
     fn exactly_touches(&self, other: AngleInterval) -> bool {
@@ -120,7 +120,7 @@ impl AngleInterval {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DirectionalAngleEdge {
     pub end_angle: Angle<f32>,
-    pub is_clockwise_end: bool,
+    pub is_low_end: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -189,10 +189,13 @@ impl AngleIntervalSet {
             .iter()
             .any(|i| i.fully_contains_interval(interval))
     }
-    pub fn overlaps_interval(&self, interval: AngleInterval) -> bool {
+    pub fn partially_or_fully_overlaps_interval(&self, interval: AngleInterval) -> bool {
         self.intervals
             .iter()
             .any(|i: &AngleInterval| i.partially_or_fully_overlaps(interval))
+    }
+    pub fn partially_overlaps_interval(&self, interval: AngleInterval) -> bool {
+        self.most_overlapped_edge_of_set(interval).is_some()
     }
     pub fn most_overlapped_edge_of_set(
         &self,
@@ -368,7 +371,7 @@ mod tests {
 
         let interval_a = AngleInterval::from_degrees(30.0, 45.0);
         let interval_b = AngleInterval::from_degrees(10.0, 35.0);
-        assert_false!(angle_interval_set.overlaps_interval(interval_a));
+        assert_false!(angle_interval_set.partially_or_fully_overlaps_interval(interval_a));
         angle_interval_set.add_interval(interval_b);
 
         assert_false!(angle_interval_set.intervals.is_empty());
@@ -376,12 +379,12 @@ mod tests {
         //println!("interval a: {}", interval_a);
         //println!("interval b: {}", interval_b);
         //println!("the set: {}", angle_interval_set);
-        assert!(angle_interval_set.overlaps_interval(interval_a));
+        assert!(angle_interval_set.partially_or_fully_overlaps_interval(interval_a));
         assert_false!(angle_interval_set.fully_contains_interval(interval_a));
 
         angle_interval_set.add_interval(interval_a);
 
-        assert!(angle_interval_set.overlaps_interval(interval_a));
+        assert!(angle_interval_set.partially_or_fully_overlaps_interval(interval_a));
         assert!(angle_interval_set.fully_contains_interval(interval_a));
     }
 
@@ -485,7 +488,7 @@ mod tests {
             interval_set.most_overlapped_edge_of_set(single_interval),
             Some(DirectionalAngleEdge {
                 end_angle: Angle::degrees(0.0),
-                is_clockwise_end: true
+                is_low_end: true
             })
         );
     }
@@ -504,7 +507,7 @@ mod tests {
             interval_set.most_overlapped_edge_of_set(single_interval),
             Some(DirectionalAngleEdge {
                 end_angle: Angle::degrees(20.0),
-                is_clockwise_end: false
+                is_low_end: false
             })
         );
     }

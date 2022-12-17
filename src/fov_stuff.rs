@@ -83,58 +83,26 @@ pub fn field_of_view_from_square(
 
     for octant_number in 0..8 {
         let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
-        let mut shadow_arcs = AngleIntervalSet::new();
+        let mut shadows = AngleIntervalSet::new();
         // skip the central square
         for outward_steps in 1..=SIGHT_RADIUS {
             for across_steps in 0..=outward_steps {
                 let square = start_square
                     + outward_dir * outward_steps as i32
                     + across_dir * across_steps as i32;
-                let square_angle_interval = angle_interval_of_square(start_square, square);
-                if shadow_arcs.fully_contains_interval(square_angle_interval) {
+                let shadow_for_this_square = angle_interval_of_square(square - start_square);
+                if shadows.fully_contains_interval(shadow_for_this_square) {
                     continue;
                 } else if sight_blockers.contains(&square) {
-                    shadow_arcs.add_interval(square_angle_interval);
+                    shadows.add_interval(shadow_for_this_square);
                     // TODO: partially visible blocks (just see one side)
                     // fully in view for now
                     fov_result.fully_visible_squares.insert(square);
-                } else if let Some(overlapped_shadow_edge) =
-                    shadow_arcs.most_overlapped_edge_of_set(square_angle_interval)
-                {
-                    let shadow_line_from_center = Line {
-                        p1: point2(0.0, 0.0),
-                        p2: point2(
-                            overlapped_shadow_edge.end_angle.radians.cos(),
-                            overlapped_shadow_edge.end_angle.radians.sin(),
-                        ),
-                    } + start_square.to_f32().to_vector();
-                    let extra_rotation_for_shadow_point = Angle::degrees(1.0)
-                        * if overlapped_shadow_edge.is_clockwise_end {
-                            1.0
-                        } else {
-                            -1.0
-                        };
-                    let point_in_shadow = rotate_point_around_point(
-                        shadow_line_from_center.p1,
-                        shadow_line_from_center.p2,
-                        extra_rotation_for_shadow_point,
-                    );
-
-                    let shadow_half_plane =
-                        HalfPlane::new(shadow_line_from_center, point_in_shadow);
-                    let left_character_square = world_square_to_left_world_character_square(square);
-                    let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
-
-                    let shadows_on_characters = PartialVisibilityOfASquare {
-                        left_char_shadow: world_half_plane_to_local_character_half_plane(
-                            shadow_half_plane,
-                            left_character_square,
-                        ),
-                        right_char_shadow: world_half_plane_to_local_character_half_plane(
-                            shadow_half_plane,
-                            right_character_square,
-                        ),
-                    };
+                } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
+                    // Partial overlap case
+                    let square_relative_to_start_square: WorldStep = square - start_square;
+                    let shadows_on_characters =
+                        visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
 
                     // partially visible
                     fov_result
@@ -150,12 +118,56 @@ pub fn field_of_view_from_square(
     fov_result
 }
 
-pub fn angle_interval_of_square(
-    sight_center: WorldSquare,
-    blocking_square: WorldSquare,
-) -> AngleInterval {
-    assert_ne!(sight_center, blocking_square);
-    let relative_square = blocking_square - sight_center;
+fn visibility_of_shadowed_square(
+    shadows: &AngleIntervalSet,
+    square_relative_to_shadow_center: WorldStep,
+) -> PartialVisibilityOfASquare {
+    let overlapped_shadow_edge = shadows
+        .most_overlapped_edge_of_set(angle_interval_of_square(square_relative_to_shadow_center))
+        .unwrap();
+
+    let shadow_line_from_center = Line {
+        p1: point2(0.0, 0.0),
+        p2: point2(
+            overlapped_shadow_edge.end_angle.radians.cos(),
+            overlapped_shadow_edge.end_angle.radians.sin(),
+        ),
+    };
+    let extra_rotation_for_shadow_point = Angle::degrees(1.0)
+        * if overlapped_shadow_edge.is_low_end {
+            1.0
+        } else {
+            -1.0
+        };
+    let point_in_shadow = rotate_point_around_point(
+        shadow_line_from_center.p1,
+        shadow_line_from_center.p2,
+        extra_rotation_for_shadow_point,
+    );
+
+    let shadow_half_plane = HalfPlane::new(shadow_line_from_center, point_in_shadow);
+
+    // do a few forbidden conversions here.
+    // TODO: FIX
+    let left_character_square = world_square_to_left_world_character_square(
+        square_relative_to_shadow_center.to_point().cast_unit(),
+    );
+    let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
+
+    PartialVisibilityOfASquare {
+        left_char_shadow: world_half_plane_to_local_character_half_plane(
+            shadow_half_plane,
+            left_character_square,
+        ),
+        right_char_shadow: world_half_plane_to_local_character_half_plane(
+            shadow_half_plane,
+            right_character_square,
+        ),
+    }
+}
+
+pub fn angle_interval_of_square(relative_square: WorldStep) -> AngleInterval {
+    assert_ne!(relative_square, vec2(0, 0));
     let rel_square_center = relative_square.to_f32();
     let rel_square_corners: Vec<WorldMove> = vec![
         rel_square_center + STEP_UP_RIGHT.to_f32() * 0.5,
@@ -199,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__horizontal() {
-        let view_angle = angle_interval_of_square(point2(0, 0), point2(3, 0));
+        let view_angle = angle_interval_of_square(vec2(3, 0));
         let correct_start_angle = WorldMove::new(2.5, 0.5).angle_from_x_axis();
         let correct_end_angle = WorldMove::new(2.5, -0.5).angle_from_x_axis();
 
@@ -212,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__diagonalish() {
-        let view_angle = angle_interval_of_square(point2(0, 0), point2(5, 3));
+        let view_angle = angle_interval_of_square(vec2(5, 3));
         let correct_start_angle = WorldMove::new(4.5, 3.5).angle_from_x_axis();
         let correct_end_angle = WorldMove::new(5.5, 2.5).angle_from_x_axis();
 
@@ -271,7 +283,8 @@ mod tests {
         for i in 1..=5 {
             let square = start_square + STEP_UP_RIGHT * i;
             let partial_visibility = fov_result.partially_visible_squares.get(&square).unwrap();
-            dbg!(partial_visibility);
+            println!("{}", partial_visibility.to_glyphs().to_clean_string());
+            //dbg!(partial_visibility);
             let string = partial_visibility.to_glyphs().to_clean_string();
             // one of these two is right.  Not sure which
             assert!(["🭈🭄", "🭊🭂"].contains(&&*string));

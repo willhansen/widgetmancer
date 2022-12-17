@@ -62,6 +62,11 @@ impl<U> Add<Vector2D<f32, U>> for Line<U> {
     }
 }
 
+pub struct Ray<U> {
+    pub point: Point2D<f32, U>,
+    pub angle: Angle<f32>,
+}
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct HalfPlane<U> {
     pub dividing_line: Line<U>,
