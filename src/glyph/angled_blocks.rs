@@ -338,4 +338,18 @@ mod tests {
             RIGHT_HALF_BLOCK
         );
     }
+
+    #[test]
+    fn test_half_plane_to_character__from_failure_data() {
+        let half_plane = HalfPlane {
+            dividing_line: Line {
+                p1: point2(-1.5, -1.0),
+                p2: point2(-0.08, -0.3),
+            },
+            point_on_half_plane: point2(-0.06, -0.3),
+        };
+        let the_char = half_plane_to_angled_block_character(half_plane);
+        println!("{}", the_char);
+        assert!(['🭈', '🭊'].contains(&the_char));
+    }
 }

@@ -20,7 +20,7 @@ impl AngleInterval {
             clockwise_end,
         }
     }
-    fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
+    pub fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
         Self::new(
             Angle::degrees(clockwise_end_in_degrees),
             Angle::degrees(anticlockwise_end_in_degrees),

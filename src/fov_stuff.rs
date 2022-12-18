@@ -9,8 +9,8 @@ use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    octant_to_outward_and_across_directions, rotate_point_around_point, HalfPlane, Line, WorldLine,
-    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    is_clockwise, octant_to_outward_and_across_directions, rotate_point_around_point, HalfPlane,
+    Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -36,7 +36,6 @@ impl PartialVisibilityOfASquare {
             .map(|i| {
                 let half_plane = self.get(i);
                 let character_square = character_squares[i];
-
                 let angle_char = half_plane_to_angled_block_character(*half_plane);
                 Glyph::fg_only(angle_char, DARK_CYAN)
             })
@@ -153,16 +152,14 @@ fn visibility_of_shadowed_square(
         square_relative_to_shadow_center.to_point().cast_unit(),
     );
     let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
+    let left_char_shadow =
+        world_half_plane_to_local_character_half_plane(shadow_half_plane, left_character_square);
+    let right_char_shadow =
+        world_half_plane_to_local_character_half_plane(shadow_half_plane, right_character_square);
 
     PartialVisibilityOfASquare {
-        left_char_shadow: world_half_plane_to_local_character_half_plane(
-            shadow_half_plane,
-            left_character_square,
-        ),
-        right_char_shadow: world_half_plane_to_local_character_half_plane(
-            shadow_half_plane,
-            right_character_square,
-        ),
+        left_char_shadow,
+        right_char_shadow,
     }
 }
 
@@ -275,7 +272,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_diagonal_shadow_looks_diagonal_right() {
+    fn test_diagonal_shadow_looks_diagonal() {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_RIGHT;
         let blocks = SquareSet::from([block_square]);
@@ -286,9 +283,21 @@ mod tests {
             println!("{}", partial_visibility.to_glyphs().to_clean_string());
             //dbg!(partial_visibility);
             let string = partial_visibility.to_glyphs().to_clean_string();
+            println!("{}", string);
             // one of these two is right.  Not sure which
             assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
         }
+    }
+    #[test]
+    fn test_single_square_is_shadowed_correctly_on_diagonal() {
+        let mut shadows = AngleIntervalSet::new();
+        shadows.add_interval(AngleInterval::from_degrees(0.0, 45.0));
+        let square_relative_to_center = vec2(1, 1);
+        let visibility = visibility_of_shadowed_square(&shadows, square_relative_to_center);
+        let string = visibility.to_glyphs().to_clean_string();
+        println!("{}", string);
+        dbg!(visibility);
+        assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
     #[test]
     fn test_partial_visibility_to_glyphs() {
@@ -309,6 +318,37 @@ mod tests {
             ),
         };
 
+        let string = partial_visibility.to_glyphs().to_clean_string();
+        assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
+    }
+    #[test]
+    fn test_partial_visibility_to_glyphs__data_from_failure() {
+        let partial_visibility = PartialVisibilityOfASquare {
+            right_char_shadow: HalfPlane {
+                dividing_line: Line {
+                    p1: point2(-2.5, -1.0),
+                    p2: point2(-1.0857865, -0.29289323),
+                },
+                point_on_half_plane: point2(-1.0610383, -0.30548787),
+            },
+            left_char_shadow: HalfPlane {
+                dividing_line: Line {
+                    p1: point2(-1.5, -1.0),
+                    p2: point2(-0.08578646, -0.29289323),
+                },
+                point_on_half_plane: point2(-0.061038256, -0.30548787),
+            },
+        };
+        assert!(is_clockwise(
+            partial_visibility.left_char_shadow.dividing_line.p1,
+            partial_visibility.left_char_shadow.dividing_line.p2,
+            partial_visibility.left_char_shadow.point_on_half_plane
+        ));
+        assert!(is_clockwise(
+            partial_visibility.right_char_shadow.dividing_line.p1,
+            partial_visibility.right_char_shadow.dividing_line.p2,
+            partial_visibility.right_char_shadow.point_on_half_plane
+        ));
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
