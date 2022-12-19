@@ -229,6 +229,11 @@ pub fn half_plane_to_angled_block_character(
             snapped_points[0],
             snapped_points[1],
             half_plane.point_on_half_plane,
+            is_clockwise(
+                snapped_points[0],
+                snapped_points[1],
+                half_plane.point_on_half_plane,
+            )
         );
         if is_clockwise(
             snapped_points[0],

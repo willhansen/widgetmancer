@@ -535,4 +535,16 @@ mod tests {
             point2(-0.5, 0.0)
         );
     }
+    #[test]
+    fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(-1.5, -1.0), point2(0.0, 0.0));
+        let output_points = line_intersections_with_centered_unit_square(input_line);
+        let output_line = Line::new(output_points[0], output_points[1]);
+        let in_vec = input_line.p2 - input_line.p1;
+        let out_vec = output_line.p2 - output_line.p1;
+
+        let same_direction = in_vec.dot(out_vec) > 0.0;
+        assert!(same_direction);
+    }
 }
