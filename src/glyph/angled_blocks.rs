@@ -51,7 +51,7 @@ fn valid_snap_points_on_angle_block() -> HashSet<SnapGridPoint> {
 //U+1FB4x 	🭀 	🭁 	🭂 	🭃 	🭄 	🭅 	🭆 	🭇 	🭈 	🭉 	🭊 	🭋 	🭌 	🭍 	🭎 	🭏
 //U+1FB5x 	🭐 	🭑 	🭒 	🭓 	🭔 	🭕 	🭖 	🭗 	🭘 	🭙 	🭚 	🭛 	🭜 	🭝 	🭞 	🭟
 //U+1FB6x 	🭠 	🭡 	🭢 	🭣 	🭤 	🭥 	🭦 	🭧
-fn get_character_from_snap_points(pointA: SnapGridPoint, pointB: SnapGridPoint) -> char {
+fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame>) -> char {
     // The inside of the angled block is CLOCKWISE from the vector point1_to_point2
     // The coordinates start at the lower-left corner of the character
 
@@ -67,6 +67,8 @@ fn get_character_from_snap_points(pointA: SnapGridPoint, pointB: SnapGridPoint) 
     //      |  |  |
     //      0  1  2
 
+    let pointA = line.p1;
+    let pointB = line.p2;
     let mut block_map = HashMap::<(SnapGridPoint, SnapGridPoint), char>::new();
 
     // TODO: find an actual pattern for these
@@ -179,7 +181,7 @@ fn get_character_from_snap_points(pointA: SnapGridPoint, pointB: SnapGridPoint) 
 }
 
 pub fn half_plane_to_angled_block_character(
-    half_plane: HalfPlane<CharacterGridInLocalCharacterFrame>,
+    half_plane: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
 ) -> char {
     // angle blocks have important edge points
 
@@ -223,20 +225,25 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
+        dbg!(
+            snapped_points[0],
+            snapped_points[1],
+            half_plane.point_on_half_plane,
+        );
         if is_clockwise(
             snapped_points[0],
             snapped_points[1],
             half_plane.point_on_half_plane,
         ) {
-            get_character_from_snap_points(
+            get_character_from_snap_points(Line::new(
                 snap_to_grid(snapped_points[0]),
                 snap_to_grid(snapped_points[1]),
-            )
+            ))
         } else {
-            get_character_from_snap_points(
+            get_character_from_snap_points(Line::new(
                 snap_to_grid(snapped_points[1]),
                 snap_to_grid(snapped_points[0]),
-            )
+            ))
         }
     }
 }
@@ -310,32 +317,41 @@ mod tests {
             point2(1, 2),
             "should snap to non-angle-block points"
         );
+        assert_eq!(
+            snap_to_grid(point2(0.5, 0.5)),
+            point2(2, 3),
+            "top right corner of character"
+        );
     }
 
     #[test]
     fn test_snap_points_to_character() {
         assert_eq!(
-            get_character_from_snap_points(point2(0, 0), point2(2, 3)),
+            get_character_from_snap_points(Line::new(point2(0, 0), point2(2, 3))),
             '◢',
             "lower-right diagonal"
         );
         assert_eq!(
-            get_character_from_snap_points(point2(2, 3), point2(0, 0)),
+            get_character_from_snap_points(Line::new(point2(2, 3), point2(0, 0))),
             '◤',
             "swap points"
         );
         assert_eq!(
-            get_character_from_snap_points(point2(2, 1), point2(0, 3)),
+            get_character_from_snap_points(Line::new(point2(2, 1), point2(0, 3))),
             '🭥',
             "upper right corner"
         );
         assert_eq!(
-            get_character_from_snap_points(point2(0, 1), point2(2, 1)),
+            get_character_from_snap_points(Line::new(point2(0, 1), point2(2, 1))),
             LOWER_ONE_THIRD_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(point2(1, 0), point2(1, 3)),
+            get_character_from_snap_points(Line::new(point2(1, 0), point2(1, 3))),
             RIGHT_HALF_BLOCK
+        );
+        assert_eq!(
+            get_character_from_snap_points(Line::new(point2(0, 0), point2(2, 1))),
+            '🭈'
         );
     }
 

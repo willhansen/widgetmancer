@@ -113,9 +113,9 @@ pub fn local_square_point_to_local_character_point(
 }
 // TODO: make this more general
 pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<SquareGridInWorldFrame>,
+    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
     ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<CharacterGridInLocalCharacterFrame> {
+) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
     HalfPlane::new(
         Line {
             p1: world_point_to_local_character_point(

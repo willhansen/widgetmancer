@@ -15,11 +15,11 @@ use crate::utility::{
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct PartialVisibilityOfASquare {
-    pub right_char_shadow: HalfPlane<CharacterGridInLocalCharacterFrame>,
-    pub left_char_shadow: HalfPlane<CharacterGridInLocalCharacterFrame>,
+    pub right_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
+    pub left_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
 }
 impl PartialVisibilityOfASquare {
-    pub fn get(&self, i: usize) -> &HalfPlane<CharacterGridInLocalCharacterFrame> {
+    pub fn get(&self, i: usize) -> &HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
         match i {
             0 => &self.left_char_shadow,
             1 => &self.right_char_shadow,
