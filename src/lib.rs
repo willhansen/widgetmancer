@@ -103,6 +103,9 @@ pub fn do_everything() {
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
     game.place_block(game.player_square() + STEP_RIGHT * 4);
+    game.place_block(game.player_square() + STEP_RIGHT * 7);
+    game.place_block(game.player_square() + STEP_RIGHT * 4 + STEP_UP * 3);
+    game.place_block(game.player_square() + STEP_RIGHT * 7 + STEP_UP * 3);
 
     let mut prev_start_time = Instant::now();
     while game.running() {
