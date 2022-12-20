@@ -225,31 +225,11 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        dbg!(
-            snapped_points[0],
-            snapped_points[1],
-            half_plane.point_on_half_plane,
-            is_clockwise(
-                snapped_points[0],
-                snapped_points[1],
-                half_plane.point_on_half_plane,
-            )
-        );
-        if is_clockwise(
-            snapped_points[0],
-            snapped_points[1],
-            half_plane.point_on_half_plane,
-        ) {
-            get_character_from_snap_points(Line::new(
-                snap_to_grid(snapped_points[0]),
-                snap_to_grid(snapped_points[1]),
-            ))
-        } else {
-            get_character_from_snap_points(Line::new(
-                snap_to_grid(snapped_points[1]),
-                snap_to_grid(snapped_points[0]),
-            ))
-        }
+        //dbg!( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, is_clockwise( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, ) );
+        get_character_from_snap_points(Line::new(
+            snap_to_grid(snapped_points[0]),
+            snap_to_grid(snapped_points[1]),
+        ))
     }
 }
 

@@ -9,6 +9,7 @@ use euclid::*;
 use itertools::Itertools;
 use num::traits::real::Real;
 use num::traits::Signed;
+use ordered_float::OrderedFloat;
 use rand::Rng;
 
 use crate::utility::coordinate_frame_conversions::*;
@@ -348,7 +349,7 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
                 if candidate_intersections[0] == candidate_intersections[1] {
                     vec![candidate_intersections[0]]
                 } else {
-                    candidate_intersections
+                    points_in_line_order(line, candidate_intersections)
                 }
             }
             1 => candidate_intersections,
@@ -364,6 +365,15 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
             }
         }
     }
+}
+
+fn points_in_line_order<U>(
+    line: Line<f32, U>,
+    mut points: Vec<Point2D<f32, U>>,
+) -> Vec<Point2D<f32, U>> {
+    let normalized_line_direction = (line.p2 - line.p1).normalize();
+    points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
+    points
 }
 
 pub fn same_side_of_line<U>(
