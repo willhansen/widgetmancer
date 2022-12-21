@@ -15,6 +15,7 @@ use crate::utility::{
     HalfPlane, Line,
 };
 
+#[derive(Clone, PartialEq, Debug, Copy)]
 struct AngleBlockSnapGridInLocalFrame;
 
 type SnapGridPoint = Point2D<i32, AngleBlockSnapGridInLocalFrame>;
@@ -226,10 +227,19 @@ pub fn half_plane_to_angled_block_character(
         }
     } else {
         //dbg!( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, is_clockwise( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, ) );
-        get_character_from_snap_points(Line::new(
+
+        let mut grid_line = Line::new(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
-        ))
+        );
+        if !is_clockwise(
+            half_plane.dividing_line.p1,
+            half_plane.dividing_line.p2,
+            half_plane.point_on_half_plane,
+        ) {
+            grid_line.reverse();
+        }
+        get_character_from_snap_points(grid_line)
     }
 }
 
@@ -242,7 +252,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_line_and_inside_point_to_angled_block_character() {
+    fn test_line_and_inside_point_to_angled_block_character__left_edge_full_block() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
             half_plane_to_angled_block_character(HalfPlane::new(
@@ -255,6 +265,9 @@ mod tests {
             FULL_BLOCK,
             "on left edge, full block"
         );
+    }
+    #[test]
+    fn test_line_and_inside_point_to_angled_block_character__left_edge_empty_block() {
         assert_eq!(
             half_plane_to_angled_block_character(HalfPlane::new(
                 Line {
@@ -266,6 +279,9 @@ mod tests {
             SPACE,
             "on left edge, empty block"
         );
+    }
+    #[test]
+    fn test_line_and_inside_point_to_angled_block_character__lower_right_diagonal() {
         assert_eq!(
             half_plane_to_angled_block_character(HalfPlane::new(
                 Line {
@@ -277,6 +293,9 @@ mod tests {
             '◢',
             "lower-right diagonal given short line"
         );
+    }
+    #[test]
+    fn test_line_and_inside_point_to_angled_block_character__notch_off_bottom_right() {
         assert_eq!(
             half_plane_to_angled_block_character(HalfPlane::new(
                 Line {

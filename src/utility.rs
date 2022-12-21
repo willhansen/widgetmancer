@@ -3,6 +3,7 @@ extern crate num;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::Display;
+use std::mem;
 use std::ops::{Add, Neg};
 
 use euclid::*;
@@ -47,6 +48,9 @@ pub struct Line<T, U> {
 impl<T, U> Line<T, U> {
     pub fn new(p1: Point2D<T, U>, p2: Point2D<T, U>) -> Line<T, U> {
         Line { p1, p2 }
+    }
+    pub fn reverse(&mut self) {
+        mem::swap(&mut self.p2, &mut self.p1);
     }
 }
 impl<U> Line<f32, U> {
@@ -307,14 +311,14 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
     } else if is_vertical_line {
         let x = line_point_a.x;
         if x.abs() <= 0.5 {
-            vec![point2(x, 0.5), point2(x, -0.5)]
+            points_in_line_order(line, vec![point2(x, 0.5), point2(x, -0.5)])
         } else {
             vec![]
         }
     } else if is_horizontal_line {
         let y = line_point_a.y;
         if y.abs() <= 0.5 {
-            vec![point2(y, 0.5), point2(y, -0.5)]
+            points_in_line_order(line, vec![point2(y, 0.5), point2(y, -0.5)])
         } else {
             vec![]
         }
@@ -556,5 +560,21 @@ mod tests {
 
         let same_direction = in_vec.dot(out_vec) > 0.0;
         assert!(same_direction);
+    }
+    #[test]
+    fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
+    ) {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(-0.5, -0.5), point2(-0.5, 0.5));
+        let output_points = line_intersections_with_centered_unit_square(input_line);
+        assert_eq!(input_line.p1, output_points[0]);
+        assert_eq!(input_line.p2, output_points[1]);
+    }
+    #[test]
+    fn test_same_side_of_line__vertical_line() {
+        let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
+        let origin = point2(0.0, 0.0);
+        let neg_point = point2(-20.0, 0.0);
+        assert_false!(same_side_of_line(line, neg_point, origin))
     }
 }
