@@ -5,7 +5,7 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use euclid::{point2, vec2, Angle};
 use ordered_float::OrderedFloat;
 
-use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, RED, SPACE};
+use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, OUT_OF_SIGHT_COLOR, RED, SPACE};
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
@@ -37,7 +37,7 @@ impl PartialVisibilityOfASquare {
                 let half_plane = self.get(i);
                 let character_square = character_squares[i];
                 let angle_char = half_plane_to_angled_block_character(*half_plane);
-                Glyph::fg_only(angle_char, DARK_CYAN)
+                Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
             })
             .collect::<Vec<Glyph>>()
             .try_into()
@@ -196,6 +196,7 @@ pub fn angle_interval_of_square(relative_square: WorldStep) -> AngleInterval {
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{STEP_DOWN, STEP_UP};
     use euclid::point2;
@@ -351,5 +352,26 @@ mod tests {
         ));
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
+    }
+    #[test]
+    fn test_observed_bright_spot_in_shadow() {
+        let player_square = point2(3, 3);
+        let block_square = player_square + STEP_UP_RIGHT * 2;
+        let test_square = block_square + STEP_UP;
+
+        let fov_result = field_of_view_from_square(player_square, &SquareSet::from([block_square]));
+        let visibility_of_test_square = fov_result
+            .partially_visible_squares
+            .get(&test_square)
+            .unwrap();
+        assert_eq!(
+            visibility_of_test_square
+                .to_glyphs()
+                .to_clean_string()
+                .chars()
+                .nth(1)
+                .unwrap(),
+            FULL_BLOCK
+        );
     }
 }

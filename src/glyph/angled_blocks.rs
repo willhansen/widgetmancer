@@ -215,7 +215,7 @@ pub fn half_plane_to_angled_block_character(
         })
         .collect();
 
-    if snapped_points.len() < 2 {
+    if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
         if same_side_of_line(
             half_plane.dividing_line,
             half_plane.point_on_half_plane,
