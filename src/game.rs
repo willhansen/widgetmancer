@@ -17,6 +17,7 @@ use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
+use crate::piece::PieceType::Pawn;
 use crate::piece::{Faction, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{king_distance, octant_to_outward_and_across_directions, reversed};
@@ -240,6 +241,25 @@ impl Game {
         !self.is_player_at(pos) && !self.is_piece_at(pos) && !self.is_block_at(pos)
     }
 
+    pub fn place_king_pawn_group(
+        &mut self,
+        king_square: WorldSquare,
+        faction: Faction,
+    ) -> Result<(), ()> {
+        self.place_piece(Piece::new(PieceType::King, faction), king_square)?;
+        for x in -1..=1 {
+            for y in -1..=1 {
+                let pawn_square = king_square + vec2(x, y);
+                if pawn_square == king_square {
+                    continue;
+                }
+                self.place_piece(Piece::new(PieceType::Pawn, faction), pawn_square)
+                    .ok();
+            }
+        }
+        Ok(())
+    }
+
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) -> Result<(), ()> {
         if !self.square_is_empty(square) || !self.square_is_on_board(square) {
             return Err(());
@@ -349,7 +369,7 @@ impl Game {
         self.turn_count += 1;
     }
 
-    pub fn move_all_factions(&mut self) {
+    pub fn move_one_piece_per_faction(&mut self) {
         for faction in self.get_all_living_factions() {
             self.move_one_piece_of_faction(faction);
         }
