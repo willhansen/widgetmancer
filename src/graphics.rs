@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::borrow::Borrow;
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::io::Write;
 use std::mem::swap;
@@ -9,6 +9,7 @@ use std::ptr::hash;
 use std::time::{Duration, Instant};
 
 use euclid::*;
+use glyph::glyph_constants::*;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
@@ -17,18 +18,15 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::*;
+use crate::fov_stuff::FovResult;
+use crate::glyph::braille::count_braille_dots;
+use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
-use crate::utility::SquareSet;
+use crate::utility::coordinate_frame_conversions::*;
 use crate::{
-    get_by_point, pair_up_glyph_map, point_to_string, print_glyph_map, BoardSize,
-    BrailleGridInWorldFrame, BufferCharacterPoint, BufferCharacterSquare,
-    CharacterGridInBufferFrame, CharacterGridInScreenFrame, CharacterGridInWorldFrame, DoubleGlyph,
-    DoubleGlyphFunctions, Game, Glyph, IPoint, PieceType, ScreenCharacterPoint,
-    ScreenCharacterSquare, SquareGridInWorldFrame, SquareList, WorldBraillePoint,
-    WorldCharacterGlyphMap, WorldCharacterPoint, WorldCharacterSquare, WorldMove, WorldPoint,
-    WorldSquare, WorldSquareGlyphMap, WorldSquareRect, WorldStep, BLACK, BOARD_BLACK, BOARD_WHITE,
-    EXPLOSION_COLOR, RED, RIGHT_I, WHITE,
+    get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
+    Game, IPoint, PieceType, RIGHT_I,
 };
 
 pub struct Graphics {
@@ -77,9 +75,7 @@ impl Graphics {
     }
 
     fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
-        self.square_is_on_screen(Glyph::world_character_square_to_world_square(
-            character_square,
-        ))
+        self.square_is_on_screen(world_character_square_to_world_square(character_square))
     }
     fn square_is_on_screen(&self, square: WorldSquare) -> bool {
         self.world_square_to_multiple_buffer_squares(square)
@@ -166,7 +162,7 @@ impl Graphics {
         &self,
         buffer_square: BufferCharacterSquare,
     ) -> WorldSquare {
-        Glyph::world_character_square_to_world_square(
+        world_character_square_to_world_square(
             self.buffer_square_to_world_character_square(buffer_square),
         )
     }
@@ -180,7 +176,7 @@ impl Graphics {
     }
 
     pub fn world_point_to_buffer_point(&self, world_point: WorldPoint) -> BufferCharacterPoint {
-        self.world_character_point_to_buffer_point(Glyph::world_point_to_world_character_point(
+        self.world_character_point_to_buffer_point(world_point_to_world_character_point(
             world_point,
         ))
     }
@@ -220,7 +216,7 @@ impl Graphics {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         Graphics::buffer_point_to_screen_point(self.world_character_point_to_buffer_point(
-            Glyph::world_point_to_world_character_point(world_position),
+            world_point_to_world_character_point(world_position),
         ))
     }
 
@@ -242,7 +238,7 @@ impl Graphics {
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
         return if self.square_is_on_screen(square) {
-            Glyph::count_braille_dots(
+            count_braille_dots(
                 self.get_buffered_glyph(self.world_square_to_left_buffer_square(square))
                     .character,
             )
@@ -255,7 +251,7 @@ impl Graphics {
         self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs(&mut self, glyph_map: WorldCharacterGlyphMap) {
+    fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareToGlyphMap) {
         let world_square_glyph_map = pair_up_glyph_map(glyph_map);
         self.draw_glyphs_at_squares(world_square_glyph_map);
     }
@@ -263,7 +259,7 @@ impl Graphics {
     fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
         for (world_square, glyph) in glyph_map {
             if self.square_is_on_screen(world_square) {
-                self.draw_glyphs_at_square_with_transparency(world_square, glyph);
+                self.draw_glyphs_for_square(world_square, glyph);
             }
         }
     }
@@ -274,12 +270,7 @@ impl Graphics {
         self.draw_string(left_of_screen_under_board, &string);
     }
 
-    fn draw_braille_line(
-        &mut self,
-        start_pos: Point2D<f32, SquareGridInWorldFrame>,
-        end_pos: Point2D<f32, SquareGridInWorldFrame>,
-        color: RGB8,
-    ) {
+    fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
         self.draw_glyphs(line_glyphs);
     }
@@ -394,14 +385,10 @@ impl Graphics {
         let square_color = Graphics::board_color_at_square(world_pos);
         player_glyphs[0].bg_color = square_color;
         player_glyphs[1].bg_color = square_color;
-        self.draw_glyphs_at_square_with_transparency(world_pos, player_glyphs);
+        self.draw_glyphs_for_square(world_pos, player_glyphs);
     }
 
-    pub fn draw_glyphs_at_square_with_transparency(
-        &mut self,
-        world_square: WorldSquare,
-        glyphs: DoubleGlyph,
-    ) {
+    pub fn draw_glyphs_for_square(&mut self, world_square: WorldSquare, glyphs: DoubleGlyph) {
         if !self.square_is_on_screen(world_square) {
             panic!(
                 "Tried to draw square off screen: {}",
@@ -436,12 +423,12 @@ impl Graphics {
     }
 
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
-        self.draw_glyphs_at_square_with_transparency(pos, piece.glyphs());
+        self.draw_glyphs_for_square(pos, piece.glyphs());
     }
-    pub fn draw_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
+    pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set
             .into_iter()
-            .for_each(|&square| self.draw_glyphs_at_square_with_transparency(square, glyphs));
+            .for_each(|&square| self.draw_glyphs_for_square(square, glyphs));
     }
     pub fn draw_move_marker_squares(
         &mut self,
@@ -471,17 +458,50 @@ impl Graphics {
                 .copied()
                 .collect();
 
-        self.draw_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
-        self.draw_at_squares(
+        self.draw_same_glyphs_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
+        self.draw_same_glyphs_at_squares(
             Glyph::tricky_danger_square_glyphs(),
             &conditional_move_and_capture_squares,
         );
-        self.draw_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
-        self.draw_at_squares(Glyph::capture_only_square_glyphs(), &capture_only_squares);
+        self.draw_same_glyphs_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
+        self.draw_same_glyphs_at_squares(
+            Glyph::capture_only_square_glyphs(),
+            &capture_only_squares,
+        );
     }
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
-        self.draw_at_squares(Glyph::block_glyphs(), block_squares);
+        self.draw_same_glyphs_at_squares(Glyph::block_glyphs(), block_squares);
+    }
+
+    pub fn all_squares_on_screen(&self) -> SquareSet {
+        let mut all_squares = SquareSet::new();
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let buffer_square: Point2D<i32, CharacterGridInBufferFrame> =
+                    point2(buffer_x, buffer_y);
+                let world_square = self.buffer_square_to_world_square(buffer_square);
+                if self.square_is_on_screen(world_square) {
+                    all_squares.insert(world_square);
+                }
+            }
+        }
+        all_squares
+    }
+
+    pub fn draw_field_of_view_mask(&mut self, fov_mask: FovResult) {
+        let glyph_mask_for_partially_visible_squares: WorldSquareGlyphMap =
+            fov_mask.partially_visible_squares_as_glyph_mask();
+        let squares_on_screen = self.all_squares_on_screen();
+        let squares_on_screen_but_out_of_sight = squares_on_screen
+            .difference(&fov_mask.at_least_partially_visible_squares())
+            .copied()
+            .collect();
+        self.draw_glyphs_at_squares(glyph_mask_for_partially_visible_squares);
+        self.draw_same_glyphs_at_squares(
+            Glyph::out_of_sight_glyphs(),
+            &squares_on_screen_but_out_of_sight,
+        );
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
@@ -499,6 +519,13 @@ impl Graphics {
     }
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));
+    }
+    pub fn draw_paths(&mut self, paths: Vec<SquareList>) {
+        let mut path_squares = HashSet::<WorldSquare>::new();
+        paths.iter().flatten().for_each(|&square| {
+            path_squares.insert(square);
+        });
+        self.draw_same_glyphs_at_squares(Glyph::path_glyphs(), &path_squares);
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
@@ -592,7 +619,7 @@ impl Graphics {
                 let glyphs = self.get_buffered_glyphs_for_square(square);
                 for glyph in glyphs {
                     let character = glyph.character;
-                    count += Glyph::count_braille_dots(character);
+                    count += count_braille_dots(character);
                 }
             }
         }
@@ -611,7 +638,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{BLUE, ENEMY_PIECE_COLOR, GREEN, LEFT_I, RIGHT_I};
+    use crate::{LEFT_I, RIGHT_I};
 
     use super::*;
 
@@ -772,9 +799,9 @@ mod tests {
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
-        g.print_output_buffer();
+        //g.print_output_buffer();
         g.draw_piece(Piece::pawn(), the_square);
-        g.print_output_buffer();
+        //g.print_output_buffer();
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);
@@ -783,5 +810,21 @@ mod tests {
         assert_eq!(drawn_glyphs[1].character, ' ');
         assert_eq!(drawn_glyphs[1].bg_color, BOARD_WHITE);
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
+    }
+    #[test]
+    fn test_field_of_view_mask_is_fully_transparent() {
+        let mut g = set_up_graphics_with_nxn_squares(1);
+        let the_square = WorldSquare::new(0, 0);
+        g.draw_piece(Piece::pawn(), the_square);
+
+        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        assert_eq!(drawn_glyphs[0].character, '♟');
+
+        let mut fov_mask = FovResult::default();
+        fov_mask.fully_visible_squares.insert(the_square);
+        g.draw_field_of_view_mask(fov_mask);
+
+        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        assert_eq!(drawn_glyphs[0].character, '♟');
     }
 }

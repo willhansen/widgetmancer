@@ -3,7 +3,8 @@ use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
 use crate::game::Game;
-use crate::{WorldSquare, DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use crate::utility::coordinate_frame_conversions::*;
+use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
     prev_mouse_square: WorldSquare,

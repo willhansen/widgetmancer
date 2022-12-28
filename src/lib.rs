@@ -4,11 +4,16 @@
 #![allow(warnings)]
 #![feature(trait_upcasting)]
 #![feature(duration_consts_float)]
+#![feature(int_abs_diff)]
+#![feature(inline_const_pat)]
+#![feature(is_some_and)]
 
 #[macro_use]
 extern crate approx;
+extern crate core;
 extern crate line_drawing;
 extern crate num;
+extern crate shrinkwraprs;
 extern crate std;
 extern crate termion;
 
@@ -27,11 +32,13 @@ use euclid::default::Point2D;
 use euclid::point2;
 use ntest::timeout;
 use num::Integer;
+use rand::SeedableRng;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
+use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 
 use glyph::*;
 use utility::*;
@@ -42,12 +49,14 @@ use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
 pub mod animations;
+mod fov_stuff;
 pub mod game;
 pub mod glyph;
 mod graphics;
 mod inputmap;
 pub mod piece;
 pub mod utility;
+pub mod utils_for_tests;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -75,9 +84,10 @@ pub fn do_everything() {
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut writable = termion::screen::AlternateScreen::from(termion::cursor::HideCursor::from(
-        MouseTerminal::from(stdout().into_raw_mode().unwrap()),
-    ));
+    let mut writable =
+        termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
+            .into_alternate_screen()
+            .unwrap();
 
     set_up_panic_hook();
 
@@ -88,7 +98,12 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    game.set_up_labyrinth_hunt();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    //game.set_up_labyrinth_hunt();
+    //game.set_up_labyrinth_kings();
+    //game.set_up_labyrinth(&mut rng);
+    //game.set_up_columns();
+    game.set_up_vs_mini_factions();
 
     let mut prev_start_time = Instant::now();
     while game.running() {
@@ -98,9 +113,12 @@ pub fn do_everything() {
         //prev_start_time = start_time;
 
         while let Ok(event) = event_receiver.try_recv() {
+            game.on_turn_start();
+
             input_map.handle_event(&mut game, event);
-            game.move_all_pieces();
-            game.select_closest_piece();
+            game.move_one_piece_per_faction();
+
+            game.on_turn_end();
         }
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));

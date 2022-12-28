@@ -3,24 +3,26 @@ use std::f32::consts::{E, PI, TAU};
 use std::time;
 use std::time::{Duration, Instant};
 
+use crate::glyph_constants::*;
 use dyn_clone::DynClone;
 use euclid::{vec2, Angle, Length};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
+use crate::glyph::braille::world_points_for_braille_line;
+use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::*;
 use crate::{
-    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step,
-    world_square_glyph_map_to_world_character_glyph_map, BoardSize, BufferCharacterSquare, Glyph,
-    Graphics, WorldCharacterGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldSquareGlyphMap,
-    WorldStep, BLACK, EXPLOSION_COLOR, RED, RIGHT_I, SELECTOR_COLOR, UP_I,
+    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics,
+    RIGHT_I, UP_I,
 };
 
 pub type AnimationObject = Box<dyn Animation>;
 pub type AnimationList = Vec<AnimationObject>;
 
 pub trait Animation: DynClone {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap;
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap;
     fn finished_at_time(&self, time: Instant) -> bool;
 }
 // This is kinda magic.  Not great, but if it works, it works.
@@ -49,7 +51,7 @@ impl SimpleLaser {
 }
 
 impl Animation for SimpleLaser {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterGlyphMap {
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareToGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
@@ -76,9 +78,8 @@ impl FloatyLaser {
 }
 
 impl Animation for FloatyLaser {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
-        let mut line_points: Vec<WorldPoint> =
-            Glyph::world_points_for_braille_line(self.start, self.end);
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+        let mut line_points: Vec<WorldPoint> = world_points_for_braille_line(self.start, self.end);
         // pretty arbitrary
         let hash = ((self.start.x * PI + self.start.y)
             * 1000.0
@@ -126,7 +127,7 @@ impl Explosion {
 }
 
 impl Animation for Explosion {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
         // rather arbitrary
         let hash = ((self.position.x * PI + self.position.y) * 1000.0)
             .abs()
@@ -173,7 +174,7 @@ impl Selector {
 }
 
 impl Animation for Selector {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
         let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = f32::sqrt(2.0) / 2.0;
 
@@ -210,14 +211,14 @@ impl StaticBoard {
 }
 
 impl Animation for StaticBoard {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterGlyphMap {
-        let mut glyphs = WorldCharacterGlyphMap::new();
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareToGlyphMap {
+        let mut glyphs = WorldCharacterSquareToGlyphMap::new();
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
                 let world_square = WorldSquare::new(x as i32, y as i32);
                 let glyph = Glyph::new(' ', BLACK, Graphics::board_color_at_square(world_square));
                 let left_character_square =
-                    Glyph::world_square_to_left_world_character_square(world_square);
+                    world_square_to_left_world_character_square(world_square);
                 let right_character_square = left_character_square + vec2(1, 0);
                 glyphs.insert(left_character_square, glyph);
                 glyphs.insert(right_character_square, glyph);
@@ -316,7 +317,7 @@ impl RecoilingBoard {
 }
 
 impl Animation for RecoilingBoard {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
         let age = time.duration_since(self.creation_time);
 
         let mut offset_distance_in_squares: f32 =
@@ -361,7 +362,7 @@ impl BoardAnimation for RecoilingBoard {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::{derivative, glyph_map_to_string, WorldCharacterSquare, DOWN_I, LEFT_I};
+    use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
 
     use super::*;
 
