@@ -7,6 +7,7 @@
 #![feature(int_abs_diff)]
 #![feature(inline_const_pat)]
 #![feature(is_some_and)]
+#![feature(let_chains)]
 
 #[macro_use]
 extern crate approx;

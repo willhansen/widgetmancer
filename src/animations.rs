@@ -411,7 +411,7 @@ mod tests {
             let bad_char = '▊'; // two left of solid
             if test_glyph.character == target_char {
                 // test pass
-                println!("good character detected");
+                //println!("good character detected");
                 break;
             }
             if test_glyph.character == bad_char {

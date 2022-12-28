@@ -281,10 +281,8 @@ mod tests {
         for i in 1..=5 {
             let square = start_square + STEP_UP_RIGHT * i;
             let partial_visibility = fov_result.partially_visible_squares.get(&square).unwrap();
-            println!("{}", partial_visibility.to_glyphs().to_clean_string());
             //dbg!(partial_visibility);
             let string = partial_visibility.to_glyphs().to_clean_string();
-            println!("{}", string);
             // one of these two is right.  Not sure which
             assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
         }
@@ -296,8 +294,7 @@ mod tests {
         let square_relative_to_center = vec2(1, 1);
         let visibility = visibility_of_shadowed_square(&shadows, square_relative_to_center);
         let string = visibility.to_glyphs().to_clean_string();
-        println!("{}", string);
-        dbg!(visibility);
+        //dbg!(visibility);
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
     #[test]

@@ -34,6 +34,8 @@ pub const STEP_DOWN: WorldStep = vec2(0, -1);
 pub const STEP_RIGHT: WorldStep = vec2(1, 0);
 pub const STEP_LEFT: WorldStep = vec2(-1, 0);
 
+pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
+
 pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
 pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
@@ -53,6 +55,7 @@ impl<T, U> Line<T, U> {
         mem::swap(&mut self.p2, &mut self.p1);
     }
 }
+
 impl<U> Line<f32, U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         in_line(self.p1, self.p2, point)
@@ -538,6 +541,7 @@ mod tests {
             "diagonal a bit"
         );
     }
+
     #[test]
     fn test_local_square_point_to_local_character_point() {
         assert_eq!(
@@ -549,6 +553,7 @@ mod tests {
             point2(-0.5, 0.0)
         );
     }
+
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
@@ -561,6 +566,7 @@ mod tests {
         let same_direction = in_vec.dot(out_vec) > 0.0;
         assert!(same_direction);
     }
+
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
     ) {
@@ -570,6 +576,7 @@ mod tests {
         assert_eq!(input_line.p1, output_points[0]);
         assert_eq!(input_line.p2, output_points[1]);
     }
+
     #[test]
     fn test_same_side_of_line__vertical_line() {
         let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));

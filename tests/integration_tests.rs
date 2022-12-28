@@ -9,7 +9,7 @@ use rand::SeedableRng;
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
-use rust_roguelike::glyph::{DoubleGlyphFunctions, Glyph};
+use rust_roguelike::glyph::DoubleGlyphFunctions;
 use rust_roguelike::piece::{Faction, Piece, PieceType};
 use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{

@@ -34,6 +34,12 @@ pub struct Player {
     pub faced_direction: WorldStep,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug, Copy)]
+pub struct IncubatingPawn {
+    pub age_in_turns: u32,
+    pub faction: Faction,
+}
+
 pub struct Game {
     board_size: BoardSize,
     // (x,y), left to right, top to bottom
@@ -47,6 +53,7 @@ pub struct Game {
     turn_count: u32,
     selectors: Vec<Selector>,
     selected_square: Option<WorldSquare>,
+    incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
 }
 
 impl Game {
@@ -62,6 +69,7 @@ impl Game {
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
+            incubating_pawns: Default::default(),
         };
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -272,7 +280,43 @@ impl Game {
     }
 
     pub fn tick_pawn_incubation(&mut self) {
-        todo!()
+        let found_incubation_squares: SquareSet = self.squares_surrounded_by_pawns_of_one_faction();
+
+        self.incubating_pawns
+            .retain(|old_square, _| found_incubation_squares.contains(old_square));
+
+        for square in found_incubation_squares {
+            let faction = self.get_piece_at(square + STEP_UP).unwrap().faction;
+            if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
+                existing_incubation.age_in_turns += 1;
+                if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
+                    self.place_piece(Piece::new(PieceType::Pawn, faction), square).expect(&*("Spawn pawn at ".to_owned() + &point_to_string(square)));
+                }
+            } else {
+                let new_incubation = IncubatingPawn {
+                    age_in_turns: 0,
+                    faction,
+                };
+                self.incubating_pawns.insert(square, new_incubation);
+            }
+        }
+    }
+
+    pub fn squares_surrounded_by_pawns_of_one_faction(&self) -> SquareSet {
+        let mut pawn_adjacency_counter = HashMap::<(WorldSquare, Faction), u32>::new();
+        self.pieces
+            .iter()
+            .cartesian_product(ORTHOGONAL_STEPS)
+            .for_each(|((pawn_square, piece), orthogonal_step)| {
+                *pawn_adjacency_counter
+                    .entry(((*pawn_square + orthogonal_step), piece.faction))
+                    .or_insert(0) += 1;
+            });
+        pawn_adjacency_counter
+            .into_iter()
+            .filter(|(_, count)| *count == 4)
+            .map(|((square, _), _)| square)
+            .collect()
     }
 
     pub fn random_empty_square(&self, rng: &mut StdRng) -> Result<WorldSquare, ()> {
@@ -809,15 +853,18 @@ impl Game {
         field_of_view_from_square(start_square, &self.blocks)
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use ntest::assert_false;
+    use pretty_assertions::{assert_eq, assert_ne};
+
     use crate::utility::{
         STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
     };
     use crate::utils_for_tests::*;
-    use ntest::assert_false;
-    use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
 
     #[test]
     fn test_try_set_player_on_block_is_fail() {
@@ -886,8 +933,9 @@ mod tests {
         game.move_one_piece_per_faction();
         assert!(game.square_is_empty(test_square));
     }
+
     #[test]
-    fn test_spawn_pawns_on_surrounded_empty_squares() {
+    fn test_pawn_reproduction_in_surrounded_squares() {
         let mut game = set_up_game();
         let test_square = point2(5, 5);
         let faction = Faction::from_id(0);

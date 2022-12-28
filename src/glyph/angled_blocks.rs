@@ -369,7 +369,6 @@ mod tests {
             point_on_half_plane: point2(-0.06, -0.3),
         };
         let the_char = half_plane_to_angled_block_character(half_plane);
-        println!("{}", the_char);
         assert!(['🭈', '🭊'].contains(&the_char));
     }
 }
