@@ -27,6 +27,8 @@ use crate::{
     IVector, LEFT_I,
 };
 
+const TURNS_TO_SPAWN_PAWN: u32 = 10;
+
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: WorldStep,
@@ -267,6 +269,10 @@ impl Game {
         }
         self.pieces.insert(square, piece);
         Ok(())
+    }
+
+    pub fn tick_pawn_incubation(&mut self) {
+        todo!()
     }
 
     pub fn random_empty_square(&self, rng: &mut StdRng) -> Result<WorldSquare, ()> {
@@ -879,5 +885,21 @@ mod tests {
         assert_false!(game.square_is_empty(test_square));
         game.move_one_piece_per_faction();
         assert!(game.square_is_empty(test_square));
+    }
+    #[test]
+    fn test_spawn_pawns_on_surrounded_empty_squares() {
+        let mut game = set_up_game();
+        let test_square = point2(5, 5);
+        let faction = Faction::from_id(0);
+        let rel_positions = vec![STEP_UP, STEP_RIGHT, STEP_LEFT, STEP_DOWN];
+        for rel_pos in rel_positions {
+            game.place_piece(Piece::new(PieceType::Pawn, faction), test_square + rel_pos)
+                .expect("place pawn");
+        }
+        assert_eq!(game.pieces.len(), 4);
+        for _ in 0..=TURNS_TO_SPAWN_PAWN {
+            game.tick_pawn_incubation();
+        }
+        assert!(game.pieces.len() > 4);
     }
 }
