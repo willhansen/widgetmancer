@@ -117,6 +117,7 @@ pub fn do_everything() {
             game.on_turn_start();
 
             input_map.handle_event(&mut game, event);
+            
             game.move_one_piece_per_faction();
 
             game.on_turn_end();

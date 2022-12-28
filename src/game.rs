@@ -54,6 +54,7 @@ pub struct Game {
     selectors: Vec<Selector>,
     selected_square: Option<WorldSquare>,
     incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
+    red_pawn_faction: Faction,
 }
 
 impl Game {
@@ -70,6 +71,7 @@ impl Game {
             selectors: vec![],
             selected_square: None,
             incubating_pawns: Default::default(),
+            red_pawn_faction: Faction::from_id(0),
         };
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -402,6 +404,7 @@ impl Game {
     }
     pub fn on_turn_start(&mut self) {}
     pub fn on_turn_end(&mut self) {
+        self.tick_pawn_incubation();
         self.select_closest_piece();
     }
 
@@ -432,6 +435,20 @@ impl Game {
             .map(|piece| piece.faction)
             .unique()
             .collect()
+    }
+
+    fn new_faction(&self) -> Faction {
+        let largest_id_of_existing_factions = self
+            .get_all_living_factions()
+            .into_iter()
+            .map(|f| f.id)
+            .max();
+        let new_id = if largest_id_of_existing_factions.is_some() {
+            largest_id_of_existing_factions.unwrap() + 1
+        } else {
+            0
+        };
+        Faction::from_id(new_id)
     }
 
     fn squares_of_pieces_in_faction(&self, faction: Faction) -> Vec<WorldSquare> {
@@ -949,5 +966,27 @@ mod tests {
             game.tick_pawn_incubation();
         }
         assert!(game.pieces.len() > 4);
+    }
+    #[test]
+    fn test_faction_with_only_pawns_becomes_red_pawns() {
+        let mut game = set_up_game();
+
+        let placed_faction = game.new_faction();
+        let king_square = point2(5, 5);
+        let test_square = king_square + STEP_UP_RIGHT;
+        game.place_king_pawn_group(king_square, placed_faction)
+            .expect("");
+
+        assert_eq!(
+            game.get_piece_at(test_square).unwrap().faction,
+            placed_faction
+        );
+
+        game.capture_piece_at(king_square).expect("cap king");
+        game.on_turn_end();
+
+        let the_piece = game.get_piece_at(test_square).unwrap();
+        assert_ne!(the_piece.faction, placed_faction);
+        assert_eq!(the_piece.faction, game.red_pawn_faction);
     }
 }

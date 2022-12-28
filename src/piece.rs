@@ -22,7 +22,7 @@ pub enum PieceType {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Faction {
-    id: u32,
+    pub(crate) id: u32,
 }
 
 impl Faction {
