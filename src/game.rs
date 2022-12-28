@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
+use ordered_float::OrderedFloat;
 use priority_queue::DoublePriorityQueue;
 use rand::rngs::StdRng;
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -383,15 +384,30 @@ impl Game {
             .collect()
     }
 
-    fn move_one_piece_of_faction(&mut self, faction: Faction) {
-        let location_of_random_piece_in_faction: WorldSquare = self
-            .pieces
+    fn squares_of_pieces_in_faction(&self, faction: Faction) -> Vec<WorldSquare> {
+        self.pieces
             .iter()
             .filter(|(square, piece)| piece.faction == faction)
-            .map(|(square, piece)| *square)
-            .choose(&mut rand::thread_rng())
-            .unwrap();
-        self.move_piece_at(location_of_random_piece_in_faction);
+            .map(|(&square, piece)| square)
+            .collect()
+    }
+
+    fn move_one_piece_of_faction(&mut self, faction: Faction) {
+        let faction_squares = self.squares_of_pieces_in_faction(faction);
+
+        if let Some(selected_piece) = if !self.player_is_dead() {
+            faction_squares
+                .into_iter()
+                .min_by_key(|&square| (square - self.player_square()).square_length())
+        } else {
+            faction_squares
+                .into_iter()
+                .min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
+        } {
+            self.move_piece_at(selected_piece);
+        } else {
+            panic!("No pieces in faction to move");
+        }
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
@@ -723,12 +739,19 @@ impl Game {
     }
 
     pub fn set_up_vs_mini_factions(&mut self) {
-        self.place_king_pawn_group(self.player_square() + STEP_UP_LEFT * 4, Faction::from_id(0))
-            .ok();
-        self.place_king_pawn_group(self.player_square() + STEP_UP * 4, Faction::from_id(1))
-            .ok();
+        let distance = 5;
         self.place_king_pawn_group(
-            self.player_square() + STEP_UP_RIGHT * 4,
+            self.player_square() + STEP_UP_LEFT * distance,
+            Faction::from_id(0),
+        )
+        .ok();
+        self.place_king_pawn_group(
+            self.player_square() + STEP_UP * distance,
+            Faction::from_id(1),
+        )
+        .ok();
+        self.place_king_pawn_group(
+            self.player_square() + STEP_UP_RIGHT * distance,
             Faction::from_id(2),
         )
         .ok();
@@ -844,5 +867,17 @@ mod tests {
                 point_to_string(square)
             );
         }
+    }
+
+    #[test]
+    fn test_faction_moves_closest_piece_to_player() {
+        let mut game = set_up_game_with_player();
+        let king_square = game.player_square() + STEP_UP_RIGHT * 3;
+        game.place_king_pawn_group(king_square, Faction::from_id(0))
+            .ok();
+        let test_square = king_square + STEP_DOWN_LEFT;
+        assert_false!(game.square_is_empty(test_square));
+        game.move_one_piece_per_faction();
+        assert!(game.square_is_empty(test_square));
     }
 }
