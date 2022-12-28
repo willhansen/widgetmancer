@@ -20,7 +20,7 @@ use crate::graphics::Graphics;
 use crate::piece::PieceType::Pawn;
 use crate::piece::{Faction, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{king_distance, octant_to_outward_and_across_directions, reversed};
+use crate::utility::*;
 use crate::{
     lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint,
     IVector, LEFT_I,
@@ -446,6 +446,38 @@ impl Game {
         self.range_cast(piece_square, repeating_step, true)
     }
 
+    pub fn square_to_move_toward_player_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+    ) -> Option<WorldSquare> {
+        if self.player_is_dead() {
+            return None;
+        }
+        self.move_options_for_piece_at(piece_square)
+            .into_iter()
+            .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
+            .min_by_key(|&square| (square - self.player_square()).square_length())
+    }
+
+    pub fn piece_can_capture_player(&self, piece_square: WorldSquare) -> bool {
+        !self.player_is_dead()
+            && self
+                .capture_options_for_piece_at(piece_square)
+                .into_iter()
+                .contains(&self.player_square())
+    }
+    pub fn square_to_capture_for_piece_at(&self, piece_square: WorldSquare) -> Option<WorldSquare> {
+        let friendly_faction = self.get_piece_at(piece_square).unwrap().faction;
+        // TODO: choose randomly rather than first
+        self.capture_options_for_piece_at(piece_square)
+            .into_iter()
+            .filter(|&world_square| {
+                self.get_piece_at(world_square)
+                    .is_some_and(|piece| piece.faction != friendly_faction)
+            })
+            .next()
+    }
+
     // returns where the piece moves to, if applicable
     pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
         if !self.is_piece_at(piece_square) {
@@ -462,18 +494,11 @@ impl Game {
             } else {
                 return None;
             }
-        } else if let Some(capture_square) = self
-            .capture_options_for_piece_at(piece_square)
-            .into_iter()
-            .find(|&square| square == self.player_square())
-        {
-            end_square = capture_square;
-        } else if let Some(square) = self
-            .move_options_for_piece_at(piece_square)
-            .into_iter()
-            .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_square()).square_length())
-        {
+        } else if self.piece_can_capture_player(piece_square) {
+            end_square = self.player_square();
+        } else if let Some(square) = self.square_to_capture_for_piece_at(piece_square) {
+            end_square = square;
+        } else if let Some(square) = self.square_to_move_toward_player_for_piece_at(piece_square) {
             end_square = square;
         } else {
             return None;
@@ -483,6 +508,9 @@ impl Game {
         if self.is_player_at(end_square) {
             self.player_optional = None;
             self.quit();
+        }
+        if self.is_piece_at(end_square) {
+            self.capture_piece_at(end_square).expect("capture failed");
         }
         self.move_piece(piece_square, end_square);
         Some(end_square)
@@ -692,6 +720,25 @@ impl Game {
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
         self.blocks.contains(&square)
+    }
+
+    pub fn set_up_vs_mini_factions(&mut self) {
+        self.place_king_pawn_group(self.player_square() + STEP_UP_LEFT * 4, Faction::from_id(0))
+            .ok();
+        self.place_king_pawn_group(self.player_square() + STEP_UP * 4, Faction::from_id(1))
+            .ok();
+        self.place_king_pawn_group(
+            self.player_square() + STEP_UP_RIGHT * 4,
+            Faction::from_id(2),
+        )
+        .ok();
+    }
+
+    pub fn set_up_columns(&mut self) {
+        self.place_block(self.player_square() + STEP_RIGHT * 4);
+        self.place_block(self.player_square() + STEP_RIGHT * 7);
+        self.place_block(self.player_square() + STEP_RIGHT * 4 + STEP_UP * 3);
+        self.place_block(self.player_square() + STEP_RIGHT * 7 + STEP_UP * 3);
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
