@@ -20,7 +20,7 @@ pub enum PieceType {
     King,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Faction {
     pub(crate) id: u32,
 }
@@ -29,8 +29,23 @@ impl Faction {
     pub fn from_id(id: u32) -> Faction {
         Faction { id }
     }
-    pub fn default() -> Faction {
-        Faction::from_id(0)
+}
+
+pub struct FactionFactory {
+    id_of_next_faction: u32,
+}
+
+impl FactionFactory {
+    pub fn new() -> FactionFactory {
+        FactionFactory {
+            // Default faction is 0.  Don't want to overlap with that
+            id_of_next_faction: 1,
+        }
+    }
+    pub fn get_new_faction(&mut self) -> Faction {
+        let faction = Faction::from_id(self.id_of_next_faction);
+        self.id_of_next_faction += 1;
+        faction
     }
 }
 

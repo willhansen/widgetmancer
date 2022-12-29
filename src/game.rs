@@ -19,7 +19,7 @@ use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::SPACE;
 use crate::graphics::Graphics;
 use crate::piece::PieceType::Pawn;
-use crate::piece::{Faction, Piece, PieceType};
+use crate::piece::{Faction, FactionFactory, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -54,12 +54,15 @@ pub struct Game {
     selectors: Vec<Selector>,
     selected_square: Option<WorldSquare>,
     incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
+    faction_factory: FactionFactory,
     red_pawn_faction: Faction,
 }
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
         let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
+        let mut faction_factory = FactionFactory::new();
+        let red_pawn_faction = faction_factory.get_new_faction();
         let mut game = Game {
             board_size,
             running: true,
@@ -71,7 +74,8 @@ impl Game {
             selectors: vec![],
             selected_square: None,
             incubating_pawns: Default::default(),
-            red_pawn_faction: Faction::from_id(0),
+            faction_factory,
+            red_pawn_faction,
         };
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -403,9 +407,33 @@ impl Game {
             .cloned()
     }
     pub fn on_turn_start(&mut self) {}
+
     pub fn on_turn_end(&mut self) {
         self.tick_pawn_incubation();
-        self.select_closest_piece();
+        self.convert_orphaned_pieces();
+        if !self.player_is_dead() {
+            self.select_closest_piece();
+        }
+    }
+
+    pub fn convert_orphaned_pieces(&mut self) {
+        for faction in self.get_all_living_factions() {
+            let mut pieces_in_faction: Vec<&mut Piece> = self
+                .pieces
+                .iter_mut()
+                .map(|(_, piece)| piece)
+                .filter(|piece| piece.faction == faction)
+                .collect();
+            let all_same_piece_type: bool = pieces_in_faction.iter().all_equal();
+            let faction_has_a_pawn =
+                pieces_in_faction.iter().next().unwrap().piece_type == PieceType::Pawn;
+            let faction_has_only_pawns = all_same_piece_type && faction_has_a_pawn;
+            if faction_has_only_pawns {
+                pieces_in_faction
+                    .iter_mut()
+                    .for_each(|piece| piece.faction = self.red_pawn_faction);
+            }
+        }
     }
 
     pub fn move_all_pieces(&mut self) {
@@ -437,18 +465,8 @@ impl Game {
             .collect()
     }
 
-    fn new_faction(&self) -> Faction {
-        let largest_id_of_existing_factions = self
-            .get_all_living_factions()
-            .into_iter()
-            .map(|f| f.id)
-            .max();
-        let new_id = if largest_id_of_existing_factions.is_some() {
-            largest_id_of_existing_factions.unwrap() + 1
-        } else {
-            0
-        };
-        Faction::from_id(new_id)
+    fn get_new_faction(&mut self) -> Faction {
+        self.faction_factory.get_new_faction()
     }
 
     fn squares_of_pieces_in_faction(&self, faction: Faction) -> Vec<WorldSquare> {
@@ -971,7 +989,7 @@ mod tests {
     fn test_faction_with_only_pawns_becomes_red_pawns() {
         let mut game = set_up_game();
 
-        let placed_faction = game.new_faction();
+        let placed_faction = game.get_new_faction();
         let king_square = point2(5, 5);
         let test_square = king_square + STEP_UP_RIGHT;
         game.place_king_pawn_group(king_square, placed_faction)
