@@ -582,11 +582,11 @@ fn test_one_move_per_faction_per_turn() {
     game.place_player(point2(0, 0));
     let pawn1 = Piece {
         piece_type: PieceType::Pawn,
-        faction: Faction::from_id(0),
+        faction: game.get_new_faction(),
     };
     let pawn2 = Piece {
         piece_type: PieceType::Pawn,
-        faction: Faction::from_id(1),
+        faction: game.get_new_faction(),
     };
     game.place_piece(pawn1, point2(2, 2)).ok();
     game.place_piece(pawn1, point2(4, 2)).ok();
@@ -632,9 +632,8 @@ fn test_factions_attack_each_other() {
     let mut game = set_up_nxn_game(10);
     let square = point2(3, 3);
 
-    game.place_king_pawn_group(square, Faction::from_id(0))
-        .expect("");
-    game.place_king_pawn_group(square + STEP_RIGHT * 3, Faction::from_id(1))
+    game.place_new_king_pawn_faction(square).expect("");
+    game.place_new_king_pawn_faction(square + STEP_RIGHT * 3)
         .expect("");
     let num_pieces = game.pieces().len();
     assert_eq!(num_pieces, 18);

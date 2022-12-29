@@ -1,12 +1,14 @@
 use std::f32::consts::PI;
 
 use euclid::*;
+use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
 use crate::glyph_constants::*;
 
+use crate::glyph::DoubleGlyph;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
@@ -38,14 +40,27 @@ pub struct FactionFactory {
 impl FactionFactory {
     pub fn new() -> FactionFactory {
         FactionFactory {
-            // Default faction is 0.  Don't want to overlap with that
-            id_of_next_faction: 1,
+            // Default faction is 0.  This is also the first generated.
+            id_of_next_faction: 0,
         }
     }
     pub fn get_new_faction(&mut self) -> Faction {
         let faction = Faction::from_id(self.id_of_next_faction);
         self.id_of_next_faction += 1;
         faction
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FactionInfo {
+    pub(crate) color: RGB8,
+}
+
+impl Default for FactionInfo {
+    fn default() -> FactionInfo {
+        FactionInfo {
+            color: ENEMY_PIECE_COLOR,
+        }
     }
 }
 
@@ -86,8 +101,12 @@ impl Piece {
         Piece::from_type(PieceType::King)
     }
 
-    pub fn glyphs(&self) -> [Glyph; 2] {
-        Piece::chars_for_type(self.piece_type)
+    pub fn glyphs(&self) -> DoubleGlyph {
+        Piece::glyphs_for_type(self.piece_type)
+    }
+
+    pub fn glyphs_for_type(piece_type: PieceType) -> DoubleGlyph {
+        Piece::chars_for_type(piece_type)
             .map(|character| Glyph::fg_only(character, ENEMY_PIECE_COLOR))
     }
 

@@ -22,7 +22,7 @@ use crate::fov_stuff::FovResult;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
-use crate::piece::Piece;
+use crate::piece::{FactionInfo, Piece};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
@@ -422,8 +422,23 @@ impl Graphics {
         self.output_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
+    #[deprecated(note = "use `draw_piece_with_faction_info` instead")]
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
         self.draw_glyphs_for_square(pos, piece.glyphs());
+    }
+
+    pub fn draw_piece_with_faction_info(
+        &mut self,
+        square: WorldSquare,
+        piece_type: PieceType,
+        faction_info: FactionInfo,
+    ) {
+        let mut piece_glyphs = Piece::glyphs_for_type(piece_type);
+        piece_glyphs
+            .iter_mut()
+            .for_each(|g: &mut Glyph| g.fg_color = faction_info.color);
+
+        self.draw_glyphs_for_square(square, piece_glyphs);
     }
     pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set

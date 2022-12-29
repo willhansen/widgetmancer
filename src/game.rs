@@ -11,15 +11,16 @@ use priority_queue::DoublePriorityQueue;
 use rand::rngs::StdRng;
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{thread_rng, Rng, SeedableRng};
+use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
-use crate::glyph::glyph_constants::SPACE;
+use crate::glyph::glyph_constants::{RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::Pawn;
-use crate::piece::{Faction, FactionFactory, Piece, PieceType};
+use crate::piece::{Faction, FactionFactory, FactionInfo, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -55,14 +56,14 @@ pub struct Game {
     selected_square: Option<WorldSquare>,
     incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
     faction_factory: FactionFactory,
+    faction_info: HashMap<Faction, FactionInfo>,
     red_pawn_faction: Faction,
+    default_enemy_faction: Faction,
 }
 
 impl Game {
     pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Game {
         let board_size = BoardSize::new(terminal_width as u32 / 2, terminal_height as u32);
-        let mut faction_factory = FactionFactory::new();
-        let red_pawn_faction = faction_factory.get_new_faction();
         let mut game = Game {
             board_size,
             running: true,
@@ -74,9 +75,20 @@ impl Game {
             selectors: vec![],
             selected_square: None,
             incubating_pawns: Default::default(),
-            faction_factory,
-            red_pawn_faction,
+            faction_factory: FactionFactory::new(),
+            faction_info: Default::default(),
+            red_pawn_faction: Faction::default(),
+            default_enemy_faction: Faction::default(),
         };
+        game.default_enemy_faction = game.get_new_faction();
+        assert_eq!(game.default_enemy_faction, Faction::default());
+
+        game.red_pawn_faction = game.get_new_faction();
+        game.faction_info
+            .get_mut(&game.red_pawn_faction)
+            .unwrap()
+            .color = RED_PAWN_COLOR;
+
         game.graphics.set_empty_board_animation(board_size);
         game
     }
@@ -238,7 +250,12 @@ impl Game {
 
         self.graphics.draw_blocks(&self.blocks);
         for (&square, &piece) in &self.pieces {
-            self.graphics.draw_piece(piece, square);
+            let faction_info = *self
+                .faction_info
+                .get(&piece.faction)
+                .unwrap_or(&FactionInfo::default());
+            self.graphics
+                .draw_piece_with_faction_info(square, piece.piece_type, faction_info)
         }
         self.graphics.draw_non_board_animations(time);
         if !self.player_is_dead() {
@@ -258,11 +275,8 @@ impl Game {
         !self.is_player_at(pos) && !self.is_piece_at(pos) && !self.is_block_at(pos)
     }
 
-    pub fn place_king_pawn_group(
-        &mut self,
-        king_square: WorldSquare,
-        faction: Faction,
-    ) -> Result<(), ()> {
+    pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) -> Result<(), ()> {
+        let faction = self.get_new_faction();
         self.place_piece(Piece::new(PieceType::King, faction), king_square)?;
         for x in -1..=1 {
             for y in -1..=1 {
@@ -469,8 +483,10 @@ impl Game {
             .collect()
     }
 
-    fn get_new_faction(&mut self) -> Faction {
-        self.faction_factory.get_new_faction()
+    pub fn get_new_faction(&mut self) -> Faction {
+        let new_faction = self.faction_factory.get_new_faction();
+        self.faction_info.insert(new_faction, Default::default());
+        new_faction
     }
 
     fn squares_of_pieces_in_faction(&self, faction: Faction) -> Vec<WorldSquare> {
@@ -829,21 +845,12 @@ impl Game {
 
     pub fn set_up_vs_mini_factions(&mut self) {
         let distance = 5;
-        self.place_king_pawn_group(
-            self.player_square() + STEP_UP_LEFT * distance,
-            Faction::from_id(0),
-        )
-        .ok();
-        self.place_king_pawn_group(
-            self.player_square() + STEP_UP * distance,
-            Faction::from_id(1),
-        )
-        .ok();
-        self.place_king_pawn_group(
-            self.player_square() + STEP_UP_RIGHT * distance,
-            Faction::from_id(2),
-        )
-        .ok();
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_LEFT * distance)
+            .ok();
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP * distance)
+            .ok();
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_RIGHT * distance)
+            .ok();
     }
 
     pub fn set_up_columns(&mut self) {
@@ -890,6 +897,14 @@ impl Game {
     fn fov_mask_for_player(&self) -> FovResult {
         let start_square = self.player_square();
         field_of_view_from_square(start_square, &self.blocks)
+    }
+
+    pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
+        if faction == self.red_pawn_faction {
+            RED_PAWN_COLOR
+        } else {
+            WHITE
+        }
     }
 }
 
@@ -966,8 +981,7 @@ mod tests {
     fn test_faction_moves_closest_piece_to_player() {
         let mut game = set_up_game_with_player();
         let king_square = game.player_square() + STEP_UP_RIGHT * 3;
-        game.place_king_pawn_group(king_square, Faction::from_id(0))
-            .ok();
+        game.place_new_king_pawn_faction(king_square).ok();
         let test_square = king_square + STEP_DOWN_LEFT;
         assert_false!(game.square_is_empty(test_square));
         game.move_one_piece_per_faction();
@@ -994,15 +1008,18 @@ mod tests {
     fn test_faction_with_only_pawns_becomes_red_pawns() {
         let mut game = set_up_game();
 
-        let placed_faction = game.get_new_faction();
         let king_square = point2(5, 5);
         let test_square = king_square + STEP_UP_RIGHT;
-        game.place_king_pawn_group(king_square, placed_faction)
-            .expect("");
+        game.place_new_king_pawn_faction(king_square).expect("");
+        let placed_faction = game.get_piece_at(king_square).unwrap().faction;
 
         assert_eq!(
             game.get_piece_at(test_square).unwrap().faction,
             placed_faction
+        );
+        assert_ne!(
+            game.get_piece_at(test_square).unwrap().faction,
+            game.red_pawn_faction
         );
 
         game.capture_piece_at(king_square).expect("cap king");
@@ -1021,5 +1038,12 @@ mod tests {
         game.draw_headless_now();
         let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
         assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
+    }
+
+    #[test]
+    fn test_start_with_info_for_default_and_red_factions() {
+        let game = set_up_game();
+        assert!(game.faction_info.contains_key(&game.red_pawn_faction));
+        assert!(game.faction_info.contains_key(&game.default_enemy_faction));
     }
 }
