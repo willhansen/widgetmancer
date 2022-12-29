@@ -53,13 +53,17 @@ impl FactionFactory {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct FactionInfo {
-    pub(crate) color: RGB8,
+    pub color: RGB8,
+    pub seek_player: bool,
+    pub wander_randomly: bool,
 }
 
 impl Default for FactionInfo {
     fn default() -> FactionInfo {
         FactionInfo {
             color: ENEMY_PIECE_COLOR,
+            seek_player: true,
+            wander_randomly: true,
         }
     }
 }

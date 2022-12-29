@@ -84,10 +84,10 @@ impl Game {
         assert_eq!(game.default_enemy_faction, Faction::default());
 
         game.red_pawn_faction = game.get_new_faction();
-        game.faction_info
-            .get_mut(&game.red_pawn_faction)
-            .unwrap()
-            .color = RED_PAWN_COLOR;
+        let red_pawn_faction_info = game.faction_info.get_mut(&game.red_pawn_faction).unwrap();
+        red_pawn_faction_info.color = RED_PAWN_COLOR;
+        red_pawn_faction_info.seek_player = false;
+        red_pawn_faction_info.wander_randomly = false;
 
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -96,9 +96,15 @@ impl Game {
         self.board_size
     }
 
+    #[deprecated(note = "'Dead' is a negative, use `player_is_alive` instead")]
     pub fn player_is_dead(&self) -> bool {
         self.player_optional.is_none()
     }
+
+    pub fn player_is_alive(&self) -> bool {
+        self.player_optional.is_some()
+    }
+
     pub fn turn_count(&self) -> u32 {
         self.turn_count
     }
@@ -496,22 +502,29 @@ impl Game {
             .map(|(&square, piece)| square)
             .collect()
     }
+    fn info_for_faction(&self, faction: Faction) -> FactionInfo {
+        *self
+            .faction_info
+            .get(&faction)
+            .unwrap_or(&FactionInfo::default())
+    }
 
     fn move_one_piece_of_faction(&mut self, faction: Faction) {
         let faction_squares = self.squares_of_pieces_in_faction(faction);
+        let faction_info = self.info_for_faction(faction);
 
-        if let Some(selected_piece) = if !self.player_is_dead() {
-            faction_squares
+        if self.player_is_alive() && faction_info.seek_player {
+            let piece_to_move = faction_squares
                 .into_iter()
                 .min_by_key(|&square| (square - self.player_square()).square_length())
-        } else {
-            faction_squares
+                .unwrap();
+            self.move_piece_at(piece_to_move);
+        } else if faction_info.wander_randomly {
+            let square_of_piece_to_move = faction_squares
                 .into_iter()
                 .min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
-        } {
-            self.move_piece_at(selected_piece);
-        } else {
-            panic!("No pieces in faction to move");
+                .unwrap();
+            self.move_piece_at(square_of_piece_to_move);
         }
     }
 
@@ -910,10 +923,10 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph::glyph_constants::RED_PAWN_COLOR;
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
+    use crate::glyph::glyph_constants::RED_PAWN_COLOR;
     use crate::utility::{
         STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
     };
@@ -1004,6 +1017,7 @@ mod tests {
         }
         assert!(game.pieces.len() > 4);
     }
+
     #[test]
     fn test_faction_with_only_pawns_becomes_red_pawns() {
         let mut game = set_up_game();
@@ -1045,5 +1059,22 @@ mod tests {
         let game = set_up_game();
         assert!(game.faction_info.contains_key(&game.red_pawn_faction));
         assert!(game.faction_info.contains_key(&game.default_enemy_faction));
+    }
+
+    #[test]
+    fn test_red_pawns_dont_move_if_stable() {
+        let mut game = set_up_game();
+        game.place_player(point2(0, 0));
+        let center_square = point2(5, 5);
+        let pawn_squares: SquareSet = ORTHOGONAL_STEPS
+            .iter()
+            .map(|&step| center_square + step)
+            .collect();
+        for &pawn_square in &pawn_squares {
+            game.place_red_pawn(pawn_square).expect("red pawn");
+        }
+        game.move_one_piece_per_faction();
+        let found_pawn_squares: SquareSet = game.pieces.keys().cloned().collect();
+        assert_eq!(pawn_squares, found_pawn_squares);
     }
 }
