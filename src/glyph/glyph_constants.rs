@@ -24,6 +24,7 @@ pub const GREY_RED: RGB8 = RGB8::new(127, 100, 100);
 pub const DANGER_SQUARE_COLOR: RGB8 = GREY_RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
 pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
+pub const RED_PAWN_COLOR: RGB8 = RED;
 
 pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = BLACK;

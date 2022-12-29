@@ -285,6 +285,10 @@ impl Game {
         Ok(())
     }
 
+    pub fn place_red_pawn(&mut self, square: WorldSquare) -> Result<(), ()> {
+        self.place_piece(Piece::new(PieceType::Pawn, self.red_pawn_faction), square)
+    }
+
     pub fn tick_pawn_incubation(&mut self) {
         let found_incubation_squares: SquareSet = self.squares_surrounded_by_pawns_of_one_faction();
 
@@ -891,6 +895,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph::glyph_constants::RED_PAWN_COLOR;
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -1006,5 +1011,15 @@ mod tests {
         let the_piece = game.get_piece_at(test_square).unwrap();
         assert_ne!(the_piece.faction, placed_faction);
         assert_eq!(the_piece.faction, game.red_pawn_faction);
+    }
+
+    #[test]
+    fn test_red_pawn_looks_red() {
+        let mut game = set_up_game();
+        let square = point2(5, 5);
+        game.place_red_pawn(square).expect("place pawn");
+        game.draw_headless_now();
+        let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+        assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
     }
 }
