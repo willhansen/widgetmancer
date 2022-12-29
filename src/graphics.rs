@@ -422,21 +422,21 @@ impl Graphics {
         self.output_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
-    #[deprecated(note = "use `draw_piece_with_faction_info` instead")]
+    #[deprecated(note = "use `draw_piece_with_color` instead")]
     pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
         self.draw_glyphs_for_square(pos, piece.glyphs());
     }
 
-    pub fn draw_piece_with_faction_info(
+    pub fn draw_piece_with_color(
         &mut self,
         square: WorldSquare,
         piece_type: PieceType,
-        faction_info: FactionInfo,
+        color: RGB8,
     ) {
         let mut piece_glyphs = Piece::glyphs_for_type(piece_type);
         piece_glyphs
             .iter_mut()
-            .for_each(|g: &mut Glyph| g.fg_color = faction_info.color);
+            .for_each(|g: &mut Glyph| g.fg_color = color);
 
         self.draw_glyphs_for_square(square, piece_glyphs);
     }

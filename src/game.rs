@@ -17,7 +17,7 @@ use strum_macros::EnumIter;
 
 use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
-use crate::glyph::glyph_constants::{RED_PAWN_COLOR, SPACE, WHITE};
+use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::Pawn;
 use crate::piece::{Faction, FactionFactory, FactionInfo, Piece, PieceType};
@@ -56,7 +56,7 @@ pub struct Game {
     selected_square: Option<WorldSquare>,
     incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
     faction_factory: FactionFactory,
-    faction_info: HashMap<Faction, FactionInfo>,
+    // faction_info: HashMap<Faction, FactionInfo>, //TODO: LATER MAYBE
     red_pawn_faction: Faction,
     default_enemy_faction: Faction,
 }
@@ -76,7 +76,7 @@ impl Game {
             selected_square: None,
             incubating_pawns: Default::default(),
             faction_factory: FactionFactory::new(),
-            faction_info: Default::default(),
+            //faction_info: Default::default(),
             red_pawn_faction: Faction::default(),
             default_enemy_faction: Faction::default(),
         };
@@ -84,10 +84,6 @@ impl Game {
         assert_eq!(game.default_enemy_faction, Faction::default());
 
         game.red_pawn_faction = game.get_new_faction();
-        let red_pawn_faction_info = game.faction_info.get_mut(&game.red_pawn_faction).unwrap();
-        red_pawn_faction_info.color = RED_PAWN_COLOR;
-        red_pawn_faction_info.seek_player = false;
-        red_pawn_faction_info.wander_randomly = false;
 
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -166,7 +162,7 @@ impl Game {
     }
 
     pub fn try_set_player_position(&mut self, square: WorldSquare) -> Result<(), ()> {
-        if self.is_piece_at(square) {
+        if self.is_non_player_piece_at(square) {
             self.capture_piece_at(square).expect("capture failed");
         }
 
@@ -256,15 +252,16 @@ impl Game {
 
         self.graphics.draw_blocks(&self.blocks);
         for (&square, &piece) in &self.pieces {
-            let faction_info = *self
-                .faction_info
-                .get(&piece.faction)
-                .unwrap_or(&FactionInfo::default());
+            let color = if piece.faction == self.red_pawn_faction {
+                RED_PAWN_COLOR
+            } else {
+                ENEMY_PIECE_COLOR
+            };
             self.graphics
-                .draw_piece_with_faction_info(square, piece.piece_type, faction_info)
+                .draw_piece_with_color(square, piece.piece_type, color)
         }
         self.graphics.draw_non_board_animations(time);
-        if !self.player_is_dead() {
+        if self.player_is_alive() {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
             self.graphics
@@ -278,7 +275,7 @@ impl Game {
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
-        !self.is_player_at(pos) && !self.is_piece_at(pos) && !self.is_block_at(pos)
+        !self.is_player_at(pos) && !self.is_non_player_piece_at(pos) && !self.is_block_at(pos)
     }
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) -> Result<(), ()> {
@@ -384,7 +381,7 @@ impl Game {
         self.pieces.get(&square)
     }
 
-    pub fn is_piece_at(&self, square: WorldSquare) -> bool {
+    pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
         self.get_piece_at(square).is_some()
     }
 
@@ -477,7 +474,7 @@ impl Game {
 
     pub fn move_one_piece_per_faction(&mut self) {
         for faction in self.get_all_living_factions() {
-            self.move_one_piece_of_faction(faction);
+            self.move_faction(faction);
         }
     }
 
@@ -491,7 +488,7 @@ impl Game {
 
     pub fn get_new_faction(&mut self) -> Faction {
         let new_faction = self.faction_factory.get_new_faction();
-        self.faction_info.insert(new_faction, Default::default());
+        //self.faction_info.insert(new_faction, Default::default());
         new_faction
     }
 
@@ -502,34 +499,35 @@ impl Game {
             .map(|(&square, piece)| square)
             .collect()
     }
-    fn info_for_faction(&self, faction: Faction) -> FactionInfo {
-        *self
-            .faction_info
-            .get(&faction)
-            .unwrap_or(&FactionInfo::default())
+
+    fn move_faction(&mut self, faction: Faction) {
+        let faction_squares = self.squares_of_pieces_in_faction(faction);
+
+        if faction == self.red_pawn_faction {
+            faction_squares.iter().for_each(|&square| {
+                self.move_piece_at(square);
+            });
+        } else if self.player_is_alive() {
+            self.move_piece_at(self.closest_piece_to_player_in_faction(faction));
+        }
+        //else if faction_info.wander_randomly {
+        //let square_of_piece_to_move = faction_squares
+        //.into_iter()
+        //.min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
+        //.unwrap();
+        //self.move_piece_at(square_of_piece_to_move);
+        //}
     }
 
-    fn move_one_piece_of_faction(&mut self, faction: Faction) {
-        let faction_squares = self.squares_of_pieces_in_faction(faction);
-        let faction_info = self.info_for_faction(faction);
-
-        if self.player_is_alive() && faction_info.seek_player {
-            let piece_to_move = faction_squares
-                .into_iter()
-                .min_by_key(|&square| (square - self.player_square()).square_length())
-                .unwrap();
-            self.move_piece_at(piece_to_move);
-        } else if faction_info.wander_randomly {
-            let square_of_piece_to_move = faction_squares
-                .into_iter()
-                .min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
-                .unwrap();
-            self.move_piece_at(square_of_piece_to_move);
-        }
+    fn closest_piece_to_player_in_faction(&self, faction: Faction) -> WorldSquare {
+        self.squares_of_pieces_in_faction(faction)
+            .into_iter()
+            .min_by_key(|&square| (square - self.player_square()).square_length())
+            .unwrap()
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
-        if !self.is_piece_at(start) {
+        if !self.is_non_player_piece_at(start) {
             panic!("No piece at {}", point_to_string(start));
         }
         if !self.square_is_empty(end) {
@@ -553,7 +551,7 @@ impl Game {
                 break;
             }
             valid_squares.push(square);
-            if pass_through_pieces && self.is_piece_at(square) {
+            if pass_through_pieces && self.is_non_player_piece_at(square) {
                 // keep going
             } else {
                 if !self.square_is_empty(square) {
@@ -600,7 +598,7 @@ impl Game {
                 .into_iter()
                 .contains(&self.player_square())
     }
-    pub fn square_to_capture_for_piece_at(&self, piece_square: WorldSquare) -> Option<WorldSquare> {
+    pub fn capture_square_for_piece_at(&self, piece_square: WorldSquare) -> Option<WorldSquare> {
         let friendly_faction = self.get_piece_at(piece_square).unwrap().faction;
         // TODO: choose randomly rather than first
         self.capture_options_for_piece_at(piece_square)
@@ -614,40 +612,101 @@ impl Game {
 
     // returns where the piece moves to, if applicable
     pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
-        if !self.is_piece_at(piece_square) {
+        if !self.is_non_player_piece_at(piece_square) {
             return None;
         }
 
         let piece = self.get_piece_at(piece_square).unwrap().clone();
-        let mut end_square;
 
-        if piece.piece_type == PieceType::King {
-            if let Some(path_to_player) = self.find_king_path(piece_square, self.player_square()) {
-                let first_step_square = *path_to_player.get(1).unwrap();
-                end_square = first_step_square;
+        let mut end_square: Option<WorldSquare>;
+
+        if piece.faction == self.red_pawn_faction {
+            // Look at surrounding 5x5 square
+            let faction_squares = self.squares_of_pieces_in_faction(piece.faction);
+            let mut nearby_ally_squares = SquareSet::new();
+            let radius = 2;
+            (-radius..=radius).for_each(|row_offset| {
+                (-radius..=radius).for_each(|column_offset| {
+                    let square = piece_square + STEP_DOWN * row_offset + STEP_RIGHT * column_offset;
+                    let is_ally_and_not_self =
+                        faction_squares.contains(&square) && square != piece_square;
+                    if is_ally_and_not_self {
+                        nearby_ally_squares.insert(square);
+                    }
+                });
+            });
+            let mut orthogonal_and_self_protection_counts = HashMap::<WorldSquare, u32>::new();
+            nearby_ally_squares.iter().for_each(|&ally_square| {
+                DIAGONAL_STEPS
+                    .iter()
+                    .map(|&diagonal_step| ally_square + diagonal_step)
+                    .filter(|&protected_square| {
+                        (0..=1).contains(&(piece_square - protected_square).square_length())
+                    })
+                    .for_each(|protected_square| {
+                        *orthogonal_and_self_protection_counts
+                            .entry(protected_square)
+                            .or_default() += 1
+                    })
+            });
+            let current_protection: u32 = orthogonal_and_self_protection_counts
+                .get(&piece_square)
+                .cloned()
+                .unwrap_or_default();
+            let most_protection_available: u32 = orthogonal_and_self_protection_counts
+                .values()
+                .max()
+                .cloned()
+                .unwrap_or_default();
+            if most_protection_available > current_protection {
+                end_square = Some(
+                    orthogonal_and_self_protection_counts
+                        .iter()
+                        .max_by_key(|(&square, &protection)| protection)
+                        .unwrap()
+                        .0
+                        .clone(),
+                );
             } else {
-                return None;
+                end_square = None
             }
-        } else if self.piece_can_capture_player(piece_square) {
-            end_square = self.player_square();
-        } else if let Some(square) = self.square_to_capture_for_piece_at(piece_square) {
-            end_square = square;
-        } else if let Some(square) = self.square_to_move_toward_player_for_piece_at(piece_square) {
-            end_square = square;
+        } else if self.player_is_alive() {
+            if piece.piece_type == PieceType::King {
+                if let Some(path_to_player) =
+                    self.find_king_path(piece_square, self.player_square())
+                {
+                    let first_step_square = *path_to_player.get(1).unwrap();
+                    end_square = Some(first_step_square);
+                } else {
+                    end_square = None;
+                }
+            } else if self.piece_can_capture_player(piece_square) {
+                end_square = Some(self.player_square());
+            } else if let Some(square) =
+                self.square_to_move_toward_player_for_piece_at(piece_square)
+            {
+                end_square = Some(square);
+            } else {
+                end_square = None;
+            }
+        } else if let Some(square) = self.capture_square_for_piece_at(piece_square) {
+            end_square = Some(square);
         } else {
-            return None;
+            end_square = None;
         }
 
-        // capture player
-        if self.is_player_at(end_square) {
-            self.player_optional = None;
-            self.quit();
+        if let Some(move_square) = end_square {
+            // capture player
+            if self.is_player_at(move_square) {
+                self.player_optional = None;
+                self.quit();
+            }
+            if self.is_non_player_piece_at(move_square) {
+                self.capture_piece_at(move_square).expect("capture failed");
+            }
+            self.move_piece(piece_square, move_square);
         }
-        if self.is_piece_at(end_square) {
-            self.capture_piece_at(end_square).expect("capture failed");
-        }
-        self.move_piece(piece_square, end_square);
-        Some(end_square)
+        end_square
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
@@ -663,7 +722,7 @@ impl Game {
         capture_instead_of_move: bool,
         pass_through_pieces: bool,
     ) -> SquareSet {
-        assert!(self.is_piece_at(piece_square));
+        assert!(self.is_non_player_piece_at(piece_square));
         let mut squares = SquareSet::new();
         let piece = self.get_piece_at(piece_square).unwrap();
 
@@ -775,7 +834,7 @@ impl Game {
     }
 
     fn capture_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        assert!(self.is_piece_at(piece_square));
+        assert!(self.is_non_player_piece_at(piece_square));
 
         let mut capture_squares: SquareList = vec![];
 
@@ -841,7 +900,7 @@ impl Game {
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
-        if !self.square_is_on_board(square) || !self.is_piece_at(square) {
+        if !self.square_is_on_board(square) || !self.is_non_player_piece_at(square) {
             return Err(());
         }
         self.pieces.remove(&square);
@@ -1055,13 +1114,6 @@ mod tests {
     }
 
     #[test]
-    fn test_start_with_info_for_default_and_red_factions() {
-        let game = set_up_game();
-        assert!(game.faction_info.contains_key(&game.red_pawn_faction));
-        assert!(game.faction_info.contains_key(&game.default_enemy_faction));
-    }
-
-    #[test]
     fn test_red_pawns_dont_move_if_stable() {
         let mut game = set_up_game();
         game.place_player(point2(0, 0));
@@ -1076,5 +1128,17 @@ mod tests {
         game.move_one_piece_per_faction();
         let found_pawn_squares: SquareSet = game.pieces.keys().cloned().collect();
         assert_eq!(pawn_squares, found_pawn_squares);
+    }
+
+    #[test]
+    fn test_red_pawn_will_move_into_protection() {
+        let mut game = set_up_game();
+        let moving_pawn_square = point2(5, 5);
+        let correct_end_square = moving_pawn_square + STEP_LEFT;
+        game.place_red_pawn(correct_end_square + STEP_DOWN_LEFT)
+            .expect("place pawn");
+        game.place_red_pawn(moving_pawn_square).expect("place pawn");
+        game.move_piece_at(moving_pawn_square);
+        assert!(game.pieces.contains_key(&correct_end_square));
     }
 }
