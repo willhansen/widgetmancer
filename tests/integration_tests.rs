@@ -593,7 +593,7 @@ fn test_one_move_per_faction_per_turn() {
     game.place_piece(pawn2, point2(2, 5)).ok();
     game.place_piece(pawn2, point2(4, 5)).ok();
     let positions_before: HashSet<WorldSquare> = HashSet::from_iter(game.pieces().keys().cloned());
-    game.move_one_piece_per_faction();
+    game.move_all_factions();
     let positions_after: HashSet<WorldSquare> = HashSet::from_iter(game.pieces().keys().cloned());
 
     assert_eq!(positions_before.intersection(&positions_after).count(), 2);
@@ -637,6 +637,6 @@ fn test_factions_attack_each_other() {
         .expect("");
     let num_pieces = game.pieces().len();
     assert_eq!(num_pieces, 18);
-    game.move_one_piece_per_faction();
+    game.move_all_factions();
     assert!(game.pieces().len() < num_pieces);
 }

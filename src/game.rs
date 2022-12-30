@@ -472,7 +472,7 @@ impl Game {
         self.turn_count += 1;
     }
 
-    pub fn move_one_piece_per_faction(&mut self) {
+    pub fn move_all_factions(&mut self) {
         for faction in self.get_all_living_factions() {
             self.move_faction(faction);
         }
@@ -504,22 +504,23 @@ impl Game {
         let faction_squares = self.squares_of_pieces_in_faction(faction);
 
         if faction == self.red_pawn_faction {
+            // all pieces move
             faction_squares.iter().for_each(|&square| {
                 self.move_piece_at(square);
             });
         } else if self.player_is_alive() {
-            self.move_piece_at(self.closest_piece_to_player_in_faction(faction));
+            self.move_piece_at(self.square_of_closest_piece_to_player_in_faction(faction));
+        } else {
+            // select one non-randomly
+            let square_of_piece_to_move = faction_squares
+                .into_iter()
+                .min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
+                .unwrap();
+            self.move_piece_at(square_of_piece_to_move);
         }
-        //else if faction_info.wander_randomly {
-        //let square_of_piece_to_move = faction_squares
-        //.into_iter()
-        //.min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
-        //.unwrap();
-        //self.move_piece_at(square_of_piece_to_move);
-        //}
     }
 
-    fn closest_piece_to_player_in_faction(&self, faction: Faction) -> WorldSquare {
+    fn square_of_closest_piece_to_player_in_faction(&self, faction: Faction) -> WorldSquare {
         self.squares_of_pieces_in_faction(faction)
             .into_iter()
             .min_by_key(|&square| (square - self.player_square()).square_length())
@@ -610,6 +611,46 @@ impl Game {
             .next()
     }
 
+    pub fn allies_within_radius_excluding_center(
+        &self,
+        center_square: WorldSquare,
+        radius: u32,
+        faction: Faction,
+    ) -> SquareSet {
+        let mut nearby_ally_squares = SquareSet::new();
+        // intentional shadow
+        let radius = radius as i32;
+        (-radius..=radius).for_each(|y_offset| {
+            (-radius..=radius).for_each(|x_offset| {
+                let square = center_square + STEP_UP * y_offset + STEP_RIGHT * x_offset;
+                if square != center_square
+                    && self
+                        .pieces
+                        .get(&square)
+                        .is_some_and(|other_piece| other_piece.faction == faction)
+                {
+                    nearby_ally_squares.insert(square);
+                }
+            });
+        });
+        nearby_ally_squares
+    }
+    pub fn protection_strengths_from_given_pawns(
+        &self,
+        pawn_squares: SquareSet,
+    ) -> HashMap<WorldSquare, u32> {
+        let mut protection_strengths = HashMap::<WorldSquare, u32>::new();
+        pawn_squares.iter().for_each(|&pawn_square| {
+            DIAGONAL_STEPS
+                .iter()
+                .map(|&diagonal_step| pawn_square + diagonal_step)
+                .for_each(|protected_square| {
+                    *protection_strengths.entry(protected_square).or_default() += 1
+                })
+        });
+        protection_strengths
+    }
+
     // returns where the piece moves to, if applicable
     pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
         if !self.is_non_player_piece_at(piece_square) {
@@ -623,44 +664,29 @@ impl Game {
         if piece.faction == self.red_pawn_faction {
             // Look at surrounding 5x5 square
             let faction_squares = self.squares_of_pieces_in_faction(piece.faction);
-            let mut nearby_ally_squares = SquareSet::new();
-            let radius = 2;
-            (-radius..=radius).for_each(|row_offset| {
-                (-radius..=radius).for_each(|column_offset| {
-                    let square = piece_square + STEP_DOWN * row_offset + STEP_RIGHT * column_offset;
-                    let is_ally_and_not_self =
-                        faction_squares.contains(&square) && square != piece_square;
-                    if is_ally_and_not_self {
-                        nearby_ally_squares.insert(square);
-                    }
-                });
-            });
-            let mut orthogonal_and_self_protection_counts = HashMap::<WorldSquare, u32>::new();
-            nearby_ally_squares.iter().for_each(|&ally_square| {
-                DIAGONAL_STEPS
-                    .iter()
-                    .map(|&diagonal_step| ally_square + diagonal_step)
-                    .filter(|&protected_square| {
-                        (0..=1).contains(&(piece_square - protected_square).square_length())
-                    })
-                    .for_each(|protected_square| {
-                        *orthogonal_and_self_protection_counts
-                            .entry(protected_square)
-                            .or_default() += 1
-                    })
-            });
-            let current_protection: u32 = orthogonal_and_self_protection_counts
+            let mut nearby_ally_squares =
+                self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
+            let protection_strengths =
+                self.protection_strengths_from_given_pawns(nearby_ally_squares);
+
+            let protection_at_movable_squares: HashMap<WorldSquare, u32> = protection_strengths
+                .into_iter()
+                .filter(|(protected_square, strength)| {
+                    (0..=1).contains(&(piece_square - *protected_square).square_length())
+                })
+                .collect();
+            let current_protection: u32 = protection_at_movable_squares
                 .get(&piece_square)
                 .cloned()
                 .unwrap_or_default();
-            let most_protection_available: u32 = orthogonal_and_self_protection_counts
+            let most_protection_available: u32 = protection_at_movable_squares
                 .values()
                 .max()
                 .cloned()
                 .unwrap_or_default();
             if most_protection_available > current_protection {
                 end_square = Some(
-                    orthogonal_and_self_protection_counts
+                    protection_at_movable_squares
                         .iter()
                         .max_by_key(|(&square, &protection)| protection)
                         .unwrap()
@@ -915,6 +941,21 @@ impl Game {
         self.blocks.contains(&square)
     }
 
+    pub fn set_up_vs_red_pawns(&mut self) {
+        let distance = 4;
+        let width = 9;
+        let depth = 5;
+
+        let start_square = self.player_square() + STEP_UP * distance + STEP_LEFT * width / 2;
+        for dx in 0..width {
+            for dy in 0..depth {
+                let vec = vec2(dx, dy);
+                self.place_red_pawn(start_square + vec)
+                    .expect("place red pawn");
+            }
+        }
+    }
+
     pub fn set_up_vs_mini_factions(&mut self) {
         let distance = 5;
         self.place_new_king_pawn_faction(self.player_square() + STEP_UP_LEFT * distance)
@@ -1056,7 +1097,7 @@ mod tests {
         game.place_new_king_pawn_faction(king_square).ok();
         let test_square = king_square + STEP_DOWN_LEFT;
         assert_false!(game.square_is_empty(test_square));
-        game.move_one_piece_per_faction();
+        game.move_all_factions();
         assert!(game.square_is_empty(test_square));
     }
 
@@ -1125,7 +1166,7 @@ mod tests {
         for &pawn_square in &pawn_squares {
             game.place_red_pawn(pawn_square).expect("red pawn");
         }
-        game.move_one_piece_per_faction();
+        game.move_all_factions();
         let found_pawn_squares: SquareSet = game.pieces.keys().cloned().collect();
         assert_eq!(pawn_squares, found_pawn_squares);
     }
