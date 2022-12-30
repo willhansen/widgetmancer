@@ -310,7 +310,8 @@ impl Game {
     }
 
     pub fn tick_pawn_incubation(&mut self) {
-        let found_incubation_squares: SquareSet = self.squares_surrounded_by_pawns_of_one_faction();
+        let found_incubation_squares: SquareSet =
+            self.empty_squares_surrounded_by_pawns_of_one_faction();
 
         self.incubating_pawns
             .retain(|old_square, _| found_incubation_squares.contains(old_square));
@@ -332,14 +333,16 @@ impl Game {
         }
     }
 
-    pub fn squares_surrounded_by_pawns_of_one_faction(&self) -> SquareSet {
+    pub fn empty_squares_surrounded_by_pawns_of_one_faction(&self) -> SquareSet {
         let mut pawn_adjacency_counter = HashMap::<(WorldSquare, Faction), u32>::new();
         self.pieces
             .iter()
             .cartesian_product(ORTHOGONAL_STEPS)
-            .for_each(|((pawn_square, piece), orthogonal_step)| {
+            .map(|((&pawn_square, piece), orthogonal_step)| (pawn_square + orthogonal_step, piece))
+            .filter(|(adjacent_square, _)| self.square_is_empty(*adjacent_square))
+            .for_each(|(adjacent_square, piece)| {
                 *pawn_adjacency_counter
-                    .entry(((*pawn_square + orthogonal_step), piece.faction))
+                    .entry((adjacent_square, piece.faction))
                     .or_insert(0) += 1;
             });
         pawn_adjacency_counter
@@ -1110,16 +1113,34 @@ mod tests {
     fn test_pawn_reproduction_in_surrounded_squares() {
         let mut game = set_up_game();
         let test_square = point2(5, 5);
-        let faction = Faction::from_id(0);
-        let rel_positions = vec![STEP_UP, STEP_RIGHT, STEP_LEFT, STEP_DOWN];
-        for rel_pos in rel_positions {
-            game.place_piece(Piece::new(Pawn, faction), test_square + rel_pos);
+        let faction = game.get_new_faction();
+        for step in ORTHOGONAL_STEPS {
+            game.place_piece(Piece::new(Pawn, faction), test_square + step);
         }
         assert_eq!(game.pieces.len(), 4);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
             game.tick_pawn_incubation();
         }
         assert!(game.pieces.len() > 4);
+    }
+
+    #[test]
+    fn test_pawn_reproduction_does_not_apply_to_filled_squares() {
+        let mut game = set_up_game();
+
+        let test_square = point2(5, 5);
+        let faction = game.get_new_faction();
+
+        for step in ORTHOGONAL_STEPS {
+            game.place_piece(Piece::new(Pawn, faction), test_square + step);
+        }
+        game.place_piece(Piece::new(Pawn, faction), test_square);
+
+        assert_eq!(game.pieces.len(), 5);
+        for _ in 0..=TURNS_TO_SPAWN_PAWN {
+            game.tick_pawn_incubation();
+        }
+        assert_eq!(game.pieces.len(), 5);
     }
 
     #[test]
