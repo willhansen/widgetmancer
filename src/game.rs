@@ -163,7 +163,7 @@ impl Game {
 
     pub fn try_set_player_position(&mut self, square: WorldSquare) -> Result<(), ()> {
         if self.is_non_player_piece_at(square) {
-            self.capture_piece_at(square).expect("capture failed");
+            self.capture_piece_at(square);
         }
 
         if !self.square_is_on_board(square) || self.is_block_at(square) {
@@ -237,11 +237,11 @@ impl Game {
 
         // TODO: fix redundant calculation
         // TODO: make redundant calculation actually produce the same path every time
-        if let Some(player_square) = self.try_get_player_square() {
-            let king_squares = self.find_pieces(Piece::king());
-            //let king_paths = king_squares .iter() .filter_map(|&king_square| self.find_king_path(king_square, player_square)) .collect();
-            //self.graphics.draw_paths(king_paths);
-        }
+        //if let Some(player_square) = self.try_get_player_square() {
+        //let king_squares = self.find_pieces(Piece::king());
+        //let king_paths = king_squares .iter() .filter_map(|&king_square| self.find_king_path(king_square, player_square)) .collect();
+        //self.graphics.draw_paths(king_paths);
+        //}
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -271,39 +271,42 @@ impl Game {
         self.graphics.remove_finished_animations(time);
     }
     fn is_player_at(&self, square: WorldSquare) -> bool {
-        !self.player_is_dead() && self.try_get_player_square() == Some(square)
+        self.player_is_alive() && self.try_get_player_square() == Some(square)
     }
 
     fn square_is_empty(&self, pos: WorldSquare) -> bool {
         !self.is_player_at(pos) && !self.is_non_player_piece_at(pos) && !self.is_block_at(pos)
     }
 
-    pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) -> Result<(), ()> {
+    pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
         let faction = self.get_new_faction();
-        self.place_piece(Piece::new(PieceType::King, faction), king_square)?;
+        self.place_piece(Piece::new(PieceType::King, faction), king_square);
         for x in -1..=1 {
             for y in -1..=1 {
                 let pawn_square = king_square + vec2(x, y);
                 if pawn_square == king_square {
                     continue;
                 }
-                self.place_piece(Piece::new(PieceType::Pawn, faction), pawn_square)
-                    .ok();
+                self.place_piece(Piece::new(Pawn, faction), pawn_square);
             }
         }
-        Ok(())
     }
 
-    pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) -> Result<(), ()> {
-        if !self.square_is_empty(square) || !self.square_is_on_board(square) {
-            return Err(());
+    pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
+        if !self.square_is_on_board(square) {
+            panic!(
+                "Tried to place piece off board at {}",
+                point_to_string(square)
+            );
+        }
+        if !self.square_is_empty(square) {
+            panic!("Tried to overwrite piece at {}", point_to_string(square));
         }
         self.pieces.insert(square, piece);
-        Ok(())
     }
 
-    pub fn place_red_pawn(&mut self, square: WorldSquare) -> Result<(), ()> {
-        self.place_piece(Piece::new(PieceType::Pawn, self.red_pawn_faction), square)
+    pub fn place_red_pawn(&mut self, square: WorldSquare) {
+        self.place_piece(Piece::new(Pawn, self.red_pawn_faction), square)
     }
 
     pub fn tick_pawn_incubation(&mut self) {
@@ -317,7 +320,7 @@ impl Game {
             if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
-                    self.place_piece(Piece::new(PieceType::Pawn, faction), square).expect(&*("Spawn pawn at ".to_owned() + &point_to_string(square)));
+                    self.place_piece(Piece::new(Pawn, faction), square);
                 }
             } else {
                 let new_incubation = IncubatingPawn {
@@ -360,16 +363,14 @@ impl Game {
         Err(())
     }
 
-    pub fn place_piece_randomly(&mut self, piece: Piece, rng: &mut StdRng) -> Result<(), ()> {
+    pub fn place_piece_randomly(&mut self, piece: Piece, rng: &mut StdRng) -> WorldSquare {
         let rand_pos = self
             .random_empty_square(rng)
             .expect("failed to get random square");
-        let place_result = self.place_piece(piece, rand_pos);
-        if place_result.is_ok() {
-            return place_result;
-        }
-        return Err(());
+        self.place_piece(piece, rand_pos);
+        return rand_pos;
     }
+
     pub fn place_block_randomly(&mut self, rng: &mut StdRng) {
         let rand_pos = self
             .random_empty_square(rng)
@@ -421,9 +422,7 @@ impl Game {
         self.pieces
             .keys()
             .min_by_key(|square| {
-                ordered_float::OrderedFloat(
-                    (square.to_f32() - slightly_right_of_player_position).length(),
-                )
+                OrderedFloat((square.to_f32() - slightly_right_of_player_position).length())
             })
             .cloned()
     }
@@ -432,7 +431,7 @@ impl Game {
     pub fn on_turn_end(&mut self) {
         self.tick_pawn_incubation();
         self.convert_orphaned_pieces();
-        if !self.player_is_dead() {
+        if self.player_is_alive() {
             self.select_closest_piece();
         }
     }
@@ -446,8 +445,7 @@ impl Game {
                 .filter(|piece| piece.faction == faction)
                 .collect();
             let all_same_piece_type: bool = pieces_in_faction.iter().all_equal();
-            let faction_has_a_pawn =
-                pieces_in_faction.iter().next().unwrap().piece_type == PieceType::Pawn;
+            let faction_has_a_pawn = pieces_in_faction.iter().next().unwrap().piece_type == Pawn;
             let faction_has_only_pawns = all_same_piece_type && faction_has_a_pawn;
             if faction_has_only_pawns {
                 pieces_in_faction
@@ -528,16 +526,27 @@ impl Game {
     }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
+        // capture player
         if !self.is_non_player_piece_at(start) {
-            panic!("No piece at {}", point_to_string(start));
+            panic!("No piece to move at {}", point_to_string(start));
         }
-        if !self.square_is_empty(end) {
-            panic!("Square is occupied: {}", point_to_string(end));
+        if self.is_player_at(end) {
+            // TODO: less abrupt game-over
+            self.player_optional = None;
+            self.quit();
         }
-
+        if self.is_non_player_piece_at(end) {
+            let target_piece = self.pieces.get(&end).unwrap();
+            let this_piece = self.pieces.get(&start).unwrap();
+            if this_piece.faction == target_piece.faction {
+                panic!("Tried to capture allied piece at {}", point_to_string(end));
+            }
+            self.capture_piece_at(end);
+        }
         let piece = self.pieces.remove(&start).unwrap();
         self.pieces.insert(end, piece);
     }
+
     fn range_cast(
         &self,
         start_square: WorldSquare,
@@ -583,7 +592,7 @@ impl Game {
         &self,
         piece_square: WorldSquare,
     ) -> Option<WorldSquare> {
-        if self.player_is_dead() {
+        if !self.player_is_alive() {
             return None;
         }
         self.move_options_for_piece_at(piece_square)
@@ -593,7 +602,7 @@ impl Game {
     }
 
     pub fn piece_can_capture_player(&self, piece_square: WorldSquare) -> bool {
-        !self.player_is_dead()
+        self.player_is_alive()
             && self
                 .capture_options_for_piece_at(piece_square)
                 .into_iter()
@@ -663,7 +672,6 @@ impl Game {
 
         if piece.faction == self.red_pawn_faction {
             // Look at surrounding 5x5 square
-            let faction_squares = self.squares_of_pieces_in_faction(piece.faction);
             let mut nearby_ally_squares =
                 self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
             let protection_strengths =
@@ -674,6 +682,7 @@ impl Game {
                 .filter(|(protected_square, strength)| {
                     (0..=1).contains(&(piece_square - *protected_square).square_length())
                 })
+                .filter(|(square, _)| *square == piece_square || self.square_is_empty(*square))
                 .collect();
             let current_protection: u32 = protection_at_movable_squares
                 .get(&piece_square)
@@ -722,14 +731,6 @@ impl Game {
         }
 
         if let Some(move_square) = end_square {
-            // capture player
-            if self.is_player_at(move_square) {
-                self.player_optional = None;
-                self.quit();
-            }
-            if self.is_non_player_piece_at(move_square) {
-                self.capture_piece_at(move_square).expect("capture failed");
-            }
             self.move_piece(piece_square, move_square);
         }
         end_square
@@ -898,7 +899,9 @@ impl Game {
                 line_end.round().to_i32().to_tuple(),
             ) {
                 let square = WorldSquare::new(x, y);
-                self.capture_piece_at(square).ok();
+                if self.is_non_player_piece_at(square) {
+                    self.capture_piece_at(square);
+                }
             }
 
             self.graphics
@@ -912,7 +915,7 @@ impl Game {
         let mut graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
-                self.capture_piece_at(square).expect("capture with sniper");
+                self.capture_piece_at(square);
             }
             graphical_laser_end = square;
         } else {
@@ -925,13 +928,21 @@ impl Game {
             .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
 
-    pub fn capture_piece_at(&mut self, square: WorldSquare) -> Result<(), ()> {
-        if !self.square_is_on_board(square) || !self.is_non_player_piece_at(square) {
-            return Err(());
+    pub fn capture_piece_at(&mut self, square: WorldSquare) {
+        if !self.square_is_on_board(square) {
+            panic!(
+                "Tried to capture piece off board at {}",
+                point_to_string(square)
+            );
+        }
+        if !self.is_non_player_piece_at(square) {
+            panic!(
+                "Tried to capture an empty square at {}",
+                point_to_string(square)
+            );
         }
         self.pieces.remove(&square);
         self.graphics.add_explosion(square.to_f32());
-        Ok(())
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -950,20 +961,16 @@ impl Game {
         for dx in 0..width {
             for dy in 0..depth {
                 let vec = vec2(dx, dy);
-                self.place_red_pawn(start_square + vec)
-                    .expect("place red pawn");
+                self.place_red_pawn(start_square + vec);
             }
         }
     }
 
     pub fn set_up_vs_mini_factions(&mut self) {
         let distance = 5;
-        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_LEFT * distance)
-            .ok();
-        self.place_new_king_pawn_faction(self.player_square() + STEP_UP * distance)
-            .ok();
-        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_RIGHT * distance)
-            .ok();
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_LEFT * distance);
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP * distance);
+        self.place_new_king_pawn_faction(self.player_square() + STEP_UP_RIGHT * distance);
     }
 
     pub fn set_up_columns(&mut self) {
@@ -985,16 +992,14 @@ impl Game {
         self.set_up_labyrinth(rng);
         for piece_type in PieceType::iter() {
             for _ in 0..2 {
-                self.place_piece_randomly(Piece::from_type(piece_type), rng)
-                    .expect("random placement");
+                self.place_piece_randomly(Piece::from_type(piece_type), rng);
             }
         }
     }
     pub fn set_up_labyrinth_kings(&mut self, rng: &mut StdRng) {
         self.set_up_labyrinth(rng);
         for _ in 0..8 {
-            self.place_piece_randomly(Piece::king(), rng)
-                .expect("random king placement");
+            self.place_piece_randomly(Piece::king(), rng);
         }
     }
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
@@ -1094,7 +1099,7 @@ mod tests {
     fn test_faction_moves_closest_piece_to_player() {
         let mut game = set_up_game_with_player();
         let king_square = game.player_square() + STEP_UP_RIGHT * 3;
-        game.place_new_king_pawn_faction(king_square).ok();
+        game.place_new_king_pawn_faction(king_square);
         let test_square = king_square + STEP_DOWN_LEFT;
         assert_false!(game.square_is_empty(test_square));
         game.move_all_factions();
@@ -1108,8 +1113,7 @@ mod tests {
         let faction = Faction::from_id(0);
         let rel_positions = vec![STEP_UP, STEP_RIGHT, STEP_LEFT, STEP_DOWN];
         for rel_pos in rel_positions {
-            game.place_piece(Piece::new(PieceType::Pawn, faction), test_square + rel_pos)
-                .expect("place pawn");
+            game.place_piece(Piece::new(Pawn, faction), test_square + rel_pos);
         }
         assert_eq!(game.pieces.len(), 4);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
@@ -1124,7 +1128,7 @@ mod tests {
 
         let king_square = point2(5, 5);
         let test_square = king_square + STEP_UP_RIGHT;
-        game.place_new_king_pawn_faction(king_square).expect("");
+        game.place_new_king_pawn_faction(king_square);
         let placed_faction = game.get_piece_at(king_square).unwrap().faction;
 
         assert_eq!(
@@ -1136,7 +1140,7 @@ mod tests {
             game.red_pawn_faction
         );
 
-        game.capture_piece_at(king_square).expect("cap king");
+        game.capture_piece_at(king_square);
         game.on_turn_end();
 
         let the_piece = game.get_piece_at(test_square).unwrap();
@@ -1148,7 +1152,7 @@ mod tests {
     fn test_red_pawn_looks_red() {
         let mut game = set_up_game();
         let square = point2(5, 5);
-        game.place_red_pawn(square).expect("place pawn");
+        game.place_red_pawn(square);
         game.draw_headless_now();
         let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
         assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
@@ -1164,7 +1168,7 @@ mod tests {
             .map(|&step| center_square + step)
             .collect();
         for &pawn_square in &pawn_squares {
-            game.place_red_pawn(pawn_square).expect("red pawn");
+            game.place_red_pawn(pawn_square);
         }
         game.move_all_factions();
         let found_pawn_squares: SquareSet = game.pieces.keys().cloned().collect();
@@ -1176,10 +1180,25 @@ mod tests {
         let mut game = set_up_game();
         let moving_pawn_square = point2(5, 5);
         let correct_end_square = moving_pawn_square + STEP_LEFT;
-        game.place_red_pawn(correct_end_square + STEP_DOWN_LEFT)
-            .expect("place pawn");
-        game.place_red_pawn(moving_pawn_square).expect("place pawn");
+        game.place_red_pawn(correct_end_square + STEP_DOWN_LEFT);
+        game.place_red_pawn(moving_pawn_square);
         game.move_piece_at(moving_pawn_square);
         assert!(game.pieces.contains_key(&correct_end_square));
+    }
+
+    #[test]
+    fn test_red_pawns_dont_try_to_capture_each_other() {
+        let mut game = set_up_game();
+        let start_square = point2(5, 5);
+
+        for dx in 0..3 {
+            for dy in 0..3 {
+                let vec = vec2(dx, dy);
+                game.place_red_pawn(start_square + vec);
+            }
+        }
+        let num_pieces_at_start = game.pieces.len();
+        game.move_piece_at(start_square);
+        assert_eq!(num_pieces_at_start, game.pieces.len());
     }
 }
