@@ -156,8 +156,6 @@ impl Animation for Explosion {
     }
 }
 
-pub const DOTS_IN_SELECTOR: u32 = 5;
-
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Selector {
     square: WorldSquare,
@@ -175,8 +173,8 @@ impl Selector {
 
 impl Animation for Selector {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
-        let num_dots = DOTS_IN_SELECTOR;
-        let radius_in_squares = f32::sqrt(2.0) / 2.0;
+        let num_dots = 3;
+        let radius_in_squares = 1.0; //f32::sqrt(2.0) / 2.0;
 
         let rotation_rate_rad_per_s = 3.0;
         let age = time.duration_since(self.creation_time);

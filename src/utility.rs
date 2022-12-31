@@ -455,7 +455,7 @@ pub fn cross_correlate_squares_with_steps(
 ) -> HashMap<WorldSquare, u32> {
     let mut step_count_map = HashMap::<WorldSquare, u32>::new();
     squares.iter().for_each(|&square| {
-        DIAGONAL_STEPS
+        steps
             .iter()
             .map(|&diagonal_step| square + diagonal_step)
             .for_each(|step_square| *step_count_map.entry(step_square).or_default() += 1)
