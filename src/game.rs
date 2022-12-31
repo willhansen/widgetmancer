@@ -647,20 +647,21 @@ impl Game {
         });
         nearby_ally_squares
     }
+
     pub fn protection_strengths_from_given_pawns(
         &self,
         pawn_squares: SquareSet,
     ) -> HashMap<WorldSquare, u32> {
-        let mut protection_strengths = HashMap::<WorldSquare, u32>::new();
-        pawn_squares.iter().for_each(|&pawn_square| {
-            DIAGONAL_STEPS
-                .iter()
-                .map(|&diagonal_step| pawn_square + diagonal_step)
-                .for_each(|protected_square| {
-                    *protection_strengths.entry(protected_square).or_default() += 1
-                })
-        });
-        protection_strengths
+        let steps = HashSet::from_iter(Piece::relative_capture_steps_for_type(Pawn));
+        cross_correlate_squares_with_steps(pawn_squares, steps)
+    }
+
+    pub fn orthogonal_adjacency_from_given_squares(
+        &self,
+        squares: SquareSet,
+    ) -> HashMap<WorldSquare, u32> {
+        let steps = HashSet::from(ORTHOGONAL_STEPS);
+        cross_correlate_squares_with_steps(squares, steps)
     }
 
     // returns where the piece moves to, if applicable
@@ -677,30 +678,62 @@ impl Game {
             // Look at surrounding 5x5 square
             let mut nearby_ally_squares =
                 self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
-            let protection_strengths =
-                self.protection_strengths_from_given_pawns(nearby_ally_squares);
+            let nearby_protection_strengths =
+                self.protection_strengths_from_given_pawns(nearby_ally_squares.clone());
+            let nearby_ally_crowdedness =
+                self.orthogonal_adjacency_from_given_squares(nearby_ally_squares.clone());
+            let mut best_case_move_steps = Vec::from(ORTHOGONAL_STEPS);
+            best_case_move_steps.push(vec2(0, 0));
 
-            let protection_at_movable_squares: HashMap<WorldSquare, u32> = protection_strengths
-                .into_iter()
-                .filter(|(protected_square, strength)| {
-                    (0..=1).contains(&(piece_square - *protected_square).square_length())
-                })
-                .filter(|(square, _)| *square == piece_square || self.square_is_empty(*square))
+            let viable_move_squares: HashSet<WorldSquare> = best_case_move_steps
+                .iter()
+                .map(|&step| piece_square + step)
+                .filter(|&square| square == piece_square || self.square_is_empty(square))
                 .collect();
-            let current_protection: u32 = protection_at_movable_squares
+
+            let protection_at_movable_squares: HashMap<WorldSquare, u32> =
+                nearby_protection_strengths
+                    .into_iter()
+                    .filter(|(protected_square, strength)| {
+                        viable_move_squares.contains(protected_square)
+                    })
+                    .collect();
+
+            let ally_crowdedness_at_movable_squares: HashMap<WorldSquare, u32> =
+                nearby_ally_crowdedness
+                    .into_iter()
+                    .filter(|(protected_square, strength)| {
+                        viable_move_squares.contains(protected_square)
+                    })
+                    .collect();
+
+            let mut goodness_metric_at_move_options: HashMap<WorldSquare, i32> =
+                protection_at_movable_squares
+                    .into_iter()
+                    .map(|(square, protection)| (square, protection as i32))
+                    .collect();
+
+            ally_crowdedness_at_movable_squares
+                .into_iter()
+                .for_each(|(square, crowdedness)| {
+                    *goodness_metric_at_move_options.entry(square).or_default() -=
+                        crowdedness as i32
+                });
+
+            let current_goodness: i32 = goodness_metric_at_move_options
                 .get(&piece_square)
                 .cloned()
                 .unwrap_or_default();
-            let most_protection_available: u32 = protection_at_movable_squares
+            let most_goodness_available: i32 = goodness_metric_at_move_options
                 .values()
                 .max()
                 .cloned()
                 .unwrap_or_default();
-            if most_protection_available > current_protection {
+            if most_goodness_available > current_goodness {
                 end_square = Some(
-                    protection_at_movable_squares
+                    goodness_metric_at_move_options
                         .iter()
-                        .max_by_key(|(&square, &protection)| protection)
+                        .max_by_key(|(&square, &goodness)| goodness)
                         .unwrap()
                         .0
                         .clone(),
@@ -1221,5 +1254,18 @@ mod tests {
         let num_pieces_at_start = game.pieces.len();
         game.move_piece_at(start_square);
         assert_eq!(num_pieces_at_start, game.pieces.len());
+    }
+    #[test]
+    fn test_red_pawns_try_to_not_pack_tightly() {
+        let mut game = set_up_game();
+        let pawn_squares = (4..=6).flat_map(|x| (4..=5).map(move |y| point2(x, y)));
+        for square in pawn_squares {
+            game.place_red_pawn(square);
+        }
+        assert_eq!(game.piece_type_count(Pawn), 6);
+        let test_square = point2(5, 5);
+        assert_false!(game.square_is_empty(test_square));
+        game.move_piece_at(test_square);
+        assert!(game.square_is_empty(test_square));
     }
 }

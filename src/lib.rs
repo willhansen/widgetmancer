@@ -8,6 +8,7 @@
 #![feature(inline_const_pat)]
 #![feature(is_some_and)]
 #![feature(let_chains)]
+#![feature(drain_keep_rest)]
 
 #[macro_use]
 extern crate approx;

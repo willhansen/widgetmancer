@@ -449,6 +449,20 @@ pub fn rotate_point_around_point<U>(
     axis_point + rotate_vect((moving_point - axis_point), angle.radians)
 }
 
+pub fn cross_correlate_squares_with_steps(
+    squares: SquareSet,
+    steps: HashSet<WorldStep>,
+) -> HashMap<WorldSquare, u32> {
+    let mut step_count_map = HashMap::<WorldSquare, u32>::new();
+    squares.iter().for_each(|&square| {
+        DIAGONAL_STEPS
+            .iter()
+            .map(|&diagonal_step| square + diagonal_step)
+            .for_each(|step_square| *step_count_map.entry(step_square).or_default() += 1)
+    });
+    step_count_map
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::assert_false;
