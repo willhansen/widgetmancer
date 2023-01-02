@@ -3,7 +3,6 @@ use std::f32::consts::{E, PI, TAU};
 use std::time;
 use std::time::{Duration, Instant};
 
-use crate::glyph_constants::*;
 use dyn_clone::DynClone;
 use euclid::{vec2, Angle, Length};
 use num::ToPrimitive;
@@ -11,6 +10,7 @@ use rand::{Rng, SeedableRng};
 use termion::color::Black;
 
 use crate::glyph::braille::world_points_for_braille_line;
+use crate::glyph_constants::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -171,9 +171,11 @@ impl Selector {
     }
 }
 
+pub const DOTS_IN_SELECTOR: u32 = 3;
+
 impl Animation for Selector {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
-        let num_dots = 3;
+        let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = 1.0; //f32::sqrt(2.0) / 2.0;
 
         let rotation_rate_rad_per_s = 3.0;
@@ -270,6 +272,7 @@ impl RecoilingBoard {
         // f'(0.0)>0
         // f(1.0)=1
         // f'(1.0)=0
+
         fn normalized_sin_rise(t: f32) -> f32 {
             (t * (PI / 2.0)).sin()
         }
@@ -281,6 +284,7 @@ impl RecoilingBoard {
         // f'(0.0)=0
         // f(1.0)=0
         // f'(1.0)=0
+
         fn normalized_cos_ease_in_and_out(t: f32) -> f32 {
             ((t * PI).cos() + 1.0) / 2.0
         }
@@ -470,10 +474,11 @@ mod tests {
             derivative(
                 RecoilingBoard::recoil_distance_in_squares_at_age,
                 0.0,
-                0.0001
+                0.0001,
             ) > 0.0
         );
     }
+
     #[test]
     fn test_recoil_function__hit_peak() {
         assert_eq!(
@@ -483,6 +488,7 @@ mod tests {
             RecoilingBoard::RECOIL_DISTANCE.0
         );
     }
+
     #[test]
     fn test_recoil_function__flat_peak() {
         let slope = derivative(
@@ -492,6 +498,7 @@ mod tests {
         );
         assert!(slope.abs() < 0.01, "slope: {slope}");
     }
+
     #[test]
     fn test_recoil_function__fully_relax() {
         let height = RecoilingBoard::recoil_distance_in_squares_at_age(
@@ -499,6 +506,7 @@ mod tests {
         );
         assert!(height.abs() < 0.01, "height: {}", height);
     }
+
     #[test]
     fn test_recoil_function__relax_flat() {
         let slope = derivative(
