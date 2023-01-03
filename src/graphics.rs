@@ -528,9 +528,9 @@ impl Graphics {
             .push(Box::new(FloatyLaser::new(start, end)));
     }
 
-    pub fn add_explosion(&mut self, position: WorldPoint) {
+    pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
         self.active_animations
-            .push(Box::new(Explosion::new(position)));
+            .push(Box::new(PieceDeathAnimation::new(square)));
     }
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));

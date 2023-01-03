@@ -4,7 +4,7 @@ use std::time;
 use std::time::{Duration, Instant};
 
 use dyn_clone::DynClone;
-use euclid::{vec2, Angle, Length};
+use euclid::{point2, vec2, Angle, Length};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use termion::color::Black;
@@ -153,6 +153,55 @@ impl Animation for Explosion {
 
     fn finished_at_time(&self, time: Instant) -> bool {
         time.duration_since(self.creation_time) > Duration::from_millis(500)
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub struct PieceDeathAnimation {
+    square: WorldSquare,
+    creation_time: Instant,
+}
+
+impl PieceDeathAnimation {
+    const DURATION: Duration = Duration::from_secs_f32(1.0);
+    pub fn new(square: WorldSquare) -> PieceDeathAnimation {
+        PieceDeathAnimation {
+            square,
+            creation_time: Instant::now(),
+        }
+    }
+}
+
+impl Animation for PieceDeathAnimation {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+        // rather arbitrary
+        let hash = ((self.square.x as f32 * PI + self.square.y as f32) * 1000.0)
+            .abs()
+            .floor()
+            .to_u64()
+            .unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
+        let mut points_to_draw: Vec<WorldPoint> = vec![];
+        let num_particles = 20;
+        let age = time.duration_since(self.creation_time);
+        let remaining_duration = PieceDeathAnimation::DURATION - age;
+        let lifetime_fraction_remaining =
+            remaining_duration.as_secs_f32() / PieceDeathAnimation::DURATION.as_secs_f32();
+
+        let range = -0.5..0.5;
+        let points_to_draw = (0..num_particles)
+            .map(|_| {
+                point2(
+                    rng.gen_range(range.clone()),
+                    rng.gen_range(range.clone()) * lifetime_fraction_remaining,
+                )
+            })
+            .collect();
+        Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)
+    }
+
+    fn finished_at_time(&self, time: Instant) -> bool {
+        time.duration_since(self.creation_time) > PieceDeathAnimation::DURATION
     }
 }
 

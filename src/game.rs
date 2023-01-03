@@ -723,7 +723,7 @@ impl Game {
             // slight preference for motion
             *goodness_metric_at_move_options
                 .entry(piece_square)
-                .or_default() -= 0.5;
+                .or_default() -= 1.5;
 
             let current_goodness: f32 = goodness_metric_at_move_options
                 .get(&piece_square)
@@ -983,7 +983,7 @@ impl Game {
             );
         }
         self.pieces.remove(&square);
-        self.graphics.add_explosion(square.to_f32());
+        self.graphics.start_piece_death_animation_at(square);
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
