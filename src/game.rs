@@ -691,6 +691,11 @@ impl Game {
                 .filter(|&square| square == piece_square || self.square_is_empty(square))
                 .collect();
 
+            let neutral_goodness_at_viable_move_squares = viable_move_squares
+                .iter()
+                .map(|&square| (square, 0.0))
+                .collect();
+
             let protection_at_movable_squares: HashMap<WorldSquare, u32> =
                 nearby_protection_strengths
                     .into_iter()
@@ -707,10 +712,13 @@ impl Game {
                     })
                     .collect();
 
-            let mut goodness_metric_at_move_options = map_to_float(map_sum(
-                map_to_signed(protection_at_movable_squares),
-                map_neg(map_to_signed(ally_crowdedness_at_movable_squares)),
-            ));
+            let mut goodness_metric_at_move_options = map_sum(
+                neutral_goodness_at_viable_move_squares,
+                map_to_float(map_sum(
+                    map_to_signed(protection_at_movable_squares),
+                    map_neg(map_to_signed(ally_crowdedness_at_movable_squares)),
+                )),
+            );
 
             // slight preference for motion
             *goodness_metric_at_move_options
@@ -1252,6 +1260,7 @@ mod tests {
         game.move_piece_at(start_square);
         assert_eq!(num_pieces_at_start, game.pieces.len());
     }
+
     #[test]
     fn test_red_pawns_try_to_not_pack_tightly() {
         let mut game = set_up_game();
@@ -1267,7 +1276,7 @@ mod tests {
     }
 
     #[test]
-    fn test_red_pawns_have_slight_preference_for_movement() {
+    fn test_red_pawns_slightly_prefer_movement_over_non_movement() {
         let mut game = set_up_game();
         let pawn_square = point2(5, 5);
         game.place_red_pawn(pawn_square);
