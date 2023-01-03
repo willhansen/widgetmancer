@@ -3,6 +3,7 @@ extern crate num;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::Display;
+use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg};
 
@@ -461,6 +462,44 @@ pub fn cross_correlate_squares_with_steps(
             .for_each(|step_square| *step_count_map.entry(step_square).or_default() += 1)
     });
     step_count_map
+}
+
+pub fn map_sum<K, V>(a: HashMap<K, V>, b: HashMap<K, V>) -> HashMap<K, V>
+where
+    K: Eq + Hash,
+    V: Default + std::ops::AddAssign,
+{
+    let mut sum = HashMap::new();
+    for m in [a, b] {
+        m.into_iter().for_each(|(k, v): (K, V)| {
+            *sum.entry(k).or_default() += v;
+        });
+    }
+    sum
+}
+pub fn map_neg<K, V>(m: HashMap<K, V>) -> HashMap<K, V>
+where
+    K: Eq + Hash,
+    V: Neg<Output = V>,
+{
+    m.into_iter().map(|(k, v): (K, V)| (k, -v)).collect()
+}
+
+pub fn map_to_signed<K>(m: HashMap<K, u32>) -> HashMap<K, i32>
+where
+    K: Eq + Hash,
+{
+    m.into_iter()
+        .map(|(k, v): (K, u32)| (k, v as i32))
+        .collect()
+}
+pub fn map_to_float<K>(m: HashMap<K, i32>) -> HashMap<K, f32>
+where
+    K: Eq + Hash,
+{
+    m.into_iter()
+        .map(|(k, v): (K, i32)| (k, v as f32))
+        .collect()
 }
 
 #[cfg(test)]

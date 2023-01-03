@@ -707,33 +707,30 @@ impl Game {
                     })
                     .collect();
 
-            let mut goodness_metric_at_move_options: HashMap<WorldSquare, i32> =
-                protection_at_movable_squares
-                    .into_iter()
-                    .map(|(square, protection)| (square, protection as i32))
-                    .collect();
+            let mut goodness_metric_at_move_options = map_to_float(map_sum(
+                map_to_signed(protection_at_movable_squares),
+                map_neg(map_to_signed(ally_crowdedness_at_movable_squares)),
+            ));
 
-            ally_crowdedness_at_movable_squares
-                .into_iter()
-                .for_each(|(square, crowdedness)| {
-                    *goodness_metric_at_move_options.entry(square).or_default() -=
-                        crowdedness as i32
-                });
+            // slight preference for motion
+            *goodness_metric_at_move_options
+                .entry(piece_square)
+                .or_default() -= 0.5;
 
-            let current_goodness: i32 = goodness_metric_at_move_options
+            let current_goodness: f32 = goodness_metric_at_move_options
                 .get(&piece_square)
                 .cloned()
                 .unwrap_or_default();
-            let most_goodness_available: i32 = goodness_metric_at_move_options
+            let most_goodness_available: f32 = goodness_metric_at_move_options
                 .values()
-                .max()
+                .max_by_key(|&&x| OrderedFloat(x))
                 .cloned()
                 .unwrap_or_default();
             if most_goodness_available > current_goodness {
                 end_square = Some(
                     goodness_metric_at_move_options
                         .iter()
-                        .max_by_key(|(&square, &goodness)| goodness)
+                        .max_by_key(|(&square, &goodness)| OrderedFloat(goodness))
                         .unwrap()
                         .0
                         .clone(),
@@ -1267,5 +1264,15 @@ mod tests {
         assert_false!(game.square_is_empty(test_square));
         game.move_piece_at(test_square);
         assert!(game.square_is_empty(test_square));
+    }
+
+    #[test]
+    fn test_red_pawns_have_slight_preference_for_movement() {
+        let mut game = set_up_game();
+        let pawn_square = point2(5, 5);
+        game.place_red_pawn(pawn_square);
+        assert_false!(game.square_is_empty(pawn_square));
+        game.move_piece_at(pawn_square);
+        assert!(game.square_is_empty(pawn_square));
     }
 }
