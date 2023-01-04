@@ -20,7 +20,7 @@ use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::Pawn;
-use crate::piece::{Faction, FactionFactory, FactionInfo, Piece, PieceType};
+use crate::piece::{Faction, FactionFactory, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -29,6 +29,12 @@ use crate::{
 };
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
+
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub struct DeathCube {
+    pub position: WorldPoint,
+    pub velocity: WorldMove,
+}
 
 pub struct Player {
     pub position: WorldSquare,
@@ -59,6 +65,7 @@ pub struct Game {
     // faction_info: HashMap<Faction, FactionInfo>, //TODO: LATER MAYBE
     red_pawn_faction: Faction,
     default_enemy_faction: Faction,
+    death_cubes: Vec<DeathCube>,
 }
 
 impl Game {
@@ -79,6 +86,7 @@ impl Game {
             //faction_info: Default::default(),
             red_pawn_faction: Faction::default(),
             default_enemy_faction: Faction::default(),
+            death_cubes: vec![],
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -292,6 +300,32 @@ impl Game {
         }
     }
 
+    pub fn place_linear_death_cube(&mut self, position: WorldPoint, velocity: WorldMove) {
+        self.death_cubes.push(DeathCube { position, velocity });
+    }
+    pub fn move_death_cubes(&mut self, duration: Duration) {
+        let mut kill_squares = HashSet::new();
+        for &(mut cube) in &self.death_cubes {
+            let start_pos = cube.position;
+            cube.position += cube.velocity * duration.as_secs_f32();
+            let end_pos = cube.position;
+
+            let start_square = world_point_to_world_square(start_pos);
+            let end_square = world_point_to_world_square(end_pos);
+
+            for (x, y) in
+                line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple())
+            {
+                kill_squares.insert(point2(x, y));
+            }
+        }
+        kill_squares.into_iter().for_each(|square| {
+            if self.is_piece_at(square) {
+                self.capture_piece_at(square);
+            }
+        });
+    }
+
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
         if !self.square_is_on_board(square) {
             panic!(
@@ -387,6 +421,10 @@ impl Game {
 
     pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
         self.get_piece_at(square).is_some()
+    }
+    pub fn is_piece_at(&self, square: WorldSquare) -> bool {
+        self.get_piece_at(square).is_some()
+            || self.try_get_player_square().is_some_and(|s| s == square)
     }
 
     pub fn piece_type_count(&self, piece_type: PieceType) -> i32 {
@@ -527,6 +565,11 @@ impl Game {
             .min_by_key(|&square| (square - self.player_square()).square_length())
             .unwrap()
     }
+    fn kill_player(&mut self) {
+        // TODO: less abrupt game-over
+        self.player_optional = None;
+        self.quit();
+    }
 
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
         // capture player
@@ -534,9 +577,7 @@ impl Game {
             panic!("No piece to move at {}", point_to_string(start));
         }
         if self.is_player_at(end) {
-            // TODO: less abrupt game-over
-            self.player_optional = None;
-            self.quit();
+            self.kill_player();
         }
         if self.is_non_player_piece_at(end) {
             let target_piece = self.pieces.get(&end).unwrap();
@@ -976,14 +1017,18 @@ impl Game {
                 point_to_string(square)
             );
         }
-        if !self.is_non_player_piece_at(square) {
+        if !self.is_piece_at(square) {
             panic!(
                 "Tried to capture an empty square at {}",
                 point_to_string(square)
             );
         }
-        self.pieces.remove(&square);
-        self.graphics.start_piece_death_animation_at(square);
+        if self.try_get_player_square().is_some_and(|s| s == square) {
+            self.kill_player();
+        } else {
+            self.pieces.remove(&square);
+            self.graphics.start_piece_death_animation_at(square);
+        }
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1283,5 +1328,16 @@ mod tests {
         assert_false!(game.square_is_empty(pawn_square));
         game.move_piece_at(pawn_square);
         assert!(game.square_is_empty(pawn_square));
+    }
+
+    #[test]
+    fn test_death_cube_kills_player() {
+        let mut game = set_up_game_with_player();
+        let death_cube_start_pos = (game.player_square() + STEP_LEFT).to_f32();
+        let death_cube_start_vel = STEP_RIGHT.to_f32() * 20.0;
+        game.place_linear_death_cube(death_cube_start_pos, death_cube_start_vel);
+        assert!(game.player_is_alive());
+        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        assert_false!(game.player_is_alive());
     }
 }

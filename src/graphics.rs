@@ -22,7 +22,7 @@ use crate::fov_stuff::FovResult;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
-use crate::piece::{FactionInfo, Piece};
+use crate::piece::Piece;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,

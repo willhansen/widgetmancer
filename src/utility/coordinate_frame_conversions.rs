@@ -144,7 +144,9 @@ pub fn world_character_point_to_world_point(
 }
 
 pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
-    world_character_point_to_world_point(pos.to_f32())
-        .round()
-        .to_i32()
+    world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
+}
+
+pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
+    point.round().to_i32()
 }
