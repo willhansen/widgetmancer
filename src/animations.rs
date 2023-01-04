@@ -163,7 +163,7 @@ pub struct PieceDeathAnimation {
 }
 
 impl PieceDeathAnimation {
-    const DURATION: Duration = Duration::from_secs_f32(1.0);
+    pub const DURATION: Duration = Duration::from_secs_f32(5.0);
     pub fn new(square: WorldSquare) -> PieceDeathAnimation {
         PieceDeathAnimation {
             square,
@@ -174,6 +174,8 @@ impl PieceDeathAnimation {
 
 impl Animation for PieceDeathAnimation {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+        assert!(!self.finished_at_time(time));
+
         // rather arbitrary
         let hash = ((self.square.x as f32 * PI + self.square.y as f32) * 1000.0)
             .abs()
@@ -184,17 +186,17 @@ impl Animation for PieceDeathAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 20;
         let age = time.duration_since(self.creation_time);
-        let remaining_duration = PieceDeathAnimation::DURATION - age;
+        let remaining_seconds = PieceDeathAnimation::DURATION.as_secs_f32() - age.as_secs_f32();
         let lifetime_fraction_remaining =
-            remaining_duration.as_secs_f32() / PieceDeathAnimation::DURATION.as_secs_f32();
+            remaining_seconds / PieceDeathAnimation::DURATION.as_secs_f32();
 
         let range = -0.5..0.5;
         let points_to_draw = (0..num_particles)
             .map(|_| {
-                point2(
-                    rng.gen_range(range.clone()),
-                    rng.gen_range(range.clone()) * lifetime_fraction_remaining,
-                )
+                let x_pos = rng.gen_range(range.clone()) * lifetime_fraction_remaining;
+                let y_pos =
+                    (rng.gen_range(range.clone()) + 0.5) * lifetime_fraction_remaining - 0.5;
+                self.square.to_f32() + vec2(x_pos, y_pos)
             })
             .collect();
         Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)

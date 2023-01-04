@@ -1,12 +1,12 @@
 use std::collections::HashSet;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;
 
-use rust_roguelike::animations::DOTS_IN_SELECTOR;
+use rust_roguelike::animations::{PieceDeathAnimation, DOTS_IN_SELECTOR};
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::DoubleGlyphFunctions;
@@ -301,6 +301,24 @@ fn test_particles_on_piece_death() {
 
     let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
     assert!(glyphs[0].is_braille() || (glyphs[1].is_braille()))
+}
+
+#[test]
+fn test_piece_death_animation_finishes() {
+    let mut game = set_up_game();
+    let pawn_square = point2(5, 5);
+    game.place_piece(Piece::pawn(), pawn_square);
+    game.capture_piece_at(pawn_square);
+    game.draw_headless_at_duration_from_start(
+        PieceDeathAnimation::DURATION + Duration::from_secs_f32(0.5),
+    );
+    game.draw_headless_now();
+
+    let graphics = game.borrow_graphics_mut();
+
+    let glyphs = graphics.get_buffered_glyphs_for_square(pawn_square);
+    assert!(!glyphs[0].is_braille() || (!glyphs[1].is_braille()));
+    assert!(glyphs.looks_solid());
 }
 
 #[test]

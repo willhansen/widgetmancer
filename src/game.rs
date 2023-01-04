@@ -260,6 +260,7 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
+        self.graphics.remove_finished_animations(time);
         self.graphics.draw_non_board_animations(time);
         if self.player_is_alive() {
             self.graphics
@@ -268,7 +269,6 @@ impl Game {
                 .draw_field_of_view_mask(self.fov_mask_for_player());
         }
         self.graphics.display(&mut writer);
-        self.graphics.remove_finished_animations(time);
     }
     fn is_player_at(&self, square: WorldSquare) -> bool {
         self.player_is_alive() && self.try_get_player_square() == Some(square)
