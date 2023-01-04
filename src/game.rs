@@ -1114,6 +1114,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph::DoubleGlyphFunctions;
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -1353,5 +1354,27 @@ mod tests {
         assert!(!game.pieces.is_empty());
         game.move_death_cubes(Duration::from_secs_f32(1.0));
         assert!(game.pieces.is_empty());
+    }
+
+    #[test]
+    fn test_death_cube_can_be_seen() {
+        let mut game = set_up_game();
+        game.draw_headless_now();
+        let test_square = point2(5, 5);
+
+        game.draw_headless_now();
+        assert!(game
+            .graphics
+            .get_buffered_glyphs_for_square(test_square)
+            .looks_solid());
+
+        let death_cube_start_pos = test_square.to_f32() + vec2(0.3, 0.0);
+        game.place_linear_death_cube(death_cube_start_pos, vec2(0.0, 0.0));
+
+        game.draw_headless_now();
+        assert!(!game
+            .graphics
+            .get_buffered_glyphs_for_square(test_square)
+            .looks_solid());
     }
 }
