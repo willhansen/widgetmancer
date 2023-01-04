@@ -104,9 +104,9 @@ pub fn do_everything() {
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
-    //game.set_up_columns();
+    game.set_up_columns();
     //game.set_up_vs_mini_factions();
-    game.set_up_vs_red_pawns();
+    //game.set_up_vs_red_pawns();
 
     let mut prev_start_time = Instant::now();
     while game.running() {

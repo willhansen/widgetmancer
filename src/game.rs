@@ -1118,6 +1118,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::RED_PAWN_COLOR;
+    use crate::piece::PieceType::Rook;
     use crate::utility::{
         STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
     };
@@ -1339,5 +1340,18 @@ mod tests {
         assert!(game.player_is_alive());
         game.move_death_cubes(Duration::from_secs_f32(1.0));
         assert_false!(game.player_is_alive());
+    }
+
+    #[test]
+    fn test_death_cube_kills_rook() {
+        let mut game = set_up_game();
+        let rook_square = point2(5, 5);
+        game.place_piece(Piece::new(Rook, game.default_enemy_faction), rook_square);
+        let death_cube_start_pos = (rook_square + STEP_LEFT).to_f32();
+        let death_cube_start_vel = STEP_RIGHT.to_f32() * 20.0;
+        game.place_linear_death_cube(death_cube_start_pos, death_cube_start_vel);
+        assert!(!game.pieces.is_empty());
+        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        assert!(game.pieces.is_empty());
     }
 }
