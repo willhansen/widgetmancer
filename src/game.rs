@@ -268,6 +268,9 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
+        self.death_cubes
+            .iter()
+            .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
         self.graphics.remove_finished_animations(time);
         self.graphics.draw_non_board_animations(time);
         if self.player_is_alive() {
@@ -278,6 +281,7 @@ impl Game {
         }
         self.graphics.display(&mut writer);
     }
+
     fn is_player_at(&self, square: WorldSquare) -> bool {
         self.player_is_alive() && self.try_get_player_square() == Some(square)
     }

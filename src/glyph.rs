@@ -11,6 +11,7 @@ use rgb::*;
 use termion::color;
 use termion::color::Black;
 
+use crate::glyph::floating_square::character_of_square_with_offset;
 use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
@@ -21,6 +22,7 @@ use crate::utility::*;
 
 pub mod angled_blocks;
 pub mod braille;
+pub mod floating_square;
 pub mod glyph_constants;
 pub mod hextant_blocks;
 
@@ -53,21 +55,6 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 //	🩀 	🩁 	🩂 	🩃 	🩄 	🩅 	🩆 	🩇 	🩈 	🩉 	🩊 	🩋 	🩌 	🩍 	🩎 	🩏
 //	🩐 	🩑 	🩒 	🩓
 //	🩠 	🩡 	🩢 	🩣 	🩤 	🩥 	🩦 	🩧 	🩨 	🩩 	🩪 	🩫 	🩬 	🩭
-
-pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
-    match half_steps.to_tuple() {
-        (1, -1) => '▗',
-        (1, 0) => '▐',
-        (1, 1) => '▝',
-        (0, -1) => '▄',
-        (0, 0) => '█',
-        (0, 1) => '▀',
-        (-1, -1) => '▖',
-        (-1, 0) => '▌',
-        (-1, 1) => '▘',
-        _ => ' ',
-    }
-}
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct Glyph {
@@ -148,35 +135,6 @@ impl Glyph {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
 
-    pub fn partial_block(vertical: bool, fraction: f32) -> char {
-        let eighths = (fraction * 8.0).round() as usize;
-        let clamped_eighths = clamp(eighths, 0, 8);
-        if vertical {
-            EIGHTH_BLOCKS_FROM_BOTTOM[clamped_eighths]
-        } else {
-            EIGHTH_BLOCKS_FROM_LEFT[clamped_eighths]
-        }
-    }
-
-    pub fn colored_character_square_with_offset(
-        is_vertical: bool,
-        fraction_of_square_offset: f32,
-        square_color: RGB8,
-        background_color: RGB8,
-    ) -> Glyph {
-        if fraction_of_square_offset < 0.0 {
-            let character = Glyph::partial_block(is_vertical, 1.0 + fraction_of_square_offset);
-            Glyph::new(character, square_color, background_color)
-        } else {
-            let character = Glyph::partial_block(is_vertical, fraction_of_square_offset);
-            Glyph::new(character, background_color, square_color)
-        }
-    }
-    pub fn colored_square_with_half_step_offset(offset: FVector, color: RGB8) -> Glyph {
-        let step: IVector = (offset * 2.0).round().to_i32();
-        Glyph::new(quadrant_block_by_offset(step), color, BLACK)
-    }
-
     pub fn offset_board_square_glyphs(
         offset_vector: WorldMove,
         square_color: RGB8,
@@ -198,9 +156,8 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             )
             .map(|character_offset| {
-                Glyph::colored_character_square_with_offset(
-                    true,
-                    character_offset,
+                Glyph::new(
+                    character_of_square_with_offset(true, character_offset),
                     square_color,
                     background_color,
                 )
@@ -210,9 +167,8 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             );
             character_offsets.map(|character_offset| {
-                Glyph::colored_character_square_with_offset(
-                    false,
-                    character_offset,
+                Glyph::new(
+                    character_of_square_with_offset(false, character_offset),
                     square_color,
                     background_color,
                 )
@@ -246,124 +202,6 @@ impl Glyph {
         // outputs in range [-1.0, 1.0)
         assert!(offset_fraction >= -1.0 && offset_fraction <= 1.0);
         [offset_fraction, offset_fraction]
-    }
-
-    #[allow(dead_code)]
-    pub fn get_glyphs_for_floating_square(pos: FPoint) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_glyphs_for_colored_floating_square(pos, WHITE)
-    }
-
-    pub fn get_glyphs_for_colored_floating_square(
-        pos: FPoint,
-        color: RGB8,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        let grid_offset = fraction_part(pos);
-        let x_offset = grid_offset.x;
-        let y_offset = grid_offset.y;
-        if y_offset.abs() < x_offset.abs() && y_offset.abs() < 0.25 {
-            Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, color)
-        } else if x_offset.abs() < 0.25 {
-            Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, color)
-        } else {
-            Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, color)
-        }
-    }
-    #[allow(dead_code)]
-    pub fn get_smooth_horizontal_glyphs_for_floating_square(
-        pos: FPoint,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_smooth_horizontal_glyphs_for_colored_floating_square(pos, WHITE)
-    }
-
-    pub fn get_smooth_horizontal_glyphs_for_colored_floating_square(
-        pos: FPoint,
-        color: RGB8,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        let width = 3;
-        let mut output = vec![vec![None; width]; width];
-
-        let c = width / 2 as usize;
-
-        let grid_offset = fraction_part(pos);
-        let x_offset = grid_offset.x;
-        let offset_dir: IPoint = sign2d(grid_offset).to_i32();
-
-        for i in 0..3 {
-            let x = i as i32 - 1;
-            if offset_dir.x == x || x == 0 {
-                output[i][c] = Some(Glyph::colored_character_square_with_offset(
-                    false,
-                    x_offset - x as f32,
-                    color,
-                    BLACK,
-                ));
-            }
-        }
-
-        return output;
-    }
-    #[allow(dead_code)]
-    pub fn get_smooth_vertical_glyphs_for_floating_square(pos: FPoint) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_smooth_vertical_glyphs_for_colored_floating_square(pos, WHITE)
-    }
-    pub fn get_smooth_vertical_glyphs_for_colored_floating_square(
-        pos: FPoint,
-        color: RGB8,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        let width = 3;
-        let mut output = vec![vec![None; width]; width];
-
-        let c = width / 2 as usize;
-
-        let grid_offset = fraction_part(pos);
-        let y_offset = grid_offset.y;
-        let offset_dir: IPoint = sign2d(grid_offset).to_i32();
-        for j in 0..3 {
-            let y = j as i32 - 1;
-            if offset_dir.y == y || y == 0 {
-                output[c][j] = Some(Glyph::colored_character_square_with_offset(
-                    true,
-                    y_offset - y as f32,
-                    color,
-                    BLACK,
-                ));
-            }
-        }
-        return output;
-    }
-
-    pub fn get_half_grid_glyphs_for_floating_square(
-        pos: default::Point2D<f32>,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        Glyph::get_half_grid_glyphs_for_colored_floating_square(pos, WHITE)
-    }
-
-    pub fn get_half_grid_glyphs_for_colored_floating_square(
-        pos: FPoint,
-        color: RGB8,
-    ) -> Vec<Vec<Option<Glyph>>> {
-        let width = 3;
-        let mut output = vec![vec![None; width]; width];
-        let grid_offset = fraction_part(pos);
-        let offset_dir = sign2d(grid_offset).to_i32();
-
-        for i in 0..3 {
-            for j in 0..3 {
-                let x = i as i32 - 1;
-                let y = j as i32 - 1;
-                let square = point2(x, y);
-                if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                    let glyph = Glyph::colored_square_with_half_step_offset(
-                        (grid_offset - square.to_f32()),
-                        color,
-                    );
-                    if glyph.character != ' ' {
-                        output[i][j] = Some(glyph);
-                    }
-                }
-            }
-        }
-        return output;
     }
 
     pub fn is_braille(&self) -> bool {
@@ -572,198 +410,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq, assert_ne};
-
     use super::*;
-
-    #[test]
-    fn test_colored_square_with_half_step_offsets() {
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).fg_color,
-            RED
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.0, 0.0), RED).bg_color,
-            BLACK
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.1, 0.1), RED).character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.24, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.25, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.26, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.25, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.26, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(-1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.49, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.5, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.2, 0.4), RED).character,
-            quadrant_block_by_offset(vec2(0, 1))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(-0.499, 0.4), RED).character,
-            quadrant_block_by_offset(vec2(-1, 1))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.74, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.76, 0.0), RED).character,
-            quadrant_block_by_offset(vec2(2, 0))
-        );
-        assert_eq!(
-            Glyph::colored_square_with_half_step_offset(vec2(0.3, -0.6), RED).character,
-            quadrant_block_by_offset(vec2(1, -1))
-        );
-    }
-
-    #[test]
-    fn test_half_grid_glyph_when_rounding_to_zero_for_both_axes() {
-        let test_pos = point2(-0.24, 0.01);
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1] == None);
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert!(glyphs[1][2] == None);
-        assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1] == None);
-        assert!(glyphs[2][2] == None);
-    }
-
-    #[test]
-    fn test_half_grid_glyphs_when_rounding_to_zero_for_x_and_half_step_up_for_y() {
-        let test_pos = point2(0.24, 0.26);
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1] == None);
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, 1))
-        );
-        assert_eq!(
-            glyphs[1][2].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, -1))
-        );
-        assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1] == None);
-        assert!(glyphs[2][2] == None);
-    }
-
-    #[test]
-    fn test_half_grid_glyphs_when_rounding_to_zero_for_x_and_exactly_half_step_up_for_y() {
-        let test_pos = point2(0.24, 0.25);
-
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1] == None);
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, 1))
-        );
-        assert_eq!(
-            glyphs[1][2].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, -1))
-        );
-        assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1] == None);
-        assert!(glyphs[2][2] == None);
-    }
-
-    #[test]
-    fn test_half_grid_glyphs_when_rounding_to_zero_for_x_and_exactly_half_step_down_for_y() {
-        let test_pos = point2(-0.2, -0.25);
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert!(glyphs[0][0] == None);
-        assert!(glyphs[0][1] == None);
-        assert!(glyphs[0][2] == None);
-        assert!(glyphs[1][0] == None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(0, 0))
-        );
-        assert!(glyphs[1][2] == None);
-        assert!(glyphs[2][0] == None);
-        assert!(glyphs[2][1] == None);
-        assert!(glyphs[2][2] == None);
-    }
-
-    #[test]
-    fn test_half_grid_glyphs_when_rounding_to_zero_for_y_and_half_step_right_for_x() {
-        let test_pos = point2(0.3, 0.1);
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert_eq!(glyphs[0][0], None);
-        assert_eq!(glyphs[0][1], None);
-        assert_eq!(glyphs[0][2], None);
-        assert_eq!(glyphs[1][0], None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert!(glyphs[1][2] == None);
-        assert!(glyphs[2][0] == None);
-        assert_eq!(
-            glyphs[2][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(-1, 0))
-        );
-        assert!(glyphs[2][2] == None);
-    }
-
-    #[test]
-    fn test_half_grid_glyphs_when_rounding_to_zero_for_y_and_half_step_left_for_x() {
-        let test_pos = point2(-0.3, 0.2);
-        let glyphs = Glyph::get_half_grid_glyphs_for_floating_square(test_pos);
-        assert_eq!(glyphs[0][0], None);
-        assert_eq!(
-            glyphs[0][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(1, 0))
-        );
-        assert_eq!(glyphs[0][2], None);
-        assert_eq!(glyphs[1][0], None);
-        assert_eq!(
-            glyphs[1][1].clone().unwrap().character,
-            quadrant_block_by_offset(vec2(-1, 0))
-        );
-        assert_eq!(glyphs[1][2], None);
-        assert_eq!(glyphs[2][0], None);
-        assert_eq!(glyphs[2][1], None);
-        assert_eq!(glyphs[2][2], None);
-    }
 
     #[test]
     fn test_double_glyph_square_offset__up() {
@@ -899,65 +546,6 @@ mod tests {
             glyphs[1].looks_solid_color(BLACK),
             "glyph: {}",
             &glyphs[1].to_string()
-        );
-    }
-
-    //                      |<--halfway
-    // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
-    #[test]
-    fn test_character_square_horizontal_offset__base_case() {
-        assert!(
-            Glyph::colored_character_square_with_offset(false, 0.0, RED, BLACK)
-                .looks_solid_color(RED)
-        );
-    }
-
-    #[test]
-    fn test_character_square_horizontal_offset__round_to_zero() {
-        assert!(
-            Glyph::colored_character_square_with_offset(false, -0.001, RED, BLACK)
-                .looks_solid_color(RED)
-        );
-
-        assert!(
-            Glyph::colored_character_square_with_offset(false, 0.001, RED, BLACK)
-                .looks_solid_color(RED)
-        );
-    }
-
-    #[test]
-    fn test_character_square_horizontal_offset__out_of_range() {
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, -1.5, RED, BLACK),
-            Glyph::new(' ', RED, BLACK)
-        );
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, 1.5, RED, BLACK),
-            Glyph::new('█', BLACK, RED)
-        );
-    }
-
-    #[test]
-    fn test_character_square_horizontal_offset__halfway() {
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, -0.5, RED, BLACK),
-            Glyph::new('▌', RED, BLACK)
-        );
-        assert_eq!(
-            Glyph::colored_character_square_with_offset(false, 0.5, RED, BLACK),
-            Glyph::new('▌', BLACK, RED)
-        );
-    }
-
-    #[test]
-    fn test_character_square_horizontal_offset__match_opposite_ends() {
-        assert!(
-            Glyph::colored_character_square_with_offset(false, -1.0, RED, BLACK)
-                .looks_solid_color(BLACK)
-        );
-        assert!(
-            Glyph::colored_character_square_with_offset(false, 1.0, RED, BLACK)
-                .looks_solid_color(BLACK)
         );
     }
 

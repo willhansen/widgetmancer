@@ -19,6 +19,7 @@ use termion::terminal_size;
 
 use crate::animations::*;
 use crate::fov_stuff::FovResult;
+use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
@@ -483,6 +484,10 @@ impl Graphics {
             Glyph::capture_only_square_glyphs(),
             &capture_only_squares,
         );
+    }
+
+    pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
+        todo!()
     }
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
