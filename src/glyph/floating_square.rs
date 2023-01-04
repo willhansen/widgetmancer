@@ -91,28 +91,32 @@ pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<ch
     return output;
 }
 
-pub fn character_of_square_with_offset(is_vertical: bool, fraction_of_square_offset: f32) -> char {
-    if fraction_of_square_offset < 0.0 {
-        partial_block(is_vertical, 1.0 + fraction_of_square_offset)
-    } else {
-        partial_block(is_vertical, fraction_of_square_offset)
-    }
-}
-
 pub fn square_with_half_step_offset(offset: FVector) -> char {
     let step: IVector = (offset * 2.0).round().to_i32();
     quadrant_block_by_offset(step)
 }
 
-pub fn partial_block(vertical: bool, fraction: f32) -> char {
-    let eighths = (fraction * 8.0).round() as usize;
-    let clamped_eighths = clamp(eighths, 0, 8);
-    if vertical {
-        EIGHTH_BLOCKS_FROM_BOTTOM[clamped_eighths]
+pub fn character_of_square_with_offset(vertical: bool, fraction_of_square_offset: f32) -> char {
+    let eighths = (fraction_of_square_offset * 8.0).round() as i32;
+    let clamped_eighths_toward_positive = clamp(eighths, -8, 8);
+    let positive_case = clamped_eighths_toward_positive >= 0;
+    let abs_index = 8 - clamped_eighths_toward_positive.abs() as usize;
+    let array = if vertical {
+        if positive_case {
+            EIGHTH_BLOCKS_FROM_TOP
+        } else {
+            EIGHTH_BLOCKS_FROM_BOTTOM
+        }
     } else {
-        EIGHTH_BLOCKS_FROM_LEFT[clamped_eighths]
-    }
+        if positive_case {
+            EIGHTH_BLOCKS_FROM_RIGHT
+        } else {
+            EIGHTH_BLOCKS_FROM_LEFT
+        }
+    };
+    array[abs_index]
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,16 +295,19 @@ mod tests {
 
     #[test]
     fn test_character_square_horizontal_offset__halfway() {
-        assert_eq!(character_of_square_with_offset(false, -0.5), '▌');
+        assert_eq!(
+            character_of_square_with_offset(false, -0.5),
+            EIGHTH_BLOCKS_FROM_LEFT[4]
+        );
         assert_eq!(
             character_of_square_with_offset(false, 0.5),
-            Glyph::new('▌', BLACK, RED)
+            EIGHTH_BLOCKS_FROM_RIGHT[4]
         );
     }
 
     #[test]
     fn test_character_square_horizontal_offset__match_opposite_ends() {
-        assert!(character_of_square_with_offset(false, -1.0).looks_solid_color(BLACK));
-        assert!(character_of_square_with_offset(false, 1.0).looks_solid_color(BLACK));
+        assert_eq!(character_of_square_with_offset(false, -1.0), SPACE);
+        assert_eq!(character_of_square_with_offset(false, 1.0), SPACE);
     }
 }

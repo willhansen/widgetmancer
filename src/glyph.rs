@@ -416,12 +416,12 @@ mod tests {
     fn test_double_glyph_square_offset__up() {
         // offset up
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
-        assert_eq!(glyphs[0].character, '▄');
-        assert_eq!(glyphs[0].fg_color, BLACK);
-        assert_eq!(glyphs[0].bg_color, RED);
-        assert_eq!(glyphs[1].character, '▄');
-        assert_eq!(glyphs[1].fg_color, BLACK);
-        assert_eq!(glyphs[1].bg_color, RED);
+        assert_eq!(glyphs[0].character, UPPER_HALF_BLOCK);
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[1].character, UPPER_HALF_BLOCK);
+        assert_eq!(glyphs[1].fg_color, RED);
+        assert_eq!(glyphs[1].bg_color, BLACK);
     }
 
     #[test]
@@ -495,9 +495,9 @@ mod tests {
     fn test_double_glyph_square_offset__25_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0].character, '▌');
-        assert_eq!(glyphs[0].fg_color, BLACK);
-        assert_eq!(glyphs[0].bg_color, RED);
+        assert_eq!(glyphs[0].character, RIGHT_HALF_BLOCK);
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
         assert!(glyphs[1].looks_solid_color(RED));
     }
 
@@ -513,12 +513,12 @@ mod tests {
     fn test_double_glyph_square_offset__75_right() {
         // offset right
         let glyphs = Glyph::offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0].character, '█');
-        assert_eq!(glyphs[0].fg_color, BLACK);
-        assert_eq!(glyphs[0].bg_color, RED);
-        assert_eq!(glyphs[1].character, '▌');
-        assert_eq!(glyphs[1].fg_color, BLACK);
-        assert_eq!(glyphs[1].bg_color, RED);
+        assert_eq!(glyphs[0].character, SPACE);
+        assert_eq!(glyphs[0].fg_color, RED);
+        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[1].character, RIGHT_HALF_BLOCK);
+        assert_eq!(glyphs[1].fg_color, RED);
+        assert_eq!(glyphs[1].bg_color, BLACK);
     }
 
     #[test]

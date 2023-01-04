@@ -31,6 +31,9 @@ pub const BLOCK_FG: RGB8 = BLACK;
 
 pub const LEFT_HALF_BLOCK: char = '▌';
 pub const RIGHT_HALF_BLOCK: char = '▐';
+pub const LOWER_HALF_BLOCK: char = '▄';
+pub const UPPER_HALF_BLOCK: char = '▀';
+
 pub const UPPER_ONE_THIRD_BLOCK: char = '🬂';
 pub const UPPER_TWO_THIRD_BLOCK: char = '🬎';
 pub const LOWER_ONE_THIRD_BLOCK: char = '🬭';
@@ -56,8 +59,40 @@ pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
     '▉',
     FULL_BLOCK,
 ];
-pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] =
-    &[SPACE, '▁', '▂', '▃', '▄', '▅', '▆', '▇', FULL_BLOCK];
+pub const EIGHTH_BLOCKS_FROM_RIGHT: &[char] = &[
+    SPACE,
+    '▕',
+    '🮇',
+    '🮈',
+    RIGHT_HALF_BLOCK,
+    '🮉',
+    '🮊',
+    '🮋',
+    FULL_BLOCK,
+];
+
+pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[
+    SPACE,
+    '▁',
+    '▂',
+    '▃',
+    LOWER_HALF_BLOCK,
+    '▅',
+    '▆',
+    '▇',
+    FULL_BLOCK,
+];
+pub const EIGHTH_BLOCKS_FROM_TOP: &[char] = &[
+    SPACE,
+    '▔',
+    '🮂',
+    '🮃',
+    UPPER_HALF_BLOCK,
+    '🮄',
+    '🮅',
+    '🮆',
+    FULL_BLOCK,
+];
 
 pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
 
