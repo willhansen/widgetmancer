@@ -1,6 +1,8 @@
 use crate::glyph::glyph_constants::*;
+use crate::glyph::hextant_blocks::hextant_array_to_char;
+use crate::utility::coordinate_frame_conversions::CharacterGridInLocalCharacterFrame;
 use crate::utility::*;
-use euclid::point2;
+use euclid::{point2, vec2, Point2D};
 use num::clamp;
 use rgb::*;
 
@@ -45,7 +47,10 @@ pub fn get_smooth_horizontal_chars_for_floating_square(pos: FPoint) -> Vec<Vec<O
     for i in 0..3 {
         let x = i as i32 - 1;
         if offset_dir.x == x || x == 0 {
-            output[i][c] = Some(character_of_square_with_offset(false, x_offset - x as f32));
+            output[i][c] = Some(character_for_square_with_1d_offset(
+                false,
+                x_offset - x as f32,
+            ));
         }
     }
 
@@ -63,7 +68,10 @@ pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Opt
     for j in 0..3 {
         let y = j as i32 - 1;
         if offset_dir.y == y || y == 0 {
-            output[c][j] = Some(character_of_square_with_offset(true, y_offset - y as f32));
+            output[c][j] = Some(character_for_square_with_1d_offset(
+                true,
+                y_offset - y as f32,
+            ));
         }
     }
     return output;
@@ -96,7 +104,8 @@ pub fn square_with_half_step_offset(offset: FVector) -> char {
     quadrant_block_by_offset(step)
 }
 
-pub fn character_of_square_with_offset(vertical: bool, fraction_of_square_offset: f32) -> char {
+pub fn character_for_square_with_1d_offset(vertical: bool, fraction_of_square_offset: f32) -> char {
+    // TODO: incoporate 1/3 and 2/3 vertical offsets from hextant blocks
     let eighths = (fraction_of_square_offset * 8.0).round() as i32;
     let clamped_eighths_toward_positive = clamp(eighths, -8, 8);
     let positive_case = clamped_eighths_toward_positive >= 0;
@@ -115,6 +124,66 @@ pub fn character_of_square_with_offset(vertical: bool, fraction_of_square_offset
         }
     };
     array[abs_index]
+}
+
+pub fn character_for_square_with_2d_offset(offset: FVector) -> char {
+    // start with basic centered square
+    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), SPACE)];
+
+    // the eighth steps along the axes
+    (1..=8).for_each(|i| {
+        let fi = i as f32;
+        snap_points_with_characters.append(&mut vec![
+            (vec2(fi / 8.0, 0.0), EIGHTH_BLOCKS_FROM_RIGHT[i]),
+            (vec2(-fi / 8.0, 0.0), EIGHTH_BLOCKS_FROM_LEFT[i]),
+            (vec2(0.0, fi / 8.0), EIGHTH_BLOCKS_FROM_TOP[i]),
+            (vec2(0.0, -fi / 8.0), EIGHTH_BLOCKS_FROM_BOTTOM[i]),
+        ])
+    });
+
+    // the one third steps vertically, with horizontal half-square offsets
+    snap_points_with_characters.append(&mut vec![
+        (vec2(0.0, 2.0 / 3.0), UPPER_ONE_THIRD_BLOCK),
+        (vec2(0.0, 1.0 / 3.0), UPPER_TWO_THIRD_BLOCK),
+        (vec2(0.0, -1.0 / 3.0), LOWER_TWO_THIRD_BLOCK),
+        (vec2(0.0, -2.0 / 3.0), LOWER_ONE_THIRD_BLOCK),
+        // TODO: shift the array rather than copy pasting
+        (
+            vec2(0.5, 2.0 / 3.0),
+            hextant_array_to_char([[false, true], [false, false], [false, false]]),
+        ),
+        (
+            vec2(0.5, 1.0 / 3.0),
+            hextant_array_to_char([[false, true], [false, true], [false, false]]),
+        ),
+        (
+            vec2(0.5, -1.0 / 3.0),
+            hextant_array_to_char([[false, false], [false, true], [false, true]]),
+        ),
+        (
+            vec2(0.5, -2.0 / 3.0),
+            hextant_array_to_char([[false, false], [false, false], [false, true]]),
+        ),
+        (
+            vec2(-0.5, 2.0 / 3.0),
+            hextant_array_to_char([[true, false], [false, false], [false, false]]),
+        ),
+        (
+            vec2(-0.5, 1.0 / 3.0),
+            hextant_array_to_char([[true, false], [true, false], [false, false]]),
+        ),
+        (
+            vec2(-0.5, -1.0 / 3.0),
+            hextant_array_to_char([[false, false], [true, false], [true, false]]),
+        ),
+        (
+            vec2(-0.5, -2.0 / 3.0),
+            hextant_array_to_char([[false, false], [false, false], [true, false]]),
+        ),
+    ]);
+
+    // the half square grid offsets
+    todo!()
 }
 
 #[cfg(test)]
@@ -277,37 +346,66 @@ mod tests {
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
     fn test_character_square_horizontal_offset__base_case() {
-        assert_eq!(character_of_square_with_offset(false, 0.0), FULL_BLOCK);
+        assert_eq!(character_for_square_with_1d_offset(false, 0.0), FULL_BLOCK);
     }
 
     #[test]
     fn test_character_square_horizontal_offset__round_to_zero() {
-        assert_eq!(character_of_square_with_offset(false, -0.001), FULL_BLOCK);
+        assert_eq!(
+            character_for_square_with_1d_offset(false, -0.001),
+            FULL_BLOCK
+        );
 
-        assert_eq!(character_of_square_with_offset(false, 0.001), FULL_BLOCK);
+        assert_eq!(
+            character_for_square_with_1d_offset(false, 0.001),
+            FULL_BLOCK
+        );
     }
 
     #[test]
     fn test_character_square_horizontal_offset__out_of_range() {
-        assert_eq!(character_of_square_with_offset(false, -1.5), SPACE);
-        assert_eq!(character_of_square_with_offset(false, 1.5), SPACE);
+        assert_eq!(character_for_square_with_1d_offset(false, -1.5), SPACE);
+        assert_eq!(character_for_square_with_1d_offset(false, 1.5), SPACE);
     }
 
     #[test]
     fn test_character_square_horizontal_offset__halfway() {
         assert_eq!(
-            character_of_square_with_offset(false, -0.5),
+            character_for_square_with_1d_offset(false, -0.5),
             EIGHTH_BLOCKS_FROM_LEFT[4]
         );
         assert_eq!(
-            character_of_square_with_offset(false, 0.5),
+            character_for_square_with_1d_offset(false, 0.5),
             EIGHTH_BLOCKS_FROM_RIGHT[4]
         );
     }
 
     #[test]
     fn test_character_square_horizontal_offset__match_opposite_ends() {
-        assert_eq!(character_of_square_with_offset(false, -1.0), SPACE);
-        assert_eq!(character_of_square_with_offset(false, 1.0), SPACE);
+        assert_eq!(character_for_square_with_1d_offset(false, -1.0), SPACE);
+        assert_eq!(character_for_square_with_1d_offset(false, 1.0), SPACE);
+    }
+
+    #[test]
+    fn test_2d_square_offset() {
+        assert_eq!(
+            character_for_square_with_2d_offset(vec2(0.0, 0.0)),
+            FULL_BLOCK
+        );
+        assert_eq!(
+            character_for_square_with_2d_offset(vec2(0.001, 0.0)),
+            FULL_BLOCK
+        );
+        assert_eq!(
+            character_for_square_with_2d_offset(vec2(0.0, -0.01)),
+            FULL_BLOCK
+        );
+
+        assert_eq!(
+            character_for_square_with_2d_offset(vec2(0.25, -0.01)),
+            EIGHTH_BLOCKS_FROM_RIGHT[6]
+        );
+
+        assert_eq!(character_for_square_with_2d_offset(vec2(1.25, -0.5)), SPACE);
     }
 }

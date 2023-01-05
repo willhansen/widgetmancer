@@ -11,7 +11,7 @@ use rgb::*;
 use termion::color;
 use termion::color::Black;
 
-use crate::glyph::floating_square::character_of_square_with_offset;
+use crate::glyph::floating_square::character_for_square_with_1d_offset;
 use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
@@ -157,7 +157,7 @@ impl Glyph {
             )
             .map(|character_offset| {
                 Glyph::new(
-                    character_of_square_with_offset(true, character_offset),
+                    character_for_square_with_1d_offset(true, character_offset),
                     square_color,
                     background_color,
                 )
@@ -168,7 +168,7 @@ impl Glyph {
             );
             character_offsets.map(|character_offset| {
                 Glyph::new(
-                    character_of_square_with_offset(false, character_offset),
+                    character_for_square_with_1d_offset(false, character_offset),
                     square_color,
                     background_color,
                 )
