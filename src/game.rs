@@ -309,7 +309,7 @@ impl Game {
     }
     pub fn move_death_cubes(&mut self, duration: Duration) {
         let mut kill_squares = HashSet::new();
-        for &(mut cube) in &self.death_cubes {
+        for cube in &mut self.death_cubes {
             let start_pos = cube.position;
             cube.position += cube.velocity * duration.as_secs_f32();
             let end_pos = cube.position;
@@ -1123,7 +1123,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use crate::glyph::DoubleGlyphFunctions;
-    use ntest::assert_false;
+    use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::RED_PAWN_COLOR;
@@ -1367,7 +1367,6 @@ mod tests {
     #[test]
     fn test_death_cube_can_be_seen() {
         let mut game = set_up_game();
-        game.draw_headless_now();
         let test_square = point2(5, 5);
 
         game.draw_headless_now();
@@ -1384,5 +1383,45 @@ mod tests {
             .graphics
             .get_buffered_glyphs_for_square(test_square)
             .looks_solid());
+    }
+    #[test]
+    fn test_death_cube_moves() {
+        let mut game = set_up_game();
+        game.place_linear_death_cube(point2(3.0, 4.5), vec2(1.0, 0.0));
+        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        assert_about_eq!(game.death_cubes[0].position.x, 4.0);
+    }
+
+    #[test]
+    fn test_death_cube_visually_moves() {
+        let mut game = set_up_game();
+        let test_square = point2(5, 5);
+
+        game.draw_headless_now();
+        let get_solidness = |game: &Game| -> Vec<bool> {
+            (0..4)
+                .map(|dx| {
+                    game.graphics
+                        .get_buffered_glyphs_for_square(test_square + STEP_RIGHT * dx)
+                        .looks_solid()
+                })
+                .collect()
+        };
+
+        let squares_that_look_solid = get_solidness(&game);
+        assert_eq!(squares_that_look_solid, vec![true, true, true, true]);
+
+        let death_cube_start_pos = test_square.to_f32() + vec2(0.3, 0.0);
+        game.place_linear_death_cube(death_cube_start_pos, vec2(1.0, 0.0));
+
+        game.draw_headless_now();
+        let squares_that_look_solid = get_solidness(&game);
+        assert_eq!(squares_that_look_solid, vec![false, false, true, true]);
+
+        game.move_death_cubes(Duration::from_secs_f32(1.0));
+
+        game.draw_headless_now();
+        let squares_that_look_solid = get_solidness(&game);
+        assert_eq!(squares_that_look_solid, vec![true, false, false, true]);
     }
 }
