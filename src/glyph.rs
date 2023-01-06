@@ -333,14 +333,14 @@ impl Glyph {
         start_pos: WorldPoint,
         end_pos: WorldPoint,
         color: RGB8,
-    ) -> WorldCharacterSquareToGlyphMap {
+    ) -> WorldCharacterSquareGlyphMap {
         Glyph::char_map_to_fg_only_glyph_map(get_chars_for_braille_line(start_pos, end_pos), color)
     }
 
     pub fn points_to_braille_glyphs(
         points: Vec<WorldPoint>,
         color: RGB8,
-    ) -> WorldCharacterSquareToGlyphMap {
+    ) -> WorldCharacterSquareGlyphMap {
         Glyph::char_map_to_fg_only_glyph_map(points_to_braille_chars(points), color)
     }
 

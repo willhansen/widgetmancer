@@ -264,9 +264,7 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
-pub fn pair_up_glyph_map(
-    character_glyph_map: WorldCharacterSquareToGlyphMap,
-) -> WorldSquareGlyphMap {
+pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterSquareGlyphMap) -> WorldSquareGlyphMap {
     let mut output_map = WorldSquareGlyphMap::new();
     character_glyph_map
         .into_iter()
@@ -289,7 +287,7 @@ pub fn pair_up_glyph_map(
     output_map
 }
 
-pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareToGlyphMap) -> String {
+pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
     let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
     let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
     let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
@@ -312,7 +310,7 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareToGlyphMap) -> String
     string
 }
 
-pub fn print_glyph_map(glyph_map: &WorldCharacterSquareToGlyphMap) {
+pub fn print_glyph_map(glyph_map: &WorldCharacterSquareGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
 }
 
@@ -544,7 +542,7 @@ mod tests {
             point2(2, 1),
         ];
 
-        let mut character_glyph_map = WorldCharacterSquareToGlyphMap::new();
+        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
         for square in character_squares {
             character_glyph_map.insert(square, Glyph::default_transparent());
         }
@@ -558,7 +556,7 @@ mod tests {
 
     #[test]
     fn test_pair_up_glyph_map__glyphs() {
-        let mut character_glyph_map = WorldCharacterSquareToGlyphMap::new();
+        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
         let test_glyph = Glyph {
             character: ' ',
             fg_color: RGB8::new(0, 0, 0),

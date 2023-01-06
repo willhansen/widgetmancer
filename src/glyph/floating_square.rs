@@ -1,10 +1,16 @@
 use crate::glyph::glyph_constants::*;
-use crate::glyph::hextant_blocks::hextant_array_to_char;
-use crate::utility::coordinate_frame_conversions::CharacterGridInLocalCharacterFrame;
+use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offset};
+use crate::utility::coordinate_frame_conversions::{
+    world_character_point_to_world_character_square, CharacterGridInLocalCharacterFrame,
+    WorldCharacterPoint, WorldCharacterSquare,
+};
 use crate::utility::*;
 use euclid::{point2, vec2, Point2D};
+use itertools::Itertools;
 use num::clamp;
+use ordered_float::OrderedFloat;
 use rgb::*;
+use std::collections::HashMap;
 
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
@@ -104,12 +110,12 @@ pub fn square_with_half_step_offset(offset: FVector) -> char {
     quadrant_block_by_offset(step)
 }
 
-pub fn character_for_square_with_1d_offset(vertical: bool, fraction_of_square_offset: f32) -> char {
-    // TODO: incoporate 1/3 and 2/3 vertical offsets from hextant blocks
-    let eighths = (fraction_of_square_offset * 8.0).round() as i32;
-    let clamped_eighths_toward_positive = clamp(eighths, -8, 8);
-    let positive_case = clamped_eighths_toward_positive >= 0;
-    let abs_index = 8 - clamped_eighths_toward_positive.abs() as usize;
+pub fn square_with_1d_eighths_offset(vertical: bool, eighths: i32) -> char {
+    if eighths.abs() >= 8 {
+        return SPACE;
+    }
+    let positive_case = eighths >= 0;
+    let abs_index = 8 - eighths.abs() as usize;
     let array = if vertical {
         if positive_case {
             EIGHTH_BLOCKS_FROM_TOP
@@ -126,64 +132,102 @@ pub fn character_for_square_with_1d_offset(vertical: bool, fraction_of_square_of
     array[abs_index]
 }
 
-pub fn character_for_square_with_2d_offset(offset: FVector) -> char {
+pub fn character_for_square_with_1d_offset(vertical: bool, fraction_of_square_offset: f32) -> char {
+    // TODO: incoporate 1/3 and 2/3 vertical offsets from hextant blocks
+    let eighths = (fraction_of_square_offset * 8.0).round() as i32;
+    square_with_1d_eighths_offset(vertical, eighths)
+}
+
+pub fn character_for_half_square_with_2d_offset(offset: FVector) -> char {
     // start with basic centered square
-    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), SPACE)];
+    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), FULL_BLOCK)];
 
     // the eighth steps along the axes
-    (1..=8).for_each(|i| {
-        let fi = i as f32;
-        snap_points_with_characters.append(&mut vec![
-            (vec2(fi / 8.0, 0.0), EIGHTH_BLOCKS_FROM_RIGHT[i]),
-            (vec2(-fi / 8.0, 0.0), EIGHTH_BLOCKS_FROM_LEFT[i]),
-            (vec2(0.0, fi / 8.0), EIGHTH_BLOCKS_FROM_TOP[i]),
-            (vec2(0.0, -fi / 8.0), EIGHTH_BLOCKS_FROM_BOTTOM[i]),
-        ])
-    });
+    let mut horizontal_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
+        .map(|i| {
+            (
+                vec2(i as f32 / 8.0, 0.0),
+                square_with_1d_eighths_offset(false, i),
+            )
+        })
+        .collect();
+    snap_points_with_characters.append(&mut horizontal_snap_points_at_eighths);
+
+    let mut vertical_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
+        .map(|i| {
+            (
+                vec2(0.0, i as f32 / 8.0),
+                square_with_1d_eighths_offset(true, i),
+            )
+        })
+        .collect();
+    snap_points_with_characters.append(&mut vertical_snap_points_at_eighths);
 
     // the one third steps vertically, with horizontal half-square offsets
-    snap_points_with_characters.append(&mut vec![
-        (vec2(0.0, 2.0 / 3.0), UPPER_ONE_THIRD_BLOCK),
-        (vec2(0.0, 1.0 / 3.0), UPPER_TWO_THIRD_BLOCK),
-        (vec2(0.0, -1.0 / 3.0), LOWER_TWO_THIRD_BLOCK),
-        (vec2(0.0, -2.0 / 3.0), LOWER_ONE_THIRD_BLOCK),
-        // TODO: shift the array rather than copy pasting
-        (
-            vec2(0.5, 2.0 / 3.0),
-            hextant_array_to_char([[false, true], [false, false], [false, false]]),
-        ),
-        (
-            vec2(0.5, 1.0 / 3.0),
-            hextant_array_to_char([[false, true], [false, true], [false, false]]),
-        ),
-        (
-            vec2(0.5, -1.0 / 3.0),
-            hextant_array_to_char([[false, false], [false, true], [false, true]]),
-        ),
-        (
-            vec2(0.5, -2.0 / 3.0),
-            hextant_array_to_char([[false, false], [false, false], [false, true]]),
-        ),
-        (
-            vec2(-0.5, 2.0 / 3.0),
-            hextant_array_to_char([[true, false], [false, false], [false, false]]),
-        ),
-        (
-            vec2(-0.5, 1.0 / 3.0),
-            hextant_array_to_char([[true, false], [true, false], [false, false]]),
-        ),
-        (
-            vec2(-0.5, -1.0 / 3.0),
-            hextant_array_to_char([[false, false], [true, false], [true, false]]),
-        ),
-        (
-            vec2(-0.5, -2.0 / 3.0),
-            hextant_array_to_char([[false, false], [false, false], [true, false]]),
-        ),
-    ]);
+    let mut hextant_snap_points: Vec<(FVector, char)> = (-2..=2)
+        .flat_map(|x| {
+            (-3..=3).map(move |y| {
+                (
+                    vec2(x as f32 / 2.0, y as f32 / 3.0),
+                    hextant_block_by_offset(vec2(x, y)),
+                )
+            })
+        })
+        .collect();
+    snap_points_with_characters.append(&mut hextant_snap_points);
 
     // the half square grid offsets
-    todo!()
+    let mut quadrant_snap_points: Vec<(FVector, char)> = (-2..=2)
+        .flat_map(|x| {
+            (-2..=2).map(move |y| {
+                (
+                    vec2(x as f32 / 2.0, y as f32 / 2.0),
+                    quadrant_block_by_offset(vec2(x, y)),
+                )
+            })
+        })
+        .collect();
+    snap_points_with_characters.append(&mut quadrant_snap_points);
+
+    // remove duplicate snap points
+    // TODO
+    //snap_points_with_characters = snap_points_with_characters
+    //.into_iter()
+    //.unique_by(|(point, char)| (OrderedFloat(point.x), OrderedFloat(point.y), char))
+    //.collect();
+
+    *snap_points_with_characters
+        .iter()
+        .min_by_key(|(snap_point, _character)| OrderedFloat((*snap_point - offset).length()))
+        .map(|(_snap_point, character)| character)
+        .unwrap()
+}
+
+pub fn characters_for_full_square_at_point(
+    point: WorldCharacterPoint,
+) -> HashMap<WorldCharacterSquare, char> {
+    let mut output_characters = HashMap::<WorldCharacterSquare, char>::new();
+    let center_square = world_character_point_to_world_character_square(point);
+    (-2..=2).for_each(|dx| {
+        (-1..=1).for_each(|dy| {
+            let step = vec2(dx, dy);
+            let square = center_square + step;
+            let center_of_square = square.to_f32();
+            let mut offset_from_square_center = point - center_of_square;
+
+            //Tweak offset for effectively double width
+            let inward_shifted_x_offset = (offset_from_square_center.x.abs() - 0.5).max(0.0)
+                * sign(offset_from_square_center.x);
+            offset_from_square_center.x = inward_shifted_x_offset;
+
+            let character_for_square =
+                character_for_half_square_with_2d_offset(offset_from_square_center.cast_unit());
+            if character_for_square != SPACE {
+                output_characters.insert(square, character_for_square);
+            }
+        })
+    });
+    output_characters
 }
 
 #[cfg(test)]
@@ -387,25 +431,53 @@ mod tests {
     }
 
     #[test]
+    fn test_eighths_1d_offset() {
+        assert_eq!(square_with_1d_eighths_offset(false, 0), FULL_BLOCK);
+        assert_eq!(square_with_1d_eighths_offset(false, 4), RIGHT_HALF_BLOCK);
+        assert_eq!(square_with_1d_eighths_offset(false, -4), LEFT_HALF_BLOCK);
+        assert_eq!(square_with_1d_eighths_offset(true, -4), LOWER_HALF_BLOCK);
+        assert_eq!(square_with_1d_eighths_offset(true, 25), SPACE);
+    }
+
+    #[test]
     fn test_2d_square_offset() {
         assert_eq!(
-            character_for_square_with_2d_offset(vec2(0.0, 0.0)),
+            character_for_half_square_with_2d_offset(vec2(0.0, 0.0)),
             FULL_BLOCK
         );
         assert_eq!(
-            character_for_square_with_2d_offset(vec2(0.001, 0.0)),
+            character_for_half_square_with_2d_offset(vec2(0.001, 0.0)),
             FULL_BLOCK
         );
         assert_eq!(
-            character_for_square_with_2d_offset(vec2(0.0, -0.01)),
+            character_for_half_square_with_2d_offset(vec2(0.0, -0.01)),
             FULL_BLOCK
         );
 
         assert_eq!(
-            character_for_square_with_2d_offset(vec2(0.25, -0.01)),
+            character_for_half_square_with_2d_offset(vec2(0.25, -0.01)),
             EIGHTH_BLOCKS_FROM_RIGHT[6]
         );
 
-        assert_eq!(character_for_square_with_2d_offset(vec2(1.25, -0.5)), SPACE);
+        assert_eq!(
+            character_for_half_square_with_2d_offset(vec2(1.25, -0.5)),
+            SPACE
+        );
+    }
+
+    #[test]
+    fn test_chars_for_floating_square__at_origin() {
+        let chars = characters_for_full_square_at_point(point2(0.0, 0.0));
+        assert_eq!(chars.len(), 3);
+        assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
+        assert_eq!(chars.get(&point2(-1, 0)), Some(&RIGHT_HALF_BLOCK));
+        assert_eq!(chars.get(&point2(1, 0)), Some(&LEFT_HALF_BLOCK));
+    }
+    #[test]
+    fn test_chars_for_floating_square__at_square_center() {
+        let chars = characters_for_full_square_at_point(point2(0.5, 0.0));
+        assert_eq!(chars.len(), 2);
+        assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
+        assert_eq!(chars.get(&point2(1, 0)), Some(&FULL_BLOCK));
     }
 }

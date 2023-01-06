@@ -21,6 +21,7 @@ use crate::animations::*;
 use crate::fov_stuff::FovResult;
 use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
+use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
@@ -252,7 +253,7 @@ impl Graphics {
         self.draw_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareToGlyphMap) {
+    fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareGlyphMap) {
         let world_square_glyph_map = pair_up_glyph_map(glyph_map);
         self.draw_glyphs_at_squares(world_square_glyph_map);
     }
@@ -487,7 +488,13 @@ impl Graphics {
     }
 
     pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
-        todo!()
+        let character_grid_point = world_point_to_world_character_point(death_cube.position);
+        let characters_map = characters_for_full_square_at_point(character_grid_point);
+        let glyphs = characters_map
+            .into_iter()
+            .map(|(char_square, char)| (char_square, Glyph::fg_only(char, CYAN)))
+            .collect();
+        self.draw_glyphs(glyphs);
     }
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {

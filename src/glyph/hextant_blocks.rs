@@ -1,5 +1,5 @@
 use super::glyph_constants::*;
-use crate::utility::{line_intersections_with_centered_unit_square, same_side_of_line};
+use crate::utility::{line_intersections_with_centered_unit_square, same_side_of_line, IVector};
 use euclid::{point2, Point2D};
 use ordered_float::OrderedFloat;
 
@@ -16,6 +16,26 @@ pub type HextantArray = [[bool; 2]; 3]; // row, column
 // 2^6 = 64 = 4* 16
 // missing hextant blocks: empty, left half, right half, full
 
+pub fn hextant_block_by_offset(hextant_grid_steps: IVector) -> char {
+    match hextant_grid_steps.to_tuple() {
+        (1, -2) => '🬞',
+        (1, -1) => '🬦',
+        (1, 0) => RIGHT_HALF_BLOCK,
+        (1, 1) => '🬉',
+        (1, 2) => '🬁',
+        (0, -2) => LOWER_ONE_THIRD_BLOCK,
+        (0, -1) => LOWER_TWO_THIRD_BLOCK,
+        (0, 0) => FULL_BLOCK,
+        (0, 1) => UPPER_TWO_THIRD_BLOCK,
+        (0, 2) => UPPER_ONE_THIRD_BLOCK,
+        (-1, -2) => '🬏',
+        (-1, -1) => '▖',
+        (-1, 0) => LEFT_HALF_BLOCK,
+        (-1, 1) => '🬄',
+        (-1, 2) => '🬀',
+        _ => SPACE,
+    }
+}
 pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     let as_binary = hextant_array_as_binary(hextant_array);
     let before_half_left = '🬓';

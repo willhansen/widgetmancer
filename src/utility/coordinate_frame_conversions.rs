@@ -43,15 +43,15 @@ pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
-pub type WorldCharacterSquareToGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
+pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
 pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
-) -> WorldCharacterSquareToGlyphMap {
-    let mut world_character_glyph_map = WorldCharacterSquareToGlyphMap::new();
+) -> WorldCharacterSquareGlyphMap {
+    let mut world_character_glyph_map = WorldCharacterSquareGlyphMap::new();
     world_square_glyph_map
         .into_iter()
         .for_each(|(world_square, two_glyphs)| {
@@ -148,5 +148,11 @@ pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> Worl
 }
 
 pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
+    point.round().to_i32()
+}
+
+pub fn world_character_point_to_world_character_square(
+    point: WorldCharacterPoint,
+) -> WorldCharacterSquare {
     point.round().to_i32()
 }

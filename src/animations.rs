@@ -22,7 +22,7 @@ pub type AnimationObject = Box<dyn Animation>;
 pub type AnimationList = Vec<AnimationObject>;
 
 pub trait Animation: DynClone {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap;
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
     fn finished_at_time(&self, time: Instant) -> bool;
 }
 // This is kinda magic.  Not great, but if it works, it works.
@@ -51,7 +51,7 @@ impl SimpleLaser {
 }
 
 impl Animation for SimpleLaser {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
         Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 
@@ -78,7 +78,7 @@ impl FloatyLaser {
 }
 
 impl Animation for FloatyLaser {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let mut line_points: Vec<WorldPoint> = world_points_for_braille_line(self.start, self.end);
         // pretty arbitrary
         let hash = ((self.start.x * PI + self.start.y)
@@ -127,7 +127,7 @@ impl Explosion {
 }
 
 impl Animation for Explosion {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         // rather arbitrary
         let hash = ((self.position.x * PI + self.position.y) * 1000.0)
             .abs()
@@ -173,7 +173,7 @@ impl PieceDeathAnimation {
 }
 
 impl Animation for PieceDeathAnimation {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         assert!(!self.finished_at_time(time));
 
         // rather arbitrary
@@ -225,7 +225,7 @@ impl Selector {
 pub const DOTS_IN_SELECTOR: u32 = 3;
 
 impl Animation for Selector {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = 1.0; //f32::sqrt(2.0) / 2.0;
 
@@ -262,8 +262,8 @@ impl StaticBoard {
 }
 
 impl Animation for StaticBoard {
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareToGlyphMap {
-        let mut glyphs = WorldCharacterSquareToGlyphMap::new();
+    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
+        let mut glyphs = WorldCharacterSquareGlyphMap::new();
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
                 let world_square = WorldSquare::new(x as i32, y as i32);
@@ -370,7 +370,7 @@ impl RecoilingBoard {
 }
 
 impl Animation for RecoilingBoard {
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareToGlyphMap {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let age = time.duration_since(self.creation_time);
 
         let mut offset_distance_in_squares: f32 =
