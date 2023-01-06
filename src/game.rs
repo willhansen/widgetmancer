@@ -1068,6 +1068,10 @@ impl Game {
         self.place_block(self.player_square() + STEP_RIGHT * 7);
         self.place_block(self.player_square() + STEP_RIGHT * 4 + STEP_UP * 3);
         self.place_block(self.player_square() + STEP_RIGHT * 7 + STEP_UP * 3);
+        self.place_linear_death_cube(
+            self.player_square().to_f32() - vec2(5.0, 3.0),
+            vec2(0.1, 0.3),
+        );
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {

@@ -108,12 +108,13 @@ pub fn do_everything() {
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
 
-    let mut prev_start_time = Instant::now();
+    let mut prev_tick_start_time = Instant::now();
     while game.running() {
-        //let start_time = Instant::now();
+        let tick_start_time = Instant::now();
+        let delta = tick_start_time - prev_tick_start_time;
+        prev_tick_start_time = tick_start_time;
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
-        //prev_start_time = start_time;
 
         while let Ok(event) = event_receiver.try_recv() {
             game.on_turn_start();
@@ -121,6 +122,7 @@ pub fn do_everything() {
             input_map.handle_event(&mut game, event);
 
             game.move_all_factions();
+            game.move_death_cubes(delta);
 
             game.on_turn_end();
         }
