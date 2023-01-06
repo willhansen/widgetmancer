@@ -122,10 +122,10 @@ pub fn do_everything() {
             input_map.handle_event(&mut game, event);
 
             game.move_all_factions();
-            game.move_death_cubes(delta);
 
             game.on_turn_end();
         }
+        game.move_death_cubes(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
     }
