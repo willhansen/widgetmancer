@@ -13,6 +13,7 @@ use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
 use rand::Rng;
+use rgb::RGB8;
 
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
@@ -498,6 +499,28 @@ where
     m.into_iter()
         .map(|(k, v): (K, i32)| (k, v as f32))
         .collect()
+}
+pub fn hue_to_rgb(hue_360: f32) -> RGB8 {
+    let hue = hue_360.rem_euclid(360.0);
+    let x = 1.0 - ((hue / 60.0) % 2.0 - 1.0).abs();
+    let float_rgb: (f32, f32, f32) = if hue < 60.0 {
+        (1.0, x, 0.0)
+    } else if hue < 120.0 {
+        (x, 1.0, 0.0)
+    } else if hue < 180.0 {
+        (0.0, 1.0, x)
+    } else if hue < 240.0 {
+        (0.0, x, 1.0)
+    } else if hue < 300.0 {
+        (x, 0.0, 1.0)
+    } else {
+        (1.0, 0.0, x)
+    };
+    RGB8::new(
+        (float_rgb.0 * 255.0) as u8,
+        (float_rgb.1 * 255.0) as u8,
+        (float_rgb.2 * 255.0) as u8,
+    )
 }
 
 #[cfg(test)]

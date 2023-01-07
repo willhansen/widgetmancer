@@ -26,6 +26,7 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::Piece;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::hue_to_rgb;
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
     Game, IPoint, PieceType, RIGHT_I,
@@ -490,11 +491,20 @@ impl Graphics {
     pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
         let character_grid_point = world_point_to_world_character_point(death_cube.position);
         let characters_map = characters_for_full_square_at_point(character_grid_point);
+        let color = self.technicolor_at_time(Instant::now());
         let glyphs = characters_map
             .into_iter()
-            .map(|(char_square, char)| (char_square, Glyph::fg_only(char, CYAN)))
+            .map(|(char_square, char)| (char_square, Glyph::fg_only(char, color)))
             .collect();
         self.draw_glyphs(glyphs);
+    }
+
+    pub fn technicolor_at_time(&self, time: Instant) -> RGB8 {
+        let duration_from_start = time.duration_since(self.start_time);
+        let period = Duration::from_secs_f32(1.0);
+        let period_fraction =
+            (duration_from_start.as_secs_f32() % period.as_secs_f32()) / period.as_secs_f32();
+        hue_to_rgb(period_fraction * 360.0)
     }
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
