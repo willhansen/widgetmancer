@@ -325,7 +325,7 @@ impl Game {
             .map(|(&square, _)| square)
             .collect();
 
-        let CUBES_PER_SECOND = 0.5;
+        let CUBES_PER_SECOND = 10.0;
         let CUBE_SPEED = 5.0;
 
         let chance_to_fire_this_tick = clamp(CUBES_PER_SECOND * delta.as_secs_f32(), 0.0, 1.0);
@@ -355,10 +355,28 @@ impl Game {
             }
         }
         kill_squares.into_iter().for_each(|square| {
-            if self.is_piece_at(square) {
+            if let Some(piece) = self.get_piece_at(square) && piece.faction != self.death_cube_faction {
+                self.capture_piece_at(square);
+            }
+            else if self.is_player_at(square) {
                 self.capture_piece_at(square);
             }
         });
+
+        self.remove_death_cubes_off_board();
+    }
+
+    pub fn remove_death_cubes_off_board(&mut self) {
+        let cubes_on_board = self
+            .death_cubes
+            .iter()
+            .cloned()
+            .filter(|death_cube: &DeathCube| {
+                let square = world_point_to_world_square(death_cube.position);
+                self.square_is_on_board(square)
+            })
+            .collect();
+        self.death_cubes = cubes_on_board;
     }
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
@@ -1488,9 +1506,22 @@ mod tests {
     #[test]
     fn test_death_cube_turret_shoots_death_cubes() {
         let mut game = set_up_game();
-        game.place_death_turret(point2(5, 5));
+        let turret_square = point2(5, 5);
+        game.place_death_turret(turret_square);
         assert!(game.death_cubes.is_empty());
         game.advance_realtime_effects(Duration::from_secs_f32(5.0));
         assert!(!game.death_cubes.is_empty());
+
+        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        assert!(!game.pieces.is_empty());
+    }
+
+    #[test]
+    fn test_death_cubes_vanish_when_off_board() {
+        let mut game = set_up_nxn_game(5);
+        game.place_linear_death_cube(point2(4.9, 4.9), vec2(20.0, 0.0));
+        assert!(!game.death_cubes.is_empty());
+        game.move_death_cubes(Duration::from_secs_f32(5.0));
+        assert!(game.death_cubes.is_empty());
     }
 }
