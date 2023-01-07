@@ -248,6 +248,21 @@ pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     v * radius
 }
 
+pub fn random_event(p: f32) -> bool {
+    assert!(p >= 0.0 && p <= 1.0);
+    rand::thread_rng().gen_range(0.0..=1.0) < p
+}
+
+pub fn random_angle() -> Angle<f32> {
+    Angle::degrees(rand::thread_rng().gen_range(0.0..360.0))
+}
+
+pub fn random_direction() -> FVector {
+    let angle = random_angle();
+    vec2(angle.radians.cos(), angle.radians.sin())
+    
+}
+
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U> {
     let angle = vector.angle_from_x_axis();
     let new_angle = angle + Angle::radians(radians);

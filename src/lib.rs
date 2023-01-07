@@ -125,7 +125,7 @@ pub fn do_everything() {
 
             game.on_turn_end();
         }
-        game.move_death_cubes(delta);
+        game.advance_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
     }

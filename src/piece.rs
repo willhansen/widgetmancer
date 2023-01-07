@@ -20,6 +20,7 @@ pub enum PieceType {
     Rook,
     Queen,
     King,
+    DeathCubeTurret,
 }
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
@@ -105,6 +106,8 @@ impl Piece {
             PieceType::Rook => ['♜', ' '],
             PieceType::Queen => ['♛', ' '],
             PieceType::King => ['♚', ' '],
+            PieceType::DeathCubeTurret => ['𐄳', ' '],
+            _ => ['�', '�'],
         }
     }
 

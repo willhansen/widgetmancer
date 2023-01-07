@@ -3,6 +3,7 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::io::Write;
 use std::time::{Duration, Instant};
 
+use ::num::clamp;
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
@@ -19,7 +20,7 @@ use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
-use crate::piece::PieceType::Pawn;
+use crate::piece::PieceType::{DeathCubeTurret, Pawn};
 use crate::piece::{Faction, FactionFactory, Piece, PieceType};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -66,6 +67,7 @@ pub struct Game {
     red_pawn_faction: Faction,
     default_enemy_faction: Faction,
     death_cubes: Vec<DeathCube>,
+    death_cube_faction: Faction,
 }
 
 impl Game {
@@ -87,11 +89,13 @@ impl Game {
             red_pawn_faction: Faction::default(),
             default_enemy_faction: Faction::default(),
             death_cubes: vec![],
+            death_cube_faction: Faction::default(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
 
         game.red_pawn_faction = game.get_new_faction();
+        game.death_cube_faction = game.get_new_faction();
 
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -307,6 +311,33 @@ impl Game {
     pub fn place_linear_death_cube(&mut self, position: WorldPoint, velocity: WorldMove) {
         self.death_cubes.push(DeathCube { position, velocity });
     }
+
+    pub fn advance_realtime_effects(&mut self, delta: Duration) {
+        self.move_death_cubes(delta);
+        self.tick_realtime_turrets(delta);
+    }
+
+    pub fn tick_realtime_turrets(&mut self, delta: Duration) {
+        let turret_squares: Vec<WorldSquare> = self
+            .pieces
+            .iter()
+            .filter(|(_, piece)| piece.piece_type == DeathCubeTurret)
+            .map(|(&square, _)| square)
+            .collect();
+
+        let CUBES_PER_SECOND = 0.5;
+        let CUBE_SPEED = 5.0;
+
+        let chance_to_fire_this_tick = clamp(CUBES_PER_SECOND * delta.as_secs_f32(), 0.0, 1.0);
+
+        turret_squares.iter().for_each(|square| {
+            let should_fire = random_event(chance_to_fire_this_tick);
+            if should_fire {
+                let direction = random_direction();
+                self.place_linear_death_cube(square.to_f32(), (direction * CUBE_SPEED).cast_unit());
+            }
+        });
+    }
     pub fn move_death_cubes(&mut self, duration: Duration) {
         let mut kill_squares = HashSet::new();
         for cube in &mut self.death_cubes {
@@ -345,6 +376,13 @@ impl Game {
 
     pub fn place_red_pawn(&mut self, square: WorldSquare) {
         self.place_piece(Piece::new(Pawn, self.red_pawn_faction), square)
+    }
+
+    pub fn place_death_turret(&mut self, square: WorldSquare) {
+        self.place_piece(
+            Piece::new(PieceType::DeathCubeTurret, self.death_cube_faction),
+            square,
+        );
     }
 
     pub fn tick_pawn_incubation(&mut self) {
@@ -1072,6 +1110,7 @@ impl Game {
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
         );
+        self.place_death_turret(self.player_square() + STEP_LEFT * 4);
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
@@ -1122,11 +1161,11 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph::DoubleGlyphFunctions;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::RED_PAWN_COLOR;
+    use crate::glyph::DoubleGlyphFunctions;
     use crate::piece::PieceType::Rook;
     use crate::utility::{
         STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
@@ -1384,6 +1423,7 @@ mod tests {
             .get_buffered_glyphs_for_square(test_square)
             .looks_solid());
     }
+
     #[test]
     fn test_death_cube_moves() {
         let mut game = set_up_game();
@@ -1423,5 +1463,34 @@ mod tests {
         game.draw_headless_now();
         let squares_that_look_solid = get_solidness(&game);
         assert_eq!(squares_that_look_solid, vec![true, false, false, true]);
+    }
+
+    #[test]
+    fn test_death_cubes_change_color_over_time() {
+        let mut game = set_up_game();
+        let test_square = point2(3, 3);
+        game.place_linear_death_cube(test_square.to_f32(), vec2(0.0, 0.0));
+        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.0));
+        let cube_color_1 = game
+            .graphics
+            .get_buffered_glyphs_for_square(test_square)
+            .get_solid_color()
+            .unwrap();
+        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.23432));
+        let cube_color_2 = game
+            .graphics
+            .get_buffered_glyphs_for_square(test_square)
+            .get_solid_color()
+            .unwrap();
+        assert_ne!(cube_color_1, cube_color_2);
+    }
+
+    #[test]
+    fn test_death_cube_turret_shoots_death_cubes() {
+        let mut game = set_up_game();
+        game.place_death_turret(point2(5, 5));
+        assert!(game.death_cubes.is_empty());
+        game.advance_realtime_effects(Duration::from_secs_f32(5.0));
+        assert!(!game.death_cubes.is_empty());
     }
 }
