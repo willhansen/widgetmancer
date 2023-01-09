@@ -4,6 +4,7 @@ use termion::event::{Event, Key, MouseButton, MouseEvent};
 
 use crate::game::Game;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::{FVector, IVector};
 use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
@@ -16,6 +17,20 @@ impl InputMap {
         InputMap {
             prev_mouse_square: point2((width / 2) as i32, (height / 2) as i32),
             terminal_size: (width, height),
+        }
+    }
+
+    fn char_to_direction(c: char) -> IVector {
+        match c.to_lowercase().next().unwrap() {
+            'k' | 'w' => UP_I,
+            'j' | 's' => DOWN_I,
+            'h' | 'a' => LEFT_I,
+            'l' | 'd' => RIGHT_I,
+            'y' => UP_I + LEFT_I,
+            'u' => UP_I + RIGHT_I,
+            'b' => DOWN_I + LEFT_I,
+            'n' => DOWN_I + RIGHT_I,
+            _ => vec2(0, 0),
         }
     }
 
@@ -50,6 +65,32 @@ impl InputMap {
                 }
                 Key::Char('n') => {
                     game.move_player((DOWN_I + RIGHT_I).cast_unit()).ok();
+                }
+
+                Key::Char('K') | Key::Char('W') => {
+                    game.player_blink(UP_I.cast_unit());
+                }
+                Key::Char('H') | Key::Char('A') => {
+                    game.player_blink(LEFT_I.cast_unit());
+                }
+                Key::Char('J') | Key::Char('S') => {
+                    game.player_blink(DOWN_I.cast_unit());
+                }
+                Key::Char('L') | Key::Char('D') => {
+                    game.player_blink(RIGHT_I.cast_unit());
+                }
+
+                Key::Char('Y') => {
+                    game.player_blink((UP_I + LEFT_I).cast_unit());
+                }
+                Key::Char('U') => {
+                    game.player_blink((UP_I + RIGHT_I).cast_unit());
+                }
+                Key::Char('B') => {
+                    game.player_blink((DOWN_I + LEFT_I).cast_unit());
+                }
+                Key::Char('N') => {
+                    game.player_blink((DOWN_I + RIGHT_I).cast_unit());
                 }
 
                 _ => {}

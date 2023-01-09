@@ -158,6 +158,32 @@ impl Game {
         self.try_set_player_position(new_pos)
     }
 
+    pub fn move_player_to(&mut self, square: WorldSquare) {
+        self.move_player(square - self.player_square())
+            .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
+    }
+
+    pub fn player_blink(&mut self, direction: WorldStep) {
+        assert!(is_king_step(direction));
+        let start_square = self.player_square();
+        let blink_range = 5;
+        let ideal_end_square = start_square + direction * blink_range;
+
+        let mut candidate_square = start_square;
+        for (x, y) in
+            line_drawing::Bresenham::new(start_square.to_tuple(), ideal_end_square.to_tuple())
+        {
+            let next_square = point2(x, y);
+            if next_square == start_square {
+                continue;
+            } else if !self.square_is_on_board(next_square) || !self.square_is_empty(next_square) {
+                break;
+            }
+            candidate_square = next_square;
+        }
+        self.move_player_to(candidate_square);
+    }
+
     pub fn try_get_player_square(&self) -> Option<WorldSquare> {
         if let Some(player) = &self.player_optional {
             Some(player.position)
@@ -282,7 +308,7 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
             self.graphics
                 .draw_field_of_view_mask(self.fov_mask_for_player());
-        }
+        };
         self.graphics.display(&mut writer);
     }
 
@@ -1523,5 +1549,24 @@ mod tests {
         assert!(!game.death_cubes.is_empty());
         game.move_death_cubes(Duration::from_secs_f32(5.0));
         assert!(game.death_cubes.is_empty());
+    }
+
+    #[test]
+    fn test_player_blink() {
+        let mut game = set_up_game_with_player();
+        let start_pos = game.player_square();
+        game.player_blink(STEP_RIGHT);
+        let square_blink_dist = (game.player_square() - start_pos).square_length();
+        assert!(square_blink_dist > 1);
+    }
+
+    #[test]
+    fn test_player_no_blink_through_block() {
+        let mut game = set_up_game_with_player();
+        let start_pos = game.player_square();
+        let block_pos = game.player_square() + STEP_RIGHT * 3;
+        game.place_block(block_pos);
+        game.player_blink(STEP_RIGHT);
+        assert_eq!(game.player_square(), block_pos + STEP_LEFT);
     }
 }

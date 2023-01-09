@@ -45,7 +45,7 @@ impl PartialVisibilityOfASquare {
     }
 }
 
-const SIGHT_RADIUS: u32 = 8;
+const SIGHT_RADIUS: u32 = 16;
 
 #[derive(Default)]
 pub struct FovResult {
