@@ -71,6 +71,13 @@ pub fn world_square_to_left_world_character_square(
         .to_i32()
 }
 
+pub fn world_square_to_both_world_character_squares(
+    world_square: WorldSquare,
+) -> [WorldCharacterSquare; 2] {
+    let left_char_square = world_square_to_left_world_character_square(world_square);
+    [left_char_square, left_char_square + STEP_RIGHT.cast_unit()]
+}
+
 pub fn world_point_to_local_character_point(
     world_point: WorldPoint,
     origin_character_square: WorldCharacterSquare,

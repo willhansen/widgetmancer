@@ -554,6 +554,12 @@ impl Graphics {
         self.active_animations
             .push(Box::new(PieceDeathAnimation::new(square)));
     }
+
+    pub fn do_blink_animation(&mut self, start_square: WorldSquare, end_square: WorldSquare) {
+        self.active_animations
+            .push(Box::new(BlinkAnimation::new(start_square, end_square)));
+    }
+
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations.push(Box::new(Selector::new(square)));
     }

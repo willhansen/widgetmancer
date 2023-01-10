@@ -182,6 +182,8 @@ impl Game {
             candidate_square = next_square;
         }
         self.move_player_to(candidate_square);
+        self.graphics
+            .do_blink_animation(start_square, candidate_square);
     }
 
     pub fn try_get_player_square(&self) -> Option<WorldSquare> {
@@ -1208,7 +1210,7 @@ mod tests {
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::RED_PAWN_COLOR;
+    use crate::glyph::glyph_constants::{BLINK_EFFECT_COLOR, RED_PAWN_COLOR};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::piece::PieceType::Rook;
     use crate::utility::{
@@ -1568,5 +1570,18 @@ mod tests {
         game.place_block(block_pos);
         game.player_blink(STEP_RIGHT);
         assert_eq!(game.player_square(), block_pos + STEP_LEFT);
+    }
+
+    #[test]
+    fn test_blink_leaves_blue_behind() {
+        let mut game = set_up_game_with_player();
+        let start_pos = game.player_square();
+        game.player_blink(STEP_RIGHT);
+        game.draw_headless_now();
+        let glyphs = game.graphics.get_buffered_glyphs_for_square(start_pos);
+
+        //assert!(!glyphs.looks_solid());
+        assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
+        assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
     }
 }

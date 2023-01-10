@@ -157,6 +157,38 @@ impl Animation for Explosion {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
+pub struct BlinkAnimation {
+    start_square: WorldSquare,
+    end_square: WorldSquare,
+    creation_time: Instant,
+}
+
+impl BlinkAnimation {
+    pub const DURATION: Duration = Duration::from_secs_f32(1.0);
+    pub fn new(start_square: WorldSquare, end_square: WorldSquare) -> BlinkAnimation {
+        BlinkAnimation {
+            start_square,
+            end_square,
+            creation_time: Instant::now(),
+        }
+    }
+}
+
+impl Animation for BlinkAnimation {
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+        line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
+            .map(|(x, y)| point2(x, y))
+            .flat_map(world_square_to_both_world_character_squares)
+            .map(|char_square| (char_square, Glyph::fg_only(FULL_BLOCK, BLINK_EFFECT_COLOR)))
+            .collect()
+    }
+
+    fn finished_at_time(&self, time: Instant) -> bool {
+        time.duration_since(self.creation_time) > BlinkAnimation::DURATION
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct PieceDeathAnimation {
     square: WorldSquare,
     creation_time: Instant,
