@@ -1,10 +1,23 @@
 use super::glyph_constants::*;
+use crate::utility::coordinate_frame_conversions::{
+    world_point_to_local_character_point, world_point_to_world_character_point,
+    LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,
+    WorldPoint,
+};
 use crate::utility::{line_intersections_with_centered_unit_square, same_side_of_line, IVector};
 use euclid::{point2, Point2D};
 use ordered_float::OrderedFloat;
+use std::collections::{HashMap, HashSet};
 
 pub const FIRST_HEXTANT: char = '🬀';
 pub const LAST_HEXTANT: char = '🬻';
+
+pub struct HextantGridInWorldFrame;
+pub struct HextantGridInLocalFrame;
+pub type WorldHextantSquare = Point2D<i32, HextantGridInWorldFrame>;
+pub type WorldHextantPoint = Point2D<f32, HextantGridInWorldFrame>;
+pub type LocalHextantSquare = Point2D<i32, HextantGridInLocalFrame>;
+pub type LocalHextantPoint = Point2D<f32, HextantGridInLocalFrame>;
 
 pub type HextantArray = [[bool; 2]; 3]; // row, column
 
@@ -66,6 +79,19 @@ pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     }
 }
 
+fn local_character_point_to_local_hextant_point(
+    local_character_point: LocalCharacterPoint,
+) -> LocalHextantPoint {
+    // the origin hextant square is the lower left square of a character
+    // (0,0) -> (0.5, 1.0)
+    // (-0.25, -1/3) -> (0,0)
+
+    point2(
+        (local_character_point.x + 0.25) * 2.0,
+        (local_character_point.y + 1.0 / 3.0) * 3.0,
+    )
+}
+
 const fn char_is_hextant(character: char) -> bool {
     character == SPACE
         || character == LEFT_HALF_BLOCK
@@ -114,9 +140,57 @@ fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
     assert!(char_is_hextant(character));
     FIRST_HEXTANT as u32 + hextant_character_as_binary(character) as u32
 }
+
+fn local_hextant_squares_to_char(local_hextant_squares: HashSet<LocalHextantSquare>) -> char {
+    let init_hex_array: HextantArray = [[false; 2]; 3];
+    let final_hex_array = local_hextant_squares.into_iter().fold(
+        init_hex_array,
+        |mut array, local_hextant_square| {
+            // column is x coordinate, row is flipped y coordinate
+            assert!(local_hextant_square.x >= 0 && local_hextant_square.x <= 1);
+            assert!(local_hextant_square.y >= 0 && local_hextant_square.y <= 2);
+            let row: usize = (2 - local_hextant_square.y) as usize;
+            let column: usize = local_hextant_square.x as usize;
+            array[row][column] = true;
+            array
+        },
+    );
+    hextant_array_to_char(final_hex_array)
+}
+
+pub fn points_to_hextant_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareToCharMap {
+    let mut local_hextant_squares_grouped_by_character_square =
+        HashMap::<WorldCharacterSquare, HashSet<LocalHextantSquare>>::new();
+    points.into_iter().for_each(|point| {
+        let char_point: WorldCharacterPoint = world_point_to_world_character_point(point);
+        let char_square: WorldCharacterSquare = char_point.round().to_i32();
+        let local_character_point: LocalCharacterPoint =
+            world_point_to_local_character_point(point, char_square);
+
+        let local_hextant_square =
+            local_character_point_to_local_hextant_point(local_character_point)
+                .round()
+                .to_i32();
+        local_hextant_squares_grouped_by_character_square
+            .entry(char_square)
+            .or_default()
+            .insert(local_hextant_square);
+    });
+    local_hextant_squares_grouped_by_character_square
+        .into_iter()
+        .map(|(world_char_square, set_of_local_hex_squares)| {
+            (
+                world_char_square,
+                local_hextant_squares_to_char(set_of_local_hex_squares),
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ntest::assert_about_eq;
     use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
@@ -145,5 +219,53 @@ mod tests {
             hextant_array_to_char([[false, true], [true, true], [false, false],]),
             '🬍'
         );
+    }
+
+    #[test]
+    fn test_points_to_hextant_chars() {
+        // 00
+        // 00
+        // 01
+        //
+        // 01 10  00 00
+        // 11 00  00 10
+        // 01 10  00 00
+
+        let points: Vec<WorldPoint> = vec![
+            // lower left
+            point2(-0.1, 0.0),
+            point2(-0.3, 0.0),
+            point2(-0.24, 1.0 / 6.0 + 0.1),
+            point2(-0.2, -0.4),
+            // upper
+            point2(-0.2, 0.7),
+            // one right
+            point2(0.01, 0.167),
+            point2(0.01, -0.467),
+            // far right
+            point2(1.1, 0.0),
+        ];
+
+        let chars = points_to_hextant_chars(points);
+
+        assert_eq!(chars.len(), 4);
+        assert_eq!(chars.get(&point2(0, 0)).unwrap(), &'🬫');
+        assert_eq!(chars.get(&point2(0, 1)).unwrap(), &'🬞');
+        assert_eq!(chars.get(&point2(1, 0)).unwrap(), &'🬐');
+        assert_eq!(chars.get(&point2(3, 0)).unwrap(), &'🬃');
+    }
+
+    #[test]
+    fn test_local_character_point_to_local_hextant_point() {
+        let char_point1 = LocalCharacterPoint::new(0.0, 0.0);
+        let char_point2 = LocalCharacterPoint::new(-0.25, -1.0 / 3.0);
+
+        let hextant_point1 = local_character_point_to_local_hextant_point(char_point1);
+        let hextant_point2 = local_character_point_to_local_hextant_point(char_point2);
+
+        assert_about_eq!(hextant_point1.x, 0.5);
+        assert_about_eq!(hextant_point1.y, 1.0);
+        assert_about_eq!(hextant_point2.x, 0.0);
+        assert_about_eq!(hextant_point2.y, 0.0);
     }
 }
