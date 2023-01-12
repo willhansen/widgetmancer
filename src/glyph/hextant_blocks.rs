@@ -92,6 +92,16 @@ fn local_character_point_to_local_hextant_point(
     )
 }
 
+pub fn snap_to_hextant_grid(point: WorldPoint) -> WorldPoint {
+    let hx = 4.0;
+    let dx = 1.0 / 8.0;
+    let hy = 3.0;
+    point2(
+        ((point.x + dx) * hx).round() / hx - dx,
+        (point.y * hy).round() / hy,
+    )
+}
+
 const fn char_is_hextant(character: char) -> bool {
     character == SPACE
         || character == LEFT_HALF_BLOCK
@@ -267,5 +277,16 @@ mod tests {
         assert_about_eq!(hextant_point1.y, 1.0);
         assert_about_eq!(hextant_point2.x, 0.0);
         assert_about_eq!(hextant_point2.y, 0.0);
+    }
+
+    #[test]
+    fn test_snap_to_hextant_grid() {
+        let snapped = snap_to_hextant_grid(point2(0.1, 0.0));
+        assert_about_eq!(snapped.x, 1.0 / 8.0);
+        assert_about_eq!(snapped.y, 0.0);
+
+        let snapped = snap_to_hextant_grid(point2(-0.1, -0.4));
+        assert_about_eq!(snapped.x, -1.0 / 8.0);
+        assert_about_eq!(snapped.y, -1.0 / 3.0);
     }
 }

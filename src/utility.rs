@@ -12,7 +12,8 @@ use itertools::Itertools;
 use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
 use crate::utility::coordinate_frame_conversions::*;
@@ -239,13 +240,21 @@ pub fn is_orthogonal(v: WorldMove) -> bool {
     v.x == 0.0 || v.y == 0.0
 }
 
-pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> default::Vector2D<f32> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
-        v.x = rand::thread_rng().gen_range(-1.0..=1.0);
-        v.y = rand::thread_rng().gen_range(-1.0..=1.0);
+        v.x = rng.gen_range(-1.0..=1.0);
+        v.y = rng.gen_range(-1.0..=1.0);
     }
     v * radius
+}
+
+pub fn get_new_rng() -> StdRng {
+    StdRng::from_rng(rand::thread_rng()).unwrap()
+}
+
+pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+    seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
 
 pub fn random_event(p: f32) -> bool {
@@ -260,7 +269,6 @@ pub fn random_angle() -> Angle<f32> {
 pub fn random_direction() -> FVector {
     let angle = random_angle();
     vec2(angle.radians.cos(), angle.radians.sin())
-    
 }
 
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U> {

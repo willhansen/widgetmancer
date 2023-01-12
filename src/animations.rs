@@ -8,8 +8,10 @@ use euclid::{point2, vec2, Angle, Length};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use termion::color::Black;
+use termion::style::Blink;
 
 use crate::glyph::braille::world_points_for_braille_line;
+use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph_constants::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -176,11 +178,51 @@ impl BlinkAnimation {
 
 impl Animation for BlinkAnimation {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
-        line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
-            .map(|(x, y)| point2(x, y))
-            .flat_map(world_square_to_both_world_character_squares)
-            .map(|char_square| (char_square, Glyph::fg_only(FULL_BLOCK, BLINK_EFFECT_COLOR)))
+        // pretty arbitrary
+        let hash = ((self.start_square.x as f32 * PI + self.start_square.y as f32) * 1000.0
+            + self.end_square.x as f32 * 4.23746287
+            + self.end_square.y as f32 * 87.4736)
+            .abs()
+            .floor()
+            .to_u64()
+            .unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
+
+        let start_speed = 2.0;
+        let motion_direction = (self.end_square.to_f32() - self.start_square.to_f32()).normalize();
+        let start_vel = motion_direction * start_speed;
+
+        let age = time.duration_since(self.creation_time);
+        let total_seconds = BlinkAnimation::DURATION.as_secs_f32();
+        let remaining_seconds = total_seconds - age.as_secs_f32();
+        let spent_seconds = age.as_secs_f32();
+        let lifetime_fraction_remaining = remaining_seconds / total_seconds;
+        let lifetime_fraction_spent = spent_seconds / total_seconds;
+
+        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 15.0;
+        let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
+
+        let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
+        let displacement = blink_vector * (1.0 - (-lifetime_fraction_spent * time_constant).exp());
+
+        let base_points: Vec<WorldPoint> = (0..20)
+            .into_iter()
+            .map(|i| {
+                self.start_square.to_f32() + seeded_rand_radial_offset(&mut rng, 2.0).cast_unit()
+            })
+            .map(snap_to_hextant_grid)
+            .collect();
+
+        points_to_hextant_chars(base_points.into_iter().map(|p| p + displacement).collect())
+            .into_iter()
+            .map(|(square, c)| (square, Glyph::fg_only(c, BLINK_EFFECT_COLOR)))
             .collect()
+
+        //line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
+        //.map(|(x, y)| point2(x, y))
+        //.flat_map(world_square_to_both_world_character_squares)
+        //.map(|char_square| (char_square, Glyph::fg_only(FULL_BLOCK, BLINK_EFFECT_COLOR)))
+        //.collect()
     }
 
     fn finished_at_time(&self, time: Instant) -> bool {
