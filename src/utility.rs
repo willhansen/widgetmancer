@@ -9,6 +9,7 @@ use std::ops::{Add, Neg};
 
 use euclid::*;
 use itertools::Itertools;
+use line_drawing::Point;
 use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
@@ -77,6 +78,9 @@ impl<U> Line<f32, U> {
     }
     pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
+    }
+    pub fn lerp(&self, t: f32) -> Point2D<f32, U> {
+        lerp2d(self.p1, self.p2, t)
     }
 }
 
@@ -280,6 +284,9 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a * (1.0 - t) + b * t
 }
+pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32, U> {
+    point2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
+}
 
 pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     if dx == 0.0 {
@@ -426,6 +433,24 @@ pub fn same_side_of_line<U>(
     let point_a = line.p1;
     let point_b = line.p2;
     is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
+}
+
+pub fn seeded_random_point_on_line<U>(rng: &mut StdRng, line: Line<f32, U>) -> Point2D<f32, U> {
+    let t = rng.gen_range(0.0..=1.0);
+    line.lerp(t)
+}
+
+pub fn seeded_random_point_near_line<U>(
+    rng: &mut StdRng,
+    line: Line<f32, U>,
+    radius: f32,
+) -> Point2D<f32, U> {
+    // TODO: make more uniform
+    seeded_random_point_on_line(rng, line) + seeded_rand_radial_offset(rng, radius).cast_unit()
+}
+
+pub fn random_point_near_line<U>(line: Line<f32, U>, radius: f32) -> Point2D<f32, U> {
+    seeded_random_point_near_line(&mut get_new_rng(), line, radius)
 }
 
 pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
