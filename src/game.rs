@@ -181,6 +181,9 @@ impl Game {
             }
             candidate_square = next_square;
         }
+        if candidate_square == start_square {
+            return;
+        }
         self.move_player_to(candidate_square);
         self.graphics
             .do_blink_animation(start_square, candidate_square);
@@ -1584,11 +1587,6 @@ mod tests {
         // TODO: why is the duration necessary? (might be just a random empty block)
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(0.1));
         let glyphs = game.graphics.get_buffered_glyphs_for_square(mid_square);
-        dbg!(
-            glyphs.to_clean_string(),
-            glyphs[0].fg_color,
-            glyphs[1].fg_color
-        );
 
         //assert!(!glyphs.looks_solid());
         assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
@@ -1603,20 +1601,30 @@ mod tests {
         let end_pos = game.player_square();
         game.player_blink(STEP_LEFT);
 
-        // TODO: why is the duration necessary?
-        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(0.1));
-        //game.draw_headless_now();
-        let delta = end_pos - start_pos;
-        for dx in 1..delta.x {
-            let square = start_pos + vec2(dx, 0);
-            let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
-            dbg!(
-                glyphs.to_clean_string(),
-                glyphs[0].fg_color,
-                glyphs[1].fg_color
-            );
-            assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
-            assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
+        let blink_step = end_pos - start_pos;
+
+        for i in 0..20 {
+            // TODO: why is the duration necessary? (might be just randomness)
+            let delta = Duration::from_secs_f32(i as f32 * 0.1);
+            game.draw_headless_at_duration_from_start(delta);
+            //game.draw_headless_now();
+            for dx in 1..blink_step.x {
+                let square = start_pos + vec2(dx, 0);
+                let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+                dbg!(
+                    glyphs.to_clean_string(),
+                    glyphs[0].fg_color,
+                    glyphs[1].fg_color
+                );
+                assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
+                assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
+            }
         }
+    }
+    #[test]
+    fn test_try_to_blink_but_blocked() {
+        let mut game = set_up_game();
+        game.place_player(point2(0, 0));
+        game.player_blink(STEP_LEFT);
     }
 }
