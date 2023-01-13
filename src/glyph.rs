@@ -280,7 +280,7 @@ impl Glyph {
         [Glyph::fg_only(' ', BLACK); 2]
     }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
-        [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, RED); 2]
+        [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
     }
 
     pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
@@ -306,16 +306,22 @@ impl Glyph {
         let mut output_glyph = self.clone();
         if self.bg_transparent == true {
             let glyph_directly_below = background_glyphs[position_index];
+            output_glyph.bg_transparent = glyph_directly_below.bg_transparent;
             if self.is_braille() && glyph_directly_below.is_braille() {
                 output_glyph.character =
                     combine_braille_characters(self.character, glyph_directly_below.character);
+                output_glyph.bg_color = glyph_directly_below.bg_color;
+            } else if char_is_hextant(self.character)
+                && char_is_hextant(glyph_directly_below.character)
+            {
+                output_glyph.character =
+                    combine_hextant_characters(self.character, glyph_directly_below.character);
                 output_glyph.bg_color = glyph_directly_below.bg_color;
             } else {
                 let bg_colors = background_glyphs.solid_color_if_backgroundified();
                 output_glyph.bg_color = bg_colors[position_index];
             }
         }
-        output_glyph.bg_transparent = false;
         output_glyph
     }
 
@@ -652,5 +658,25 @@ mod tests {
                 bg_transparent: false,
             }
         );
+    }
+
+    #[test]
+    fn test_hextant_drawn_over_hextant_combines() {
+        let bottom_glyphs = [Glyph::fg_only('🬀', RED); 2];
+        let top_glyphs = [Glyph::fg_only('🬑', RED); 2];
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+
+        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
+        assert_eq!(combo_glyphs[0], Glyph::fg_only('🬒', RED));
+    }
+
+    #[test]
+    fn test_braille_drawn_over_braille_combines() {
+        let bottom_glyphs = [Glyph::fg_only('⠎', RED); 2];
+        let top_glyphs = [Glyph::fg_only('⠁', RED); 2];
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+
+        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
+        assert_eq!(combo_glyphs[0], Glyph::fg_only('⠏', RED));
     }
 }

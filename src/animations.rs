@@ -205,7 +205,7 @@ impl Animation for BlinkAnimation {
         let lifetime_fraction_remaining = remaining_seconds / total_seconds;
         let lifetime_fraction_spent = spent_seconds / total_seconds;
 
-        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 3.0;
+        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 5.0;
         let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
         let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
@@ -214,9 +214,16 @@ impl Animation for BlinkAnimation {
         let points_per_square_blinked = 3.0;
         let distance_blinked = (start_point - end_point).length();
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
+        let point_spread_radius = 0.5;
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
-            .map(|i| seeded_random_point_near_line(&mut rng, float_line_centered_on_start, 0.5))
+            .map(|i| {
+                seeded_random_point_near_line(
+                    &mut rng,
+                    float_line_centered_on_start,
+                    point_spread_radius,
+                )
+            })
             .map(snap_to_hextant_grid)
             .collect();
 

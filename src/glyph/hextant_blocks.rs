@@ -50,17 +50,17 @@ pub fn hextant_block_by_offset(hextant_grid_steps: IVector) -> char {
     }
 }
 pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
-    let as_binary = hextant_array_as_binary(hextant_array);
+    let as_binary = hextant_array_to_binary(hextant_array);
     let before_half_left = '🬓';
     let after_half_left = '🬔';
     let before_half_right = '🬧';
     let after_half_right = '🬨';
 
     match as_binary {
-        const { hextant_character_as_binary(SPACE) } => SPACE,
-        const { hextant_character_as_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
-        const { hextant_character_as_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
-        const { hextant_character_as_binary(FULL_BLOCK) } => FULL_BLOCK,
+        const { hextant_character_to_binary(SPACE) } => SPACE,
+        const { hextant_character_to_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
+        const { hextant_character_to_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
+        const { hextant_character_to_binary(FULL_BLOCK) } => FULL_BLOCK,
         _ => {
             let unadjusted_value = FIRST_HEXTANT as u32 + as_binary as u32;
             let offset = if unadjusted_value
@@ -77,6 +77,10 @@ pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
             char::from_u32(unadjusted_value - offset).unwrap()
         }
     }
+}
+
+fn binary_to_hextant_char(binary: u8) -> char {
+    hextant_array_to_char(binary_to_hextant_array(binary))
 }
 
 fn local_character_point_to_local_hextant_point(
@@ -102,7 +106,7 @@ pub fn snap_to_hextant_grid(point: WorldPoint) -> WorldPoint {
     )
 }
 
-const fn char_is_hextant(character: char) -> bool {
+pub const fn char_is_hextant(character: char) -> bool {
     character == SPACE
         || character == LEFT_HALF_BLOCK
         || character == RIGHT_HALF_BLOCK
@@ -110,7 +114,7 @@ const fn char_is_hextant(character: char) -> bool {
         || (FIRST_HEXTANT <= character && character <= LAST_HEXTANT)
 }
 
-fn hextant_array_as_binary(hextant_array: HextantArray) -> u8 {
+fn hextant_array_to_binary(hextant_array: HextantArray) -> u8 {
     let mut out = 0;
     for row in 0..hextant_array.len() {
         for column in 0..hextant_array[row].len() {
@@ -122,7 +126,20 @@ fn hextant_array_as_binary(hextant_array: HextantArray) -> u8 {
     }
     out
 }
-const fn hextant_character_as_binary(hextant_character: char) -> u8 {
+
+fn binary_to_hextant_array(mut binary: u8) -> HextantArray {
+    let mut out: HextantArray = [[false; 2]; 3];
+    for row in 0..3 {
+        for column in 0..2 {
+            let this_bit_is_set = binary % 2 == 1;
+            binary /= 2;
+            out[row][column] = this_bit_is_set;
+        }
+    }
+    out
+}
+
+const fn hextant_character_to_binary(hextant_character: char) -> u8 {
     assert!(char_is_hextant(hextant_character));
     let before_half_left = '🬓';
     let before_half_right = '🬧';
@@ -145,10 +162,16 @@ const fn hextant_character_as_binary(hextant_character: char) -> u8 {
     }
 }
 
+pub fn combine_hextant_characters(a: char, b: char) -> char {
+    assert!(char_is_hextant(a));
+    assert!(char_is_hextant(b));
+    binary_to_hextant_char(hextant_character_to_binary(a) | hextant_character_to_binary(b))
+}
+
 fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
     // If its empty, full, and horizontal halfblocks weren't already taken
     assert!(char_is_hextant(character));
-    FIRST_HEXTANT as u32 + hextant_character_as_binary(character) as u32
+    FIRST_HEXTANT as u32 + hextant_character_to_binary(character) as u32
 }
 
 fn local_hextant_squares_to_char(local_hextant_squares: HashSet<LocalHextantSquare>) -> char {
@@ -288,5 +311,22 @@ mod tests {
         let snapped = snap_to_hextant_grid(point2(-0.1, -0.4));
         assert_about_eq!(snapped.x, -1.0 / 8.0);
         assert_about_eq!(snapped.y, -1.0 / 3.0);
+    }
+
+    #[test]
+    fn test_hextant_array_to_binary_and_back() {
+        let arrays: Vec<HextantArray> = vec![
+            [[false, false], [false, false], [false, false]],
+            [[true, true], [true, true], [true, true]],
+            [[false, false], [true, false], [false, false]],
+            [[false, false], [true, false], [false, true]],
+        ];
+
+        for array in arrays {
+            assert_eq!(
+                array,
+                binary_to_hextant_array(hextant_array_to_binary(array))
+            );
+        }
     }
 }
