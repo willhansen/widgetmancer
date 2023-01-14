@@ -82,6 +82,21 @@ impl<U> Line<f32, U> {
     pub fn lerp(&self, t: f32) -> Point2D<f32, U> {
         lerp2d(self.p1, self.p2, t)
     }
+    pub fn point_is_on_or_normal_to_line(&self, point: Point2D<f32, U>) -> bool {
+        let start_point = self.p1;
+        let end_point = self.p2;
+
+        let point_relative_to_start_point = point - start_point;
+        let end_point_relative_to_start_point = end_point - start_point;
+        let point_is_on_end_side_of_start_point =
+            point_relative_to_start_point.dot(end_point_relative_to_start_point) > 0.0;
+
+        let point_relative_to_end_point = point - end_point;
+        let point_is_on_start_side_of_end_point =
+            point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
+
+        point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
+    }
 }
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {

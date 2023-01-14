@@ -1159,7 +1159,7 @@ impl Game {
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
         );
-        self.place_death_turret(self.player_square() + STEP_LEFT * 4);
+        self.place_death_turret(self.player_square() + STEP_LEFT * 14);
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
@@ -1611,13 +1611,14 @@ mod tests {
             for dx in 1..blink_step.x {
                 let square = start_pos + vec2(dx, 0);
                 let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
-                dbg!(
-                    glyphs.to_clean_string(),
-                    glyphs[0].fg_color,
-                    glyphs[1].fg_color
-                );
-                assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
-                assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
+                dbg!(glyphs);
+                // There might not be particles in every character square.  Don't test the empty ones
+                if !glyphs[0].looks_solid() {
+                    assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
+                }
+                if !glyphs[1].looks_solid() {
+                    assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
+                }
             }
         }
     }

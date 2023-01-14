@@ -188,7 +188,12 @@ impl Animation for BlinkAnimation {
             .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
 
+        // the tunable constants
         let start_speed = 2.0;
+        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 4.0;
+        let points_per_square_blinked = 3.0;
+        let point_spread_radius = 0.5;
+
         let motion_direction = (self.end_square.to_f32() - self.start_square.to_f32()).normalize();
         let start_vel = motion_direction * start_speed;
 
@@ -205,16 +210,13 @@ impl Animation for BlinkAnimation {
         let lifetime_fraction_remaining = remaining_seconds / total_seconds;
         let lifetime_fraction_spent = spent_seconds / total_seconds;
 
-        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 5.0;
         let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
         let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
         let displacement = blink_vector * (1.0 - (-lifetime_fraction_spent * time_constant).exp());
 
-        let points_per_square_blinked = 3.0;
         let distance_blinked = (start_point - end_point).length();
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
-        let point_spread_radius = 0.5;
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
             .map(|i| {
@@ -230,20 +232,10 @@ impl Animation for BlinkAnimation {
         let moved_points: Vec<WorldPoint> =
             base_points.into_iter().map(|p| p + displacement).collect();
 
+        let blink_line = Line::new(start_point, end_point);
         let visible_points: Vec<WorldPoint> = moved_points
             .into_iter()
-            .filter(|&point| {
-                let point_relative_to_start_point = point - start_point;
-                let end_point_relative_to_start_point = end_point - start_point;
-                let point_is_on_end_side_of_start_point =
-                    point_relative_to_start_point.dot(end_point_relative_to_start_point) > 0.0;
-
-                let point_relative_to_end_point = point - end_point;
-                let point_is_on_start_side_of_end_point =
-                    point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
-
-                point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
-            })
+            .filter(|&point| blink_line.point_is_on_or_normal_to_line(point))
             .collect();
 
         points_to_hextant_chars(visible_points)

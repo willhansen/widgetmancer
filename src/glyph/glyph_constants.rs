@@ -7,6 +7,7 @@ pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
 pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
 pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
 pub const COBALT_BLUE: RGB8 = RGB8::new(0, 71, 171);
+pub const LIGHTISH_BLUE: RGB8 = RGB8::new(0, 130, 170);
 pub const CYAN: RGB8 = RGB8::new(0, 255, 255);
 pub const DARK_CYAN: RGB8 = RGB8::new(0, 127, 127);
 pub const MAGENTA: RGB8 = RGB8::new(255, 0, 255);
@@ -26,7 +27,7 @@ pub const DANGER_SQUARE_COLOR: RGB8 = GREY_RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
 pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
 pub const RED_PAWN_COLOR: RGB8 = RED;
-pub const BLINK_EFFECT_COLOR: RGB8 = COBALT_BLUE;
+pub const BLINK_EFFECT_COLOR: RGB8 = LIGHTISH_BLUE;
 
 pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = BLACK;

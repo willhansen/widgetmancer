@@ -307,7 +307,9 @@ impl Glyph {
         if self.bg_transparent == true {
             let glyph_directly_below = background_glyphs[position_index];
             output_glyph.bg_transparent = glyph_directly_below.bg_transparent;
-            if self.is_braille() && glyph_directly_below.is_braille() {
+            if self.character == SPACE {
+                return glyph_directly_below;
+            } else if self.is_braille() && glyph_directly_below.is_braille() {
                 output_glyph.character =
                     combine_braille_characters(self.character, glyph_directly_below.character);
                 output_glyph.bg_color = glyph_directly_below.bg_color;
@@ -662,17 +664,27 @@ mod tests {
 
     #[test]
     fn test_hextant_drawn_over_hextant_combines() {
-        let bottom_glyphs = [Glyph::fg_only('🬀', RED); 2];
+        let bottom_glyphs = [Glyph::fg_only('🬀', GREEN); 2];
         let top_glyphs = [Glyph::fg_only('🬑', RED); 2];
         let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
 
         assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
         assert_eq!(combo_glyphs[0], Glyph::fg_only('🬒', RED));
     }
+    #[test]
+    fn test_space_drawn_over_hextant_does_nothing() {
+        let the_char = '🬒';
+        let bottom_glyphs = [Glyph::fg_only(the_char, RED); 2];
+        let top_glyphs = [Glyph::fg_only(SPACE, BLUE); 2];
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+
+        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
+        assert_eq!(combo_glyphs[0], Glyph::fg_only(the_char, RED));
+    }
 
     #[test]
     fn test_braille_drawn_over_braille_combines() {
-        let bottom_glyphs = [Glyph::fg_only('⠎', RED); 2];
+        let bottom_glyphs = [Glyph::fg_only('⠎', BLUE); 2];
         let top_glyphs = [Glyph::fg_only('⠁', RED); 2];
         let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
 
