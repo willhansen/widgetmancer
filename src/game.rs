@@ -1213,7 +1213,7 @@ mod tests {
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::{BLINK_EFFECT_COLOR, RED_PAWN_COLOR};
+    use crate::glyph::glyph_constants::{BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, RED_PAWN_COLOR};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::piece::PieceType::Rook;
     use crate::utility::{
@@ -1627,5 +1627,18 @@ mod tests {
         let mut game = set_up_game();
         game.place_player(point2(0, 0));
         game.player_blink(STEP_LEFT);
+    }
+
+    #[test]
+    fn test_protected_piece_has_fully_colored_background() {
+        let mut game = set_up_game();
+        let square1 = point2(5, 5);
+        game.place_red_pawn(square1);
+        game.place_red_pawn(square1 + STEP_UP_RIGHT);
+        game.draw_headless_now();
+        let pawn_glyphs = game.graphics.get_buffered_glyphs_for_square(square1);
+
+        assert_eq!(pawn_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
+        assert_eq!(pawn_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
     }
 }

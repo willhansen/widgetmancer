@@ -27,7 +27,7 @@ pub const DANGER_SQUARE_COLOR: RGB8 = GREY_RED;
 pub const PATH_COLOR: RGB8 = MAGENTA;
 pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
 pub const RED_PAWN_COLOR: RGB8 = RED;
-pub const BLINK_EFFECT_COLOR: RGB8 = LIGHTISH_BLUE;
+pub const BLINK_EFFECT_COLOR: RGB8 = COBALT_BLUE;
 
 pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = BLACK;
@@ -98,6 +98,8 @@ pub const EIGHTH_BLOCKS_FROM_TOP: &[char] = &[
 ];
 
 pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
+
+pub const THICK_ARROWS: &[char] = &['🢀', '🢂', '🢁', '🢃', '🢄', '🢅', '🢆', '🢇'];
 
 // tiny squid: ᵜ
 // big squid: ᴥ (or a jelly thing from zelda)
