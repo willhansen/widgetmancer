@@ -13,6 +13,8 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{get_new_rng, random_choice};
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
+pub const MAX_PIECE_RANGE: u32 = 5;
+
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
 pub enum PieceType {
     Pawn,
