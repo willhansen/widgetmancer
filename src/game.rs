@@ -339,6 +339,23 @@ impl Game {
         }
     }
 
+    pub fn place_random_3x3_faction(&mut self, king_square: WorldSquare) {
+        let faction = self.get_new_faction();
+        self.place_piece(Piece::new(PieceType::King, faction), king_square);
+        for x in -1..=1 {
+            for y in -1..=1 {
+                let square = king_square + vec2(x, y);
+                if square == king_square {
+                    continue;
+                }
+                self.place_piece(
+                    Piece::new(Piece::random_subordinate_type(), faction),
+                    square,
+                );
+            }
+        }
+    }
+
     pub fn place_linear_death_cube(&mut self, position: WorldPoint, velocity: WorldMove) {
         self.death_cubes.push(DeathCube { position, velocity });
     }
@@ -1147,6 +1164,7 @@ impl Game {
         let distance = 5;
         self.place_new_king_pawn_faction(self.player_square() + STEP_UP_LEFT * distance);
         self.place_new_king_pawn_faction(self.player_square() + STEP_UP * distance);
+        self.place_random_3x3_faction(self.player_square() + STEP_UP * distance * 2);
         self.place_new_king_pawn_faction(self.player_square() + STEP_UP_RIGHT * distance);
     }
 

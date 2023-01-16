@@ -290,6 +290,10 @@ pub fn random_direction() -> FVector {
     vec2(angle.radians.cos(), angle.radians.sin())
 }
 
+pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
+    v.get(rng.gen_range(0..v.len())).unwrap()
+}
+
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U> {
     let angle = vector.angle_from_x_axis();
     let new_angle = angle + Angle::radians(radians);

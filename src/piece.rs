@@ -10,6 +10,7 @@ use crate::glyph_constants::*;
 
 use crate::glyph::DoubleGlyph;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::{get_new_rng, random_choice};
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
@@ -87,6 +88,18 @@ impl Piece {
     }
     pub fn king() -> Piece {
         Piece::from_type(PieceType::King)
+    }
+
+    pub fn random_subordinate_type() -> PieceType {
+        let mut rng = get_new_rng();
+        let options = vec![
+            PieceType::Pawn,
+            PieceType::Knight,
+            PieceType::Bishop,
+            PieceType::Rook,
+            PieceType::Queen,
+        ];
+        *random_choice(&mut rng, &options)
     }
 
     pub fn glyphs(&self) -> DoubleGlyph {
