@@ -21,7 +21,7 @@ use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::{DeathCubeTurret, Pawn};
-use crate::piece::{Faction, FactionFactory, Piece, PieceType, MAX_PIECE_RANGE};
+use crate::piece::{Faction, FactionFactory, Piece, PieceType, Upgrade, MAX_PIECE_RANGE};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -40,6 +40,7 @@ pub struct DeathCube {
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: WorldStep,
+    pub blink_range: u32,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
@@ -57,6 +58,7 @@ pub struct Game {
     player_optional: Option<Player>,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
+    upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     turn_count: u32,
     selectors: Vec<Selector>,
@@ -79,6 +81,7 @@ impl Game {
             player_optional: None,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
+            upgrades: HashMap::new(),
             blocks: HashSet::new(),
             turn_count: 0,
             selectors: vec![],
@@ -121,6 +124,7 @@ impl Game {
         self.player_optional = Some(Player {
             position: square,
             faced_direction: LEFT_I.cast_unit(),
+            blink_range: 5,
         });
     }
 
@@ -145,7 +149,7 @@ impl Game {
         self.running
     }
 
-    pub fn move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
+    pub fn try_move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         self.raw_set_player_faced_direction(round_to_king_step(movement));
         let new_pos = self.player_square() + movement;
         if self
@@ -159,14 +163,14 @@ impl Game {
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
-        self.move_player(square - self.player_square())
+        self.try_move_player(square - self.player_square())
             .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
     }
 
     pub fn player_blink(&mut self, direction: WorldStep) {
         assert!(is_king_step(direction));
         let start_square = self.player_square();
-        let blink_range = 5;
+        let blink_range = self.player().blink_range as i32;
         let ideal_end_square = start_square + direction * blink_range;
 
         let mut candidate_square = start_square;
@@ -204,6 +208,10 @@ impl Game {
         }
     }
 
+    pub fn player(&mut self) -> &mut Player {
+        self.player_optional.as_mut().unwrap()
+    }
+
     pub fn try_set_player_position(&mut self, square: WorldSquare) -> Result<(), ()> {
         if self.is_non_player_piece_at(square) {
             self.capture_piece_at(square);
@@ -211,6 +219,11 @@ impl Game {
 
         if !self.square_is_on_board(square) || self.is_block_at(square) {
             return Err(());
+        }
+
+        if let Some(&upgrade) = self.upgrades.get(&square) {
+            self.apply_upgrade(upgrade);
+            self.upgrades.remove(&square);
         }
 
         self.raw_set_player_position(square);
@@ -321,8 +334,11 @@ impl Game {
         self.player_is_alive() && self.try_get_player_square() == Some(square)
     }
 
-    fn square_is_empty(&self, pos: WorldSquare) -> bool {
-        !self.is_player_at(pos) && !self.is_non_player_piece_at(pos) && !self.is_block_at(pos)
+    fn square_is_empty(&self, square: WorldSquare) -> bool {
+        !self.is_player_at(square)
+            && !self.is_non_player_piece_at(square)
+            && !self.is_block_at(square)
+            && !self.is_upgrade_at(square)
     }
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
@@ -451,6 +467,11 @@ impl Game {
         );
     }
 
+    pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
+        assert!(self.square_is_empty(square));
+        self.upgrades.insert(square, upgrade_type);
+    }
+
     pub fn tick_pawn_incubation(&mut self) {
         let found_incubation_squares: SquareSet =
             self.empty_squares_surrounded_by_pawns_of_one_faction();
@@ -530,9 +551,14 @@ impl Game {
     pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
         self.get_piece_at(square).is_some()
     }
+
     pub fn is_piece_at(&self, square: WorldSquare) -> bool {
         self.get_piece_at(square).is_some()
             || self.try_get_player_square().is_some_and(|s| s == square)
+    }
+
+    pub fn is_upgrade_at(&self, square: WorldSquare) -> bool {
+        self.upgrades.contains_key(&square)
     }
 
     pub fn piece_type_count(&self, piece_type: PieceType) -> i32 {
@@ -1118,6 +1144,15 @@ impl Game {
             .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
 
+    pub fn apply_upgrade(&mut self, upgrade: Upgrade) {
+        assert!(self.player_is_alive());
+        match upgrade {
+            Upgrade::BlinkRange => {
+                self.player().blink_range += 1;
+            }
+        }
+    }
+
     pub fn capture_piece_at(&mut self, square: WorldSquare) {
         if !self.square_is_on_board(square) {
             panic!(
@@ -1228,12 +1263,14 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, RED_PAWN_COLOR};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::piece::PieceType::Rook;
+    use crate::piece::Upgrade;
     use crate::utility::{
         STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
     };
@@ -1658,5 +1695,33 @@ mod tests {
 
         assert_eq!(pawn_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
         assert_eq!(pawn_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
+    }
+
+    #[test]
+    fn test_blink_range_upgrade() {
+        let mut game = set_up_nxn_game(20);
+        let start = point2(5, 5);
+        game.place_player(start);
+        let start_blink_range = 3;
+        game.player().blink_range = start_blink_range;
+        game.player_blink(STEP_RIGHT);
+        assert_eq!(
+            (start - game.player_square()).square_length().sqrt(),
+            start_blink_range as i32
+        );
+
+        let upgrade_square = point2(5, 6);
+        game.place_upgrade(Upgrade::BlinkRange, upgrade_square);
+
+        game.move_player_to(upgrade_square);
+
+        game.player_blink(STEP_RIGHT);
+
+        assert_eq!(
+            (upgrade_square - game.player_square())
+                .square_length()
+                .sqrt(),
+            start_blink_range as i32 + 1
+        );
     }
 }

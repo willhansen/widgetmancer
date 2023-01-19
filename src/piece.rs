@@ -16,6 +16,11 @@ use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockw
 pub const MAX_PIECE_RANGE: u32 = 5;
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
+pub enum Upgrade {
+    BlinkRange,
+}
+
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
 pub enum PieceType {
     Pawn,
     Knight,
