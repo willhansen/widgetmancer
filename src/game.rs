@@ -316,6 +316,9 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
+        self.upgrades
+            .iter()
+            .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
         self.death_cubes
             .iter()
             .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
@@ -1208,6 +1211,14 @@ impl Game {
         self.place_random_3x3_faction(self.player_square() + STEP_UP * distance * 2);
         self.place_new_king_pawn_faction(self.player_square() + STEP_UP_RIGHT * distance);
     }
+    pub fn set_up_upgrades_galore(&mut self) {
+        for i in 0..8 {
+            self.place_upgrade(
+                Upgrade::BlinkRange,
+                self.player_square() + STEP_UP * 5 + STEP_RIGHT * i,
+            );
+        }
+    }
 
     pub fn set_up_columns(&mut self) {
         self.place_block(self.player_square() + STEP_RIGHT * 4);
@@ -1672,7 +1683,7 @@ mod tests {
             for dx in 1..blink_step.x {
                 let square = start_pos + vec2(dx, 0);
                 let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
-                dbg!(glyphs);
+                //dbg!(glyphs);
                 // There might not be particles in every character square.  Don't test the empty ones
                 if !glyphs[0].looks_solid() {
                     assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);

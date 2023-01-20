@@ -12,6 +12,7 @@ use termion::color;
 use termion::color::Black;
 
 use crate::glyph::floating_square::character_for_square_with_1d_offset;
+use crate::piece::Upgrade;
 use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
@@ -235,6 +236,10 @@ impl Glyph {
         glyphs[0].fg_color = PLAYER_GREEN;
 
         glyphs
+    }
+
+    pub fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
+        [Glyph::fg_only('😜', CYAN), Glyph::transparent_glyph()]
     }
 
     pub fn looks_solid_color(&self, color: RGB8) -> bool {

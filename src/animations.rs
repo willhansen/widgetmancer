@@ -189,12 +189,20 @@ impl Animation for BlinkAnimation {
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
 
         // the tunable constants
-        let start_speed = 2.0;
-        let time_constant = BlinkAnimation::DURATION.as_secs_f32() * 4.0;
+        let ostensible_blink_duration = 0.2;
+        let settling_time = 0.8;
+
+        let time_constant = settling_time / 5.0;
+
         let points_per_square_blinked = 3.0;
         let point_spread_radius = 0.5;
 
-        let motion_direction = (self.end_square.to_f32() - self.start_square.to_f32()).normalize();
+        let motion_vector = self.end_square.to_f32() - self.start_square.to_f32();
+        let motion_direction = motion_vector.normalize();
+        let motion_distance = motion_vector.length();
+
+        let start_speed = motion_distance / ostensible_blink_duration;
+
         let start_vel = motion_direction * start_speed;
 
         let end_point = self.end_square.to_f32();
@@ -210,10 +218,10 @@ impl Animation for BlinkAnimation {
         let lifetime_fraction_remaining = remaining_seconds / total_seconds;
         let lifetime_fraction_spent = spent_seconds / total_seconds;
 
-        let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
+        //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
         let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
-        let displacement = blink_vector * (1.0 - (-lifetime_fraction_spent * time_constant).exp());
+        let displacement = blink_vector * (1.0 - (-spent_seconds / time_constant).exp());
 
         let distance_blinked = (start_point - end_point).length();
         let num_points = (points_per_square_blinked * distance_blinked) as u32;

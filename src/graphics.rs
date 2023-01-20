@@ -24,7 +24,7 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
-use crate::piece::Piece;
+use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::hue_to_rgb;
 use crate::{
@@ -443,6 +443,11 @@ impl Graphics {
 
         self.draw_glyphs_for_square(square, piece_glyphs);
     }
+
+    pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
+        self.draw_glyphs_for_square(square, Glyph::glyphs_for_upgrade(upgrade));
+    }
+
     pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set
             .into_iter()
