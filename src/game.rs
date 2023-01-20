@@ -1166,12 +1166,18 @@ impl Game {
                 point_to_string(square)
             );
         }
-        if self.try_get_player_square().is_some_and(|s| s == square) {
+        if self.try_get_player_square() == Some(square) {
             self.kill_player();
-        } else {
-            self.pieces.remove(&square);
-            self.graphics.start_piece_death_animation_at(square);
+            return;
         }
+
+        let piece = self.pieces.remove(&square).unwrap();
+
+        if piece.piece_type == PieceType::King {
+            self.place_upgrade(Upgrade::BlinkRange, square);
+        }
+
+        self.graphics.start_piece_death_animation_at(square);
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1723,5 +1729,18 @@ mod tests {
                 .sqrt(),
             start_blink_range as i32 + 1
         );
+    }
+
+    #[test]
+    fn test_kings_drop_upgrades() {
+        let mut game = set_up_game();
+        let square = point2(5, 5);
+        game.place_piece(
+            Piece::new(PieceType::King, game.default_enemy_faction),
+            square,
+        );
+        assert!(game.upgrades.is_empty());
+        game.capture_piece_at(square);
+        assert_eq!(game.upgrades.get(&square).unwrap(), &Upgrade::BlinkRange);
     }
 }
