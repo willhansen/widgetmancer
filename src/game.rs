@@ -1653,16 +1653,20 @@ mod tests {
         let start_pos = game.player_square();
         game.player_blink(STEP_RIGHT);
         let end_pos = game.player_square();
-        let mid_square =
-            WorldSquare::new((start_pos.x + end_pos.x) / 2, (start_pos.y + end_pos.y) / 2);
 
         // TODO: why is the duration necessary? (might be just a random empty block)
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(0.1));
-        let glyphs = game.graphics.get_buffered_glyphs_for_square(mid_square);
 
-        //assert!(!glyphs.looks_solid());
-        assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
-        assert_eq!(glyphs[1].fg_color, BLINK_EFFECT_COLOR);
+        // check all the intermediate squares, but only require at least one of the two characters in each square has a particle
+        (start_pos.x + 1..end_pos.x).for_each(|x| {
+            let square = point2(x, start_pos.y);
+            let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+            //assert!(!glyphs.looks_solid());
+            assert!(
+                glyphs[0].fg_color == BLINK_EFFECT_COLOR
+                    || glyphs[1].fg_color == BLINK_EFFECT_COLOR
+            );
+        })
     }
 
     #[test]
