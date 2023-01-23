@@ -1219,6 +1219,16 @@ impl Game {
             );
         }
     }
+    pub fn set_up_homogeneous_army(&mut self, piece_type: PieceType) {
+        for y in 0..3 {
+            for x in 0..8 {
+                self.place_piece(
+                    Piece::from_type(piece_type),
+                    self.player_square() + STEP_UP * (5 + y) + STEP_RIGHT * (x - 3),
+                );
+            }
+        }
+    }
 
     pub fn set_up_columns(&mut self) {
         self.place_block(self.player_square() + STEP_RIGHT * 4);
@@ -1757,5 +1767,36 @@ mod tests {
         assert!(game.upgrades.is_empty());
         game.capture_piece_at(square);
         assert_eq!(game.upgrades.get(&square).unwrap(), &Upgrade::BlinkRange);
+    }
+    #[test]
+    fn test_soldier() {
+        let mut game = set_up_game();
+        let square = point2(5, 5);
+        game.place_piece(Piece::from_type(PieceType::Soldier), square);
+        assert!(game
+            .move_squares_for_piece_at(square, false)
+            .contains(&(square + STEP_RIGHT)));
+        assert!(game
+            .guarded_squares_for_piece_at(square)
+            .contains(&(square + STEP_RIGHT)))
+    }
+    #[test]
+    fn test_turning_soldier_turns_toward_player() {
+        let mut game = set_up_game();
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+
+        let soldier_square = player_square + STEP_LEFT * 3;
+        game.place_piece(Piece::from_type(PieceType::TurningSoldier), soldier_square);
+
+        assert_eq!(
+            game.move_options_for_piece_at(soldier_square),
+            vec![soldier_square + STEP_UP]
+        );
+        game.move_all_pieces();
+        assert_eq!(
+            game.move_options_for_piece_at(soldier_square),
+            vec![soldier_square + STEP_RIGHT]
+        );
     }
 }

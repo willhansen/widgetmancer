@@ -9,8 +9,9 @@ use strum_macros::EnumIter;
 use crate::glyph_constants::*;
 
 use crate::glyph::DoubleGlyph;
+use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{get_new_rng, random_choice};
+use crate::utility::{get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS};
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
@@ -23,6 +24,8 @@ pub enum Upgrade {
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
 pub enum PieceType {
     Pawn,
+    Soldier,
+    TurningSoldier,
     Knight,
     Bishop,
     Rook,
@@ -79,33 +82,27 @@ impl Piece {
     }
 
     pub fn pawn() -> Piece {
-        Piece::from_type(PieceType::Pawn)
+        Piece::from_type(Pawn)
     }
     pub fn knight() -> Piece {
-        Piece::from_type(PieceType::Knight)
+        Piece::from_type(Knight)
     }
     pub fn bishop() -> Piece {
-        Piece::from_type(PieceType::Bishop)
+        Piece::from_type(Bishop)
     }
     pub fn rook() -> Piece {
-        Piece::from_type(PieceType::Rook)
+        Piece::from_type(Rook)
     }
     pub fn queen() -> Piece {
-        Piece::from_type(PieceType::Queen)
+        Piece::from_type(Queen)
     }
     pub fn king() -> Piece {
-        Piece::from_type(PieceType::King)
+        Piece::from_type(King)
     }
 
     pub fn random_subordinate_type() -> PieceType {
         let mut rng = get_new_rng();
-        let options = vec![
-            PieceType::Pawn,
-            PieceType::Knight,
-            PieceType::Bishop,
-            PieceType::Rook,
-            PieceType::Queen,
-        ];
+        let options = vec![Pawn, Knight, Bishop, Rook, Queen];
         *random_choice(&mut rng, &options)
     }
 
@@ -120,26 +117,23 @@ impl Piece {
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
-            PieceType::Pawn => ['♟', ' '],
-            PieceType::Knight => ['♞', ' '],
-            PieceType::Bishop => ['♝', ' '],
-            PieceType::Rook => ['♜', ' '],
-            PieceType::Queen => ['♛', ' '],
-            PieceType::King => ['♚', ' '],
-            PieceType::DeathCubeTurret => ['𐄳', ' '],
-            _ => ['�', '�'],
+            Pawn => ['♟', ' '],
+            Soldier => ['S', 'o'],
+            Knight => ['♞', ' '],
+            Bishop => ['♝', ' '],
+            Rook => ['♜', ' '],
+            Queen => ['♛', ' '],
+            King => ['♚', ' '],
+            DeathCubeTurret => ['𐄳', ' '],
+            _ => panic!("Tried to draw unknown piece type: {:?}", piece_type),
         }
     }
 
     pub fn relative_move_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations_of(WorldStep::new(1, 0)),
-            PieceType::King => (0..=1)
-                .map(|y| WorldStep::new(1, y))
-                .map(get_4_rotations_of)
-                .flatten()
-                .collect(),
-            PieceType::Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
+            Pawn | Soldier => ORTHOGONAL_STEPS.into(),
+            King => KING_STEPS.into(),
+            Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
             _ => vec![],
         }
     }
@@ -149,7 +143,7 @@ impl Piece {
 
     pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Pawn => get_4_rotations_of(WorldStep::new(1, 1)),
+            Pawn => DIAGONAL_STEPS.into(),
             _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
@@ -159,9 +153,9 @@ impl Piece {
 
     pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
-            PieceType::Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
-            PieceType::Rook => get_4_rotations_of(WorldStep::new(1, 0)),
-            PieceType::Queen => (0..=1)
+            Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
+            Rook => get_4_rotations_of(WorldStep::new(1, 0)),
+            Queen => (0..=1)
                 .map(|y| WorldStep::new(1, y))
                 .map(get_4_rotations_of)
                 .flatten()

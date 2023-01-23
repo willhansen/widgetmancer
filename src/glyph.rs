@@ -239,7 +239,7 @@ impl Glyph {
     }
 
     pub fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
-        [Glyph::fg_only('😜', CYAN), Glyph::transparent_glyph()]
+        [Glyph::fg_only('*', CYAN), Glyph::transparent_glyph()]
     }
 
     pub fn looks_solid_color(&self, color: RGB8) -> bool {
