@@ -10,7 +10,7 @@ use rust_roguelike::animations::{PieceDeathAnimation, DOTS_IN_SELECTOR};
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::DoubleGlyphFunctions;
-use rust_roguelike::piece::{Piece, PieceType};
+use rust_roguelike::piece::{PieceType, SimplePiece};
 use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
     DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
@@ -106,7 +106,7 @@ fn test_checkerboard_background() {
 fn test_draw_placed_pawn() {
     let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
-    game.place_piece(Piece::pawn(), one_left);
+    game.place_piece(SimplePiece::pawn(), one_left);
     game.draw_headless_now();
     let pawn_glyphs = game
         .borrow_graphics_mut()
@@ -118,7 +118,7 @@ fn test_draw_placed_pawn() {
 fn test_capture_pawn() {
     let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
-    game.place_piece(Piece::pawn(), one_left);
+    game.place_piece(SimplePiece::pawn(), one_left);
 
     assert_eq!(
         1,
@@ -141,12 +141,12 @@ fn test_pawn_capture_player() {
     let mut game = set_up_game_with_player();
     let player_start_square = game.player_square();
     let one_up_left = game.player_square() + (UP_I + LEFT_I).cast_unit();
-    game.place_piece(Piece::pawn(), one_up_left);
+    game.place_piece(SimplePiece::pawn(), one_up_left);
     game.move_piece_at(one_up_left);
     assert_false!(game.player_is_alive());
     assert_eq!(
         *game.get_piece_at(player_start_square).unwrap(),
-        Piece::pawn()
+        SimplePiece::pawn()
     );
 }
 
@@ -155,9 +155,9 @@ fn test_pawn_move_towards_player() {
     let mut game = set_up_game_with_player();
     let two_left = game.player_square() + (LEFT_I * 2).cast_unit();
     let one_left = game.player_square() + (LEFT_I).cast_unit();
-    game.place_piece(Piece::pawn(), two_left);
+    game.place_piece(SimplePiece::pawn(), two_left);
     game.move_all_pieces();
-    assert_eq!(*game.get_piece_at(one_left).unwrap(), Piece::pawn());
+    assert_eq!(*game.get_piece_at(one_left).unwrap(), SimplePiece::pawn());
 }
 
 #[test]
@@ -267,8 +267,8 @@ fn test_pawn_background_is_transparent() {
     let mut game = set_up_game();
     let square1 = point2(2, 3);
     let square2 = square1 + UP_I.cast_unit() * 3;
-    game.place_piece(Piece::pawn(), square1);
-    game.place_piece(Piece::pawn(), square2);
+    game.place_piece(SimplePiece::pawn(), square1);
+    game.place_piece(SimplePiece::pawn(), square2);
 
     game.draw_headless_now();
 
@@ -294,7 +294,7 @@ fn test_shotgun_spread() {
 fn test_particles_on_piece_death() {
     let mut game = set_up_game();
     let pawn_square = point2(5, 5);
-    game.place_piece(Piece::pawn(), pawn_square);
+    game.place_piece(SimplePiece::pawn(), pawn_square);
     game.capture_piece_at(pawn_square);
     game.draw_headless_now();
 
@@ -308,7 +308,7 @@ fn test_particles_on_piece_death() {
 fn test_piece_death_animation_finishes() {
     let mut game = set_up_game();
     let pawn_square = point2(5, 5);
-    game.place_piece(Piece::pawn(), pawn_square);
+    game.place_piece(SimplePiece::pawn(), pawn_square);
     game.capture_piece_at(pawn_square);
     game.draw_headless_at_duration_from_start(
         PieceDeathAnimation::DURATION + Duration::from_secs_f32(0.5),
@@ -338,7 +338,7 @@ fn test_sniper_one_shot_one_kill() {
 fn test_selector() {
     let mut game = set_up_game();
     let test_square = point2(5, 5);
-    game.place_piece(Piece::pawn(), test_square);
+    game.place_piece(SimplePiece::pawn(), test_square);
     game.select_all_pieces();
     game.draw_headless_now();
 
@@ -367,7 +367,7 @@ fn test_game_over_on_capture_player() {
 fn test_rook_move() {
     let mut game = set_up_game_with_player();
     game.place_piece(
-        Piece::rook(),
+        SimplePiece::rook(),
         // three right, one up
         game.player_square() + RIGHT_I.cast_unit() * 3 + UP_I.cast_unit() * 1,
     );
@@ -375,14 +375,14 @@ fn test_rook_move() {
     let one_up = game.player_square() + UP_I.cast_unit();
     assert_eq!(game.get_piece_at(one_up), None);
     game.move_all_pieces();
-    assert_eq!(game.get_piece_at(one_up), Some(&Piece::rook()));
+    assert_eq!(game.get_piece_at(one_up), Some(&SimplePiece::rook()));
 }
 
 #[test]
 fn test_rook_capture() {
     let mut game = set_up_game_with_player();
     game.place_piece(
-        Piece::rook(),
+        SimplePiece::rook(),
         game.player_square() + RIGHT_I.cast_unit() * 3,
     );
 
@@ -396,7 +396,7 @@ fn test_king_move() {
     let mut game = set_up_game_with_player();
     let diag_up_right: WorldStep = RIGHT_I.cast_unit() + UP_I.cast_unit();
     game.place_piece(
-        Piece::king(),
+        SimplePiece::king(),
         // three right, one up
         game.player_square() + diag_up_right * 2,
     );
@@ -404,14 +404,17 @@ fn test_king_move() {
     let king_end_square = game.player_square() + diag_up_right;
     assert_eq!(game.get_piece_at(king_end_square), None);
     game.move_all_pieces();
-    assert_eq!(game.get_piece_at(king_end_square), Some(&Piece::king()));
+    assert_eq!(
+        game.get_piece_at(king_end_square),
+        Some(&SimplePiece::king())
+    );
 }
 
 #[test]
 fn test_knight_move() {
     let mut game = set_up_game_with_player();
     game.place_piece(
-        Piece::knight(),
+        SimplePiece::knight(),
         // three right, one up
         game.player_square() + RIGHT_I.cast_unit() * 3 + UP_I.cast_unit(),
     );
@@ -419,7 +422,7 @@ fn test_knight_move() {
     let end_square = game.player_square() + RIGHT_I.cast_unit();
     assert_eq!(game.get_piece_at(end_square), None);
     game.move_all_pieces();
-    assert_eq!(game.get_piece_at(end_square), Some(&Piece::knight()));
+    assert_eq!(game.get_piece_at(end_square), Some(&SimplePiece::knight()));
 }
 
 #[test]
@@ -448,7 +451,7 @@ fn test_correct_amount_of_braille_in_selector() {
 fn test_no_move_into_check() {
     let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
-    game.place_piece(Piece::rook(), rook_square);
+    game.place_piece(SimplePiece::rook(), rook_square);
     game.try_move_player(LEFT_I.cast_unit())
         .expect_err("no move into check");
 }
@@ -457,7 +460,7 @@ fn test_no_move_into_check() {
 fn test_draw_danger_squares() {
     let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
-    game.place_piece(Piece::rook(), rook_square);
+    game.place_piece(SimplePiece::rook(), rook_square);
     let danger_square = game.player_square() + LEFT_I.cast_unit();
     game.draw_headless_now();
     let actual_glyphs = game
@@ -485,11 +488,14 @@ fn test_rook_stopped_by_block() {
     let rook_end_square = game.player_square() + RIGHT_I.cast_unit() * 2;
     let block_square = game.player_square() + RIGHT_I.cast_unit();
     game.place_block(block_square);
-    game.place_piece(Piece::rook(), rook_start_square);
+    game.place_piece(SimplePiece::rook(), rook_start_square);
 
     assert_eq!(game.get_piece_at(rook_end_square), None);
     game.move_all_pieces();
-    assert_eq!(game.get_piece_at(rook_end_square), Some(&Piece::rook()));
+    assert_eq!(
+        game.get_piece_at(rook_end_square),
+        Some(&SimplePiece::rook())
+    );
 }
 
 #[test]
@@ -499,8 +505,8 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
     let pawn_square = game.player_square() + RIGHT_I.cast_unit() * 3;
     let rook_square = game.player_square() + RIGHT_I.cast_unit() * 4;
     let square_to_check = game.player_square() + RIGHT_I.cast_unit() * 1;
-    game.place_piece(Piece::pawn(), pawn_square);
-    game.place_piece(Piece::rook(), rook_square);
+    game.place_piece(SimplePiece::pawn(), pawn_square);
+    game.place_piece(SimplePiece::rook(), rook_square);
 
     game.draw_headless_now();
 
@@ -516,7 +522,7 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
 fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
     let mut game = set_up_game();
     let pawn_square = game.mid_square();
-    game.place_piece(Piece::pawn(), pawn_square);
+    game.place_piece(SimplePiece::pawn(), pawn_square);
     let move_square = pawn_square + RIGHT_I.cast_unit();
     let capture_square = pawn_square + RIGHT_I.cast_unit() + UP_I.cast_unit();
 
@@ -539,7 +545,7 @@ fn test_king_pathfind() {
     game.place_player(player_square);
     let u_center = WorldSquare::new(6, 10);
     let king_square = u_center + vec2(1, 0);
-    game.place_piece(Piece::king(), king_square);
+    game.place_piece(SimplePiece::king(), king_square);
     game.place_block(u_center + vec2(-1, -1));
     game.place_block(u_center + vec2(-1, 0));
     game.place_block(u_center + vec2(-1, 1));
@@ -561,7 +567,7 @@ fn test_draw_pathfind_paths() {
     let king_square = player_square + STEP_UP_RIGHT * 5;
     let test_square = player_square + STEP_UP_RIGHT * 2;
     game.place_player(player_square);
-    game.place_piece(Piece::king(), king_square);
+    game.place_piece(SimplePiece::king(), king_square);
     game.draw_headless_now();
     let path_glyphs = game.graphics().get_buffered_glyphs_for_square(test_square);
 
@@ -586,11 +592,11 @@ fn test_turn_if_move_into_wall() {
 fn test_one_move_per_faction_per_turn() {
     let mut game = set_up_game();
     game.place_player(point2(0, 0));
-    let pawn1 = Piece {
+    let pawn1 = SimplePiece {
         piece_type: PieceType::Pawn,
         faction: game.get_new_faction(),
     };
-    let pawn2 = Piece {
+    let pawn2 = SimplePiece {
         piece_type: PieceType::Pawn,
         faction: game.get_new_faction(),
     };

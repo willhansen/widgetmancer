@@ -811,6 +811,24 @@ mod tests {
         assert_eq!(combo_glyphs[1].fg_color, bottom_color);
     }
     #[test]
+    fn two_halfwidth_chars_drawn_over_fullwidth_char() {
+        let halfwidth_char = 'a';
+        let fullwidth_char = '🢃';
+        let top_color = RED;
+        let bottom_color = BLUE;
+        let top_glyphs = [halfwidth_char; 2].map(|c| Glyph::fg_only(c, top_color));
+        let bottom_glyphs = [fullwidth_char, SPACE].map(|c| Glyph::fg_only(c, bottom_color));
+        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
+
+        assert_eq!(combo_glyphs[0].character, halfwidth_char);
+        assert_eq!(combo_glyphs[0].fg_color, top_color);
+        assert_eq!(combo_glyphs[0].bg_color, bottom_color);
+
+        assert_eq!(combo_glyphs[1].character, halfwidth_char);
+        assert_eq!(combo_glyphs[1].fg_color, top_color);
+        assert_eq!(combo_glyphs[1].bg_color, bottom_color);
+    }
+    #[test]
     fn fullwidth_char_drawn_over_fullwidth_char() {
         let fullwidth_char = '🢃';
         let top_color = RED;

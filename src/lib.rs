@@ -48,7 +48,7 @@ use utility::*;
 use crate::game::Game;
 use crate::graphics::Graphics;
 use crate::inputmap::InputMap;
-use crate::piece::{Piece, PieceType};
+use crate::piece::{PieceType, SimplePiece};
 
 pub mod animations;
 mod fov_stuff;

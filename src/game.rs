@@ -20,8 +20,8 @@ use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
-use crate::piece::PieceType::{DeathCubeTurret, Pawn};
-use crate::piece::{Faction, FactionFactory, Piece, PieceType, Upgrade, MAX_PIECE_RANGE};
+use crate::piece::PieceType::*;
+use crate::piece::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -57,7 +57,7 @@ pub struct Game {
     // set false to quit
     player_optional: Option<Player>,
     graphics: Graphics,
-    pieces: HashMap<WorldSquare, Piece>,
+    pieces: HashMap<WorldSquare, SimplePiece>,
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     turn_count: u32,
@@ -267,11 +267,11 @@ impl Game {
     pub fn graphics(&self) -> &Graphics {
         return &self.graphics;
     }
-    pub fn pieces(&mut self) -> &mut HashMap<WorldSquare, Piece> {
+    pub fn pieces(&mut self) -> &mut HashMap<WorldSquare, SimplePiece> {
         return &mut self.pieces;
     }
 
-    fn find_pieces(&self, target_piece: Piece) -> SquareSet {
+    fn find_pieces(&self, target_piece: SimplePiece) -> SquareSet {
         self.pieces
             .iter()
             .filter(|(&square, &piece)| piece == target_piece)
@@ -346,21 +346,21 @@ impl Game {
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
         let faction = self.get_new_faction();
-        self.place_piece(Piece::new(PieceType::King, faction), king_square);
+        self.place_piece(SimplePiece::new(PieceType::King, faction), king_square);
         for x in -1..=1 {
             for y in -1..=1 {
                 let pawn_square = king_square + vec2(x, y);
                 if pawn_square == king_square {
                     continue;
                 }
-                self.place_piece(Piece::new(Pawn, faction), pawn_square);
+                self.place_piece(SimplePiece::new(Pawn, faction), pawn_square);
             }
         }
     }
 
     pub fn place_random_3x3_faction(&mut self, king_square: WorldSquare) {
         let faction = self.get_new_faction();
-        self.place_piece(Piece::new(PieceType::King, faction), king_square);
+        self.place_piece(SimplePiece::new(PieceType::King, faction), king_square);
         for x in -1..=1 {
             for y in -1..=1 {
                 let square = king_square + vec2(x, y);
@@ -368,7 +368,7 @@ impl Game {
                     continue;
                 }
                 self.place_piece(
-                    Piece::new(Piece::random_subordinate_type(), faction),
+                    SimplePiece::new(SimplePiece::random_subordinate_type(), faction),
                     square,
                 );
             }
@@ -446,7 +446,7 @@ impl Game {
         self.death_cubes = cubes_on_board;
     }
 
-    pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
+    pub fn place_piece(&mut self, piece: SimplePiece, square: WorldSquare) {
         if !self.square_is_on_board(square) {
             panic!(
                 "Tried to place piece off board at {}",
@@ -460,12 +460,12 @@ impl Game {
     }
 
     pub fn place_red_pawn(&mut self, square: WorldSquare) {
-        self.place_piece(Piece::new(Pawn, self.red_pawn_faction), square)
+        self.place_piece(SimplePiece::new(Pawn, self.red_pawn_faction), square)
     }
 
     pub fn place_death_turret(&mut self, square: WorldSquare) {
         self.place_piece(
-            Piece::new(PieceType::DeathCubeTurret, self.death_cube_faction),
+            SimplePiece::new(PieceType::DeathCubeTurret, self.death_cube_faction),
             square,
         );
     }
@@ -487,7 +487,7 @@ impl Game {
             if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
-                    self.place_piece(Piece::new(Pawn, faction), square);
+                    self.place_piece(SimplePiece::new(Pawn, faction), square);
                 }
             } else {
                 let new_incubation = IncubatingPawn {
@@ -532,7 +532,7 @@ impl Game {
         Err(())
     }
 
-    pub fn place_piece_randomly(&mut self, piece: Piece, rng: &mut StdRng) -> WorldSquare {
+    pub fn place_piece_randomly(&mut self, piece: SimplePiece, rng: &mut StdRng) -> WorldSquare {
         let rand_pos = self
             .random_empty_square(rng)
             .expect("failed to get random square");
@@ -547,7 +547,7 @@ impl Game {
         self.place_block(rand_pos);
     }
 
-    pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
+    pub fn get_piece_at(&self, square: WorldSquare) -> Option<&SimplePiece> {
         self.pieces.get(&square)
     }
 
@@ -616,7 +616,7 @@ impl Game {
 
     pub fn convert_orphaned_pieces(&mut self) {
         for faction in self.get_all_living_factions() {
-            let mut pieces_in_faction: Vec<&mut Piece> = self
+            let mut pieces_in_faction: Vec<&mut SimplePiece> = self
                 .pieces
                 .iter_mut()
                 .map(|(_, piece)| piece)
@@ -830,7 +830,7 @@ impl Game {
         &self,
         pawn_squares: SquareSet,
     ) -> HashMap<WorldSquare, u32> {
-        let steps = HashSet::from_iter(Piece::relative_capture_steps_for_type(Pawn));
+        let steps = HashSet::from_iter(SimplePiece::relative_capture_steps_for_type(Pawn));
         cross_correlate_squares_with_steps(pawn_squares, steps)
     }
 
@@ -973,14 +973,14 @@ impl Game {
         let piece = self.get_piece_at(piece_square).unwrap();
 
         let function_for_steps = if capture_instead_of_move {
-            Piece::relative_capture_steps
+            SimplePiece::relative_capture_steps
         } else {
-            Piece::relative_move_steps
+            SimplePiece::relative_move_steps
         };
         let function_for_directions = if capture_instead_of_move {
-            Piece::capture_directions
+            SimplePiece::capture_directions
         } else {
-            Piece::move_directions
+            SimplePiece::move_directions
         };
 
         for single_step in function_for_steps(piece) {
@@ -1040,7 +1040,7 @@ impl Game {
         fn cost_heuristic(a: WorldSquare, b: WorldSquare) -> u32 {
             king_distance(a, b)
         }
-        let relative_steps = Piece::relative_move_steps_for_type(PieceType::King);
+        let relative_steps = SimplePiece::relative_move_steps_for_type(PieceType::King);
         let mut recorded_step_start_squares_by_step_end_squares =
             HashMap::<WorldSquare, WorldSquare>::new();
         let mut squares_to_check = DoublePriorityQueue::<WorldSquare, u32>::new();
@@ -1223,7 +1223,7 @@ impl Game {
         for y in 0..3 {
             for x in 0..8 {
                 self.place_piece(
-                    Piece::from_type(piece_type),
+                    SimplePiece::from_type(piece_type),
                     self.player_square() + STEP_UP * (5 + y) + STEP_RIGHT * (x - 3),
                 );
             }
@@ -1254,14 +1254,14 @@ impl Game {
         self.set_up_labyrinth(rng);
         for piece_type in PieceType::iter() {
             for _ in 0..2 {
-                self.place_piece_randomly(Piece::from_type(piece_type), rng);
+                self.place_piece_randomly(SimplePiece::from_type(piece_type), rng);
             }
         }
     }
     pub fn set_up_labyrinth_kings(&mut self, rng: &mut StdRng) {
         self.set_up_labyrinth(rng);
         for _ in 0..8 {
-            self.place_piece_randomly(Piece::king(), rng);
+            self.place_piece_randomly(SimplePiece::king(), rng);
         }
     }
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
@@ -1378,7 +1378,7 @@ mod tests {
         let test_square = point2(5, 5);
         let faction = game.get_new_faction();
         for step in ORTHOGONAL_STEPS {
-            game.place_piece(Piece::new(Pawn, faction), test_square + step);
+            game.place_piece(SimplePiece::new(Pawn, faction), test_square + step);
         }
         assert_eq!(game.pieces.len(), 4);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
@@ -1395,9 +1395,9 @@ mod tests {
         let faction = game.get_new_faction();
 
         for step in ORTHOGONAL_STEPS {
-            game.place_piece(Piece::new(Pawn, faction), test_square + step);
+            game.place_piece(SimplePiece::new(Pawn, faction), test_square + step);
         }
-        game.place_piece(Piece::new(Pawn, faction), test_square);
+        game.place_piece(SimplePiece::new(Pawn, faction), test_square);
 
         assert_eq!(game.pieces.len(), 5);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
@@ -1525,7 +1525,10 @@ mod tests {
     fn test_death_cube_kills_rook() {
         let mut game = set_up_game();
         let rook_square = point2(5, 5);
-        game.place_piece(Piece::new(Rook, game.default_enemy_faction), rook_square);
+        game.place_piece(
+            SimplePiece::new(Rook, game.default_enemy_faction),
+            rook_square,
+        );
         let death_cube_start_pos = (rook_square + STEP_LEFT).to_f32();
         let death_cube_start_vel = STEP_RIGHT.to_f32() * 20.0;
         game.place_linear_death_cube(death_cube_start_pos, death_cube_start_vel);
@@ -1761,7 +1764,7 @@ mod tests {
         let mut game = set_up_game();
         let square = point2(5, 5);
         game.place_piece(
-            Piece::new(PieceType::King, game.default_enemy_faction),
+            SimplePiece::new(PieceType::King, game.default_enemy_faction),
             square,
         );
         assert!(game.upgrades.is_empty());
@@ -1772,7 +1775,7 @@ mod tests {
     fn test_soldier() {
         let mut game = set_up_game();
         let square = point2(5, 5);
-        game.place_piece(Piece::from_type(PieceType::Soldier), square);
+        game.place_piece(SimplePiece::from_type(PieceType::Soldier), square);
         assert!(game
             .move_squares_for_piece_at(square, false)
             .contains(&(square + STEP_RIGHT)));
@@ -1787,7 +1790,10 @@ mod tests {
         game.place_player(player_square);
 
         let soldier_square = player_square + STEP_LEFT * 3;
-        game.place_piece(Piece::from_type(PieceType::TurningSoldier), soldier_square);
+        game.place_piece(
+            SimplePiece::from_type(PieceType::TurningSoldier),
+            soldier_square,
+        );
 
         assert_eq!(
             game.move_options_for_piece_at(soldier_square),

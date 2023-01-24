@@ -24,7 +24,7 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
-use crate::piece::{Piece, Upgrade};
+use crate::piece::{SimplePiece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::hue_to_rgb;
 use crate::{
@@ -426,7 +426,7 @@ impl Graphics {
     }
 
     #[deprecated(note = "use `draw_piece_with_color` instead")]
-    pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
+    pub fn draw_piece(&mut self, piece: SimplePiece, pos: WorldSquare) {
         self.draw_glyphs_for_square(pos, piece.glyphs());
     }
 
@@ -436,7 +436,7 @@ impl Graphics {
         piece_type: PieceType,
         color: RGB8,
     ) {
-        let mut piece_glyphs = Piece::glyphs_for_type(piece_type);
+        let mut piece_glyphs = SimplePiece::glyphs_for_type(piece_type);
         piece_glyphs
             .iter_mut()
             .for_each(|g: &mut Glyph| g.fg_color = color);
@@ -848,7 +848,7 @@ mod tests {
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
         //g.print_output_buffer();
-        g.draw_piece(Piece::pawn(), the_square);
+        g.draw_piece(SimplePiece::pawn(), the_square);
         //g.print_output_buffer();
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
@@ -863,7 +863,7 @@ mod tests {
     fn test_field_of_view_mask_is_fully_transparent() {
         let mut g = set_up_graphics_with_nxn_squares(1);
         let the_square = WorldSquare::new(0, 0);
-        g.draw_piece(Piece::pawn(), the_square);
+        g.draw_piece(SimplePiece::pawn(), the_square);
 
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');

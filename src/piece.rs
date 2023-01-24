@@ -6,9 +6,8 @@ use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
-use crate::glyph_constants::*;
-
 use crate::glyph::DoubleGlyph;
+use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS};
@@ -63,41 +62,46 @@ impl FactionFactory {
     }
 }
 
+pub trait Turnable {
+    fn faced_direction(&self) -> WorldStep;
+    fn turn_to_face_direction(&mut self, new_dir: WorldStep);
+}
+
+pub trait Piece {
+    fn piece_type(&self) -> PieceType;
+    fn faction(&self) -> Faction;
+    fn new(piece_type: PieceType, faction: Faction) -> Self;
+    fn from_type(piece_type: PieceType) -> Self;
+    fn relative_move_steps(&self) -> StepList;
+    fn relative_capture_steps(&self) -> StepList;
+    fn move_directions(&self) -> StepList;
+    fn capture_directions(&self) -> StepList;
+}
+
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub struct Piece {
+pub struct SimplePiece {
     pub piece_type: PieceType,
     pub faction: Faction,
 }
 
-impl Piece {
-    pub fn new(piece_type: PieceType, faction: Faction) -> Piece {
-        Piece {
-            piece_type,
-            faction,
-        }
+impl SimplePiece {
+    pub fn pawn() -> SimplePiece {
+        SimplePiece::from_type(Pawn)
     }
-
-    pub fn from_type(piece_type: PieceType) -> Piece {
-        Piece::new(piece_type, Faction::default())
+    pub fn knight() -> SimplePiece {
+        SimplePiece::from_type(Knight)
     }
-
-    pub fn pawn() -> Piece {
-        Piece::from_type(Pawn)
+    pub fn bishop() -> SimplePiece {
+        SimplePiece::from_type(Bishop)
     }
-    pub fn knight() -> Piece {
-        Piece::from_type(Knight)
+    pub fn rook() -> SimplePiece {
+        SimplePiece::from_type(Rook)
     }
-    pub fn bishop() -> Piece {
-        Piece::from_type(Bishop)
+    pub fn queen() -> SimplePiece {
+        SimplePiece::from_type(Queen)
     }
-    pub fn rook() -> Piece {
-        Piece::from_type(Rook)
-    }
-    pub fn queen() -> Piece {
-        Piece::from_type(Queen)
-    }
-    pub fn king() -> Piece {
-        Piece::from_type(King)
+    pub fn king() -> SimplePiece {
+        SimplePiece::from_type(King)
     }
 
     pub fn random_subordinate_type() -> PieceType {
@@ -107,11 +111,11 @@ impl Piece {
     }
 
     pub fn glyphs(&self) -> DoubleGlyph {
-        Piece::glyphs_for_type(self.piece_type)
+        SimplePiece::glyphs_for_type(self.piece_type)
     }
 
     pub fn glyphs_for_type(piece_type: PieceType) -> DoubleGlyph {
-        Piece::chars_for_type(piece_type)
+        SimplePiece::chars_for_type(piece_type)
             .map(|character| Glyph::fg_only(character, ENEMY_PIECE_COLOR))
     }
 
@@ -137,9 +141,6 @@ impl Piece {
             _ => vec![],
         }
     }
-    pub fn relative_move_steps(&self) -> StepList {
-        Self::relative_move_steps_for_type(self.piece_type)
-    }
 
     pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
@@ -147,10 +148,6 @@ impl Piece {
             _ => Self::relative_move_steps_for_type(piece_type),
         }
     }
-    pub fn relative_capture_steps(&self) -> StepList {
-        Self::relative_capture_steps_for_type(self.piece_type)
-    }
-
     pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
             Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
@@ -163,17 +160,46 @@ impl Piece {
             _ => vec![],
         }
     }
-    pub fn move_directions(&self) -> StepList {
-        Self::move_directions_for_type(self.piece_type)
-    }
-
     pub fn capture_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
             _ => Self::move_directions_for_type(piece_type),
         }
     }
+}
 
-    pub fn capture_directions(&self) -> StepList {
+impl Piece for SimplePiece {
+    fn piece_type(&self) -> PieceType {
+        self.piece_type
+    }
+
+    fn faction(&self) -> Faction {
+        self.faction
+    }
+
+    fn new(piece_type: PieceType, faction: Faction) -> SimplePiece {
+        SimplePiece {
+            piece_type,
+            faction,
+        }
+    }
+
+    fn from_type(piece_type: PieceType) -> SimplePiece {
+        SimplePiece::new(piece_type, Faction::default())
+    }
+
+    fn relative_move_steps(&self) -> StepList {
+        Self::relative_move_steps_for_type(self.piece_type)
+    }
+
+    fn relative_capture_steps(&self) -> StepList {
+        Self::relative_capture_steps_for_type(self.piece_type)
+    }
+
+    fn move_directions(&self) -> StepList {
+        Self::move_directions_for_type(self.piece_type)
+    }
+
+    fn capture_directions(&self) -> StepList {
         Self::capture_directions_for_type(self.piece_type)
     }
 }
@@ -188,14 +214,14 @@ mod tests {
 
     #[test]
     fn test_pawn_moveset() {
-        let pawn_moveset = HashSet::from_iter(Piece::pawn().relative_move_steps());
+        let pawn_moveset = HashSet::from_iter(SimplePiece::pawn().relative_move_steps());
         let correct_moveset = HashSet::from([vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1)]);
         assert_eq!(correct_moveset, pawn_moveset);
     }
 
     #[test]
     fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(Piece::pawn().relative_capture_steps());
+        let pawn_captureset = HashSet::from_iter(SimplePiece::pawn().relative_capture_steps());
         let correct_captureset =
             HashSet::from([vec2(1, 1), vec2(-1, 1), vec2(1, -1), vec2(-1, -1)]);
         assert_eq!(correct_captureset, pawn_captureset);
