@@ -24,7 +24,8 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
-use crate::piece::{SimplePiece, Upgrade};
+use crate::piece::simple_piece::SimplePiece;
+use crate::piece::Upgrade;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::hue_to_rgb;
 use crate::{

@@ -1,5 +1,5 @@
 use crate::game::Game;
-use crate::piece::SimplePiece;
+use crate::piece::simple_piece::SimplePiece;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{LEFT_I, RIGHT_I, UP_I};
 use euclid::point2;

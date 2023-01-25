@@ -10,7 +10,8 @@ use rust_roguelike::animations::{PieceDeathAnimation, DOTS_IN_SELECTOR};
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::DoubleGlyphFunctions;
-use rust_roguelike::piece::{PieceType, SimplePiece};
+use rust_roguelike::piece::simple_piece::SimplePiece;
+use rust_roguelike::piece::PieceType;
 use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
     DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,

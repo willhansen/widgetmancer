@@ -20,6 +20,7 @@ use crate::animations::Selector;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
+use crate::piece::simple_piece::SimplePiece;
 use crate::piece::PieceType::*;
 use crate::piece::*;
 use crate::utility::coordinate_frame_conversions::*;
