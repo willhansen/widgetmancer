@@ -303,6 +303,7 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a * (1.0 - t) + b * t
 }
+
 pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32, U> {
     point2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
 }
@@ -543,6 +544,7 @@ where
     }
     sum
 }
+
 pub fn map_neg<K, V>(m: HashMap<K, V>) -> HashMap<K, V>
 where
     K: Eq + Hash,
@@ -559,6 +561,7 @@ where
         .map(|(k, v): (K, u32)| (k, v as i32))
         .collect()
 }
+
 pub fn map_to_float<K>(m: HashMap<K, i32>) -> HashMap<K, f32>
 where
     K: Eq + Hash,
@@ -567,6 +570,7 @@ where
         .map(|(k, v): (K, i32)| (k, v as f32))
         .collect()
 }
+
 pub fn hue_to_rgb(hue_360: f32) -> RGB8 {
     let hue = hue_360.rem_euclid(360.0);
     let x = 1.0 - ((hue / 60.0) % 2.0 - 1.0).abs();

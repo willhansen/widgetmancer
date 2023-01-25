@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::f32::consts::PI;
 
 use euclid::*;
@@ -10,7 +11,9 @@ use crate::glyph::DoubleGlyph;
 use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS};
+use crate::utility::{
+    get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS, STEP_RIGHT,
+};
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
@@ -20,7 +23,7 @@ pub enum Upgrade {
     BlinkRange,
 }
 
-#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter, Hash)]
 pub enum PieceType {
     Pawn,
     Soldier,
@@ -62,46 +65,64 @@ impl FactionFactory {
     }
 }
 
-pub trait Turnable {
-    fn faced_direction(&self) -> WorldStep;
-    fn turn_to_face_direction(&mut self, new_dir: WorldStep);
-}
-
-pub trait Piece {
-    fn piece_type(&self) -> PieceType;
-    fn faction(&self) -> Faction;
-    fn new(piece_type: PieceType, faction: Faction) -> Self;
-    fn from_type(piece_type: PieceType) -> Self;
-    fn relative_move_steps(&self) -> StepList;
-    fn relative_capture_steps(&self) -> StepList;
-    fn move_directions(&self) -> StepList;
-    fn capture_directions(&self) -> StepList;
-}
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub struct SimplePiece {
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash)]
+pub struct Piece {
     pub piece_type: PieceType,
     pub faction: Faction,
+    faced_direction: Option<WorldStep>,
 }
 
-impl SimplePiece {
-    pub fn pawn() -> SimplePiece {
-        SimplePiece::from_type(Pawn)
+impl Piece {
+    pub fn pawn() -> Piece {
+        Piece::from_type(Pawn)
     }
-    pub fn knight() -> SimplePiece {
-        SimplePiece::from_type(Knight)
+    pub fn knight() -> Piece {
+        Piece::from_type(Knight)
     }
-    pub fn bishop() -> SimplePiece {
-        SimplePiece::from_type(Bishop)
+    pub fn bishop() -> Piece {
+        Piece::from_type(Bishop)
     }
-    pub fn rook() -> SimplePiece {
-        SimplePiece::from_type(Rook)
+    pub fn rook() -> Piece {
+        Piece::from_type(Rook)
     }
-    pub fn queen() -> SimplePiece {
-        SimplePiece::from_type(Queen)
+    pub fn queen() -> Piece {
+        Piece::from_type(Queen)
     }
-    pub fn king() -> SimplePiece {
-        SimplePiece::from_type(King)
+    pub fn king() -> Piece {
+        Piece::from_type(King)
+    }
+
+    pub fn faced_direction(&self) -> WorldStep {
+        if let Some(dir) = self.faced_direction {
+            dir
+        } else {
+            panic!("Piece isn't directional!");
+        }
+    }
+
+    pub fn can_turn(&self) -> bool {
+        self.faced_direction.is_some()
+    }
+
+    pub fn turned_by_quarters(&self, quarter_turns: i32) -> Piece {
+        assert!(self.can_turn());
+        Piece {
+            piece_type: self.piece_type,
+            faction: self.faction,
+            faced_direction: Some(quarter_turns_counter_clockwise(
+                &self.faced_direction(),
+                quarter_turns,
+            )),
+        }
+    }
+
+    pub fn turned_versions(&self) -> HashSet<Piece> {
+        assert!(self.can_turn());
+
+        [-1, 1]
+            .into_iter()
+            .map(|i| self.turned_by_quarters(i))
+            .collect()
     }
 
     pub fn random_subordinate_type() -> PieceType {
@@ -111,11 +132,11 @@ impl SimplePiece {
     }
 
     pub fn glyphs(&self) -> DoubleGlyph {
-        SimplePiece::glyphs_for_type(self.piece_type)
+        Piece::glyphs_for_type(self.piece_type)
     }
 
     pub fn glyphs_for_type(piece_type: PieceType) -> DoubleGlyph {
-        SimplePiece::chars_for_type(piece_type)
+        Piece::chars_for_type(piece_type)
             .map(|character| Glyph::fg_only(character, ENEMY_PIECE_COLOR))
     }
 
@@ -165,9 +186,6 @@ impl SimplePiece {
             _ => Self::move_directions_for_type(piece_type),
         }
     }
-}
-
-impl Piece for SimplePiece {
     fn piece_type(&self) -> PieceType {
         self.piece_type
     }
@@ -176,30 +194,34 @@ impl Piece for SimplePiece {
         self.faction
     }
 
-    fn new(piece_type: PieceType, faction: Faction) -> SimplePiece {
-        SimplePiece {
+    pub(crate) fn new(piece_type: PieceType, faction: Faction) -> Piece {
+        Piece {
             piece_type,
             faction,
+            faced_direction: match piece_type {
+                Soldier => Some(STEP_RIGHT),
+                _ => None,
+            },
         }
     }
 
-    fn from_type(piece_type: PieceType) -> SimplePiece {
-        SimplePiece::new(piece_type, Faction::default())
+    pub(crate) fn from_type(piece_type: PieceType) -> Piece {
+        Piece::new(piece_type, Faction::default())
     }
 
-    fn relative_move_steps(&self) -> StepList {
+    pub(crate) fn relative_move_steps(&self) -> StepList {
         Self::relative_move_steps_for_type(self.piece_type)
     }
 
-    fn relative_capture_steps(&self) -> StepList {
+    pub(crate) fn relative_capture_steps(&self) -> StepList {
         Self::relative_capture_steps_for_type(self.piece_type)
     }
 
-    fn move_directions(&self) -> StepList {
+    pub(crate) fn move_directions(&self) -> StepList {
         Self::move_directions_for_type(self.piece_type)
     }
 
-    fn capture_directions(&self) -> StepList {
+    pub(crate) fn capture_directions(&self) -> StepList {
         Self::capture_directions_for_type(self.piece_type)
     }
 }
@@ -214,14 +236,14 @@ mod tests {
 
     #[test]
     fn test_pawn_moveset() {
-        let pawn_moveset = HashSet::from_iter(SimplePiece::pawn().relative_move_steps());
+        let pawn_moveset = HashSet::from_iter(Piece::pawn().relative_move_steps());
         let correct_moveset = HashSet::from([vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1)]);
         assert_eq!(correct_moveset, pawn_moveset);
     }
 
     #[test]
     fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(SimplePiece::pawn().relative_capture_steps());
+        let pawn_captureset = HashSet::from_iter(Piece::pawn().relative_capture_steps());
         let correct_captureset =
             HashSet::from([vec2(1, 1), vec2(-1, 1), vec2(1, -1), vec2(-1, -1)]);
         assert_eq!(correct_captureset, pawn_captureset);
