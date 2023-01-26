@@ -776,6 +776,7 @@ impl Game {
         if !self.player_is_alive() {
             return None;
         }
+        todo!("only return if the move would actually move closer");
         self.move_options_for_piece_at(piece_square)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
@@ -789,7 +790,10 @@ impl Game {
                 .into_iter()
                 .contains(&self.player_square())
     }
-    pub fn capture_square_for_piece_at(&self, piece_square: WorldSquare) -> Option<WorldSquare> {
+    pub fn highest_priority_capture_square_for_piece_at(
+        &self,
+        piece_square: WorldSquare,
+    ) -> Option<WorldSquare> {
         let friendly_faction = self.get_piece_at(piece_square).unwrap().faction;
         // TODO: choose randomly rather than first
         self.capture_options_for_piece_at(piece_square)
@@ -842,6 +846,85 @@ impl Game {
         cross_correlate_squares_with_steps(squares, steps)
     }
 
+    fn move_red_pawn_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
+        let mut end_square: Option<WorldSquare>;
+        let piece = self.get_piece_at(piece_square).unwrap().clone();
+        assert_eq!(piece.faction, self.red_pawn_faction);
+        // Look at surrounding 5x5 square
+        let mut nearby_ally_squares =
+            self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
+        let nearby_protection_strengths =
+            self.protection_strengths_from_given_pawns(nearby_ally_squares.clone());
+        let nearby_ally_crowdedness =
+            self.orthogonal_adjacency_from_given_squares(nearby_ally_squares.clone());
+        let mut best_case_move_steps = Vec::from(ORTHOGONAL_STEPS);
+        best_case_move_steps.push(vec2(0, 0));
+
+        let viable_move_squares: HashSet<WorldSquare> = best_case_move_steps
+            .iter()
+            .map(|&step| piece_square + step)
+            .filter(|&square| square == piece_square || self.square_is_empty(square))
+            .collect();
+
+        let neutral_goodness_at_viable_move_squares = viable_move_squares
+            .iter()
+            .map(|&square| (square, 0.0))
+            .collect();
+
+        let protection_at_movable_squares: HashMap<WorldSquare, u32> = nearby_protection_strengths
+            .into_iter()
+            .filter(|(protected_square, strength)| viable_move_squares.contains(protected_square))
+            .collect();
+
+        let ally_crowdedness_at_movable_squares: HashMap<WorldSquare, u32> =
+            nearby_ally_crowdedness
+                .into_iter()
+                .filter(|(protected_square, strength)| {
+                    viable_move_squares.contains(protected_square)
+                })
+                .collect();
+
+        let mut goodness_metric_at_move_options = map_sum(
+            neutral_goodness_at_viable_move_squares,
+            map_to_float(map_sum(
+                map_to_signed(protection_at_movable_squares),
+                map_neg(map_to_signed(ally_crowdedness_at_movable_squares)),
+            )),
+        );
+
+        // slight preference for motion
+        *goodness_metric_at_move_options
+            .entry(piece_square)
+            .or_default() -= 1.5;
+
+        let current_goodness: f32 = goodness_metric_at_move_options
+            .get(&piece_square)
+            .cloned()
+            .unwrap_or_default();
+        let most_goodness_available: f32 = goodness_metric_at_move_options
+            .values()
+            .max_by_key(|&&x| OrderedFloat(x))
+            .cloned()
+            .unwrap_or_default();
+        if most_goodness_available > current_goodness {
+            end_square = Some(
+                goodness_metric_at_move_options
+                    .iter()
+                    .max_by_key(|(&square, &goodness)| OrderedFloat(goodness))
+                    .unwrap()
+                    .0
+                    .clone(),
+            );
+        } else {
+            end_square = None
+        }
+
+        if let Some(move_square) = end_square {
+            self.move_piece(piece_square, move_square);
+        }
+        end_square
+    }
+
     // returns where the piece moves to, if applicable
     pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
         if !self.is_non_player_piece_at(piece_square) {
@@ -853,79 +936,9 @@ impl Game {
         let mut end_square: Option<WorldSquare>;
 
         if piece.faction == self.red_pawn_faction {
-            // Look at surrounding 5x5 square
-            let mut nearby_ally_squares =
-                self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
-            let nearby_protection_strengths =
-                self.protection_strengths_from_given_pawns(nearby_ally_squares.clone());
-            let nearby_ally_crowdedness =
-                self.orthogonal_adjacency_from_given_squares(nearby_ally_squares.clone());
-            let mut best_case_move_steps = Vec::from(ORTHOGONAL_STEPS);
-            best_case_move_steps.push(vec2(0, 0));
-
-            let viable_move_squares: HashSet<WorldSquare> = best_case_move_steps
-                .iter()
-                .map(|&step| piece_square + step)
-                .filter(|&square| square == piece_square || self.square_is_empty(square))
-                .collect();
-
-            let neutral_goodness_at_viable_move_squares = viable_move_squares
-                .iter()
-                .map(|&square| (square, 0.0))
-                .collect();
-
-            let protection_at_movable_squares: HashMap<WorldSquare, u32> =
-                nearby_protection_strengths
-                    .into_iter()
-                    .filter(|(protected_square, strength)| {
-                        viable_move_squares.contains(protected_square)
-                    })
-                    .collect();
-
-            let ally_crowdedness_at_movable_squares: HashMap<WorldSquare, u32> =
-                nearby_ally_crowdedness
-                    .into_iter()
-                    .filter(|(protected_square, strength)| {
-                        viable_move_squares.contains(protected_square)
-                    })
-                    .collect();
-
-            let mut goodness_metric_at_move_options = map_sum(
-                neutral_goodness_at_viable_move_squares,
-                map_to_float(map_sum(
-                    map_to_signed(protection_at_movable_squares),
-                    map_neg(map_to_signed(ally_crowdedness_at_movable_squares)),
-                )),
-            );
-
-            // slight preference for motion
-            *goodness_metric_at_move_options
-                .entry(piece_square)
-                .or_default() -= 1.5;
-
-            let current_goodness: f32 = goodness_metric_at_move_options
-                .get(&piece_square)
-                .cloned()
-                .unwrap_or_default();
-            let most_goodness_available: f32 = goodness_metric_at_move_options
-                .values()
-                .max_by_key(|&&x| OrderedFloat(x))
-                .cloned()
-                .unwrap_or_default();
-            if most_goodness_available > current_goodness {
-                end_square = Some(
-                    goodness_metric_at_move_options
-                        .iter()
-                        .max_by_key(|(&square, &goodness)| OrderedFloat(goodness))
-                        .unwrap()
-                        .0
-                        .clone(),
-                );
-            } else {
-                end_square = None
-            }
+            return self.move_red_pawn_at(piece_square);
         } else if self.player_is_alive() {
-            if piece.piece_type == PieceType::King {
+            if piece.piece_type == King {
                 if let Some(path_to_player) =
                     self.find_king_path(piece_square, self.player_square())
                 {
@@ -940,11 +953,15 @@ impl Game {
                 self.square_to_move_toward_player_for_piece_at(piece_square)
             {
                 end_square = Some(square);
+            } else if piece.can_turn() {
+                todo!("turn piece");
             } else {
                 end_square = None;
             }
-        } else if let Some(square) = self.capture_square_for_piece_at(piece_square) {
-            end_square = Some(square);
+        } else if let optional_square =
+            self.highest_priority_capture_square_for_piece_at(piece_square)
+        {
+            end_square = optional_square;
         } else {
             end_square = None;
         }
@@ -956,13 +973,13 @@ impl Game {
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
-        self.move_squares_for_piece_at(piece_square, false)
+        self.on_board_move_squares_for_piece_at(piece_square, false)
             .into_iter()
             .filter(|&square| self.square_is_empty(square))
             .collect()
     }
 
-    fn move_or_capture_squares_for_piece_at(
+    fn on_board_move_or_capture_squares_for_piece_at(
         &self,
         piece_square: WorldSquare,
         capture_instead_of_move: bool,
@@ -998,38 +1015,38 @@ impl Game {
         squares
     }
 
-    fn capture_squares_for_piece_at(
+    fn on_board_capture_squares_for_piece_at(
         &self,
         piece_square: WorldSquare,
         pass_through_pieces: bool,
     ) -> SquareSet {
-        self.move_or_capture_squares_for_piece_at(piece_square, true, pass_through_pieces)
+        self.on_board_move_or_capture_squares_for_piece_at(piece_square, true, pass_through_pieces)
     }
-    fn move_squares_for_piece_at(
+    fn on_board_move_squares_for_piece_at(
         &self,
         piece_square: WorldSquare,
         pass_through_pieces: bool,
     ) -> SquareSet {
-        self.move_or_capture_squares_for_piece_at(piece_square, false, pass_through_pieces)
+        self.on_board_move_or_capture_squares_for_piece_at(piece_square, false, pass_through_pieces)
     }
 
     fn move_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
         self.pieces
             .keys()
-            .map(|&square| self.move_squares_for_piece_at(square, pass_through_pieces))
+            .map(|&square| self.on_board_move_squares_for_piece_at(square, pass_through_pieces))
             .flatten()
             .collect()
     }
     fn capture_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
         self.pieces
             .keys()
-            .map(|&square| self.capture_squares_for_piece_at(square, pass_through_pieces))
+            .map(|&square| self.on_board_capture_squares_for_piece_at(square, pass_through_pieces))
             .flatten()
             .collect()
     }
 
     fn guarded_squares_for_piece_at(&self, piece_square: WorldSquare) -> SquareSet {
-        self.capture_squares_for_piece_at(piece_square, false)
+        self.on_board_capture_squares_for_piece_at(piece_square, false)
     }
 
     fn find_king_path(
@@ -1774,7 +1791,7 @@ mod tests {
         let square = point2(5, 5);
         game.place_piece(Piece::from_type(PieceType::Soldier), square);
         assert!(game
-            .move_squares_for_piece_at(square, false)
+            .on_board_move_squares_for_piece_at(square, false)
             .contains(&(square + STEP_RIGHT)));
         assert!(game
             .guarded_squares_for_piece_at(square)

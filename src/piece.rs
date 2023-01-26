@@ -194,7 +194,7 @@ impl Piece {
         self.faction
     }
 
-    pub(crate) fn new(piece_type: PieceType, faction: Faction) -> Piece {
+    pub fn new(piece_type: PieceType, faction: Faction) -> Piece {
         Piece {
             piece_type,
             faction,
