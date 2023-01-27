@@ -142,7 +142,7 @@ fn test_pawn_capture_player() {
     let player_start_square = game.player_square();
     let one_up_left = game.player_square() + (UP_I + LEFT_I).cast_unit();
     game.place_piece(Piece::pawn(), one_up_left);
-    game.move_piece_at(one_up_left);
+    game.move_piece_at_square_and_return_end_position_if_moved(one_up_left);
     assert_false!(game.player_is_alive());
     assert_eq!(
         *game.get_piece_at(player_start_square).unwrap(),

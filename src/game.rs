@@ -641,7 +641,9 @@ impl Game {
             if moved_piece_locations.contains(&piece_square) {
                 continue;
             }
-            if let Some(end_pos) = self.move_piece_at(piece_square) {
+            if let Some(end_pos) =
+                self.move_piece_at_square_and_return_end_position_if_moved(piece_square)
+            {
                 moved_piece_locations.insert(end_pos);
             }
         }
@@ -682,17 +684,19 @@ impl Game {
         if faction == self.red_pawn_faction {
             // all pieces move
             faction_squares.iter().for_each(|&square| {
-                self.move_piece_at(square);
+                self.move_piece_at_square_and_return_end_position_if_moved(square);
             });
         } else if self.player_is_alive() {
-            self.move_piece_at(self.square_of_closest_piece_to_player_in_faction(faction));
+            self.move_piece_at_square_and_return_end_position_if_moved(
+                self.square_of_closest_piece_to_player_in_faction(faction),
+            );
         } else {
             // select one non-randomly
             let square_of_piece_to_move = faction_squares
                 .into_iter()
                 .min_by_key(|&square| OrderedFloat(square.x as f32 + 0.1 + square.y as f32))
                 .unwrap();
-            self.move_piece_at(square_of_piece_to_move);
+            self.move_piece_at_square_and_return_end_position_if_moved(square_of_piece_to_move);
         }
     }
 
@@ -776,11 +780,20 @@ impl Game {
         if !self.player_is_alive() {
             return None;
         }
-        todo!("only return if the move would actually move closer");
-        self.move_options_for_piece_at(piece_square)
+        let current_square_distance_to_player =
+            (self.player_square() - piece_square).square_length();
+        let closest_move_option_to_player = self
+            .move_options_for_piece_at(piece_square)
             .into_iter()
             .filter(|&square| self.square_is_empty(square) && self.square_is_on_board(square))
-            .min_by_key(|&square| (square - self.player_square()).square_length())
+            .min_by_key(|&square| (square - self.player_square()).square_length());
+        if let Some(end_square) = closest_move_option_to_player {
+            let possible_square_distance = (end_square - self.player_square()).square_length();
+            if possible_square_distance < current_square_distance_to_player {
+                return closest_move_option_to_player;
+            }
+        }
+        None
     }
 
     pub fn piece_can_capture_player(&self, piece_square: WorldSquare) -> bool {
@@ -834,7 +847,7 @@ impl Game {
         &self,
         pawn_squares: SquareSet,
     ) -> HashMap<WorldSquare, u32> {
-        let steps = HashSet::from_iter(Piece::relative_capture_steps_for_type(Pawn));
+        let steps = HashSet::from_iter(DIAGONAL_STEPS);
         cross_correlate_squares_with_steps(pawn_squares, steps)
     }
 
@@ -926,7 +939,10 @@ impl Game {
     }
 
     // returns where the piece moves to, if applicable
-    pub fn move_piece_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
+    pub fn move_piece_at_square_and_return_end_position_if_moved(
+        &mut self,
+        piece_square: WorldSquare,
+    ) -> Option<WorldSquare> {
         if !self.is_non_player_piece_at(piece_square) {
             return None;
         }
@@ -954,7 +970,8 @@ impl Game {
             {
                 end_square = Some(square);
             } else if piece.can_turn() {
-                todo!("turn piece");
+                self.turn_piece_toward_player(piece_square);
+                return Some(piece_square);
             } else {
                 end_square = None;
             }
@@ -970,6 +987,34 @@ impl Game {
             self.move_piece(piece_square, move_square);
         }
         end_square
+    }
+
+    fn turn_piece_toward_player(&mut self, piece_square: WorldSquare) {
+        assert!(self.is_non_player_piece_at(piece_square));
+        let piece = self.get_piece_at(piece_square).unwrap();
+        assert!(piece.can_turn());
+        assert!(self.player_is_alive());
+
+        let vector_to_player = self.player_square() - piece_square;
+        let angle_to_player = |p: &Piece| -> Angle<f32> {
+            p.faced_direction()
+                .to_f32()
+                .angle_to(vector_to_player.to_f32())
+        };
+        let mut best_angle_to_player_yet = angle_to_player(piece);
+        let mut best_rotation_yet = piece.clone();
+        for turned_piece in piece.turned_versions() {
+            let possible_angle_to_player = angle_to_player(&turned_piece);
+            if possible_angle_to_player.radians.abs() < best_angle_to_player_yet.radians.abs() {
+                best_rotation_yet = turned_piece;
+                best_angle_to_player_yet = possible_angle_to_player;
+            }
+        }
+
+        if best_rotation_yet != *piece {
+            self.pieces.remove(&piece_square);
+            self.pieces.insert(piece_square, best_rotation_yet);
+        }
     }
 
     fn move_options_for_piece_at(&self, piece_square: WorldSquare) -> SquareList {
@@ -1057,7 +1102,7 @@ impl Game {
         fn cost_heuristic(a: WorldSquare, b: WorldSquare) -> u32 {
             king_distance(a, b)
         }
-        let relative_steps = Piece::relative_move_steps_for_type(PieceType::King);
+        let relative_steps = KING_STEPS;
         let mut recorded_step_start_squares_by_step_end_squares =
             HashMap::<WorldSquare, WorldSquare>::new();
         let mut squares_to_check = DoublePriorityQueue::<WorldSquare, u32>::new();
@@ -1483,7 +1528,7 @@ mod tests {
         let correct_end_square = moving_pawn_square + STEP_LEFT;
         game.place_red_pawn(correct_end_square + STEP_DOWN_LEFT);
         game.place_red_pawn(moving_pawn_square);
-        game.move_piece_at(moving_pawn_square);
+        game.move_piece_at_square_and_return_end_position_if_moved(moving_pawn_square);
         assert!(game.pieces.contains_key(&correct_end_square));
     }
 
@@ -1499,7 +1544,7 @@ mod tests {
             }
         }
         let num_pieces_at_start = game.pieces.len();
-        game.move_piece_at(start_square);
+        game.move_piece_at_square_and_return_end_position_if_moved(start_square);
         assert_eq!(num_pieces_at_start, game.pieces.len());
     }
 
@@ -1513,7 +1558,7 @@ mod tests {
         assert_eq!(game.piece_type_count(Pawn), 6);
         let test_square = point2(5, 5);
         assert_false!(game.square_is_empty(test_square));
-        game.move_piece_at(test_square);
+        game.move_piece_at_square_and_return_end_position_if_moved(test_square);
         assert!(game.square_is_empty(test_square));
     }
 
@@ -1523,7 +1568,7 @@ mod tests {
         let pawn_square = point2(5, 5);
         game.place_red_pawn(pawn_square);
         assert_false!(game.square_is_empty(pawn_square));
-        game.move_piece_at(pawn_square);
+        game.move_piece_at_square_and_return_end_position_if_moved(pawn_square);
         assert!(game.square_is_empty(pawn_square));
     }
 

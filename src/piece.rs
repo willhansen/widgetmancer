@@ -154,21 +154,6 @@ impl Piece {
         }
     }
 
-    pub fn relative_move_steps_for_type(piece_type: PieceType) -> StepList {
-        match piece_type {
-            Pawn | Soldier => ORTHOGONAL_STEPS.into(),
-            King => KING_STEPS.into(),
-            Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
-            _ => vec![],
-        }
-    }
-
-    pub fn relative_capture_steps_for_type(piece_type: PieceType) -> StepList {
-        match piece_type {
-            Pawn => DIAGONAL_STEPS.into(),
-            _ => Self::relative_move_steps_for_type(piece_type),
-        }
-    }
     pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
         match piece_type {
             Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
@@ -210,11 +195,20 @@ impl Piece {
     }
 
     pub(crate) fn relative_move_steps(&self) -> StepList {
-        Self::relative_move_steps_for_type(self.piece_type)
+        match self.piece_type {
+            Pawn => ORTHOGONAL_STEPS.into(),
+            King => KING_STEPS.into(),
+            Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
+            Soldier => vec![self.faced_direction.unwrap()],
+            _ => vec![],
+        }
     }
 
     pub(crate) fn relative_capture_steps(&self) -> StepList {
-        Self::relative_capture_steps_for_type(self.piece_type)
+        match self.piece_type {
+            Pawn => DIAGONAL_STEPS.into(),
+            _ => self.relative_move_steps(),
+        }
     }
 
     pub(crate) fn move_directions(&self) -> StepList {
