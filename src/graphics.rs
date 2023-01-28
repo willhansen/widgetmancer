@@ -788,7 +788,11 @@ mod tests {
         assert_ne!(glyphs_at_start[0].bg_color, ENEMY_PIECE_COLOR);
         assert_ne!(glyphs_at_start[1].bg_color, ENEMY_PIECE_COLOR);
 
-        g.draw_piece_with_color(test_square, PieceType::Pawn, ENEMY_PIECE_COLOR);
+        g.draw_piece_with_color(
+            test_square,
+            PieceType::OmniDirectionalPawn,
+            ENEMY_PIECE_COLOR,
+        );
         let line_color = GREEN;
         assert_ne!(line_color, ENEMY_PIECE_COLOR);
         g.draw_braille_line(

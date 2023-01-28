@@ -122,7 +122,7 @@ fn test_capture_pawn() {
 
     assert_eq!(
         1,
-        game.piece_type_count(PieceType::Pawn),
+        game.piece_type_count(PieceType::OmniDirectionalPawn),
         "Should be one pawn"
     );
 
@@ -131,7 +131,7 @@ fn test_capture_pawn() {
 
     assert_eq!(
         0,
-        game.piece_type_count(PieceType::Pawn),
+        game.piece_type_count(PieceType::OmniDirectionalPawn),
         "Should have captured pawn"
     );
 }
@@ -164,9 +164,9 @@ fn test_pawn_move_towards_player() {
 fn test_shoot_pawn() {
     let mut game = set_up_player_facing_pawn_on_left();
 
-    assert_eq!(1, game.piece_type_count(PieceType::Pawn));
+    assert_eq!(1, game.piece_type_count(PieceType::OmniDirectionalPawn));
     game.player_shoot_shotgun();
-    assert_eq!(0, game.piece_type_count(PieceType::Pawn));
+    assert_eq!(0, game.piece_type_count(PieceType::OmniDirectionalPawn));
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn test_shotgun_spread() {
     let start_pawns = 5;
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
     game.player_shoot_shotgun();
-    let end_pawns = game.piece_type_count(PieceType::Pawn);
+    let end_pawns = game.piece_type_count(PieceType::OmniDirectionalPawn);
 
     assert!(end_pawns < start_pawns - 1);
 }
@@ -331,7 +331,7 @@ fn test_sniper_one_shot_one_kill() {
     game.player_shoot_sniper();
     game.select_closest_piece();
     game.player_shoot_sniper();
-    assert_eq!(game.piece_type_count(PieceType::Pawn), 0);
+    assert_eq!(game.piece_type_count(PieceType::OmniDirectionalPawn), 0);
 }
 
 #[test]
@@ -586,8 +586,8 @@ fn test_turn_if_move_into_wall() {
 fn test_one_move_per_faction_per_turn() {
     let mut game = set_up_game();
     game.place_player(point2(0, 0));
-    let pawn1 = Piece::new(PieceType::Pawn, game.get_new_faction());
-    let pawn2 = Piece::new(PieceType::Pawn, game.get_new_faction());
+    let pawn1 = Piece::new(PieceType::OmniDirectionalPawn, game.get_new_faction());
+    let pawn2 = Piece::new(PieceType::OmniDirectionalPawn, game.get_new_faction());
     game.place_piece(pawn1, point2(2, 2));
     game.place_piece(pawn1, point2(4, 2));
     game.place_piece(pawn2, point2(2, 5));

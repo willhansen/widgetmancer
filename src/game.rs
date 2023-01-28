@@ -353,7 +353,7 @@ impl Game {
                 if pawn_square == king_square {
                     continue;
                 }
-                self.place_piece(Piece::new(Pawn, faction), pawn_square);
+                self.place_piece(Piece::new(OmniDirectionalPawn, faction), pawn_square);
             }
         }
     }
@@ -460,7 +460,10 @@ impl Game {
     }
 
     pub fn place_red_pawn(&mut self, square: WorldSquare) {
-        self.place_piece(Piece::new(Pawn, self.red_pawn_faction), square)
+        self.place_piece(
+            Piece::new(OmniDirectionalPawn, self.red_pawn_faction),
+            square,
+        )
     }
 
     pub fn place_death_turret(&mut self, square: WorldSquare) {
@@ -487,7 +490,7 @@ impl Game {
             if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
-                    self.place_piece(Piece::new(Pawn, faction), square);
+                    self.place_piece(Piece::new(OmniDirectionalPawn, faction), square);
                 }
             } else {
                 let new_incubation = IncubatingPawn {
@@ -623,7 +626,8 @@ impl Game {
                 .filter(|piece| piece.faction == faction)
                 .collect();
             let all_same_piece_type: bool = pieces_in_faction.iter().all_equal();
-            let faction_has_a_pawn = pieces_in_faction.iter().next().unwrap().piece_type == Pawn;
+            let faction_has_a_pawn =
+                pieces_in_faction.iter().next().unwrap().piece_type == OmniDirectionalPawn;
             let faction_has_only_pawns = all_same_piece_type && faction_has_a_pawn;
             if faction_has_only_pawns {
                 pieces_in_faction
@@ -1440,7 +1444,7 @@ mod tests {
         let test_square = point2(5, 5);
         let faction = game.get_new_faction();
         for step in ORTHOGONAL_STEPS {
-            game.place_piece(Piece::new(Pawn, faction), test_square + step);
+            game.place_piece(Piece::new(OmniDirectionalPawn, faction), test_square + step);
         }
         assert_eq!(game.pieces.len(), 4);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
@@ -1457,9 +1461,9 @@ mod tests {
         let faction = game.get_new_faction();
 
         for step in ORTHOGONAL_STEPS {
-            game.place_piece(Piece::new(Pawn, faction), test_square + step);
+            game.place_piece(Piece::new(OmniDirectionalPawn, faction), test_square + step);
         }
-        game.place_piece(Piece::new(Pawn, faction), test_square);
+        game.place_piece(Piece::new(OmniDirectionalPawn, faction), test_square);
 
         assert_eq!(game.pieces.len(), 5);
         for _ in 0..=TURNS_TO_SPAWN_PAWN {
@@ -1555,7 +1559,7 @@ mod tests {
         for square in pawn_squares {
             game.place_red_pawn(square);
         }
-        assert_eq!(game.piece_type_count(Pawn), 6);
+        assert_eq!(game.piece_type_count(OmniDirectionalPawn), 6);
         let test_square = point2(5, 5);
         assert_false!(game.square_is_empty(test_square));
         game.move_piece_at_square_and_return_end_position_if_moved(test_square);
@@ -1834,7 +1838,9 @@ mod tests {
     fn test_soldier() {
         let mut game = set_up_game();
         let square = point2(5, 5);
-        game.place_piece(Piece::from_type(PieceType::Soldier), square);
+        let piece = Piece::from_type(PieceType::OmniDirectionalSoldier);
+        game.place_piece( piece,square);
+        assert_false!(piece.can_turn());
         assert!(game
             .on_board_move_squares_for_piece_at(square, false)
             .contains(&(square + STEP_RIGHT)));
@@ -1859,6 +1865,25 @@ mod tests {
         assert_eq!(
             game.move_options_for_piece_at(soldier_square),
             vec![soldier_square + STEP_RIGHT]
+        );
+    }
+    #[test]
+    fn test_turning_pawn_turns_toward_player() {
+        let mut game = set_up_game();
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+
+        let square = player_square + STEP_LEFT * 3;
+        game.place_piece(Piece::from_type(PieceType::TurningPawn), square);
+
+        assert_eq!(
+            game.move_options_for_piece_at(square),
+            vec![square + STEP_UP]
+        );
+        game.move_all_pieces();
+        assert_eq!(
+            game.move_options_for_piece_at(square),
+            vec![square + STEP_RIGHT]
         );
     }
 }

@@ -108,7 +108,7 @@ pub fn do_everything() {
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();
-    game.set_up_homogeneous_army(PieceType::Soldier);
+    game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
 
     let mut prev_tick_start_time = Instant::now();
     while game.running() {

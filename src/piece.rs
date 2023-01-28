@@ -25,8 +25,9 @@ pub enum Upgrade {
 
 #[derive(Debug, Display, Copy, Clone, Eq, PartialEq, EnumIter, Hash)]
 pub enum PieceType {
-    Pawn,
-    Soldier,
+    OmniDirectionalPawn,
+    TurningPawn,
+    OmniDirectionalSoldier,
     TurningSoldier,
     Knight,
     Bishop,
@@ -35,6 +36,8 @@ pub enum PieceType {
     King,
     DeathCubeTurret,
 }
+
+const TURNING_PIECE_TYPES: &'static [PieceType] = &[TurningPawn, TurningSoldier];
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Faction {
@@ -74,7 +77,7 @@ pub struct Piece {
 
 impl Piece {
     pub fn pawn() -> Piece {
-        Piece::from_type(Pawn)
+        Piece::from_type(OmniDirectionalPawn)
     }
     pub fn knight() -> Piece {
         Piece::from_type(Knight)
@@ -127,7 +130,7 @@ impl Piece {
 
     pub fn random_subordinate_type() -> PieceType {
         let mut rng = get_new_rng();
-        let options = vec![Pawn, Knight, Bishop, Rook, Queen];
+        let options = vec![OmniDirectionalPawn, Knight, Bishop, Rook, Queen];
         *random_choice(&mut rng, &options)
     }
 
@@ -142,8 +145,8 @@ impl Piece {
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
-            Pawn => ['♟', ' '],
-            Soldier => ['S', 'o'],
+            OmniDirectionalPawn => ['♟', ' '],
+            OmniDirectionalSoldier => ['S', 'o'],
             Knight => ['♞', ' '],
             Bishop => ['♝', ' '],
             Rook => ['♜', ' '],
@@ -183,9 +186,10 @@ impl Piece {
         Piece {
             piece_type,
             faction,
-            faced_direction: match piece_type {
-                Soldier => Some(STEP_RIGHT),
-                _ => None,
+            faced_direction: if TURNING_PIECE_TYPES.contains(&piece_type) {
+                Some(STEP_RIGHT)
+            } else {
+                None
             },
         }
     }
@@ -196,17 +200,17 @@ impl Piece {
 
     pub(crate) fn relative_move_steps(&self) -> StepList {
         match self.piece_type {
-            Pawn => ORTHOGONAL_STEPS.into(),
+            OmniDirectionalPawn => ORTHOGONAL_STEPS.into(),
             King => KING_STEPS.into(),
             Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
-            Soldier => vec![self.faced_direction.unwrap()],
+            OmniDirectionalSoldier => vec![self.faced_direction.unwrap()],
             _ => vec![],
         }
     }
 
     pub(crate) fn relative_capture_steps(&self) -> StepList {
         match self.piece_type {
-            Pawn => DIAGONAL_STEPS.into(),
+            OmniDirectionalPawn => DIAGONAL_STEPS.into(),
             _ => self.relative_move_steps(),
         }
     }
@@ -229,17 +233,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pawn_moveset() {
-        let pawn_moveset = HashSet::from_iter(Piece::pawn().relative_move_steps());
-        let correct_moveset = HashSet::from([vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1)]);
-        assert_eq!(correct_moveset, pawn_moveset);
-    }
+    fn test_turning_vs_omnidirectional_pawn() {
+        assert_eq!(
+            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_move_steps()),
+            HashSet::from(ORTHOGONAL_STEPS)
+        );
+        assert_eq!(
+            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_capture_steps()),
+            HashSet::from(DIAGONAL_STEPS)
+        );
 
+        assert_eq!(
+            Piece::from_type(TurningPawn,).relative_move_steps().len(),
+            1
+        );
+        assert_eq!(
+            Piece::from_type(TurningPawn,)
+                .relative_capture_steps()
+                .len(),
+            2
+        );
+    }
     #[test]
-    fn test_pawn_captureset() {
-        let pawn_captureset = HashSet::from_iter(Piece::pawn().relative_capture_steps());
-        let correct_captureset =
-            HashSet::from([vec2(1, 1), vec2(-1, 1), vec2(1, -1), vec2(-1, -1)]);
-        assert_eq!(correct_captureset, pawn_captureset);
+    fn test_turning_vs_omnidirectional_soldier() {
+        assert_eq!(
+            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_move_steps()),
+            HashSet::from(ORTHOGONAL_STEPS)
+        );
+        assert_eq!(
+            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_capture_steps()),
+            HashSet::from(ORTHOGONAL_STEPS)
+        );
+
+        assert_eq!(
+            Piece::from_type(TurningSoldier,)
+                .relative_move_steps()
+                .len(),
+            1
+        );
+        assert_eq!(
+            Piece::from_type(TurningSoldier,).relative_capture_steps(),
+            Piece::from_type(TurningSoldier,).relative_move_steps()
+        );
     }
 }
