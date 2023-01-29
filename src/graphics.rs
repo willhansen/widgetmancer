@@ -686,6 +686,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
+    use crate::piece::PieceType::TurningPawn;
     use crate::{LEFT_I, RIGHT_I};
 
     use super::*;
@@ -852,7 +853,7 @@ mod tests {
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
         //g.print_output_buffer();
-        g.draw_piece(Piece::pawn(), the_square);
+        g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
@@ -867,7 +868,7 @@ mod tests {
     fn test_field_of_view_mask_is_fully_transparent() {
         let mut g = set_up_graphics_with_nxn_squares(1);
         let the_square = WorldSquare::new(0, 0);
-        g.draw_piece(Piece::pawn(), the_square);
+        g.draw_piece_with_color(the_square, TurningPawn, WHITE);
 
         let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');

@@ -254,8 +254,16 @@ impl Glyph {
         self.get_solid_color() != None
     }
 
-    pub fn solid(color: RGB8) -> Glyph {
+    pub fn solid_fg(color: RGB8) -> Glyph {
         Glyph::fg_only(FULL_BLOCK, color)
+    }
+    pub fn solid_bg(color: RGB8) -> Glyph {
+        Glyph {
+            character: SPACE,
+            fg_color: RED,
+            bg_color: color,
+            bg_transparent: false,
+        }
     }
 
     pub fn get_solid_color(&self) -> Option<RGB8> {
@@ -338,31 +346,30 @@ impl Glyph {
         [Glyph::new(FULL_BLOCK, BLOCK_FG, BLOCK_BG); 2]
     }
 
-    #[deprecated(note = "Use the DoubleGlyph version instead")]
-    pub fn drawn_over(&self, background_glyphs: DoubleGlyph, is_left_glyph: bool) -> Glyph {
-        let position_index = if is_left_glyph { 0 } else { 1 };
-        let mut output_glyph = self.clone();
-        if self.bg_transparent == true {
-            let glyph_directly_below = background_glyphs[position_index];
-            output_glyph.bg_transparent = glyph_directly_below.bg_transparent;
-            if self.character == SPACE {
-                return glyph_directly_below;
-            } else if self.is_braille() && glyph_directly_below.is_braille() {
-                output_glyph.character =
-                    combine_braille_characters(self.character, glyph_directly_below.character);
-                output_glyph.bg_color = glyph_directly_below.bg_color;
-            } else if char_is_hextant(self.character)
-                && char_is_hextant(glyph_directly_below.character)
-            {
-                output_glyph.character =
-                    combine_hextant_characters(self.character, glyph_directly_below.character);
-                output_glyph.bg_color = glyph_directly_below.bg_color;
+    pub fn drawn_over(&self, bottom: Glyph) -> Glyph {
+        let top = *self;
+
+        if top.has_fg() {
+            if top.bg_transparent && let Some(combined_character) = combine_characters(top.character, bottom.character) {
+                Glyph::new(combined_character, top.fg_color, bottom.bg_color)
             } else {
-                let bg_colors = background_glyphs.solid_color_if_backgroundified();
-                output_glyph.bg_color = bg_colors[position_index];
+                let bg = if !top.bg_transparent {
+                    top.bg_color
+                } else if bottom.has_fg() {
+                    bottom.fg_color
+                } else {
+                    bottom.bg_color
+                };
+
+                Glyph::new(top.character, top.fg_color, bg)
             }
+        } else if !top.bg_transparent {
+            Glyph::solid_bg(top.bg_color)
+        } else if bottom.has_fg() {
+            bottom
+        } else {
+            Glyph::solid_bg(bottom.bg_color)
         }
-        output_glyph
     }
 
     pub fn char_map_to_fg_only_glyph_map<T: Hash + Eq + Copy>(
@@ -429,25 +436,55 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         let bottom_left = background_glyphs[0];
         let bottom_right = background_glyphs[1];
 
-        let new_left = if top_left.has_fg() {
-            let bg = if !top_left.bg_transparent {
-                top_left.bg_color
-            } else if bottom_left.has_fg() {
-                bottom_left.fg_color
+        let halfwidth_only_output = [0, 1].map(|i| {
+            let top = self[i];
+            let bottom = background_glyphs[i];
+            top.drawn_over(bottom)
+        });
+
+        let output = if bottom_left.is_fullwidth() {
+            if !top_left.is_fullwidth() && top_left.has_fg() && top_right.has_fg() {
+                let mut tmp = halfwidth_only_output;
+                tmp[1].bg_color = bottom_left.fg_color;
+                tmp
+            } else if top_left.is_fullwidth() && top_left.bg_transparent {
+                let mut tmp = halfwidth_only_output;
+                tmp[1].bg_color = bottom_left.fg_color;
+                tmp
             } else {
-                bottom_left.bg_color
-            };
-            Glyph::new(top_left.character, top_left.fg_color, bg)
-        } else if !top_left.bg_transparent {
-            Glyph::solid(top_left.bg_color)
-        } else if bottom_left.has_fg() {
-            bottom_left
+                halfwidth_only_output
+            }
         } else {
-            Glyph::solid(bottom_left.bg_color)
+            halfwidth_only_output
         };
 
-        let new_right = if top_right.has_fg() {};
+        return output;
 
+        let new_right = if top_right.has_fg() {
+            if top_right.bg_transparent && let Some(combined_character) = combine_characters(top_right.character, bottom_right.character) {
+                Glyph::new(combined_character, top_right.fg_color, bottom_right.bg_color)
+            }
+            else {
+
+                let bg = if !top_right.bg_transparent {
+                    top_right.bg_color
+                } else if bottom_right.has_fg() {
+                    bottom_right.fg_color
+                } else if bottom_left.is_fullwidth() {
+                    bottom_left.fg_color
+                } else {
+                    bottom_right.bg_color
+                };
+                Glyph::new(top_right.character, top_right.fg_color, bg)
+            }
+        } else if !top_right.bg_transparent {
+            Glyph::solid_fg(top_right.bg_color)
+        } else if top_left.is_fullwidth() && bottom_left.is_fullwidth() {
+            Glyph::solid_bg(bottom_left.fg_color)
+        } else {
+            Glyph::solid_bg(bottom_right.bg_color)
+        };
+        //dbg!( "asdfasdf", self.to_clean_string(), background_glyphs.to_clean_string(), output.to_clean_string(), "------" );
         let mut output_glyphs = self.clone();
 
         let background_colors = [
@@ -464,7 +501,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         ];
 
         // Apply basic halfwidth transparency
-        (0..2).for_each(|position_index| {
+        let mut output = (0..2).map(|position_index| {
             let top_glyph = self[position_index];
             let bottom_glyph = background_glyphs[position_index];
             if top_glyph.bg_transparent == true {
@@ -780,7 +817,8 @@ mod tests {
         let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
 
         assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
-        assert_eq!(combo_glyphs[0], Glyph::fg_only('🬒', RED));
+        assert_eq!(combo_glyphs[0].character, '🬒');
+        assert_eq!(combo_glyphs[0].fg_color, RED);
     }
     #[test]
     fn test_space_drawn_over_hextant_does_nothing() {
@@ -800,7 +838,8 @@ mod tests {
         let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
 
         assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
-        assert_eq!(combo_glyphs[0], Glyph::fg_only('⠏', RED));
+        assert_eq!(combo_glyphs[0].character, '⠏');
+        assert_eq!(combo_glyphs[0].fg_color, RED);
     }
 
     #[test]
