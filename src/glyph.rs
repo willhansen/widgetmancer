@@ -254,6 +254,10 @@ impl Glyph {
         self.get_solid_color() != None
     }
 
+    pub fn solid(color: RGB8) -> Glyph {
+        Glyph::fg_only(FULL_BLOCK, color)
+    }
+
     pub fn get_solid_color(&self) -> Option<RGB8> {
         if KNOWN_FG_ONLY_CHARS.contains(&self.character) {
             Some(self.fg_color)
@@ -264,8 +268,13 @@ impl Glyph {
         }
     }
 
+    #[deprecated(note = "Use has_fg instead")]
     pub fn has_no_fg(&self) -> bool {
         Glyph::char_is_empty(self.character)
+    }
+
+    pub fn has_fg(&self) -> bool {
+        !Glyph::char_is_empty(self.character)
     }
 
     pub fn char_is_empty(c: char) -> bool {
@@ -419,6 +428,25 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         let top_right = self[1];
         let bottom_left = background_glyphs[0];
         let bottom_right = background_glyphs[1];
+
+        let new_left = if top_left.has_fg() {
+            let bg = if !top_left.bg_transparent {
+                top_left.bg_color
+            } else if bottom_left.has_fg() {
+                bottom_left.fg_color
+            } else {
+                bottom_left.bg_color
+            };
+            Glyph::new(top_left.character, top_left.fg_color, bg)
+        } else if !top_left.bg_transparent {
+            Glyph::solid(top_left.bg_color)
+        } else if bottom_left.has_fg() {
+            bottom_left
+        } else {
+            Glyph::solid(bottom_left.bg_color)
+        };
+
+        let new_right = if top_right.has_fg() {};
 
         let mut output_glyphs = self.clone();
 
@@ -776,25 +804,29 @@ mod tests {
     }
 
     #[test]
-    fn halfwidth_char_drawn_over_right_side_of_fullwidth_char() {
+    fn test_halfwidth_char_drawn_over_right_side_of_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
-        let top_color = RED;
-        let bottom_color = BLUE;
+        let top_fg_color = RED;
+        let bottom_fg_color = BLUE;
         let bottom_bg_color = GREEN;
 
         let bottom_glyphs =
-            [fullwidth_char, SPACE].map(|c| Glyph::new(c, bottom_color, bottom_bg_color));
-        let top_glyphs = [SPACE, halfwidth_char].map(|c| Glyph::fg_only(c, top_color));
+            [fullwidth_char, SPACE].map(|c| Glyph::new(c, bottom_fg_color, bottom_bg_color));
+        let top_glyphs = [SPACE, halfwidth_char].map(|c| Glyph::fg_only(c, top_fg_color));
         let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
 
+        assert_eq!(combo_glyphs[0].character, fullwidth_char);
+        assert_eq!(combo_glyphs[0].fg_color, bottom_fg_color);
+        assert_eq!(combo_glyphs[0].bg_color, bottom_bg_color);
+
         assert_eq!(combo_glyphs[1].character, halfwidth_char);
-        assert_eq!(combo_glyphs[1].fg_color, top_color);
+        assert_eq!(combo_glyphs[1].fg_color, top_fg_color);
         assert_eq!(combo_glyphs[1].bg_color, bottom_bg_color);
     }
 
     #[test]
-    fn fullwidth_char_drawn_over_two_halfwidth_chars() {
+    fn test_fullwidth_char_drawn_over_two_halfwidth_chars() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
         let top_color = RED;
@@ -811,7 +843,7 @@ mod tests {
         assert_eq!(combo_glyphs[1].fg_color, bottom_color);
     }
     #[test]
-    fn two_halfwidth_chars_drawn_over_fullwidth_char() {
+    fn test_two_halfwidth_chars_drawn_over_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
         let top_color = RED;
@@ -829,7 +861,7 @@ mod tests {
         assert_eq!(combo_glyphs[1].bg_color, bottom_color);
     }
     #[test]
-    fn fullwidth_char_drawn_over_fullwidth_char() {
+    fn test_fullwidth_char_drawn_over_fullwidth_char() {
         let fullwidth_char = '🢃';
         let top_color = RED;
         let bottom_color = BLUE;
