@@ -26,6 +26,7 @@ pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
 
 pub type SquareSet = HashSet<WorldSquare>;
+pub type StepSet = HashSet<WorldStep>;
 
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;

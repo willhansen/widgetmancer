@@ -21,6 +21,7 @@ use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
+use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -552,6 +553,9 @@ impl Game {
 
     pub fn get_piece_at(&self, square: WorldSquare) -> Option<&Piece> {
         self.pieces.get(&square)
+    }
+    pub fn get_mut_piece_at(&mut self, square: WorldSquare) -> Option<&mut Piece> {
+        self.pieces.get_mut(&square)
     }
 
     pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
@@ -1285,6 +1289,28 @@ impl Game {
             );
         }
     }
+
+    pub fn set_up_vs_weak_with_pillars_and_turret_and_upgrades(&mut self) {
+        self.set_up_columns();
+        for x in 0..8 {
+            let piece_type = match x % 4 {
+                0 => TurningPawn,
+                1 => TurningSoldier,
+                2 => OmniDirectionalPawn,
+                3 => OmniDirectionalSoldier,
+                _ => panic!("bad math"),
+            };
+
+            self.place_piece(
+                Piece::from_type(piece_type),
+                self.player_square() + STEP_UP * 5 + STEP_RIGHT * (x - 3),
+            );
+            self.place_upgrade(
+                BlinkRange,
+                self.player_square() + STEP_UP * 7 + STEP_RIGHT * (x - 3),
+            )
+        }
+    }
     pub fn set_up_homogeneous_army(&mut self, piece_type: PieceType) {
         for y in 0..3 {
             for x in 0..8 {
@@ -1305,7 +1331,7 @@ impl Game {
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
         );
-        self.place_death_turret(self.player_square() + STEP_LEFT * 14);
+        //self.place_death_turret(self.player_square() + STEP_LEFT * 14);
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
@@ -1839,7 +1865,7 @@ mod tests {
         let mut game = set_up_game();
         let square = point2(5, 5);
         let piece = Piece::from_type(PieceType::OmniDirectionalSoldier);
-        game.place_piece( piece,square);
+        game.place_piece(piece, square);
         assert_false!(piece.can_turn());
         assert!(game
             .on_board_move_squares_for_piece_at(square, false)
@@ -1855,7 +1881,11 @@ mod tests {
         game.place_player(player_square);
 
         let soldier_square = player_square + STEP_LEFT * 3;
+
         game.place_piece(Piece::from_type(PieceType::TurningSoldier), soldier_square);
+        game.get_mut_piece_at(soldier_square)
+            .unwrap()
+            .set_faced_direction(STEP_UP);
 
         assert_eq!(
             game.move_options_for_piece_at(soldier_square),
@@ -1875,6 +1905,10 @@ mod tests {
 
         let square = player_square + STEP_LEFT * 3;
         game.place_piece(Piece::from_type(PieceType::TurningPawn), square);
+
+        game.get_mut_piece_at(square)
+            .unwrap()
+            .set_faced_direction(STEP_UP);
 
         assert_eq!(
             game.move_options_for_piece_at(square),

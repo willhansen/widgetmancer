@@ -12,7 +12,8 @@ use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS, STEP_RIGHT,
+    adjacent_king_steps, get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS,
+    STEP_RIGHT,
 };
 use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
 
@@ -103,6 +104,11 @@ impl Piece {
         }
     }
 
+    pub fn set_faced_direction(&mut self, dir: WorldStep) {
+        assert!(self.can_turn());
+        self.faced_direction = Some(dir);
+    }
+
     pub fn can_turn(&self) -> bool {
         self.faced_direction.is_some()
     }
@@ -145,8 +151,10 @@ impl Piece {
 
     pub fn chars_for_type(piece_type: PieceType) -> [char; 2] {
         match piece_type {
-            OmniDirectionalPawn => ['♟', ' '],
-            OmniDirectionalSoldier => ['S', 'o'],
+            TurningPawn => ['♟', ' '],
+            TurningSoldier => ['S', 'o'],
+            OmniDirectionalPawn => ['O', 'P'],
+            OmniDirectionalSoldier => ['O', 'S'],
             Knight => ['♞', ' '],
             Bishop => ['♝', ' '],
             Rook => ['♜', ' '],
@@ -200,10 +208,10 @@ impl Piece {
 
     pub(crate) fn relative_move_steps(&self) -> StepList {
         match self.piece_type {
-            OmniDirectionalPawn => ORTHOGONAL_STEPS.into(),
+            OmniDirectionalPawn | OmniDirectionalSoldier => ORTHOGONAL_STEPS.into(),
             King => KING_STEPS.into(),
             Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
-            OmniDirectionalSoldier => vec![self.faced_direction.unwrap()],
+            TurningPawn | TurningSoldier => vec![self.faced_direction.unwrap()],
             _ => vec![],
         }
     }
@@ -211,6 +219,9 @@ impl Piece {
     pub(crate) fn relative_capture_steps(&self) -> StepList {
         match self.piece_type {
             OmniDirectionalPawn => DIAGONAL_STEPS.into(),
+            TurningPawn => adjacent_king_steps(self.faced_direction.unwrap())
+                .into_iter()
+                .collect(),
             _ => self.relative_move_steps(),
         }
     }

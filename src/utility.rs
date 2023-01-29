@@ -594,6 +594,21 @@ pub fn hue_to_rgb(hue_360: f32) -> RGB8 {
     )
 }
 
+pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
+    assert!(KING_STEPS.contains(&dir));
+    if ORTHOGONAL_STEPS.contains(&dir) {
+        if dir.x != 0 {
+            HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
+        } else {
+            HashSet::from([dir + STEP_LEFT, dir + STEP_RIGHT])
+        }
+    } else {
+        let no_x = vec2(0, dir.y);
+        let no_y = vec2(dir.x, 0);
+        HashSet::from([no_x, no_y])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::assert_false;
@@ -740,5 +755,21 @@ mod tests {
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
         assert_false!(same_side_of_line(line, neg_point, origin))
+    }
+
+    #[test]
+    fn test_adjacent_king_steps() {
+        assert_eq!(
+            adjacent_king_steps(STEP_UP),
+            vec![STEP_UP_RIGHT, STEP_UP_LEFT].into_iter().collect()
+        );
+        assert_eq!(
+            adjacent_king_steps(STEP_RIGHT),
+            vec![STEP_UP_RIGHT, STEP_DOWN_RIGHT].into_iter().collect()
+        );
+        assert_eq!(
+            adjacent_king_steps(STEP_DOWN_LEFT),
+            vec![STEP_DOWN, STEP_LEFT].into_iter().collect()
+        );
     }
 }
