@@ -17,6 +17,14 @@ use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
 
+use crate::animations::blink_animation::BlinkAnimation;
+use crate::animations::floaty_laser::FloatyLaser;
+use crate::animations::piece_death_animation::PieceDeathAnimation;
+use crate::animations::recoiling_board::RecoilingBoard;
+use crate::animations::selector_animation::SelectorAnimation;
+use crate::animations::simple_laser::SimpleLaser;
+use crate::animations::smite_from_above::SmiteFromAbove;
+use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::FovResult;
 use crate::game::DeathCube;
@@ -40,7 +48,7 @@ pub struct Graphics {
     terminal_width: u16,
     terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
-    selectors: Vec<Selector>,
+    selectors: Vec<SelectorAnimation>,
     board_animation: Option<Box<dyn BoardAnimation>>,
     start_time: Instant,
 }
@@ -555,6 +563,11 @@ impl Graphics {
             .push(Box::new(FloatyLaser::new(start, end)));
     }
 
+    pub fn do_smite_animation(&mut self, square: WorldSquare) {
+        self.active_animations
+            .push(Box::new(SmiteFromAbove::new(square)));
+    }
+
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
         self.active_animations
             .push(Box::new(PieceDeathAnimation::new(square)));
@@ -566,7 +579,8 @@ impl Graphics {
     }
 
     pub fn add_selector(&mut self, square: WorldSquare) {
-        self.active_animations.push(Box::new(Selector::new(square)));
+        self.active_animations
+            .push(Box::new(SelectorAnimation::new(square)));
     }
     pub fn draw_paths(&mut self, paths: Vec<SquareList>) {
         let mut path_squares = HashSet::<WorldSquare>::new();
@@ -677,7 +691,7 @@ impl Graphics {
     pub fn select_squares(&mut self, squares: Vec<WorldSquare>) {
         self.selectors = squares
             .into_iter()
-            .map(|square| Selector::new(square))
+            .map(|square| SelectorAnimation::new(square))
             .collect();
     }
 }

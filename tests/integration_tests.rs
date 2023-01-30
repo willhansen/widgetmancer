@@ -6,7 +6,8 @@ use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;
 
-use rust_roguelike::animations::{PieceDeathAnimation, DOTS_IN_SELECTOR};
+use rust_roguelike::animations::piece_death_animation::PieceDeathAnimation;
+use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::DoubleGlyphFunctions;
@@ -15,7 +16,6 @@ use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
     DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
 };
-
 use rust_roguelike::utils_for_tests::*;
 
 #[test]

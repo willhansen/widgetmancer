@@ -16,7 +16,7 @@ use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::animations::Selector;
+use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::{field_of_view_from_square, FovResult};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
@@ -62,7 +62,7 @@ pub struct Game {
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     turn_count: u32,
-    selectors: Vec<Selector>,
+    selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
     incubating_pawns: HashMap<WorldSquare, IncubatingPawn>,
     faction_factory: FactionFactory,
@@ -425,8 +425,7 @@ impl Game {
         kill_squares.into_iter().for_each(|square| {
             if let Some(piece) = self.get_piece_at(square) && piece.faction != self.death_cube_faction {
                 self.capture_piece_at(square);
-            }
-            else if self.is_player_at(square) {
+            } else if self.is_player_at(square) {
                 self.capture_piece_at(square);
             }
         });
@@ -1217,6 +1216,18 @@ impl Game {
             .add_floaty_laser(graphical_laser_start, graphical_laser_end.to_f32());
     }
 
+    pub fn smite_selected_square(&mut self) {
+        assert!(self.player_is_alive());
+        if let Some(target_square) = self.selected_square {
+            self.smite(target_square);
+        }
+    }
+
+    fn smite(&mut self, square: WorldSquare) {
+        self.try_capture_piece_at(square).ok();
+        self.graphics.do_smite_animation(square);
+    }
+
     pub fn apply_upgrade(&mut self, upgrade: Upgrade) {
         assert!(self.player_is_alive());
         match upgrade {
@@ -1227,21 +1238,28 @@ impl Game {
     }
 
     pub fn capture_piece_at(&mut self, square: WorldSquare) {
+        let result = self.try_capture_piece_at(square);
+        if let Some(err_str) = result.err() {
+            panic!("{}", err_str);
+        }
+    }
+
+    pub fn try_capture_piece_at(&mut self, square: WorldSquare) -> Result<(), String> {
         if !self.square_is_on_board(square) {
-            panic!(
+            return Err(format!(
                 "Tried to capture piece off board at {}",
                 point_to_string(square)
-            );
+            ));
         }
         if !self.is_piece_at(square) {
-            panic!(
+            return Err(format!(
                 "Tried to capture an empty square at {}",
                 point_to_string(square)
-            );
+            ));
         }
         if self.try_get_player_square() == Some(square) {
             self.kill_player();
-            return;
+            return Ok(());
         }
 
         let piece = self.pieces.remove(&square).unwrap();
@@ -1251,6 +1269,8 @@ impl Game {
         }
 
         self.graphics.start_piece_death_animation_at(square);
+
+        Ok(())
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1800,6 +1820,7 @@ mod tests {
             }
         }
     }
+
     #[test]
     fn test_try_to_blink_but_blocked() {
         let mut game = set_up_game();
@@ -1860,6 +1881,7 @@ mod tests {
         game.capture_piece_at(square);
         assert_eq!(game.upgrades.get(&square).unwrap(), &Upgrade::BlinkRange);
     }
+
     #[test]
     fn test_soldier() {
         let mut game = set_up_game();
@@ -1874,6 +1896,7 @@ mod tests {
             .guarded_squares_for_piece_at(square)
             .contains(&(square + STEP_RIGHT)))
     }
+
     #[test]
     fn test_turning_soldier_turns_toward_player() {
         let mut game = set_up_game();
@@ -1897,6 +1920,7 @@ mod tests {
             vec![soldier_square + STEP_RIGHT]
         );
     }
+
     #[test]
     fn test_turning_pawn_turns_toward_player() {
         let mut game = set_up_game();
