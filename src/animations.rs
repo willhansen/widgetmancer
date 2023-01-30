@@ -36,8 +36,12 @@ pub type AnimationList = Vec<AnimationObject>;
 
 pub trait Animation: DynClone {
     fn start_time(&self) -> Instant;
+    fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
-    fn finished_at_time(&self, time: Instant) -> bool;
+
+    fn finished_at_time(&self, time: Instant) -> bool {
+        time.duration_since(self.start_time()) > self.duration()
+    }
 }
 // This is kinda magic.  Not great, but if it works, it works.
 dyn_clone::clone_trait_object!(Animation);

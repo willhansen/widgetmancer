@@ -5,8 +5,9 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldSquare,
 };
 use euclid::Angle;
+use num::Float;
 use std::f32::consts::TAU;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SelectorAnimation {
@@ -26,6 +27,9 @@ impl SelectorAnimation {
 impl Animation for SelectorAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
+    }
+    fn duration(&self) -> Duration {
+        Duration::from_secs_f32(1.0)
     }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
@@ -47,7 +51,6 @@ impl Animation for SelectorAnimation {
         }
         Glyph::points_to_braille_glyphs(points, SELECTOR_COLOR)
     }
-
     fn finished_at_time(&self, _time: Instant) -> bool {
         false
     }

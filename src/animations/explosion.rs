@@ -29,6 +29,9 @@ impl Animation for Explosion {
     fn start_time(&self) -> Instant {
         self.start_time
     }
+    fn duration(&self) -> Duration {
+        Duration::from_millis(500)
+    }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         // rather arbitrary
@@ -52,9 +55,5 @@ impl Animation for Explosion {
             points_to_draw.push(particle_pos);
         }
         Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)
-    }
-
-    fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.start_time) > Duration::from_millis(500)
     }
 }

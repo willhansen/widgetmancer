@@ -91,6 +91,9 @@ impl Animation for RecoilingBoard {
     fn start_time(&self) -> Instant {
         self.start_time
     }
+    fn duration(&self) -> Duration {
+        RecoilingBoard::RECOIL_DURATION
+    }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let age = time.duration_since(self.start_time);
@@ -120,10 +123,6 @@ impl Animation for RecoilingBoard {
             }
         }
         world_square_glyph_map_to_world_character_glyph_map(glyph_map)
-    }
-
-    fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.start_time) > RecoilingBoard::RECOIL_DURATION
     }
 }
 

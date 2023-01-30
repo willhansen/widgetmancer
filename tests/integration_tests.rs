@@ -310,9 +310,7 @@ fn test_piece_death_animation_finishes() {
     let pawn_square = point2(5, 5);
     game.place_piece(Piece::pawn(), pawn_square);
     game.capture_piece_at(pawn_square);
-    game.draw_headless_at_duration_from_start(
-        PieceDeathAnimation::DURATION + Duration::from_secs_f32(0.5),
-    );
+    game.draw_headless_at_duration_from_start(Duration::from_secs_f32(10.5));
     game.draw_headless_now();
 
     let graphics = game.borrow_graphics_mut();

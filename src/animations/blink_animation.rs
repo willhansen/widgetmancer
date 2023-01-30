@@ -19,7 +19,6 @@ pub struct BlinkAnimation {
 }
 
 impl BlinkAnimation {
-    pub const DURATION: Duration = Duration::from_secs_f32(1.0);
     pub fn new(start_square: WorldSquare, end_square: WorldSquare) -> BlinkAnimation {
         BlinkAnimation {
             start_square,
@@ -32,6 +31,10 @@ impl BlinkAnimation {
 impl Animation for BlinkAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
+    }
+
+    fn duration(&self) -> Duration {
+        Duration::from_secs_f32(1.0)
     }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
@@ -69,7 +72,7 @@ impl Animation for BlinkAnimation {
             Line::new(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
-        let total_seconds = BlinkAnimation::DURATION.as_secs_f32();
+        let total_seconds = self.duration().as_secs_f32();
         let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
         let lifetime_fraction_remaining = remaining_seconds / total_seconds;
@@ -113,9 +116,5 @@ impl Animation for BlinkAnimation {
         //.flat_map(world_square_to_both_world_character_squares)
         //.map(|char_square| (char_square, Glyph::fg_only(FULL_BLOCK, BLINK_EFFECT_COLOR)))
         //.collect()
-    }
-
-    fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.start_time) > BlinkAnimation::DURATION
     }
 }

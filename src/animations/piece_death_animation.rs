@@ -17,7 +17,6 @@ pub struct PieceDeathAnimation {
 }
 
 impl PieceDeathAnimation {
-    pub const DURATION: Duration = Duration::from_secs_f32(5.0);
     pub fn new(square: WorldSquare) -> PieceDeathAnimation {
         PieceDeathAnimation {
             square,
@@ -29,6 +28,9 @@ impl PieceDeathAnimation {
 impl Animation for PieceDeathAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
+    }
+    fn duration(&self) -> Duration {
+        Duration::from_secs_f32(5.0)
     }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
@@ -44,9 +46,8 @@ impl Animation for PieceDeathAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 20;
         let age = time.duration_since(self.start_time);
-        let remaining_seconds = PieceDeathAnimation::DURATION.as_secs_f32() - age.as_secs_f32();
-        let lifetime_fraction_remaining =
-            remaining_seconds / PieceDeathAnimation::DURATION.as_secs_f32();
+        let remaining_seconds = self.duration().as_secs_f32() - age.as_secs_f32();
+        let lifetime_fraction_remaining = remaining_seconds / self.duration().as_secs_f32();
 
         let range = -0.5..0.5;
         let points_to_draw = (0..num_particles)
@@ -58,9 +59,5 @@ impl Animation for PieceDeathAnimation {
             })
             .collect();
         Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)
-    }
-
-    fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.start_time) > PieceDeathAnimation::DURATION
     }
 }

@@ -8,7 +8,7 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use euclid::vec2;
 use std::time;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct StaticBoard {
@@ -25,6 +25,9 @@ impl Animation for StaticBoard {
     fn start_time(&self) -> Instant {
         // TODO: is this even applicable?
         Instant::now()
+    }
+    fn duration(&self) -> Duration {
+        Duration::from_secs_f32(0.0)
     }
 
     fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
