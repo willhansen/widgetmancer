@@ -42,7 +42,7 @@ impl Animation for Explosion {
             .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
         let mut points_to_draw: Vec<WorldPoint> = vec![];
-        let num_particles = 20;
+        let num_particles = 50;
         let age = time.duration_since(self.start_time);
         for _ in 0..num_particles {
             let radius: f32 = 10.0;

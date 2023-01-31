@@ -37,14 +37,17 @@ impl Animation for SmiteFromAbove {
     }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
-        let beam_width_fraction =
-            time.duration_since(self.start_time()).as_secs_f32() / self.duration().as_secs_f32();
+        let start_width_fraction = 0.4;
+        let beam_width_fraction = 1.0
+            - (self.fraction_done_at_time(time) * (1.0 + start_width_fraction)
+                - start_width_fraction)
+                .abs();
 
         let one_horizontal_slice: DoubleGlyph = [1.0, -1.0].map(|i| {
             Glyph::fg_only(
                 floating_square::character_for_square_with_1d_offset(
                     false,
-                    i * beam_width_fraction,
+                    i * (1.0 - beam_width_fraction),
                 ),
                 RED,
             )

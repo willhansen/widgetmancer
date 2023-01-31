@@ -18,6 +18,7 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::blink_animation::BlinkAnimation;
+use crate::animations::explosion::Explosion;
 use crate::animations::floaty_laser::FloatyLaser;
 use crate::animations::piece_death_animation::PieceDeathAnimation;
 use crate::animations::recoiling_board::RecoilingBoard;
@@ -566,6 +567,10 @@ impl Graphics {
     pub fn do_smite_animation(&mut self, square: WorldSquare) {
         self.active_animations
             .push(Box::new(SmiteFromAbove::new(square)));
+    }
+
+    pub fn start_burst_explosion(&mut self, point: WorldPoint) {
+        self.active_animations.push(Box::new(Explosion::new(point)));
     }
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {

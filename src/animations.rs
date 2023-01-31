@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use dyn_clone::DynClone;
 use euclid::{point2, vec2, Angle, Length};
-use num::ToPrimitive;
+use num::{clamp, ToPrimitive};
 use rand::{Rng, SeedableRng};
 use static_board::StaticBoard;
 use termion::color::Black;
@@ -40,7 +40,15 @@ pub trait Animation: DynClone {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
 
     fn finished_at_time(&self, time: Instant) -> bool {
-        time.duration_since(self.start_time()) > self.duration()
+        self.fraction_done_at_time(time) == 1.0
+    }
+
+    fn fraction_done_at_time(&self, time: Instant) -> f32 {
+        clamp(
+            time.duration_since(self.start_time()).as_secs_f32() / self.duration().as_secs_f32(),
+            0.0,
+            1.0,
+        )
     }
 }
 // This is kinda magic.  Not great, but if it works, it works.

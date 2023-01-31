@@ -1225,6 +1225,7 @@ impl Game {
 
     fn smite(&mut self, square: WorldSquare) {
         self.try_capture_piece_at(square).ok();
+        self.graphics.start_burst_explosion(square.to_f32());
         self.graphics.do_smite_animation(square);
     }
 
