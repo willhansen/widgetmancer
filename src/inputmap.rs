@@ -38,7 +38,7 @@ impl InputMap {
         match evt {
             Event::Key(ke) => match ke {
                 Key::Char('q') => game.quit(),
-                Key::Char(' ') => game.player_shoot_shotgun(),
+                Key::Char(' ') => game.do_player_radial_attack(),
                 Key::Char('f') => game.smite_selected_square(),
 
                 Key::Char('k') | Key::Char('w') | Key::Up => {

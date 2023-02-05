@@ -22,9 +22,11 @@ use crate::{
 };
 
 pub mod blink_animation;
-pub mod explosion;
+pub mod burst_explosion_animation;
+pub mod circle_attack_animation;
 pub mod floaty_laser;
 pub mod piece_death_animation;
+pub mod radial_shockwave;
 pub mod recoiling_board;
 pub mod selector_animation;
 pub mod simple_laser;
@@ -39,6 +41,10 @@ pub trait Animation: DynClone {
     fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
 
+    fn glyphs_at_duration(&self, duration: Duration) -> WorldCharacterSquareGlyphMap {
+        self.glyphs_at_time(self.start_time() + duration)
+    }
+
     fn finished_at_time(&self, time: Instant) -> bool {
         self.fraction_done_at_time(time) == 1.0
     }
@@ -49,6 +55,13 @@ pub trait Animation: DynClone {
             0.0,
             1.0,
         )
+    }
+    fn fraction_remaining_at_time(&self, time: Instant) -> f32 {
+        1.0 - self.fraction_done_at_time(time)
+    }
+
+    fn age_at_time(&self, time: Instant) -> Duration {
+        time.duration_since(self.start_time())
     }
 }
 // This is kinda magic.  Not great, but if it works, it works.

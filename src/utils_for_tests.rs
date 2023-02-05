@@ -8,11 +8,11 @@ use std::time::Instant;
 pub fn set_up_nxn_game(board_size: u32) -> Game {
     Game::new(board_size as u16 * 2, board_size as u16, Instant::now())
 }
-pub fn set_up_game() -> Game {
+pub fn set_up_10x10_game() -> Game {
     set_up_nxn_game(10)
 }
 pub fn set_up_game_with_player() -> Game {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     game.place_player(game.mid_square());
     game
 }

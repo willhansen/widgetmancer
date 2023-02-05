@@ -1161,7 +1161,27 @@ impl Game {
         capture_squares
     }
 
-    pub fn player_shoot_shotgun(&mut self) {
+    pub fn do_player_radial_attack(&mut self) {
+        assert!(self.player_is_alive());
+
+        let kill_radius = 1;
+        let circle_radius = 1.5;
+
+        (-kill_radius..=kill_radius).for_each(|dx| {
+            (-kill_radius..=kill_radius).for_each(|dy| {
+                let step: WorldStep = vec2(dx, dy);
+
+                if step.square_length() != 0 {
+                    self.try_capture_piece_at(self.player_square() + step).ok();
+                }
+            })
+        });
+
+        self.graphics
+            .start_circle_attack_animation(self.player_square(), circle_radius);
+    }
+
+    pub fn do_player_shoot_shotgun(&mut self) {
         let num_lasers = 10;
         let range = 5.0;
         let spread_radians = 1.0;
@@ -1199,7 +1219,7 @@ impl Game {
             .start_recoil_animation(self.board_size, self.player_faced_direction());
     }
 
-    pub fn player_shoot_sniper(&mut self) {
+    pub fn do_player_shoot_sniper(&mut self) {
         let mut graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
@@ -1428,7 +1448,7 @@ mod tests {
 
     #[test]
     fn test_blocks_block_view() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         game.place_block(point2(5, 4));
         let test_square = point2(5, 3);
@@ -1437,7 +1457,7 @@ mod tests {
 
     #[test]
     fn test_fov_mask_non_partials() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         for i in 0..4 {
             game.place_block(game.player_square() + STEP_DOWN + STEP_RIGHT * i);
@@ -1487,7 +1507,7 @@ mod tests {
 
     #[test]
     fn test_pawn_reproduction_in_surrounded_squares() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
         let faction = game.get_new_faction();
         for step in ORTHOGONAL_STEPS {
@@ -1502,7 +1522,7 @@ mod tests {
 
     #[test]
     fn test_pawn_reproduction_does_not_apply_to_filled_squares() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
 
         let test_square = point2(5, 5);
         let faction = game.get_new_faction();
@@ -1521,7 +1541,7 @@ mod tests {
 
     #[test]
     fn test_faction_with_only_pawns_becomes_red_pawns() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
 
         let king_square = point2(5, 5);
         let test_square = king_square + STEP_UP_RIGHT;
@@ -1547,7 +1567,7 @@ mod tests {
 
     #[test]
     fn test_red_pawn_looks_red() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_red_pawn(square);
         game.draw_headless_now();
@@ -1557,7 +1577,7 @@ mod tests {
 
     #[test]
     fn test_red_pawns_dont_move_if_stable() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         game.place_player(point2(0, 0));
         let center_square = point2(5, 5);
         let pawn_squares: SquareSet = ORTHOGONAL_STEPS
@@ -1574,7 +1594,7 @@ mod tests {
 
     #[test]
     fn test_red_pawn_will_move_into_protection() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let moving_pawn_square = point2(5, 5);
         let correct_end_square = moving_pawn_square + STEP_LEFT;
         game.place_red_pawn(correct_end_square + STEP_DOWN_LEFT);
@@ -1585,7 +1605,7 @@ mod tests {
 
     #[test]
     fn test_red_pawns_dont_try_to_capture_each_other() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
 
         for dx in 0..3 {
@@ -1601,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_red_pawns_try_to_not_pack_tightly() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let pawn_squares = (4..=6).flat_map(|x| (4..=5).map(move |y| point2(x, y)));
         for square in pawn_squares {
             game.place_red_pawn(square);
@@ -1615,7 +1635,7 @@ mod tests {
 
     #[test]
     fn test_red_pawns_slightly_prefer_movement_over_non_movement() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let pawn_square = point2(5, 5);
         game.place_red_pawn(pawn_square);
         assert_false!(game.square_is_empty(pawn_square));
@@ -1636,7 +1656,7 @@ mod tests {
 
     #[test]
     fn test_death_cube_kills_rook() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let rook_square = point2(5, 5);
         game.place_piece(Piece::new(Rook, game.default_enemy_faction), rook_square);
         let death_cube_start_pos = (rook_square + STEP_LEFT).to_f32();
@@ -1649,7 +1669,7 @@ mod tests {
 
     #[test]
     fn test_death_cube_can_be_seen() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
 
         game.draw_headless_now();
@@ -1670,7 +1690,7 @@ mod tests {
 
     #[test]
     fn test_death_cube_moves() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         game.place_linear_death_cube(point2(3.0, 4.5), vec2(1.0, 0.0));
         game.move_death_cubes(Duration::from_secs_f32(1.0));
         assert_about_eq!(game.death_cubes[0].position.x, 4.0);
@@ -1678,7 +1698,7 @@ mod tests {
 
     #[test]
     fn test_death_cube_visually_moves() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
 
         game.draw_headless_now();
@@ -1711,7 +1731,7 @@ mod tests {
 
     #[test]
     fn test_death_cubes_change_color_over_time() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let test_square = point2(3, 3);
         game.place_linear_death_cube(test_square.to_f32(), vec2(0.0, 0.0));
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.0));
@@ -1731,7 +1751,7 @@ mod tests {
 
     #[test]
     fn test_death_cube_turret_shoots_death_cubes() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let turret_square = point2(5, 5);
         game.place_death_turret(turret_square);
         assert!(game.death_cubes.is_empty());
@@ -1824,14 +1844,14 @@ mod tests {
 
     #[test]
     fn test_try_to_blink_but_blocked() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         game.place_player(point2(0, 0));
         game.player_blink(STEP_LEFT);
     }
 
     #[test]
     fn test_protected_piece_has_fully_colored_background() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let square1 = point2(5, 5);
         game.place_red_pawn(square1);
         game.place_red_pawn(square1 + STEP_UP_RIGHT);
@@ -1872,7 +1892,7 @@ mod tests {
 
     #[test]
     fn test_kings_drop_upgrades() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_piece(
             Piece::new(PieceType::King, game.default_enemy_faction),
@@ -1885,7 +1905,7 @@ mod tests {
 
     #[test]
     fn test_soldier() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         let piece = Piece::from_type(PieceType::OmniDirectionalSoldier);
         game.place_piece(piece, square);
@@ -1900,7 +1920,7 @@ mod tests {
 
     #[test]
     fn test_turning_soldier_turns_toward_player() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
 
@@ -1924,7 +1944,7 @@ mod tests {
 
     #[test]
     fn test_turning_pawn_turns_toward_player() {
-        let mut game = set_up_game();
+        let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
 
@@ -1944,5 +1964,19 @@ mod tests {
             game.move_options_for_piece_at(square),
             vec![square + STEP_RIGHT]
         );
+    }
+
+    #[test]
+    fn test_player_radial_attack() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        KING_STEPS
+            .iter()
+            .for_each(|&step: &WorldStep| game.place_piece(Piece::pawn(), square + step));
+        game.place_piece(Piece::pawn(), square + STEP_RIGHT * 2);
+        assert_eq!(game.pieces.len(), 9);
+        game.do_player_radial_attack();
+        assert_eq!(game.pieces.len(), 1);
     }
 }

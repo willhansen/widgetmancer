@@ -165,7 +165,7 @@ fn test_shoot_pawn() {
     let mut game = set_up_player_facing_pawn_on_left();
 
     assert_eq!(1, game.piece_type_count(PieceType::OmniDirectionalPawn));
-    game.player_shoot_shotgun();
+    game.do_player_shoot_shotgun();
     assert_eq!(0, game.piece_type_count(PieceType::OmniDirectionalPawn));
 }
 
@@ -200,7 +200,7 @@ fn test_move_to_turn() {
 fn test_visible_laser() {
     let mut game = set_up_game_with_player();
     let inspection_square: WorldSquare = game.player_square() + game.player_faced_direction();
-    game.player_shoot_sniper();
+    game.do_player_shoot_sniper();
     game.draw_headless_now();
 
     let drawn_glyphs = game
@@ -239,7 +239,7 @@ fn test_player_background_is_transparent() {
 
 #[test]
 fn test_laser_background_is_transparent() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let left_point: WorldPoint = point2(2.0, 2.0);
     // Two lasers, because it can make a difference
     for _ in 0..2 {
@@ -264,7 +264,7 @@ fn test_laser_background_is_transparent() {
 
 #[test]
 fn test_pawn_background_is_transparent() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let square1 = point2(2, 3);
     let square2 = square1 + UP_I.cast_unit() * 3;
     game.place_piece(Piece::pawn(), square1);
@@ -284,7 +284,7 @@ fn test_pawn_background_is_transparent() {
 fn test_shotgun_spread() {
     let start_pawns = 5;
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
-    game.player_shoot_shotgun();
+    game.do_player_shoot_shotgun();
     let end_pawns = game.piece_type_count(PieceType::OmniDirectionalPawn);
 
     assert!(end_pawns < start_pawns - 1);
@@ -292,7 +292,7 @@ fn test_shotgun_spread() {
 
 #[test]
 fn test_particles_on_piece_death() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let pawn_square = point2(5, 5);
     game.place_piece(Piece::pawn(), pawn_square);
     game.capture_piece_at(pawn_square);
@@ -306,7 +306,7 @@ fn test_particles_on_piece_death() {
 
 #[test]
 fn test_piece_death_animation_finishes() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let pawn_square = point2(5, 5);
     game.place_piece(Piece::pawn(), pawn_square);
     game.capture_piece_at(pawn_square);
@@ -324,17 +324,17 @@ fn test_piece_death_animation_finishes() {
 fn test_sniper_one_shot_one_kill() {
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(3, 20);
     game.select_closest_piece();
-    game.player_shoot_sniper();
+    game.do_player_shoot_sniper();
     game.select_closest_piece();
-    game.player_shoot_sniper();
+    game.do_player_shoot_sniper();
     game.select_closest_piece();
-    game.player_shoot_sniper();
+    game.do_player_shoot_sniper();
     assert_eq!(game.piece_type_count(PieceType::OmniDirectionalPawn), 0);
 }
 
 #[test]
 fn test_selector() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let test_square = point2(5, 5);
     game.place_piece(Piece::pawn(), test_square);
     game.select_all_pieces();
@@ -422,7 +422,7 @@ fn test_knight_move() {
 
 #[test]
 fn test_correct_amount_of_braille_in_selector() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let test_square = point2(5, 5);
     let diag = vec2(1, 1);
     let test_rectangle = WorldSquareRect::new(test_square - diag, test_square + diag);
@@ -512,7 +512,7 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
 
 #[test]
 fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let pawn_square = game.mid_square();
     game.place_piece(Piece::pawn(), pawn_square);
     let move_square = pawn_square + RIGHT_I.cast_unit();
@@ -582,7 +582,7 @@ fn test_turn_if_move_into_wall() {
 
 #[test]
 fn test_one_move_per_faction_per_turn() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     game.place_player(point2(0, 0));
     let pawn1 = Piece::new(PieceType::OmniDirectionalPawn, game.get_new_faction());
     let pawn2 = Piece::new(PieceType::OmniDirectionalPawn, game.get_new_faction());
@@ -599,7 +599,7 @@ fn test_one_move_per_faction_per_turn() {
 
 #[test]
 fn test_blocks_visibly_block_view() {
-    let mut game = set_up_game();
+    let mut game = set_up_10x10_game();
     let player_pos = point2(5, 5);
     game.place_player(player_pos);
     game.place_block(player_pos + STEP_DOWN);

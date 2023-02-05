@@ -18,9 +18,11 @@ use termion::raw::RawTerminal;
 use termion::terminal_size;
 
 use crate::animations::blink_animation::BlinkAnimation;
-use crate::animations::explosion::Explosion;
+use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
+use crate::animations::circle_attack_animation::CircleAttackAnimation;
 use crate::animations::floaty_laser::FloatyLaser;
 use crate::animations::piece_death_animation::PieceDeathAnimation;
+use crate::animations::radial_shockwave::RadialShockwave;
 use crate::animations::recoiling_board::RecoilingBoard;
 use crate::animations::selector_animation::SelectorAnimation;
 use crate::animations::simple_laser::SimpleLaser;
@@ -302,8 +304,18 @@ impl Graphics {
         self.board_animation = Some(Box::new(StaticBoard::new(board_size)));
     }
 
+    pub fn square_is_white(square: WorldSquare) -> bool {
+        (square.x + square.y) % 2 == 0
+    }
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
-        if (square.x + square.y) % 2 == 0 {
+        if Graphics::square_is_white(square) {
+            BOARD_WHITE
+        } else {
+            BOARD_BLACK
+        }
+    }
+    pub fn off_board_color_at_square(square: WorldSquare) -> RGB8 {
+        if !Graphics::square_is_white(square) {
             BOARD_WHITE
         } else {
             BOARD_BLACK
@@ -570,7 +582,17 @@ impl Graphics {
     }
 
     pub fn start_burst_explosion(&mut self, point: WorldPoint) {
-        self.active_animations.push(Box::new(Explosion::new(point)));
+        self.active_animations
+            .push(Box::new(BurstExplosionAnimation::new(point)));
+    }
+    pub fn start_circle_attack_animation(&mut self, square: WorldSquare, radius: f32) {
+        self.active_animations
+            .push(Box::new(CircleAttackAnimation::new(
+                square.to_f32(),
+                radius,
+            )));
+        self.active_animations
+            .push(Box::new(RadialShockwave::new(square)));
     }
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
