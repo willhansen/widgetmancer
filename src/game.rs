@@ -50,8 +50,6 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
-pub type LaserSegmentsInSquare = [[bool; 4]; 2];
-
 pub struct Game {
     board_size: BoardSize,
     // (x,y), left to right, top to bottom
@@ -63,7 +61,6 @@ pub struct Game {
     pieces: HashMap<WorldSquare, Piece>,
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
-    lasers: HashMap<WorldSquare, LaserSegmentsInSquare>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -87,7 +84,6 @@ impl Game {
             pieces: HashMap::new(),
             upgrades: HashMap::new(),
             blocks: HashSet::new(),
-            lasers: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -347,10 +343,6 @@ impl Game {
             && !self.is_non_player_piece_at(square)
             && !self.is_block_at(square)
             && !self.is_upgrade_at(square)
-    }
-
-    fn square_has_laser(&self, square: WorldSquare) -> bool {
-        self.lasers.contains_key(&square)
     }
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
@@ -1257,10 +1249,6 @@ impl Game {
         self.graphics.do_smite_animation(square);
     }
 
-    pub fn player_shine(&mut self) {
-        todo!()
-    }
-
     pub fn apply_upgrade(&mut self, upgrade: Upgrade) {
         assert!(self.player_is_alive());
         match upgrade {
@@ -1990,16 +1978,5 @@ mod tests {
         assert_eq!(game.pieces.len(), 9);
         game.do_player_radial_attack();
         assert_eq!(game.pieces.len(), 1);
-    }
-    #[test]
-    fn test_player_emit_lasers() {
-        let mut game = set_up_10x10_game();
-        let player_square = point2(5, 5);
-        game.place_player(player_square);
-        game.player_shine();
-        KING_STEPS.iter().for_each(|&step: &WorldStep| {
-            let laser_square = player_square + step;
-            assert!(game.square_has_laser(laser_square));
-        });
     }
 }
