@@ -31,6 +31,7 @@ pub mod recoiling_board;
 pub mod selector_animation;
 pub mod simple_laser;
 pub mod smite_from_above;
+pub mod spear_attack_animation;
 pub mod static_board;
 
 pub type AnimationObject = Box<dyn Animation>;

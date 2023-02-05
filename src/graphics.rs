@@ -27,6 +27,7 @@ use crate::animations::recoiling_board::RecoilingBoard;
 use crate::animations::selector_animation::SelectorAnimation;
 use crate::animations::simple_laser::SimpleLaser;
 use crate::animations::smite_from_above::SmiteFromAbove;
+use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::FovResult;
@@ -593,6 +594,19 @@ impl Graphics {
             )));
         self.active_animations
             .push(Box::new(RadialShockwave::new(square)));
+    }
+    pub fn start_spear_attack_animation(
+        &mut self,
+        start_square: WorldSquare,
+        direction: WorldStep,
+        range: u32,
+    ) {
+        self.active_animations
+            .push(Box::new(SpearAttackAnimation::new(
+                start_square,
+                direction,
+                range,
+            )));
     }
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {

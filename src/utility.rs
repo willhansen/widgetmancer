@@ -255,8 +255,14 @@ pub fn is_diagonal_king_step(step: WorldStep) -> bool {
     step.square_length() == 2
 }
 
-pub fn is_orthogonal(v: WorldMove) -> bool {
-    v.x == 0.0 || v.y == 0.0
+pub fn is_orthogonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
+    v.x == T::zero() || v.y == T::zero()
+}
+pub fn is_diagonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
+    v.x == v.y || v.x == v.y.neg()
+}
+pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
+    is_orthogonal(v) || is_diagonal(v)
 }
 
 pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> default::Vector2D<f32> {

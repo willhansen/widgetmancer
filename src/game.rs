@@ -1181,6 +1181,26 @@ impl Game {
             .start_circle_attack_animation(self.player_square(), circle_radius);
     }
 
+    pub fn do_player_spear_attack(&mut self) {
+        assert!(self.player_is_alive());
+
+        let spear_length = 3;
+
+        for i in 1..=spear_length {
+            let target_square = self.player_square() + self.player_faced_direction() * i;
+            if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
+                break;
+            }
+            self.try_capture_piece_at(target_square).ok();
+        }
+
+        self.graphics.start_spear_attack_animation(
+            self.player_square(),
+            self.player_faced_direction(),
+            spear_length as u32,
+        );
+    }
+
     pub fn do_player_shoot_shotgun(&mut self) {
         let num_lasers = 10;
         let range = 5.0;
@@ -1978,5 +1998,18 @@ mod tests {
         assert_eq!(game.pieces.len(), 9);
         game.do_player_radial_attack();
         assert_eq!(game.pieces.len(), 1);
+    }
+
+    #[test]
+    fn test_player_spear_attack() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        game.player().faced_direction = STEP_RIGHT;
+
+        game.place_piece(Piece::pawn(), square + STEP_RIGHT * 2);
+        assert_eq!(game.pieces.len(), 1);
+        game.do_player_spear_attack();
+        assert_eq!(game.pieces.len(), 0);
     }
 }
