@@ -300,9 +300,12 @@ pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
-pub fn rotate_vect<U>(vector: Vector2D<f32, U>, radians: f32) -> Vector2D<f32, U> {
-    let angle = vector.angle_from_x_axis();
-    let new_angle = angle + Angle::radians(radians);
+pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
+    if vector.length() == 0.0 {
+        return vector;
+    }
+    let start_angle = vector.angle_from_x_axis();
+    let new_angle = start_angle + delta_angle;
     Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
 }
 
@@ -520,7 +523,7 @@ pub fn rotate_point_around_point<U>(
     moving_point: Point2D<f32, U>,
     angle: Angle<f32>,
 ) -> Point2D<f32, U> {
-    axis_point + rotate_vect((moving_point - axis_point), angle.radians)
+    axis_point + rotate_vect((moving_point - axis_point), angle)
 }
 
 pub fn cross_correlate_squares_with_steps(
@@ -617,7 +620,7 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
 
 #[cfg(test)]
 mod tests {
-    use ntest::assert_false;
+    use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
@@ -776,6 +779,13 @@ mod tests {
         assert_eq!(
             adjacent_king_steps(STEP_DOWN_LEFT),
             vec![STEP_DOWN, STEP_LEFT].into_iter().collect()
+        );
+    }
+    #[test]
+    fn test_rotate_zero_vector() {
+        assert_eq!(
+            rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
+            vec2(0.0, 0.0)
         );
     }
 }

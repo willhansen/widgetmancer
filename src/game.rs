@@ -1216,7 +1216,7 @@ impl Game {
             let line_end: WorldPoint = line_start.to_f32()
                 + rotate_vect(
                     self.player_faced_direction().to_f32() * range,
-                    rotation_if_uniform,
+                    Angle::radians(rotation_if_uniform),
                 )
                 .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();

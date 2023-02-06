@@ -2,10 +2,11 @@ use crate::animations::Animation;
 use crate::glyph::glyph_constants::{CYAN, EXPLOSION_COLOR, GREY, GREY_RED, RED};
 use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
+    WorldStep,
 };
-use crate::utility::{is_orthodiagonal, KING_STEPS};
-use euclid::Angle;
+use crate::utility::{is_orthodiagonal, rotate_vect, KING_STEPS};
+use euclid::{point2, vec2, Angle};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use std::f32::consts::{PI, TAU};
@@ -33,6 +34,25 @@ impl SpearAttackAnimation {
             start_time: Instant::now(),
         }
     }
+
+    fn points_in_an_arrow() -> MoveList {
+        //  >
+        let x_length = 1.0;
+        let slope = 1.0;
+        let spacing = 0.2;
+
+        let mut points = vec![];
+        let x_layers = (x_length / spacing).to_f32().unwrap().ceil() as i32;
+        (0..x_layers).for_each(|ix| {
+            let x = ix as f32 * spacing;
+            let column_half_height = x * slope;
+            let points_in_half_column =
+                (column_half_height / spacing).to_f32().unwrap().ceil() as i32;
+            (-points_in_half_column..=points_in_half_column)
+                .for_each(|iy| points.push(vec2(-ix as f32 * spacing, iy as f32 * spacing)));
+        });
+        points
+    }
 }
 
 impl Animation for SpearAttackAnimation {
@@ -47,10 +67,8 @@ impl Animation for SpearAttackAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
-        let angle_delta =
-            Angle::degrees(-sweep_degrees / 2.0 + sweep_degrees * self.fraction_done_at_time(time));
-        let angle = self.direction.to_f32().angle_from_x_axis() + angle_delta;
-        let spear_length = self.range as f32; //* self.fraction_remaining_at_time(time);
+        let angle = self.direction.to_f32().angle_from_x_axis();
+        let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
             let relative_position = WorldMove::from_angle_and_length(
                 angle,
@@ -59,6 +77,13 @@ impl Animation for SpearAttackAnimation {
             let particle_pos = self.start_square.to_f32() + relative_position;
             points_to_draw.push(particle_pos);
         }
+        let rel_spear_tip = WorldMove::from_angle_and_length(angle, spear_length);
+        let mut spearhead_points: PointList = SpearAttackAnimation::points_in_an_arrow()
+            .into_iter()
+            .map(|p: WorldMove| rotate_vect(p, rel_spear_tip.angle_from_x_axis()))
+            .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
+            .collect();
+        points_to_draw.append(&mut spearhead_points);
         Glyph::points_to_braille_glyphs(points_to_draw, GREY_RED)
     }
 }
