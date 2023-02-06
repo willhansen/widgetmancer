@@ -3,6 +3,7 @@ use rgb::*;
 pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 170, 50);
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
 pub const MAROON: RGB8 = RGB8::new(127, 0, 0);
+pub const DARKER_RED: RGB8 = RGB8::new(63, 0, 0);
 pub const BRICK_RED: RGB8 = RGB8::new(255, 87, 51);
 pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
 pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
@@ -28,6 +29,7 @@ pub const PATH_COLOR: RGB8 = MAGENTA;
 pub const OUT_OF_SIGHT_COLOR: RGB8 = DARK_GREY;
 pub const RED_PAWN_COLOR: RGB8 = RED;
 pub const BLINK_EFFECT_COLOR: RGB8 = COBALT_BLUE;
+pub const SPEAR_COLOR: RGB8 = DARKER_RED;
 
 pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = BLACK;

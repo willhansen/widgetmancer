@@ -1184,7 +1184,7 @@ impl Game {
     pub fn do_player_spear_attack(&mut self) {
         assert!(self.player_is_alive());
 
-        let spear_length = 3;
+        let spear_length = 5;
 
         for i in 1..=spear_length {
             let target_square = self.player_square() + self.player_faced_direction() * i;

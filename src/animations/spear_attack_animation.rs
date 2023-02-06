@@ -1,5 +1,5 @@
 use crate::animations::Animation;
-use crate::glyph::glyph_constants::{CYAN, EXPLOSION_COLOR, GREY, GREY_RED, RED};
+use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
@@ -37,9 +37,9 @@ impl SpearAttackAnimation {
 
     fn points_in_an_arrow() -> MoveList {
         //  >
-        let x_length = 1.0;
+        let x_length = 0.6;
         let slope = 1.0;
-        let spacing = 0.2;
+        let spacing = 0.24;
 
         let mut points = vec![];
         let x_layers = (x_length / spacing).to_f32().unwrap().ceil() as i32;
@@ -84,7 +84,7 @@ impl Animation for SpearAttackAnimation {
             .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
             .collect();
         points_to_draw.append(&mut spearhead_points);
-        Glyph::points_to_braille_glyphs(points_to_draw, GREY_RED)
+        Glyph::points_to_braille_glyphs(points_to_draw, SPEAR_COLOR)
     }
 }
 #[cfg(test)]
