@@ -37,9 +37,9 @@ impl SpearAttackAnimation {
 
     fn points_in_an_arrow() -> MoveList {
         //  >
-        let x_length = 0.6;
+        let x_length = 1.0;
         let slope = 1.0;
-        let spacing = 0.24;
+        let spacing = 0.2;
 
         let mut points = vec![];
         let x_layers = (x_length / spacing).to_f32().unwrap().ceil() as i32;
