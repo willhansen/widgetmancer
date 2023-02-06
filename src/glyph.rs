@@ -306,6 +306,42 @@ impl Glyph {
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
+    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
+        assert!(KING_STEPS.contains(&dir));
+        assert_eq!(arrow_string.chars().count(), 8);
+
+        let arrow_string_direction_order = [
+            STEP_LEFT,
+            STEP_RIGHT,
+            STEP_UP,
+            STEP_DOWN,
+            STEP_UP_LEFT,
+            STEP_UP_RIGHT,
+            STEP_DOWN_LEFT,
+            STEP_UP_RIGHT,
+        ];
+
+        let index_of_char = arrow_string_direction_order
+            .iter()
+            .position(|&arrow_dir| dir == arrow_dir)
+            .unwrap();
+
+        arrow_string.chars().nth(index_of_char).unwrap()
+    }
+    pub fn char_for_spear_point(dir: WorldStep) -> char {
+        Glyph::extract_arrow_from_arrow_string(dir, "🡐🡒🡑🡓🡔🡕🡖🡗")
+    }
+    pub fn char_for_spear_shaft(dir: WorldStep) -> char {
+        if dir.y == 0 {
+            '─'
+        } else if dir.x == 0 {
+            '│'
+        } else if dir.x == dir.y {
+            '╱'
+        } else {
+            '╲'
+        }
+    }
 
     pub fn is_chess(&self) -> bool {
         Glyph::char_is_chess(self.character)

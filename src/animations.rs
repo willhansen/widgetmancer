@@ -42,8 +42,16 @@ pub trait Animation: DynClone {
     fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
 
+    fn double_glyphs_at_time(&self, time: Instant) -> WorldSquareGlyphMap {
+        pair_up_glyph_map(self.glyphs_at_time(time))
+    }
+
     fn glyphs_at_duration(&self, duration: Duration) -> WorldCharacterSquareGlyphMap {
         self.glyphs_at_time(self.start_time() + duration)
+    }
+
+    fn double_glyphs_at_duration(&self, duration: Duration) -> WorldSquareGlyphMap {
+        pair_up_glyph_map(self.glyphs_at_duration(duration))
     }
 
     fn finished_at_time(&self, time: Instant) -> bool {
