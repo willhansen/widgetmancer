@@ -215,7 +215,7 @@ impl Glyph {
         let mut glyphs = [
             Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
                 faced_direction,
-                "🢀🢂🢁🢃🢄🢅🢇🢆",
+                "🢀🢂🢁🢃🢄🢅🢆🢇",
             )),
             Glyph::from_char(' '),
         ];
@@ -303,8 +303,8 @@ impl Glyph {
             STEP_DOWN,
             STEP_UP_LEFT,
             STEP_UP_RIGHT,
-            STEP_DOWN_LEFT,
             STEP_DOWN_RIGHT,
+            STEP_DOWN_LEFT,
         ];
 
         let index_of_char = arrow_string_direction_order

@@ -1,3 +1,9 @@
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
+
+use num::ToPrimitive;
+use rand::SeedableRng;
+
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
@@ -6,10 +12,6 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
 };
 use crate::utility::{seeded_random_point_near_line, Line};
-use num::ToPrimitive;
-use rand::SeedableRng;
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -54,7 +56,7 @@ impl Animation for BlinkAnimation {
 
         let time_constant = settling_time / 5.0;
 
-        let points_per_square_blinked = 3.0;
+        let points_per_square_blinked = 1.0;
         let point_spread_radius = 0.5;
 
         let motion_vector = self.end_square.to_f32() - self.start_square.to_f32();

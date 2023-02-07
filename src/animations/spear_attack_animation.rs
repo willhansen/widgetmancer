@@ -100,6 +100,5 @@ mod tests {
         let animation = SpearAttackAnimation::new(square, dir, 3);
         let double_glyphs = animation.double_glyphs_at_duration(Duration::from_secs_f32(0.1));
         assert!(double_glyphs.contains_key(&(square + STEP_RIGHT)));
-        dbg!(double_glyphs);
     }
 }

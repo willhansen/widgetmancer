@@ -597,7 +597,7 @@ impl Game {
     }
 
     pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
-        self.get_piece_at(square).is_some()
+        self.get_piece_at(square).is_some() || self.arrows.contains_key(&square)
     }
 
     pub fn is_piece_at(&self, square: WorldSquare) -> bool {
@@ -607,6 +607,9 @@ impl Game {
 
     pub fn is_upgrade_at(&self, square: WorldSquare) -> bool {
         self.upgrades.contains_key(&square)
+    }
+    pub fn is_arrow_at(&self, square: WorldSquare) -> bool {
+        self.arrows.contains_key(&square)
     }
 
     pub fn piece_type_count(&self, piece_type: PieceType) -> i32 {
@@ -1240,6 +1243,15 @@ impl Game {
         );
     }
 
+    pub fn do_player_shoot_arrow(&mut self) {
+        assert!(self.player_is_alive());
+        let square_in_front_of_player = self.player_square() + self.player_faced_direction();
+        if !self.square_is_empty(square_in_front_of_player) {
+            return;
+        }
+        self.place_arrow(square_in_front_of_player, self.player_faced_direction());
+    }
+
     pub fn do_player_shoot_shotgun(&mut self) {
         let num_lasers = 10;
         let range = 5.0;
@@ -1331,30 +1343,30 @@ impl Game {
                 point_to_string(square)
             ));
         }
-        if !self.is_piece_at(square) {
-            return Err(format!(
+        if self.is_arrow_at(square) {
+            self.arrows.remove(&square);
+            Ok(())
+        } else if self.try_get_player_square() == Some(square) {
+            self.kill_player();
+            Ok(())
+        } else if let Some(piece) = self.pieces.remove(&square) {
+            if piece.piece_type == PieceType::King {
+                self.place_upgrade(Upgrade::BlinkRange, square);
+            }
+
+            self.graphics.start_piece_death_animation_at(square);
+
+            Ok(())
+        } else {
+            Err(format!(
                 "Tried to capture an empty square at {}",
                 point_to_string(square)
-            ));
+            ))
         }
-        if self.try_get_player_square() == Some(square) {
-            self.kill_player();
-            return Ok(());
-        }
-
-        let piece = self.pieces.remove(&square).unwrap();
-
-        if piece.piece_type == PieceType::King {
-            self.place_upgrade(Upgrade::BlinkRange, square);
-        }
-
-        self.graphics.start_piece_death_animation_at(square);
-
-        Ok(())
     }
 
     pub fn place_arrow(&mut self, square: WorldSquare, direction: WorldStep) {
-        assert!(ORTHOGONAL_STEPS.contains(&direction));
+        assert!(KING_STEPS.contains(&direction));
         assert!(self.square_is_empty(square));
         self.arrows.insert(square, direction);
     }
@@ -2083,5 +2095,35 @@ mod tests {
         game.draw_headless_now();
         let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
         assert_false!(glyphs.looks_solid());
+    }
+    #[test]
+    fn test_player_shoot_arrow() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        game.player().faced_direction = STEP_RIGHT;
+        assert!(game.arrows.is_empty());
+        game.do_player_shoot_arrow();
+        assert_false!(game.arrows.is_empty());
+    }
+    #[test]
+    fn test_player_shoot_arrow_diagonal() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        game.player().faced_direction = STEP_UP_RIGHT;
+        assert!(game.arrows.is_empty());
+        game.do_player_shoot_arrow();
+        assert_false!(game.arrows.is_empty());
+    }
+    #[test]
+    fn test_player_can_capture_arrow() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square + STEP_UP);
+        game.place_arrow(square, STEP_RIGHT);
+        assert_false!(game.arrows.is_empty());
+        game.move_player_to(square);
+        assert!(game.arrows.is_empty());
     }
 }
