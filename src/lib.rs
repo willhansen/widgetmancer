@@ -110,6 +110,7 @@ pub fn do_everything() {
     //game.set_up_upgrades_galore();
     //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
     //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
+    game.set_up_vs_arrows();
 
     let mut prev_tick_start_time = Instant::now();
     while game.running() {
@@ -125,6 +126,7 @@ pub fn do_everything() {
             input_map.handle_event(&mut game, event);
 
             game.move_all_factions();
+            game.tick_arrows();
 
             game.on_turn_end();
         }

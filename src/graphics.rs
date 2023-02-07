@@ -469,6 +469,9 @@ impl Graphics {
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
         self.draw_glyphs_for_square(square, Glyph::glyphs_for_upgrade(upgrade));
     }
+    pub fn draw_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
+        self.draw_glyphs_for_square(square, Glyph::glyphs_for_flying_arrow(dir))
+    }
 
     pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set

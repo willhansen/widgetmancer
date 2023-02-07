@@ -210,27 +210,13 @@ impl Glyph {
     }
 
     pub fn get_glyphs_for_player(faced_direction: WorldStep) -> DoubleGlyph {
-        let mut arrow_step_map: HashMap<WorldStep, char> = HashMap::new();
-
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
-        let arrows = "🢀🢂🢁🢃🢄🢅🢆🢇";
-        let king_steps_in_arrow_order = vec![
-            vec2(-1, 0),
-            vec2(1, 0),
-            vec2(0, 1),
-            vec2(0, -1),
-            vec2(-1, 1),
-            vec2(1, 1),
-            vec2(1, -1),
-            vec2(-1, -1),
-        ];
-        for i in 0..king_steps_in_arrow_order.len() {
-            let arrow_char = arrows.chars().nth(i).unwrap();
-            arrow_step_map.insert(*king_steps_in_arrow_order.get(i).unwrap(), arrow_char);
-        }
 
         let mut glyphs = [
-            Glyph::from_char(*arrow_step_map.get(&faced_direction).unwrap_or(&'X')),
+            Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
+                faced_direction,
+                "🢀🢂🢁🢃🢄🢅🢇🢆",
+            )),
             Glyph::from_char(' '),
         ];
         glyphs[0].fg_color = PLAYER_GREEN;
@@ -306,7 +292,7 @@ impl Glyph {
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
-    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
+    fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
         assert!(KING_STEPS.contains(&dir));
         assert_eq!(arrow_string.chars().count(), 8);
 
@@ -318,7 +304,7 @@ impl Glyph {
             STEP_UP_LEFT,
             STEP_UP_RIGHT,
             STEP_DOWN_LEFT,
-            STEP_UP_RIGHT,
+            STEP_DOWN_RIGHT,
         ];
 
         let index_of_char = arrow_string_direction_order
@@ -328,9 +314,18 @@ impl Glyph {
 
         arrow_string.chars().nth(index_of_char).unwrap()
     }
-    pub fn char_for_spear_point(dir: WorldStep) -> char {
-        Glyph::extract_arrow_from_arrow_string(dir, "🡐🡒🡑🡓🡔🡕🡖🡗")
+    pub fn char_for_flying_arrow(dir: WorldStep) -> char {
+        //"🡐🡒🡑🡓🡔🡕🡖🡗")
+        Glyph::extract_arrow_from_arrow_string(dir, "⭠⭢⭡⭣⭦⭧⭨⭩")
     }
+
+    pub fn glyphs_for_flying_arrow(dir: WorldStep) -> DoubleGlyph {
+        [
+            Glyph::fg_only(Glyph::char_for_flying_arrow(dir), RED),
+            Glyph::transparent_glyph(),
+        ]
+    }
+
     pub fn char_for_spear_shaft(dir: WorldStep) -> char {
         if dir.y == 0 {
             '─'

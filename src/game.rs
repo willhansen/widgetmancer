@@ -61,6 +61,7 @@ pub struct Game {
     pieces: HashMap<WorldSquare, Piece>,
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
+    arrows: HashMap<WorldSquare, WorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -84,6 +85,7 @@ impl Game {
             pieces: HashMap::new(),
             upgrades: HashMap::new(),
             blocks: HashSet::new(),
+            arrows: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -317,6 +319,9 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
+        self.arrows
+            .iter()
+            .for_each(|(&square, &dir)| self.graphics.draw_arrow(square, dir));
         self.upgrades
             .iter()
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
@@ -343,6 +348,7 @@ impl Game {
             && !self.is_non_player_piece_at(square)
             && !self.is_block_at(square)
             && !self.is_upgrade_at(square)
+            && !self.arrows.contains_key(&square)
     }
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
@@ -431,6 +437,39 @@ impl Game {
         });
 
         self.remove_death_cubes_off_board();
+    }
+
+    pub fn tick_arrows(&mut self) {
+        // arrows that hit arrows, blocks, or board edges disappear
+        let mut next_arrows = HashMap::<WorldSquare, WorldStep>::new();
+        let mut arrow_midair_collisions = SquareSet::new();
+        let mut capture_squares = SquareSet::new();
+        self.arrows
+            .iter()
+            .for_each(|(&square, &dir): (&WorldSquare, &WorldStep)| {
+                let next_square = square + dir;
+                if self.is_piece_at(next_square) {
+                    capture_squares.insert(next_square);
+                }
+                if !self.is_block_at(next_square)
+                    && self.square_is_on_board(next_square)
+                    && !arrow_midair_collisions.contains(&next_square)
+                {
+                    let is_new_midair_collision = next_arrows.contains_key(&next_square);
+                    if is_new_midair_collision {
+                        next_arrows.remove(&next_square);
+                        arrow_midair_collisions.insert(next_square);
+                    } else {
+                        next_arrows.insert(next_square, dir);
+                    }
+                }
+            });
+        // apply captures
+        capture_squares.into_iter().for_each(|square| {
+            self.try_capture_piece_at(square).ok();
+        });
+
+        self.arrows = next_arrows;
     }
 
     pub fn remove_death_cubes_off_board(&mut self) {
@@ -1314,11 +1353,23 @@ impl Game {
         Ok(())
     }
 
+    pub fn place_arrow(&mut self, square: WorldSquare, direction: WorldStep) {
+        assert!(ORTHOGONAL_STEPS.contains(&direction));
+        assert!(self.square_is_empty(square));
+        self.arrows.insert(square, direction);
+    }
+
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
         self.blocks.contains(&square)
+    }
+    pub fn set_up_vs_arrows(&mut self) {
+        (0..10).for_each(|i| {
+            self.place_arrow(point2(0, 1 + i), STEP_RIGHT);
+            self.place_arrow(point2(1 + i, 0), STEP_UP);
+        });
     }
 
     pub fn set_up_vs_red_pawns(&mut self) {
@@ -2011,5 +2062,26 @@ mod tests {
         assert_eq!(game.pieces.len(), 1);
         game.do_player_spear_attack();
         assert_eq!(game.pieces.len(), 0);
+    }
+
+    #[test]
+    fn test_arrow_travels() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_arrow(square, STEP_RIGHT);
+        assert!(game.arrows.contains_key(&square));
+        assert_eq!(game.arrows.len(), 1);
+        game.tick_arrows();
+        assert!(game.arrows.contains_key(&(square + STEP_RIGHT)));
+        assert_eq!(game.arrows.len(), 1);
+    }
+    #[test]
+    fn test_draw_arrows() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_arrow(square, STEP_RIGHT);
+        game.draw_headless_now();
+        let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+        assert_false!(glyphs.looks_solid());
     }
 }
