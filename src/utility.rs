@@ -212,10 +212,8 @@ pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
 
-pub fn king_distance(a: WorldSquare, b: WorldSquare) -> u32 {
-    let x_dist = a.x.abs_diff(b.x);
-    let y_dist = a.y.abs_diff(b.y);
-    x_dist.max(y_dist)
+pub fn king_distance(step: WorldStep) -> u32 {
+    step.x.abs().max(step.y.abs()) as u32
 }
 
 pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {

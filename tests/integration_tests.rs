@@ -22,10 +22,10 @@ use rust_roguelike::utils_for_tests::*;
 fn test_walk_in_circle() {
     let mut game = set_up_game_with_player();
     let start_pos = game.try_get_player_square();
-    game.try_move_player(vec2(1, 0)).expect("");
-    game.try_move_player(vec2(0, 1)).expect("");
-    game.try_move_player(vec2(-1, 0)).expect("");
-    game.try_move_player(vec2(0, -1)).expect("");
+    game.try_slide_player(vec2(1, 0)).expect("");
+    game.try_slide_player(vec2(0, 1)).expect("");
+    game.try_slide_player(vec2(-1, 0)).expect("");
+    game.try_slide_player(vec2(0, -1)).expect("");
     assert_eq!(game.try_get_player_square(), start_pos)
 }
 
@@ -47,7 +47,7 @@ fn test_player_can_not_move_off_low_edge() {
     game.try_set_player_position(start_pos)
         .expect("Failed to set player pos");
 
-    let result = game.try_move_player(DOWN_I.cast_unit());
+    let result = game.try_slide_player(DOWN_I.cast_unit());
     assert!(result.is_err());
 }
 
@@ -62,10 +62,10 @@ fn test_player_can_not_move_off_high_edge() {
     game.try_set_player_position(bottom_right)
         .expect("Failed to set player pos");
 
-    let result = game.try_move_player(RIGHT_I.cast_unit());
+    let result = game.try_slide_player(RIGHT_I.cast_unit());
     assert!(result.is_err());
 
-    let result = game.try_move_player(DOWN_I.cast_unit());
+    let result = game.try_slide_player(DOWN_I.cast_unit());
     assert!(result.is_err());
 
     game.draw_headless_now();
@@ -126,7 +126,7 @@ fn test_capture_pawn() {
         "Should be one pawn"
     );
 
-    game.try_move_player(LEFT_I.cast_unit())
+    game.try_slide_player(LEFT_I.cast_unit())
         .expect("Failed to move player");
 
     assert_eq!(
@@ -172,14 +172,14 @@ fn test_shoot_pawn() {
 #[test]
 fn test_move_to_turn() {
     let mut game = set_up_game_with_player();
-    game.try_move_player(UP_I.cast_unit()).expect("step");
+    game.try_slide_player(UP_I.cast_unit()).expect("step");
     assert_eq!(
         game.player_faced_direction(),
         UP_I.cast_unit(),
         "turn with step"
     );
 
-    game.try_move_player(((DOWN_I + RIGHT_I) * 3).cast_unit())
+    game.try_slide_player(((DOWN_I + RIGHT_I) * 3).cast_unit())
         .expect("step");
     assert_eq!(
         game.player_faced_direction(),
@@ -187,7 +187,7 @@ fn test_move_to_turn() {
         "only face directions with length one"
     );
 
-    game.try_move_player((UP_I + LEFT_I * 4).cast_unit())
+    game.try_slide_player((UP_I + LEFT_I * 4).cast_unit())
         .expect("step");
     assert_eq!(
         game.player_faced_direction(),
@@ -221,7 +221,7 @@ fn test_player_background_is_transparent() {
         .borrow_graphics_mut()
         .get_buffered_glyphs_for_square(inspection_square);
 
-    game.try_move_player(RIGHT_I.cast_unit())
+    game.try_slide_player(RIGHT_I.cast_unit())
         .expect("move player");
     game.draw_headless_now();
 
@@ -447,7 +447,7 @@ fn test_no_move_into_check() {
     let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
     game.place_piece(Piece::rook(), rook_square);
-    game.try_move_player(LEFT_I.cast_unit())
+    game.try_slide_player(LEFT_I.cast_unit())
         .expect_err("no move into check");
 }
 
@@ -472,7 +472,7 @@ fn test_no_step_on_block() {
     let block_square = game.player_square() + RIGHT_I.cast_unit();
     game.place_block(block_square);
     assert!(game.is_block_at(block_square));
-    game.try_move_player(RIGHT_I.cast_unit())
+    game.try_slide_player(RIGHT_I.cast_unit())
         .expect_err("no step on blok");
 }
 
@@ -574,7 +574,7 @@ fn test_turn_if_move_into_wall() {
     game.place_block(game.player_square() + STEP_RIGHT);
 
     let start_square = game.player_square();
-    game.try_move_player(STEP_RIGHT).ok();
+    game.try_slide_player(STEP_RIGHT).ok();
 
     assert_eq!(game.player_faced_direction(), STEP_RIGHT);
     assert_eq!(game.player_square(), start_square);
@@ -621,7 +621,7 @@ fn test_mystery_labyrinth_death() {
     game.place_player(point2(width as i32 / 4, height as i32 / 2));
     let mut rng = rand::rngs::StdRng::seed_from_u64(5);
     game.set_up_labyrinth(&mut rng);
-    game.try_move_player(STEP_DOWN_LEFT).ok();
+    game.try_slide_player(STEP_DOWN_LEFT).ok();
     game.draw_headless_now();
 }
 

@@ -53,10 +53,30 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Constructor)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
 pub struct SquareFace {
-    pub square: WorldSquare,
-    pub step_through_face: WorldStep,
+    square: WorldSquare,
+    step_through_face: WorldStep,
+}
+impl SquareFace {
+    pub fn new(square: WorldSquare, step_through_face: WorldStep) -> SquareFace {
+        assert!(ORTHOGONAL_STEPS.contains(&step_through_face));
+        SquareFace {
+            square,
+            step_through_face,
+        }
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Constructor, Getters)]
+pub struct SquareWithKingDirection {
+    square: WorldSquare,
+    direction: WorldStep,
+}
+impl SquareWithKingDirection {
+    fn tuple(&self) -> (WorldSquare, WorldStep) {
+        (self.square, self.direction)
+    }
 }
 
 pub struct Game {
@@ -163,13 +183,18 @@ impl Game {
         self.running
     }
 
-    pub fn try_move_player(&mut self, movement: WorldStep) -> Result<(), ()> {
-        self.raw_set_player_faced_direction(round_to_king_step(movement));
-        let new_pos = self.player_square() + movement;
-        if self
-            .capture_squares_for_all_pieces(false)
-            .contains(&new_pos)
-        {
+    pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
+        assert!(is_orthodiagonal(movement));
+
+        let (new_pos, new_dir) = self
+            .multiple_portal_aware_steps(self.player_square(), movement)
+            .tuple();
+        //self.raw_set_player_faced_direction(round_to_king_step(movement));
+        self.raw_set_player_faced_direction(new_dir);
+        let new_square_is_threatened = self
+            .squares_threatened_by_any_piece(false)
+            .contains(&new_pos);
+        if new_square_is_threatened {
             return Err(());
         }
 
@@ -177,7 +202,7 @@ impl Game {
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
-        self.try_move_player(square - self.player_square())
+        self.try_slide_player(square - self.player_square())
             .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
     }
 
@@ -315,9 +340,9 @@ impl Game {
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
-            self.capture_squares_for_all_pieces(false),
+            self.squares_threatened_by_any_piece(false),
             self.move_squares_for_all_pieces(true),
-            self.capture_squares_for_all_pieces(true),
+            self.squares_threatened_by_any_piece(true),
         );
 
         self.graphics.draw_blocks(&self.blocks);
@@ -1142,7 +1167,7 @@ impl Game {
             .flatten()
             .collect()
     }
-    fn capture_squares_for_all_pieces(&self, pass_through_pieces: bool) -> SquareSet {
+    fn squares_threatened_by_any_piece(&self, pass_through_pieces: bool) -> SquareSet {
         self.pieces
             .keys()
             .map(|&square| self.on_board_capture_squares_for_piece_at(square, pass_through_pieces))
@@ -1160,7 +1185,7 @@ impl Game {
         target_square: WorldSquare,
     ) -> Option<Vec<WorldSquare>> {
         fn cost_heuristic(a: WorldSquare, b: WorldSquare) -> u32 {
-            king_distance(a, b)
+            king_distance(a - b)
         }
         let relative_steps = KING_STEPS;
         let mut recorded_step_start_squares_by_step_end_squares =
@@ -1526,6 +1551,36 @@ impl Game {
         } else {
             WHITE
         }
+    }
+
+    pub fn portal_aware_single_step(
+        &self,
+        start_square: WorldSquare,
+        step: WorldStep,
+    ) -> (WorldSquare, WorldStep) {
+        assert!(KING_STEPS.contains(&step));
+        let start_face = SquareFace::new(start_square, step);
+        if let Some(exit_portal_face) = self.portal_exits_by_entrances.get(&start_face) {
+            (exit_portal_face.square, -exit_portal_face.step_through_face)
+        } else {
+            (start_square + step, step)
+        }
+    }
+    pub fn multiple_portal_aware_steps(
+        &self,
+        start_square: WorldSquare,
+        step: WorldStep,
+    ) -> SquareWithKingDirection {
+        assert!(is_orthodiagonal(step));
+        let mut state = SquareWithKingDirection::new(start_square, step);
+        let num_steps = king_distance(*state.direction());
+
+        let next_step = round_to_king_step(*state.direction());
+        let (end_square, end_direction) = (0..num_steps)
+            .fold((start_square, next_step), |(square, direction), _| {
+                self.portal_aware_single_step(square, direction)
+            });
+        SquareWithKingDirection::new(end_square, end_direction)
     }
 }
 
@@ -2161,9 +2216,35 @@ mod tests {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         game.place_portal(point2(5, 5), STEP_RIGHT, point2(5, 7), STEP_RIGHT);
-        game.try_move_player(STEP_RIGHT).expect("move player");
+        game.try_slide_player(STEP_RIGHT).expect("move player");
 
         assert_eq!(game.player_square(), point2(5, 7));
         assert_eq!(game.player_faced_direction(), STEP_LEFT);
+    }
+
+    #[test]
+    fn test_portal_steps() {
+        let mut game = set_up_10x10_game();
+        let start = point2(2, 6);
+        let end = point2(5, 2);
+        game.place_portal(start, STEP_UP, end, STEP_RIGHT);
+        assert_eq!(
+            game.portal_aware_single_step(start, STEP_UP),
+            (end, STEP_LEFT)
+        );
+    }
+    #[test]
+    fn test_move_through_multiple_portals() {
+        let mut game = set_up_10x10_game();
+        let start = point2(2, 6);
+        let mid = point2(5, 5);
+        let end = point2(5, 2);
+        game.place_portal(start, STEP_RIGHT, mid, STEP_UP);
+        game.place_portal(mid, STEP_DOWN, end, STEP_RIGHT);
+        assert_eq!(
+            game.multiple_portal_aware_steps(start, STEP_RIGHT * 2)
+                .tuple(),
+            (end, STEP_LEFT)
+        );
     }
 }

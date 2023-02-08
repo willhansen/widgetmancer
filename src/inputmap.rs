@@ -44,29 +44,29 @@ impl InputMap {
                 Key::Char('t') => game.do_player_shoot_arrow(),
 
                 Key::Char('k') | Key::Char('w') | Key::Up => {
-                    game.try_move_player(UP_I.cast_unit()).ok();
+                    game.try_slide_player(UP_I.cast_unit()).ok();
                 }
                 Key::Char('h') | Key::Char('a') | Key::Left => {
-                    game.try_move_player(LEFT_I.cast_unit()).ok();
+                    game.try_slide_player(LEFT_I.cast_unit()).ok();
                 }
                 Key::Char('j') | Key::Char('s') | Key::Down => {
-                    game.try_move_player(DOWN_I.cast_unit()).ok();
+                    game.try_slide_player(DOWN_I.cast_unit()).ok();
                 }
                 Key::Char('l') | Key::Char('d') | Key::Right => {
-                    game.try_move_player(RIGHT_I.cast_unit()).ok();
+                    game.try_slide_player(RIGHT_I.cast_unit()).ok();
                 }
 
                 Key::Char('y') => {
-                    game.try_move_player((UP_I + LEFT_I).cast_unit()).ok();
+                    game.try_slide_player((UP_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('u') => {
-                    game.try_move_player((UP_I + RIGHT_I).cast_unit()).ok();
+                    game.try_slide_player((UP_I + RIGHT_I).cast_unit()).ok();
                 }
                 Key::Char('b') => {
-                    game.try_move_player((DOWN_I + LEFT_I).cast_unit()).ok();
+                    game.try_slide_player((DOWN_I + LEFT_I).cast_unit()).ok();
                 }
                 Key::Char('n') => {
-                    game.try_move_player((DOWN_I + RIGHT_I).cast_unit()).ok();
+                    game.try_slide_player((DOWN_I + RIGHT_I).cast_unit()).ok();
                 }
 
                 Key::Char('K') | Key::Char('W') => {
