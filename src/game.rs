@@ -4,9 +4,12 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use ::num::clamp;
+use derive_getters::Getters;
+use derive_more::Constructor;
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
+use ntest::assert_false;
 use ordered_float::OrderedFloat;
 use priority_queue::DoublePriorityQueue;
 use rand::rngs::StdRng;
@@ -50,6 +53,12 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Constructor)]
+pub struct SquareFace {
+    pub square: WorldSquare,
+    pub step_through_face: WorldStep,
+}
+
 pub struct Game {
     board_size: BoardSize,
     // (x,y), left to right, top to bottom
@@ -72,6 +81,7 @@ pub struct Game {
     default_enemy_faction: Faction,
     death_cubes: Vec<DeathCube>,
     death_cube_faction: Faction,
+    portal_exits_by_entrances: HashMap<SquareFace, SquareFace>,
 }
 
 impl Game {
@@ -96,6 +106,7 @@ impl Game {
             default_enemy_faction: Faction::default(),
             death_cubes: vec![],
             death_cube_faction: Faction::default(),
+            portal_exits_by_entrances: HashMap::default(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -1371,6 +1382,20 @@ impl Game {
         self.arrows.insert(square, direction);
     }
 
+    pub fn place_portal(
+        &mut self,
+        start_square: WorldSquare,
+        step_into_entrance: WorldStep,
+        end_square: WorldSquare,
+        step_into_exit: WorldStep,
+    ) {
+        let entrance_face = SquareFace::new(start_square, step_into_entrance);
+        let exit_face = SquareFace::new(end_square, step_into_exit);
+        assert_false!(self.portal_exits_by_entrances.contains_key(&entrance_face));
+        self.portal_exits_by_entrances
+            .insert(entrance_face, exit_face);
+    }
+
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
     }
@@ -2087,6 +2112,7 @@ mod tests {
         assert!(game.arrows.contains_key(&(square + STEP_RIGHT)));
         assert_eq!(game.arrows.len(), 1);
     }
+
     #[test]
     fn test_draw_arrows() {
         let mut game = set_up_10x10_game();
@@ -2096,6 +2122,7 @@ mod tests {
         let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
         assert_false!(glyphs.looks_solid());
     }
+
     #[test]
     fn test_player_shoot_arrow() {
         let mut game = set_up_10x10_game();
@@ -2106,6 +2133,7 @@ mod tests {
         game.do_player_shoot_arrow();
         assert_false!(game.arrows.is_empty());
     }
+
     #[test]
     fn test_player_shoot_arrow_diagonal() {
         let mut game = set_up_10x10_game();
@@ -2116,6 +2144,7 @@ mod tests {
         game.do_player_shoot_arrow();
         assert_false!(game.arrows.is_empty());
     }
+
     #[test]
     fn test_player_can_capture_arrow() {
         let mut game = set_up_10x10_game();
@@ -2125,5 +2154,16 @@ mod tests {
         assert_false!(game.arrows.is_empty());
         game.move_player_to(square);
         assert!(game.arrows.is_empty());
+    }
+
+    #[test]
+    fn test_player_can_step_through_portal() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        game.place_portal(point2(5, 5), STEP_RIGHT, point2(5, 7), STEP_RIGHT);
+        game.try_move_player(STEP_RIGHT).expect("move player");
+
+        assert_eq!(game.player_square(), point2(5, 7));
+        assert_eq!(game.player_faced_direction(), STEP_LEFT);
     }
 }
