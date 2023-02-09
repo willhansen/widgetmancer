@@ -54,28 +54,26 @@ pub struct IncubatingPawn {
 }
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
-pub struct SquareFace {
-    square: WorldSquare,
-    step_through_face: WorldStep,
-}
-impl SquareFace {
-    pub fn new(square: WorldSquare, step_through_face: WorldStep) -> SquareFace {
-        assert!(ORTHOGONAL_STEPS.contains(&step_through_face));
-        SquareFace {
-            square,
-            step_through_face,
-        }
-    }
-}
-
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Constructor, Getters)]
-pub struct SquareWithKingDirection {
+pub struct SquareWithDir {
     square: WorldSquare,
     direction: WorldStep,
 }
-impl SquareWithKingDirection {
+impl SquareWithDir {
+    pub fn new(square: WorldSquare, step: WorldStep) -> SquareWithDir {
+        assert!(KING_STEPS.contains(&step));
+        SquareWithDir {
+            square,
+            direction: step,
+        }
+    }
     fn tuple(&self) -> (WorldSquare, WorldStep) {
         (self.square, self.direction)
+    }
+    fn is_square_face(&self) -> bool {
+        ORTHOGONAL_STEPS.contains(&self.direction)
+    }
+    fn stepped(&self) -> SquareWithDir {
+        SquareWithDir::new(self.square + self.direction, self.direction)
     }
 }
 
@@ -101,7 +99,7 @@ pub struct Game {
     default_enemy_faction: Faction,
     death_cubes: Vec<DeathCube>,
     death_cube_faction: Faction,
-    portal_exits_by_entrances: HashMap<SquareFace, SquareFace>,
+    portal_exits_by_entrance: HashMap<SquareWithDir, SquareWithDir>,
 }
 
 impl Game {
@@ -126,7 +124,7 @@ impl Game {
             default_enemy_faction: Faction::default(),
             death_cubes: vec![],
             death_cube_faction: Faction::default(),
-            portal_exits_by_entrances: HashMap::default(),
+            portal_exits_by_entrance: HashMap::default(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -183,11 +181,24 @@ impl Game {
         self.running
     }
 
+    #[deprecated(note = "Use try_slide_player_v2 instead")]
     pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         assert!(is_orthodiagonal(movement));
+        let movement_direction = round_to_king_step(movement);
+        let movement_length = king_distance(movement);
+        self.try_slide_player_v2(movement_direction, movement_length)
+    }
 
+    pub fn try_slide_player_v2(
+        &mut self,
+        direction: WorldStep,
+        num_squares: u32,
+    ) -> Result<(), ()> {
         let (new_pos, new_dir) = self
-            .multiple_portal_aware_steps(self.player_square(), movement)
+            .multiple_portal_aware_steps(
+                SquareWithDir::new(self.player_square(), direction),
+                num_squares,
+            )
             .tuple();
         //self.raw_set_player_faced_direction(round_to_king_step(movement));
         self.raw_set_player_faced_direction(new_dir);
@@ -1407,18 +1418,12 @@ impl Game {
         self.arrows.insert(square, direction);
     }
 
-    pub fn place_portal(
-        &mut self,
-        start_square: WorldSquare,
-        step_into_entrance: WorldStep,
-        end_square: WorldSquare,
-        step_into_exit: WorldStep,
-    ) {
-        let entrance_face = SquareFace::new(start_square, step_into_entrance);
-        let exit_face = SquareFace::new(end_square, step_into_exit);
-        assert_false!(self.portal_exits_by_entrances.contains_key(&entrance_face));
-        self.portal_exits_by_entrances
-            .insert(entrance_face, exit_face);
+    pub fn place_portal(&mut self, entrance_step: SquareWithDir, exit_step: SquareWithDir) {
+        assert!(entrance_step.is_square_face());
+        assert!(exit_step.is_square_face());
+        assert_false!(self.portal_exits_by_entrance.contains_key(&entrance_step));
+        self.portal_exits_by_entrance
+            .insert(entrance_step, exit_step);
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1553,37 +1558,21 @@ impl Game {
         }
     }
 
-    pub fn portal_aware_single_step(
-        &self,
-        start_square: WorldSquare,
-        step: WorldStep,
-    ) -> (WorldSquare, WorldStep) {
-        assert!(KING_STEPS.contains(&step));
-        if is_diagonal(step) {
-            return (start_square + step, step);
-        }
-        let start_face = SquareFace::new(start_square, step);
-        if let Some(exit_portal_face) = self.portal_exits_by_entrances.get(&start_face) {
-            (exit_portal_face.square, -exit_portal_face.step_through_face)
+    pub fn portal_aware_single_step(&self, start: SquareWithDir) -> SquareWithDir {
+        if let Some(&exit) = self.portal_exits_by_entrance.get(&start) {
+            exit
         } else {
-            (start_square + step, step)
+            start.stepped()
         }
     }
     pub fn multiple_portal_aware_steps(
         &self,
-        start_square: WorldSquare,
-        step: WorldStep,
-    ) -> SquareWithKingDirection {
-        assert!(is_orthodiagonal(step));
-        let mut state = SquareWithKingDirection::new(start_square, step);
-        let num_steps = king_distance(*state.direction());
-
-        let next_step = round_to_king_step(*state.direction());
-        let (end_square, end_direction) = (0..num_steps)
-            .fold((start_square, next_step), |(square, direction), _| {
-                self.portal_aware_single_step(square, direction)
-            });
-        SquareWithKingDirection::new(end_square, end_direction)
+        start: SquareWithDir,
+        num_steps: u32,
+    ) -> SquareWithDir {
+        (0..num_steps).fold(start, |current_square_and_dir, _| {
+            self.portal_aware_single_step(current_square_and_dir)
+        })
     }
 }
 
@@ -2218,7 +2207,10 @@ mod tests {
     fn test_player_can_step_through_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
-        game.place_portal(point2(5, 5), STEP_RIGHT, point2(5, 7), STEP_RIGHT);
+        game.place_portal(
+            SquareWithDir::new(point2(5, 5), STEP_RIGHT),
+            SquareWithDir::new(point2(5, 7), STEP_LEFT),
+        );
         game.try_slide_player(STEP_RIGHT).expect("move player");
 
         assert_eq!(game.player_square(), point2(5, 7));
@@ -2228,44 +2220,63 @@ mod tests {
     #[test]
     fn test_portal_steps() {
         let mut game = set_up_10x10_game();
-        let start = point2(2, 6);
-        let end = point2(5, 2);
-        game.place_portal(start, STEP_UP, end, STEP_RIGHT);
-        assert_eq!(
-            game.portal_aware_single_step(start, STEP_UP),
-            (end, STEP_LEFT)
-        );
+        let entrance_step = SquareWithDir::new(point2(2, 6), STEP_UP);
+        let exit_step = SquareWithDir::new(point2(5, 2), STEP_RIGHT);
+        game.place_portal(entrance_step, exit_step);
+        assert_eq!(game.portal_aware_single_step(entrance_step), exit_step);
     }
     #[test]
     fn test_move_through_multiple_portals() {
         let mut game = set_up_10x10_game();
-        let start = point2(2, 6);
-        let mid = point2(5, 5);
-        let end = point2(5, 2);
-        game.place_portal(start, STEP_RIGHT, mid, STEP_UP);
-        game.place_portal(mid, STEP_DOWN, end, STEP_RIGHT);
-        assert_eq!(
-            game.multiple_portal_aware_steps(start, STEP_RIGHT * 2)
-                .tuple(),
-            (end, STEP_LEFT)
-        );
+        let start = SquareWithDir::new(point2(2, 6), STEP_RIGHT);
+        let mid = SquareWithDir::new(point2(5, 5), STEP_DOWN);
+        let end = SquareWithDir::new(point2(5, 2), STEP_LEFT);
+        game.place_portal(start, mid);
+        game.place_portal(mid, end);
+        assert_eq!(game.multiple_portal_aware_steps(start, 2), end);
     }
     #[test]
     fn test_arrow_through_portal() {
         let mut game = set_up_10x10_game();
-        let start = point2(2, 6);
-        let end = point2(5, 2);
-        game.place_portal(start, STEP_RIGHT, end, STEP_DOWN);
-        game.place_arrow(start, STEP_RIGHT);
+        let start = SquareWithDir::new(point2(2, 6), STEP_RIGHT);
+        let end = SquareWithDir::new(point2(5, 2), STEP_DOWN);
+        game.place_portal(start, end);
+        game.place_arrow(start.square, start.direction);
         game.tick_arrows();
-        assert_eq!(game.arrows.get(&end), Some(&STEP_UP));
+        assert_eq!(game.arrows.get(&end.square), Some(&STEP_UP));
     }
     #[test]
-    fn test_pawn_capture_through_portal() {
-        todo!()
+    fn test_piece_capture_through_portal() {
+        let mut game = set_up_10x10_game();
+        let enemy_square = point2(5, 5);
+        let player_square = point2(2, 2);
+        let entrance = SquareWithDir::new(enemy_square, STEP_RIGHT);
+        let exit = SquareWithDir::new(player_square, STEP_DOWN);
+        game.place_portal(entrance, exit);
+        game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
+        game.place_player(player_square);
+        assert!(game.player_is_alive());
+        game.move_all_pieces();
+        assert_false!(game.player_is_alive());
+        assert!(game.is_non_player_piece_at(player_square));
     }
     #[test]
     fn test_spear_stab_through_portal() {
-        todo!()
+        let mut game = set_up_10x10_game();
+        let enemy_square = point2(5, 5);
+        let player_square = point2(2, 2);
+        let entrance = SquareWithDir::new(player_square, STEP_RIGHT);
+        let exit = SquareWithDir::new(enemy_square, STEP_DOWN);
+
+        game.place_portal(entrance, exit);
+
+        game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
+
+        game.place_player(player_square);
+        game.player().faced_direction = entrance.direction;
+
+        assert_false!(game.pieces.is_empty());
+        game.do_player_spear_attack();
+        assert!(game.pieces.is_empty());
     }
 }
