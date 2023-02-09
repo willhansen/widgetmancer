@@ -447,11 +447,6 @@ impl Graphics {
         self.output_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
-    #[deprecated(note = "use `draw_piece_with_color` instead")]
-    pub fn draw_piece(&mut self, piece: Piece, pos: WorldSquare) {
-        self.draw_glyphs_for_square(pos, piece.glyphs());
-    }
-
     pub fn draw_piece_with_color(
         &mut self,
         square: WorldSquare,

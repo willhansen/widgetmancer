@@ -88,7 +88,6 @@ pub struct Game {
     pieces: HashMap<WorldSquare, Piece>,
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
-    arrows: HashMap<WorldSquare, WorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -113,7 +112,6 @@ impl Game {
             pieces: HashMap::new(),
             upgrades: HashMap::new(),
             blocks: HashSet::new(),
-            arrows: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -258,6 +256,14 @@ impl Game {
         }
     }
 
+    pub fn arrows(&self) -> HashMap<WorldSquare, WorldStep> {
+        self.pieces
+            .iter()
+            .filter(|(&square, &piece)| piece.piece_type == Arrow)
+            .map(|(&square, &piece)| (square, piece.faced_direction()))
+            .collect()
+    }
+
     pub fn player(&mut self) -> &mut Player {
         self.player_optional.as_mut().unwrap()
     }
@@ -358,6 +364,10 @@ impl Game {
 
         self.graphics.draw_blocks(&self.blocks);
         for (&square, &piece) in &self.pieces {
+            if piece.piece_type == Arrow {
+                self.graphics.draw_arrow(square, piece.faced_direction());
+                continue;
+            }
             let color = if piece.faction == self.red_pawn_faction {
                 RED_PAWN_COLOR
             } else {
@@ -366,9 +376,6 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
-        self.arrows
-            .iter()
-            .for_each(|(&square, &dir)| self.graphics.draw_arrow(square, dir));
         self.upgrades
             .iter()
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
@@ -395,7 +402,6 @@ impl Game {
             && !self.is_non_player_piece_at(square)
             && !self.is_block_at(square)
             && !self.is_upgrade_at(square)
-            && !self.arrows.contains_key(&square)
     }
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
@@ -486,12 +492,28 @@ impl Game {
         self.remove_death_cubes_off_board();
     }
 
+    fn drain_arrows(&mut self) -> HashMap<WorldSquare, WorldStep> {
+        let old_arrows = self.arrows();
+        old_arrows.iter().for_each(|(square, _)| {
+            self.pieces.remove(&square);
+        });
+        old_arrows
+    }
+
+    fn set_arrows(&mut self, new_arrows: HashMap<WorldSquare, WorldStep>) {
+        new_arrows.into_iter().for_each(|(square, dir)| {
+            self.pieces.insert(square, Piece::arrow(dir));
+        });
+    }
+
     pub fn tick_arrows(&mut self) {
+        let old_arrows = self.drain_arrows();
+
         // arrows that hit arrows, blocks, or board edges disappear
         let mut next_arrows = HashMap::<WorldSquare, WorldStep>::new();
         let mut arrow_midair_collisions = SquareSet::new();
         let mut capture_squares = SquareSet::new();
-        self.arrows
+        old_arrows
             .iter()
             .for_each(|(&square, &dir): (&WorldSquare, &WorldStep)| {
                 let next_square = square + dir;
@@ -516,7 +538,7 @@ impl Game {
             self.try_capture_piece_at(square).ok();
         });
 
-        self.arrows = next_arrows;
+        self.set_arrows(next_arrows);
     }
 
     pub fn remove_death_cubes_off_board(&mut self) {
@@ -644,7 +666,7 @@ impl Game {
     }
 
     pub fn is_non_player_piece_at(&self, square: WorldSquare) -> bool {
-        self.get_piece_at(square).is_some() || self.arrows.contains_key(&square)
+        self.get_piece_at(square).is_some()
     }
 
     pub fn is_piece_at(&self, square: WorldSquare) -> bool {
@@ -656,7 +678,9 @@ impl Game {
         self.upgrades.contains_key(&square)
     }
     pub fn is_arrow_at(&self, square: WorldSquare) -> bool {
-        self.arrows.contains_key(&square)
+        self.pieces
+            .get(&square)
+            .is_some_and(|piece| piece.piece_type == Arrow)
     }
 
     pub fn piece_type_count(&self, piece_type: PieceType) -> i32 {
@@ -1390,10 +1414,7 @@ impl Game {
                 point_to_string(square)
             ));
         }
-        if self.is_arrow_at(square) {
-            self.arrows.remove(&square);
-            Ok(())
-        } else if self.try_get_player_square() == Some(square) {
+        if self.try_get_player_square() == Some(square) {
             self.kill_player();
             Ok(())
         } else if let Some(piece) = self.pieces.remove(&square) {
@@ -1414,8 +1435,7 @@ impl Game {
 
     pub fn place_arrow(&mut self, square: WorldSquare, direction: WorldStep) {
         assert!(KING_STEPS.contains(&direction));
-        assert!(self.square_is_empty(square));
-        self.arrows.insert(square, direction);
+        self.place_piece(Piece::arrow(direction), square);
     }
 
     pub fn place_portal(&mut self, entrance_step: SquareWithDir, exit_step: SquareWithDir) {
@@ -2153,11 +2173,11 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_arrow(square, STEP_RIGHT);
-        assert!(game.arrows.contains_key(&square));
-        assert_eq!(game.arrows.len(), 1);
+        assert!(game.is_arrow_at(square));
+        assert_eq!(game.arrows().len(), 1);
         game.tick_arrows();
-        assert!(game.arrows.contains_key(&(square + STEP_RIGHT)));
-        assert_eq!(game.arrows.len(), 1);
+        assert!(game.is_arrow_at(square + STEP_RIGHT));
+        assert_eq!(game.arrows().len(), 1);
     }
 
     #[test]
@@ -2176,9 +2196,9 @@ mod tests {
         let square = point2(5, 5);
         game.place_player(square);
         game.player().faced_direction = STEP_RIGHT;
-        assert!(game.arrows.is_empty());
+        assert!(game.arrows().is_empty());
         game.do_player_shoot_arrow();
-        assert_false!(game.arrows.is_empty());
+        assert_false!(game.arrows().is_empty());
     }
 
     #[test]
@@ -2187,9 +2207,9 @@ mod tests {
         let square = point2(5, 5);
         game.place_player(square);
         game.player().faced_direction = STEP_UP_RIGHT;
-        assert!(game.arrows.is_empty());
+        assert!(game.arrows().is_empty());
         game.do_player_shoot_arrow();
-        assert_false!(game.arrows.is_empty());
+        assert_false!(game.arrows().is_empty());
     }
 
     #[test]
@@ -2198,9 +2218,9 @@ mod tests {
         let square = point2(5, 5);
         game.place_player(square + STEP_UP);
         game.place_arrow(square, STEP_RIGHT);
-        assert_false!(game.arrows.is_empty());
+        assert_false!(game.arrows().is_empty());
         game.move_player_to(square);
-        assert!(game.arrows.is_empty());
+        assert!(game.arrows().is_empty());
     }
 
     #[test]
@@ -2243,7 +2263,7 @@ mod tests {
         game.place_portal(start, end);
         game.place_arrow(start.square, start.direction);
         game.tick_arrows();
-        assert_eq!(game.arrows.get(&end.square), Some(&STEP_UP));
+        assert_eq!(game.arrows().get(&end.square), Some(&STEP_UP));
     }
     #[test]
     fn test_piece_capture_through_portal() {

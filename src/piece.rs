@@ -36,9 +36,10 @@ pub enum PieceType {
     Queen,
     King,
     DeathCubeTurret,
+    Arrow,
 }
 
-const TURNING_PIECE_TYPES: &'static [PieceType] = &[TurningPawn, TurningSoldier];
+const TURNING_PIECE_TYPES: &'static [PieceType] = &[TurningPawn, TurningSoldier, Arrow];
 
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Faction {
@@ -94,6 +95,11 @@ impl Piece {
     }
     pub fn king() -> Piece {
         Piece::from_type(King)
+    }
+    pub fn arrow(dir: WorldStep) -> Piece {
+        let mut piece = Piece::from_type(Arrow);
+        piece.set_faced_direction(dir);
+        piece
     }
 
     pub fn faced_direction(&self) -> WorldStep {
