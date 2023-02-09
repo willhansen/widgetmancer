@@ -202,7 +202,7 @@ impl Game {
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
-        self.try_slide_player(square - self.player_square())
+        self.try_set_player_position(square)
             .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
     }
 
@@ -1559,6 +1559,9 @@ impl Game {
         step: WorldStep,
     ) -> (WorldSquare, WorldStep) {
         assert!(KING_STEPS.contains(&step));
+        if is_diagonal(step) {
+            return (start_square + step, step);
+        }
         let start_face = SquareFace::new(start_square, step);
         if let Some(exit_portal_face) = self.portal_exits_by_entrances.get(&start_face) {
             (exit_portal_face.square, -exit_portal_face.step_through_face)
@@ -2246,5 +2249,23 @@ mod tests {
                 .tuple(),
             (end, STEP_LEFT)
         );
+    }
+    #[test]
+    fn test_arrow_through_portal() {
+        let mut game = set_up_10x10_game();
+        let start = point2(2, 6);
+        let end = point2(5, 2);
+        game.place_portal(start, STEP_RIGHT, end, STEP_DOWN);
+        game.place_arrow(start, STEP_RIGHT);
+        game.tick_arrows();
+        assert_eq!(game.arrows.get(&end), Some(&STEP_UP));
+    }
+    #[test]
+    fn test_pawn_capture_through_portal() {
+        todo!()
+    }
+    #[test]
+    fn test_spear_stab_through_portal() {
+        todo!()
     }
 }
