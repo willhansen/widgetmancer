@@ -125,7 +125,7 @@ pub fn do_everything() {
 
             input_map.handle_event(&mut game, event);
 
-            game.move_all_factions();
+            game.move_non_arrow_factions();
             game.tick_arrows();
 
             game.on_turn_end();
