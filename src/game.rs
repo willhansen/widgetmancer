@@ -59,12 +59,9 @@ pub struct SquareWithDir {
     direction: WorldStep,
 }
 impl SquareWithDir {
-    pub fn new(square: WorldSquare, step: WorldStep) -> SquareWithDir {
-        assert!(KING_STEPS.contains(&step));
-        SquareWithDir {
-            square,
-            direction: step,
-        }
+    pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
+        assert!(KING_STEPS.contains(&direction));
+        SquareWithDir { square, direction }
     }
     fn tuple(&self) -> (WorldSquare, WorldStep) {
         (self.square, self.direction)
@@ -300,6 +297,10 @@ impl Game {
         }
     }
 
+    pub fn player_pose(&self) -> SquareWithDir {
+        SquareWithDir::new(self.player_square(), self.player_faced_direction())
+    }
+
     pub fn raw_set_player_faced_direction(&mut self, new_dir: WorldStep) {
         assert_eq!(
             max(new_dir.x.abs(), new_dir.y.abs()),
@@ -513,7 +514,9 @@ impl Game {
         old_arrows
             .iter()
             .for_each(|(&square, &dir): (&WorldSquare, &WorldStep)| {
-                let next_square = square + dir;
+                let (next_square, next_dir) = self
+                    .portal_aware_single_step(SquareWithDir::new(square, dir))
+                    .tuple();
                 if self.is_piece_at(next_square) {
                     capture_squares.insert(next_square);
                 }
@@ -526,7 +529,7 @@ impl Game {
                         next_arrows.remove(&next_square);
                         arrow_midair_collisions.insert(next_square);
                     } else {
-                        next_arrows.insert(next_square, dir);
+                        next_arrows.insert(next_square, next_dir);
                     }
                 }
             });
@@ -1295,7 +1298,9 @@ impl Game {
         let spear_length = 5;
 
         for i in 1..=spear_length {
-            let target_square = self.player_square() + self.player_faced_direction() * i;
+            let target_square = self
+                .multiple_portal_aware_steps(self.player_pose(), i)
+                .square;
             if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
                 break;
             }
@@ -2250,7 +2255,6 @@ mod tests {
         game.place_portal(mid, end);
         assert_eq!(game.multiple_portal_aware_steps(start, 2), end);
     }
-    #[ignore] // for now
     #[test]
     fn test_arrow_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2259,10 +2263,9 @@ mod tests {
         game.place_portal(start, end);
         game.place_arrow(start.square, start.direction);
         game.tick_arrows();
-        assert_eq!(game.arrows().get(&end.square), Some(&STEP_UP));
+        assert_eq!(game.arrows().get(&end.square), Some(&STEP_DOWN));
     }
 
-    #[ignore] // for now
     #[test]
     fn test_piece_capture_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2278,7 +2281,6 @@ mod tests {
         assert_false!(game.player_is_alive());
         assert!(game.is_non_player_piece_at(player_square));
     }
-    #[ignore] // for now
     #[test]
     fn test_spear_stab_through_portal() {
         let mut game = set_up_10x10_game();
