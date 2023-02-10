@@ -41,14 +41,16 @@ pub enum PieceType {
 
 const TURNING_PIECE_TYPES: &'static [PieceType] = &[TurningPawn, TurningSoldier, Arrow];
 
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
-pub struct Faction {
-    pub(crate) id: u32,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Faction {
+    Unaligned,
+    RedPawn,
+    Enemy(u32),
 }
 
-impl Faction {
-    pub fn from_id(id: u32) -> Faction {
-        Faction { id }
+impl Default for Faction {
+    fn default() -> Self {
+        Faction::Enemy(0)
     }
 }
 
@@ -64,7 +66,7 @@ impl FactionFactory {
         }
     }
     pub fn get_new_faction(&mut self) -> Faction {
-        let faction = Faction::from_id(self.id_of_next_faction);
+        let faction = Faction::Enemy(self.id_of_next_faction);
         self.id_of_next_faction += 1;
         faction
     }
@@ -260,17 +262,13 @@ mod tests {
             HashSet::from(DIAGONAL_STEPS)
         );
 
+        assert_eq!(Piece::from_type(TurningPawn).relative_move_steps().len(), 1);
         assert_eq!(
-            Piece::from_type(TurningPawn,).relative_move_steps().len(),
-            1
-        );
-        assert_eq!(
-            Piece::from_type(TurningPawn,)
-                .relative_capture_steps()
-                .len(),
+            Piece::from_type(TurningPawn).relative_capture_steps().len(),
             2
         );
     }
+
     #[test]
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
@@ -283,14 +281,12 @@ mod tests {
         );
 
         assert_eq!(
-            Piece::from_type(TurningSoldier,)
-                .relative_move_steps()
-                .len(),
+            Piece::from_type(TurningSoldier).relative_move_steps().len(),
             1
         );
         assert_eq!(
-            Piece::from_type(TurningSoldier,).relative_capture_steps(),
-            Piece::from_type(TurningSoldier,).relative_move_steps()
+            Piece::from_type(TurningSoldier).relative_capture_steps(),
+            Piece::from_type(TurningSoldier).relative_move_steps()
         );
     }
 }
