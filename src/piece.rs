@@ -45,6 +45,7 @@ const TURNING_PIECE_TYPES: &'static [PieceType] = &[TurningPawn, TurningSoldier,
 pub enum Faction {
     Unaligned,
     RedPawn,
+    DeathCube,
     Enemy(u32),
 }
 
@@ -101,6 +102,7 @@ impl Piece {
     pub fn arrow(dir: WorldStep) -> Piece {
         let mut piece = Piece::from_type(Arrow);
         piece.set_faced_direction(dir);
+        piece.faction = Faction::Unaligned;
         piece
     }
 

@@ -96,7 +96,6 @@ pub struct Game {
     // faction_info: HashMap<Faction, FactionInfo>, //TODO: LATER MAYBE
     red_pawn_faction: Faction,
     default_enemy_faction: Faction,
-    arrow_faction: Faction,
     death_cubes: Vec<DeathCube>,
     death_cube_faction: Faction,
     portal_exits_by_entrance: HashMap<SquareWithDir, SquareWithDir>,
@@ -119,19 +118,14 @@ impl Game {
             incubating_pawns: Default::default(),
             faction_factory: FactionFactory::new(),
             //faction_info: Default::default(),
-            red_pawn_faction: Faction::default(),
+            red_pawn_faction: Faction::RedPawn,
             default_enemy_faction: Faction::default(),
-            arrow_faction: Faction::default(),
             death_cubes: vec![],
-            death_cube_faction: Faction::default(),
+            death_cube_faction: Faction::DeathCube,
             portal_exits_by_entrance: HashMap::default(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
-
-        game.red_pawn_faction = game.get_new_faction();
-        game.death_cube_faction = game.get_new_faction();
-        game.arrow_faction = game.get_new_faction();
 
         game.graphics.set_empty_board_animation(board_size);
         game
@@ -505,9 +499,7 @@ impl Game {
 
     fn set_arrows(&mut self, new_arrows: HashMap<WorldSquare, WorldStep>) {
         new_arrows.into_iter().for_each(|(square, dir)| {
-            let mut arrow = Piece::arrow(dir);
-            arrow.faction = self.arrow_faction;
-            self.pieces.insert(square, arrow);
+            self.pieces.insert(square, Piece::arrow(dir));
         });
     }
 
@@ -739,7 +731,7 @@ impl Game {
     }
 
     pub fn convert_orphaned_pieces(&mut self) {
-        for faction in self.get_all_living_non_arrow_factions() {
+        for faction in self.get_enemy_factions() {
             let mut pieces_in_faction: Vec<&mut Piece> = self
                 .pieces
                 .iter_mut()
@@ -773,17 +765,17 @@ impl Game {
     }
 
     pub fn move_non_arrow_factions(&mut self) {
-        for faction in self.get_all_living_non_arrow_factions() {
+        for faction in self.get_enemy_factions() {
             self.move_faction(faction);
         }
     }
 
-    fn get_all_living_non_arrow_factions(&self) -> HashSet<Faction> {
+    fn get_enemy_factions(&self) -> HashSet<Faction> {
         self.pieces
             .values()
             .map(|piece| piece.faction)
             .unique()
-            .filter(|&faction| faction != self.arrow_faction)
+            .filter(|&faction| matches!(faction, Faction::Enemy(_) | Faction::RedPawn))
             .collect()
     }
 
@@ -1438,9 +1430,7 @@ impl Game {
 
     pub fn place_arrow(&mut self, square: WorldSquare, direction: WorldStep) {
         assert!(KING_STEPS.contains(&direction));
-        let mut arrow = Piece::arrow(direction);
-        arrow.faction = self.arrow_faction;
-        self.place_piece(arrow, square);
+        self.place_piece(Piece::arrow(direction), square);
     }
 
     pub fn place_portal(&mut self, entrance_step: SquareWithDir, exit_step: SquareWithDir) {
