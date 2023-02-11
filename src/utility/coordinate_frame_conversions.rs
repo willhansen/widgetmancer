@@ -1,3 +1,4 @@
+use crate::piece::NStep;
 use crate::utility::*;
 
 // empty enums for euclid typing
@@ -24,11 +25,13 @@ pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
+pub type NStepList = Vec<NStep>;
 pub type PointList = Vec<WorldPoint>;
 pub type MoveList = Vec<WorldMove>;
 
 pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
+pub type NStepSet = HashSet<NStep>;
 
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;

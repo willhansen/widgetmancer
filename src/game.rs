@@ -850,16 +850,17 @@ impl Game {
         self.pieces.insert(end, piece);
     }
 
-    fn range_cast(
+    fn slide_cast(
         &self,
         start_square: WorldSquare,
-        repeating_step: WorldStep,
+        repeating_step: NStep,
         pass_through_pieces: bool,
     ) -> SquareList {
         let mut valid_squares: SquareList = vec![];
-        let mut i = 1;
-        for _ in 0..MAX_PIECE_RANGE {
-            let square = start_square + repeating_step * i;
+        let range_cap: u32 = repeating_step.n().unwrap_or(MAX_PIECE_RANGE);
+        for i in 0..range_cap {
+            let distance = i + 1;
+            let square = start_square + *repeating_step.step() * distance as i32;
             if !self.square_is_on_board(square) {
                 break;
             }
@@ -871,24 +872,8 @@ impl Game {
                     break;
                 }
             }
-            i += 1;
         }
         valid_squares
-    }
-
-    pub fn steps_in_direction_including_hit(
-        &self,
-        piece_square: WorldSquare,
-        repeating_step: WorldStep,
-    ) -> SquareList {
-        self.range_cast(piece_square, repeating_step, false)
-    }
-    pub fn steps_in_direction_passing_through_pieces_including_hit(
-        &self,
-        piece_square: WorldSquare,
-        repeating_step: WorldStep,
-    ) -> SquareList {
-        self.range_cast(piece_square, repeating_step, true)
     }
 
     pub fn square_to_move_toward_player_for_piece_at(
@@ -1152,27 +1137,15 @@ impl Game {
         let mut squares = SquareSet::new();
         let piece = self.get_piece_at(piece_square).unwrap();
 
-        let function_for_steps = if capture_instead_of_move {
-            Piece::relative_capture_steps
+        let move_function = if capture_instead_of_move {
+            Piece::relative_captures
         } else {
-            Piece::relative_move_steps
-        };
-        let function_for_directions = if capture_instead_of_move {
-            Piece::capture_directions
-        } else {
-            Piece::move_directions
+            Piece::relative_moves
         };
 
-        for single_step in function_for_steps(piece) {
-            let target_square = piece_square + single_step;
-            if self.square_is_on_board(target_square) {
-                squares.insert(target_square);
-            }
-        }
-
-        for move_direction in function_for_directions(piece) {
+        for move_direction in move_function(piece) {
             let mut squares_to_collision =
-                self.range_cast(piece_square, move_direction, pass_through_pieces);
+                self.slide_cast(piece_square, move_direction, pass_through_pieces);
             squares.extend(squares_to_collision);
         }
         squares

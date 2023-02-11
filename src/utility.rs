@@ -199,7 +199,7 @@ pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2
         .collect()
 }
 
-pub fn get_8_quadrants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
+pub fn get_8_octants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     let transpose = Vector2D::<T, U>::new(v.y, v.x);
     vec![v, transpose]
         .into_iter()

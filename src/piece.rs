@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::f32::consts::PI;
 
+use derive_getters::Getters;
+use derive_more::Constructor;
 use euclid::*;
 use rgb::RGB8;
 use strum::IntoEnumIterator;
@@ -15,7 +17,7 @@ use crate::utility::{
     adjacent_king_steps, get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS,
     STEP_RIGHT,
 };
-use crate::{get_4_rotations_of, get_8_quadrants_of, quarter_turns_counter_clockwise, Glyph};
+use crate::{get_4_rotations_of, get_8_octants_of, quarter_turns_counter_clockwise, Glyph};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 
@@ -70,6 +72,34 @@ impl FactionFactory {
         let faction = Faction::Enemy(self.id_of_next_faction);
         self.id_of_next_faction += 1;
         faction
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, Getters)]
+pub struct NStep {
+    step: WorldStep,
+    n: Option<u32>,
+}
+
+impl NStep {
+    pub fn one(step: WorldStep) -> Self {
+        NStep { step, n: Some(1) }
+    }
+    pub fn dir(step: WorldStep) -> Self {
+        NStep { step, n: None }
+    }
+
+    pub fn quadrant_symmetries(&self) -> Vec<Self> {
+        get_4_rotations_of(self.step)
+            .into_iter()
+            .map(|step| NStep::new(step, self.n))
+            .collect()
+    }
+    pub fn octant_symmetries(&self) -> Vec<Self> {
+        get_8_octants_of(self.step)
+            .into_iter()
+            .map(|step| NStep::new(step, self.n))
+            .collect()
     }
 }
 
@@ -175,23 +205,6 @@ impl Piece {
         }
     }
 
-    pub fn move_directions_for_type(piece_type: PieceType) -> StepList {
-        match piece_type {
-            Bishop => get_4_rotations_of(WorldStep::new(1, 1)),
-            Rook => get_4_rotations_of(WorldStep::new(1, 0)),
-            Queen => (0..=1)
-                .map(|y| WorldStep::new(1, y))
-                .map(get_4_rotations_of)
-                .flatten()
-                .collect(),
-            _ => vec![],
-        }
-    }
-    pub fn capture_directions_for_type(piece_type: PieceType) -> StepList {
-        match piece_type {
-            _ => Self::move_directions_for_type(piece_type),
-        }
-    }
     fn piece_type(&self) -> PieceType {
         self.piece_type
     }
@@ -216,32 +229,28 @@ impl Piece {
         Piece::new(piece_type, Faction::default())
     }
 
-    pub(crate) fn relative_move_steps(&self) -> StepList {
+    pub(crate) fn relative_moves(&self) -> NStepList {
         match self.piece_type {
-            OmniDirectionalPawn | OmniDirectionalSoldier => ORTHOGONAL_STEPS.into(),
-            King => KING_STEPS.into(),
-            Knight => get_8_quadrants_of(WorldStep::new(1, 2)),
-            TurningPawn | TurningSoldier => vec![self.faced_direction.unwrap()],
+            OmniDirectionalPawn | OmniDirectionalSoldier => ORTHOGONAL_STEPS.map(NStep::one).into(),
+            King => KING_STEPS.map(NStep::one).into(),
+            Knight => NStep::one(WorldStep::new(1, 2)).octant_symmetries(),
+            TurningPawn | TurningSoldier => vec![NStep::one(self.faced_direction.unwrap())],
+            Bishop => DIAGONAL_STEPS.map(NStep::dir).into(),
+            Rook => ORTHOGONAL_STEPS.map(NStep::dir).into(),
+            Queen => KING_STEPS.map(NStep::dir).into(),
             _ => vec![],
         }
     }
 
-    pub(crate) fn relative_capture_steps(&self) -> StepList {
+    pub(crate) fn relative_captures(&self) -> NStepList {
         match self.piece_type {
-            OmniDirectionalPawn => DIAGONAL_STEPS.into(),
+            OmniDirectionalPawn => DIAGONAL_STEPS.map(NStep::one).into(),
             TurningPawn => adjacent_king_steps(self.faced_direction.unwrap())
                 .into_iter()
+                .map(NStep::one)
                 .collect(),
-            _ => self.relative_move_steps(),
+            _ => self.relative_moves(),
         }
-    }
-
-    pub(crate) fn move_directions(&self) -> StepList {
-        Self::move_directions_for_type(self.piece_type)
-    }
-
-    pub(crate) fn capture_directions(&self) -> StepList {
-        Self::capture_directions_for_type(self.piece_type)
     }
 }
 
@@ -256,39 +265,33 @@ mod tests {
     #[test]
     fn test_turning_vs_omnidirectional_pawn() {
         assert_eq!(
-            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_move_steps()),
-            HashSet::from(ORTHOGONAL_STEPS)
+            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_moves()),
+            HashSet::from(ORTHOGONAL_STEPS.map(NStep::one))
         );
         assert_eq!(
-            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_capture_steps()),
-            HashSet::from(DIAGONAL_STEPS)
+            HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_captures()),
+            HashSet::from(DIAGONAL_STEPS.map(NStep::one))
         );
 
-        assert_eq!(Piece::from_type(TurningPawn).relative_move_steps().len(), 1);
-        assert_eq!(
-            Piece::from_type(TurningPawn).relative_capture_steps().len(),
-            2
-        );
+        assert_eq!(Piece::from_type(TurningPawn).relative_moves().len(), 1);
+        assert_eq!(Piece::from_type(TurningPawn).relative_captures().len(), 2);
     }
 
     #[test]
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
-            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_move_steps()),
-            HashSet::from(ORTHOGONAL_STEPS)
+            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_moves()),
+            HashSet::from(ORTHOGONAL_STEPS.map(NStep::one))
         );
         assert_eq!(
-            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_capture_steps()),
-            HashSet::from(ORTHOGONAL_STEPS)
+            HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_captures()),
+            HashSet::from(ORTHOGONAL_STEPS.map(NStep::one))
         );
 
+        assert_eq!(Piece::from_type(TurningSoldier).relative_moves().len(), 1);
         assert_eq!(
-            Piece::from_type(TurningSoldier).relative_move_steps().len(),
-            1
-        );
-        assert_eq!(
-            Piece::from_type(TurningSoldier).relative_capture_steps(),
-            Piece::from_type(TurningSoldier).relative_move_steps()
+            Piece::from_type(TurningSoldier).relative_captures(),
+            Piece::from_type(TurningSoldier).relative_moves()
         );
     }
 }
