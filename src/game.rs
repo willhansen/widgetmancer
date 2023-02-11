@@ -1927,6 +1927,14 @@ mod tests {
         let square_blink_dist = (game.player_square() - start_pos).square_length();
         assert!(square_blink_dist > 1);
     }
+    #[test]
+    fn test_blink_is_also_strafe() {
+        let mut game = set_up_game_with_player();
+        let start_pos = game.player_square();
+        game.raw_set_player_faced_direction(STEP_UP);
+        game.player_blink(STEP_RIGHT);
+        assert_eq!(game.player_faced_direction(), STEP_UP);
+    }
 
     #[test]
     fn test_player_no_blink_through_block() {
