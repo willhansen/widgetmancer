@@ -860,7 +860,16 @@ impl Game {
         let range_cap: u32 = repeating_step.n().unwrap_or(MAX_PIECE_RANGE);
         for i in 0..range_cap {
             let distance = i + 1;
-            let square = start_square + *repeating_step.step() * distance as i32;
+            // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
+            let square = if is_king_step(*repeating_step.step()) {
+                self.multiple_portal_aware_steps(
+                    SquareWithDir::new(start_square, *repeating_step.step()),
+                    distance,
+                )
+                .square
+            } else {
+                start_square + *repeating_step.step() * distance as i32
+            };
             if !self.square_is_on_board(square) {
                 break;
             }
