@@ -26,6 +26,7 @@ use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
+use crate::portal_geometry::PortalGeometry;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
@@ -53,27 +54,6 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
-pub struct SquareWithDir {
-    square: WorldSquare,
-    direction: WorldStep,
-}
-impl SquareWithDir {
-    pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
-        assert!(KING_STEPS.contains(&direction));
-        SquareWithDir { square, direction }
-    }
-    fn tuple(&self) -> (WorldSquare, WorldStep) {
-        (self.square, self.direction)
-    }
-    fn is_square_face(&self) -> bool {
-        ORTHOGONAL_STEPS.contains(&self.direction)
-    }
-    fn stepped(&self) -> SquareWithDir {
-        SquareWithDir::new(self.square + self.direction, self.direction)
-    }
-}
-
 pub struct Game {
     board_size: BoardSize,
     // (x,y), left to right, top to bottom
@@ -95,7 +75,7 @@ pub struct Game {
     default_enemy_faction: Faction,
     death_cubes: Vec<DeathCube>,
     death_cube_faction: Faction,
-    portal_exits_by_entrance: HashMap<SquareWithDir, SquareWithDir>,
+    portal_geometry: PortalGeometry,
 }
 
 impl Game {
@@ -119,7 +99,7 @@ impl Game {
             default_enemy_faction: Faction::default(),
             death_cubes: vec![],
             death_cube_faction: Faction::DeathCube,
-            portal_exits_by_entrance: HashMap::default(),
+            portal_geometry: PortalGeometry::default(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -404,7 +384,7 @@ impl Game {
 
     pub fn place_new_king_pawn_faction(&mut self, king_square: WorldSquare) {
         let faction = self.get_new_faction();
-        self.place_piece(Piece::new(PieceType::King, faction), king_square);
+        self.place_piece(Piece::new(King, faction), king_square);
         for x in -1..=1 {
             for y in -1..=1 {
                 let pawn_square = king_square + vec2(x, y);
@@ -418,7 +398,7 @@ impl Game {
 
     pub fn place_random_3x3_faction(&mut self, king_square: WorldSquare) {
         let faction = self.get_new_faction();
-        self.place_piece(Piece::new(PieceType::King, faction), king_square);
+        self.place_piece(Piece::new(King, faction), king_square);
         for x in -1..=1 {
             for y in -1..=1 {
                 let square = king_square + vec2(x, y);
@@ -575,10 +555,7 @@ impl Game {
     }
 
     pub fn place_death_turret(&mut self, square: WorldSquare) {
-        self.place_piece(
-            Piece::new(PieceType::DeathCubeTurret, self.death_cube_faction),
-            square,
-        );
+        self.place_piece(Piece::new(DeathCubeTurret, self.death_cube_faction), square);
     }
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
@@ -862,11 +839,12 @@ impl Game {
             let distance = i + 1;
             // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
             let square = if is_king_step(*repeating_step.step()) {
-                self.multiple_portal_aware_steps(
-                    SquareWithDir::new(start_square, *repeating_step.step()),
-                    distance,
-                )
-                .square
+                *self
+                    .multiple_portal_aware_steps(
+                        SquareWithDir::new(start_square, *repeating_step.step()),
+                        distance,
+                    )
+                    .square()
             } else {
                 start_square + *repeating_step.step() * distance as i32
             };
@@ -1280,9 +1258,9 @@ impl Game {
         let spear_length = 5;
 
         for i in 1..=spear_length {
-            let target_square = self
+            let target_square = *self
                 .multiple_portal_aware_steps(self.player_pose(), i)
-                .square;
+                .square();
             if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
                 break;
             }
@@ -1376,7 +1354,7 @@ impl Game {
     pub fn apply_upgrade(&mut self, upgrade: Upgrade) {
         assert!(self.player_is_alive());
         match upgrade {
-            Upgrade::BlinkRange => {
+            BlinkRange => {
                 self.player().blink_range += 1;
             }
         }
@@ -1400,8 +1378,8 @@ impl Game {
             self.kill_player();
             Ok(())
         } else if let Some(piece) = self.pieces.remove(&square) {
-            if piece.piece_type == PieceType::King {
-                self.place_upgrade(Upgrade::BlinkRange, square);
+            if piece.piece_type == King {
+                self.place_upgrade(BlinkRange, square);
             }
 
             self.graphics.start_piece_death_animation_at(square);
@@ -1421,11 +1399,7 @@ impl Game {
     }
 
     pub fn place_portal(&mut self, entrance_step: SquareWithDir, exit_step: SquareWithDir) {
-        assert!(entrance_step.is_square_face());
-        assert!(exit_step.is_square_face());
-        assert_false!(self.portal_exits_by_entrance.contains_key(&entrance_step));
-        self.portal_exits_by_entrance
-            .insert(entrance_step, exit_step);
+        self.portal_geometry.create_portal(entrance_step, exit_step);
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1465,7 +1439,7 @@ impl Game {
     pub fn set_up_upgrades_galore(&mut self) {
         for i in 0..8 {
             self.place_upgrade(
-                Upgrade::BlinkRange,
+                BlinkRange,
                 self.player_square() + STEP_UP * 5 + STEP_RIGHT * i,
             );
         }
@@ -1561,20 +1535,15 @@ impl Game {
     }
 
     pub fn portal_aware_single_step(&self, start: SquareWithDir) -> SquareWithDir {
-        if let Some(&exit) = self.portal_exits_by_entrance.get(&start) {
-            exit
-        } else {
-            start.stepped()
-        }
+        self.portal_geometry.portal_aware_single_step(start)
     }
     pub fn multiple_portal_aware_steps(
         &self,
         start: SquareWithDir,
         num_steps: u32,
     ) -> SquareWithDir {
-        (0..num_steps).fold(start, |current_square_and_dir, _| {
-            self.portal_aware_single_step(current_square_and_dir)
-        })
+        self.portal_geometry
+            .multiple_portal_aware_steps(start, num_steps)
     }
 }
 
@@ -2041,7 +2010,7 @@ mod tests {
         );
 
         let upgrade_square = point2(5, 6);
-        game.place_upgrade(Upgrade::BlinkRange, upgrade_square);
+        game.place_upgrade(BlinkRange, upgrade_square);
 
         game.move_player_to(upgrade_square);
 
@@ -2059,20 +2028,17 @@ mod tests {
     fn test_kings_drop_upgrades() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
-        game.place_piece(
-            Piece::new(PieceType::King, game.default_enemy_faction),
-            square,
-        );
+        game.place_piece(Piece::new(King, game.default_enemy_faction), square);
         assert!(game.upgrades.is_empty());
         game.capture_piece_at(square);
-        assert_eq!(game.upgrades.get(&square).unwrap(), &Upgrade::BlinkRange);
+        assert_eq!(game.upgrades.get(&square).unwrap(), &BlinkRange);
     }
 
     #[test]
     fn test_soldier() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
-        let piece = Piece::from_type(PieceType::OmniDirectionalSoldier);
+        let piece = Piece::from_type(OmniDirectionalSoldier);
         game.place_piece(piece, square);
         assert_false!(piece.can_turn());
         assert!(game
@@ -2091,7 +2057,7 @@ mod tests {
 
         let soldier_square = player_square + STEP_LEFT * 3;
 
-        game.place_piece(Piece::from_type(PieceType::TurningSoldier), soldier_square);
+        game.place_piece(Piece::from_type(TurningSoldier), soldier_square);
         game.get_mut_piece_at(soldier_square)
             .unwrap()
             .set_faced_direction(STEP_UP);
@@ -2114,7 +2080,7 @@ mod tests {
         game.place_player(player_square);
 
         let square = player_square + STEP_LEFT * 3;
-        game.place_piece(Piece::from_type(PieceType::TurningPawn), square);
+        game.place_piece(Piece::from_type(TurningPawn), square);
 
         game.get_mut_piece_at(square)
             .unwrap()
@@ -2251,9 +2217,9 @@ mod tests {
         let start = SquareWithDir::new(point2(2, 6), STEP_RIGHT);
         let end = SquareWithDir::new(point2(5, 2), STEP_DOWN);
         game.place_portal(start, end);
-        game.place_arrow(start.square, start.direction);
+        game.place_arrow(*start.square(), *start.direction());
         game.tick_arrows();
-        assert_eq!(game.arrows().get(&end.square), Some(&STEP_DOWN));
+        assert_eq!(game.arrows().get(end.square()), Some(&STEP_DOWN));
     }
 
     #[test]
@@ -2284,7 +2250,7 @@ mod tests {
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
         game.place_player(player_square);
-        game.player().faced_direction = entrance.direction;
+        game.player().faced_direction = *entrance.direction();
 
         assert_false!(game.pieces.is_empty());
         game.do_player_spear_attack();
@@ -2302,5 +2268,26 @@ mod tests {
             game.arrows().get(&(arrow_square + STEP_LEFT)),
             Some(&STEP_LEFT)
         );
+    }
+    #[test]
+    fn test_see_through_portal() {
+        let mut game = set_up_10x10_game();
+
+        let player_square = point2(2, 2);
+        game.place_player(player_square);
+
+        let enemy_square = player_square + STEP_UP * 2;
+        game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
+
+        let entrance = SquareWithDir::new(player_square, STEP_RIGHT);
+        let exit = SquareWithDir::new(enemy_square, STEP_RIGHT);
+        game.place_portal(entrance, exit);
+
+        game.draw_headless_now();
+        let visible_enemy_square = player_square + STEP_RIGHT;
+        assert_false!(game
+            .graphics
+            .get_buffered_glyphs_for_square(visible_enemy_square)
+            .looks_solid())
     }
 }

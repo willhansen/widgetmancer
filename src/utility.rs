@@ -7,6 +7,7 @@ use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg};
 
+use derive_getters::Getters;
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
@@ -613,6 +614,27 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
         let no_x = vec2(0, dir.y);
         let no_y = vec2(dir.x, 0);
         HashSet::from([no_x, no_y])
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
+pub struct SquareWithDir {
+    square: WorldSquare,
+    direction: WorldStep,
+}
+impl SquareWithDir {
+    pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
+        assert!(KING_STEPS.contains(&direction));
+        SquareWithDir { square, direction }
+    }
+    pub fn tuple(&self) -> (WorldSquare, WorldStep) {
+        (self.square, self.direction)
+    }
+    pub fn is_square_face(&self) -> bool {
+        ORTHOGONAL_STEPS.contains(&self.direction)
+    }
+    pub fn stepped(&self) -> SquareWithDir {
+        SquareWithDir::new(self.square + self.direction, self.direction)
     }
 }
 

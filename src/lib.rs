@@ -57,6 +57,7 @@ pub mod glyph;
 mod graphics;
 mod inputmap;
 pub mod piece;
+pub mod portal_geometry;
 pub mod utility;
 pub mod utils_for_tests;
 
