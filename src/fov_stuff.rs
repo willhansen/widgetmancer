@@ -6,6 +6,7 @@ use ordered_float::OrderedFloat;
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, OUT_OF_SIGHT_COLOR, RED, SPACE};
 use crate::glyph::{DoubleGlyph, Glyph};
+use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
@@ -90,6 +91,46 @@ impl FovResult {
     }
 }
 
+struct OctantFOVSquareSequenceIter {
+    outward_dir: WorldStep,
+    across_dir: WorldStep,
+    outward_steps: u32,
+    across_steps: u32,
+}
+
+impl OctantFOVSquareSequenceIter {
+    pub fn new(octant_number: i32) -> Self {
+        let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
+        OctantFOVSquareSequenceIter {
+            outward_dir,
+            across_dir,
+            outward_steps: 1, // skip the zero square
+            across_steps: 0,
+        }
+    }
+}
+
+impl Iterator for OctantFOVSquareSequenceIter {
+    type Item = WorldStep;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.outward_steps > SIGHT_RADIUS {
+            return None;
+        }
+
+        let relative_square = self.outward_dir * self.outward_steps as i32
+            + self.across_dir * self.across_steps as i32;
+
+        self.across_steps += 1;
+        if self.across_steps > self.outward_steps {
+            self.across_steps = 0;
+            self.outward_steps += 1;
+        }
+
+        Some(relative_square)
+    }
+}
+
 pub fn single_octant_field_of_view(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
@@ -103,37 +144,30 @@ pub fn single_octant_field_of_view(
     let mut fov_result = FovResult::default();
     fov_result.fully_visible_squares.insert(center_square);
 
-    let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
-
     let mut shadows = AngleIntervalSet::new();
-    // skip the central square
-    for outward_steps in 1..=SIGHT_RADIUS {
-        for across_steps in 0..=outward_steps {
-            let square = center_square
-                + outward_dir * outward_steps as i32
-                + across_dir * across_steps as i32;
-            let shadow_for_this_square = angle_interval_of_square(square - center_square);
-            if shadows.fully_contains_interval(shadow_for_this_square) {
-                continue;
-            } else if sight_blockers.contains(&square) {
-                shadows.add_interval(shadow_for_this_square);
-                // TODO: partially visible blocks (just see one side)
-                // fully in view for now
-                fov_result.fully_visible_squares.insert(square);
-            } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
-                // Partial overlap case
-                let square_relative_to_start_square: WorldStep = square - center_square;
-                let shadows_on_characters =
-                    visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
+    for relative_square in OctantFOVSquareSequenceIter::new(octant_number) {
+        let square = center_square + relative_square;
+        let shadow_for_this_square = angle_interval_of_square(square - center_square);
+        if shadows.fully_contains_interval(shadow_for_this_square) {
+            continue;
+        } else if sight_blockers.contains(&square) {
+            shadows.add_interval(shadow_for_this_square);
+            // TODO: partially visible blocks (just see one side)
+            // fully in view for now
+            fov_result.fully_visible_squares.insert(square);
+        } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
+            // Partial overlap case
+            let square_relative_to_start_square: WorldStep = square - center_square;
+            let shadows_on_characters =
+                visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
 
-                // partially visible
-                fov_result
-                    .partially_visible_squares
-                    .insert(square, shadows_on_characters);
-            } else {
-                // fully visible
-                fov_result.fully_visible_squares.insert(square);
-            }
+            // partially visible
+            fov_result
+                .partially_visible_squares
+                .insert(square, shadows_on_characters);
+        } else {
+            // fully visible
+            fov_result.fully_visible_squares.insert(square);
         }
     }
     fov_result
