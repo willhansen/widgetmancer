@@ -1,11 +1,13 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
-use crate::fov_stuff::PartialVisibilityOfASquare;
 use euclid::Angle;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
+
+use crate::fov_stuff::PartialVisibilityOfASquare;
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct AngleInterval {
@@ -43,6 +45,10 @@ impl AngleInterval {
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
     }
+    pub fn octant(&self) -> Option<i32> {
+        todo!()
+    }
+
     fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
         self.contains_angle(other.anticlockwise_end)
             || (self.contains_angle(other.clockwise_end)
@@ -264,6 +270,7 @@ mod tests {
             "commutative"
         );
     }
+
     #[test]
     fn test_interval_overlap_does_not_include_full_overlap() {
         let interval_b = AngleInterval::from_degrees(5.0, 15.0);
@@ -353,6 +360,7 @@ mod tests {
             }
         );
     }
+
     #[test]
     fn test_angle_interval_set__standardize_with_one() {
         let interval = AngleInterval::from_degrees(15.0, 30.0);
@@ -455,6 +463,7 @@ mod tests {
         the_set.add_interval(AngleInterval::from_degrees(33.0, 35.0));
         assert_eq!(before_adding, the_set);
     }
+
     #[test]
     fn test_angle_interval_set_validity() {
         assert!(AngleIntervalSet {
@@ -477,6 +486,7 @@ mod tests {
         }
         .is_valid());
     }
+
     #[test]
     fn test_get_angle_endpoint_of_overlapped_region() {
         let interval_set = AngleIntervalSet {

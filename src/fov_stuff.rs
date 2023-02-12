@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
-use crate::glyph::{DoubleGlyph, Glyph};
 use euclid::{point2, vec2, Angle};
 use ordered_float::OrderedFloat;
 
+use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, OUT_OF_SIGHT_COLOR, RED, SPACE};
+use crate::glyph::{DoubleGlyph, Glyph};
+use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
@@ -18,6 +19,7 @@ pub struct PartialVisibilityOfASquare {
     pub right_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
     pub left_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
 }
+
 impl PartialVisibilityOfASquare {
     pub fn get(&self, i: usize) -> &HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
         match i {
@@ -71,50 +73,96 @@ impl FovResult {
             .copied()
             .collect()
     }
+    pub fn combine(&self, other: Self) -> Self {
+        let mut next_result = FovResult {
+            fully_visible_squares: self
+                .fully_visible_squares
+                .union(&other.fully_visible_squares)
+                .copied()
+                .collect(),
+            partially_visible_squares: self.partially_visible_squares.clone(),
+        };
+        // TODO: find better combination method.  Also some may combine to full squares
+        next_result
+            .partially_visible_squares
+            .extend((other.partially_visible_squares));
+        next_result
+    }
 }
 
-pub fn field_of_view_from_square(
-    start_square: WorldSquare,
+pub fn portal_aware_field_of_view_within_arc_within_octant(
     sight_blockers: &HashSet<WorldSquare>,
+    portal_geometry: &PortalGeometry,
+    center_square: WorldSquare,
+    octant_number: i32,
+    //arc: AngleInterval,
+    //first_relative_square_in_sequence: WorldStep,
 ) -> FovResult {
+    //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
+    //let octant: i32 = arc.octant().expect("arc not confined to octant");
     let mut fov_result = FovResult::default();
-    fov_result.fully_visible_squares.insert(start_square);
+    fov_result.fully_visible_squares.insert(center_square);
 
-    for octant_number in 0..8 {
-        let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
-        let mut shadows = AngleIntervalSet::new();
-        // skip the central square
-        for outward_steps in 1..=SIGHT_RADIUS {
-            for across_steps in 0..=outward_steps {
-                let square = start_square
-                    + outward_dir * outward_steps as i32
-                    + across_dir * across_steps as i32;
-                let shadow_for_this_square = angle_interval_of_square(square - start_square);
-                if shadows.fully_contains_interval(shadow_for_this_square) {
-                    continue;
-                } else if sight_blockers.contains(&square) {
-                    shadows.add_interval(shadow_for_this_square);
-                    // TODO: partially visible blocks (just see one side)
-                    // fully in view for now
-                    fov_result.fully_visible_squares.insert(square);
-                } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
-                    // Partial overlap case
-                    let square_relative_to_start_square: WorldStep = square - start_square;
-                    let shadows_on_characters =
-                        visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
+    let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
 
-                    // partially visible
-                    fov_result
-                        .partially_visible_squares
-                        .insert(square, shadows_on_characters);
-                } else {
-                    // fully visible
-                    fov_result.fully_visible_squares.insert(square);
-                }
+    let mut shadows = AngleIntervalSet::new();
+    // skip the central square
+    for outward_steps in 1..=SIGHT_RADIUS {
+        for across_steps in 0..=outward_steps {
+            let square = center_square
+                + outward_dir * outward_steps as i32
+                + across_dir * across_steps as i32;
+            let shadow_for_this_square = angle_interval_of_square(square - center_square);
+            if shadows.fully_contains_interval(shadow_for_this_square) {
+                continue;
+            } else if sight_blockers.contains(&square) {
+                shadows.add_interval(shadow_for_this_square);
+                // TODO: partially visible blocks (just see one side)
+                // fully in view for now
+                fov_result.fully_visible_squares.insert(square);
+            } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
+                // Partial overlap case
+                let square_relative_to_start_square: WorldStep = square - center_square;
+                let shadows_on_characters =
+                    visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
+
+                // partially visible
+                fov_result
+                    .partially_visible_squares
+                    .insert(square, shadows_on_characters);
+            } else {
+                // fully visible
+                fov_result.fully_visible_squares.insert(square);
             }
         }
     }
     fov_result
+}
+
+pub fn portal_aware_field_of_view_from_square(
+    center_square: WorldSquare,
+    sight_blockers: &HashSet<WorldSquare>,
+    portal_geometry: &PortalGeometry,
+) -> FovResult {
+    (0..8).fold(
+        FovResult::default(),
+        |fov_result_accumulator: FovResult, octant_number: i32| {
+            fov_result_accumulator.combine(portal_aware_field_of_view_within_arc_within_octant(
+                sight_blockers,
+                portal_geometry,
+                center_square,
+                octant_number,
+            ))
+        },
+    )
+}
+
+#[deprecated(note = "Use portal_aware_field_of_view_from_square instead")]
+pub fn field_of_view_from_square(
+    start_square: WorldSquare,
+    sight_blockers: &HashSet<WorldSquare>,
+) -> FovResult {
+    portal_aware_field_of_view_from_square(start_square, sight_blockers, &PortalGeometry::default())
 }
 
 fn visibility_of_shadowed_square(
@@ -196,14 +244,15 @@ pub fn angle_interval_of_square(relative_square: WorldStep) -> AngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph::glyph_constants::FULL_BLOCK;
-    use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{STEP_DOWN, STEP_UP};
     use euclid::point2;
     use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
+
+    use crate::glyph::glyph_constants::FULL_BLOCK;
+    use crate::glyph::DoubleGlyphFunctions;
+    use crate::utility::{STEP_DOWN, STEP_UP};
 
     use super::*;
 
@@ -242,6 +291,7 @@ mod tests {
         let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
         assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
     }
+
     #[test]
     fn test_field_of_view_includes_blocks() {
         let start_square = point2(5, 5);
@@ -256,6 +306,7 @@ mod tests {
             .fully_visible_squares
             .contains(&(block_square + STEP_UP)));
     }
+
     #[test]
     fn test_partial_squares_look_partial() {
         let start_square = point2(5, 5);
@@ -272,6 +323,7 @@ mod tests {
             }
         ));
     }
+
     #[test]
     fn test_diagonal_shadow_looks_diagonal() {
         let start_square = point2(5, 5);
@@ -287,6 +339,7 @@ mod tests {
             assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
         }
     }
+
     #[test]
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let mut shadows = AngleIntervalSet::new();
@@ -297,6 +350,7 @@ mod tests {
         //dbg!(visibility);
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
+
     #[test]
     fn test_partial_visibility_to_glyphs() {
         let partial_visibility = PartialVisibilityOfASquare {
@@ -319,6 +373,7 @@ mod tests {
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
+
     #[test]
     fn test_partial_visibility_to_glyphs__data_from_failure() {
         let partial_visibility = PartialVisibilityOfASquare {
@@ -340,16 +395,17 @@ mod tests {
         assert!(is_clockwise(
             partial_visibility.left_char_shadow.dividing_line.p1,
             partial_visibility.left_char_shadow.dividing_line.p2,
-            partial_visibility.left_char_shadow.point_on_half_plane
+            partial_visibility.left_char_shadow.point_on_half_plane,
         ));
         assert!(is_clockwise(
             partial_visibility.right_char_shadow.dividing_line.p1,
             partial_visibility.right_char_shadow.dividing_line.p2,
-            partial_visibility.right_char_shadow.point_on_half_plane
+            partial_visibility.right_char_shadow.point_on_half_plane,
         ));
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
+
     #[test]
     fn test_observed_bright_spot_in_shadow() {
         let player_square = point2(3, 3);

@@ -638,6 +638,12 @@ impl SquareWithDir {
     }
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
+pub struct TranslationAndRotationTransform {
+    translation: WorldStep,
+    quarter_rotations_counterclockwise: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
