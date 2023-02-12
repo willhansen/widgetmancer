@@ -34,6 +34,7 @@ pub const UP_I: IVector = vec2(0, 1);
 pub const LEFT_I: IVector = vec2(-1, 0);
 pub const RIGHT_I: IVector = vec2(1, 0);
 
+pub const STEP_ZERO: WorldStep = vec2(0, 0);
 pub const STEP_UP: WorldStep = vec2(0, 1);
 pub const STEP_DOWN: WorldStep = vec2(0, -1);
 pub const STEP_RIGHT: WorldStep = vec2(1, 0);

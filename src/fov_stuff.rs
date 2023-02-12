@@ -13,6 +13,7 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     is_clockwise, octant_to_outward_and_across_directions, rotate_point_around_point, HalfPlane,
     Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -99,13 +100,28 @@ struct OctantFOVSquareSequenceIter {
 }
 
 impl OctantFOVSquareSequenceIter {
-    pub fn new(octant_number: i32) -> Self {
+    // one_before_starting_square is useful for skipping the vec2(0, 0) square.
+    pub fn new(octant_number: i32, one_before_starting_square: WorldStep) -> Self {
         let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
+        let prev_square_outward_steps = outward_dir.dot(one_before_starting_square) as u32;
+        let prev_square_across_steps = across_dir.dot(one_before_starting_square) as u32;
+
+        let (outward_steps, across_steps) =
+            Self::next_out_and_across_steps(prev_square_outward_steps, prev_square_across_steps);
+
         OctantFOVSquareSequenceIter {
             outward_dir,
             across_dir,
-            outward_steps: 1, // skip the zero square
-            across_steps: 0,
+            outward_steps,
+            across_steps,
+        }
+    }
+
+    fn next_out_and_across_steps(outward_steps: u32, across_steps: u32) -> (u32, u32) {
+        if across_steps == outward_steps {
+            (outward_steps + 1, 0)
+        } else {
+            (outward_steps, across_steps + 1)
         }
     }
 }
@@ -121,14 +137,60 @@ impl Iterator for OctantFOVSquareSequenceIter {
         let relative_square = self.outward_dir * self.outward_steps as i32
             + self.across_dir * self.across_steps as i32;
 
-        self.across_steps += 1;
-        if self.across_steps > self.outward_steps {
-            self.across_steps = 0;
-            self.outward_steps += 1;
-        }
+        (self.outward_steps, self.across_steps) =
+            Self::next_out_and_across_steps(self.outward_steps, self.across_steps);
 
         Some(relative_square)
     }
+}
+
+pub fn field_of_view_within_arc_in_single_octant(
+    sight_blockers: &HashSet<WorldSquare>,
+    portal_geometry: &PortalGeometry,
+    center_square: WorldSquare,
+    octant_number: i32,
+    view_arc: AngleInterval,
+    start_checking_after_this_square_in_the_fov_sequence: WorldStep,
+) -> FovResult {
+    let mut fov_result = FovResult::default();
+    for relative_square in OctantFOVSquareSequenceIter::new(
+        octant_number,
+        start_checking_after_this_square_in_the_fov_sequence,
+    ) {
+        let absolute_square = center_square + relative_square;
+
+        let view_arc_of_this_square = angle_interval_of_square(relative_square);
+
+        if view_arc.fully_contains_interval(view_arc_of_this_square) {
+            fov_result.fully_visible_squares.insert(absolute_square);
+        } else if view_arc.partially_overlaps(view_arc_of_this_square) {
+            fov_result.partially_visible_squares.insert(
+                absolute_square,
+                partial_visibility_of_square_from_one_view_arc(view_arc, relative_square),
+            );
+        }
+
+        let is_sight_blocker = sight_blockers.contains(&absolute_square);
+        if is_sight_blocker {
+            // split arc and recurse
+            let view_arcs_around_blocker: Vec<AngleInterval> =
+                view_arc.split_around_arc(view_arc_of_this_square);
+            view_arcs_around_blocker
+                .into_iter()
+                .for_each(|new_sub_arc| {
+                    fov_result = fov_result.combine(field_of_view_within_arc_in_single_octant(
+                        sight_blockers,
+                        portal_geometry,
+                        center_square,
+                        octant_number,
+                        new_sub_arc,
+                        relative_square,
+                    ));
+                });
+        }
+        // TODO: portals
+    }
+    fov_result
 }
 
 pub fn single_octant_field_of_view(
@@ -136,41 +198,20 @@ pub fn single_octant_field_of_view(
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
     octant_number: i32,
-    //arc: AngleInterval,
-    //first_relative_square_in_sequence: WorldStep,
 ) -> FovResult {
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
     let mut fov_result = FovResult::default();
     fov_result.fully_visible_squares.insert(center_square);
-
-    let mut shadows = AngleIntervalSet::new();
-    for relative_square in OctantFOVSquareSequenceIter::new(octant_number) {
-        let square = center_square + relative_square;
-        let shadow_for_this_square = angle_interval_of_square(square - center_square);
-        if shadows.fully_contains_interval(shadow_for_this_square) {
-            continue;
-        } else if sight_blockers.contains(&square) {
-            shadows.add_interval(shadow_for_this_square);
-            // TODO: partially visible blocks (just see one side)
-            // fully in view for now
-            fov_result.fully_visible_squares.insert(square);
-        } else if shadows.partially_overlaps_interval(shadow_for_this_square) {
-            // Partial overlap case
-            let square_relative_to_start_square: WorldStep = square - center_square;
-            let shadows_on_characters =
-                visibility_of_shadowed_square(&shadows, square_relative_to_start_square);
-
-            // partially visible
-            fov_result
-                .partially_visible_squares
-                .insert(square, shadows_on_characters);
-        } else {
-            // fully visible
-            fov_result.fully_visible_squares.insert(square);
-        }
-    }
-    fov_result
+    let full_octant_arc = AngleInterval::from_octant(octant_number);
+    fov_result.combine(field_of_view_within_arc_in_single_octant(
+        sight_blockers,
+        portal_geometry,
+        center_square,
+        octant_number,
+        full_octant_arc,
+        STEP_ZERO,
+    ))
 }
 
 pub fn portal_aware_field_of_view_from_square(
@@ -197,6 +238,13 @@ pub fn field_of_view_from_square(
     sight_blockers: &HashSet<WorldSquare>,
 ) -> FovResult {
     portal_aware_field_of_view_from_square(start_square, sight_blockers, &PortalGeometry::default())
+}
+
+fn partial_visibility_of_square_from_one_view_arc(
+    visibility_arc: AngleInterval,
+    square_relative_to_center: WorldStep,
+) -> PartialVisibilityOfASquare {
+    todo!()
 }
 
 fn visibility_of_shadowed_square(

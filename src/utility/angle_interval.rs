@@ -28,6 +28,12 @@ impl AngleInterval {
             Angle::degrees(anticlockwise_end_in_degrees),
         )
     }
+    pub fn from_octant(octant_number: i32) -> Self {
+        let reduced_octant = octant_number.rem_euclid(8);
+        let low_degrees = 45 * reduced_octant;
+        let high_degrees = low_degrees + 45;
+        Self::from_degrees(low_degrees as f32, high_degrees as f32)
+    }
     fn union(&self, other: AngleInterval) -> Self {
         assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches(other));
         let result = AngleInterval {
@@ -44,9 +50,6 @@ impl AngleInterval {
         };
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
-    }
-    pub fn octant(&self) -> Option<i32> {
-        todo!()
     }
 
     fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
@@ -67,8 +70,11 @@ impl AngleInterval {
         }
         sum
     }
-    fn partially_overlaps(&self, other: AngleInterval) -> bool {
+    pub fn partially_overlaps(&self, other: AngleInterval) -> bool {
         self.num_contained_edges(other) == 1 && other.num_contained_edges(*self) == 1
+    }
+    pub fn split_around_arc(&self, other: AngleInterval) -> Vec<AngleInterval> {
+        todo!()
     }
     fn edge_of_this_overlapped_by(&self, other: AngleInterval) -> Option<DirectionalAngleEdge> {
         if !self.partially_overlaps(other) {
@@ -112,7 +118,7 @@ impl AngleInterval {
         self.contains_angle(angle) || self.clockwise_end == angle
     }
 
-    fn fully_contains_interval(&self, other: AngleInterval) -> bool {
+    pub fn fully_contains_interval(&self, other: AngleInterval) -> bool {
         let contains_other_edges = self.contains_angle(other.anticlockwise_end)
             && self.contains_or_touches_angle(other.clockwise_end);
         let other_firmly_contains_any_of_these_edges = (other
