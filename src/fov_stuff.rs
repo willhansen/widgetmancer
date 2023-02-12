@@ -90,7 +90,7 @@ impl FovResult {
     }
 }
 
-pub fn portal_aware_field_of_view_within_arc_within_octant(
+pub fn single_octant_field_of_view(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
@@ -147,7 +147,7 @@ pub fn portal_aware_field_of_view_from_square(
     (0..8).fold(
         FovResult::default(),
         |fov_result_accumulator: FovResult, octant_number: i32| {
-            fov_result_accumulator.combine(portal_aware_field_of_view_within_arc_within_octant(
+            fov_result_accumulator.combine(single_octant_field_of_view(
                 sight_blockers,
                 portal_geometry,
                 center_square,
