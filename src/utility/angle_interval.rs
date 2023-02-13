@@ -1,13 +1,17 @@
 use std::collections::HashSet;
+use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
-use euclid::Angle;
+use euclid::{vec2, Angle};
 use itertools::Itertools;
+use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::PartialVisibilityOfASquare;
+use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
+use crate::utility::{STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT};
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct AngleInterval {
@@ -34,6 +38,37 @@ impl AngleInterval {
         let high_degrees = low_degrees + 45;
         Self::from_degrees(low_degrees as f32, high_degrees as f32)
     }
+
+    pub fn from_square(relative_square: WorldStep) -> Self {
+        assert_ne!(relative_square, vec2(0, 0));
+        let rel_square_center = relative_square.to_f32();
+        let rel_square_corners: Vec<WorldMove> = vec![
+            rel_square_center + STEP_UP_RIGHT.to_f32() * 0.5,
+            rel_square_center + STEP_UP_LEFT.to_f32() * 0.5,
+            rel_square_center + STEP_DOWN_LEFT.to_f32() * 0.5,
+            rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
+        ];
+
+        let center_angle = rel_square_center.angle_from_x_axis();
+        let corner_angles: Vec<Angle<f32>> = rel_square_corners
+            .iter()
+            .map(|rel_corner_point| rel_corner_point.angle_from_x_axis())
+            .collect();
+
+        let most_clockwise = corner_angles
+            .iter()
+            .min_by_key(|&&c| OrderedFloat(center_angle.angle_to(c).radians))
+            .unwrap();
+        let least_clockwise = corner_angles
+            .iter()
+            .max_by_key(|&&c| OrderedFloat(center_angle.angle_to(c).radians))
+            .unwrap();
+
+        AngleInterval {
+            anticlockwise_end: *least_clockwise,
+            clockwise_end: *most_clockwise,
+        }
+    }
     fn union(&self, other: AngleInterval) -> Self {
         assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches(other));
         let result = AngleInterval {
@@ -50,6 +85,9 @@ impl AngleInterval {
         };
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
+    }
+    pub fn complement(&self) -> Self {
+        AngleInterval::new(self.anticlockwise_end, self.clockwise_end)
     }
 
     fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
@@ -74,20 +112,37 @@ impl AngleInterval {
         self.num_contained_edges(other) == 1 && other.num_contained_edges(*self) == 1
     }
     pub fn split_around_arc(&self, other: AngleInterval) -> Vec<AngleInterval> {
-        todo!()
+        assert!(self.partially_or_fully_overlaps(other));
+
+        let mut split_results = vec![];
+        if self.contains_angle(other.anticlockwise_end)
+            && self.anticlockwise_end != other.anticlockwise_end
+        {
+            let above_interval =
+                AngleInterval::new(self.anticlockwise_end, other.anticlockwise_end);
+            split_results.push(above_interval);
+        }
+        if self.contains_angle(other.clockwise_end) && self.clockwise_end != other.clockwise_end {
+            let below_interval = AngleInterval::new(other.clockwise_end, self.clockwise_end);
+            split_results.push(below_interval);
+        }
+        split_results
     }
-    fn edge_of_this_overlapped_by(&self, other: AngleInterval) -> Option<DirectionalAngleEdge> {
+    pub fn edge_of_this_overlapped_by(
+        &self,
+        other: AngleInterval,
+    ) -> Option<DirectionalAngularEdge> {
         if !self.partially_overlaps(other) {
             return None;
         }
         let is_clockwise_end = other.contains_angle(self.clockwise_end);
-        Some(DirectionalAngleEdge {
-            end_angle: if is_clockwise_end {
+        Some(DirectionalAngularEdge {
+            angle: if is_clockwise_end {
                 self.clockwise_end
             } else {
                 self.anticlockwise_end
             },
-            is_low_end: is_clockwise_end,
+            is_clockwise_edge: is_clockwise_end,
         })
     }
     fn exactly_touches(&self, other: AngleInterval) -> bool {
@@ -117,6 +172,23 @@ impl AngleInterval {
     fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
         self.contains_angle(angle) || self.clockwise_end == angle
     }
+    pub fn width(&self) -> Angle<f32> {
+        let short_width = self.anticlockwise_end.angle_to(self.clockwise_end);
+        let interval_is_less_than_half_circle = short_width.radians < 0.0;
+        let full_width = if interval_is_less_than_half_circle {
+            Angle::radians(short_width.radians.abs())
+        } else {
+            Angle::radians(TAU - short_width.radians.abs())
+        };
+        assert!(full_width.radians >= 0.0);
+        full_width
+    }
+
+    pub fn center_angle(&self) -> Angle<f32> {
+        let mid_angle = Angle::radians(self.clockwise_end.radians + self.width().radians / 2.0);
+        assert!(self.contains_angle(mid_angle));
+        mid_angle
+    }
 
     pub fn fully_contains_interval(&self, other: AngleInterval) -> bool {
         let contains_other_edges = self.contains_angle(other.anticlockwise_end)
@@ -130,9 +202,18 @@ impl AngleInterval {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct DirectionalAngleEdge {
-    pub end_angle: Angle<f32>,
-    pub is_low_end: bool,
+pub struct DirectionalAngularEdge {
+    pub angle: Angle<f32>,
+    pub is_clockwise_edge: bool,
+}
+
+impl DirectionalAngularEdge {
+    pub fn flipped(&self) -> Self {
+        DirectionalAngularEdge {
+            angle: self.angle,
+            is_clockwise_edge: !self.is_clockwise_edge,
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -212,7 +293,7 @@ impl AngleIntervalSet {
     pub fn most_overlapped_edge_of_set(
         &self,
         interval: AngleInterval,
-    ) -> Option<DirectionalAngleEdge> {
+    ) -> Option<DirectionalAngularEdge> {
         // TODO: don't just get the first one
         self.intervals
             .iter()
@@ -249,7 +330,7 @@ impl Display for AngleIntervalSet {
 
 #[cfg(test)]
 mod tests {
-    use ntest::assert_false;
+    use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
@@ -502,9 +583,9 @@ mod tests {
 
         assert_eq!(
             interval_set.most_overlapped_edge_of_set(single_interval),
-            Some(DirectionalAngleEdge {
-                end_angle: Angle::degrees(0.0),
-                is_low_end: true
+            Some(DirectionalAngularEdge {
+                angle: Angle::degrees(0.0),
+                is_clockwise_edge: true
             })
         );
     }
@@ -521,10 +602,51 @@ mod tests {
 
         assert_eq!(
             interval_set.most_overlapped_edge_of_set(single_interval),
-            Some(DirectionalAngleEdge {
-                end_angle: Angle::degrees(20.0),
-                is_low_end: false
+            Some(DirectionalAngularEdge {
+                angle: Angle::degrees(20.0),
+                is_clockwise_edge: false
             })
+        );
+    }
+    #[test]
+    fn test_center_angle_of_interval() {
+        assert_about_eq!(
+            AngleInterval::from_degrees(10.0, 20.0)
+                .center_angle()
+                .to_degrees(),
+            15.0
+        );
+        assert_about_eq!(
+            AngleInterval::from_degrees(-10.0, 10.0)
+                .center_angle()
+                .to_degrees(),
+            0.0
+        );
+        assert_about_eq!(
+            AngleInterval::from_degrees(10.0, -10.0)
+                .center_angle()
+                .to_degrees(),
+            180.0
+        );
+    }
+    #[test]
+    fn test_angle_interval_width() {
+        assert_about_eq!(
+            AngleInterval::from_degrees(10.0, 20.0).width().to_degrees(),
+            10.0
+        );
+        assert_about_eq!(
+            AngleInterval::from_degrees(-10.0, 10.0)
+                .width()
+                .to_degrees(),
+            20.0
+        );
+        assert_about_eq!(
+            AngleInterval::from_degrees(10.0, -10.0)
+                .width()
+                .to_degrees(),
+            340.0,
+            1e-4
         );
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use euclid::{point2, vec2, Angle};
+use itertools::all;
 use ordered_float::OrderedFloat;
 
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
@@ -11,19 +12,19 @@ use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    is_clockwise, octant_to_outward_and_across_directions, rotate_point_around_point, HalfPlane,
-    Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
-    STEP_ZERO,
+    direction_from_angle, is_clockwise, octant_to_outward_and_across_directions,
+    rotate_point_around_point, HalfPlane, Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
+    STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct PartialVisibilityOfASquare {
-    pub right_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
-    pub left_char_shadow: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
+    pub right_char_shadow: Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>>,
+    pub left_char_shadow: Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>>,
 }
 
 impl PartialVisibilityOfASquare {
-    pub fn get(&self, i: usize) -> &HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+    pub fn get(&self, i: usize) -> &Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>> {
         match i {
             0 => &self.left_char_shadow,
             1 => &self.right_char_shadow,
@@ -38,14 +39,47 @@ impl PartialVisibilityOfASquare {
         ];
         (0..2)
             .map(|i| {
-                let half_plane = self.get(i);
+                let half_plane = self.get(i).unwrap();
                 let character_square = character_squares[i];
-                let angle_char = half_plane_to_angled_block_character(*half_plane);
+                let angle_char = half_plane_to_angled_block_character(half_plane);
                 Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
             })
             .collect::<Vec<Glyph>>()
             .try_into()
             .unwrap()
+    }
+
+    pub fn combine(&self, other: &Self) -> Self {
+        let complement_tolerance = 1e-6;
+        let combined_shadows: Vec<Option<HalfPlane<_, _>>> = (0..2)
+            .map(|i| {
+                let self_shadow = *self.get(i);
+                let other_shadow = *other.get(i);
+                if self_shadow.is_none() && other_shadow.is_none() {
+                    None
+                } else if self_shadow.is_some() && other_shadow.is_none() {
+                    self_shadow
+                } else if self_shadow.is_none() && other_shadow.is_some() {
+                    other_shadow
+                } else if self_shadow
+                    .unwrap()
+                    .is_about_complement_to(other_shadow.unwrap(), complement_tolerance)
+                {
+                    None
+                } else {
+                    // TODO: better combination method than taking just one
+                    self_shadow
+                }
+            })
+            .collect();
+
+        PartialVisibilityOfASquare {
+            left_char_shadow: combined_shadows[0],
+            right_char_shadow: combined_shadows[1],
+        }
+    }
+    pub fn is_fully_visible(&self) -> bool {
+        self.left_char_shadow.is_none() && self.right_char_shadow.is_none()
     }
 }
 
@@ -69,26 +103,90 @@ impl FovResult {
         the_map
     }
     pub fn at_least_partially_visible_squares(&self) -> SquareSet {
-        let partial_vis: SquareSet = self.partially_visible_squares.keys().copied().collect();
+        let partial_vis: SquareSet = self.squares_with_partials();
         self.fully_visible_squares
             .union(&partial_vis)
             .copied()
             .collect()
     }
+    pub fn squares_with_partials(&self) -> SquareSet {
+        self.partially_visible_squares.keys().copied().collect()
+    }
     pub fn combine(&self, other: Self) -> Self {
-        let mut next_result = FovResult {
-            fully_visible_squares: self
-                .fully_visible_squares
-                .union(&other.fully_visible_squares)
-                .copied()
-                .collect(),
-            partially_visible_squares: self.partially_visible_squares.clone(),
-        };
-        // TODO: find better combination method.  Also some may combine to full squares
-        next_result
+        type PartialVisibilityMap = HashMap<WorldSquare, PartialVisibilityOfASquare>;
+
+        let squares_with_non_conflicting_partials: SquareSet = self
+            .squares_with_partials()
+            .symmetric_difference(&other.squares_with_partials())
+            .copied()
+            .collect();
+
+        let self_non_conflicting_partials: PartialVisibilityMap = self
             .partially_visible_squares
-            .extend((other.partially_visible_squares));
-        next_result
+            .clone()
+            .into_iter()
+            .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
+            .collect();
+
+        let other_non_conflicting_partials: PartialVisibilityMap = other
+            .partially_visible_squares
+            .clone()
+            .into_iter()
+            .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
+            .collect();
+
+        let all_squares_with_partials: SquareSet = self
+            .squares_with_partials()
+            .union(&other.squares_with_partials())
+            .copied()
+            .collect();
+
+        let squares_with_conflicting_partials: SquareSet = all_squares_with_partials
+            .difference(&squares_with_non_conflicting_partials)
+            .copied()
+            .collect();
+
+        let combined_partials: PartialVisibilityMap = squares_with_conflicting_partials
+            .into_iter()
+            .map(|square| {
+                let combined_partial = self
+                    .partially_visible_squares
+                    .get(&square)
+                    .unwrap()
+                    .combine(other.partially_visible_squares.get(&square).unwrap());
+                (square, combined_partial)
+            })
+            .collect();
+
+        let conflicting_partials_that_combine_to_full_visibility: SquareSet = combined_partials
+            .iter()
+            .filter(|(square, partial)| partial.is_fully_visible())
+            .map(|(square, partial)| square)
+            .copied()
+            .collect();
+
+        let conflicting_partials_that_remain_partials: PartialVisibilityMap = combined_partials
+            .into_iter()
+            .filter(|(square, partial)| !partial.is_fully_visible())
+            .collect();
+
+        let mut all_partials: PartialVisibilityMap = self_non_conflicting_partials;
+        all_partials.extend(other_non_conflicting_partials);
+        all_partials.extend(conflicting_partials_that_remain_partials);
+
+        let all_fully_visible: SquareSet = self
+            .fully_visible_squares
+            .union(&other.fully_visible_squares)
+            .cloned()
+            .collect::<SquareSet>()
+            .union(&conflicting_partials_that_combine_to_full_visibility)
+            .cloned()
+            .collect();
+
+        FovResult {
+            fully_visible_squares: all_fully_visible,
+            partially_visible_squares: all_partials,
+        }
     }
 }
 
@@ -244,7 +342,17 @@ fn partial_visibility_of_square_from_one_view_arc(
     visibility_arc: AngleInterval,
     square_relative_to_center: WorldStep,
 ) -> PartialVisibilityOfASquare {
-    todo!()
+    let square_arc = AngleInterval::from_square(square_relative_to_center);
+    assert!(visibility_arc.partially_overlaps(square_arc));
+
+    let shadow_arc = visibility_arc.complement();
+    let mut shadow_set_with_one_shadow = AngleIntervalSet::new();
+    shadow_set_with_one_shadow.add_interval(shadow_arc);
+    visibility_of_shadowed_square(&shadow_set_with_one_shadow, square_relative_to_center)
+}
+
+fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
+    direction_from_angle(view_arc.center_angle()).cast_unit()
 }
 
 fn visibility_of_shadowed_square(
@@ -258,12 +366,12 @@ fn visibility_of_shadowed_square(
     let shadow_line_from_center = Line {
         p1: point2(0.0, 0.0),
         p2: point2(
-            overlapped_shadow_edge.end_angle.radians.cos(),
-            overlapped_shadow_edge.end_angle.radians.sin(),
+            overlapped_shadow_edge.angle.radians.cos(),
+            overlapped_shadow_edge.angle.radians.sin(),
         ),
     };
     let extra_rotation_for_shadow_point = Angle::degrees(1.0)
-        * if overlapped_shadow_edge.is_low_end {
+        * if overlapped_shadow_edge.is_clockwise_edge {
             1.0
         } else {
             -1.0
@@ -282,10 +390,14 @@ fn visibility_of_shadowed_square(
         square_relative_to_shadow_center.to_point().cast_unit(),
     );
     let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
-    let left_char_shadow =
-        world_half_plane_to_local_character_half_plane(shadow_half_plane, left_character_square);
-    let right_char_shadow =
-        world_half_plane_to_local_character_half_plane(shadow_half_plane, right_character_square);
+    let left_char_shadow = Some(world_half_plane_to_local_character_half_plane(
+        shadow_half_plane,
+        left_character_square,
+    ));
+    let right_char_shadow = Some(world_half_plane_to_local_character_half_plane(
+        shadow_half_plane,
+        right_character_square,
+    ));
 
     PartialVisibilityOfASquare {
         left_char_shadow,
@@ -293,35 +405,9 @@ fn visibility_of_shadowed_square(
     }
 }
 
+#[deprecated(note = "use AngleInterval::from_square instead")]
 pub fn angle_interval_of_square(relative_square: WorldStep) -> AngleInterval {
-    assert_ne!(relative_square, vec2(0, 0));
-    let rel_square_center = relative_square.to_f32();
-    let rel_square_corners: Vec<WorldMove> = vec![
-        rel_square_center + STEP_UP_RIGHT.to_f32() * 0.5,
-        rel_square_center + STEP_UP_LEFT.to_f32() * 0.5,
-        rel_square_center + STEP_DOWN_LEFT.to_f32() * 0.5,
-        rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
-    ];
-
-    let center_angle = rel_square_center.angle_from_x_axis();
-    let corner_angles: Vec<Angle<f32>> = rel_square_corners
-        .iter()
-        .map(|rel_corner_point| rel_corner_point.angle_from_x_axis())
-        .collect();
-
-    let most_clockwise = corner_angles
-        .iter()
-        .min_by_key(|&&c| OrderedFloat(center_angle.angle_to(c).radians))
-        .unwrap();
-    let least_clockwise = corner_angles
-        .iter()
-        .max_by_key(|&&c| OrderedFloat(center_angle.angle_to(c).radians))
-        .unwrap();
-
-    AngleInterval {
-        anticlockwise_end: *least_clockwise,
-        clockwise_end: *most_clockwise,
-    }
+    AngleInterval::from_square(relative_square)
 }
 
 #[cfg(test)]
@@ -436,20 +522,20 @@ mod tests {
     #[test]
     fn test_partial_visibility_to_glyphs() {
         let partial_visibility = PartialVisibilityOfASquare {
-            left_char_shadow: HalfPlane::new(
+            left_char_shadow: Some(HalfPlane::new(
                 Line {
                     p1: point2(-0.5, -0.5),
                     p2: point2(1.5, 0.5),
                 },
                 point2(2.0, 0.0),
-            ),
-            right_char_shadow: HalfPlane::new(
+            )),
+            right_char_shadow: Some(HalfPlane::new(
                 Line {
                     p1: point2(-1.5, -0.5),
                     p2: point2(0.5, 0.5),
                 },
                 point2(2.0, 0.0),
-            ),
+            )),
         };
 
         let string = partial_visibility.to_glyphs().to_clean_string();
@@ -459,30 +545,52 @@ mod tests {
     #[test]
     fn test_partial_visibility_to_glyphs__data_from_failure() {
         let partial_visibility = PartialVisibilityOfASquare {
-            right_char_shadow: HalfPlane {
+            right_char_shadow: Some(HalfPlane {
                 dividing_line: Line {
                     p1: point2(-2.5, -1.0),
                     p2: point2(-1.0857865, -0.29289323),
                 },
                 point_on_half_plane: point2(-1.0610383, -0.30548787),
-            },
-            left_char_shadow: HalfPlane {
+            }),
+            left_char_shadow: Some(HalfPlane {
                 dividing_line: Line {
                     p1: point2(-1.5, -1.0),
                     p2: point2(-0.08578646, -0.29289323),
                 },
                 point_on_half_plane: point2(-0.061038256, -0.30548787),
-            },
+            }),
         };
         assert!(is_clockwise(
-            partial_visibility.left_char_shadow.dividing_line.p1,
-            partial_visibility.left_char_shadow.dividing_line.p2,
-            partial_visibility.left_char_shadow.point_on_half_plane,
+            partial_visibility
+                .left_char_shadow
+                .unwrap()
+                .dividing_line
+                .p1,
+            partial_visibility
+                .left_char_shadow
+                .unwrap()
+                .dividing_line
+                .p2,
+            partial_visibility
+                .left_char_shadow
+                .unwrap()
+                .point_on_half_plane,
         ));
         assert!(is_clockwise(
-            partial_visibility.right_char_shadow.dividing_line.p1,
-            partial_visibility.right_char_shadow.dividing_line.p2,
-            partial_visibility.right_char_shadow.point_on_half_plane,
+            partial_visibility
+                .right_char_shadow
+                .unwrap()
+                .dividing_line
+                .p1,
+            partial_visibility
+                .right_char_shadow
+                .unwrap()
+                .dividing_line
+                .p2,
+            partial_visibility
+                .right_char_shadow
+                .unwrap()
+                .point_on_half_plane,
         ));
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
@@ -508,5 +616,26 @@ mod tests {
                 .unwrap(),
             FULL_BLOCK
         );
+    }
+    #[test]
+    fn complementary_partial_squares_combine_to_full_visibility() {
+        let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::new(line, p1);
+        let half_plane_2 = HalfPlane::new(line, p2);
+
+        let partial_1 = PartialVisibilityOfASquare {
+            right_char_shadow: Some(half_plane_1),
+            left_char_shadow: Some(half_plane_1),
+        };
+        let partial_2 = PartialVisibilityOfASquare {
+            right_char_shadow: Some(half_plane_2),
+            left_char_shadow: Some(half_plane_2),
+        };
+
+        let combined_partial = partial_1.combine(&partial_2);
+        assert!(combined_partial.is_fully_visible());
     }
 }

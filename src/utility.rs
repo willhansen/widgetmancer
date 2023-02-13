@@ -7,10 +7,13 @@ use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg};
 
+use approx::AbsDiffEq;
 use derive_getters::Getters;
+use euclid::approxeq::ApproxEq;
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
+use ntest::about_eq;
 use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
@@ -99,6 +102,24 @@ impl<U> Line<f32, U> {
 
         point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
     }
+
+    pub fn approx_eq_eps(&self, other: Self, tolerance: f32) -> bool {
+        let p11 = self
+            .p1
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+        let p22 = self
+            .p2
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p12 = self
+            .p1
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p21 = self
+            .p2
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+
+        // don't care about point order
+        (p11 && p22) || (p12 && p21)
+    }
 }
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
@@ -130,6 +151,20 @@ impl<U: Copy> HalfPlane<f32, U> {
             dividing_line: line,
             point_on_half_plane: point,
         }
+    }
+
+    pub fn complement(&self) -> Self {
+        todo!()
+    }
+
+    pub fn is_about_complement_to(&self, other: Self, tolerance: f32) -> bool {
+        self.dividing_line
+            .approx_eq_eps(other.dividing_line, tolerance)
+            && !same_side_of_line(
+                self.dividing_line,
+                self.point_on_half_plane,
+                other.point_on_half_plane,
+            )
     }
 }
 
@@ -258,9 +293,11 @@ pub fn is_diagonal_king_step(step: WorldStep) -> bool {
 pub fn is_orthogonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
     v.x == T::zero() || v.y == T::zero()
 }
+
 pub fn is_diagonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
     v.x == v.y || v.x == v.y.neg()
 }
+
 pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
@@ -293,6 +330,10 @@ pub fn random_angle() -> Angle<f32> {
 
 pub fn random_direction() -> FVector {
     let angle = random_angle();
+    direction_from_angle(angle)
+}
+
+pub fn direction_from_angle(angle: Angle<f32>) -> FVector {
     vec2(angle.radians.cos(), angle.radians.sin())
 }
 
@@ -623,6 +664,7 @@ pub struct SquareWithDir {
     square: WorldSquare,
     direction: WorldStep,
 }
+
 impl SquareWithDir {
     pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
         assert!(KING_STEPS.contains(&direction));
@@ -808,11 +850,30 @@ mod tests {
             vec![STEP_DOWN, STEP_LEFT].into_iter().collect()
         );
     }
+
     #[test]
     fn test_rotate_zero_vector() {
         assert_eq!(
             rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
             vec2(0.0, 0.0)
         );
+    }
+    #[test]
+    fn test_half_plane_complementary_check() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::new(line, p1);
+        let half_plane_2 = HalfPlane::new(line, p2);
+        let half_plane_3 = HalfPlane::new(line2, p2);
+
+        assert!(half_plane_1.is_about_complement_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.is_about_complement_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complement_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complement_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.is_about_complement_to(half_plane_3, 1e-6));
     }
 }
