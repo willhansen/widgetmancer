@@ -81,6 +81,16 @@ impl<U> Line<f32, U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         in_line(self.p1, self.p2, point)
     }
+    pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
+        self.normal_distance_to_point(point) < tolerance
+    }
+    pub fn normal_distance_to_point(&self, point: Point2D<f32, U>) -> f32 {
+        let p1_to_point = point - self.p1;
+        let p1_to_p2 = self.p2 - self.p1;
+        let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
+        let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
+        perpendicular_part_of_p1_to_point.length()
+    }
     pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
@@ -120,6 +130,11 @@ impl<U> Line<f32, U> {
         // don't care about point order
         (p11 && p22) || (p12 && p21)
     }
+
+    pub fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
+        self.point_is_approx_on_line(other.p1, tolerance)
+            && self.point_is_approx_on_line(other.p2, tolerance)
+    }
 }
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
@@ -157,9 +172,9 @@ impl<U: Copy> HalfPlane<f32, U> {
         todo!()
     }
 
-    pub fn is_about_complement_to(&self, other: Self, tolerance: f32) -> bool {
+    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line
-            .approx_eq_eps(other.dividing_line, tolerance)
+            .approx_on_same_line(other.dividing_line, tolerance)
             && !same_side_of_line(
                 self.dividing_line,
                 self.point_on_half_plane,
@@ -859,7 +874,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_half_plane_complementary_check() {
+    fn test_half_plane_complementary_check__different_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let line2: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
@@ -870,10 +885,24 @@ mod tests {
         let half_plane_2 = HalfPlane::new(line, p2);
         let half_plane_3 = HalfPlane::new(line2, p2);
 
-        assert!(half_plane_1.is_about_complement_to(half_plane_2, 1e-6));
-        assert!(half_plane_2.is_about_complement_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complement_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complement_to(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.is_about_complement_to(half_plane_3, 1e-6));
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
+    }
+
+    #[test]
+    fn test_half_plane_complementary_check__equivalent_lines() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(2.0, 2.0), point2(5.0, 5.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::new(line, p1);
+        let half_plane_2 = HalfPlane::new(line2, p2);
+
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
     }
 }

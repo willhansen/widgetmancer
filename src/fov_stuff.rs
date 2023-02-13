@@ -63,7 +63,7 @@ impl PartialVisibilityOfASquare {
                     other_shadow
                 } else if self_shadow
                     .unwrap()
-                    .is_about_complement_to(other_shadow.unwrap(), complement_tolerance)
+                    .is_about_complementary_to(other_shadow.unwrap(), complement_tolerance)
                 {
                     None
                 } else {
@@ -454,6 +454,7 @@ mod tests {
     fn test_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
         let fov_result = field_of_view_from_square(start_square, &SquareSet::default());
+        //dbg!(&fov_result.partially_visible_squares);
         assert!(fov_result.partially_visible_squares.is_empty());
         assert!(fov_result.fully_visible_squares.contains(&start_square));
         let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
