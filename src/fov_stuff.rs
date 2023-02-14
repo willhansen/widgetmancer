@@ -12,25 +12,32 @@ use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    direction_from_angle, is_clockwise, octant_to_outward_and_across_directions,
-    rotate_point_around_point, HalfPlane, Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
-    STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    direction_from_angle, is_clockwise, line_intersections_with_centered_unit_square,
+    line_intersects_with_centered_unit_square, octant_to_outward_and_across_directions,
+    rotate_point_around_point, same_side_of_line, HalfPlane, Line, WorldLine, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct PartialVisibilityOfASquare {
-    pub right_char_shadow: Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>>,
-    pub left_char_shadow: Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>>,
+    pub right_char_shadow: Option<CharacterShadow>,
+    pub left_char_shadow: Option<CharacterShadow>,
 }
+type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
 
 impl PartialVisibilityOfASquare {
-    pub fn get(&self, i: usize) -> &Option<HalfPlane<f32, CharacterGridInLocalCharacterFrame>> {
+    pub fn get(&self, i: usize) -> &Option<CharacterShadow> {
         match i {
             0 => &self.left_char_shadow,
             1 => &self.right_char_shadow,
             _ => panic!("tried getting invalid character of square: {}", i),
         }
     }
+
+    pub fn shadows(&self) -> Vec<Option<CharacterShadow>> {
+        vec![self.left_char_shadow, self.right_char_shadow]
+    }
+
     pub fn to_glyphs(&self) -> DoubleGlyph {
         let left_character_square = world_square_to_left_world_character_square(point2(0, 0));
         let character_squares = vec![
@@ -79,13 +86,29 @@ impl PartialVisibilityOfASquare {
         }
     }
     pub fn is_fully_visible(&self) -> bool {
-        self.left_char_shadow.is_none() && self.right_char_shadow.is_none()
+        self.shadows()
+            .iter()
+            .all(|shadow_optional: &Option<CharacterShadow>| {
+                shadow_optional.is_none()
+                    || shadow_optional.is_some_and(|shadow: CharacterShadow| {
+                        !line_intersects_with_centered_unit_square(shadow.dividing_line)
+                            && !shadow.covers_origin()
+                    })
+            })
+    }
+    pub fn is_fully_non_visible(&self) -> bool {
+        self.shadows()
+            .iter()
+            .all(|shadow_optional: &Option<CharacterShadow>| {
+                shadow_optional.is_some_and(|shadow: CharacterShadow| {
+                    !line_intersects_with_centered_unit_square(shadow.dividing_line)
+                        && shadow.covers_origin()
+                })
+            })
     }
 }
 
-const SIGHT_RADIUS: u32 = 16;
-
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct FovResult {
     pub fully_visible_squares: SquareSet,
     pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
@@ -183,6 +206,15 @@ impl FovResult {
             .cloned()
             .collect();
 
+        let squares_somehow_both_fully_and_partially_visible = all_partials
+            .keys()
+            .cloned()
+            .collect::<SquareSet>()
+            .intersection(&all_fully_visible)
+            .cloned()
+            .collect::<SquareSet>();
+        assert!(squares_somehow_both_fully_and_partially_visible.is_empty());
+
         FovResult {
             fully_visible_squares: all_fully_visible,
             partially_visible_squares: all_partials,
@@ -228,10 +260,6 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.outward_steps > SIGHT_RADIUS {
-            return None;
-        }
-
         let relative_square = self.outward_dir * self.outward_steps as i32
             + self.across_dir * self.across_steps as i32;
 
@@ -246,6 +274,7 @@ pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
+    radius: u32,
     octant_number: i32,
     view_arc: AngleInterval,
     start_checking_after_this_square_in_the_fov_sequence: WorldStep,
@@ -255,6 +284,10 @@ pub fn field_of_view_within_arc_in_single_octant(
         octant_number,
         start_checking_after_this_square_in_the_fov_sequence,
     ) {
+        if relative_square.x.abs() > radius as i32 || relative_square.y.abs() > radius as i32 {
+            break;
+        }
+
         let absolute_square = center_square + relative_square;
 
         let view_arc_of_this_square = angle_interval_of_square(relative_square);
@@ -280,6 +313,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
                         center_square,
+                        radius,
                         octant_number,
                         new_sub_arc,
                         relative_square,
@@ -295,6 +329,7 @@ pub fn single_octant_field_of_view(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
+    radius: u32,
     octant_number: i32,
 ) -> FovResult {
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
@@ -306,6 +341,7 @@ pub fn single_octant_field_of_view(
         sight_blockers,
         portal_geometry,
         center_square,
+        radius,
         octant_number,
         full_octant_arc,
         STEP_ZERO,
@@ -314,28 +350,36 @@ pub fn single_octant_field_of_view(
 
 pub fn portal_aware_field_of_view_from_square(
     center_square: WorldSquare,
+    radius: u32,
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
 ) -> FovResult {
     (0..8).fold(
         FovResult::default(),
         |fov_result_accumulator: FovResult, octant_number: i32| {
-            fov_result_accumulator.combine(single_octant_field_of_view(
+            let new_fov_result = single_octant_field_of_view(
                 sight_blockers,
                 portal_geometry,
                 center_square,
+                radius,
                 octant_number,
-            ))
+            );
+            fov_result_accumulator.combine(new_fov_result)
         },
     )
 }
 
-#[deprecated(note = "Use portal_aware_field_of_view_from_square instead")]
 pub fn field_of_view_from_square(
     start_square: WorldSquare,
+    radius: u32,
     sight_blockers: &HashSet<WorldSquare>,
 ) -> FovResult {
-    portal_aware_field_of_view_from_square(start_square, sight_blockers, &PortalGeometry::default())
+    portal_aware_field_of_view_from_square(
+        start_square,
+        radius,
+        sight_blockers,
+        &PortalGeometry::default(),
+    )
 }
 
 fn partial_visibility_of_square_from_one_view_arc(
@@ -420,9 +464,13 @@ mod tests {
 
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{STEP_DOWN, STEP_UP};
+    use crate::utility::{
+        line_intersections_with_centered_unit_square, STEP_DOWN, STEP_LEFT, STEP_UP,
+    };
 
     use super::*;
+
+    const SIGHT_RADIUS: u32 = 16;
 
     #[test]
     fn test_square_view_angle__horizontal() {
@@ -453,12 +501,55 @@ mod tests {
     #[test]
     fn test_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
-        let fov_result = field_of_view_from_square(start_square, &SquareSet::default());
+        let fov_result =
+            field_of_view_from_square(start_square, SIGHT_RADIUS, &SquareSet::default());
         //dbg!(&fov_result.partially_visible_squares);
         assert!(fov_result.partially_visible_squares.is_empty());
         assert!(fov_result.fully_visible_squares.contains(&start_square));
         let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
         assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
+    }
+    #[test]
+    fn test_small_field_of_view_with_no_obstacles() {
+        let start_square = point2(5, 5);
+        let radius = 2;
+        let fov_result = portal_aware_field_of_view_from_square(
+            start_square,
+            radius,
+            &SquareSet::default(),
+            &PortalGeometry::default(),
+        );
+
+        dbg!(&fov_result.partially_visible_squares.keys());
+        //dbg!(&fov_result.partially_visible_squares.get(&point2(4, 3)));
+
+        assert!(fov_result.partially_visible_squares.is_empty());
+        assert!(fov_result.fully_visible_squares.contains(&start_square));
+        let square_area = (radius * 2 + 1).pow(2);
+        assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
+    }
+    #[test]
+    fn test_partially_visible_square_knows_if_its_fully_visible() {
+        // Data from failure case
+        let partial = PartialVisibilityOfASquare {
+            right_char_shadow: Some(HalfPlane {
+                dividing_line: Line {
+                    p1: point2(1.5, 2.0),
+                    p2: point2(0.08578634, 1.2928933),
+                },
+                point_on_half_plane: point2(0.061038017, 1.3054879),
+            }),
+            left_char_shadow: Some(HalfPlane {
+                dividing_line: Line {
+                    p1: point2(2.5, 2.0),
+                    p2: point2(1.0857863, 1.2928933),
+                },
+                point_on_half_plane: point2(1.061038, 1.3054879),
+            }),
+        };
+        assert!(partial.to_glyphs().looks_solid());
+        assert_eq!(partial.to_glyphs().to_clean_string(), "  ");
+        assert!(partial.is_fully_visible());
     }
 
     #[test]
@@ -466,7 +557,7 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = point2(5, 7);
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, &blocks);
+        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
         assert!(fov_result.fully_visible_squares.contains(&block_square));
         assert!(fov_result
             .fully_visible_squares
@@ -481,7 +572,7 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_DOWN * 2;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, &blocks);
+        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
         assert!(!fov_result.partially_visible_squares.is_empty());
         assert!(fov_result.partially_visible_squares.iter().all(
             |(&square, partial_visibility): (&WorldSquare, &PartialVisibilityOfASquare)| {
@@ -498,7 +589,7 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_RIGHT;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, &blocks);
+        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
         for i in 1..=5 {
             let square = start_square + STEP_UP_RIGHT * i;
             let partial_visibility = fov_result.partially_visible_squares.get(&square).unwrap();
@@ -603,7 +694,11 @@ mod tests {
         let block_square = player_square + STEP_UP_RIGHT * 2;
         let test_square = block_square + STEP_UP;
 
-        let fov_result = field_of_view_from_square(player_square, &SquareSet::from([block_square]));
+        let fov_result = field_of_view_from_square(
+            player_square,
+            SIGHT_RADIUS,
+            &SquareSet::from([block_square]),
+        );
         let visibility_of_test_square = fov_result
             .partially_visible_squares
             .get(&test_square)
@@ -638,5 +733,18 @@ mod tests {
 
         let combined_partial = partial_1.combine(&partial_2);
         assert!(combined_partial.is_fully_visible());
+    }
+    #[test]
+    fn test_fov_square_sequence() {
+        // right, up
+        assert_eq!(
+            OctantFOVSquareSequenceIter::new(0, STEP_ZERO).next(),
+            Some(STEP_RIGHT)
+        );
+        // up, left
+        assert_eq!(
+            OctantFOVSquareSequenceIter::new(2, STEP_UP * 2).next(),
+            Some(STEP_UP * 2 + STEP_LEFT)
+        );
     }
 }

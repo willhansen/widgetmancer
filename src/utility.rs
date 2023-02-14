@@ -181,6 +181,13 @@ impl<U: Copy> HalfPlane<f32, U> {
                 other.point_on_half_plane,
             )
     }
+
+    pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
+        same_side_of_line(self.dividing_line, self.point_on_half_plane, point)
+    }
+    pub fn covers_origin(&self) -> bool {
+        self.point_is_on_half_plane(point2(0.0, 0.0))
+    }
 }
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
@@ -428,6 +435,10 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
 
 pub fn print_glyph_map(glyph_map: &WorldCharacterSquareGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
+}
+
+pub fn line_intersects_with_centered_unit_square<U>(line: Line<f32, U>) -> bool {
+    !line_intersections_with_centered_unit_square(line).is_empty()
 }
 
 pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Vec<Point2D<f32, U>> {
@@ -904,5 +915,10 @@ mod tests {
         let half_plane_2 = HalfPlane::new(line2, p2);
 
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+    }
+    #[test]
+    fn test_check_line_intersection_with_standard_square() {
+        let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
+        assert_false!(line_intersects_with_centered_unit_square(line));
     }
 }

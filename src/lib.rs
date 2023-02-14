@@ -9,6 +9,7 @@
 #![feature(is_some_and)]
 #![feature(let_chains)]
 #![feature(drain_keep_rest)]
+#![feature(inherent_associated_types)]
 
 #[macro_use]
 extern crate approx;

@@ -35,6 +35,7 @@ use crate::{
 };
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
+const PLAYER_SIGHT_RADIUS: u32 = 16;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct DeathCube {
@@ -1523,7 +1524,7 @@ impl Game {
     }
     fn fov_mask_for_player(&self) -> FovResult {
         let start_square = self.player_square();
-        field_of_view_from_square(start_square, &self.blocks)
+        field_of_view_from_square(start_square, PLAYER_SIGHT_RADIUS, &self.blocks)
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
