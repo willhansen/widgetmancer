@@ -10,6 +10,7 @@
 #![feature(let_chains)]
 #![feature(drain_keep_rest)]
 #![feature(inherent_associated_types)]
+#![feature(iter_next_chunk)]
 
 #[macro_use]
 extern crate approx;

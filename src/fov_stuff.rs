@@ -5,17 +5,19 @@ use itertools::all;
 use ordered_float::OrderedFloat;
 
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
-use crate::glyph::glyph_constants::{BLACK, CYAN, DARK_CYAN, OUT_OF_SIGHT_COLOR, RED, SPACE};
-use crate::glyph::{DoubleGlyph, Glyph};
+use crate::glyph::glyph_constants::{
+    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, OUT_OF_SIGHT_COLOR, RED, SPACE,
+};
+use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    direction_from_angle, is_clockwise, line_intersections_with_centered_unit_square,
+    direction_from_angle, intersection, is_clockwise, line_intersections_with_centered_unit_square,
     line_intersects_with_centered_unit_square, octant_to_outward_and_across_directions,
-    rotate_point_around_point, same_side_of_line, HalfPlane, Line, WorldLine, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    rotate_point_around_point, same_side_of_line, set_of_keys, union, HalfPlane, Line, WorldLine,
+    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -23,6 +25,7 @@ pub struct PartialVisibilityOfASquare {
     pub right_char_shadow: Option<CharacterShadow>,
     pub left_char_shadow: Option<CharacterShadow>,
 }
+
 type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
 
 impl PartialVisibilityOfASquare {
@@ -31,6 +34,13 @@ impl PartialVisibilityOfASquare {
             0 => &self.left_char_shadow,
             1 => &self.right_char_shadow,
             _ => panic!("tried getting invalid character of square: {}", i),
+        }
+    }
+
+    pub fn fully_visible() -> Self {
+        PartialVisibilityOfASquare {
+            right_char_shadow: None,
+            left_char_shadow: None,
         }
     }
 
@@ -44,12 +54,15 @@ impl PartialVisibilityOfASquare {
             left_character_square,
             left_character_square + STEP_RIGHT.cast_unit(),
         ];
-        (0..2)
-            .map(|i| {
-                let half_plane = self.get(i).unwrap();
-                let character_square = character_squares[i];
-                let angle_char = half_plane_to_angled_block_character(half_plane);
-                Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
+        self.shadows()
+            .iter()
+            .map(|optional_shadow| {
+                if let Some(half_plane) = optional_shadow {
+                    let angle_char = half_plane_to_angled_block_character(*half_plane);
+                    Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
+                } else {
+                    Glyph::transparent_glyph()
+                }
             })
             .collect::<Vec<Glyph>>()
             .try_into()
@@ -86,6 +99,13 @@ impl PartialVisibilityOfASquare {
         }
     }
     pub fn is_fully_visible(&self) -> bool {
+        self.to_glyphs().looks_solid()
+            && self.shadows().iter().all(|optional_shadow| {
+                optional_shadow.is_none()
+                    || optional_shadow.is_some_and(|shadow| !shadow.covers_origin())
+            })
+    }
+    pub fn is_fully_visible__old_version(&self) -> bool {
         self.shadows()
             .iter()
             .all(|shadow_optional: &Option<CharacterShadow>| {
@@ -97,6 +117,13 @@ impl PartialVisibilityOfASquare {
             })
     }
     pub fn is_fully_non_visible(&self) -> bool {
+        self.to_glyphs().looks_solid()
+            && self
+                .shadows()
+                .iter()
+                .all(|optional_shadow| optional_shadow.is_some_and(|shadow| shadow.covers_origin()))
+    }
+    pub fn is_fully_non_visible__old_version(&self) -> bool {
         self.shadows()
             .iter()
             .all(|shadow_optional: &Option<CharacterShadow>| {
@@ -197,22 +224,13 @@ impl FovResult {
         all_partials.extend(other_non_conflicting_partials);
         all_partials.extend(conflicting_partials_that_remain_partials);
 
-        let all_fully_visible: SquareSet = self
-            .fully_visible_squares
-            .union(&other.fully_visible_squares)
-            .cloned()
-            .collect::<SquareSet>()
-            .union(&conflicting_partials_that_combine_to_full_visibility)
-            .cloned()
-            .collect();
+        let all_fully_visible: SquareSet = union(
+            &union(&self.fully_visible_squares, &other.fully_visible_squares),
+            &conflicting_partials_that_combine_to_full_visibility,
+        );
 
-        let squares_somehow_both_fully_and_partially_visible = all_partials
-            .keys()
-            .cloned()
-            .collect::<SquareSet>()
-            .intersection(&all_fully_visible)
-            .cloned()
-            .collect::<SquareSet>();
+        let squares_somehow_both_fully_and_partially_visible =
+            intersection(&set_of_keys(&all_partials), &all_fully_visible);
         assert!(squares_somehow_both_fully_and_partially_visible.is_empty());
 
         FovResult {
@@ -290,15 +308,36 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         let absolute_square = center_square + relative_square;
 
-        let view_arc_of_this_square = angle_interval_of_square(relative_square);
+        let view_arc_of_this_square = AngleInterval::from_square(relative_square);
 
+        if relative_square == vec2(0, 1) {
+            dbg!(
+                &absolute_square,
+                view_arc.to_degrees(),
+                view_arc_of_this_square.to_degrees()
+            );
+        }
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
-        } else if view_arc.partially_overlaps(view_arc_of_this_square) {
-            fov_result.partially_visible_squares.insert(
-                absolute_square,
-                partial_visibility_of_square_from_one_view_arc(view_arc, relative_square),
-            );
+        } else if view_arc.partially_overlaps(view_arc_of_this_square)
+            || view_arc_of_this_square.fully_contains_interval(view_arc)
+        {
+            if relative_square == vec2(0, 1) {
+                dbg!("partial_coverage");
+            }
+            let partial_visibility_for_square =
+                partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
+            let is_actually_fully_visible = partial_visibility_for_square.is_fully_visible();
+            let is_actually_not_visible = partial_visibility_for_square.is_fully_non_visible();
+            if is_actually_fully_visible {
+                fov_result.fully_visible_squares.insert(absolute_square);
+            } else if is_actually_not_visible {
+                // do nothing
+            } else {
+                fov_result
+                    .partially_visible_squares
+                    .insert(absolute_square, partial_visibility_for_square);
+            }
         }
 
         let is_sight_blocker = sight_blockers.contains(&absolute_square);
@@ -321,6 +360,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                 });
         }
         // TODO: portals
+    }
+    if octant_number == 1 {
+        dbg!(&fov_result.partially_visible_squares.keys());
     }
     fov_result
 }
@@ -387,7 +429,10 @@ fn partial_visibility_of_square_from_one_view_arc(
     square_relative_to_center: WorldStep,
 ) -> PartialVisibilityOfASquare {
     let square_arc = AngleInterval::from_square(square_relative_to_center);
-    assert!(visibility_arc.partially_overlaps(square_arc));
+    assert!(
+        visibility_arc.partially_overlaps(square_arc)
+            || square_arc.fully_contains_interval(visibility_arc)
+    );
 
     let shadow_arc = visibility_arc.complement();
     let mut shadow_set_with_one_shadow = AngleIntervalSet::new();
@@ -403,9 +448,8 @@ fn visibility_of_shadowed_square(
     shadows: &AngleIntervalSet,
     square_relative_to_shadow_center: WorldStep,
 ) -> PartialVisibilityOfASquare {
-    let overlapped_shadow_edge = shadows
-        .most_overlapped_edge_of_set(angle_interval_of_square(square_relative_to_shadow_center))
-        .unwrap();
+    let square_arc = AngleInterval::from_square(square_relative_to_shadow_center);
+    let overlapped_shadow_edge = shadows.most_overlapped_edge_of_set(square_arc).unwrap();
 
     let shadow_line_from_center = Line {
         p1: point2(0.0, 0.0),
@@ -465,7 +509,8 @@ mod tests {
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        line_intersections_with_centered_unit_square, STEP_DOWN, STEP_LEFT, STEP_UP,
+        angle_from_better_x_axis, line_intersections_with_centered_unit_square, STEP_DOWN,
+        STEP_LEFT, STEP_UP,
     };
 
     use super::*;
@@ -475,8 +520,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__horizontal() {
         let view_angle = angle_interval_of_square(vec2(3, 0));
-        let correct_start_angle = WorldMove::new(2.5, 0.5).angle_from_x_axis();
-        let correct_end_angle = WorldMove::new(2.5, -0.5).angle_from_x_axis();
+        let correct_start_angle = angle_from_better_x_axis(WorldMove::new(2.5, 0.5));
+        let correct_end_angle = angle_from_better_x_axis(WorldMove::new(2.5, -0.5));
 
         assert_about_eq!(
             view_angle.anticlockwise_end.radians,
@@ -488,8 +533,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__diagonalish() {
         let view_angle = angle_interval_of_square(vec2(5, 3));
-        let correct_start_angle = WorldMove::new(4.5, 3.5).angle_from_x_axis();
-        let correct_end_angle = WorldMove::new(5.5, 2.5).angle_from_x_axis();
+        let correct_start_angle = angle_from_better_x_axis(WorldMove::new(4.5, 3.5));
+        let correct_end_angle = angle_from_better_x_axis(WorldMove::new(5.5, 2.5));
 
         assert_about_eq!(
             view_angle.anticlockwise_end.radians,
@@ -509,6 +554,7 @@ mod tests {
         let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
         assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
     }
+
     #[test]
     fn test_small_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
@@ -520,7 +566,10 @@ mod tests {
             &PortalGeometry::default(),
         );
 
-        dbg!(&fov_result.partially_visible_squares.keys());
+        dbg!(
+            &fov_result.fully_visible_squares.get(&point2(5, 4)),
+            &fov_result.fully_visible_squares.get(&point2(5, 6)),
+        );
         //dbg!(&fov_result.partially_visible_squares.get(&point2(4, 3)));
 
         assert!(fov_result.partially_visible_squares.is_empty());
@@ -528,6 +577,7 @@ mod tests {
         let square_area = (radius * 2 + 1).pow(2);
         assert_eq!(fov_result.fully_visible_squares.len(), square_area as usize);
     }
+
     #[test]
     fn test_partially_visible_square_knows_if_its_fully_visible() {
         // Data from failure case
@@ -713,6 +763,7 @@ mod tests {
             FULL_BLOCK
         );
     }
+
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
         let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
@@ -734,6 +785,7 @@ mod tests {
         let combined_partial = partial_1.combine(&partial_2);
         assert!(combined_partial.is_fully_visible());
     }
+
     #[test]
     fn test_fov_square_sequence() {
         // right, up
@@ -746,5 +798,18 @@ mod tests {
             OctantFOVSquareSequenceIter::new(2, STEP_UP * 2).next(),
             Some(STEP_UP * 2 + STEP_LEFT)
         );
+    }
+    #[test]
+    fn test_fov_square_sequence__detailed() {
+        let mut sequence = OctantFOVSquareSequenceIter::new(1, STEP_ZERO);
+        let correct_sequence = [
+            vec2(0, 1),
+            vec2(1, 1),
+            vec2(0, 2),
+            vec2(1, 2),
+            vec2(2, 2),
+            vec2(0, 3),
+        ];
+        assert_eq!(sequence.next_chunk::<6>().unwrap(), correct_sequence);
     }
 }

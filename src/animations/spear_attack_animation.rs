@@ -5,7 +5,7 @@ use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
     WorldStep,
 };
-use crate::utility::{is_orthodiagonal, rotate_vect, KING_STEPS};
+use crate::utility::{angle_from_better_x_axis, is_orthodiagonal, rotate_vect, KING_STEPS};
 use euclid::{point2, vec2, Angle};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
@@ -67,7 +67,7 @@ impl Animation for SpearAttackAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
-        let angle = self.direction.to_f32().angle_from_x_axis();
+        let angle = angle_from_better_x_axis(self.direction.to_f32());
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
             let relative_position = WorldMove::from_angle_and_length(
@@ -80,7 +80,7 @@ impl Animation for SpearAttackAnimation {
         let rel_spear_tip = WorldMove::from_angle_and_length(angle, spear_length);
         let mut spearhead_points: PointList = SpearAttackAnimation::points_in_an_arrow()
             .into_iter()
-            .map(|p: WorldMove| rotate_vect(p, rel_spear_tip.angle_from_x_axis()))
+            .map(|p: WorldMove| rotate_vect(p, angle_from_better_x_axis(rel_spear_tip)))
             .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
             .collect();
         points_to_draw.append(&mut spearhead_points);
