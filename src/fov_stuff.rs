@@ -171,6 +171,10 @@ impl FovResult {
             .copied()
             .collect();
 
+        dbg!("asdfasdf D");
+        let target = WorldSquare::new(5, 6);
+        dbg!(squares_with_non_conflicting_partials.contains(&target),);
+
         let self_non_conflicting_partials: PartialVisibilityMap = self
             .partially_visible_squares
             .clone()
@@ -220,6 +224,16 @@ impl FovResult {
             .filter(|(square, partial)| !partial.is_fully_visible())
             .collect();
 
+        //asdfasdf
+        let target = WorldSquare::new(5, 6);
+        dbg!(
+            self_non_conflicting_partials.contains_key(&target),
+            other_non_conflicting_partials.contains_key(&target),
+            conflicting_partials_that_remain_partials.contains_key(&target),
+            self.fully_visible_squares.contains(&target),
+            other.fully_visible_squares.contains(&target)
+        );
+
         let mut all_partials: PartialVisibilityMap = self_non_conflicting_partials;
         all_partials.extend(other_non_conflicting_partials);
         all_partials.extend(conflicting_partials_that_remain_partials);
@@ -231,6 +245,7 @@ impl FovResult {
 
         let squares_somehow_both_fully_and_partially_visible =
             intersection(&set_of_keys(&all_partials), &all_fully_visible);
+        dbg!(&squares_somehow_both_fully_and_partially_visible);
         assert!(squares_somehow_both_fully_and_partially_visible.is_empty());
 
         FovResult {
@@ -317,10 +332,10 @@ pub fn field_of_view_within_arc_in_single_octant(
                 view_arc_of_this_square.to_degrees()
             );
         }
-        dbg!("asdfasdf");
+        dbg!("asdfasdf  A");
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
-        } else if view_arc.partially_overlaps(view_arc_of_this_square)
+        } else if view_arc.partially_overlaps_other_while_including_edges(view_arc_of_this_square)
             || view_arc_of_this_square.fully_contains_interval(view_arc)
         {
             if relative_square == vec2(0, 1) {
@@ -435,10 +450,7 @@ fn partial_visibility_of_square_from_one_view_arc(
     square_relative_to_center: WorldStep,
 ) -> PartialVisibilityOfASquare {
     let square_arc = AngleInterval::from_square(square_relative_to_center);
-    assert!(
-        visibility_arc.partially_overlaps(square_arc)
-            || square_arc.fully_contains_interval(visibility_arc)
-    );
+    assert!(visibility_arc.touches_or_overlaps(square_arc));
 
     let shadow_arc = visibility_arc.complement();
     let mut shadows = AngleIntervalSet::new();
@@ -518,10 +530,13 @@ mod tests {
         let correct_end_angle = angle_from_better_x_axis(WorldMove::new(2.5, -0.5));
 
         assert_about_eq!(
-            view_angle.anticlockwise_end.radians,
+            view_angle.anticlockwise_end().radians,
             correct_start_angle.radians
         );
-        assert_about_eq!(view_angle.clockwise_end.radians, correct_end_angle.radians);
+        assert_about_eq!(
+            view_angle.clockwise_end().radians,
+            correct_end_angle.radians
+        );
     }
 
     #[test]
@@ -531,10 +546,13 @@ mod tests {
         let correct_end_angle = angle_from_better_x_axis(WorldMove::new(5.5, 2.5));
 
         assert_about_eq!(
-            view_angle.anticlockwise_end.radians,
+            view_angle.anticlockwise_end().radians,
             correct_start_angle.radians
         );
-        assert_about_eq!(view_angle.clockwise_end.radians, correct_end_angle.radians);
+        assert_about_eq!(
+            view_angle.clockwise_end().radians,
+            correct_end_angle.radians
+        );
     }
 
     #[test]
@@ -646,10 +664,10 @@ mod tests {
 
     #[test]
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
-        let mut shadows = AngleIntervalSet::new();
-        shadows.add_interval(AngleInterval::from_degrees(0.0, 45.0));
+        let interval = AngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
-        let visibility = visibility_of_shadowed_square(&shadows, square_relative_to_center);
+        let visibility =
+            partial_visibility_of_square_from_one_view_arc(interval, square_relative_to_center);
         let string = visibility.to_glyphs().to_clean_string();
         //dbg!(visibility);
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));

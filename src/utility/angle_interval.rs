@@ -3,6 +3,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
+use derive_getters::Getters;
 use euclid::{default, vec2, Angle};
 use itertools::Itertools;
 use num::traits::FloatConst;
@@ -15,10 +16,10 @@ use crate::utility::{
     angle_from_better_x_axis, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
 pub struct AngleInterval {
-    pub anticlockwise_end: Angle<f32>,
-    pub clockwise_end: Angle<f32>,
+    anticlockwise_end: Angle<f32>,
+    clockwise_end: Angle<f32>,
 }
 
 impl AngleInterval {
@@ -80,12 +81,12 @@ impl AngleInterval {
     fn union(&self, other: AngleInterval) -> Self {
         assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other));
         let result = AngleInterval {
-            anticlockwise_end: if self.contains_or_touches_angle(other.anticlockwise_end) {
+            anticlockwise_end: if self.contains_angle_including_edges(other.anticlockwise_end) {
                 self.anticlockwise_end
             } else {
                 other.anticlockwise_end
             },
-            clockwise_end: if self.contains_or_touches_angle(other.clockwise_end) {
+            clockwise_end: if self.contains_angle_including_edges(other.clockwise_end) {
                 self.clockwise_end
             } else {
                 other.clockwise_end
@@ -111,7 +112,13 @@ impl AngleInterval {
             || (other.contains_angle_not_including_edges(self.clockwise_end)
                 && other.anticlockwise_end != self.clockwise_end)
     }
-    fn num_contained_edges(&self, other: AngleInterval) -> u32 {
+
+    pub fn touches_or_overlaps(&self, other: AngleInterval) -> bool {
+        self.num_contained_or_touching_edges(other) > 0
+            || other.num_contained_or_touching_edges(*self) > 0
+    }
+
+    fn num_contained_or_touching_edges(&self, other: AngleInterval) -> u32 {
         let mut sum = 0;
         if self.contains_angle_including_edges(other.anticlockwise_end) {
             sum += 1;
@@ -121,10 +128,10 @@ impl AngleInterval {
         }
         sum
     }
-    pub fn partially_overlaps(&self, other: AngleInterval) -> bool {
-        let contained_in_self = self.num_contained_edges(other);
-        let contained_in_other = other.num_contained_edges(*self);
-        contained_in_self == contained_in_other && contained_in_self >= 1
+    pub fn partially_overlaps_other_while_including_edges(&self, other: AngleInterval) -> bool {
+        let contained_in_self = self.num_contained_or_touching_edges(other);
+        let contained_in_other = other.num_contained_or_touching_edges(*self);
+        contained_in_self >= 1 && contained_in_other >= 1
     }
     pub fn split_around_arc(&self, other: AngleInterval) -> Vec<AngleInterval> {
         //assert!(self.partially_or_fully_overlaps(other));
@@ -146,7 +153,7 @@ impl AngleInterval {
         split_results
     }
     pub fn edge_of_this_overlapped_by(&self, other: AngleInterval) -> DirectionalAngularEdge {
-        if !self.partially_overlaps(other) {
+        if !self.partially_overlaps_other_while_including_edges(other) {
             panic!("no overlap between {} and {}", self, other);
         }
         let is_clockwise_end = other.contains_angle_including_edges(self.clockwise_end);
@@ -199,10 +206,7 @@ impl AngleInterval {
 
         self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
     }
-    #[deprecated(note = "use contains_angle_including_edges instead")]
-    fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
-        self.contains_angle_including_edges(angle)
-    }
+
     pub fn width(&self) -> Angle<f32> {
         if self.clockwise_end == self.anticlockwise_end {
             return Angle::radians(0.0);
@@ -333,14 +337,11 @@ impl AngleIntervalSet {
         self.intervals
             .iter()
             .filter_map(|&arc_from_set: &AngleInterval| {
-                if arc_from_set.partially_overlaps(interval) {
+                if arc_from_set.partially_overlaps_other_while_including_edges(interval) {
                     Some(arc_from_set.edge_of_this_overlapped_by(interval))
                 } else if interval.fully_contains_interval(arc_from_set) {
                     Some(arc_from_set.edge_of_this_deeper_in(interval))
                 } else {
-                    // asdfasdf
-                    dbg!(format!("{}", arc_from_set));
-                    dbg!(format!("{}", interval));
                     None
                 }
             })
@@ -407,8 +408,8 @@ mod tests {
         let arc_a = AngleInterval::from_degrees(0.0, 20.0);
         let arc_b = AngleInterval::from_degrees(-25.0, 5.0);
 
-        assert!(arc_a.partially_overlaps(arc_b));
-        assert!(arc_b.partially_overlaps(arc_a));
+        assert!(arc_a.partially_overlaps_other_while_including_edges(arc_b));
+        assert!(arc_b.partially_overlaps_other_while_including_edges(arc_a));
     }
 
     #[test]
@@ -416,11 +417,11 @@ mod tests {
         let interval_b = AngleInterval::from_degrees(5.0, 15.0);
         let interval_a = AngleInterval::from_degrees(7.0, 10.0);
         assert!(
-            !interval_a.partially_overlaps(interval_b),
+            !interval_a.partially_overlaps_other_while_including_edges(interval_b),
             "should not count full overlaps"
         );
         assert!(
-            !interval_b.partially_overlaps(interval_a),
+            !interval_b.partially_overlaps_other_while_including_edges(interval_a),
             "should not count full overlaps"
         );
     }
@@ -428,15 +429,15 @@ mod tests {
     fn test_partial_overlap_on_both_ends() {
         let wrapping_angle = AngleInterval::from_degrees(45.0, 0.0);
         let zero_center_angle = AngleInterval::from_degrees(-45.0, 45.0);
-        assert!(wrapping_angle.partially_overlaps(zero_center_angle));
+        assert!(wrapping_angle.partially_overlaps_other_while_including_edges(zero_center_angle));
     }
     #[test]
     fn num_contained_edges_is_symmetric__weird_wrapping_case() {
         let arc_a = AngleInterval::from_degrees(45.0, 0.0);
         let arc_b = AngleInterval::from_degrees(-45.0, 45.0);
         assert_eq!(
-            arc_a.num_contained_edges(arc_b),
-            arc_b.num_contained_edges(arc_a)
+            arc_a.num_contained_or_touching_edges(arc_b),
+            arc_b.num_contained_or_touching_edges(arc_a)
         );
     }
     #[test]
@@ -444,8 +445,8 @@ mod tests {
         let arc_a = AngleInterval::from_degrees(0.0, 20.0);
         let arc_b = AngleInterval::from_degrees(10.0, 30.0);
         assert_eq!(
-            arc_a.num_contained_edges(arc_b),
-            arc_b.num_contained_edges(arc_a)
+            arc_a.num_contained_or_touching_edges(arc_b),
+            arc_b.num_contained_or_touching_edges(arc_a)
         );
     }
 
@@ -775,5 +776,28 @@ mod tests {
                 AngleInterval::from_degrees(20.0, 30.0),
             ]
         );
+    }
+
+    #[test]
+    fn test_partial_overlap_includes_almost_peaking_out() {
+        assert!(AngleInterval::from_degrees(10.0, 20.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                10.0, 15.0
+            )));
+        assert!(AngleInterval::from_degrees(10.0, 20.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                15.0, 20.0
+            )));
+        assert!(AngleInterval::from_degrees(10.0, 20.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                10.0, 20.0
+            )));
+    }
+    #[test]
+    fn test_partial_overlap_includes_almost_peaking_out__wraparound_case() {
+        assert!(AngleInterval::from_degrees(315.0, 270.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                225.0, 315.0
+            )));
     }
 }
