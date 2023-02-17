@@ -119,7 +119,7 @@ impl AngleInterval {
     pub fn partially_overlaps(&self, other: AngleInterval) -> bool {
         let contained_in_self = self.num_contained_edges(other);
         let contained_in_other = other.num_contained_edges(*self);
-        contained_in_self == contained_in_other && contained_in_self > 1
+        contained_in_self == contained_in_other && contained_in_self >= 1
     }
     pub fn split_around_arc(&self, other: AngleInterval) -> Vec<AngleInterval> {
         assert!(self.partially_or_fully_overlaps(other));
@@ -138,22 +138,19 @@ impl AngleInterval {
         }
         split_results
     }
-    pub fn edge_of_this_overlapped_by(
-        &self,
-        other: AngleInterval,
-    ) -> Option<DirectionalAngularEdge> {
+    pub fn edge_of_this_overlapped_by(&self, other: AngleInterval) -> DirectionalAngularEdge {
         if !self.partially_overlaps(other) {
-            return None;
+            panic!("no overlap between {} and {}", self, other);
         }
         let is_clockwise_end = other.contains_angle(self.clockwise_end);
-        Some(DirectionalAngularEdge {
+        DirectionalAngularEdge {
             angle: if is_clockwise_end {
                 self.clockwise_end
             } else {
                 self.anticlockwise_end
             },
             is_clockwise_edge: is_clockwise_end,
-        })
+        }
     }
     pub fn edge_of_this_deeper_in(&self, other: AngleInterval) -> DirectionalAngularEdge {
         assert!(other.fully_contains_interval(*self));
@@ -324,7 +321,7 @@ impl AngleIntervalSet {
             .iter()
             .filter_map(|&arc_from_set: &AngleInterval| {
                 if arc_from_set.partially_overlaps(interval) {
-                    arc_from_set.edge_of_this_overlapped_by(interval)
+                    Some(arc_from_set.edge_of_this_overlapped_by(interval))
                 } else if interval.fully_contains_interval(arc_from_set) {
                     Some(arc_from_set.edge_of_this_deeper_in(interval))
                 } else {
@@ -391,6 +388,14 @@ mod tests {
             interval_b.partially_or_fully_overlaps(interval_a),
             "commutative"
         );
+    }
+    #[test]
+    fn test_partial_overlap() {
+        let arc_a = AngleInterval::from_degrees(0.0, 20.0);
+        let arc_b = AngleInterval::from_degrees(-25.0, 5.0);
+
+        assert!(arc_a.partially_overlaps(arc_b));
+        assert!(arc_b.partially_overlaps(arc_a));
     }
 
     #[test]

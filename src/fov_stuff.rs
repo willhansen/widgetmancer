@@ -424,6 +424,10 @@ pub fn field_of_view_from_square(
     )
 }
 
+fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
+    direction_from_angle(view_arc.center_angle()).cast_unit()
+}
+
 fn partial_visibility_of_square_from_one_view_arc(
     visibility_arc: AngleInterval,
     square_relative_to_center: WorldStep,
@@ -438,10 +442,6 @@ fn partial_visibility_of_square_from_one_view_arc(
     let mut shadow_set_with_one_shadow = AngleIntervalSet::new();
     shadow_set_with_one_shadow.add_interval(shadow_arc);
     visibility_of_shadowed_square(&shadow_set_with_one_shadow, square_relative_to_center)
-}
-
-fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
-    direction_from_angle(view_arc.center_angle()).cast_unit()
 }
 
 fn visibility_of_shadowed_square(
