@@ -317,6 +317,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 view_arc_of_this_square.to_degrees()
             );
         }
+        dbg!("asdfasdf");
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
         } else if view_arc.partially_overlaps(view_arc_of_this_square)
@@ -347,6 +348,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 view_arc.split_around_arc(view_arc_of_this_square);
             view_arcs_around_blocker
                 .into_iter()
+                .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
                     fov_result = fov_result.combine(field_of_view_within_arc_in_single_octant(
                         sight_blockers,
@@ -439,16 +441,8 @@ fn partial_visibility_of_square_from_one_view_arc(
     );
 
     let shadow_arc = visibility_arc.complement();
-    let mut shadow_set_with_one_shadow = AngleIntervalSet::new();
-    shadow_set_with_one_shadow.add_interval(shadow_arc);
-    visibility_of_shadowed_square(&shadow_set_with_one_shadow, square_relative_to_center)
-}
-
-fn visibility_of_shadowed_square(
-    shadows: &AngleIntervalSet,
-    square_relative_to_shadow_center: WorldStep,
-) -> PartialVisibilityOfASquare {
-    let square_arc = AngleInterval::from_square(square_relative_to_shadow_center);
+    let mut shadows = AngleIntervalSet::new();
+    shadows.add_interval(shadow_arc);
     let overlapped_shadow_edge = shadows.most_overlapped_edge_of_set(square_arc).unwrap();
 
     let shadow_line_from_center = Line {
@@ -475,7 +469,7 @@ fn visibility_of_shadowed_square(
     // do a few forbidden conversions here.
     // TODO: FIX
     let left_character_square = world_square_to_left_world_character_square(
-        square_relative_to_shadow_center.to_point().cast_unit(),
+        square_relative_to_center.to_point().cast_unit(),
     );
     let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
     let left_char_shadow = Some(world_half_plane_to_local_character_half_plane(

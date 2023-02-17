@@ -78,7 +78,7 @@ impl AngleInterval {
         }
     }
     fn union(&self, other: AngleInterval) -> Self {
-        assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches(other));
+        assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other));
         let result = AngleInterval {
             anticlockwise_end: if self.contains_or_touches_angle(other.anticlockwise_end) {
                 self.anticlockwise_end
@@ -99,19 +99,24 @@ impl AngleInterval {
     }
 
     fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
-        self.contains_angle(other.anticlockwise_end)
-            || (self.contains_angle(other.clockwise_end)
+        // self overlap
+        if other == *self {
+            return true;
+        }
+
+        self.contains_angle_not_including_edges(other.anticlockwise_end)
+            || (self.contains_angle_not_including_edges(other.clockwise_end)
                 && self.anticlockwise_end != other.clockwise_end)
-            || other.contains_angle(self.anticlockwise_end)
-            || (other.contains_angle(self.clockwise_end)
+            || other.contains_angle_not_including_edges(self.anticlockwise_end)
+            || (other.contains_angle_not_including_edges(self.clockwise_end)
                 && other.anticlockwise_end != self.clockwise_end)
     }
     fn num_contained_edges(&self, other: AngleInterval) -> u32 {
         let mut sum = 0;
-        if self.contains_angle(other.anticlockwise_end) {
+        if self.contains_angle_including_edges(other.anticlockwise_end) {
             sum += 1;
         }
-        if self.contains_angle(other.clockwise_end) {
+        if self.contains_angle_including_edges(other.clockwise_end) {
             sum += 1;
         }
         sum
@@ -122,19 +127,21 @@ impl AngleInterval {
         contained_in_self == contained_in_other && contained_in_self >= 1
     }
     pub fn split_around_arc(&self, other: AngleInterval) -> Vec<AngleInterval> {
-        assert!(self.partially_or_fully_overlaps(other));
+        //assert!(self.partially_or_fully_overlaps(other));
 
         let mut split_results = vec![];
-        if self.contains_angle(other.anticlockwise_end)
+        if self.contains_angle_including_edges(other.clockwise_end)
+            && self.clockwise_end != other.clockwise_end
+        {
+            let below_interval = AngleInterval::new(self.clockwise_end, other.clockwise_end);
+            split_results.push(below_interval);
+        }
+        if self.contains_angle_including_edges(other.anticlockwise_end)
             && self.anticlockwise_end != other.anticlockwise_end
         {
             let above_interval =
-                AngleInterval::new(self.anticlockwise_end, other.anticlockwise_end);
+                AngleInterval::new(other.anticlockwise_end, self.anticlockwise_end);
             split_results.push(above_interval);
-        }
-        if self.contains_angle(other.clockwise_end) && self.clockwise_end != other.clockwise_end {
-            let below_interval = AngleInterval::new(other.clockwise_end, self.clockwise_end);
-            split_results.push(below_interval);
         }
         split_results
     }
@@ -142,7 +149,7 @@ impl AngleInterval {
         if !self.partially_overlaps(other) {
             panic!("no overlap between {} and {}", self, other);
         }
-        let is_clockwise_end = other.contains_angle(self.clockwise_end);
+        let is_clockwise_end = other.contains_angle_including_edges(self.clockwise_end);
         DirectionalAngularEdge {
             angle: if is_clockwise_end {
                 self.clockwise_end
@@ -167,34 +174,40 @@ impl AngleInterval {
             is_clockwise_edge: clockwise_edge_is_deeper,
         }
     }
-    fn exactly_touches(&self, other: AngleInterval) -> bool {
+    fn exactly_touches_arc(&self, other: AngleInterval) -> bool {
         self.clockwise_end == other.anticlockwise_end
             || other.clockwise_end == self.anticlockwise_end
     }
     fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
-        self.partially_or_fully_overlaps(other) || self.exactly_touches(other)
+        self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other)
     }
-    fn contains_angle(&self, angle: Angle<f32>) -> bool {
-        // special case for zero length interval
-        // TODO: full circle arc instead?
-        if self.anticlockwise_end == self.clockwise_end {
-            return angle == self.anticlockwise_end;
+    fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
+        self.clockwise_end == angle || angle == self.anticlockwise_end
+    }
+    fn contains_angle_not_including_edges(&self, angle: Angle<f32>) -> bool {
+        if self.exactly_touches_angle(angle) {
+            return false;
         }
 
-        let interval_is_less_than_half_circle =
-            self.anticlockwise_end.angle_to(self.clockwise_end).radians < 0.0;
-        if interval_is_less_than_half_circle {
-            self.anticlockwise_end.angle_to(angle).radians <= 0.0
-                && self.clockwise_end.angle_to(angle).radians > 0.0
-        } else {
-            self.anticlockwise_end.angle_to(angle).radians <= 0.0
-                || self.clockwise_end.angle_to(angle).radians > 0.0
-        }
+        self.center_angle().angle_to(angle).radians.abs() < self.width().radians / 2.0
     }
+    fn contains_angle_including_edges(&self, angle: Angle<f32>) -> bool {
+        // both edges count
+        if self.exactly_touches_angle(angle) {
+            return true;
+        }
+
+        self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
+    }
+    #[deprecated(note = "use contains_angle_including_edges instead")]
     fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
-        self.contains_angle(angle) || self.clockwise_end == angle
+        self.contains_angle_including_edges(angle)
     }
     pub fn width(&self) -> Angle<f32> {
+        if self.clockwise_end == self.anticlockwise_end {
+            return Angle::radians(0.0);
+        }
+
         let short_width = self.anticlockwise_end.angle_to(self.clockwise_end);
         let interval_is_less_than_half_circle = short_width.radians < 0.0;
         let full_width = if interval_is_less_than_half_circle {
@@ -208,18 +221,17 @@ impl AngleInterval {
 
     pub fn center_angle(&self) -> Angle<f32> {
         let mid_angle = Angle::radians(self.clockwise_end.radians + self.width().radians / 2.0);
-        assert!(self.contains_angle(mid_angle));
         mid_angle
     }
 
     pub fn fully_contains_interval(&self, other: AngleInterval) -> bool {
-        let contains_other_edges = self.contains_angle(other.anticlockwise_end)
-            && self.contains_or_touches_angle(other.clockwise_end);
-        let other_firmly_contains_any_of_these_edges = (other
-            .contains_angle(self.anticlockwise_end)
-            && other.anticlockwise_end != self.anticlockwise_end)
-            || other.contains_angle(self.clockwise_end);
-        contains_other_edges && !other_firmly_contains_any_of_these_edges
+        let contains_other_edges = self.contains_angle_not_including_edges(other.anticlockwise_end)
+            && self.contains_angle_not_including_edges(other.clockwise_end);
+        let other_does_not_contain_these_edges = !other
+            .contains_angle_not_including_edges(self.clockwise_end)
+            && !other.contains_angle_not_including_edges(self.anticlockwise_end);
+
+        contains_other_edges && other_does_not_contain_these_edges
     }
 }
 
@@ -239,6 +251,7 @@ impl DirectionalAngularEdge {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
+#[deprecated]
 pub struct AngleIntervalSet {
     intervals: Vec<AngleInterval>,
 }
@@ -413,9 +426,27 @@ mod tests {
     }
     #[test]
     fn test_partial_overlap_on_both_ends() {
-        let wrapping_angle = AngleInterval::from_degrees(10.0, 0.0);
+        let wrapping_angle = AngleInterval::from_degrees(45.0, 0.0);
         let zero_center_angle = AngleInterval::from_degrees(-45.0, 45.0);
         assert!(wrapping_angle.partially_overlaps(zero_center_angle));
+    }
+    #[test]
+    fn num_contained_edges_is_symmetric__weird_wrapping_case() {
+        let arc_a = AngleInterval::from_degrees(45.0, 0.0);
+        let arc_b = AngleInterval::from_degrees(-45.0, 45.0);
+        assert_eq!(
+            arc_a.num_contained_edges(arc_b),
+            arc_b.num_contained_edges(arc_a)
+        );
+    }
+    #[test]
+    fn num_contained_edges_is_symmetric__regular_case() {
+        let arc_a = AngleInterval::from_degrees(0.0, 20.0);
+        let arc_b = AngleInterval::from_degrees(10.0, 30.0);
+        assert_eq!(
+            arc_a.num_contained_edges(arc_b),
+            arc_b.num_contained_edges(arc_a)
+        );
     }
 
     #[test]
@@ -431,32 +462,47 @@ mod tests {
     #[test]
     fn test_interval_contains_angle() {
         assert!(
-            AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(5.0)),
+            AngleInterval::from_degrees(0.0, 10.0)
+                .contains_angle_including_edges(Angle::degrees(5.0)),
             "simple case"
         );
         assert!(
-            !AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(15.0)),
+            !AngleInterval::from_degrees(0.0, 10.0)
+                .contains_angle_including_edges(Angle::degrees(15.0)),
             "simple outside bounds case"
         );
         assert!(
-            AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(10.0)),
+            AngleInterval::from_degrees(0.0, 10.0)
+                .contains_angle_including_edges(Angle::degrees(10.0)),
             "On left bound should be inside"
         );
         assert!(
-            !AngleInterval::from_degrees(0.0, 10.0).contains_angle(Angle::degrees(0.0)),
-            "On right bound should NOT be inside"
+            AngleInterval::from_degrees(0.0, 10.0)
+                .contains_angle_including_edges(Angle::degrees(0.0)),
+            "On right bound should ALSO be inside"
         );
         assert!(
-            !AngleInterval::from_degrees(10.0, 0.0).contains_angle(Angle::degrees(5.0)),
+            !AngleInterval::from_degrees(10.0, 0.0)
+                .contains_angle_including_edges(Angle::degrees(5.0)),
             "outside a large arc"
         );
         assert!(
-            AngleInterval::from_degrees(10.0, 0.0).contains_angle(Angle::degrees(180.0)),
+            AngleInterval::from_degrees(10.0, 0.0)
+                .contains_angle_including_edges(Angle::degrees(180.0)),
             "inside a large arc"
         );
         assert!(
-            !AngleInterval::from_degrees(0.0, 0.0).contains_angle(Angle::degrees(180.0)),
+            !AngleInterval::from_degrees(0.0, 0.0)
+                .contains_angle_including_edges(Angle::degrees(180.0)),
             "directly across from zero width interval"
+        );
+    }
+
+    #[test]
+    fn test_width_of_zero_width_arc() {
+        assert_eq!(
+            AngleInterval::from_degrees(0.0, 0.0).width().to_degrees(),
+            0.0
         );
     }
 
@@ -505,6 +551,7 @@ mod tests {
         assert_false!(angle_interval_set.intervals.is_empty());
     }
 
+    #[ignore = "moving away from angle sets"]
     #[test]
     fn test_angle_interval_set__overlap_and_adding() {
         let mut angle_interval_set = AngleIntervalSet::default();
@@ -570,13 +617,17 @@ mod tests {
         let complementary_but_overlapping_top = AngleInterval::from_degrees(aa, b);
         let complementary_but_overlapping_bottom = AngleInterval::from_degrees(a, ab);
 
-        assert!(base_interval.fully_contains_interval(base_interval));
+        assert!(!base_interval.fully_contains_interval(base_interval)); // controversial
         assert!(!base_interval.fully_contains_interval(touching_below));
         assert!(!base_interval.fully_contains_interval(touching_above));
         assert!(!base_interval.fully_contains_interval(overlapping_below));
         assert!(!base_interval.fully_contains_interval(overlapping_above));
-        assert!(base_interval.fully_contains_interval(inside_touching_start));
-        assert!(base_interval.fully_contains_interval(inside_touching_end));
+        assert!(!base_interval.fully_contains_interval(inside_touching_start));
+        assert!(!base_interval.fully_contains_interval(inside_touching_end));
+        assert_eq!(
+            base_interval.fully_contains_interval(inside_touching_start),
+            base_interval.fully_contains_interval(inside_touching_end)
+        );
         assert!(!base_interval.fully_contains_interval(edges_in_but_wraparound));
         assert!(!base_interval.fully_contains_interval(complementary));
         assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_top));
@@ -713,5 +764,16 @@ mod tests {
         let arc = AngleInterval::from_square(vec2(0, -1));
         assert_about_eq!(arc.clockwise_end.to_degrees(), -135.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), -45.0);
+    }
+    #[test]
+    fn test_split_interval_around_interval() {
+        let new_arcs = assert_eq!(
+            AngleInterval::from_degrees(0.0, 30.0)
+                .split_around_arc(AngleInterval::from_degrees(10.0, 20.0)),
+            vec![
+                AngleInterval::from_degrees(0.0, 10.0),
+                AngleInterval::from_degrees(20.0, 30.0),
+            ]
+        );
     }
 }
