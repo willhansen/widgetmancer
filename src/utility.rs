@@ -743,6 +743,15 @@ pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
     }
 }
 
+pub fn angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
+    Angle::radians(
+        standardize_angle(a)
+            .angle_to(standardize_angle(b))
+            .radians
+            .abs(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

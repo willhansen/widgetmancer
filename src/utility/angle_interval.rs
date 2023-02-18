@@ -13,8 +13,8 @@ use termion::cursor::Left;
 use crate::fov_stuff::PartialVisibilityOfASquare;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_from_better_x_axis, standardize_angle, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
-    STEP_UP_RIGHT,
+    angle_distance, angle_from_better_x_axis, standardize_angle, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
+    STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
@@ -238,35 +238,38 @@ impl AngleInterval {
 
         contains_other_edges && other_does_not_contain_these_edges
     }
-    pub fn most_overlapped_edge_of_self(
-        &self,
-        other: AngleInterval,
-    ) -> Option<DirectionalAngularEdge> {
+    pub fn most_overlapped_edge_of_self(&self, other: AngleInterval) -> DirectionalAngularEdge {
         assert!(self.touches_or_overlaps(other));
 
-        // TODO: don't just get the first one
-        if self.partially_overlaps_other_while_including_edges(other) {
-            Some(self.edge_of_this_overlapped_by(other))
-        } else if other.fully_contains_interval(*self) {
-            Some(self.edge_of_this_deeper_in(other))
-        } else {
-            dbg!(
-                format!("{},{}", self, other),
-                other.clockwise_end.to_degrees() + 360.0,
-                other.anticlockwise_end.to_degrees() + 360.0
-            );
-            panic!("no edge found for {}, {}", self, other);
-        }
+        // Select edge of self closest to the other's center
+        let dist_from_clockwise_edge = angle_distance(self.clockwise_end, other.center_angle());
+        let dist_from_anticlockwise_edge =
+            angle_distance(self.anticlockwise_end, other.center_angle());
+        let clockwise_is_closer = dist_from_clockwise_edge < dist_from_anticlockwise_edge;
+        DirectionalAngularEdge::new(
+            if clockwise_is_closer {
+                self.clockwise_end
+            } else {
+                self.anticlockwise_end
+            },
+            clockwise_is_closer,
+        )
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Getters)]
 pub struct DirectionalAngularEdge {
-    pub angle: Angle<f32>,
-    pub is_clockwise_edge: bool,
+    angle: Angle<f32>,
+    is_clockwise_edge: bool,
 }
 
 impl DirectionalAngularEdge {
+    pub fn new(angle: Angle<f32>, is_clockwise_edge: bool) -> Self {
+        DirectionalAngularEdge {
+            angle: standardize_angle(angle),
+            is_clockwise_edge,
+        }
+    }
     pub fn flipped(&self) -> Self {
         DirectionalAngularEdge {
             angle: self.angle,
@@ -833,5 +836,13 @@ mod tests {
                 280.0 - 360.0,
                 315.0 - 360.0
             )));
+    }
+    #[test]
+    fn test_most_overlapped_edge_of_arc() {
+        assert_eq!(
+            AngleInterval::from_degrees(135.0, 90.0)
+                .most_overlapped_edge_of_self(AngleInterval::from_degrees(45.0, 135.0)),
+            DirectionalAngularEdge::new(Angle::degrees(90.0), false)
+        );
     }
 }

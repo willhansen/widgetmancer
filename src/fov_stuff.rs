@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use euclid::{point2, vec2, Angle};
 use itertools::all;
+use ntest::assert_false;
 use ordered_float::OrderedFloat;
 
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
@@ -69,26 +70,24 @@ impl PartialVisibilityOfASquare {
             .unwrap()
     }
 
-    pub fn combine(&self, other: &Self) -> Self {
+    pub fn combine_while_increasing_visibility(&self, other: &Self) -> Self {
         let complement_tolerance = 1e-6;
         let combined_shadows: Vec<Option<HalfPlane<_, _>>> = (0..2)
             .map(|i| {
                 let self_shadow = *self.get(i);
                 let other_shadow = *other.get(i);
-                if self_shadow.is_none() && other_shadow.is_none() {
-                    None
-                } else if self_shadow.is_some() && other_shadow.is_none() {
-                    self_shadow
-                } else if self_shadow.is_none() && other_shadow.is_some() {
-                    other_shadow
-                } else if self_shadow
-                    .unwrap()
-                    .is_about_complementary_to(other_shadow.unwrap(), complement_tolerance)
-                {
+                if self_shadow.is_none() || other_shadow.is_none() {
                     None
                 } else {
-                    // TODO: better combination method than taking just one
-                    self_shadow
+                    if self_shadow
+                        .unwrap()
+                        .is_about_complementary_to(other_shadow.unwrap(), complement_tolerance)
+                    {
+                        None
+                    } else {
+                        // TODO: better combination method than taking just one
+                        self_shadow
+                    }
                 }
             })
             .collect();
@@ -210,7 +209,9 @@ impl FovResult {
                     .partially_visible_squares
                     .get(&square)
                     .unwrap()
-                    .combine(other.partially_visible_squares.get(&square).unwrap());
+                    .combine_while_increasing_visibility(
+                        other.partially_visible_squares.get(&square).unwrap(),
+                    );
                 (square, combined_partial)
             })
             .collect();
@@ -219,14 +220,33 @@ impl FovResult {
             dbg!(
                 "asdfasdf M",
                 self.partially_visible_squares.get(&point2(5, 6)),
-                other.partially_visible_squares.get(&point2(5, 6)),
+                other.partially_visible_squares.get(&point2(5, 6)), // asdfasdf This one is suspicious...
                 combined_partials.get(&point2(5, 6)),
                 combined_partials
                     .get(&point2(5, 6))
                     .unwrap()
-                    .is_fully_visible()
+                    .is_fully_visible(),
+                self.partially_visible_squares
+                    .get(&point2(5, 6))
+                    .unwrap()
+                    .to_glyphs()
+                    .to_clean_string(),
+                other
+                    .partially_visible_squares
+                    .get(&point2(5, 6))
+                    .unwrap()
+                    .to_glyphs()
+                    .to_clean_string(),
+                combined_partials
+                    .get(&point2(5, 6))
+                    .unwrap()
+                    .to_glyphs()
+                    .to_clean_string(),
             );
-            panic!("debug");
+            assert!(combined_partials
+                .get(&point2(5, 6))
+                .unwrap()
+                .is_fully_visible());
         }
 
         let conflicting_partials_that_combine_to_full_visibility: SquareSet = combined_partials
@@ -359,6 +379,16 @@ pub fn field_of_view_within_arc_in_single_octant(
         {
             let partial_visibility_for_square =
                 partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
+            if relative_square == vec2(0, 1) {
+                dbg!(
+                    "asdfasdf N",
+                    &absolute_square,
+                    view_arc.to_degrees(),
+                    relative_square,
+                    &partial_visibility_for_square.to_glyphs().to_clean_string(),
+                    &partial_visibility_for_square.is_fully_visible()
+                );
+            }
             fov_result
                 .partially_visible_squares
                 .insert(absolute_square, partial_visibility_for_square);
@@ -373,6 +403,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
+                    return; //asdfasdf
                     fov_result = fov_result.combine(field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
@@ -383,6 +414,16 @@ pub fn field_of_view_within_arc_in_single_octant(
                         relative_square,
                     ));
                 });
+        }
+
+        if let Some(partial) = fov_result.partially_visible_squares.get((&point2(5, 6))) {
+            dbg!(
+                "asdfasdf AA",
+                octant_number,
+                &partial,
+                partial.to_glyphs().to_clean_string()
+            );
+            assert_false!(partial.is_fully_visible());
         }
         // TODO: portals
     }
@@ -428,11 +469,16 @@ pub fn portal_aware_field_of_view_from_square(
                 radius,
                 octant_number,
             );
-            dbg!(
-                "asdfasdf F",
-                octant_number,
-                new_fov_result.fully_visible_squares.contains(&point2(5, 6))
-            );
+            if new_fov_result
+                .partially_visible_squares
+                .contains_key((&point2(5, 6)))
+            {
+                dbg!(
+                    "asdfasdf F",
+                    octant_number,
+                    new_fov_result.partially_visible_squares.get(&point2(5, 6))
+                );
+            }
             fov_result_accumulator.combine(new_fov_result)
         },
     )
@@ -464,17 +510,18 @@ fn partial_visibility_of_square_from_one_view_arc(
 
     let shadow_arc = visibility_arc.complement();
     dbg!("asdfasdf J", format!("{}, {}", &shadow_arc, &square_arc));
-    let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc).unwrap();
+    let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
+    dbg!("asdfasdf O", &overlapped_shadow_edge.angle().to_degrees());
 
     let shadow_line_from_center = Line {
         p1: point2(0.0, 0.0),
         p2: point2(
-            overlapped_shadow_edge.angle.radians.cos(),
-            overlapped_shadow_edge.angle.radians.sin(),
+            overlapped_shadow_edge.angle().radians.cos(),
+            overlapped_shadow_edge.angle().radians.sin(),
         ),
     };
     let extra_rotation_for_shadow_point = Angle::degrees(1.0)
-        * if overlapped_shadow_edge.is_clockwise_edge {
+        * if *overlapped_shadow_edge.is_clockwise_edge() {
             1.0
         } else {
             -1.0
@@ -587,10 +634,6 @@ mod tests {
             &PortalGeometry::default(),
         );
 
-        dbg!(
-            &fov_result.fully_visible_squares.get(&point2(5, 4)),
-            &fov_result.fully_visible_squares.get(&point2(5, 6)),
-        );
         //dbg!(&fov_result.partially_visible_squares.get(&point2(4, 3)));
 
         assert!(fov_result.partially_visible_squares.is_empty());
@@ -793,6 +836,7 @@ mod tests {
 
         let half_plane_1 = HalfPlane::new(line, p1);
         let half_plane_2 = HalfPlane::new(line, p2);
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
         let partial_1 = PartialVisibilityOfASquare {
             right_char_shadow: Some(half_plane_1),
@@ -803,7 +847,12 @@ mod tests {
             left_char_shadow: Some(half_plane_2),
         };
 
-        let combined_partial = partial_1.combine(&partial_2);
+        let combined_partial = partial_1.combine_while_increasing_visibility(&partial_2);
+        dbg!(
+            &partial_1.to_glyphs().to_clean_string(),
+            &partial_2.to_glyphs().to_clean_string(),
+            &combined_partial.to_glyphs().to_clean_string()
+        );
         assert!(combined_partial.is_fully_visible());
     }
 
@@ -832,5 +881,16 @@ mod tests {
             vec2(0, 3),
         ];
         assert_eq!(sequence.next_chunk::<6>().unwrap(), correct_sequence);
+    }
+    #[test]
+    fn test_partial_visibility_of_one_square__one_step_up() {
+        let arc = AngleInterval::from_degrees(90.0, 135.0);
+        let square = WorldStep::new(0, 1);
+        let partial = partial_visibility_of_square_from_one_view_arc(arc, square);
+        assert!(!partial.is_fully_visible());
+        assert_eq!(
+            partial.to_glyphs().to_clean_string(),
+            [SPACE, FULL_BLOCK].into_iter().collect::<String>()
+        );
     }
 }
