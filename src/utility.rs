@@ -730,6 +730,19 @@ pub fn angle_from_better_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
     Angle::radians(v.y.atan2(v.x))
 }
 
+pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
+    let mut radians = angle.radians;
+    if radians > -PI && radians <= PI {
+        angle
+    } else {
+        radians = radians.rem_euclid(TAU);
+        if radians > PI {
+            radians -= TAU;
+        }
+        Angle::radians(radians)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -970,6 +983,13 @@ mod tests {
                 - 45.0)
                 .abs()
                 > 0.01
+        );
+    }
+    #[test]
+    fn test_standardize_angle() {
+        assert_about_eq!(
+            standardize_angle(Angle::<f32>::degrees(75.0)).radians,
+            standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
     }
 }

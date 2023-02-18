@@ -13,20 +13,21 @@ use termion::cursor::Left;
 use crate::fov_stuff::PartialVisibilityOfASquare;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_from_better_x_axis, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    angle_from_better_x_axis, standardize_angle, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
+    STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
 pub struct AngleInterval {
-    anticlockwise_end: Angle<f32>,
     clockwise_end: Angle<f32>,
+    anticlockwise_end: Angle<f32>,
 }
 
 impl AngleInterval {
     fn new(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
         AngleInterval {
-            anticlockwise_end,
-            clockwise_end,
+            clockwise_end: standardize_angle(clockwise_end),
+            anticlockwise_end: standardize_angle(anticlockwise_end),
         }
     }
     pub fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
@@ -236,6 +237,26 @@ impl AngleInterval {
             && !other.contains_angle_not_including_edges(self.anticlockwise_end);
 
         contains_other_edges && other_does_not_contain_these_edges
+    }
+    pub fn most_overlapped_edge_of_self(
+        &self,
+        other: AngleInterval,
+    ) -> Option<DirectionalAngularEdge> {
+        assert!(self.touches_or_overlaps(other));
+
+        // TODO: don't just get the first one
+        if self.partially_overlaps_other_while_including_edges(other) {
+            Some(self.edge_of_this_overlapped_by(other))
+        } else if other.fully_contains_interval(*self) {
+            Some(self.edge_of_this_deeper_in(other))
+        } else {
+            dbg!(
+                format!("{},{}", self, other),
+                other.clockwise_end.to_degrees() + 360.0,
+                other.anticlockwise_end.to_degrees() + 360.0
+            );
+            panic!("no edge found for {}, {}", self, other);
+        }
     }
 }
 
@@ -798,6 +819,19 @@ mod tests {
         assert!(AngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
                 225.0, 315.0
+            )));
+    }
+    #[test]
+    fn test_angle_wraparound_invariance() {
+        assert!(AngleInterval::from_degrees(315.0, 270.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                280.0, 315.0
+            )));
+
+        assert!(AngleInterval::from_degrees(315.0, 270.0)
+            .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
+                280.0 - 360.0,
+                315.0 - 360.0
             )));
     }
 }
