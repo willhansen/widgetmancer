@@ -352,12 +352,21 @@ pub fn field_of_view_within_arc_in_single_octant(
         let absolute_square = center_square + relative_square;
 
         let view_arc_of_this_square = AngleInterval::from_square(relative_square);
+        if absolute_square == point2(4, 2) {
+            dbg!("asdfasdf A", &absolute_square, &relative_square);
+        }
 
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
         } else if view_arc.overlaps_or_touches(view_arc_of_this_square) {
             let partial_visibility_for_square =
                 partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
+            if relative_square == vec2(-1, -3) {
+                dbg!(
+                    "asdfasdf B",
+                    partial_visibility_for_square.to_glyphs().to_clean_string()
+                );
+            }
             fov_result
                 .partially_visible_squares
                 .insert(absolute_square, partial_visibility_for_square);
@@ -463,6 +472,14 @@ fn partial_visibility_of_square_from_one_view_arc(
     let square_arc = AngleInterval::from_square(square_relative_to_center);
     assert!(visibility_arc.touches_or_overlaps(square_arc));
 
+    if square_relative_to_center == vec2(-1, -3) {
+        dbg!(
+            "asdfasdf C",
+            visibility_arc.to_degrees(),
+            square_relative_to_center
+        );
+    }
+
     let shadow_arc = visibility_arc.complement();
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
@@ -521,6 +538,10 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
+    use crate::glyph::angled_blocks::{
+        angle_block_chars_are_horizontally_continuous, angled_block_char_to_snap_points_map,
+        SnapGridPoint,
+    };
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
@@ -867,5 +888,56 @@ mod tests {
             .fully_visible_squares
             .contains(&(visible_square + STEP_LEFT)));
         assert!(fov_result.fully_visible_squares.contains(&visible_square));
+    }
+
+    #[test]
+    fn test_no_sharp_corners_in_shadows__mid_square() {
+        let player_square = point2(5, 5);
+        let block_square = player_square + STEP_DOWN_LEFT;
+        let sight_blockers = HashSet::from([block_square]);
+        let fov_result = field_of_view_from_square(player_square, 20, &sight_blockers);
+
+        fov_result
+            .partially_visible_squares
+            .iter()
+            .map(
+                |(square, partial): (&WorldSquare, &PartialVisibilityOfASquare)| {
+                    (square, partial.to_glyphs().to_clean_string())
+                },
+            )
+            .for_each(|(square, char_string): (&WorldSquare, String)| {
+                let chars: Vec<char> = char_string.chars().collect();
+                assert_eq!(chars.len(), 2);
+                assert!(
+                    angle_block_chars_are_horizontally_continuous(chars[0], chars[1]),
+                    "square: {:?}, chars: {}",
+                    square,
+                    char_string
+                );
+            });
+    }
+
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_discontinuities() {
+        let arc = AngleInterval::from_degrees(-108.43459, -90.0);
+        let partial_1 = partial_visibility_of_square_from_one_view_arc(arc, vec2(-1, -3));
+        let chars_1 = partial_1
+            .to_glyphs()
+            .to_clean_string()
+            .chars()
+            .collect::<Vec<char>>();
+        assert!(angle_block_chars_are_horizontally_continuous(
+            chars_1[0], chars_1[1]
+        ));
+
+        let partial_2 = partial_visibility_of_square_from_one_view_arc(arc, vec2(-9, 0));
+        let chars_2 = partial_2
+            .to_glyphs()
+            .to_clean_string()
+            .chars()
+            .collect::<Vec<char>>();
+        assert!(angle_block_chars_are_horizontally_continuous(
+            chars_2[0], chars_2[1]
+        ));
     }
 }

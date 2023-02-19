@@ -9,6 +9,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
@@ -16,9 +17,9 @@ use crate::utility::{
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-struct AngleBlockSnapGridInLocalFrame;
+pub struct AngleBlockSnapGridInLocalFrame;
 
-type SnapGridPoint = Point2D<i32, AngleBlockSnapGridInLocalFrame>;
+pub type SnapGridPoint = Point2D<i32, AngleBlockSnapGridInLocalFrame>;
 
 fn local_snap_grid_to_local_character_frame(grid_point: SnapGridPoint) -> LocalCharacterPoint {
     point2(
@@ -48,11 +49,18 @@ fn valid_snap_points_on_angle_block() -> HashSet<SnapGridPoint> {
     valid_points.into_iter().collect()
 }
 
+pub fn angled_block_char_to_snap_points_map() -> HashMap<char, (SnapGridPoint, SnapGridPoint)> {
+    points_to_angled_block_mapping()
+        .into_iter()
+        .map(|(a, b)| (b, a))
+        .collect()
+}
+
 //                                                           🬼 	🬽 	🬾 	🬿
 //U+1FB4x 	🭀 	🭁 	🭂 	🭃 	🭄 	🭅 	🭆 	🭇 	🭈 	🭉 	🭊 	🭋 	🭌 	🭍 	🭎 	🭏
 //U+1FB5x 	🭐 	🭑 	🭒 	🭓 	🭔 	🭕 	🭖 	🭗 	🭘 	🭙 	🭚 	🭛 	🭜 	🭝 	🭞 	🭟
 //U+1FB6x 	🭠 	🭡 	🭢 	🭣 	🭤 	🭥 	🭦 	🭧
-fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame>) -> char {
+fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), char> {
     // The inside of the angled block is CLOCKWISE from the vector point1_to_point2
     // The coordinates start at the lower-left corner of the character
 
@@ -67,9 +75,6 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
     // 0 -- o──o──o -- 0
     //      |  |  |
     //      0  1  2
-
-    let pointA = line.p1;
-    let pointB = line.p2;
     let mut block_map = HashMap::<(SnapGridPoint, SnapGridPoint), char>::new();
 
     // TODO: find an actual pattern for these
@@ -135,6 +140,14 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
         UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     );
     block_map.insert((point2(0, 3), point2(2, 0)), LOWER_LEFT_HALF_BLOCK_TRIANGLE);
+    block_map
+}
+
+fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame>) -> char {
+    let pointA = line.p1;
+    let pointB = line.p2;
+
+    let block_map = points_to_angled_block_mapping();
 
     if let Some(&character) = block_map.get(&(pointA, pointB)) {
         character
@@ -240,6 +253,42 @@ pub fn half_plane_to_angled_block_character(
             grid_line.reverse();
         }
         get_character_from_snap_points(grid_line)
+    }
+}
+
+pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char: char) -> bool {
+    let angle_block_to_snap_points_map = angled_block_char_to_snap_points_map();
+    let chars = [left_char, right_char];
+    let snap_points_optional = chars.map(|ch| angle_block_to_snap_points_map.get(&ch));
+
+    let left_char_right_snap_point = if let Some(left_snap_line) = snap_points_optional[0] {
+        Some(if left_snap_line.0.x == 2 {
+            left_snap_line.0
+        } else {
+            left_snap_line.1
+        })
+    } else {
+        None
+    };
+    let right_char_left_snap_point = if let Some(right_snap_line) = snap_points_optional[1] {
+        Some(if right_snap_line.0.x == 0 {
+            right_snap_line.0
+        } else {
+            right_snap_line.1
+        })
+    } else {
+        None
+    };
+    if left_char_right_snap_point.is_some() && right_char_left_snap_point.is_some() {
+        left_char_right_snap_point.unwrap().y == right_char_left_snap_point.unwrap().y
+    } else if left_char_right_snap_point.is_some() && right_char_left_snap_point.is_none() {
+        let left_y = left_char_right_snap_point.unwrap().y;
+        left_y == 0 || left_y == 3
+    } else if left_char_right_snap_point.is_none() && right_char_left_snap_point.is_some() {
+        let right_y = right_char_left_snap_point.unwrap().y;
+        right_y == 0 || right_y == 3
+    } else {
+        panic!("actually_fully_visible");
     }
 }
 

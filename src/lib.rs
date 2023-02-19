@@ -114,7 +114,7 @@ pub fn do_everything() {
     //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
     //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
     //game.set_up_vs_arrows();
-    game.set_up_two_pillars();
+    game.set_up_n_pillars(1);
 
     let mut prev_tick_start_time = Instant::now();
     while game.running() {
