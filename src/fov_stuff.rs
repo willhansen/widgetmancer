@@ -384,6 +384,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         relative_square,
                     ));
                 });
+            break;
         }
 
         // TODO: portals
@@ -400,10 +401,8 @@ pub fn single_octant_field_of_view(
 ) -> FovResult {
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
-    let mut fov_result = FovResult::default();
-    fov_result.fully_visible_squares.insert(center_square);
     let full_octant_arc = AngleInterval::from_octant(octant_number);
-    fov_result.combine(field_of_view_within_arc_in_single_octant(
+    let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
         center_square,
@@ -411,7 +410,9 @@ pub fn single_octant_field_of_view(
         octant_number,
         full_octant_arc,
         STEP_ZERO,
-    ))
+    );
+    fov_result.fully_visible_squares.insert(center_square);
+    fov_result
 }
 
 pub fn portal_aware_field_of_view_from_square(
@@ -821,6 +822,7 @@ mod tests {
             Some(STEP_UP * 2 + STEP_LEFT)
         );
     }
+
     #[test]
     fn test_fov_square_sequence__detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new(1, STEP_ZERO);
@@ -834,6 +836,7 @@ mod tests {
         ];
         assert_eq!(sequence.next_chunk::<6>().unwrap(), correct_sequence);
     }
+
     #[test]
     fn test_partial_visibility_of_one_square__one_step_up() {
         let arc = AngleInterval::from_degrees(90.0, 135.0);
