@@ -848,4 +848,23 @@ mod tests {
             [SPACE, FULL_BLOCK].into_iter().collect::<String>()
         );
     }
+
+    #[test]
+    fn test_visibility_near_two_blocks() {
+        let mid_square = point2(5, 5);
+        let sight_blockers =
+            HashSet::from([mid_square + STEP_RIGHT * 4, mid_square + STEP_RIGHT * 5]);
+        let fov_result = single_octant_field_of_view(
+            &sight_blockers,
+            &PortalGeometry::default(),
+            mid_square,
+            10,
+            0,
+        );
+        let visible_square = mid_square + STEP_RIGHT * 5 + STEP_UP * 2;
+        assert!(fov_result
+            .fully_visible_squares
+            .contains(&(visible_square + STEP_LEFT)));
+        assert!(fov_result.fully_visible_squares.contains(&visible_square));
+    }
 }
