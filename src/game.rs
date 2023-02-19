@@ -1477,6 +1477,10 @@ impl Game {
             }
         }
     }
+    pub fn set_up_two_pillars(&mut self) {
+        self.place_block(self.player_square() + STEP_RIGHT * 4);
+        self.place_block(self.player_square() + STEP_RIGHT * 5);
+    }
 
     pub fn set_up_columns(&mut self) {
         self.place_block(self.player_square() + STEP_RIGHT * 4);
