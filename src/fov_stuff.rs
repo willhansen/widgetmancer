@@ -355,14 +355,14 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
-        } else if view_arc.partially_overlaps_other_while_including_edges(view_arc_of_this_square)
-            || view_arc_of_this_square.fully_contains_interval(view_arc)
-        {
+        } else if view_arc.overlaps_or_touches(view_arc_of_this_square) {
             let partial_visibility_for_square =
                 partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
             fov_result
                 .partially_visible_squares
                 .insert(absolute_square, partial_visibility_for_square);
+        } else {
+            continue;
         }
 
         let is_sight_blocker = sight_blockers.contains(&absolute_square);
@@ -374,7 +374,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
-                    fov_result = fov_result.combine(field_of_view_within_arc_in_single_octant(
+                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
                         center_square,
@@ -382,7 +382,8 @@ pub fn field_of_view_within_arc_in_single_octant(
                         octant_number,
                         new_sub_arc,
                         relative_square,
-                    ));
+                    );
+                    fov_result = fov_result.combine(sub_arc_fov);
                 });
             break;
         }

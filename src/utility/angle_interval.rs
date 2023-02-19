@@ -186,7 +186,7 @@ impl AngleInterval {
         self.clockwise_end == other.anticlockwise_end
             || other.clockwise_end == self.anticlockwise_end
     }
-    fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
+    pub fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
         self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other)
     }
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
