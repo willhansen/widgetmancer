@@ -209,7 +209,7 @@ pub fn half_plane_to_angled_block_character(
     // │     │
     // o──o──o
 
-    let snap_points: Vec<LocalCharacterPoint> = valid_snap_points_on_angle_block()
+    let valid_snap_points: Vec<LocalCharacterPoint> = valid_snap_points_on_angle_block()
         .into_iter()
         .map(local_snap_grid_to_local_character_frame)
         .collect();
@@ -217,16 +217,18 @@ pub fn half_plane_to_angled_block_character(
     let raw_intersection_points =
         line_intersections_with_centered_unit_square(half_plane.dividing_line);
     assert!(raw_intersection_points.len() <= 2);
+    dbg!("asdfasdf F", &raw_intersection_points);
 
     let snapped_points: Vec<LocalCharacterPoint> = raw_intersection_points
         .iter()
         .map(|&intersection_point| {
-            *snap_points
+            *valid_snap_points
                 .iter()
                 .min_by_key(|&&snap_point| OrderedFloat((intersection_point - snap_point).length()))
                 .unwrap()
         })
         .collect();
+    dbg!("asdfasdf E", &snapped_points);
 
     if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
         if same_side_of_line(

@@ -508,7 +508,6 @@ fn partial_visibility_of_square_from_one_view_arc(
         right_char_shadow,
     };
 
-    //dbg!("asdfasdf D", partial.to_glyphs().to_clean_string());
     partial
 }
 
