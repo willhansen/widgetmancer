@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::f32::consts::PI;
 
-use euclid::{point2, Point2D};
+use euclid::{point2, vec2, Angle, Point2D};
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::{
@@ -13,7 +14,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    HalfPlane, Line,
+    snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -47,6 +48,26 @@ fn valid_snap_points_on_angle_block() -> HashSet<SnapGridPoint> {
         }
     }
     valid_points.into_iter().collect()
+}
+
+pub fn angled_block_flip_y(c: char) -> char {
+    if c == FULL_BLOCK {
+        return FULL_BLOCK;
+    }
+    if c == SPACE {
+        return SPACE;
+    }
+    let points = angled_block_char_to_snap_points_map()
+        .get(&c)
+        .unwrap()
+        .clone();
+    let y_flipped_points = (
+        point2(points.1.x, 3 - points.1.y),
+        point2(points.0.x, 3 - points.0.y),
+    );
+    *points_to_angled_block_mapping()
+        .get(&y_flipped_points)
+        .unwrap()
 }
 
 pub fn angled_block_char_to_snap_points_map() -> HashMap<char, (SnapGridPoint, SnapGridPoint)> {
@@ -196,6 +217,7 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
 
 pub fn half_plane_to_angled_block_character(
     half_plane: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
+    bias_direction: Angle<f32>,
 ) -> char {
     // angle blocks have important edge points
 
@@ -217,9 +239,17 @@ pub fn half_plane_to_angled_block_character(
     let raw_intersection_points =
         line_intersections_with_centered_unit_square(half_plane.dividing_line);
     assert!(raw_intersection_points.len() <= 2);
-    dbg!("asdfasdf F", &raw_intersection_points);
 
-    let snapped_points: Vec<LocalCharacterPoint> = raw_intersection_points
+    // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
+    let snapped_bias_direction = snap_angle_to_diagonal(bias_direction);
+    let biased_intersection_points: Vec<_> = raw_intersection_points
+        .into_iter()
+        .map(|point| {
+            point + unit_vector_from_angle(snapped_bias_direction).cast_unit() * (PI / 1000.0)
+        })
+        .collect();
+
+    let snapped_points: Vec<LocalCharacterPoint> = biased_intersection_points
         .iter()
         .map(|&intersection_point| {
             *valid_snap_points
@@ -228,7 +258,6 @@ pub fn half_plane_to_angled_block_character(
                 .unwrap()
         })
         .collect();
-    dbg!("asdfasdf E", &snapped_points);
 
     if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
         if same_side_of_line(
@@ -306,13 +335,16 @@ mod tests {
     fn test_line_and_inside_point_to_angled_block_character__left_edge_full_block() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
-            half_plane_to_angled_block_character(HalfPlane::new(
-                Line {
-                    p1: point2(-0.5, -0.5),
-                    p2: point2(-0.5, 0.5),
-                },
-                point2(0.0, 0.0),
-            )),
+            half_plane_to_angled_block_character(
+                HalfPlane::new(
+                    Line {
+                        p1: point2(-0.5, -0.5),
+                        p2: point2(-0.5, 0.5),
+                    },
+                    point2(0.0, 0.0),
+                ),
+                Angle::degrees(45.0)
+            ),
             FULL_BLOCK,
             "on left edge, full block"
         );
@@ -320,13 +352,16 @@ mod tests {
     #[test]
     fn test_line_and_inside_point_to_angled_block_character__left_edge_empty_block() {
         assert_eq!(
-            half_plane_to_angled_block_character(HalfPlane::new(
-                Line {
-                    p1: point2(-0.5, -0.5),
-                    p2: point2(-0.5, 0.5)
-                },
-                point2(-20.0, 0.0),
-            )),
+            half_plane_to_angled_block_character(
+                HalfPlane::new(
+                    Line {
+                        p1: point2(-0.5, -0.5),
+                        p2: point2(-0.5, 0.5)
+                    },
+                    point2(-20.0, 0.0),
+                ),
+                Angle::degrees(45.0)
+            ),
             SPACE,
             "on left edge, empty block"
         );
@@ -334,13 +369,16 @@ mod tests {
     #[test]
     fn test_line_and_inside_point_to_angled_block_character__lower_right_diagonal() {
         assert_eq!(
-            half_plane_to_angled_block_character(HalfPlane::new(
-                Line {
-                    p1: point2(-0.5, -0.5),
-                    p2: point2(-0.4, -0.4)
-                },
-                point2(2.0, 0.0),
-            )),
+            half_plane_to_angled_block_character(
+                HalfPlane::new(
+                    Line {
+                        p1: point2(-0.5, -0.5),
+                        p2: point2(-0.4, -0.4)
+                    },
+                    point2(2.0, 0.0),
+                ),
+                Angle::degrees(45.0)
+            ),
             '◢',
             "lower-right diagonal given short line"
         );
@@ -348,13 +386,16 @@ mod tests {
     #[test]
     fn test_line_and_inside_point_to_angled_block_character__notch_off_bottom_right() {
         assert_eq!(
-            half_plane_to_angled_block_character(HalfPlane::new(
-                Line {
-                    p1: point2(0.0, -0.5),
-                    p2: point2(0.5, -0.15),
-                },
-                point2(0.0, 0.0),
-            )),
+            half_plane_to_angled_block_character(
+                HalfPlane::new(
+                    Line {
+                        p1: point2(0.0, -0.5),
+                        p2: point2(0.5, -0.15),
+                    },
+                    point2(0.0, 0.0),
+                ),
+                Angle::degrees(45.0)
+            ),
             '🭝',
             "Notch off bottom-right"
         );
@@ -419,7 +460,7 @@ mod tests {
             },
             point_on_half_plane: point2(-0.06, -0.3),
         };
-        let the_char = half_plane_to_angled_block_character(half_plane);
+        let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
         assert!(['🭈', '🭊'].contains(&the_char));
     }
 }

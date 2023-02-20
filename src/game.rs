@@ -439,7 +439,7 @@ impl Game {
         turret_squares.iter().for_each(|square| {
             let should_fire = random_event(chance_to_fire_this_tick);
             if should_fire {
-                let direction = random_direction();
+                let direction = random_unit_vector();
                 self.place_linear_death_cube(square.to_f32(), (direction * CUBE_SPEED).cast_unit());
             }
         });

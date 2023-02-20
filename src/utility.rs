@@ -350,13 +350,20 @@ pub fn random_angle() -> Angle<f32> {
     Angle::degrees(rand::thread_rng().gen_range(0.0..360.0))
 }
 
-pub fn random_direction() -> FVector {
+pub fn random_unit_vector() -> FVector {
     let angle = random_angle();
-    direction_from_angle(angle)
+    unit_vector_from_angle(angle)
 }
 
-pub fn direction_from_angle(angle: Angle<f32>) -> FVector {
+pub fn unit_vector_from_angle(angle: Angle<f32>) -> FVector {
     vec2(angle.radians.cos(), angle.radians.sin())
+}
+
+pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
+    (0..4)
+        .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
+        .min_by_key(|&snap_angle| OrderedFloat(angle_distance(snap_angle, angle).radians))
+        .unwrap()
 }
 
 pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
@@ -723,9 +730,11 @@ where
 pub fn union<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
     a.union(b).cloned().collect()
 }
+
 pub fn intersection<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
     a.intersection(b).cloned().collect()
 }
+
 pub fn angle_from_better_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
     Angle::radians(v.y.atan2(v.x))
 }
@@ -923,6 +932,7 @@ mod tests {
             vec2(0.0, 0.0)
         );
     }
+
     #[test]
     fn test_half_plane_complementary_check__different_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
@@ -955,11 +965,13 @@ mod tests {
 
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
     }
+
     #[test]
     fn test_check_line_intersection_with_standard_square() {
         let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
         assert_false!(line_intersects_with_centered_unit_square(line));
     }
+
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
@@ -983,6 +995,7 @@ mod tests {
             180.0
         );
     }
+
     #[test]
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
         assert!(
@@ -994,6 +1007,7 @@ mod tests {
                 > 0.01
         );
     }
+
     #[test]
     fn test_standardize_angle() {
         assert_about_eq!(
