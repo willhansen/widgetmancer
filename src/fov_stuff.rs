@@ -352,21 +352,12 @@ pub fn field_of_view_within_arc_in_single_octant(
         let absolute_square = center_square + relative_square;
 
         let view_arc_of_this_square = AngleInterval::from_square(relative_square);
-        if absolute_square == point2(4, 2) {
-            dbg!("asdfasdf A", &absolute_square, &relative_square);
-        }
 
         if view_arc.fully_contains_interval(view_arc_of_this_square) {
             fov_result.fully_visible_squares.insert(absolute_square);
         } else if view_arc.overlaps_or_touches(view_arc_of_this_square) {
             let partial_visibility_for_square =
                 partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
-            if relative_square == vec2(-1, -3) {
-                dbg!(
-                    "asdfasdf B",
-                    partial_visibility_for_square.to_glyphs().to_clean_string()
-                );
-            }
             fov_result
                 .partially_visible_squares
                 .insert(absolute_square, partial_visibility_for_square);
@@ -472,14 +463,6 @@ fn partial_visibility_of_square_from_one_view_arc(
     let square_arc = AngleInterval::from_square(square_relative_to_center);
     assert!(visibility_arc.touches_or_overlaps(square_arc));
 
-    if square_relative_to_center == vec2(-1, -3) {
-        dbg!(
-            "asdfasdf C",
-            visibility_arc.to_degrees(),
-            square_relative_to_center
-        );
-    }
-
     let shadow_arc = visibility_arc.complement();
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
@@ -490,7 +473,8 @@ fn partial_visibility_of_square_from_one_view_arc(
             overlapped_shadow_edge.angle().radians.sin(),
         ),
     };
-    let extra_rotation_for_shadow_point = Angle::degrees(1.0)
+    // TODO: make this angle bigger for easier debugging
+    let extra_rotation_for_shadow_point = Angle::degrees(90.0)
         * if *overlapped_shadow_edge.is_clockwise_edge() {
             1.0
         } else {
@@ -519,10 +503,13 @@ fn partial_visibility_of_square_from_one_view_arc(
         right_character_square,
     ));
 
-    PartialVisibilityOfASquare {
+    let partial = PartialVisibilityOfASquare {
         left_char_shadow,
         right_char_shadow,
-    }
+    };
+
+    //dbg!("asdfasdf D", partial.to_glyphs().to_clean_string());
+    partial
 }
 
 #[deprecated(note = "use AngleInterval::from_square instead")]
@@ -917,27 +904,71 @@ mod tests {
             });
     }
 
-    #[test]
-    fn test_partial_visibility_of_one_square__observed_discontinuities() {
-        let arc = AngleInterval::from_degrees(-108.43459, -90.0);
-        let partial_1 = partial_visibility_of_square_from_one_view_arc(arc, vec2(-1, -3));
-        let chars_1 = partial_1
+    fn assert_shadow_is_horizontally_continuous(partial: PartialVisibilityOfASquare) {
+        let chars = partial
             .to_glyphs()
             .to_clean_string()
             .chars()
             .collect::<Vec<char>>();
-        assert!(angle_block_chars_are_horizontally_continuous(
-            chars_1[0], chars_1[1]
-        ));
+        assert!(
+            angle_block_chars_are_horizontally_continuous(chars[0], chars[1],),
+            "chars: {}{}",
+            chars[0],
+            chars[1]
+        );
+    }
 
-        let partial_2 = partial_visibility_of_square_from_one_view_arc(arc, vec2(-9, 0));
-        let chars_2 = partial_2
-            .to_glyphs()
-            .to_clean_string()
-            .chars()
-            .collect::<Vec<char>>();
-        assert!(angle_block_chars_are_horizontally_continuous(
-            chars_2[0], chars_2[1]
+    fn partial_from_block_and_square(
+        block_square: WorldStep,
+        shadowed_square: WorldStep,
+    ) -> PartialVisibilityOfASquare {
+        partial_visibility_of_square_from_one_view_arc(
+            AngleInterval::from_square(block_square).complement(),
+            shadowed_square,
+        )
+    }
+
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_discontinuity_1() {
+        assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+            STEP_DOWN_LEFT,
+            vec2(-1, -3),
         ));
+    }
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_discontinuity_2() {
+        assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+            STEP_DOWN_RIGHT,
+            vec2(9, -3),
+        ));
+    }
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_discontinuity_3() {
+        assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+            STEP_UP_LEFT,
+            vec2(-14, 5),
+        ));
+    }
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_discontinuity_4() {
+        assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+            STEP_RIGHT * 2,
+            vec2(9, 3),
+        ));
+        assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+            STEP_RIGHT * 2,
+            vec2(9, -3),
+        ));
+    }
+    #[test]
+    fn test_partial_visibility_of_one_square__observed_random_discontinuity() {
+        // highest i observed before failure: 9
+        for i in 0..30 {
+            dbg!(i);
+            assert_shadow_is_horizontally_continuous(partial_from_block_and_square(
+                STEP_DOWN_LEFT,
+                vec2(-14, -5),
+            ));
+        }
     }
 }
