@@ -35,6 +35,7 @@ use crate::{
 };
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
+const PLAYER_SIGHT_RADIUS: u32 = 16;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct DeathCube {
@@ -438,7 +439,7 @@ impl Game {
         turret_squares.iter().for_each(|square| {
             let should_fire = random_event(chance_to_fire_this_tick);
             if should_fire {
-                let direction = random_direction();
+                let direction = random_unit_vector();
                 self.place_linear_death_cube(square.to_f32(), (direction * CUBE_SPEED).cast_unit());
             }
         });
@@ -1476,6 +1477,9 @@ impl Game {
             }
         }
     }
+    pub fn set_up_n_pillars(&mut self, n: u32) {
+        (0..n).for_each(|i| self.place_block(self.player_square() + STEP_RIGHT * (i as i32 + 4)));
+    }
 
     pub fn set_up_columns(&mut self) {
         self.place_block(self.player_square() + STEP_RIGHT * 4);
@@ -1523,7 +1527,7 @@ impl Game {
     }
     fn fov_mask_for_player(&self) -> FovResult {
         let start_square = self.player_square();
-        field_of_view_from_square(start_square, &self.blocks)
+        field_of_view_from_square(start_square, PLAYER_SIGHT_RADIUS, &self.blocks)
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
@@ -1905,6 +1909,7 @@ mod tests {
         let square_blink_dist = (game.player_square() - start_pos).square_length();
         assert!(square_blink_dist > 1);
     }
+
     #[test]
     fn test_blink_is_also_strafe() {
         let mut game = set_up_game_with_player();
@@ -2201,6 +2206,7 @@ mod tests {
         game.place_portal(entrance_step, exit_step);
         assert_eq!(game.portal_aware_single_step(entrance_step), exit_step);
     }
+
     #[test]
     fn test_move_through_multiple_portals() {
         let mut game = set_up_10x10_game();
@@ -2211,6 +2217,7 @@ mod tests {
         game.place_portal(mid, end);
         assert_eq!(game.multiple_portal_aware_steps(start, 2), end);
     }
+
     #[test]
     fn test_arrow_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2237,6 +2244,7 @@ mod tests {
         assert_false!(game.player_is_alive());
         assert!(game.is_non_player_piece_at(player_square));
     }
+
     #[test]
     fn test_spear_stab_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2256,6 +2264,7 @@ mod tests {
         game.do_player_spear_attack();
         assert!(game.pieces.is_empty());
     }
+
     #[test]
     fn test_arrow_does_not_turn_toward_player() {
         let mut game = set_up_10x10_game();
@@ -2269,6 +2278,7 @@ mod tests {
             Some(&STEP_LEFT)
         );
     }
+
     #[test]
     fn test_see_through_portal() {
         let mut game = set_up_10x10_game();

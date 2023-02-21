@@ -7,10 +7,13 @@ use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg};
 
+use approx::AbsDiffEq;
 use derive_getters::Getters;
+use euclid::approxeq::ApproxEq;
 use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
+use ntest::about_eq;
 use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
@@ -34,6 +37,7 @@ pub const UP_I: IVector = vec2(0, 1);
 pub const LEFT_I: IVector = vec2(-1, 0);
 pub const RIGHT_I: IVector = vec2(1, 0);
 
+pub const STEP_ZERO: WorldStep = vec2(0, 0);
 pub const STEP_UP: WorldStep = vec2(0, 1);
 pub const STEP_DOWN: WorldStep = vec2(0, -1);
 pub const STEP_RIGHT: WorldStep = vec2(1, 0);
@@ -77,6 +81,16 @@ impl<U> Line<f32, U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         in_line(self.p1, self.p2, point)
     }
+    pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
+        self.normal_distance_to_point(point) < tolerance
+    }
+    pub fn normal_distance_to_point(&self, point: Point2D<f32, U>) -> f32 {
+        let p1_to_point = point - self.p1;
+        let p1_to_p2 = self.p2 - self.p1;
+        let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
+        let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
+        perpendicular_part_of_p1_to_point.length()
+    }
     pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
@@ -97,6 +111,29 @@ impl<U> Line<f32, U> {
             point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
 
         point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
+    }
+
+    pub fn approx_eq_eps(&self, other: Self, tolerance: f32) -> bool {
+        let p11 = self
+            .p1
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+        let p22 = self
+            .p2
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p12 = self
+            .p1
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p21 = self
+            .p2
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+
+        // don't care about point order
+        (p11 && p22) || (p12 && p21)
+    }
+
+    pub fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
+        self.point_is_approx_on_line(other.p1, tolerance)
+            && self.point_is_approx_on_line(other.p2, tolerance)
     }
 }
 
@@ -129,6 +166,27 @@ impl<U: Copy> HalfPlane<f32, U> {
             dividing_line: line,
             point_on_half_plane: point,
         }
+    }
+
+    pub fn complement(&self) -> Self {
+        todo!()
+    }
+
+    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+        self.dividing_line
+            .approx_on_same_line(other.dividing_line, tolerance)
+            && !same_side_of_line(
+                self.dividing_line,
+                self.point_on_half_plane,
+                other.point_on_half_plane,
+            )
+    }
+
+    pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
+        same_side_of_line(self.dividing_line, self.point_on_half_plane, point)
+    }
+    pub fn covers_origin(&self) -> bool {
+        self.point_is_on_half_plane(point2(0.0, 0.0))
     }
 }
 
@@ -227,7 +285,7 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
     if step.square_length() == 0 {
         return step;
     }
-    let radians_from_plus_x = step.to_f32().angle_from_x_axis();
+    let radians_from_plus_x = angle_from_better_x_axis(step.to_f32());
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
     let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
 
@@ -257,9 +315,11 @@ pub fn is_diagonal_king_step(step: WorldStep) -> bool {
 pub fn is_orthogonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
     v.x == T::zero() || v.y == T::zero()
 }
+
 pub fn is_diagonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
     v.x == v.y || v.x == v.y.neg()
 }
+
 pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
@@ -290,9 +350,20 @@ pub fn random_angle() -> Angle<f32> {
     Angle::degrees(rand::thread_rng().gen_range(0.0..360.0))
 }
 
-pub fn random_direction() -> FVector {
+pub fn random_unit_vector() -> FVector {
     let angle = random_angle();
+    unit_vector_from_angle(angle)
+}
+
+pub fn unit_vector_from_angle(angle: Angle<f32>) -> FVector {
     vec2(angle.radians.cos(), angle.radians.sin())
+}
+
+pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
+    (0..4)
+        .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
+        .min_by_key(|&snap_angle| OrderedFloat(angle_distance(snap_angle, angle).radians))
+        .unwrap()
 }
 
 pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
@@ -303,7 +374,7 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vect
     if vector.length() == 0.0 {
         return vector;
     }
-    let start_angle = vector.angle_from_x_axis();
+    let start_angle = angle_from_better_x_axis(vector);
     let new_angle = start_angle + delta_angle;
     Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
 }
@@ -371,6 +442,10 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
 
 pub fn print_glyph_map(glyph_map: &WorldCharacterSquareGlyphMap) {
     print!("{}", glyph_map_to_string(glyph_map));
+}
+
+pub fn line_intersects_with_centered_unit_square<U>(line: Line<f32, U>) -> bool {
+    !line_intersections_with_centered_unit_square(line).is_empty()
 }
 
 pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Vec<Point2D<f32, U>> {
@@ -622,6 +697,7 @@ pub struct SquareWithDir {
     square: WorldSquare,
     direction: WorldStep,
 }
+
 impl SquareWithDir {
     pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
         assert!(KING_STEPS.contains(&direction));
@@ -636,6 +712,53 @@ impl SquareWithDir {
     pub fn stepped(&self) -> SquareWithDir {
         SquareWithDir::new(self.square + self.direction, self.direction)
     }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
+pub struct TranslationAndRotationTransform {
+    translation: WorldStep,
+    quarter_rotations_counterclockwise: u32,
+}
+
+pub fn set_of_keys<K, V>(hashmap: &HashMap<K, V>) -> HashSet<K>
+where
+    K: Clone + Hash + Eq,
+{
+    hashmap.keys().cloned().collect::<HashSet<K>>()
+}
+
+pub fn union<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
+    a.union(b).cloned().collect()
+}
+
+pub fn intersection<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
+    a.intersection(b).cloned().collect()
+}
+
+pub fn angle_from_better_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
+    Angle::radians(v.y.atan2(v.x))
+}
+
+pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
+    let mut radians = angle.radians;
+    if radians > -PI && radians <= PI {
+        angle
+    } else {
+        radians = radians.rem_euclid(TAU);
+        if radians > PI {
+            radians -= TAU;
+        }
+        Angle::radians(radians)
+    }
+}
+
+pub fn angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
+    Angle::radians(
+        standardize_angle(a)
+            .angle_to(standardize_angle(b))
+            .radians
+            .abs(),
+    )
 }
 
 #[cfg(test)]
@@ -801,11 +924,95 @@ mod tests {
             vec![STEP_DOWN, STEP_LEFT].into_iter().collect()
         );
     }
+
     #[test]
     fn test_rotate_zero_vector() {
         assert_eq!(
             rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
             vec2(0.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn test_half_plane_complementary_check__different_lines() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::new(line, p1);
+        let half_plane_2 = HalfPlane::new(line, p2);
+        let half_plane_3 = HalfPlane::new(line2, p2);
+
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
+    }
+
+    #[test]
+    fn test_half_plane_complementary_check__equivalent_lines() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(2.0, 2.0), point2(5.0, 5.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::new(line, p1);
+        let half_plane_2 = HalfPlane::new(line2, p2);
+
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+    }
+
+    #[test]
+    fn test_check_line_intersection_with_standard_square() {
+        let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
+        assert_false!(line_intersects_with_centered_unit_square(line));
+    }
+
+    #[test]
+    fn test_angle_from_x_axis() {
+        assert_about_eq!(
+            angle_from_better_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
+            45.0
+        );
+        assert_about_eq!(
+            angle_from_better_x_axis(default::Vector2D::new(0.0, 0.5)).to_degrees(),
+            90.0
+        );
+        assert_about_eq!(
+            angle_from_better_x_axis(default::Vector2D::new(0.0, -0.5)).to_degrees(),
+            -90.0
+        );
+        assert_about_eq!(
+            angle_from_better_x_axis(default::Vector2D::new(1.0, 0.0)).to_degrees(),
+            0.0
+        );
+        assert_about_eq!(
+            angle_from_better_x_axis(default::Vector2D::new(-1.0, 0.0)).to_degrees(),
+            180.0
+        );
+    }
+
+    #[test]
+    fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
+        assert!(
+            (default::Vector2D::new(0.5, 0.5)
+                .angle_from_x_axis()
+                .to_degrees()
+                - 45.0)
+                .abs()
+                > 0.01
+        );
+    }
+
+    #[test]
+    fn test_standardize_angle() {
+        assert_about_eq!(
+            standardize_angle(Angle::<f32>::degrees(75.0)).radians,
+            standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
     }
 }

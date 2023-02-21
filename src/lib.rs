@@ -9,6 +9,8 @@
 #![feature(is_some_and)]
 #![feature(let_chains)]
 #![feature(drain_keep_rest)]
+#![feature(inherent_associated_types)]
+#![feature(iter_next_chunk)]
 
 #[macro_use]
 extern crate approx;
@@ -105,13 +107,14 @@ pub fn do_everything() {
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
-    //game.set_up_columns();
+    game.set_up_columns();
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();
     //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
     //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
-    game.set_up_vs_arrows();
+    //game.set_up_vs_arrows();
+    game.set_up_n_pillars(3);
 
     let mut prev_tick_start_time = Instant::now();
     while game.running() {
