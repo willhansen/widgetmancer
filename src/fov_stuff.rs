@@ -44,12 +44,11 @@ impl PartialVisibilityOfASquare {
     pub fn new(
         left_char_shadow: Option<CharacterShadow>,
         right_char_shadow: Option<CharacterShadow>,
-        bias_direction: Angle<f32>,
     ) -> Self {
         PartialVisibilityOfASquare {
             left_char_shadow,
             right_char_shadow,
-            tie_break_bias_direction: bias_direction,
+            tie_break_bias_direction: Angle::degrees(45.0),
         }
     }
 
@@ -62,7 +61,7 @@ impl PartialVisibilityOfASquare {
     }
 
     pub fn fully_visible() -> Self {
-        PartialVisibilityOfASquare::new(None, None, Angle::degrees(45.0))
+        PartialVisibilityOfASquare::new(None, None)
     }
 
     pub fn shadows(&self) -> Vec<Option<CharacterShadow>> {
@@ -527,11 +526,9 @@ fn partial_visibility_of_square_from_one_view_arc(
         right_character_square,
     ));
 
-    let partial = PartialVisibilityOfASquare::new(
-        left_char_shadow,
-        right_char_shadow,
-        visibility_arc.center_angle(), //Angle::radians(visibility_arc.center_angle().radians + PI),
-    );
+    let partial = PartialVisibilityOfASquare::new(left_char_shadow, right_char_shadow)
+        .rebiased(visibility_arc.center_angle());
+    //Angle::radians(visibility_arc.center_angle().radians + PI),
 
     partial
 }
@@ -646,7 +643,6 @@ mod tests {
                 },
                 point_on_half_plane: point2(0.061038017, 1.3054879),
             }),
-            Angle::degrees(45.0),
         );
         assert!(partial.to_glyphs().looks_solid());
         assert_eq!(partial.to_glyphs().to_clean_string(), "  ");
@@ -729,7 +725,6 @@ mod tests {
                 },
                 point2(2.0, 0.0),
             )),
-            Angle::degrees(45.0),
         );
 
         let string = partial_visibility.to_glyphs().to_clean_string();
@@ -753,7 +748,6 @@ mod tests {
                 },
                 point_on_half_plane: point2(-1.0610383, -0.30548787),
             }),
-            Angle::degrees(45.0),
         );
         assert!(is_clockwise(
             partial_visibility
@@ -827,16 +821,8 @@ mod tests {
         let half_plane_2 = HalfPlane::new(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
-        let partial_1 = PartialVisibilityOfASquare::new(
-            Some(half_plane_1),
-            Some(half_plane_1),
-            Angle::degrees(45.0),
-        );
-        let partial_2 = PartialVisibilityOfASquare::new(
-            Some(half_plane_2),
-            Some(half_plane_2),
-            Angle::degrees(45.0),
-        );
+        let partial_1 = PartialVisibilityOfASquare::new(Some(half_plane_1), Some(half_plane_1));
+        let partial_2 = PartialVisibilityOfASquare::new(Some(half_plane_2), Some(half_plane_2));
 
         let combined_partial = partial_1.combine_while_increasing_visibility(&partial_2);
         dbg!(
