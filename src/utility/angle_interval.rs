@@ -276,6 +276,10 @@ impl DirectionalAngularEdge {
             is_clockwise_edge: !self.is_clockwise_edge,
         }
     }
+    pub fn direction_to_inside(&self) -> Angle<f32> {
+        let rotation_sign = if self.is_clockwise_edge { 1.0 } else { -1.0 };
+        standardize_angle(self.angle + Angle::degrees(rotation_sign * 90.0))
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]

@@ -489,25 +489,15 @@ fn partial_visibility_of_square_from_one_view_arc(
     let shadow_arc = visibility_arc.complement();
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
-    let shadow_line_from_center = Line {
+    let shadow_line_from_center: WorldLine = Line {
         p1: point2(0.0, 0.0),
-        p2: point2(
-            overlapped_shadow_edge.angle().radians.cos(),
-            overlapped_shadow_edge.angle().radians.sin(),
-        ),
+        p2: unit_vector_from_angle(*overlapped_shadow_edge.angle())
+            .to_point()
+            .cast_unit(),
     };
-    // TODO: make this angle bigger for easier debugging
-    let extra_rotation_for_shadow_point = Angle::degrees(90.0)
-        * if *overlapped_shadow_edge.is_clockwise_edge() {
-            1.0
-        } else {
-            -1.0
-        };
-    let point_in_shadow = rotate_point_around_point(
-        shadow_line_from_center.p1,
-        shadow_line_from_center.p2,
-        extra_rotation_for_shadow_point,
-    );
+    let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
+        .to_point()
+        .cast_unit();
 
     let shadow_half_plane = HalfPlane::new(shadow_line_from_center, point_in_shadow);
 
@@ -527,7 +517,7 @@ fn partial_visibility_of_square_from_one_view_arc(
     ));
 
     let partial = PartialVisibilityOfASquare::new(left_char_shadow, right_char_shadow)
-        .rebiased(visibility_arc.center_angle());
+        .rebiased(overlapped_shadow_edge.direction_to_inside());
     //Angle::radians(visibility_arc.center_angle().radians + PI),
 
     partial
