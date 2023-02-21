@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::f32::consts::PI;
 
 use derive_getters::Getters;
 use euclid::{point2, vec2, Angle};
@@ -529,7 +530,7 @@ fn partial_visibility_of_square_from_one_view_arc(
     let partial = PartialVisibilityOfASquare::new(
         left_char_shadow,
         right_char_shadow,
-        visibility_arc.center_angle(),
+        visibility_arc.center_angle(), //Angle::radians(visibility_arc.center_angle().radians + PI),
     );
 
     partial
@@ -1013,6 +1014,47 @@ mod tests {
         assert_eq!(
             above_glyphs[1].character,
             angled_block_flip_y(below_glyphs[1].character)
+        );
+    }
+
+    // "🭈🭄"
+    // "🭏🬽"
+    // "🭠🭘"
+    // "🭣🭕"
+
+    #[test]
+    fn test_shadows_have_concave_bias_for_angled_blocks() {
+        let block_shadow_string_tuples = vec![
+            (STEP_LEFT, STEP_UP_LEFT, "🭏🬽"),
+            (STEP_LEFT, STEP_DOWN_LEFT, "🭠🭘"),
+            (STEP_RIGHT, STEP_UP_RIGHT, "🭈🭄"),
+            (STEP_RIGHT, STEP_DOWN_RIGHT, "🭣🭕"),
+            (STEP_DOWN, STEP_DOWN_LEFT, "🭈🭄"),
+            (STEP_DOWN, STEP_DOWN_RIGHT, "🭏🬽"),
+            (STEP_UP, STEP_UP_LEFT, "🭣🭕"),
+            (STEP_UP, STEP_UP_RIGHT, "🭠🭘"),
+            (STEP_LEFT * 2, STEP_LEFT * 2 + STEP_UP, "🬽 "),
+            (STEP_LEFT * 2, STEP_LEFT * 2 + STEP_DOWN, "🭘 "),
+            (STEP_RIGHT * 2, STEP_RIGHT * 2 + STEP_UP, " 🭈"),
+            (STEP_RIGHT * 2, STEP_RIGHT * 2 + STEP_DOWN, " 🭣"),
+            (STEP_UP * 2, STEP_UP * 2 + STEP_LEFT, " 🭦"),
+            (STEP_UP * 2, STEP_UP * 2 + STEP_RIGHT, "🭛 "),
+            (STEP_DOWN * 2, STEP_DOWN * 2 + STEP_LEFT, " 🭋"),
+            (STEP_DOWN * 2, STEP_DOWN * 2 + STEP_RIGHT, "🭀 "),
+        ];
+        block_shadow_string_tuples.into_iter().for_each(
+            |(block_square, shadow_square, correct_string)| {
+                assert_eq!(
+                    partial_from_block_and_square(block_square, shadow_square)
+                        .to_glyphs()
+                        .to_clean_string(),
+                    correct_string,
+                    "block_square: {:?}, shadow_square: {:?}, correct_string: {}",
+                    block_square,
+                    shadow_square,
+                    correct_string,
+                );
+            },
         );
     }
 }
