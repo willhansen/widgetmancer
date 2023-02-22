@@ -2280,7 +2280,7 @@ mod tests {
     }
 
     #[test]
-    fn test_see_through_portal() {
+    fn test_see_through_portal__no_rotation() {
         let mut game = set_up_10x10_game();
 
         let player_square = point2(2, 2);
