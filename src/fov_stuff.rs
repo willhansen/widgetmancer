@@ -5,6 +5,7 @@ use derive_getters::Getters;
 use euclid::{point2, vec2, Angle};
 use itertools::all;
 use ntest::assert_false;
+use num::abs;
 use ordered_float::OrderedFloat;
 
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
@@ -13,8 +14,8 @@ use crate::glyph::glyph_constants::{
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::PortalGeometry;
-use crate::utility::angle_interval::{AngleInterval, AngleIntervalSet};
+use crate::portal_geometry::{Portal, PortalGeometry};
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     intersection, is_clockwise, line_intersections_with_centered_unit_square,
@@ -411,7 +412,52 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
 
-        // TODO: portals
+        // portals are on inside faces of squares, while stepping out of a square, so if a block has a sight blocker and a portal, the sight blocker takes priority
+        let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
+        if square_has_portal {
+            let portals_for_square: Vec<Portal> =
+                portal_geometry.portals_entering_from_square(absolute_square);
+            // portals are only visible if you see the entrance from the correct side
+            let visible_portals_for_square: Vec<Portal> = portals_for_square
+                .into_iter()
+                .filter(|portal| {
+                    unit_vector_from_angle(view_arc.center_angle())
+                        .cast_unit()
+                        .dot(portal.entrance().direction().to_f32())
+                        > 0.0
+                })
+                .collect();
+            // Break the view arc around the (up to 2) portals and recurse
+            let portal_view_arcs: HashMap<Portal, AngleInterval> = visible_portals_for_square
+                .into_iter()
+                .map(|portal: Portal| {
+                    (
+                        portal.clone(),
+                        AngleInterval::from_square_face(
+                            relative_square,
+                            *portal.entrance().direction(),
+                        ),
+                    )
+                })
+                .collect();
+
+            // a max of two portals are visible in one square, touching each other at a corner
+            // TODO: turn this into a constructor for angleintervals
+            let combined_view_arc: AngleInterval = if portal_view_arcs.len() == 1 {
+                *portal_view_arcs.values().next().unwrap()
+            } else if portal_view_arcs.len() == 2 {
+                let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
+                arcs[0].union(*arcs[1])
+            } else {
+                panic!(
+                    "there should be one or two portals here: {:?}",
+                    portal_view_arcs
+                );
+            };
+
+            todo!()
+            // TODO: portals
+        }
     }
     fov_result
 }

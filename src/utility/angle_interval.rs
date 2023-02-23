@@ -13,8 +13,8 @@ use termion::cursor::Left;
 use crate::fov_stuff::PartialVisibilityOfASquare;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_distance, angle_from_better_x_axis, standardize_angle, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
-    STEP_UP_LEFT, STEP_UP_RIGHT,
+    angle_distance, angle_from_better_x_axis, standardize_angle, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
@@ -79,8 +79,14 @@ impl AngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    fn union(&self, other: AngleInterval) -> Self {
-        assert!(self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other));
+    pub fn from_square_face(relative_square: WorldStep, face_direction: WorldStep) -> Self {
+        assert!(ORTHOGONAL_STEPS.contains(&face_direction));
+
+        todo!()
+    }
+
+    pub fn union(&self, other: AngleInterval) -> Self {
+        assert!(self.overlaps_or_touches(other));
         let result = AngleInterval {
             anticlockwise_end: if self.contains_angle_including_edges(other.anticlockwise_end) {
                 self.anticlockwise_end

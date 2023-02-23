@@ -1,7 +1,15 @@
+use crate::utility::coordinate_frame_conversions::WorldSquare;
 use crate::utility::SquareWithDir;
+use derive_getters::Getters;
 use derive_more::Constructor;
 use ntest::assert_false;
 use std::collections::HashMap;
+
+#[derive(Hash, Eq, PartialEq, Constructor, Getters, Clone, Copy, Debug)]
+pub struct Portal {
+    entrance: SquareWithDir,
+    exit: SquareWithDir,
+}
 
 #[derive(Constructor, Default)]
 pub struct PortalGeometry {
@@ -32,5 +40,21 @@ impl PortalGeometry {
         (0..num_steps).fold(start, |current_square_and_dir, _| {
             self.portal_aware_single_step(current_square_and_dir)
         })
+    }
+
+    pub fn square_has_portal_entrance(&self, square: WorldSquare) -> bool {
+        self.portal_exits_by_entrance
+            .iter()
+            .any(|(entrance, exit)| *entrance.square() == square)
+    }
+
+    pub fn portals_entering_from_square(&self, square: WorldSquare) -> Vec<Portal> {
+        self.portal_exits_by_entrance
+            .iter()
+            .filter(|(&entrance, &exit): &(&SquareWithDir, &SquareWithDir)| {
+                *entrance.square() == square
+            })
+            .map(|(&entrance, &exit): (&SquareWithDir, &SquareWithDir)| Portal::new(entrance, exit))
+            .collect()
     }
 }
