@@ -1,36 +1,31 @@
-use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
-use crate::utility::{quarter_turns_counter_clockwise, SquareWithDir};
-use derive_getters::Getters;
-use derive_more::Constructor;
-use ntest::assert_false;
 use std::collections::HashMap;
 use std::ops::Add;
 
-#[derive(Hash, Eq, PartialEq, Getters, Clone, Copy, Debug)]
+use derive_getters::Getters;
+use derive_more::Constructor;
+use ntest::assert_false;
+
+use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
+use crate::utility::{quarter_turns_counter_clockwise, SquareWithDir, STEP_ZERO};
+
+#[derive(Hash, Eq, PartialEq, Constructor, Getters, Clone, Copy, Debug)]
 pub struct ViewTransform {
     translation: WorldStep,
-    half_turn_rotations: i32,
+    rotate_180: bool,
 }
-impl ViewTransform {
-    pub fn new(translation: WorldStep, half_turn_rotations: i32) -> Self {
-        ViewTransform {
-            translation,
-            half_turn_rotations,
-        }
-        .standardized()
-    }
-    fn standardized(&self) -> Self {
-        ViewTransform {
-            translation: self.translation,
-            half_turn_rotations: self.half_turn_rotations.rem_euclid(2),
-        }
-    }
 
+impl ViewTransform {
     pub fn transform(&self, pose: SquareWithDir) -> SquareWithDir {
         SquareWithDir::new(
             *pose.square() + self.translation,
-            quarter_turns_counter_clockwise(pose.direction(), self.half_turn_rotations * 2),
+            *pose.direction() * if self.rotate_180 { -1 } else { 1 },
         )
+    }
+}
+
+impl Default for ViewTransform {
+    fn default() -> Self {
+        ViewTransform::new(STEP_ZERO, false)
     }
 }
 
@@ -40,7 +35,7 @@ impl Add for ViewTransform {
     fn add(self, rhs: Self) -> Self::Output {
         ViewTransform::new(
             self.translation + rhs.translation,
-            self.half_turn_rotations + rhs.half_turn_rotations,
+            self.rotate_180 ^ rhs.rotate_180,
         )
     }
 }
@@ -57,16 +52,13 @@ impl Portal {
             *entrance.direction() == *exit.direction()
                 || *entrance.direction() == -*exit.direction()
         );
+        assert_ne!(entrance, exit);
         Portal { entrance, exit }
     }
     pub fn get_transform(&self) -> ViewTransform {
         ViewTransform::new(
             *self.exit().square() - *self.entrance.square(),
-            if *self.entrance().direction() == *self.exit().direction() {
-                0
-            } else {
-                1
-            },
+            *self.entrance().direction() == -*self.exit().direction(),
         )
     }
 }

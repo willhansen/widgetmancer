@@ -162,8 +162,7 @@ impl PartialVisibilityOfASquare {
 pub struct FovResult {
     pub fully_visible_squares: SquareSet,
     pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
-    pub view_transform: Option<ViewTransform>,
-    pub transformed_sub_fovs: Vec<FovResult>,
+    pub transformed_sub_fovs: Vec<(FovResult, ViewTransform)>,
 }
 
 impl FovResult {
@@ -188,7 +187,6 @@ impl FovResult {
         self.partially_visible_squares.keys().copied().collect()
     }
     pub fn combine(&self, other: Self) -> Self {
-        assert_eq!(self.view_transform, other.view_transform);
         type PartialVisibilityMap = HashMap<WorldSquare, PartialVisibilityOfASquare>;
 
         let squares_with_non_conflicting_partials: SquareSet = self
@@ -270,6 +268,7 @@ impl FovResult {
         FovResult {
             fully_visible_squares: all_fully_visible,
             partially_visible_squares: all_partials,
+            transformed_sub_fovs: vec![],
         }
     }
 
@@ -306,6 +305,7 @@ impl FovResult {
         FovResult {
             partially_visible_squares: new_partials,
             fully_visible_squares: new_visible,
+            transformed_sub_fovs: vec![],
         }
     }
 }
@@ -458,7 +458,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         octant_number,
                         portal_view_arc,
                         relative_square,
-                        accumulated_view_transform.transform(portal.view_transform()),
+                        accumulated_view_transform + portal.get_transform(),
                     );
                     fov_result = fov_result.combine(sub_arc_fov);
                 });
@@ -520,6 +520,7 @@ pub fn single_octant_field_of_view(
         octant_number,
         full_octant_arc,
         STEP_ZERO,
+        ViewTransform::default(),
     );
     fov_result.fully_visible_squares.insert(center_square);
     fov_result
