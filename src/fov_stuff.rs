@@ -14,7 +14,7 @@ use crate::glyph::glyph_constants::{
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::{Portal, PortalGeometry};
+use crate::portal_geometry::{Portal, PortalGeometry, ViewTransform};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
@@ -162,6 +162,8 @@ impl PartialVisibilityOfASquare {
 pub struct FovResult {
     pub fully_visible_squares: SquareSet,
     pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
+    pub view_transform: Option<ViewTransform>,
+    pub transformed_sub_fovs: Vec<FovResult>,
 }
 
 impl FovResult {
@@ -186,6 +188,7 @@ impl FovResult {
         self.partially_visible_squares.keys().copied().collect()
     }
     pub fn combine(&self, other: Self) -> Self {
+        assert_eq!(self.view_transform, other.view_transform);
         type PartialVisibilityMap = HashMap<WorldSquare, PartialVisibilityOfASquare>;
 
         let squares_with_non_conflicting_partials: SquareSet = self
@@ -363,6 +366,7 @@ pub fn field_of_view_within_arc_in_single_octant(
     octant_number: i32,
     view_arc: AngleInterval,
     start_checking_after_this_square_in_the_fov_sequence: WorldStep,
+    accumulated_view_transform: ViewTransform,
 ) -> FovResult {
     let mut fov_result = FovResult::default();
     for relative_square in OctantFOVSquareSequenceIter::new(
@@ -386,11 +390,13 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .partially_visible_squares
                 .insert(absolute_square, partial_visibility_for_square);
         } else {
+            // outside of view arc
             continue;
         }
 
-        let is_sight_blocker = sight_blockers.contains(&absolute_square);
-        if is_sight_blocker {
+        let square_blocks_sight = sight_blockers.contains(&absolute_square);
+
+        if square_blocks_sight {
             // split arc and recurse
             let view_arcs_around_blocker: Vec<AngleInterval> =
                 view_arc.split_around_arc(view_arc_of_this_square);
@@ -406,6 +412,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         octant_number,
                         new_sub_arc,
                         relative_square,
+                        accumulated_view_transform,
                     );
                     fov_result = fov_result.combine(sub_arc_fov);
                 });
@@ -440,6 +447,21 @@ pub fn field_of_view_within_arc_in_single_octant(
                     )
                 })
                 .collect();
+            portal_view_arcs
+                .iter()
+                .for_each(|(&portal, &portal_view_arc)| {
+                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+                        sight_blockers,
+                        portal_geometry,
+                        center_square,
+                        radius,
+                        octant_number,
+                        portal_view_arc,
+                        relative_square,
+                        accumulated_view_transform.transform(portal.view_transform()),
+                    );
+                    fov_result = fov_result.combine(sub_arc_fov);
+                });
 
             // a max of two portals are visible in one square, touching each other at a corner
             // TODO: turn this into a constructor for angleintervals
@@ -450,10 +472,28 @@ pub fn field_of_view_within_arc_in_single_octant(
                 arcs[0].union(*arcs[1])
             } else {
                 panic!(
-                    "there should be one or two portals here: {:?}",
+                    "There should be exactly one or two portals here: {:?}",
                     portal_view_arcs
                 );
             };
+            let view_arcs_around_portals = view_arc.split_around_arc(combined_view_arc);
+            view_arcs_around_portals
+                .into_iter()
+                .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
+                .for_each(|new_sub_arc| {
+                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+                        sight_blockers,
+                        portal_geometry,
+                        center_square,
+                        radius,
+                        octant_number,
+                        new_sub_arc,
+                        relative_square,
+                        accumulated_view_transform,
+                    );
+                    fov_result = fov_result.combine(sub_arc_fov);
+                });
+            break;
 
             todo!()
             // TODO: portals
