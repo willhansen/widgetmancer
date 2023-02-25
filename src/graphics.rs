@@ -256,7 +256,7 @@ impl Graphics {
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
         return if self.square_is_on_screen(square) {
             count_braille_dots(
-                self.get_buffered_glyph(self.world_square_to_left_buffer_square(square))
+                self.get_screen_buffered_glyph(self.world_square_to_left_buffer_square(square))
                     .character,
             )
         } else {
@@ -275,9 +275,7 @@ impl Graphics {
 
     fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
         for (world_square, glyph) in glyph_map {
-            if self.square_is_on_screen(world_square) {
-                self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
-            }
+            self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
         }
     }
 
@@ -324,17 +322,29 @@ impl Graphics {
             BOARD_BLACK
         }
     }
+    pub fn get_glyphs_for_square_from_draw_buffer(&self, world_square: WorldSquare) -> DoubleGlyph {
+        let world_character_squares = world_square_to_both_world_character_squares(world_square);
+        world_character_squares.map(|char_square| {
+            *self
+                .draw_buffer
+                .get(&char_square)
+                .unwrap_or(&Glyph::default_background())
+        })
+    }
 
-    pub fn get_buffered_glyphs_for_square(&self, world_pos: WorldSquare) -> DoubleGlyph {
+    pub fn get_glyphs_for_square_from_screen_buffer(&self, world_pos: WorldSquare) -> DoubleGlyph {
         let buffer_pos = self.world_square_to_left_buffer_square(world_pos);
         [
-            self.get_buffered_glyph(buffer_pos).clone(),
-            self.get_buffered_glyph(buffer_pos + RIGHT_I.cast_unit())
+            self.get_screen_buffered_glyph(buffer_pos).clone(),
+            self.get_screen_buffered_glyph(buffer_pos + RIGHT_I.cast_unit())
                 .clone(),
         ]
     }
 
-    fn get_buffered_glyph(&self, pos: Point2D<i32, CharacterGridInScreenBufferFrame>) -> &Glyph {
+    fn get_screen_buffered_glyph(
+        &self,
+        pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
+    ) -> &Glyph {
         return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }
     fn set_buffered_glyph(
@@ -442,12 +452,7 @@ impl Graphics {
         glyphs: DoubleGlyph,
     ) {
         let world_character_squares = world_square_to_both_world_character_squares(world_square);
-        let background_glyphs: DoubleGlyph = world_character_squares.map(|char_square| {
-            *self
-                .draw_buffer
-                .get(&char_square)
-                .unwrap_or(&Glyph::default_background())
-        });
+        let background_glyphs = self.get_glyphs_for_square_from_draw_buffer(world_square);
 
         let combined_glyphs = glyphs.drawn_over(background_glyphs);
 
@@ -742,7 +747,7 @@ impl Graphics {
         for x in rect.min.x..=rect.max.x {
             for y in rect.min.y..=rect.max.y {
                 let square = WorldSquare::new(x, y);
-                let glyphs = self.get_buffered_glyphs_for_square(square);
+                let glyphs = self.get_glyphs_for_square_from_draw_buffer(square);
                 for glyph in glyphs {
                     let character = glyph.character;
                     count += count_braille_dots(character);
@@ -816,7 +821,7 @@ mod tests {
 
         let test_square = WorldSquare::new(4, 4);
 
-        let [glyph_left, glyph_right] = g.get_buffered_glyphs_for_square(test_square);
+        let [glyph_left, glyph_right] = g.get_glyphs_for_square_from_draw_buffer(test_square);
         //g.print_output_buffer();
 
         assert_eq!(glyph_left.fg_color, RED);
@@ -839,14 +844,14 @@ mod tests {
         let mut g = set_up_graphics();
         g.fill_output_buffer_with_solid_color(BLUE);
         assert_eq!(
-            g.get_buffered_glyphs_for_square(point2(5, 0))[0].bg_color,
+            g.get_glyphs_for_square_from_screen_buffer(point2(5, 0))[0].bg_color,
             BLUE
         );
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
         g.draw_non_board_animations(Instant::now());
         //g.print_output_buffer();
         assert_eq!(
-            g.get_buffered_glyphs_for_square(point2(5, 0))[0].bg_color,
+            g.get_glyphs_for_square_from_screen_buffer(point2(5, 0))[0].bg_color,
             BLUE
         );
         //g.print_output_buffer();
@@ -863,7 +868,7 @@ mod tests {
     fn test_overlapped_glyphs_change_background_color() {
         let mut g = set_up_graphics_with_nxn_squares(6);
         let test_square = WorldSquare::new(3, 4);
-        let glyphs_at_start = g.get_buffered_glyphs_for_square(test_square);
+        let glyphs_at_start = g.get_glyphs_for_square_from_draw_buffer(test_square);
         assert_ne!(glyphs_at_start[0].bg_color, ENEMY_PIECE_COLOR);
         assert_ne!(glyphs_at_start[1].bg_color, ENEMY_PIECE_COLOR);
 
@@ -879,7 +884,7 @@ mod tests {
             test_square.to_f32() + vec2(1.0, 0.0),
             line_color,
         );
-        let glyphs_at_end = g.get_buffered_glyphs_for_square(test_square);
+        let glyphs_at_end = g.get_glyphs_for_square_from_draw_buffer(test_square);
 
         assert_eq!(glyphs_at_end[0].bg_color, ENEMY_PIECE_COLOR);
         //assert_eq!(glyphs_at_end[1].bg_color, ENEMY_PIECE_COLOR);
@@ -933,7 +938,7 @@ mod tests {
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
-        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);
         assert_eq!(drawn_glyphs[0].bg_color, BOARD_WHITE);
@@ -948,14 +953,14 @@ mod tests {
         let the_square = WorldSquare::new(0, 0);
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
 
-        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
 
         let mut fov_mask = FovResult::default();
         fov_mask.fully_visible_squares.insert(the_square);
         g.draw_field_of_view_mask(fov_mask);
 
-        let drawn_glyphs = g.get_buffered_glyphs_for_square(the_square);
+        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
     }
 }

@@ -1707,7 +1707,9 @@ mod tests {
         let square = point2(5, 5);
         game.place_red_pawn(square);
         game.draw_headless_now();
-        let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+        let glyphs = game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(square);
         assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
     }
 
@@ -1811,7 +1813,7 @@ mod tests {
         game.draw_headless_now();
         assert!(game
             .graphics
-            .get_buffered_glyphs_for_square(test_square)
+            .get_glyphs_for_square_from_screen_buffer(test_square)
             .looks_solid());
 
         let death_cube_start_pos = test_square.to_f32() + vec2(0.3, 0.0);
@@ -1820,7 +1822,7 @@ mod tests {
         game.draw_headless_now();
         assert!(!game
             .graphics
-            .get_buffered_glyphs_for_square(test_square)
+            .get_glyphs_for_square_from_screen_buffer(test_square)
             .looks_solid());
     }
 
@@ -1842,7 +1844,7 @@ mod tests {
             (0..4)
                 .map(|dx| {
                     game.graphics
-                        .get_buffered_glyphs_for_square(test_square + STEP_RIGHT * dx)
+                        .get_glyphs_for_square_from_screen_buffer(test_square + STEP_RIGHT * dx)
                         .looks_solid()
                 })
                 .collect()
@@ -1873,13 +1875,13 @@ mod tests {
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.0));
         let cube_color_1 = game
             .graphics
-            .get_buffered_glyphs_for_square(test_square)
+            .get_glyphs_for_square_from_screen_buffer(test_square)
             .get_solid_color()
             .unwrap();
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.23432));
         let cube_color_2 = game
             .graphics
-            .get_buffered_glyphs_for_square(test_square)
+            .get_glyphs_for_square_from_screen_buffer(test_square)
             .get_solid_color()
             .unwrap();
         assert_ne!(cube_color_1, cube_color_2);
@@ -1948,7 +1950,9 @@ mod tests {
         // check all the intermediate squares, but only require at least one of the two characters in each square has a particle
         (start_pos.x + 1..end_pos.x).for_each(|x| {
             let square = point2(x, start_pos.y);
-            let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+            let glyphs = game
+                .graphics
+                .get_glyphs_for_square_from_screen_buffer(square);
             //assert!(!glyphs.looks_solid());
             assert!(
                 glyphs[0].fg_color == BLINK_EFFECT_COLOR
@@ -1974,7 +1978,9 @@ mod tests {
             //game.draw_headless_now();
             for dx in 1..blink_step.x {
                 let square = start_pos + vec2(dx, 0);
-                let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+                let glyphs = game
+                    .graphics
+                    .get_glyphs_for_square_from_screen_buffer(square);
                 //dbg!(glyphs);
                 // There might not be particles in every character square.  Don't test the empty ones
                 if !glyphs[0].looks_solid() {
@@ -2001,7 +2007,9 @@ mod tests {
         game.place_red_pawn(square1);
         game.place_red_pawn(square1 + STEP_UP_RIGHT);
         game.draw_headless_now();
-        let pawn_glyphs = game.graphics.get_buffered_glyphs_for_square(square1);
+        let pawn_glyphs = game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(square1);
 
         assert_eq!(pawn_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
         assert_eq!(pawn_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
@@ -2153,7 +2161,9 @@ mod tests {
         let square = point2(5, 5);
         game.place_arrow(square, STEP_RIGHT);
         game.draw_headless_now();
-        let glyphs = game.graphics.get_buffered_glyphs_for_square(square);
+        let glyphs = game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(square);
         assert_false!(glyphs.looks_solid());
     }
 
@@ -2304,7 +2314,7 @@ mod tests {
         let visible_enemy_square = player_square + STEP_RIGHT;
         assert_false!(game
             .graphics
-            .get_buffered_glyphs_for_square(visible_enemy_square)
+            .get_glyphs_for_square_from_screen_buffer(visible_enemy_square)
             .looks_solid())
     }
 }
