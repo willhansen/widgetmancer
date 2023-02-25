@@ -102,7 +102,7 @@ impl Graphics {
 
     fn buffer_character_is_on_screen(
         &self,
-        buffer_char_pos: Point2D<i32, CharacterGridInBufferFrame>,
+        buffer_char_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> bool {
         return buffer_char_pos.x >= 0
             && buffer_char_pos.x < self.terminal_width as i32
@@ -144,7 +144,7 @@ impl Graphics {
     pub fn world_character_square_to_buffer_square(
         &self,
         world_character_square: Point2D<i32, CharacterGridInWorldFrame>,
-    ) -> Point2D<i32, CharacterGridInBufferFrame> {
+    ) -> Point2D<i32, CharacterGridInScreenBufferFrame> {
         self.world_character_point_to_buffer_point(world_character_square.to_f32())
             .round()
             .to_i32()
@@ -206,9 +206,9 @@ impl Graphics {
         point2(buffer_point.x + 1.0, buffer_point.y + 1.0)
     }
 
-    pub fn buffer_square_to_screen_square(
+    pub fn screen_buffer_square_to_screen_square(
         &self,
-        buffer_pos: Point2D<i32, CharacterGridInBufferFrame>,
+        buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> Point2D<i32, CharacterGridInScreenFrame> {
         // Terminal indexes from 1, and the y axis goes top to bottom
         // The screen buffer indexes from 0, but the y axis also goes top to bottom
@@ -219,7 +219,7 @@ impl Graphics {
     pub fn screen_square_to_buffer_square(
         &self,
         screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
-    ) -> Point2D<i32, CharacterGridInBufferFrame> {
+    ) -> Point2D<i32, CharacterGridInScreenBufferFrame> {
         // Terminal indexes from 1, and the y axis goes top to bottom
         // The screen buffer indexes from 0, but the y axis also goes top to bottom
         // End result is just an off-by-one offset on both axes
@@ -276,7 +276,7 @@ impl Graphics {
     fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
         for (world_square, glyph) in glyph_map {
             if self.square_is_on_screen(world_square) {
-                self.draw_glyphs_for_square(world_square, glyph);
+                self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
             }
         }
     }
@@ -334,12 +334,12 @@ impl Graphics {
         ]
     }
 
-    fn get_buffered_glyph(&self, pos: Point2D<i32, CharacterGridInBufferFrame>) -> &Glyph {
+    fn get_buffered_glyph(&self, pos: Point2D<i32, CharacterGridInScreenBufferFrame>) -> &Glyph {
         return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }
     fn set_buffered_glyph(
         &mut self,
-        pos: Point2D<i32, CharacterGridInBufferFrame>,
+        pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
         new_glyph: Glyph,
     ) {
         self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
@@ -386,9 +386,26 @@ impl Graphics {
         self.current_screen_state = self.screen_buffer.clone();
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {}
+    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
+        todo!()
+    }
 
-    pub fn load_screen_buffer_from_absolute_positions(&mut self) {}
+    pub fn load_screen_buffer_from_absolute_positions_in_draw_buffer(&mut self) {
+        // for character squares on screen
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
+                    point2(buffer_x, buffer_y);
+                let world_character_square =
+                    self.buffer_square_to_world_character_square(buffer_square);
+                if let Some(&glyph) = self.draw_buffer.get(&world_character_square) {
+                    self.draw_glyph_straight_to_screen_buffer(buffer_square, glyph);
+                }
+            }
+        }
+
+        // if associated world square is in draw buffer, put it on screen
+    }
 
     pub fn draw_string(
         &mut self,
@@ -416,29 +433,31 @@ impl Graphics {
         let square_color = Graphics::board_color_at_square(world_pos);
         player_glyphs[0].bg_color = square_color;
         player_glyphs[1].bg_color = square_color;
-        self.draw_glyphs_for_square(world_pos, player_glyphs);
+        self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
-    pub fn draw_glyphs_for_square(&mut self, world_square: WorldSquare, glyphs: DoubleGlyph) {
-        if !self.square_is_on_screen(world_square) {
-            panic!(
-                "Tried to draw square off screen: {}",
-                point_to_string(world_square)
-            );
-        }
-
-        let background_glyphs = self.get_buffered_glyphs_for_square(world_square);
-
-        let left_buffer_square = self.world_square_to_left_buffer_square(world_square);
-        let right_buffer_square = left_buffer_square + RIGHT_I.cast_unit();
+    pub fn draw_glyphs_for_square_to_draw_buffer(
+        &mut self,
+        world_square: WorldSquare,
+        glyphs: DoubleGlyph,
+    ) {
+        let world_character_squares = world_square_to_both_world_character_squares(world_square);
+        let background_glyphs: DoubleGlyph = world_character_squares.map(|char_square| {
+            *self
+                .draw_buffer
+                .get(&char_square)
+                .unwrap_or(&Glyph::default_background())
+        });
 
         let combined_glyphs = glyphs.drawn_over(background_glyphs);
 
-        self.draw_glyph_straight_to_buffer(left_buffer_square, combined_glyphs[0]);
-        self.draw_glyph_straight_to_buffer(right_buffer_square, combined_glyphs[1]);
+        (0..2).for_each(|i| {
+            self.draw_buffer
+                .insert(world_character_squares[i], combined_glyphs[i]);
+        });
     }
 
-    pub fn draw_glyph_straight_to_buffer(
+    pub fn draw_glyph_straight_to_screen_buffer(
         &mut self,
         buffer_square: BufferCharacterSquare,
         new_glyph: Glyph,
@@ -464,20 +483,20 @@ impl Graphics {
             .iter_mut()
             .for_each(|g: &mut Glyph| g.fg_color = color);
 
-        self.draw_glyphs_for_square(square, piece_glyphs);
+        self.draw_glyphs_for_square_to_draw_buffer(square, piece_glyphs);
     }
 
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
-        self.draw_glyphs_for_square(square, Glyph::glyphs_for_upgrade(upgrade));
+        self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_upgrade(upgrade));
     }
     pub fn draw_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
-        self.draw_glyphs_for_square(square, Glyph::glyphs_for_flying_arrow(dir))
+        self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_flying_arrow(dir))
     }
 
     pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set
             .into_iter()
-            .for_each(|&square| self.draw_glyphs_for_square(square, glyphs));
+            .for_each(|&square| self.draw_glyphs_for_square_to_draw_buffer(square, glyphs));
     }
     pub fn draw_move_marker_squares(
         &mut self,
@@ -546,7 +565,7 @@ impl Graphics {
         let mut all_squares = SquareSet::new();
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
-                let buffer_square: Point2D<i32, CharacterGridInBufferFrame> =
+                let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
                 let world_square = self.buffer_square_to_world_square(buffer_square);
                 if self.square_is_on_screen(world_square) {
@@ -685,13 +704,13 @@ impl Graphics {
         // Now update the graphics where applicable
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
-                let buffer_pos: Point2D<i32, CharacterGridInBufferFrame> =
+                let buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
                 if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
                     != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
                 {
                     let screen_pos: Point2D<i32, CharacterGridInScreenFrame> =
-                        self.buffer_square_to_screen_square(buffer_pos);
+                        self.screen_buffer_square_to_screen_square(buffer_pos);
                     write!(
                         writer,
                         "{}",

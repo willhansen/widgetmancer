@@ -7,7 +7,7 @@ pub struct SquareGridInWorldFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInWorldFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInBufferFrame;
+pub struct CharacterGridInScreenBufferFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -42,8 +42,8 @@ pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
-pub type BufferCharacterSquare = Point2D<i32, CharacterGridInBufferFrame>;
-pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
+pub type BufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
+pub type BufferCharacterPoint = Point2D<f32, CharacterGridInScreenBufferFrame>;
 
 pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;

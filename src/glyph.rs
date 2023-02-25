@@ -77,6 +77,9 @@ impl Glyph {
     pub fn default_transparent() -> Glyph {
         Glyph::fg_only(' ', WHITE)
     }
+    pub fn default_background() -> Glyph {
+        Glyph::new(FULL_BLOCK, BLACK, BLACK)
+    }
 
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
         Glyph {
