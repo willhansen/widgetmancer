@@ -52,7 +52,7 @@ impl Portal {
             *entrance.direction() == *exit.direction()
                 || *entrance.direction() == -*exit.direction()
         );
-        assert_ne!(entrance, exit);
+        assert_ne!(exit, entrance.stepped());
         Portal { entrance, exit }
     }
     pub fn get_transform(&self) -> ViewTransform {

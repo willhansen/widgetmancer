@@ -368,7 +368,12 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
             self.graphics
                 .draw_field_of_view_mask(self.fov_mask_for_player());
-        };
+            self.graphics
+                .load_screen_buffer_from_fov(self.fov_mask_for_player());
+        } else {
+            self.graphics.load_screen_buffer_from_absolute_positions();
+        }
+
         self.graphics.display(&mut writer);
     }
 

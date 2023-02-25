@@ -162,7 +162,8 @@ impl PartialVisibilityOfASquare {
 pub struct FovResult {
     pub fully_visible_squares: SquareSet,
     pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
-    pub transformed_sub_fovs: Vec<(FovResult, ViewTransform)>,
+    pub view_transform: Option<ViewTransform>,
+    pub transformed_sub_fovs: Vec<FovResult>,
 }
 
 impl FovResult {
@@ -268,6 +269,7 @@ impl FovResult {
         FovResult {
             fully_visible_squares: all_fully_visible,
             partially_visible_squares: all_partials,
+            view_transform: None,
             transformed_sub_fovs: vec![],
         }
     }
@@ -305,6 +307,7 @@ impl FovResult {
         FovResult {
             partially_visible_squares: new_partials,
             fully_visible_squares: new_visible,
+            view_transform: None,
             transformed_sub_fovs: vec![],
         }
     }

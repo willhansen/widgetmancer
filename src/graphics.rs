@@ -45,9 +45,10 @@ use crate::{
 };
 
 pub struct Graphics {
-    output_buffer: Vec<Vec<Glyph>>,
+    draw_buffer: HashMap<WorldCharacterSquare, Glyph>,
+    screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
-    output_on_screen: Vec<Vec<Glyph>>,
+    current_screen_state: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
     terminal_width: u16,
     terminal_height: u16,
@@ -60,11 +61,12 @@ pub struct Graphics {
 impl Graphics {
     pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         Graphics {
-            output_buffer: vec![
+            draw_buffer: HashMap::default(),
+            screen_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
                 terminal_width as usize
             ],
-            output_on_screen: vec![
+            current_screen_state: vec![
                 vec![Glyph::from_char('x'); terminal_height as usize];
                 terminal_width as usize
             ],
@@ -296,7 +298,7 @@ impl Graphics {
     pub fn fill_output_buffer_with_solid_color(&mut self, color: RGB8) {
         for x in 0..self.terminal_width as usize {
             for y in 0..self.terminal_height as usize {
-                self.output_buffer[x][y] = Glyph::new(' ', WHITE, color);
+                self.screen_buffer[x][y] = Glyph::new(' ', WHITE, color);
             }
         }
     }
@@ -333,26 +335,26 @@ impl Graphics {
     }
 
     fn get_buffered_glyph(&self, pos: Point2D<i32, CharacterGridInBufferFrame>) -> &Glyph {
-        return &self.output_buffer[pos.x as usize][pos.y as usize];
+        return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }
     fn set_buffered_glyph(
         &mut self,
         pos: Point2D<i32, CharacterGridInBufferFrame>,
         new_glyph: Glyph,
     ) {
-        self.output_buffer[pos.x as usize][pos.y as usize] = new_glyph;
+        self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
     }
     #[allow(dead_code)]
     fn get_glyph_on_screen(&self, screen_pos: Point2D<i32, CharacterGridInScreenFrame>) -> &Glyph {
         let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-        return &self.output_on_screen[buffer_pos.x as usize][buffer_pos.y as usize];
+        return &self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize];
     }
 
     pub fn print_output_buffer(&self) {
         for y in 0..self.terminal_height() as usize {
             let mut row_string = String::new();
             for x in 0..self.terminal_width() as usize {
-                row_string += &self.output_buffer[x][y].to_string();
+                row_string += &self.screen_buffer[x][y].to_string();
             }
             row_string += &Glyph::reset_colors();
             if y % 5 == 0 || y == self.terminal_height() as usize - 1 {
@@ -381,8 +383,12 @@ impl Graphics {
         if optional_writer.is_some() {
             self.update_screen(optional_writer.as_mut().unwrap());
         }
-        self.output_on_screen = self.output_buffer.clone();
+        self.current_screen_state = self.screen_buffer.clone();
     }
+
+    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {}
+
+    pub fn load_screen_buffer_from_absolute_positions(&mut self) {}
 
     pub fn draw_string(
         &mut self,
@@ -392,7 +398,7 @@ impl Graphics {
         for i in 0..the_string.chars().count() {
             let character: char = the_string.chars().nth(i).unwrap();
             let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-            self.output_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
+            self.screen_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
                 Glyph::from_char(character);
         }
     }
@@ -402,7 +408,7 @@ impl Graphics {
         screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
     ) -> char {
         let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-        get_by_point(&self.output_on_screen, buffer_pos).character
+        get_by_point(&self.current_screen_state, buffer_pos).character
     }
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
@@ -444,7 +450,7 @@ impl Graphics {
             );
         }
 
-        self.output_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
+        self.screen_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
     pub fn draw_piece_with_color(
@@ -681,8 +687,8 @@ impl Graphics {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_pos: Point2D<i32, CharacterGridInBufferFrame> =
                     point2(buffer_x, buffer_y);
-                if self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
-                    != self.output_on_screen[buffer_pos.x as usize][buffer_pos.y as usize]
+                if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                    != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
                 {
                     let screen_pos: Point2D<i32, CharacterGridInScreenFrame> =
                         self.buffer_square_to_screen_square(buffer_pos);
@@ -695,7 +701,7 @@ impl Graphics {
                     write!(
                         writer,
                         "{}",
-                        self.output_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                        self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
                             .to_string()
                     )
                     .unwrap();
