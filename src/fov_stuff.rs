@@ -160,8 +160,8 @@ impl PartialVisibilityOfASquare {
 
 #[derive(Default, Debug)]
 pub struct FovResult {
-    pub fully_visible_squares: SquareSet,
-    pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
+    fully_visible_squares: SquareSet,
+    partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
     transformed_sub_fovs: Vec<FovResult>,
 }
 
@@ -175,6 +175,9 @@ impl FovResult {
                 the_map.insert(square, partial_visibility.to_glyphs());
             });
         the_map
+    }
+    pub fn manually_add_fully_visible_square(&mut self, square: WorldSquare) {
+        self.fully_visible_squares.insert(square);
     }
     pub fn at_least_partially_visible_squares(&self) -> SquareSet {
         let partial_vis: SquareSet = self.squares_with_partials();
@@ -1133,11 +1136,7 @@ mod tests {
     #[test]
     fn test_get_mapping_from_fov_result() {
         let center: WorldSquare = point2(5, 5);
-        let mut fov_result = FovResult {
-            fully_visible_squares: Default::default(),
-            partially_visible_squares: Default::default(),
-            transformed_sub_fovs: vec![],
-        };
+        let mut fov_result = FovResult::default();
         fov_result.fully_visible_squares.insert(point2(7, 7));
 
         let relative_square = vec2(2, 2);

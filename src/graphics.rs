@@ -973,9 +973,9 @@ mod tests {
         let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
 
-        let mut fov_mask = FovResult::default();
-        fov_mask.fully_visible_squares.insert(the_square);
-        g.draw_field_of_view_mask(fov_mask);
+        let mut fov = FovResult::default();
+        fov.manually_add_fully_visible_square(the_square);
+        g.draw_field_of_view_mask(fov);
 
         let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
