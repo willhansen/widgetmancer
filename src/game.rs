@@ -370,7 +370,7 @@ impl Game {
                 .draw_field_of_view_mask(self.fov_mask_for_player());
             //self.graphics .load_screen_buffer_from_fov(self.fov_mask_for_player());
         } else {
-            //self.graphics .load_screen_buffer_from_absolute_positions_in_draw_buffer();
+            //self.graphics.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         }
         self.graphics
             .load_screen_buffer_from_absolute_positions_in_draw_buffer();

@@ -162,8 +162,7 @@ impl PartialVisibilityOfASquare {
 pub struct FovResult {
     pub fully_visible_squares: SquareSet,
     pub partially_visible_squares: HashMap<WorldSquare, PartialVisibilityOfASquare>,
-    pub view_transform: Option<ViewTransform>,
-    pub transformed_sub_fovs: Vec<FovResult>,
+    transformed_sub_fovs: Vec<FovResult>,
 }
 
 impl FovResult {
@@ -269,7 +268,6 @@ impl FovResult {
         FovResult {
             fully_visible_squares: all_fully_visible,
             partially_visible_squares: all_partials,
-            view_transform: None,
             transformed_sub_fovs: vec![],
         }
     }
@@ -307,8 +305,23 @@ impl FovResult {
         FovResult {
             partially_visible_squares: new_partials,
             fully_visible_squares: new_visible,
-            view_transform: None,
             transformed_sub_fovs: vec![],
+        }
+    }
+
+    pub fn relative_square_is_visible(
+        &self,
+        center: WorldSquare,
+        relative_square: WorldStep,
+    ) -> (bool, Option<PartialVisibilityOfASquare>) {
+        //if self.can_fully_see_relative_square(relative_world_square) {}
+        let absolute_square = center + relative_square;
+        if self.fully_visible_squares.contains(&absolute_square) {
+            (true, None)
+        } else if let Some(&partial) = self.partially_visible_squares.get(&absolute_square) {
+            (true, Some(partial))
+        } else {
+            (false, None)
         }
     }
 }
@@ -1116,5 +1129,21 @@ mod tests {
                 );
             },
         );
+    }
+    #[test]
+    fn test_get_mapping_from_fov_result() {
+        let center: WorldSquare = point2(5, 5);
+        let mut fov_result = FovResult {
+            fully_visible_squares: Default::default(),
+            partially_visible_squares: Default::default(),
+            transformed_sub_fovs: vec![],
+        };
+        fov_result.fully_visible_squares.insert(point2(7, 7));
+
+        let relative_square = vec2(2, 2);
+        let (is_visible, partial_visibility) =
+            fov_result.relative_square_is_visible(center, relative_square);
+        assert!(is_visible);
+        assert!(partial_visibility.is_none());
     }
 }

@@ -397,6 +397,23 @@ impl Graphics {
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
+        let view_center: BufferCharacterSquare =
+            BufferCharacterSquare::new(self.terminal_width() / 2, self.terminal_height() / 2);
+
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
+                    point2(buffer_x, buffer_y);
+                let screen_buffer_square_relative_to_view_center: BufferCharacterStep =
+                    buffer_square - view_center;
+                let relative_character_square_to_draw: WorldCharacterStep =
+                    screen_buffer_square_relative_to_view_center.cast_unit();
+                let relative_world_square_to_draw: WorldStep =
+                    world_character_step_to_world_step(relative_character_square_to_draw);
+                //if let Some(view_transform, optional_partial_visibility) = field_of_view.view_at_relative_square(relative_character_square_to_draw)
+                {}
+            }
+        }
         todo!()
     }
 

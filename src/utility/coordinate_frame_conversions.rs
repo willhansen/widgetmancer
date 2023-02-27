@@ -35,6 +35,7 @@ pub type NStepSet = HashSet<NStep>;
 
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
+pub type WorldCharacterStep = Vector2D<i32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
@@ -44,6 +45,7 @@ pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
 pub type BufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
 pub type BufferCharacterPoint = Point2D<f32, CharacterGridInScreenBufferFrame>;
+pub type BufferCharacterStep = Vector2D<i32, CharacterGridInScreenBufferFrame>;
 
 pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
 pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
@@ -158,6 +160,13 @@ pub fn world_character_point_to_world_point(
 
 pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
     world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
+}
+
+pub fn world_character_step_to_world_step(char_step: WorldCharacterStep) -> WorldStep {
+    let char_square_relative_to_zero = char_step.to_point();
+    let world_square_relative_to_zero =
+        world_character_square_to_world_square(char_square_relative_to_zero);
+    world_square_relative_to_zero.to_vector()
 }
 
 pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
