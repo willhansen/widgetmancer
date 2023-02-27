@@ -368,12 +368,13 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
             self.graphics
                 .draw_field_of_view_mask(self.player_field_of_view());
-            //self.graphics .load_screen_buffer_from_fov(self.fov_mask_for_player());
+            self.graphics
+                .load_screen_buffer_from_fov(self.player_field_of_view());
         } else {
-            //self.graphics.load_screen_buffer_from_absolute_positions_in_draw_buffer();
+            self.graphics
+                .load_screen_buffer_from_absolute_positions_in_draw_buffer();
         }
-        self.graphics
-            .load_screen_buffer_from_absolute_positions_in_draw_buffer();
+        //self.graphics .load_screen_buffer_from_absolute_positions_in_draw_buffer();
 
         self.graphics.display(&mut writer);
     }
@@ -1525,14 +1526,14 @@ impl Game {
         let target_square_relative_to_player = square - self.player_square();
         let (is_visible, partial_option) = self
             .player_field_of_view()
-            .relative_square_is_visible(self.player_square(), target_square_relative_to_player);
+            .visibility_of_relative_square(target_square_relative_to_player);
         is_visible && partial_option.is_none()
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         let (is_visible, partial_option) = self
             .player_field_of_view()
-            .relative_square_is_visible(self.player_square(), target_square_relative_to_player);
+            .visibility_of_relative_square(target_square_relative_to_player);
         !is_visible
     }
     fn player_field_of_view(&self) -> FovResult {

@@ -38,7 +38,7 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::hue_to_rgb;
+use crate::utility::{hue_to_rgb, is_world_character_square_left_square_of_world_square};
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
     Game, IPoint, PieceType, RIGHT_I,
@@ -404,17 +404,40 @@ impl Graphics {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
-                let screen_buffer_square_relative_to_view_center: BufferCharacterStep =
+
+                let screen_buffer_character_square_relative_to_view_center: BufferCharacterStep =
                     buffer_square - view_center;
+
                 let relative_character_square_to_draw: WorldCharacterStep =
-                    screen_buffer_square_relative_to_view_center.cast_unit();
+                    screen_buffer_character_square_relative_to_view_center.cast_unit();
+                let is_left_character_square =
+                    is_world_character_square_left_square_of_world_square(
+                        relative_character_square_to_draw.to_point(),
+                    );
+
                 let relative_world_square_to_draw: WorldStep =
                     world_character_step_to_world_step(relative_character_square_to_draw);
-                //if let Some(view_transform, optional_partial_visibility) = field_of_view.view_at_relative_square(relative_character_square_to_draw)
-                {}
+
+                let (is_visible, partial_option) =
+                    field_of_view.visibility_of_relative_square(relative_world_square_to_draw);
+                if is_visible {
+                    let absolute_world_character_square =
+                        world_square_to_left_world_character_square(field_of_view.root_square());
+
+                    let mut glyph: Glyph = *self
+                        .draw_buffer
+                        .get(&absolute_world_character_square)
+                        .unwrap_or(&Glyph::default_background());
+
+                    if let Some(partial) = partial_option {
+                        let shadow_glyph =
+                            partial.to_glyphs()[if is_left_character_square { 0 } else { 1 }];
+                        glyph = shadow_glyph.drawn_over(glyph);
+                    }
+                    self.draw_glyph_straight_to_screen_buffer(buffer_square, glyph);
+                }
             }
         }
-        todo!()
     }
 
     pub fn load_screen_buffer_from_absolute_positions_in_draw_buffer(&mut self) {
@@ -598,6 +621,7 @@ impl Graphics {
         all_squares
     }
 
+    #[deprecated(note = "draw the fields of view directly instead")]
     pub fn draw_field_of_view_mask(&mut self, fov_mask: FovResult) {
         let glyph_mask_for_partially_visible_squares: WorldSquareGlyphMap =
             fov_mask.partially_visible_squares_as_glyph_mask();
