@@ -372,7 +372,25 @@ impl Graphics {
         return &self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize];
     }
 
-    pub fn print_output_buffer(&self) {
+    pub fn print_draw_buffer(&self, center: WorldCharacterSquare, radius: u32) {
+        let l = 2 * radius + 1;
+        for row in 0..l {
+            let y = center.y + radius as i32 - row as i32;
+            let row_string = (0..l)
+                .into_iter()
+                .map(|column| center.x - radius as i32 + column as i32)
+                .map(|x| {
+                    self.draw_buffer
+                        .get(&point2(x, y))
+                        .unwrap_or(&Glyph::fg_only('*', RED))
+                        .to_string()
+                })
+                .fold(String::new(), |acc, other| acc + &other)
+                + &Glyph::reset_colors();
+            println!("{}", row_string);
+        }
+    }
+    pub fn print_screen_buffer(&self) {
         for y in 0..self.terminal_height() as usize {
             let mut row_string = String::new();
             for x in 0..self.terminal_width() as usize {
@@ -1030,7 +1048,8 @@ mod tests {
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square =
             g.world_character_square_to_buffer_square(world_character_square);
-        g.print_output_buffer();
+        g.print_draw_buffer(point2(0, 0), 5);
+        g.print_screen_buffer();
         assert_eq!(
             g.get_screen_buffered_glyph(screen_buffer_square).fg_color,
             BLUE
