@@ -157,6 +157,17 @@ impl Graphics {
             .round()
             .to_i32()
     }
+    pub fn screen_buffer_step_to_world_character_step(
+        &self,
+        buffer_step: BufferCharacterStep,
+    ) -> WorldCharacterStep {
+        let buffer_square_relative_to_zero = buffer_step.to_point();
+        let world_character_square_relative_to_zero =
+            self.buffer_square_to_world_character_square(buffer_square_relative_to_zero);
+        let world_character_square_of_buffer_zero =
+            self.buffer_square_to_world_character_square(point2(0, 0));
+        world_character_square_relative_to_zero - world_character_square_of_buffer_zero
+    }
 
     pub fn world_square_to_left_buffer_square(
         &self,
@@ -347,6 +358,7 @@ impl Graphics {
     ) -> &Glyph {
         return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }
+
     fn set_buffered_glyph(
         &mut self,
         pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
@@ -408,8 +420,10 @@ impl Graphics {
                 let screen_buffer_character_square_relative_to_view_center: BufferCharacterStep =
                     buffer_square - view_center;
 
-                let relative_character_square_to_draw: WorldCharacterStep =
-                    screen_buffer_character_square_relative_to_view_center.cast_unit();
+                let relative_character_square_to_draw: WorldCharacterStep = self
+                    .screen_buffer_step_to_world_character_step(
+                        screen_buffer_character_square_relative_to_view_center,
+                    );
                 let is_left_character_square =
                     is_world_character_square_left_square_of_world_square(
                         relative_character_square_to_draw.to_point(),
@@ -810,7 +824,9 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
+    use crate::fov_stuff::field_of_view_from_square;
     use crate::piece::PieceType::TurningPawn;
+    use crate::utility::*;
     use crate::{LEFT_I, RIGHT_I};
 
     use super::*;
@@ -1003,5 +1019,29 @@ mod tests {
 
         let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
+    }
+    #[test]
+    fn test_draw_buffer_to_screen_through_field_of_view() {
+        let mut g = set_up_graphics_with_nxn_squares(5);
+        let world_character_square = WorldCharacterSquare::new(3, 2);
+        g.draw_buffer
+            .insert(world_character_square, Glyph::fg_only('#', BLUE));
+        let fov = field_of_view_from_square(point2(0, 0), 5, &Default::default());
+        g.load_screen_buffer_from_fov(fov);
+        let screen_buffer_square =
+            g.world_character_square_to_buffer_square(world_character_square);
+        g.print_output_buffer();
+        assert_eq!(
+            g.get_screen_buffered_glyph(screen_buffer_square).fg_color,
+            BLUE
+        );
+    }
+    #[test]
+    fn test_screen_buffer_step_to_world_character_step_conversion() {
+        let g = set_up_graphics_with_nxn_squares(5);
+        assert_eq!(
+            g.screen_buffer_step_to_world_character_step(STEP_UP_LEFT.cast_unit()),
+            STEP_DOWN_LEFT.cast_unit()
+        );
     }
 }
