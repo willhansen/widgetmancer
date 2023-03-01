@@ -45,6 +45,7 @@ use crate::{
 };
 
 pub struct Graphics {
+    screen_buffer_origin: WorldCharacterSquare,
     draw_buffer: HashMap<WorldCharacterSquare, Glyph>,
     screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
@@ -61,6 +62,7 @@ pub struct Graphics {
 impl Graphics {
     pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         Graphics {
+            screen_buffer_origin: point2(0, terminal_height as i32 - 1),
             draw_buffer: HashMap::default(),
             screen_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
@@ -89,6 +91,16 @@ impl Graphics {
 
     fn terminal_height(&self) -> i32 {
         self.terminal_height as i32
+    }
+
+    fn set_screen_center(&mut self, world_character_square: WorldCharacterSquare) {
+        self.screen_buffer_origin = point2(
+            world_character_square.x - self.terminal_width() / 2,
+            world_character_square.y + self.terminal_height() / 2,
+        );
+    }
+    fn set_screen_origin(&mut self, world_character_square: WorldCharacterSquare) {
+        self.screen_buffer_origin = world_character_square;
     }
 
     fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
@@ -124,9 +136,12 @@ impl Graphics {
     ) -> BufferCharacterPoint {
         // buffer indexes from 0, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
+        // origin of buffer is a world character point
+        let buffer_origin_point = self.screen_buffer_origin.to_f32();
+
         point2(
-            world_character_point.x,
-            self.terminal_height as f32 - (world_character_point.y + 1.0),
+            world_character_point.x - buffer_origin_point.x,
+            (self.terminal_height as f32 - 1.0) - (world_character_point.y - buffer_origin_point.y),
         )
     }
     pub fn buffer_point_to_world_character_point(
@@ -135,9 +150,13 @@ impl Graphics {
     ) -> WorldCharacterPoint {
         // buffer indexes from 0, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
+        // origin of buffer is a world character point
+
+        let buffer_origin_point = self.screen_buffer_origin.to_f32();
+
         point2(
-            buffer_point.x,
-            self.terminal_height as f32 - buffer_point.y - 1.0,
+            buffer_point.x + buffer_origin_point.x,
+            (self.terminal_height as f32 - 1.0) - buffer_point.y + buffer_origin_point.y,
         )
     }
 
@@ -453,8 +472,12 @@ impl Graphics {
                 let (is_visible, partial_option) =
                     field_of_view.visibility_of_relative_square(relative_world_square_to_draw);
                 if is_visible {
-                    let absolute_world_character_square =
-                        world_square_to_left_world_character_square(field_of_view.root_square());
+                    let absolute_world_character_squares =
+                        world_square_to_both_world_character_squares(
+                            field_of_view.root_square() + relative_world_square_to_draw,
+                        );
+                    let absolute_world_character_square = absolute_world_character_squares
+                        [if is_left_character_square { 0 } else { 1 }];
 
                     let mut glyph: Glyph = *self
                         .draw_buffer
@@ -853,7 +876,7 @@ mod tests {
         Graphics::new(40, 20, Instant::now())
     }
 
-    fn set_up_graphics_with_nxn_squares(board_length: u16) -> Graphics {
+    fn set_up_graphics_with_nxn_world_squares(board_length: u16) -> Graphics {
         Graphics::new(board_length * 2, board_length, Instant::now())
     }
 
@@ -941,7 +964,7 @@ mod tests {
 
     #[test]
     fn test_overlapped_glyphs_change_background_color() {
-        let mut g = set_up_graphics_with_nxn_squares(6);
+        let mut g = set_up_graphics_with_nxn_world_squares(6);
         let test_square = WorldSquare::new(3, 4);
         let glyphs_at_start = g.get_glyphs_for_square_from_draw_buffer(test_square);
         assert_ne!(glyphs_at_start[0].bg_color, ENEMY_PIECE_COLOR);
@@ -1006,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_draw_piece_on_board() {
-        let mut g = set_up_graphics_with_nxn_squares(1);
+        let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation(BoardSize::new(1, 1));
         g.draw_board_animation(Instant::now());
@@ -1024,7 +1047,7 @@ mod tests {
     }
     #[test]
     fn test_field_of_view_mask_is_fully_transparent() {
-        let mut g = set_up_graphics_with_nxn_squares(1);
+        let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
 
@@ -1040,24 +1063,45 @@ mod tests {
     }
     #[test]
     fn test_draw_buffer_to_screen_through_field_of_view() {
-        let mut g = set_up_graphics_with_nxn_squares(5);
+        let mut g = set_up_graphics_with_nxn_world_squares(5);
         let world_character_square = WorldCharacterSquare::new(3, 2);
+        let color = CYAN;
         g.draw_buffer
-            .insert(world_character_square, Glyph::fg_only('#', BLUE));
+            .insert(world_character_square, Glyph::fg_only('#', color));
+        g.draw_buffer
+            .insert(point2(0, 0), Glyph::fg_only('#', GREEN));
         let fov = field_of_view_from_square(point2(0, 0), 5, &Default::default());
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square =
             g.world_character_square_to_buffer_square(world_character_square);
-        g.print_draw_buffer(point2(0, 0), 5);
+        g.print_draw_buffer(point2(0, 0), 3);
         g.print_screen_buffer();
+        dbg!(screen_buffer_square, world_character_square);
         assert_eq!(
             g.get_screen_buffered_glyph(screen_buffer_square).fg_color,
-            BLUE
+            color
         );
     }
+
+    #[test]
+    fn test_world_character_grid_to_screen_buffer_grid_conversions() {
+        let mut g = set_up_graphics_with_nxn_world_squares(7);
+        g.set_screen_center(WorldCharacterSquare::new(5, 3));
+        let world_character_square = WorldCharacterSquare::new(3, 4);
+        let screen_buffer_square = BufferCharacterSquare::new(1, 2);
+        assert_eq!(
+            g.world_character_square_to_buffer_square(world_character_square),
+            screen_buffer_square
+        );
+        assert_eq!(
+            g.buffer_square_to_world_character_square(screen_buffer_square),
+            world_character_square
+        );
+    }
+
     #[test]
     fn test_screen_buffer_step_to_world_character_step_conversion() {
-        let g = set_up_graphics_with_nxn_squares(5);
+        let g = set_up_graphics_with_nxn_world_squares(5);
         assert_eq!(
             g.screen_buffer_step_to_world_character_step(STEP_UP_LEFT.cast_unit()),
             STEP_DOWN_LEFT.cast_unit()
