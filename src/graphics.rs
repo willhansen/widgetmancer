@@ -9,13 +9,14 @@ use std::ptr::hash;
 use std::time::{Duration, Instant};
 
 use euclid::*;
-use glyph::glyph_constants::*;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
+
+use glyph::glyph_constants::*;
 
 use crate::animations::blink_animation::BlinkAnimation;
 use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
@@ -139,10 +140,13 @@ impl Graphics {
         // origin of buffer is a world character point
         let buffer_origin_point = self.screen_buffer_origin.to_f32();
 
-        point2(
-            world_character_point.x - buffer_origin_point.x,
-            (self.terminal_height as f32 - 1.0) - (world_character_point.y - buffer_origin_point.y),
-        )
+        let new_x = world_character_point.x - buffer_origin_point.x;
+        let new_unflipped_y = world_character_point.y - buffer_origin_point.y;
+        let new_y = -new_unflipped_y;
+
+        let new_point = point2(new_x, new_y);
+
+        new_point
     }
     pub fn buffer_point_to_world_character_point(
         &self,
@@ -156,7 +160,7 @@ impl Graphics {
 
         point2(
             buffer_point.x + buffer_origin_point.x,
-            (self.terminal_height as f32 - 1.0) - buffer_point.y + buffer_origin_point.y,
+            -buffer_point.y + buffer_origin_point.y,
         )
     }
 
@@ -1045,6 +1049,7 @@ mod tests {
         assert_eq!(drawn_glyphs[1].bg_color, BOARD_WHITE);
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
     }
+
     #[test]
     fn test_field_of_view_mask_is_fully_transparent() {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
@@ -1061,6 +1066,7 @@ mod tests {
         let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
         assert_eq!(drawn_glyphs[0].character, '♟');
     }
+
     #[test]
     fn test_draw_buffer_to_screen_through_field_of_view() {
         let mut g = set_up_graphics_with_nxn_world_squares(5);
@@ -1085,10 +1091,11 @@ mod tests {
 
     #[test]
     fn test_world_character_grid_to_screen_buffer_grid_conversions() {
-        let mut g = set_up_graphics_with_nxn_world_squares(7);
-        g.set_screen_center(WorldCharacterSquare::new(5, 3));
-        let world_character_square = WorldCharacterSquare::new(3, 4);
+        let mut g = set_up_graphics_with_nxn_world_squares(3);
+        g.set_screen_origin(WorldCharacterSquare::new(5, 2));
+        let world_character_square = WorldCharacterSquare::new(6, 0);
         let screen_buffer_square = BufferCharacterSquare::new(1, 2);
+        dbg!(g.screen_buffer_origin);
         assert_eq!(
             g.world_character_square_to_buffer_square(world_character_square),
             screen_buffer_square
