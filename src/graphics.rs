@@ -453,6 +453,10 @@ impl Graphics {
         let view_center: BufferCharacterSquare =
             BufferCharacterSquare::new(self.terminal_width() / 2, self.terminal_height() / 2);
 
+        self.set_screen_center(world_square_to_left_world_character_square(
+            field_of_view.root_square(),
+        ));
+
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
@@ -1080,9 +1084,10 @@ mod tests {
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square =
             g.world_character_square_to_buffer_square(world_character_square);
-        g.print_draw_buffer(point2(0, 0), 3);
-        g.print_screen_buffer();
-        dbg!(screen_buffer_square, world_character_square);
+        //g.print_draw_buffer(point2(0, 0), 3);
+        //g.print_screen_buffer();
+        //dbg!( screen_buffer_square, world_character_square, g.get_screen_buffered_glyph(point2(8, 0)).fg_color );
+        assert_eq!(screen_buffer_square, point2(8, 0));
         assert_eq!(
             g.get_screen_buffered_glyph(screen_buffer_square).fg_color,
             color
@@ -1095,7 +1100,6 @@ mod tests {
         g.set_screen_origin(WorldCharacterSquare::new(5, 2));
         let world_character_square = WorldCharacterSquare::new(6, 0);
         let screen_buffer_square = BufferCharacterSquare::new(1, 2);
-        dbg!(g.screen_buffer_origin);
         assert_eq!(
             g.world_character_square_to_buffer_square(world_character_square),
             screen_buffer_square

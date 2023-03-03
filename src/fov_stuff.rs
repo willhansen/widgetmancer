@@ -167,6 +167,11 @@ pub struct FovResult {
 }
 
 impl FovResult {
+    pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
+        let mut fov = Self::default();
+        fov.root_square = new_center;
+        fov
+    }
     pub fn root_square(&self) -> WorldSquare {
         self.root_square
     }
@@ -272,6 +277,7 @@ impl FovResult {
             squares_somehow_both_fully_and_partially_visible
         );
 
+        assert_eq!(self.root_square, other.root_square);
         FovResult {
             root_square: self.root_square,
             fully_visible_squares: all_fully_visible,
@@ -408,6 +414,8 @@ pub fn field_of_view_within_arc_in_single_octant(
     accumulated_view_transform: ViewTransform,
 ) -> FovResult {
     let mut fov_result = FovResult::default();
+    fov_result.root_square = center_square;
+
     for relative_square in OctantFOVSquareSequenceIter::new(
         octant_number,
         start_checking_after_this_square_in_the_fov_sequence,
@@ -575,7 +583,7 @@ pub fn portal_aware_field_of_view_from_square(
 ) -> FovResult {
     (0..8)
         .fold(
-            FovResult::default(),
+            FovResult::new_empty_fov_at(center_square),
             |fov_result_accumulator: FovResult, octant_number: i32| {
                 let new_fov_result = single_octant_field_of_view(
                     sight_blockers,
