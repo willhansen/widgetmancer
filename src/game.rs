@@ -366,8 +366,7 @@ impl Game {
         if self.player_is_alive() {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
-            self.graphics
-                .draw_field_of_view_mask(self.player_field_of_view());
+            //self.graphics .draw_field_of_view_mask(self.player_field_of_view());
             self.graphics
                 .load_screen_buffer_from_fov(self.player_field_of_view());
         } else {
