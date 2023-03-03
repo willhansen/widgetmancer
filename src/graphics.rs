@@ -104,6 +104,21 @@ impl Graphics {
         self.screen_buffer_origin = world_character_square;
     }
 
+    pub fn center_screen_at_square(&mut self, world_square: WorldSquare) {
+        self.set_screen_center(world_square_to_left_world_character_square(world_square))
+    }
+
+    fn screen_center(&self) -> WorldCharacterSquare {
+        point2(
+            self.screen_buffer_origin.x + self.terminal_width() / 2,
+            self.screen_buffer_origin.y - self.terminal_height() / 2,
+        )
+    }
+
+    pub fn screen_center_square(&self) -> WorldSquare {
+        world_character_square_to_world_square(self.screen_center())
+    }
+
     fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
         self.square_is_on_screen(world_character_square_to_world_square(character_square))
     }
@@ -452,10 +467,6 @@ impl Graphics {
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
         let view_center: BufferCharacterSquare =
             BufferCharacterSquare::new(self.terminal_width() / 2, self.terminal_height() / 2);
-
-        self.set_screen_center(world_square_to_left_world_character_square(
-            field_of_view.root_square(),
-        ));
 
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
@@ -1081,6 +1092,7 @@ mod tests {
         g.draw_buffer
             .insert(point2(0, 0), Glyph::fg_only('#', GREEN));
         let fov = field_of_view_from_square(point2(0, 0), 5, &Default::default());
+        g.center_screen_at_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square =
             g.world_character_square_to_buffer_square(world_character_square);
