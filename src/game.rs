@@ -367,7 +367,7 @@ impl Game {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
             //self.graphics .draw_field_of_view_mask(self.player_field_of_view());
-            self.recenter_screen_on_player_if_required();
+            self.graphics.center_screen_at_square(self.player_square());
             self.graphics
                 .load_screen_buffer_from_fov(self.player_field_of_view());
         } else {
@@ -377,12 +377,6 @@ impl Game {
         //self.graphics .load_screen_buffer_from_absolute_positions_in_draw_buffer();
 
         self.graphics.display(&mut writer);
-    }
-    fn recenter_screen_on_player_if_required(&mut self) {
-        let center_dist = self.player_square() - self.graphics.screen_center_world_square();
-        if king_distance(center_dist) > 10 {
-            self.graphics.center_screen_at_square(self.player_square())
-        }
     }
 
     fn is_player_at(&self, square: WorldSquare) -> bool {
@@ -2329,11 +2323,12 @@ mod tests {
             .looks_solid())
     }
 
+    #[ignore = "Turns out not a great feature"]
     #[test]
     fn test_screen_jumps_to_player_if_far_from_screen_center() {
         let mut game = set_up_nxn_game(20);
         let start_square = point2(5, 5);
-        let recenter_radius = 10; // TODO: make constant
+        let recenter_radius = 10;
         let square2 = point2(start_square.x + recenter_radius - 1, 5);
         let square3 = point2(start_square.x + recenter_radius + 1, 5);
         game.place_player(start_square);
