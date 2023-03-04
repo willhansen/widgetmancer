@@ -43,7 +43,7 @@ pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
-pub type BufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
+pub type ScreenBufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
 pub type BufferCharacterPoint = Point2D<f32, CharacterGridInScreenBufferFrame>;
 pub type BufferCharacterStep = Vector2D<i32, CharacterGridInScreenBufferFrame>;
 
@@ -55,7 +55,7 @@ pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
-pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
+pub type BufferGlyphMap = HashMap<ScreenBufferCharacterSquare, Glyph>;
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
 ) -> WorldCharacterSquareGlyphMap {

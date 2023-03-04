@@ -329,10 +329,10 @@ impl FovResult {
     }
 
     pub fn can_fully_see_absolute_square_relative_to_root(&self, square: WorldSquare) -> bool {
-        self.visibility_of_absolute_square_relative_to_root(square)
+        self.visibility_of_absolute_square_as_seen_from_fov_center(square)
             .0
     }
-    pub fn visibility_of_absolute_square_relative_to_root(
+    pub fn visibility_of_absolute_square_as_seen_from_fov_center(
         &self,
         absolute_square: WorldSquare,
     ) -> (bool, Option<PartialVisibilityOfASquare>) {
@@ -917,7 +917,7 @@ mod tests {
             &SquareSet::from([block_square]),
         );
         let visibility_of_test_square = fov_result
-            .visibility_of_absolute_square_relative_to_root(test_square)
+            .visibility_of_absolute_square_as_seen_from_fov_center(test_square)
             .1
             .unwrap();
         assert_eq!(

@@ -115,8 +115,12 @@ impl Graphics {
         )
     }
 
-    pub fn screen_center_square(&self) -> WorldSquare {
+    pub fn screen_center_world_square(&self) -> WorldSquare {
         world_character_square_to_world_square(self.screen_center())
+    }
+
+    pub fn screen_center_in_screen_space(&self) -> ScreenBufferCharacterSquare {
+        point2(self.terminal_width() / 2, self.terminal_height() / 2)
     }
 
     fn world_character_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
@@ -189,7 +193,7 @@ impl Graphics {
     }
     pub fn buffer_square_to_world_character_square(
         &self,
-        buffer_square: BufferCharacterSquare,
+        buffer_square: ScreenBufferCharacterSquare,
     ) -> WorldCharacterSquare {
         self.buffer_point_to_world_character_point(buffer_square.to_f32())
             .round()
@@ -210,13 +214,13 @@ impl Graphics {
     pub fn world_square_to_left_buffer_square(
         &self,
         world_position: WorldSquare,
-    ) -> BufferCharacterSquare {
+    ) -> ScreenBufferCharacterSquare {
         self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
     pub fn world_square_to_multiple_buffer_squares(
         &self,
         world_position: WorldSquare,
-    ) -> [BufferCharacterSquare; 2] {
+    ) -> [ScreenBufferCharacterSquare; 2] {
         let left_square = self.screen_square_to_buffer_square(
             self.world_square_to_left_screen_square(world_position),
         );
@@ -226,7 +230,7 @@ impl Graphics {
 
     pub fn buffer_square_to_world_square(
         &self,
-        buffer_square: BufferCharacterSquare,
+        buffer_square: ScreenBufferCharacterSquare,
     ) -> WorldSquare {
         world_character_square_to_world_square(
             self.buffer_square_to_world_character_square(buffer_square),
@@ -235,7 +239,7 @@ impl Graphics {
 
     pub fn is_buffer_character_square_left_glyph_of_world_square(
         &self,
-        buffer_square: BufferCharacterSquare,
+        buffer_square: ScreenBufferCharacterSquare,
     ) -> bool {
         self.world_square_to_left_buffer_square(self.buffer_square_to_world_square(buffer_square))
             == buffer_square
@@ -390,7 +394,7 @@ impl Graphics {
         ]
     }
 
-    fn get_screen_buffered_glyph(
+    pub fn get_screen_buffered_glyph(
         &self,
         pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> &Glyph {
@@ -403,11 +407,6 @@ impl Graphics {
         new_glyph: Glyph,
     ) {
         self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
-    }
-    #[allow(dead_code)]
-    fn get_glyph_on_screen(&self, screen_pos: Point2D<i32, CharacterGridInScreenFrame>) -> &Glyph {
-        let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-        return &self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize];
     }
 
     pub fn print_draw_buffer(&self, center: WorldCharacterSquare, radius: u32) {
@@ -465,43 +464,31 @@ impl Graphics {
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
-        let view_center: BufferCharacterSquare =
-            BufferCharacterSquare::new(self.terminal_width() / 2, self.terminal_height() / 2);
-
         for buffer_x in 0..self.terminal_width() {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
 
-                let screen_buffer_character_square_relative_to_view_center: BufferCharacterStep =
-                    buffer_square - view_center;
+                let world_character_square_of_current_screen_buffer_square =
+                    self.buffer_square_to_world_character_square(buffer_square);
 
-                let relative_character_square_to_draw: WorldCharacterStep = self
-                    .screen_buffer_step_to_world_character_step(
-                        screen_buffer_character_square_relative_to_view_center,
-                    );
-                let is_left_character_square =
-                    is_world_character_square_left_square_of_world_square(
-                        relative_character_square_to_draw.to_point(),
-                    );
+                let current_world_square = world_character_square_to_world_square(
+                    world_character_square_of_current_screen_buffer_square,
+                );
 
-                let relative_world_square_to_draw: WorldStep =
-                    world_character_step_to_world_step(relative_character_square_to_draw);
+                let (is_visible, partial_option) = field_of_view
+                    .visibility_of_absolute_square_as_seen_from_fov_center(current_world_square);
 
-                let (is_visible, partial_option) =
-                    field_of_view.visibility_of_relative_square(relative_world_square_to_draw);
                 if is_visible {
-                    let absolute_world_character_squares =
-                        world_square_to_both_world_character_squares(
-                            field_of_view.root_square() + relative_world_square_to_draw,
-                        );
-                    let absolute_world_character_square = absolute_world_character_squares
-                        [if is_left_character_square { 0 } else { 1 }];
-
                     let mut glyph: Glyph = *self
                         .draw_buffer
-                        .get(&absolute_world_character_square)
+                        .get(&world_character_square_of_current_screen_buffer_square)
                         .unwrap_or(&Glyph::default_background());
+
+                    let is_left_character_square =
+                        is_world_character_square_left_square_of_world_square(
+                            world_character_square_of_current_screen_buffer_square,
+                        );
 
                     if let Some(partial) = partial_option {
                         let shadow_glyph =
@@ -578,7 +565,7 @@ impl Graphics {
 
     pub fn draw_glyph_straight_to_screen_buffer(
         &mut self,
-        buffer_square: BufferCharacterSquare,
+        buffer_square: ScreenBufferCharacterSquare,
         new_glyph: Glyph,
     ) {
         if !self.buffer_character_is_on_screen(buffer_square) {
@@ -1111,7 +1098,7 @@ mod tests {
         let mut g = set_up_graphics_with_nxn_world_squares(3);
         g.set_screen_origin(WorldCharacterSquare::new(5, 2));
         let world_character_square = WorldCharacterSquare::new(6, 0);
-        let screen_buffer_square = BufferCharacterSquare::new(1, 2);
+        let screen_buffer_square = ScreenBufferCharacterSquare::new(1, 2);
         assert_eq!(
             g.world_character_square_to_buffer_square(world_character_square),
             screen_buffer_square

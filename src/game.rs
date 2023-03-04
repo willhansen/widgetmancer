@@ -379,7 +379,7 @@ impl Game {
         self.graphics.display(&mut writer);
     }
     fn recenter_screen_on_player_if_required(&mut self) {
-        let center_dist = self.player_square() - self.graphics.screen_center_square();
+        let center_dist = self.player_square() - self.graphics.screen_center_world_square();
         if king_distance(center_dist) > 10 {
             self.graphics.center_screen_at_square(self.player_square())
         }
@@ -2340,14 +2340,36 @@ mod tests {
         game.borrow_graphics_mut()
             .center_screen_at_square(start_square);
         game.draw_headless_now();
-        assert_eq!(game.graphics.screen_center_square(), game.player_square());
+        assert_eq!(
+            game.graphics.screen_center_world_square(),
+            game.player_square()
+        );
+
+        assert_false!(game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .looks_solid());
 
         game.move_player_to(square2);
         game.draw_headless_now();
-        assert_ne!(game.graphics.screen_center_square(), game.player_square());
+        assert_ne!(
+            game.graphics.screen_center_world_square(),
+            game.player_square()
+        );
+        assert!(game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .looks_solid());
 
         game.move_player_to(square3);
         game.draw_headless_now();
-        assert_eq!(game.graphics.screen_center_square(), game.player_square());
+        assert_eq!(
+            game.graphics.screen_center_world_square(),
+            game.player_square()
+        );
+        assert_false!(game
+            .graphics
+            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .looks_solid());
     }
 }
