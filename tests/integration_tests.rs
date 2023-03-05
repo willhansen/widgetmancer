@@ -10,7 +10,7 @@ use rust_roguelike::animations::piece_death_animation::PieceDeathAnimation;
 use rust_roguelike::animations::DOTS_IN_SELECTOR;
 use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
-use rust_roguelike::glyph::DoubleGlyphFunctions;
+use rust_roguelike::glyph::{DoubleGlyph, DoubleGlyphFunctions};
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
@@ -74,7 +74,7 @@ fn test_player_can_not_move_off_high_edge() {
 #[test]
 fn test_checkerboard_background() {
     let mut game = set_up_game_with_player();
-    game.try_set_player_position(point2(0, 0))
+    game.try_set_player_position(point2(1, 2))
         .expect("move player"); // out of the way
 
     game.draw_headless_now();
@@ -208,22 +208,22 @@ fn test_visible_laser() {
 #[test]
 fn test_player_background_is_transparent() {
     let mut game = set_up_game_with_player();
-    let inspection_square: WorldSquare = game.player_square();
 
-    game.draw_headless_now();
+    let player_glyph = |game: &mut Game| -> DoubleGlyph {
+        let inspection_square: WorldSquare = game.player_square();
 
-    let drawn_glyphs_at_pos_1 = game
-        .borrow_graphics_mut()
-        .get_glyphs_for_square_from_screen_buffer(inspection_square);
+        game.draw_headless_now();
+
+        game.borrow_graphics_mut()
+            .get_glyphs_for_square_from_screen_buffer(inspection_square)
+    };
+
+    let drawn_glyphs_at_pos_1 = player_glyph(&mut game);
 
     game.try_slide_player(RIGHT_I.cast_unit())
         .expect("move player");
-    game.draw_headless_now();
 
-    let inspection_square: WorldSquare = game.player_square();
-    let drawn_glyphs_at_pos_2 = game
-        .borrow_graphics_mut()
-        .get_glyphs_for_square_from_screen_buffer(inspection_square);
+    let drawn_glyphs_at_pos_2 = player_glyph(&mut game);
 
     // one horizontal step -> different checker color
     assert_ne!(

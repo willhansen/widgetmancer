@@ -217,6 +217,7 @@ impl Graphics {
     ) -> ScreenBufferCharacterSquare {
         self.screen_square_to_buffer_square(self.world_square_to_left_screen_square(world_position))
     }
+
     pub fn world_square_to_multiple_buffer_squares(
         &self,
         world_position: WorldSquare,
@@ -296,10 +297,9 @@ impl Graphics {
     ) -> Point2D<i32, CharacterGridInScreenFrame> {
         // terminal indexes from 1, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
-        point2(
-            world_position.x * 2 + 1,
-            self.terminal_height as i32 - world_position.y,
-        )
+        let world_char_square = world_square_to_left_world_character_square(world_position);
+        let buffer_square = self.world_character_square_to_buffer_square(world_char_square);
+        self.screen_buffer_square_to_screen_square(buffer_square)
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -903,6 +903,22 @@ mod tests {
             screen_character_square,
             g.world_square_to_left_screen_square(world_square)
         );
+    }
+
+    #[test]
+    fn test_world_to_screen__with_screen_motion() {
+        let mut g = set_up_graphics();
+
+        let world_square: WorldSquare = point2(0, 0);
+        let screen_character_square: ScreenCharacterSquare = point2(1, 5);
+        let screen_pos_1 = g.world_square_to_left_buffer_square(world_square);
+
+        g.set_screen_origin(g.screen_buffer_origin + STEP_RIGHT.cast_unit());
+
+        let screen_pos_2 = g.world_square_to_left_buffer_square(world_square);
+
+        assert_ne!(screen_pos_1, screen_pos_2);
+        assert_eq!(screen_pos_2, screen_pos_1 + STEP_LEFT.cast_unit());
     }
 
     #[test]
