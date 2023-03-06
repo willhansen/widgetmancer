@@ -776,12 +776,14 @@ mod tests {
     #[test]
     fn test_field_of_view_includes_blocks() {
         let start_square = point2(5, 5);
-        let block_square = point2(5, 7);
+        let block_square = start_square + STEP_UP * 2;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
+        let fov_result = field_of_view_from_square(start_square, 5, &blocks);
         assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square));
         assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_DOWN));
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_UP));
+        assert_false!(
+            fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_UP)
+        );
     }
 
     #[test]

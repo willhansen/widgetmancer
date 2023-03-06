@@ -2367,4 +2367,15 @@ mod tests {
             .get_glyphs_for_square_from_screen_buffer(game.player_square())
             .looks_solid());
     }
+
+    #[test]
+    fn test_observed_crash_from_one_pillar_shadow() {
+        let mut game = set_up_nxn_game(20);
+        let player_square = point2(0, 0);
+        let block_offset = vec2(14, -5);
+        game.place_player(player_square);
+        game.place_block(player_square + block_offset);
+        game.draw_headless_now();
+        // shouldn't crash
+    }
 }
