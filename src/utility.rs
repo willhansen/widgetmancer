@@ -9,6 +9,7 @@ use std::ops::{Add, Neg};
 
 use approx::AbsDiffEq;
 use derive_getters::Getters;
+use derive_more::Display;
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use itertools::Itertools;
@@ -506,17 +507,21 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
             }
             1 => candidate_intersections,
             0 => vec![],
-            _ => {
-                panic!(
-                    "Too many intersections {}",
-                    candidate_intersections
-                        .iter()
-                        .map(|&point| point_to_string(point))
-                        .join(", ")
-                );
-            }
+            _ => furthest_apart_points(candidate_intersections).into(),
         }
     }
+}
+fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
+    assert!(points.len() >= 2);
+    let furthest = points
+        .iter()
+        .combinations(2)
+        .max_by_key(|two_points: &Vec<&Point2D<f32, U>>| {
+            OrderedFloat((*two_points[0] - *two_points[1]).length())
+        })
+        .unwrap();
+    let furthest_values: Vec<Point2D<f32, U>> = furthest.into_iter().copied().collect();
+    furthest_values.try_into().unwrap()
 }
 
 fn points_in_line_order<U>(
@@ -1014,5 +1019,12 @@ mod tests {
             standardize_angle(Angle::<f32>::degrees(75.0)).radians,
             standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
+    }
+    #[test]
+    fn test_line_intersections__observed_3_intersections() {
+        line_intersections_with_centered_unit_square(Line::new(
+            WorldPoint::new(-29.5, 5.0),
+            WorldPoint::new(-27.589872, 4.703601),
+        ));
     }
 }
