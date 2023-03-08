@@ -679,8 +679,8 @@ mod tests {
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        angle_from_better_x_axis, line_intersections_with_centered_unit_square, STEP_DOWN,
-        STEP_LEFT, STEP_UP,
+        angle_from_better_x_axis, line_intersections_with_centered_unit_square, SquareWithDir,
+        STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
     use super::*;
@@ -1173,5 +1173,20 @@ mod tests {
             fov_result.visibility_of_relative_square(relative_square);
         assert!(is_visible);
         assert!(partial_visibility.is_none());
+    }
+
+    #[test]
+    fn test_one_octant_with_one_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            SquareWithDir::new(point2(1, 0), STEP_RIGHT),
+            SquareWithDir::new(point2(-5, 0), STEP_UP),
+        );
+
+        let fov_result =
+            single_octant_field_of_view(&Default::default(), &portal_geometry, point2(0, 0), 5, 0);
+
+        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
+        assert!(fov_result.can_fully_see_relative_square(STEP_RIGHT * 2));
     }
 }

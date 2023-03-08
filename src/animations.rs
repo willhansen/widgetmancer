@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // more for visual debugging than an actual test
+    #[ignore = "More for visual debugging than an actual test"]
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
         let animation = RecoilingBoard::new(

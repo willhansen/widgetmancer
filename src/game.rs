@@ -2300,7 +2300,6 @@ mod tests {
         );
     }
 
-    #[ignore = "for now"]
     #[test]
     fn test_see_through_portal__no_rotation() {
         let mut game = set_up_10x10_game();
