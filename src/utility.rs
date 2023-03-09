@@ -286,7 +286,7 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
     if step.square_length() == 0 {
         return step;
     }
-    let radians_from_plus_x = angle_from_better_x_axis(step.to_f32());
+    let radians_from_plus_x = better_angle_from_x_axis(step.to_f32());
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
     let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
 
@@ -375,7 +375,7 @@ pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vect
     if vector.length() == 0.0 {
         return vector;
     }
-    let start_angle = angle_from_better_x_axis(vector);
+    let start_angle = better_angle_from_x_axis(vector);
     let new_angle = start_angle + delta_angle;
     Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
 }
@@ -740,7 +740,7 @@ pub fn intersection<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> Has
     a.intersection(b).cloned().collect()
 }
 
-pub fn angle_from_better_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
+pub fn better_angle_from_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
     Angle::radians(v.y.atan2(v.x))
 }
 
@@ -980,23 +980,23 @@ mod tests {
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            angle_from_better_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
+            better_angle_from_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
             45.0
         );
         assert_about_eq!(
-            angle_from_better_x_axis(default::Vector2D::new(0.0, 0.5)).to_degrees(),
+            better_angle_from_x_axis(default::Vector2D::new(0.0, 0.5)).to_degrees(),
             90.0
         );
         assert_about_eq!(
-            angle_from_better_x_axis(default::Vector2D::new(0.0, -0.5)).to_degrees(),
+            better_angle_from_x_axis(default::Vector2D::new(0.0, -0.5)).to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            angle_from_better_x_axis(default::Vector2D::new(1.0, 0.0)).to_degrees(),
+            better_angle_from_x_axis(default::Vector2D::new(1.0, 0.0)).to_degrees(),
             0.0
         );
         assert_about_eq!(
-            angle_from_better_x_axis(default::Vector2D::new(-1.0, 0.0)).to_degrees(),
+            better_angle_from_x_axis(default::Vector2D::new(-1.0, 0.0)).to_degrees(),
             180.0
         );
     }

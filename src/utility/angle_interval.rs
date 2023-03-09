@@ -13,8 +13,8 @@ use termion::cursor::Left;
 use crate::fov_stuff::PartialVisibilityOfASquare;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_distance, angle_from_better_x_axis, standardize_angle, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    angle_distance, better_angle_from_x_axis, quarter_turns_counter_clockwise, standardize_angle,
+    ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
@@ -59,10 +59,10 @@ impl AngleInterval {
             rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
         ];
 
-        let center_angle = angle_from_better_x_axis(rel_square_center);
+        let center_angle = better_angle_from_x_axis(rel_square_center);
         let corner_angles: Vec<Angle<f32>> = rel_square_corners
             .iter()
-            .map(|rel_corner_point| angle_from_better_x_axis(*rel_corner_point))
+            .map(|rel_corner_point| better_angle_from_x_axis(*rel_corner_point))
             .collect();
 
         let most_clockwise = corner_angles
@@ -82,7 +82,23 @@ impl AngleInterval {
     pub fn from_square_face(relative_square: WorldStep, face_direction: WorldStep) -> Self {
         assert!(ORTHOGONAL_STEPS.contains(&face_direction));
 
-        todo!()
+        let square_center = relative_square.to_f32();
+        let face_center = square_center + face_direction.to_f32();
+        let face_corners = [1, -1].map(|sign| {
+            face_center + quarter_turns_counter_clockwise(&(face_direction.to_f32() / 2.0), sign)
+        });
+
+        let center_angle = better_angle_from_x_axis(face_center);
+        let face_corner_angles = face_corners.map(better_angle_from_x_axis);
+
+        let first_corner_angle_is_more_clockwise =
+            center_angle.angle_to(face_corner_angles[0]).radians < 0.0;
+
+        if first_corner_angle_is_more_clockwise {
+            AngleInterval::new(face_corner_angles[0], face_corner_angles[1])
+        } else {
+            AngleInterval::new(face_corner_angles[1], face_corner_angles[0])
+        }
     }
 
     pub fn union(&self, other: AngleInterval) -> Self {
@@ -409,6 +425,7 @@ impl Display for AngleIntervalSet {
 
 #[cfg(test)]
 mod tests {
+    use crate::utility::{STEP_DOWN, STEP_UP};
     use ntest::{assert_about_eq, assert_false};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
@@ -854,5 +871,16 @@ mod tests {
                 .most_overlapped_edge_of_self(AngleInterval::from_degrees(45.0, 135.0)),
             DirectionalAngularEdge::new(Angle::degrees(90.0), false)
         );
+    }
+    #[test]
+    fn test_arc_from_square_face_is_smallish() {
+        ORTHOGONAL_STEPS.into_iter().for_each(|step| {
+            assert!(
+                AngleInterval::from_square_face(vec2(3, 6), step)
+                    .width()
+                    .to_degrees()
+                    < 45.0
+            )
+        });
     }
 }

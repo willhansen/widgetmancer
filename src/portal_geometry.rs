@@ -48,10 +48,7 @@ pub struct Portal {
 
 impl Portal {
     pub fn new(entrance: SquareWithDir, exit: SquareWithDir) -> Self {
-        assert!(
-            *entrance.direction() == *exit.direction()
-                || *entrance.direction() == -*exit.direction()
-        );
+        //assert!( *entrance.direction() == *exit.direction() || *entrance.direction() == -*exit.direction() );
         assert_ne!(exit, entrance.stepped());
         Portal { entrance, exit }
     }

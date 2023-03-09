@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
 use derive_getters::Getters;
+use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
 use itertools::all;
 use ntest::assert_false;
@@ -24,6 +25,23 @@ use crate::utility::{
     unit_vector_from_angle, HalfPlane, Line, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
     STEP_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
+
+#[derive(Clone, PartialEq, Debug, Copy, Constructor)]
+pub struct SquareVisibility {
+    is_visible: bool,
+    partial_visibility: Option<PartialVisibilityOfASquare>,
+}
+impl SquareVisibility {
+    pub fn is_fully_visible(&self) -> bool {
+        self.is_visible && self.partial_visibility.is_none()
+    }
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+    pub fn partial_visibility(&self) -> Option<PartialVisibilityOfASquare> {
+        self.partial_visibility
+    }
+}
 
 #[derive(Clone, PartialEq, Debug, Copy, Getters)]
 pub struct PartialVisibilityOfASquare {
@@ -325,32 +343,44 @@ impl FovResult {
     }
 
     pub fn can_fully_see_relative_square(&self, step: WorldStep) -> bool {
-        self.visibility_of_relative_square(step).0
+        self.visibility_of_relative_square(step).is_fully_visible()
     }
 
     pub fn can_fully_see_absolute_square_relative_to_root(&self, square: WorldSquare) -> bool {
         self.visibility_of_absolute_square_as_seen_from_fov_center(square)
-            .0
+            .is_fully_visible()
     }
+
     pub fn visibility_of_absolute_square_as_seen_from_fov_center(
         &self,
         absolute_square: WorldSquare,
-    ) -> (bool, Option<PartialVisibilityOfASquare>) {
+    ) -> SquareVisibility {
         let relative_square = absolute_square - self.root_square;
         self.visibility_of_relative_square(relative_square)
     }
 
-    pub fn visibility_of_relative_square(
+    pub fn visibility_of_absolute_square(
         &self,
-        relative_square: WorldStep,
-    ) -> (bool, Option<PartialVisibilityOfASquare>) {
+        world_square: WorldSquare,
+    ) -> Vec<SquareVisibility> {
+        // Due to portals, this may see the same square multiple times
+        todo!()
+    }
+    pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
+        self.visibility_of_absolute_square(world_square)
+            .into_iter()
+            .any(|vis: SquareVisibility| vis.is_visible())
+    }
+
+    pub fn visibility_of_relative_square(&self, relative_square: WorldStep) -> SquareVisibility {
+        // TODO: account for portals
         //if self.can_fully_see_relative_square(relative_world_square) {}
         if self.fully_visible_squares.contains(&relative_square) {
-            (true, None)
+            SquareVisibility::new(true, None)
         } else if let Some(&partial) = self.partially_visible_squares.get(&relative_square) {
-            (true, Some(partial))
+            SquareVisibility::new(true, Some(partial))
         } else {
-            (false, None)
+            SquareVisibility::new(false, None)
         }
     }
 }
@@ -679,7 +709,7 @@ mod tests {
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        angle_from_better_x_axis, line_intersections_with_centered_unit_square, SquareWithDir,
+        better_angle_from_x_axis, line_intersections_with_centered_unit_square, SquareWithDir,
         STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
@@ -690,8 +720,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__horizontal() {
         let view_angle = angle_interval_of_square(vec2(3, 0));
-        let correct_start_angle = angle_from_better_x_axis(WorldMove::new(2.5, 0.5));
-        let correct_end_angle = angle_from_better_x_axis(WorldMove::new(2.5, -0.5));
+        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
+        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,
@@ -706,8 +736,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__diagonalish() {
         let view_angle = angle_interval_of_square(vec2(5, 3));
-        let correct_start_angle = angle_from_better_x_axis(WorldMove::new(4.5, 3.5));
-        let correct_end_angle = angle_from_better_x_axis(WorldMove::new(5.5, 2.5));
+        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
+        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,
@@ -920,7 +950,7 @@ mod tests {
         );
         let visibility_of_test_square = fov_result
             .visibility_of_absolute_square_as_seen_from_fov_center(test_square)
-            .1
+            .partial_visibility
             .unwrap();
         assert_eq!(
             visibility_of_test_square
@@ -1169,10 +1199,9 @@ mod tests {
         let relative_square = vec2(2, 2);
         fov_result.fully_visible_squares.insert(relative_square);
 
-        let (is_visible, partial_visibility) =
-            fov_result.visibility_of_relative_square(relative_square);
-        assert!(is_visible);
-        assert!(partial_visibility.is_none());
+        let square_visibility = fov_result.visibility_of_relative_square(relative_square);
+        assert!(square_visibility.is_fully_visible());
+        assert!(square_visibility.partial_visibility.is_none());
     }
 
     #[test]
@@ -1183,10 +1212,12 @@ mod tests {
             SquareWithDir::new(point2(-5, 0), STEP_UP),
         );
 
+        let center = point2(0, 0);
         let fov_result =
-            single_octant_field_of_view(&Default::default(), &portal_geometry, point2(0, 0), 5, 0);
+            single_octant_field_of_view(&Default::default(), &portal_geometry, center, 5, 0);
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert!(fov_result.can_fully_see_relative_square(STEP_RIGHT * 2));
+        assert_false!(fov_result.can_see_absolute_square(center + STEP_RIGHT * 2));
     }
 }

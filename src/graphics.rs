@@ -476,10 +476,10 @@ impl Graphics {
                     world_character_square_of_current_screen_buffer_square,
                 );
 
-                let (is_visible, partial_option) = field_of_view
+                let visibility = field_of_view
                     .visibility_of_absolute_square_as_seen_from_fov_center(current_world_square);
 
-                if is_visible {
+                if visibility.is_visible() {
                     let mut glyph: Glyph = *self
                         .draw_buffer
                         .get(&world_character_square_of_current_screen_buffer_square)
@@ -490,7 +490,7 @@ impl Graphics {
                             world_character_square_of_current_screen_buffer_square,
                         );
 
-                    if let Some(partial) = partial_option {
+                    if let Some(partial) = visibility.partial_visibility() {
                         let shadow_glyph =
                             partial.to_glyphs()[if is_left_character_square { 0 } else { 1 }];
                         glyph = shadow_glyph.drawn_over(glyph);
