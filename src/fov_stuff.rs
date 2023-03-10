@@ -473,6 +473,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         let visibility_of_this_square: SquareVisibility =
             visibility_of_square(view_arc, relative_square);
+
         if visibility_of_this_square.is_visible() {
             fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
@@ -480,35 +481,17 @@ pub fn field_of_view_within_arc_in_single_octant(
         }
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
+        let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
 
-        if square_blocks_sight {
-            // split arc and recurse
-            let view_arcs_around_blocker: Vec<AngleInterval> =
-                view_arc.split_around_arc(view_arc_of_this_square);
-            view_arcs_around_blocker
-                .into_iter()
-                .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
-                .for_each(|new_sub_arc| {
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
-                        sight_blockers,
-                        portal_geometry,
-                        center_square,
-                        radius,
-                        octant_number,
-                        new_sub_arc,
-                        relative_square,
-                        accumulated_view_transform,
-                    );
-                    fov_result = fov_result.combine(sub_arc_fov);
-                });
-            break;
-        }
+        let maybe_view_blocking_arc: Option<AngleInterval>;
 
         // portals are on inside faces of squares, while stepping out of a square, so if a block has a sight blocker and a portal, the sight blocker takes priority
-        let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
-        if square_has_portal {
+        if square_blocks_sight {
+            maybe_view_blocking_arc = Some(view_arc_of_this_square);
+        } else if square_has_portal {
             let portals_for_square: Vec<Portal> =
                 portal_geometry.portals_entering_from_square(absolute_square);
+
             // portals are only visible if you see the entrance from the correct side
             let visible_portals_for_square: Vec<Portal> = portals_for_square
                 .into_iter()
@@ -519,6 +502,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         > 0.0
                 })
                 .collect();
+
             // Break the view arc around the (up to 2) portals and recurse
             let portal_view_arcs: HashMap<Portal, AngleInterval> = visible_portals_for_square
                 .into_iter()
@@ -562,8 +546,16 @@ pub fn field_of_view_within_arc_in_single_octant(
                 );
             };
 
-            let view_arcs_around_portals = view_arc.split_around_arc(combined_view_arc);
-            view_arcs_around_portals
+            maybe_view_blocking_arc = Some(combined_view_arc);
+        } else {
+            maybe_view_blocking_arc = None;
+        }
+
+        if let Some(view_blocking_arc) = maybe_view_blocking_arc {
+            // split arc and recurse
+            let view_arcs_around_blocker: Vec<AngleInterval> =
+                view_arc.split_around_arc(view_arc_of_this_square);
+            view_arcs_around_blocker
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
@@ -580,9 +572,6 @@ pub fn field_of_view_within_arc_in_single_octant(
                     fov_result = fov_result.combine(sub_arc_fov);
                 });
             break;
-
-            todo!()
-            // TODO: portals
         }
     }
     fov_result
