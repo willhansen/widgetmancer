@@ -10,7 +10,7 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::PartialVisibilityOfASquare;
+use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     angle_distance, better_angle_from_x_axis, quarter_turns_counter_clockwise, standardize_angle,

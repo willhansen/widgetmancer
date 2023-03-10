@@ -383,6 +383,17 @@ impl FovResult {
             SquareVisibility::new(false, None)
         }
     }
+
+    pub fn add_visible_square(&mut self, relative_square: WorldStep, visibility: SquareVisibility) {
+        if visibility.is_fully_visible() {
+            self.fully_visible_squares.insert(relative_square);
+        } else if let Some(partial) = visibility.partial_visibility() {
+            self.partially_visible_squares
+                .insert(relative_square, partial);
+        } else {
+            panic!("told to add non-visible square");
+        }
+    }
 }
 
 struct OctantFOVSquareSequenceIter {
@@ -434,7 +445,7 @@ impl Iterator for OctantFOVSquareSequenceIter {
 }
 
 pub fn field_of_view_within_arc_in_single_octant(
-    sight_blockers: &HashSet<WorldSquare>,
+    sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
     radius: u32,
@@ -460,16 +471,11 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         let view_arc_of_this_square = AngleInterval::from_square(relative_square);
 
-        if view_arc.fully_contains_interval(view_arc_of_this_square) {
-            fov_result.fully_visible_squares.insert(relative_square);
-        } else if view_arc.overlaps_or_touches(view_arc_of_this_square) {
-            let partial_visibility_for_square =
-                partial_visibility_of_square_from_one_view_arc(view_arc, relative_square);
-            fov_result
-                .partially_visible_squares
-                .insert(relative_square, partial_visibility_for_square);
+        let visibility_of_this_square: SquareVisibility =
+            visibility_of_square(view_arc, relative_square);
+        if visibility_of_this_square.is_visible() {
+            fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
-            // outside of view arc
             continue;
         }
 
@@ -555,6 +561,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                     portal_view_arcs
                 );
             };
+
             let view_arcs_around_portals = view_arc.split_around_arc(combined_view_arc);
             view_arcs_around_portals
                 .into_iter()
@@ -643,6 +650,22 @@ pub fn field_of_view_from_square(
 
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
+}
+
+fn visibility_of_square(view_arc: AngleInterval, rel_square: WorldStep) -> SquareVisibility {
+    let square_arc = AngleInterval::from_square(rel_square);
+    if view_arc.fully_contains_interval(square_arc) {
+        SquareVisibility::new(true, None)
+    } else if view_arc.overlaps_or_touches(square_arc) {
+        SquareVisibility::new(
+            true,
+            Some(partial_visibility_of_square_from_one_view_arc(
+                view_arc, rel_square,
+            )),
+        )
+    } else {
+        SquareVisibility::new(false, None)
+    }
 }
 
 fn partial_visibility_of_square_from_one_view_arc(
