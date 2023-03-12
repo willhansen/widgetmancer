@@ -498,7 +498,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .filter(|portal| {
                     unit_vector_from_angle(view_arc.center_angle())
                         .cast_unit()
-                        .dot(portal.entrance().direction().to_f32())
+                        .dot(portal.entrance().direction_vector().to_f32())
                         > 0.0
                 })
                 .collect();
@@ -511,11 +511,12 @@ pub fn field_of_view_within_arc_in_single_octant(
                         portal.clone(),
                         AngleInterval::from_square_face(
                             relative_square,
-                            *portal.entrance().direction(),
+                            portal.entrance().direction_vector(),
                         ),
                     )
                 })
                 .collect();
+
             portal_view_arcs
                 .iter()
                 .for_each(|(&portal, &portal_view_arc)| {
@@ -529,7 +530,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                         relative_square,
                         accumulated_view_transform + portal.get_transform(),
                     );
-                    fov_result = fov_result.combine(sub_arc_fov);
+                    fov_result
+                        .transformed_sub_fovs
+                        .push((portal.get_transform(), sub_arc_fov));
                 });
 
             // a max of two portals are visible in one square, touching each other at a corner
@@ -554,7 +557,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         if let Some(view_blocking_arc) = maybe_view_blocking_arc {
             // split arc and recurse
             let view_arcs_around_blocker: Vec<AngleInterval> =
-                view_arc.split_around_arc(view_arc_of_this_square);
+                view_arc.split_around_arc(view_blocking_arc);
             view_arcs_around_blocker
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
@@ -721,8 +724,8 @@ mod tests {
     use crate::glyph::glyph_constants::FULL_BLOCK;
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        better_angle_from_x_axis, line_intersections_with_centered_unit_square, SquareWithDir,
-        STEP_DOWN, STEP_LEFT, STEP_UP,
+        better_angle_from_x_axis, line_intersections_with_centered_unit_square,
+        SquareWithAdjacentDir, STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
     use super::*;
@@ -1219,17 +1222,35 @@ mod tests {
     #[test]
     fn test_one_octant_with_one_portal() {
         let mut portal_geometry = PortalGeometry::default();
+        let center = point2(0, 0);
+        let entrance_square = center + STEP_RIGHT;
+        let exit_square = center + STEP_LEFT * 5;
         portal_geometry.create_portal(
-            SquareWithDir::new(point2(1, 0), STEP_RIGHT),
-            SquareWithDir::new(point2(-5, 0), STEP_UP),
+            SquareWithAdjacentDir::new(entrance_square, STEP_RIGHT),
+            SquareWithAdjacentDir::new(exit_square, STEP_UP),
         );
 
-        let center = point2(0, 0);
         let fov_result =
             single_octant_field_of_view(&Default::default(), &portal_geometry, center, 5, 0);
 
-        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert!(fov_result.can_fully_see_relative_square(STEP_RIGHT * 2));
-        assert_false!(fov_result.can_see_absolute_square(center + STEP_RIGHT * 2));
+        assert_false!(fov_result.can_see_absolute_square(entrance_square + STEP_RIGHT));
+        assert!(fov_result.can_see_absolute_square(exit_square));
+
+        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
+        assert_eq!(
+            fov_result.transformed_sub_fovs[0].0,
+            ViewTransform::new(STEP_LEFT * 6, 1)
+        );
+        assert_eq!(
+            fov_result.transformed_sub_fovs[0].1.root_square,
+            point2(-5, -2)
+        );
+        assert_false!(fov_result.transformed_sub_fovs[0]
+            .1
+            .can_fully_see_relative_square(STEP_ZERO));
+        assert!(fov_result.transformed_sub_fovs[0]
+            .1
+            .can_fully_see_relative_square(STEP_UP * 2));
     }
 }

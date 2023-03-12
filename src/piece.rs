@@ -17,7 +17,9 @@ use crate::utility::{
     adjacent_king_steps, get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS,
     STEP_RIGHT,
 };
-use crate::{get_4_rotations_of, get_8_octants_of, quarter_turns_counter_clockwise, Glyph};
+use crate::{
+    get_4_rotations_of, get_8_octants_of, rotated_n_quarter_turns_counter_clockwise, Glyph,
+};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 
@@ -158,8 +160,8 @@ impl Piece {
         Piece {
             piece_type: self.piece_type,
             faction: self.faction,
-            faced_direction: Some(quarter_turns_counter_clockwise(
-                &self.faced_direction(),
+            faced_direction: Some(rotated_n_quarter_turns_counter_clockwise(
+                self.faced_direction(),
                 quarter_turns,
             )),
         }

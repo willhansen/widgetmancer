@@ -3,29 +3,39 @@ use std::ops::Add;
 
 use derive_getters::Getters;
 use derive_more::Constructor;
+use itertools::Itertools;
 use ntest::assert_false;
 
 use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
-use crate::utility::{quarter_turns_counter_clockwise, SquareWithDir, STEP_ZERO};
+use crate::utility::{
+    is_orthogonal, rotated_n_quarter_turns_counter_clockwise, QuarterTurnsAnticlockwise,
+    SquareWithAdjacentDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_ZERO,
+};
 
-#[derive(Hash, Eq, PartialEq, Constructor, Getters, Clone, Copy, Debug)]
-pub struct ViewTransform {
-    translation: WorldStep,
-    rotate_180: bool,
-}
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
+pub struct ViewTransform(StepWithQuarterRotations);
 
 impl ViewTransform {
-    pub fn transform(&self, pose: SquareWithDir) -> SquareWithDir {
-        SquareWithDir::new(
-            *pose.square() + self.translation,
-            *pose.direction() * if self.rotate_180 { -1 } else { 1 },
+    pub fn new(
+        translation: WorldStep,
+        quarter_rotations_anticlockwise: QuarterTurnsAnticlockwise,
+    ) -> Self {
+        ViewTransform(StepWithQuarterRotations::new(
+            translation,
+            quarter_rotations_anticlockwise,
+        ))
+    }
+    pub fn transform(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
+        SquareWithOrthogonalDir::new(
+            *pose.square() + *self.0.step(),
+            *pose.direction() + *self.0.rotation(),
         )
     }
-}
-
-impl Default for ViewTransform {
-    fn default() -> Self {
-        ViewTransform::new(STEP_ZERO, false)
+    pub fn from_start_and_end_poses(
+        start: SquareWithOrthogonalDir,
+        end: SquareWithOrthogonalDir,
+    ) -> Self {
+        Self(StepWithQuarterRotations::from_direction_squares(start, end))
     }
 }
 
@@ -33,40 +43,50 @@ impl Add for ViewTransform {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        ViewTransform::new(
-            self.translation + rhs.translation,
-            self.rotate_180 ^ rhs.rotate_180,
-        )
+        ViewTransform(self.0 + rhs.0)
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Getters, Clone, Copy, Debug)]
+impl Default for ViewTransform {
+    fn default() -> Self {
+        ViewTransform(Default::default())
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
 pub struct Portal {
-    entrance: SquareWithDir,
-    exit: SquareWithDir,
+    entrance: SquareWithOrthogonalDir,
+    exit: SquareWithOrthogonalDir,
 }
 
 impl Portal {
-    pub fn new(entrance: SquareWithDir, exit: SquareWithDir) -> Self {
+    pub fn entrance(&self) -> SquareWithOrthogonalDir {
+        self.entrance
+    }
+    pub fn exit(&self) -> SquareWithOrthogonalDir {
+        self.exit
+    }
+    pub fn new(entrance: SquareWithOrthogonalDir, exit: SquareWithOrthogonalDir) -> Self {
         //assert!( *entrance.direction() == *exit.direction() || *entrance.direction() == -*exit.direction() );
         assert_ne!(exit, entrance.stepped());
         Portal { entrance, exit }
     }
     pub fn get_transform(&self) -> ViewTransform {
-        ViewTransform::new(
-            *self.exit().square() - *self.entrance.square(),
-            *self.entrance().direction() == -*self.exit().direction(),
-        )
+        ViewTransform::from_start_and_end_poses(self.entrance, self.exit)
     }
 }
 
 #[derive(Constructor, Default)]
 pub struct PortalGeometry {
-    portal_exits_by_entrance: HashMap<SquareWithDir, SquareWithDir>,
+    portal_exits_by_entrance: HashMap<SquareWithOrthogonalDir, SquareWithOrthogonalDir>,
 }
 
 impl PortalGeometry {
-    pub fn create_portal(&mut self, entrance_step: SquareWithDir, exit_step: SquareWithDir) {
+    pub fn create_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
         assert!(entrance_step.is_square_face());
         assert!(exit_step.is_square_face());
         assert_false!(self.portal_exits_by_entrance.contains_key(&entrance_step));
@@ -74,18 +94,22 @@ impl PortalGeometry {
             .insert(entrance_step, exit_step);
     }
 
-    pub fn portal_aware_single_step(&self, start: SquareWithDir) -> SquareWithDir {
-        if let Some(&exit) = self.portal_exits_by_entrance.get(&start) {
-            exit
+    pub fn portal_aware_single_step(&self, start: SquareWithAdjacentDir) -> SquareWithAdjacentDir {
+        if let Some(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
+            if let Some(&exit) = self.portal_exits_by_entrance.get(&ortho_start) {
+                exit.into()
+            } else {
+                start.stepped()
+            }
         } else {
             start.stepped()
         }
     }
     pub fn multiple_portal_aware_steps(
         &self,
-        start: SquareWithDir,
+        start: SquareWithAdjacentDir,
         num_steps: u32,
-    ) -> SquareWithDir {
+    ) -> SquareWithAdjacentDir {
         (0..num_steps).fold(start, |current_square_and_dir, _| {
             self.portal_aware_single_step(current_square_and_dir)
         })
@@ -100,10 +124,16 @@ impl PortalGeometry {
     pub fn portals_entering_from_square(&self, square: WorldSquare) -> Vec<Portal> {
         self.portal_exits_by_entrance
             .iter()
-            .filter(|(&entrance, &exit): &(&SquareWithDir, &SquareWithDir)| {
-                *entrance.square() == square
-            })
-            .map(|(&entrance, &exit): (&SquareWithDir, &SquareWithDir)| Portal::new(entrance, exit))
+            .filter(
+                |(&entrance, &exit): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
+                    *entrance.square() == square
+                },
+            )
+            .map(
+                |(&entrance, &exit): (&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
+                    Portal::new(entrance, exit)
+                },
+            )
             .collect()
     }
 }

@@ -5,11 +5,11 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::mem;
-use std::ops::{Add, Neg};
+use std::ops::{Add, Neg, Sub};
 
 use approx::AbsDiffEq;
 use derive_getters::Getters;
-use derive_more::Display;
+use derive_more::{Constructor, Display};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use itertools::Itertools;
@@ -62,6 +62,41 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_RIGHT,
     STEP_DOWN_LEFT,
 ];
+
+#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct QuarterTurnsAnticlockwise {
+    quarter_turns: i32,
+}
+
+impl QuarterTurnsAnticlockwise {
+    pub fn new(quarter_turns: i32) -> Self {
+        QuarterTurnsAnticlockwise {
+            quarter_turns: quarter_turns.rem_euclid(4),
+        }
+    }
+    pub fn quarter_turns(&self) -> i32 {
+        self.quarter_turns
+    }
+    pub fn to_vector(&self) -> WorldStep {
+        rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
+    }
+}
+
+impl Add for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.quarter_turns() + rhs.quarter_turns())
+    }
+}
+
+impl Sub for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.quarter_turns() - rhs.quarter_turns())
+    }
+}
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Line<T, U> {
@@ -225,13 +260,13 @@ pub fn int_to_T<T: Signed>(x: i32) -> T {
     }
 }
 
-pub fn quarter_turns_counter_clockwise<T: Signed + Copy, U>(
-    v: &Vector2D<T, U>,
-    quarter_periods: i32,
+pub fn rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
+    v: Vector2D<T, U>,
+    quarter_turns: i32,
 ) -> Vector2D<T, U> {
     vec2(
-        v.x * int_to_T(int_cos(quarter_periods)) - v.y * int_to_T(int_sin(quarter_periods)),
-        v.x * int_to_T(int_sin(quarter_periods)) + v.y * int_to_T(int_cos(quarter_periods)),
+        v.x * int_to_T(int_cos(quarter_turns)) - v.y * int_to_T(int_sin(quarter_turns)),
+        v.x * int_to_T(int_sin(quarter_turns)) + v.y * int_to_T(int_cos(quarter_turns)),
     )
 }
 
@@ -255,7 +290,7 @@ pub fn int_sin(quarter_periods: i32) -> i32 {
 
 pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     (0..4)
-        .map(|i| quarter_turns_counter_clockwise(&v, i))
+        .map(|i| rotated_n_quarter_turns_counter_clockwise(v, i))
         .collect()
 }
 
@@ -511,6 +546,7 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
         }
     }
 }
+
 fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
     assert!(points.len() >= 2);
     let furthest = points
@@ -697,16 +733,68 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
     }
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters, Constructor)]
+pub struct StepWithQuarterRotations {
+    step: WorldStep,
+    rotation: QuarterTurnsAnticlockwise,
+}
+
+impl StepWithQuarterRotations {
+    pub fn from_direction_squares(
+        start: SquareWithOrthogonalDir,
+        end: SquareWithOrthogonalDir,
+    ) -> Self {
+        let translation = *end.square() - *start.square();
+        let rotation = *end.direction() - *start.direction();
+        Self::new(translation, rotation)
+    }
+}
+
+impl Default for StepWithQuarterRotations {
+    fn default() -> Self {
+        StepWithQuarterRotations::new(STEP_ZERO, QuarterTurnsAnticlockwise::new(0))
+    }
+}
+
+impl Add for StepWithQuarterRotations {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        StepWithQuarterRotations::new(self.step + rhs.step, self.rotation + rhs.rotation)
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters, Constructor)]
+pub struct SquareWithOrthogonalDir {
+    square: WorldSquare,
+    direction: QuarterTurnsAnticlockwise,
+}
+
+impl SquareWithOrthogonalDir {
+    pub fn direction_vector(&self) -> WorldStep {
+        self.direction.to_vector()
+    }
+    pub fn stepped(&self) -> Self {
+        SquareWithOrthogonalDir::new(self.square + self.direction_vector(), self.direction)
+    }
+}
+
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
-pub struct SquareWithDir {
+pub struct SquareWithAdjacentDir {
     square: WorldSquare,
     direction: WorldStep,
 }
 
-impl SquareWithDir {
-    pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithDir {
+impl SquareWithAdjacentDir {
+    pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithAdjacentDir {
         assert!(KING_STEPS.contains(&direction));
-        SquareWithDir { square, direction }
+        SquareWithAdjacentDir { square, direction }
+    }
+    pub fn from_square_with_orthogonal_dir(other: SquareWithOrthogonalDir) -> Self {
+        SquareWithAdjacentDir {
+            square: *other.square(),
+            direction: other.direction_vector(),
+        }
     }
     pub fn tuple(&self) -> (WorldSquare, WorldStep) {
         (self.square, self.direction)
@@ -714,8 +802,8 @@ impl SquareWithDir {
     pub fn is_square_face(&self) -> bool {
         ORTHOGONAL_STEPS.contains(&self.direction)
     }
-    pub fn stepped(&self) -> SquareWithDir {
-        SquareWithDir::new(self.square + self.direction, self.direction)
+    pub fn stepped(&self) -> SquareWithAdjacentDir {
+        SquareWithAdjacentDir::new(self.square + self.direction, self.direction)
     }
 }
 
@@ -1020,6 +1108,7 @@ mod tests {
             standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
     }
+
     #[test]
     fn test_line_intersections__observed_3_intersections() {
         line_intersections_with_centered_unit_square(Line::new(

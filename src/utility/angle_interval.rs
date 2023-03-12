@@ -13,8 +13,9 @@ use termion::cursor::Left;
 use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_distance, better_angle_from_x_axis, quarter_turns_counter_clockwise, standardize_angle,
-    ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
+    standardize_angle, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
+    STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
@@ -85,7 +86,8 @@ impl AngleInterval {
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.to_f32();
         let face_corners = [1, -1].map(|sign| {
-            face_center + quarter_turns_counter_clockwise(&(face_direction.to_f32() / 2.0), sign)
+            face_center
+                + rotated_n_quarter_turns_counter_clockwise(&(face_direction.to_f32() / 2.0), sign)
         });
 
         let center_angle = better_angle_from_x_axis(face_center);
