@@ -26,9 +26,9 @@ impl ViewTransform {
         ))
     }
     pub fn transform(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
-        SquareWithOrthogonalDir::new(
-            *pose.square() + *self.0.step(),
-            *pose.direction() + *self.0.rotation(),
+        SquareWithOrthogonalDir::from_square_and_turns(
+            pose.square() + *self.0.step(),
+            pose.direction_in_quarter_turns() + *self.0.rotation(),
         )
     }
     pub fn from_start_and_end_poses(
@@ -87,15 +87,13 @@ impl PortalGeometry {
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
-        assert!(entrance_step.is_square_face());
-        assert!(exit_step.is_square_face());
         assert_false!(self.portal_exits_by_entrance.contains_key(&entrance_step));
         self.portal_exits_by_entrance
             .insert(entrance_step, exit_step);
     }
 
     pub fn portal_aware_single_step(&self, start: SquareWithAdjacentDir) -> SquareWithAdjacentDir {
-        if let Some(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
+        if let Ok(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
             if let Some(&exit) = self.portal_exits_by_entrance.get(&ortho_start) {
                 exit.into()
             } else {
@@ -118,7 +116,7 @@ impl PortalGeometry {
     pub fn square_has_portal_entrance(&self, square: WorldSquare) -> bool {
         self.portal_exits_by_entrance
             .iter()
-            .any(|(entrance, exit)| *entrance.square() == square)
+            .any(|(entrance, exit)| entrance.square() == square)
     }
 
     pub fn portals_entering_from_square(&self, square: WorldSquare) -> Vec<Portal> {
@@ -126,7 +124,7 @@ impl PortalGeometry {
             .iter()
             .filter(
                 |(&entrance, &exit): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
-                    *entrance.square() == square
+                    entrance.square() == square
                 },
             )
             .map(

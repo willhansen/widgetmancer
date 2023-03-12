@@ -80,6 +80,22 @@ impl QuarterTurnsAnticlockwise {
     pub fn to_vector(&self) -> WorldStep {
         rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
     }
+    pub fn from_vector(dir: WorldStep) -> Self {
+        assert!(is_orthogonal(dir));
+        QuarterTurnsAnticlockwise::new(if dir.x == 0 {
+            if dir.y > 0 {
+                1
+            } else {
+                3
+            }
+        } else {
+            if dir.x > 0 {
+                0
+            } else {
+                2
+            }
+        })
+    }
 }
 
 impl Add for QuarterTurnsAnticlockwise {
@@ -744,8 +760,8 @@ impl StepWithQuarterRotations {
         start: SquareWithOrthogonalDir,
         end: SquareWithOrthogonalDir,
     ) -> Self {
-        let translation = *end.square() - *start.square();
-        let rotation = *end.direction() - *start.direction();
+        let translation = end.square() - start.square();
+        let rotation = end.direction_in_quarter_turns() - start.direction_in_quarter_turns();
         Self::new(translation, rotation)
     }
 }
@@ -764,18 +780,57 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters, Constructor)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct SquareWithOrthogonalDir {
     square: WorldSquare,
     direction: QuarterTurnsAnticlockwise,
 }
 
 impl SquareWithOrthogonalDir {
+    pub fn from_square_and_dir(square: WorldSquare, direction: WorldStep) -> Self {
+        SquareWithOrthogonalDir {
+            square,
+            direction: QuarterTurnsAnticlockwise::from_vector(direction),
+        }
+    }
+    pub fn new(square: WorldSquare, direction: WorldStep) -> Self {
+        SquareWithOrthogonalDir::new(square, direction)
+    }
+    pub fn from_square_and_turns(
+        square: WorldSquare,
+        quarter_turns: QuarterTurnsAnticlockwise,
+    ) -> Self {
+        SquareWithOrthogonalDir::new(square, quarter_turns.to_vector())
+    }
+    pub fn square(&self) -> WorldSquare {
+        self.square
+    }
+    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
+        self.direction
+    }
     pub fn direction_vector(&self) -> WorldStep {
         self.direction.to_vector()
     }
     pub fn stepped(&self) -> Self {
-        SquareWithOrthogonalDir::new(self.square + self.direction_vector(), self.direction)
+        SquareWithOrthogonalDir::new(
+            self.square + self.direction_vector(),
+            self.direction_vector(),
+        )
+    }
+}
+
+impl TryFrom<SquareWithAdjacentDir> for SquareWithOrthogonalDir {
+    type Error = ();
+
+    fn try_from(value: SquareWithAdjacentDir) -> Result<Self, Self::Error> {
+        if is_orthogonal(*value.direction()) {
+            Ok(SquareWithOrthogonalDir::new(
+                *value.square(),
+                *value.direction(),
+            ))
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -790,12 +845,6 @@ impl SquareWithAdjacentDir {
         assert!(KING_STEPS.contains(&direction));
         SquareWithAdjacentDir { square, direction }
     }
-    pub fn from_square_with_orthogonal_dir(other: SquareWithOrthogonalDir) -> Self {
-        SquareWithAdjacentDir {
-            square: *other.square(),
-            direction: other.direction_vector(),
-        }
-    }
     pub fn tuple(&self) -> (WorldSquare, WorldStep) {
         (self.square, self.direction)
     }
@@ -804,6 +853,15 @@ impl SquareWithAdjacentDir {
     }
     pub fn stepped(&self) -> SquareWithAdjacentDir {
         SquareWithAdjacentDir::new(self.square + self.direction, self.direction)
+    }
+}
+
+impl From<SquareWithOrthogonalDir> for SquareWithAdjacentDir {
+    fn from(value: SquareWithOrthogonalDir) -> Self {
+        SquareWithAdjacentDir {
+            square: value.square(),
+            direction: value.direction_vector(),
+        }
     }
 }
 

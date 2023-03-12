@@ -725,7 +725,8 @@ mod tests {
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
         better_angle_from_x_axis, line_intersections_with_centered_unit_square,
-        SquareWithAdjacentDir, STEP_DOWN, STEP_LEFT, STEP_UP,
+        QuarterTurnsAnticlockwise, SquareWithAdjacentDir, SquareWithOrthogonalDir, STEP_DOWN,
+        STEP_LEFT, STEP_UP,
     };
 
     use super::*;
@@ -1226,8 +1227,8 @@ mod tests {
         let entrance_square = center + STEP_RIGHT;
         let exit_square = center + STEP_LEFT * 5;
         portal_geometry.create_portal(
-            SquareWithAdjacentDir::new(entrance_square, STEP_RIGHT),
-            SquareWithAdjacentDir::new(exit_square, STEP_UP),
+            SquareWithOrthogonalDir::new(entrance_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::new(exit_square, STEP_UP),
         );
 
         let fov_result =
@@ -1240,7 +1241,7 @@ mod tests {
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert_eq!(
             fov_result.transformed_sub_fovs[0].0,
-            ViewTransform::new(STEP_LEFT * 6, 1)
+            ViewTransform::new(STEP_LEFT * 6, QuarterTurnsAnticlockwise::new(1))
         );
         assert_eq!(
             fov_result.transformed_sub_fovs[0].1.root_square,
