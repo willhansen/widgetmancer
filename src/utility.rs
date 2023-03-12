@@ -794,7 +794,10 @@ impl SquareWithOrthogonalDir {
         }
     }
     pub fn new(square: WorldSquare, direction: WorldStep) -> Self {
-        SquareWithOrthogonalDir::new(square, direction)
+        SquareWithOrthogonalDir {
+            square,
+            direction: QuarterTurnsAnticlockwise::from_vector(direction),
+        }
     }
     pub fn from_square_and_turns(
         square: WorldSquare,
