@@ -98,6 +98,14 @@ impl QuarterTurnsAnticlockwise {
     }
 }
 
+impl Neg for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        QuarterTurnsAnticlockwise::new(-self.quarter_turns)
+    }
+}
+
 impl Add for QuarterTurnsAnticlockwise {
     type Output = Self;
 

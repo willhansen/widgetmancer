@@ -13,7 +13,7 @@ use crate::utility::{
 };
 
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
-pub struct ViewTransform(StepWithQuarterRotations);
+pub struct ViewTransform(pub StepWithQuarterRotations);
 
 impl ViewTransform {
     pub fn new(
