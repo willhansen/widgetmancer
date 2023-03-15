@@ -84,7 +84,7 @@ impl AngleInterval {
         assert!(ORTHOGONAL_STEPS.contains(&face_direction));
 
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.to_f32();
+        let face_center = square_center + face_direction.to_f32() / 2.0;
         let face_corners = [1, -1].map(|sign| {
             face_center
                 + rotated_n_quarter_turns_counter_clockwise(face_direction.to_f32() / 2.0, sign)

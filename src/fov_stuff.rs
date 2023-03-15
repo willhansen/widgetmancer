@@ -1397,4 +1397,20 @@ mod tests {
         assert!(main_fov.can_fully_see_relative_square(vec2(-4, 0)));
         assert!(main_fov.can_see_absolute_square(point2(1, 4)));
     }
+    #[test]
+    fn test_square_fully_covered_by_face() {
+        let view_arc_of_face = AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT);
+        let square = STEP_RIGHT * 2;
+
+        let visibility = visibility_of_square(view_arc_of_face, square);
+        assert_false!(visibility.is_visible());
+    }
+    #[test]
+    fn test_square_fully_not_covered_by_adjacent() {
+        let view_arc_of_face = AngleInterval::from_square_face(STEP_UP_RIGHT, STEP_RIGHT);
+        let square = STEP_RIGHT * 2;
+
+        let visibility = visibility_of_square(view_arc_of_face, square);
+        assert!(visibility.is_fully_visible());
+    }
 }
