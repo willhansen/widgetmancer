@@ -764,7 +764,7 @@ fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
 
 fn visibility_of_square(view_arc: AngleInterval, rel_square: WorldStep) -> SquareVisibility {
     let square_arc = AngleInterval::from_square(rel_square);
-    if view_arc.fully_contains_interval(square_arc) {
+    if view_arc.at_least_fully_overlaps(square_arc) {
         SquareVisibility::new(true, None)
     } else if view_arc.overlaps_or_touches(square_arc) {
         SquareVisibility::new(
@@ -1403,7 +1403,7 @@ mod tests {
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
-        assert_false!(visibility.is_visible());
+        assert!(visibility.is_fully_visible());
     }
     #[test]
     fn test_square_fully_not_covered_by_adjacent() {
@@ -1411,6 +1411,6 @@ mod tests {
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
-        assert!(visibility.is_fully_visible());
+        assert_false!(visibility.is_visible());
     }
 }

@@ -124,6 +124,10 @@ impl AngleInterval {
         AngleInterval::new(self.anticlockwise_end, self.clockwise_end)
     }
 
+    pub fn at_least_fully_overlaps(&self, other: AngleInterval) -> bool {
+        self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
+    }
+
     fn partially_or_fully_overlaps(&self, other: AngleInterval) -> bool {
         // self overlap
         if other == *self {
@@ -895,5 +899,44 @@ mod tests {
                 .anticlockwise_end
                 .to_degrees()
         );
+    }
+    #[test]
+    fn test_arc_at_least_fully_overlap() {
+        let cw = Angle::degrees(5.0);
+        let ccw = Angle::degrees(25.0);
+        let d = Angle::degrees(1.0);
+
+        let arc = AngleInterval::new(cw, ccw);
+        let arc_extend_cw = AngleInterval::new(cw - d, ccw);
+        let arc_retract_cw = AngleInterval::new(cw + d, ccw);
+        let arc_extend_ccw = AngleInterval::new(cw, ccw + d);
+        let arc_retract_ccw = AngleInterval::new(cw, ccw - d);
+        let arc_extend_both = AngleInterval::new(cw - d, ccw + d);
+        let arc_retract_both = AngleInterval::new(cw + d, ccw - d);
+
+        assert!(arc.at_least_fully_overlaps(arc));
+
+        assert_false!(arc.at_least_fully_overlaps(arc_extend_cw));
+        assert_false!(arc.at_least_fully_overlaps(arc_extend_ccw));
+        assert_false!(arc.at_least_fully_overlaps(arc_extend_both));
+        assert!(arc.at_least_fully_overlaps(arc_retract_cw));
+        assert!(arc.at_least_fully_overlaps(arc_retract_ccw));
+        assert!(arc.at_least_fully_overlaps(arc_retract_both));
+
+        //commutation
+        assert!(arc_extend_cw.at_least_fully_overlaps(arc));
+        assert!(arc_extend_ccw.at_least_fully_overlaps(arc));
+        assert!(arc_extend_both.at_least_fully_overlaps(arc));
+        assert_false!(arc_retract_cw.at_least_fully_overlaps(arc));
+        assert_false!(arc_retract_ccw.at_least_fully_overlaps(arc));
+        assert_false!(arc_retract_both.at_least_fully_overlaps(arc));
+
+        // complements
+        assert_false!(arc.at_least_fully_overlaps(arc.complement()));
+
+        assert_false!(arc.at_least_fully_overlaps(arc_extend_cw.complement()));
+        assert_false!(arc.at_least_fully_overlaps(arc_extend_ccw.complement()));
+        assert_false!(arc.at_least_fully_overlaps(arc_retract_cw.complement()));
+        assert_false!(arc.at_least_fully_overlaps(arc_retract_ccw.complement()));
     }
 }
