@@ -197,15 +197,18 @@ pub struct FovResult {
 }
 
 impl FovResult {
-    pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
+    pub fn new_oriented_empty_fov_at(oriented_center: SquareWithOrthogonalDir) -> Self {
         FovResult {
-            root_square_with_direction: SquareWithOrthogonalDir::from_square_and_dir(
-                new_center, STEP_UP,
-            ),
+            root_square_with_direction: oriented_center,
             fully_visible_squares: Default::default(),
             partially_visible_squares: Default::default(),
             transformed_sub_fovs: vec![],
         }
+    }
+    pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
+        Self::new_oriented_empty_fov_at(SquareWithOrthogonalDir::from_square_and_dir(
+            new_center, STEP_UP,
+        ))
     }
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
@@ -393,7 +396,22 @@ impl FovResult {
         world_square: WorldSquare,
     ) -> Vec<SquareVisibility> {
         // Due to portals, this may see the same square multiple times
-        todo!()
+        let rel_to_root = world_square - self.root_square();
+        let visibility_in_untransformed_view =
+            self.visibility_of_relative_square_in_untransformed_view(rel_to_root);
+
+        let mut visibilities = vec![];
+        if visibility_in_untransformed_view.is_visible() {
+            visibilities.push(visibility_in_untransformed_view);
+        }
+
+        self.transformed_sub_fovs
+            .iter()
+            .for_each(|sub_fov: &FovResult| {
+                let mut sub_visibilities = sub_fov.visibility_of_absolute_square(world_square);
+                visibilities.append(&mut sub_visibilities);
+            });
+        visibilities
     }
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
         self.visibility_of_absolute_square(world_square)
@@ -418,6 +436,8 @@ impl FovResult {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
+        dbg!("asdfasdf A", relative_square);
+
         if let Some(visibility) = self
             .transformed_sub_fovs
             .iter()
@@ -441,6 +461,12 @@ impl FovResult {
         sub_view: &FovResult,
     ) -> SquareVisibility {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
+        dbg!(
+            "asdfasdf B",
+            relative_square,
+            sub_view.root_square_with_direction,
+            view_transform_to_sub_view
+        );
 
         let quarter_rotations: QuarterTurnsAnticlockwise = *view_transform_to_sub_view.0.rotation();
 
@@ -449,7 +475,7 @@ impl FovResult {
             quarter_rotations.quarter_turns(),
         );
 
-        let rotated_visibility = sub_view.visibility_of_relative_square(relative_square);
+        let rotated_visibility = sub_view.visibility_of_relative_square(rotated_relative_square);
 
         let derotated_visibility = rotated_visibility.rotated(-quarter_rotations);
 
@@ -457,8 +483,6 @@ impl FovResult {
     }
 
     pub fn visibility_of_relative_square(&self, relative_square: WorldStep) -> SquareVisibility {
-        // TODO: account for portals
-        //if self.can_fully_see_relative_square(relative_world_square) {}
         let top_level_visibility =
             self.visibility_of_relative_square_in_untransformed_view(relative_square);
         if top_level_visibility.is_visible() {
@@ -537,14 +561,13 @@ impl Iterator for OctantFOVSquareSequenceIter {
 pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
-    center_square: WorldSquare,
+    oriented_center_square: SquareWithOrthogonalDir,
     radius: u32,
     octant_number: i32,
     view_arc: AngleInterval,
     start_checking_after_this_square_in_the_fov_sequence: WorldStep,
-    accumulated_view_transform: ViewTransform,
 ) -> FovResult {
-    let mut fov_result = FovResult::new_empty_fov_at(center_square);
+    let mut fov_result = FovResult::new_oriented_empty_fov_at(oriented_center_square);
 
     for relative_square in OctantFOVSquareSequenceIter::new(
         octant_number,
@@ -556,7 +579,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
 
-        let absolute_square = center_square + relative_square;
+        let absolute_square = oriented_center_square.square() + relative_square;
 
         let view_arc_of_this_square = AngleInterval::from_square(relative_square);
 
@@ -606,23 +629,22 @@ pub fn field_of_view_within_arc_in_single_octant(
                 })
                 .collect();
 
-            portal_view_arcs
-                .iter()
-                .for_each(|(&portal, &portal_view_arc)| {
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+            portal_view_arcs.iter().for_each(
+                |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
+                    let transformed_center =
+                        portal.get_transform().transform(oriented_center_square);
+                    let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
-                        center_square,
+                        transformed_center,
                         radius,
                         octant_number,
                         portal_view_arc,
                         relative_square,
-                        accumulated_view_transform + portal.get_transform(),
                     );
-                    fov_result
-                        .transformed_sub_fovs
-                        .push((portal.get_transform(), sub_arc_fov));
-                });
+                    fov_result.transformed_sub_fovs.push(sub_arc_fov);
+                },
+            );
 
             // a max of two portals are visible in one square, touching each other at a corner
             // TODO: turn this into a constructor for angleintervals
@@ -654,12 +676,11 @@ pub fn field_of_view_within_arc_in_single_octant(
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
-                        center_square,
+                        oriented_center_square,
                         radius,
                         octant_number,
                         new_sub_arc,
                         relative_square,
-                        accumulated_view_transform,
                     );
                     fov_result = fov_result.combine(sub_arc_fov);
                 });
@@ -682,12 +703,11 @@ pub fn single_octant_field_of_view(
     let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
-        center_square,
+        SquareWithOrthogonalDir::from_square_and_dir(center_square, STEP_UP),
         radius,
         octant_number,
         full_octant_arc,
         STEP_ZERO,
-        ViewTransform::default(),
     );
     fov_result.fully_visible_squares.insert(STEP_ZERO);
     fov_result
@@ -1334,21 +1354,17 @@ mod tests {
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert_eq!(
-            fov_result.transformed_sub_fovs[0].0,
+            fov_result.view_transform_to(&fov_result.transformed_sub_fovs[0]),
             ViewTransform::new(STEP_LEFT * 6, QuarterTurnsAnticlockwise::new(1))
         );
         assert_eq!(
             fov_result.transformed_sub_fovs[0]
-                .1
-                .root_square_with_direction,
+                .root_square_with_direction
+                .square(),
             point2(-5, -2)
         );
-        assert_false!(fov_result.transformed_sub_fovs[0]
-            .1
-            .can_fully_see_relative_square(STEP_ZERO));
-        assert!(fov_result.transformed_sub_fovs[0]
-            .1
-            .can_fully_see_relative_square(STEP_UP * 2));
+        assert_false!(fov_result.transformed_sub_fovs[0].can_fully_see_relative_square(STEP_ZERO));
+        assert!(fov_result.transformed_sub_fovs[0].can_fully_see_relative_square(STEP_UP * 2));
     }
 
     #[test]
@@ -1361,13 +1377,13 @@ mod tests {
         let mut main_fov = FovResult::new_empty_fov_at(main_center.square());
         main_fov.root_square_with_direction = main_center;
 
-        main_fov.transformed_sub_fovs.push(sub_fov);
-
         let target_square = point2(1, 4);
 
         sub_fov
             .fully_visible_squares
             .insert(target_square - sub_fov.root_square());
+
+        main_fov.transformed_sub_fovs.push(sub_fov);
 
         assert!(main_fov.can_fully_see_relative_square(vec2(-4, 0)));
         assert!(main_fov.can_see_absolute_square(point2(1, 4)));
