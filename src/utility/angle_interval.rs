@@ -427,7 +427,7 @@ impl Display for AngleIntervalSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::{STEP_DOWN, STEP_UP};
+    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
     use ntest::{assert_about_eq, assert_false};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
@@ -884,5 +884,16 @@ mod tests {
                     < 45.0
             )
         });
+    }
+    #[test]
+    fn test_arc_from_square_face__observed_failure_at_right_face_of_one_block_right() {
+        assert_about_eq!(
+            AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT)
+                .anticlockwise_end
+                .to_degrees(),
+            AngleInterval::from_square(STEP_RIGHT * 2)
+                .anticlockwise_end
+                .to_degrees()
+        );
     }
 }

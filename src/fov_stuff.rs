@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 use derive_getters::Getters;
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
-use itertools::all;
+use itertools::*;
 use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
@@ -436,8 +436,6 @@ impl FovResult {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
-        dbg!("asdfasdf A", relative_square);
-
         if let Some(visibility) = self
             .transformed_sub_fovs
             .iter()
@@ -461,12 +459,6 @@ impl FovResult {
         sub_view: &FovResult,
     ) -> SquareVisibility {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
-        dbg!(
-            "asdfasdf B",
-            relative_square,
-            sub_view.root_square_with_direction,
-            view_transform_to_sub_view
-        );
 
         let quarter_rotations: QuarterTurnsAnticlockwise = *view_transform_to_sub_view.0.rotation();
 
@@ -591,6 +583,15 @@ pub fn field_of_view_within_arc_in_single_octant(
         } else {
             continue;
         }
+        if absolute_square == point2(2, 0) {
+            dbg!(
+                "asdfasdf F",
+                "WHY VISIBLE?!",
+                "SHOULD PERFECTLY COVER AND NOT BE VISIBLE!!!",
+                view_arc.to_string(),
+                view_arc_of_this_square.to_string()
+            );
+        }
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
         let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
@@ -628,6 +629,14 @@ pub fn field_of_view_within_arc_in_single_octant(
                     )
                 })
                 .collect();
+
+            dbg!(
+                "asdfasdf A",
+                portal_view_arcs
+                    .values()
+                    .map(|arc| arc.to_string())
+                    .collect_vec()
+            );
 
             portal_view_arcs.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
@@ -1346,7 +1355,7 @@ mod tests {
         );
 
         let fov_result =
-            single_octant_field_of_view(&Default::default(), &portal_geometry, center, 5, 0);
+            single_octant_field_of_view(&Default::default(), &portal_geometry, center, 3, 0);
 
         assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
         assert_false!(fov_result.can_see_absolute_square(entrance_square + STEP_RIGHT));
