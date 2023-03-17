@@ -188,7 +188,7 @@ impl PartialVisibilityOfASquare {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FovResult {
     root_square_with_direction: SquareWithOrthogonalDir,
     fully_visible_squares: StepSet,
@@ -325,11 +325,13 @@ impl FovResult {
             self.root_square_with_direction,
             other.root_square_with_direction
         );
+        let mut all_sub_fovs = self.transformed_sub_fovs.clone();
+        all_sub_fovs.append(&mut other.transformed_sub_fovs.clone());
         FovResult {
             root_square_with_direction: self.root_square_with_direction,
             fully_visible_squares: all_fully_visible,
             partially_visible_squares: all_partials,
-            transformed_sub_fovs: vec![],
+            transformed_sub_fovs: all_sub_fovs,
         }
     }
 
@@ -367,7 +369,7 @@ impl FovResult {
             root_square_with_direction: self.root_square_with_direction,
             partially_visible_squares: new_partials,
             fully_visible_squares: new_visible,
-            transformed_sub_fovs: vec![],
+            transformed_sub_fovs: self.transformed_sub_fovs.clone(),
         }
     }
 
@@ -436,6 +438,7 @@ impl FovResult {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
+        dbg!("asdfasdf E", self.transformed_sub_fovs.len());
         if let Some(visibility) = self
             .transformed_sub_fovs
             .iter()
@@ -461,6 +464,7 @@ impl FovResult {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
         let quarter_rotations: QuarterTurnsAnticlockwise = *view_transform_to_sub_view.0.rotation();
+        dbg!("asdfasdf D", view_transform_to_sub_view, quarter_rotations);
 
         let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(
             relative_square,
@@ -483,6 +487,7 @@ impl FovResult {
 
         let sub_view_visibility =
             self.transformed_visibility_of_relative_square_in_sub_views(relative_square);
+        dbg!("asdfasdf C", sub_view_visibility);
         if sub_view_visibility.is_visible() {
             return sub_view_visibility;
         }
@@ -570,6 +575,11 @@ pub fn field_of_view_within_arc_in_single_octant(
         if out_of_range {
             break;
         }
+        dbg!(
+            "asdfasdf J",
+            fov_result.transformed_sub_fovs.len(),
+            relative_square
+        );
 
         let absolute_square = oriented_center_square.square() + relative_square;
 
@@ -582,15 +592,6 @@ pub fn field_of_view_within_arc_in_single_octant(
             fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
             continue;
-        }
-        if absolute_square == point2(2, 0) {
-            dbg!(
-                "asdfasdf F",
-                "WHY VISIBLE?!",
-                "SHOULD PERFECTLY COVER AND NOT BE VISIBLE!!!",
-                view_arc.to_string(),
-                view_arc_of_this_square.to_string()
-            );
         }
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
@@ -640,6 +641,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             portal_view_arcs.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
+                    dbg!("asdfasdf F");
                     let transformed_center =
                         portal.get_transform().transform(oriented_center_square);
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
@@ -654,6 +656,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
                 },
             );
+            dbg!("asdfasdf G", fov_result.transformed_sub_fovs.len());
 
             // a max of two portals are visible in one square, touching each other at a corner
             // TODO: turn this into a constructor for angleintervals
@@ -696,6 +699,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
     }
+    dbg!("asdfasdf I", fov_result.transformed_sub_fovs.len());
     fov_result
 }
 
@@ -719,6 +723,7 @@ pub fn single_octant_field_of_view(
         STEP_ZERO,
     );
     fov_result.fully_visible_squares.insert(STEP_ZERO);
+    dbg!("asdfasdf H", fov_result.transformed_sub_fovs.len());
     fov_result
 }
 
@@ -766,7 +771,7 @@ fn visibility_of_square(view_arc: AngleInterval, rel_square: WorldStep) -> Squar
     let square_arc = AngleInterval::from_square(rel_square);
     if view_arc.at_least_fully_overlaps(square_arc) {
         SquareVisibility::new(true, None)
-    } else if view_arc.overlaps_or_touches(square_arc) {
+    } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
         SquareVisibility::new(
             true,
             Some(partial_visibility_of_square_from_one_view_arc(
@@ -1357,6 +1362,7 @@ mod tests {
         let fov_result =
             single_octant_field_of_view(&Default::default(), &portal_geometry, center, 3, 0);
 
+        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
         assert_false!(fov_result.can_see_absolute_square(entrance_square + STEP_RIGHT));
         assert!(fov_result.can_see_absolute_square(exit_square));

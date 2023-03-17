@@ -211,12 +211,21 @@ impl AngleInterval {
         }
     }
     fn exactly_touches_arc(&self, other: AngleInterval) -> bool {
-        self.clockwise_end == other.anticlockwise_end
-            || other.clockwise_end == self.anticlockwise_end
+        let edges_touch = self.clockwise_end == other.anticlockwise_end
+            || other.clockwise_end == self.anticlockwise_end;
+
+        let contains_other_edge = self.contains_angle_not_including_edges(other.clockwise_end)
+            || self.contains_angle_not_including_edges(other.anticlockwise_end);
+
+        edges_touch && !contains_other_edge
     }
     pub fn overlaps_or_touches(&self, other: AngleInterval) -> bool {
         self.partially_or_fully_overlaps(other) || self.exactly_touches_arc(other)
     }
+    pub fn overlapping_but_not_exactly_touching(&self, other: AngleInterval) -> bool {
+        self.partially_or_fully_overlaps(other) && !self.exactly_touches_arc(other)
+    }
+
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
         self.clockwise_end == angle || angle == self.anticlockwise_end
     }
@@ -938,5 +947,25 @@ mod tests {
         assert_false!(arc.at_least_fully_overlaps(arc_extend_ccw.complement()));
         assert_false!(arc.at_least_fully_overlaps(arc_retract_cw.complement()));
         assert_false!(arc.at_least_fully_overlaps(arc_retract_ccw.complement()));
+    }
+    #[test]
+    fn test_arc_exact_touch() {
+        let cw = Angle::degrees(5.0);
+        let ccw = Angle::degrees(25.0);
+        let d = Angle::degrees(1.0);
+
+        let arc = AngleInterval::new(cw, ccw);
+        let arc_extend_cw = AngleInterval::new(cw - d, ccw);
+        let arc_retract_cw = AngleInterval::new(cw + d, ccw);
+        let arc_extend_ccw = AngleInterval::new(cw, ccw + d);
+        let arc_retract_ccw = AngleInterval::new(cw, ccw - d);
+        let arc_extend_both = AngleInterval::new(cw - d, ccw + d);
+        let arc_retract_both = AngleInterval::new(cw + d, ccw - d);
+
+        assert!(arc.exactly_touches_arc(arc_extend_ccw.complement()));
+        assert_false!(arc.exactly_touches_arc(arc_retract_ccw.complement()));
+
+        assert_false!(arc.exactly_touches_arc(arc));
+        assert!(arc.exactly_touches_arc(arc.complement()))
     }
 }
