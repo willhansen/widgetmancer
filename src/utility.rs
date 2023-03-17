@@ -330,6 +330,9 @@ pub fn get_8_octants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<
 pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
+pub fn vector2_to_string<T: Display, U>(vec: Vector2D<T, U>) -> String {
+    format!("(dx: {}, dy: {})", vec.x, vec.y)
+}
 
 pub fn king_distance(step: WorldStep) -> u32 {
     step.x.abs().max(step.y.abs()) as u32

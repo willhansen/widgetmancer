@@ -21,10 +21,11 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     intersection, is_clockwise, line_intersections_with_centered_unit_square,
     line_intersects_with_centered_unit_square, octant_to_outward_and_across_directions,
-    rotate_point_around_point, rotated_n_quarter_turns_counter_clockwise, same_side_of_line,
-    set_of_keys, standardize_angle, union, unit_vector_from_angle, HalfPlane, Line,
-    QuarterTurnsAnticlockwise, SquareWithOrthogonalDir, WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT,
-    STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    point_to_string, rotate_point_around_point, rotated_n_quarter_turns_counter_clockwise,
+    same_side_of_line, set_of_keys, standardize_angle, union, unit_vector_from_angle,
+    vector2_to_string, HalfPlane, Line, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir,
+    WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
+    STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy, Constructor)]
@@ -242,7 +243,7 @@ impl FovResult {
     pub fn only_partially_visible_squares(&self) -> StepSet {
         self.partially_visible_squares.keys().copied().collect()
     }
-    pub fn combine(&self, other: Self) -> Self {
+    pub fn combined(&self, other: Self) -> Self {
         type PartialVisibilityMap = HashMap<WorldStep, PartialVisibilityOfASquare>;
 
         let squares_with_non_conflicting_partials: StepSet = self
@@ -438,7 +439,6 @@ impl FovResult {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
-        dbg!("asdfasdf E", self.transformed_sub_fovs.len());
         if let Some(visibility) = self
             .transformed_sub_fovs
             .iter()
@@ -464,7 +464,6 @@ impl FovResult {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
         let quarter_rotations: QuarterTurnsAnticlockwise = *view_transform_to_sub_view.0.rotation();
-        dbg!("asdfasdf D", view_transform_to_sub_view, quarter_rotations);
 
         let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(
             relative_square,
@@ -487,7 +486,6 @@ impl FovResult {
 
         let sub_view_visibility =
             self.transformed_visibility_of_relative_square_in_sub_views(relative_square);
-        dbg!("asdfasdf C", sub_view_visibility);
         if sub_view_visibility.is_visible() {
             return sub_view_visibility;
         }
@@ -564,6 +562,11 @@ pub fn field_of_view_within_arc_in_single_octant(
     view_arc: AngleInterval,
     start_checking_after_this_square_in_the_fov_sequence: WorldStep,
 ) -> FovResult {
+    dbg!(
+        "asdfasdf N",
+        "START OF NEW ARC!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+        view_arc.to_string()
+    );
     let mut fov_result = FovResult::new_oriented_empty_fov_at(oriented_center_square);
 
     for relative_square in OctantFOVSquareSequenceIter::new(
@@ -578,7 +581,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         dbg!(
             "asdfasdf J",
             fov_result.transformed_sub_fovs.len(),
-            relative_square
+            vector2_to_string(relative_square)
         );
 
         let absolute_square = oriented_center_square.square() + relative_square;
@@ -694,12 +697,16 @@ pub fn field_of_view_within_arc_in_single_octant(
                         new_sub_arc,
                         relative_square,
                     );
-                    fov_result = fov_result.combine(sub_arc_fov);
+                    fov_result = fov_result.combined(sub_arc_fov);
                 });
             break;
         }
     }
-    dbg!("asdfasdf I", fov_result.transformed_sub_fovs.len());
+    dbg!(
+        "asdfasdf I",
+        fov_result.transformed_sub_fovs.len(),
+        point_to_string(fov_result.root_square())
+    );
     fov_result
 }
 
@@ -744,7 +751,14 @@ pub fn portal_aware_field_of_view_from_square(
                     radius,
                     octant_number,
                 );
-                fov_result_accumulator.combine(new_fov_result)
+                dbg!(
+                    "asdfasdf K",
+                    new_fov_result.transformed_sub_fovs.len(),
+                    fov_result_accumulator.transformed_sub_fovs.len()
+                );
+                let combined_fov = fov_result_accumulator.combined(new_fov_result);
+                dbg!("asdfasdf L", combined_fov.transformed_sub_fovs.len());
+                combined_fov
             },
         )
         .departialized()
