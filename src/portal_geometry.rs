@@ -8,7 +8,7 @@ use ntest::assert_false;
 
 use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 use crate::utility::{
-    is_orthogonal, rotated_n_quarter_turns_counter_clockwise, QuarterTurnsAnticlockwise,
+    is_orthogonal, rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
     SquareWithAdjacentDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_ZERO,
 };
 
@@ -25,11 +25,14 @@ impl ViewTransform {
             quarter_rotations_anticlockwise,
         ))
     }
-    pub fn transform(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
+    pub fn transform_pose(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_turns(
             pose.square() + *self.0.step(),
             pose.direction_in_quarter_turns() + *self.0.rotation(),
         )
+    }
+    pub fn transform_octant(&self, octant: Octant) -> Octant {
+        octant.with_n_quarter_turns_anticlockwise(*self.0.rotation())
     }
     pub fn from_start_and_end_poses(
         start: SquareWithOrthogonalDir,

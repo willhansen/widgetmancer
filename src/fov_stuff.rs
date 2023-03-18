@@ -18,15 +18,7 @@ use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, ViewTransform};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    intersection, is_clockwise, line_intersections_with_centered_unit_square,
-    line_intersects_with_centered_unit_square, octant_to_outward_and_across_directions,
-    point_to_string, rotate_point_around_point, rotated_n_quarter_turns_counter_clockwise,
-    same_side_of_line, set_of_keys, standardize_angle, union, unit_vector_from_angle,
-    vector2_to_string, HalfPlane, Line, QuarterTurnsAnticlockwise, SquareWithOrthogonalDir,
-    WorldLine, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
-    STEP_ZERO,
-};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy, Constructor)]
 pub struct SquareVisibility {
@@ -508,34 +500,31 @@ impl FovResult {
 struct OctantFOVSquareSequenceIter {
     outward_dir: WorldStep,
     across_dir: WorldStep,
-    outward_steps: u32,
-    across_steps: u32,
+    previous_step_number: u32,
 }
 
 impl OctantFOVSquareSequenceIter {
     // one_before_starting_square is useful for skipping the vec2(0, 0) square.
-    pub fn new(octant_number: i32, one_before_starting_square: WorldStep) -> Self {
-        let (outward_dir, across_dir) = octant_to_outward_and_across_directions(octant_number);
-        let prev_square_outward_steps = outward_dir.dot(one_before_starting_square) as u32;
-        let prev_square_across_steps = across_dir.dot(one_before_starting_square) as u32;
-
-        let (outward_steps, across_steps) =
-            Self::next_out_and_across_steps(prev_square_outward_steps, prev_square_across_steps);
+    pub fn new(octant: Octant, prev_step: u32) -> Self {
+        let (outward_dir, across_dir) = octant.outward_and_across_directions();
 
         OctantFOVSquareSequenceIter {
             outward_dir,
             across_dir,
-            outward_steps,
-            across_steps,
+            previous_step_number: prev_step,
         }
     }
 
-    fn next_out_and_across_steps(outward_steps: u32, across_steps: u32) -> (u32, u32) {
-        if across_steps == outward_steps {
-            (outward_steps + 1, 0)
-        } else {
-            (outward_steps, across_steps + 1)
-        }
+    fn next_out_and_across_steps(previous_step_number: u32) -> (u32, u32) {
+        // area = y + (x-1)/2 * x
+        // dx = x-1, dy = y-1, i = area-2
+
+        let area: i32 = previous_step_number as i32 + 2;
+        let x: i32 = (0.5 + (0.25 + 2.0 * area as f32).sqrt()).ceil() as i32 - 1;
+        let y: i32 = area - ((x - 1) as f32 / 2.0 * x as f32).round() as i32;
+        let dx: u32 = x as u32 - 1;
+        let dy: u32 = y as u32 - 1;
+        (dx, dy)
     }
 }
 
@@ -543,11 +532,12 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let relative_square = self.outward_dir * self.outward_steps as i32
-            + self.across_dir * self.across_steps as i32;
+        let (outward_steps, across_steps) =
+            Self::next_out_and_across_steps(self.previous_step_number);
+        let relative_square =
+            self.outward_dir * outward_steps as i32 + self.across_dir * across_steps as i32;
 
-        (self.outward_steps, self.across_steps) =
-            Self::next_out_and_across_steps(self.outward_steps, self.across_steps);
+        self.previous_step_number += 1;
 
         Some(relative_square)
     }
@@ -558,31 +548,19 @@ pub fn field_of_view_within_arc_in_single_octant(
     portal_geometry: &PortalGeometry,
     oriented_center_square: SquareWithOrthogonalDir,
     radius: u32,
-    octant_number: i32,
+    octant: Octant,
     view_arc: AngleInterval,
-    start_checking_after_this_square_in_the_fov_sequence: WorldStep,
+    mut prev_step_in_fov_sequence: u32,
 ) -> FovResult {
-    dbg!(
-        "asdfasdf N",
-        "START OF NEW ARC!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-        view_arc.to_string()
-    );
     let mut fov_result = FovResult::new_oriented_empty_fov_at(oriented_center_square);
 
-    for relative_square in OctantFOVSquareSequenceIter::new(
-        octant_number,
-        start_checking_after_this_square_in_the_fov_sequence,
-    ) {
+    for relative_square in OctantFOVSquareSequenceIter::new(octant, prev_step_in_fov_sequence) {
+        prev_step_in_fov_sequence += 1;
         let out_of_range =
             relative_square.x.abs() > radius as i32 || relative_square.y.abs() > radius as i32;
         if out_of_range {
             break;
         }
-        dbg!(
-            "asdfasdf J",
-            fov_result.transformed_sub_fovs.len(),
-            vector2_to_string(relative_square)
-        );
 
         let absolute_square = oriented_center_square.square() + relative_square;
 
@@ -634,32 +612,22 @@ pub fn field_of_view_within_arc_in_single_octant(
                 })
                 .collect();
 
-            dbg!(
-                "asdfasdf A",
-                portal_view_arcs
-                    .values()
-                    .map(|arc| arc.to_string())
-                    .collect_vec()
-            );
-
             portal_view_arcs.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
-                    dbg!("asdfasdf F");
-                    let transformed_center =
-                        portal.get_transform().transform(oriented_center_square);
+                    let transform = portal.get_transform();
+                    let transformed_center = transform.transform_pose(oriented_center_square);
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
                         transformed_center,
                         radius,
-                        octant_number,
+                        transform.transform_octant(octant),
                         portal_view_arc,
-                        relative_square,
+                        prev_step_in_fov_sequence,
                     );
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
                 },
             );
-            dbg!("asdfasdf G", fov_result.transformed_sub_fovs.len());
 
             // a max of two portals are visible in one square, touching each other at a corner
             // TODO: turn this into a constructor for angleintervals
@@ -693,20 +661,15 @@ pub fn field_of_view_within_arc_in_single_octant(
                         portal_geometry,
                         oriented_center_square,
                         radius,
-                        octant_number,
+                        octant,
                         new_sub_arc,
-                        relative_square,
+                        prev_step_in_fov_sequence,
                     );
                     fov_result = fov_result.combined(sub_arc_fov);
                 });
             break;
         }
     }
-    dbg!(
-        "asdfasdf I",
-        fov_result.transformed_sub_fovs.len(),
-        point_to_string(fov_result.root_square())
-    );
     fov_result
 }
 
@@ -715,22 +678,21 @@ pub fn single_octant_field_of_view(
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
     radius: u32,
-    octant_number: i32,
+    octant: Octant,
 ) -> FovResult {
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
-    let full_octant_arc = AngleInterval::from_octant(octant_number);
+    let full_octant_arc = AngleInterval::from_octant(octant);
     let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
         SquareWithOrthogonalDir::from_square_and_dir(center_square, STEP_UP),
         radius,
-        octant_number,
+        octant,
         full_octant_arc,
-        STEP_ZERO,
+        0,
     );
     fov_result.fully_visible_squares.insert(STEP_ZERO);
-    dbg!("asdfasdf H", fov_result.transformed_sub_fovs.len());
     fov_result
 }
 
@@ -749,15 +711,9 @@ pub fn portal_aware_field_of_view_from_square(
                     portal_geometry,
                     center_square,
                     radius,
-                    octant_number,
-                );
-                dbg!(
-                    "asdfasdf K",
-                    new_fov_result.transformed_sub_fovs.len(),
-                    fov_result_accumulator.transformed_sub_fovs.len()
+                    Octant::new(octant_number),
                 );
                 let combined_fov = fov_result_accumulator.combined(new_fov_result);
-                dbg!("asdfasdf L", combined_fov.transformed_sub_fovs.len());
                 combined_fov
             },
         )
@@ -1135,22 +1091,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fov_square_sequence() {
-        // right, up
-        assert_eq!(
-            OctantFOVSquareSequenceIter::new(0, STEP_ZERO).next(),
-            Some(STEP_RIGHT)
-        );
-        // up, left
-        assert_eq!(
-            OctantFOVSquareSequenceIter::new(2, STEP_UP * 2).next(),
-            Some(STEP_UP * 2 + STEP_LEFT)
-        );
-    }
-
-    #[test]
     fn test_fov_square_sequence__detailed() {
-        let mut sequence = OctantFOVSquareSequenceIter::new(1, STEP_ZERO);
+        let mut sequence = OctantFOVSquareSequenceIter::new(Octant::new(1), 0);
         let correct_sequence = [
             vec2(0, 1),
             vec2(1, 1),
@@ -1184,7 +1126,7 @@ mod tests {
             &PortalGeometry::default(),
             mid_square,
             10,
-            0,
+            Octant::new(0),
         );
         let visible_square = mid_square + STEP_RIGHT * 5 + STEP_UP * 2;
         assert!(
@@ -1373,8 +1315,13 @@ mod tests {
             SquareWithOrthogonalDir::new(exit_square, STEP_UP),
         );
 
-        let fov_result =
-            single_octant_field_of_view(&Default::default(), &portal_geometry, center, 3, 0);
+        let fov_result = single_octant_field_of_view(
+            &Default::default(),
+            &portal_geometry,
+            center,
+            3,
+            Octant::new(0),
+        );
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
@@ -1432,5 +1379,27 @@ mod tests {
 
         let visibility = visibility_of_square(view_arc_of_face, square);
         assert_false!(visibility.is_visible());
+    }
+    #[test]
+    fn test_octant_step_sequence() {
+        let i_x_y = vec![
+            (0, 1, 0),
+            (1, 1, 1),
+            (2, 2, 0),
+            (3, 2, 1),
+            (4, 2, 2),
+            (5, 3, 0),
+            (6, 3, 1),
+            (7, 3, 2),
+            (8, 3, 3),
+            (9, 4, 0),
+            (10, 4, 1),
+        ];
+        i_x_y.into_iter().for_each(|(i, x, y)| {
+            assert_eq!(
+                OctantFOVSquareSequenceIter::next_out_and_across_steps(i),
+                (x, y)
+            )
+        });
     }
 }

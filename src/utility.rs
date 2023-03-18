@@ -123,6 +123,37 @@ impl Sub for QuarterTurnsAnticlockwise {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
+pub struct Octant(i32);
+impl Octant {
+    pub fn new(octant: i32) -> Self {
+        Octant(octant.rem_euclid(8))
+    }
+    pub fn with_n_quarter_turns_anticlockwise(
+        &self,
+        quarter_turns: QuarterTurnsAnticlockwise,
+    ) -> Self {
+        Self::new(self.0 + quarter_turns.quarter_turns() * 2)
+    }
+    pub fn outward_and_across_directions(&self) -> (WorldStep, WorldStep) {
+        // TODO: probably make this an actual equation
+        match self.0 {
+            0 => (STEP_RIGHT, STEP_UP),
+            1 => (STEP_UP, STEP_RIGHT),
+            2 => (STEP_UP, STEP_LEFT),
+            3 => (STEP_LEFT, STEP_UP),
+            4 => (STEP_LEFT, STEP_DOWN),
+            5 => (STEP_DOWN, STEP_LEFT),
+            6 => (STEP_DOWN, STEP_RIGHT),
+            7 => (STEP_RIGHT, STEP_DOWN),
+            _ => panic!("bad octant: {}", self.0),
+        }
+    }
+    pub fn number(&self) -> i32 {
+        self.0
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Line<T, U> {
     pub p1: Point2D<T, U>,
     pub p2: Point2D<T, U>,
@@ -642,22 +673,6 @@ pub fn is_world_character_square_left_square_of_world_square(
     world_square_to_left_world_character_square(world_character_square_to_world_square(
         character_square,
     )) == character_square
-}
-
-pub fn octant_to_outward_and_across_directions(octant_number: i32) -> (WorldStep, WorldStep) {
-    let reduced_octant = octant_number.rem_euclid(8);
-    // TODO: probably make this an actual equation
-    match reduced_octant {
-        0 => (STEP_RIGHT, STEP_UP),
-        1 => (STEP_UP, STEP_RIGHT),
-        2 => (STEP_UP, STEP_LEFT),
-        3 => (STEP_LEFT, STEP_UP),
-        4 => (STEP_LEFT, STEP_DOWN),
-        5 => (STEP_DOWN, STEP_LEFT),
-        6 => (STEP_DOWN, STEP_RIGHT),
-        7 => (STEP_RIGHT, STEP_DOWN),
-        _ => panic!("bad octant: {}", reduced_octant),
-    }
 }
 
 pub fn rotate_point_around_point<U>(

@@ -14,7 +14,7 @@ use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
+    standardize_angle, Octant, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
     STEP_UP_RIGHT,
 };
 
@@ -43,9 +43,8 @@ impl AngleInterval {
             self.anticlockwise_end.to_degrees(),
         )
     }
-    pub fn from_octant(octant_number: i32) -> Self {
-        let reduced_octant = octant_number.rem_euclid(8);
-        let low_degrees = 45 * reduced_octant;
+    pub fn from_octant(octant: Octant) -> Self {
+        let low_degrees = 45 * octant.number();
         let high_degrees = low_degrees + 45;
         Self::from_degrees(low_degrees as f32, high_degrees as f32)
     }
