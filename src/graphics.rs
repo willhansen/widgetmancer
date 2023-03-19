@@ -688,7 +688,13 @@ impl Graphics {
             fov_mask.partially_visible_squares_as_glyph_mask();
         let squares_on_screen = self.all_squares_on_screen();
         let squares_on_screen_but_out_of_sight = squares_on_screen
-            .difference(&fov_mask.at_least_partially_visible_squares())
+            .difference(
+                &fov_mask
+                    .at_least_partially_visible_relative_squares()
+                    .iter()
+                    .map(|step| fov_mask.root_square() + *step)
+                    .collect(),
+            )
             .copied()
             .collect();
         self.draw_glyphs_at_squares(glyph_mask_for_partially_visible_squares);

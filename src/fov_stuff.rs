@@ -225,11 +225,10 @@ impl FovResult {
         self.fully_visible_squares
             .insert(square - self.root_square());
     }
-    pub fn at_least_partially_visible_squares(&self) -> SquareSet {
+    pub fn at_least_partially_visible_relative_squares(&self) -> StepSet {
         self.fully_visible_squares
             .union(&self.only_partially_visible_squares())
             .copied()
-            .map(|step| self.root_square() + step)
             .collect()
     }
     pub fn only_partially_visible_squares(&self) -> StepSet {
@@ -392,6 +391,7 @@ impl FovResult {
     ) -> Vec<SquareVisibility> {
         // Due to portals, this may see the same square multiple times
         let rel_to_root = world_square - self.root_square();
+        dbg!("asdfasdf 1", world_square, rel_to_root);
         let visibility_in_untransformed_view =
             self.visibility_of_relative_square_in_untransformed_view(rel_to_root);
 
@@ -1309,14 +1309,77 @@ mod tests {
     }
 
     #[test]
+    fn test_really_narrow_fov_through_a_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        let center = point2(10, 20);
+        let dx_to_portal_square = 3;
+        let entrance_square = center + STEP_RIGHT * dx_to_portal_square;
+        let exit_square = center + STEP_LEFT * 5;
+
+        portal_geometry.create_portal(
+            SquareWithOrthogonalDir::new(entrance_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::new(exit_square, STEP_DOWN),
+        );
+
+        let view_arc = AngleInterval::from_degrees(0.1, 0.11);
+
+        let radius = 10;
+        let mut fov_result = field_of_view_within_arc_in_single_octant(
+            &Default::default(),
+            &portal_geometry,
+            SquareWithOrthogonalDir::from_square_and_dir(center, STEP_UP),
+            radius,
+            Octant::new(0),
+            view_arc,
+            0,
+        );
+
+        let should_be_visible_relative_squares: StepSet =
+            (1..=10).into_iter().map(|dx| STEP_RIGHT * dx).collect();
+        let should_be_visible_before_portal: SquareSet = (1..=dx_to_portal_square)
+            .into_iter()
+            .map(|dx| center + STEP_RIGHT * dx)
+            .collect();
+        let should_be_visible_after_portal: SquareSet = ((dx_to_portal_square + 1)..=radius as i32)
+            .into_iter()
+            .map(|dy| exit_square + STEP_DOWN * dy)
+            .collect();
+
+        assert_eq!(
+            fov_result
+                .at_least_partially_visible_relative_squares()
+                .len(),
+            radius as usize
+        );
+        should_be_visible_relative_squares.iter().for_each(|step| {
+            assert!(fov_result.can_see_relative_square(*step));
+        });
+        should_be_visible_before_portal.iter().for_each(|square| {
+            assert!(
+                fov_result.can_see_absolute_square(*square),
+                "square: {}",
+                point_to_string(*square)
+            );
+        });
+        should_be_visible_after_portal.iter().for_each(|square| {
+            assert!(
+                fov_result.can_see_absolute_square(*square),
+                "square: {}",
+                point_to_string(*square)
+            );
+        });
+        assert_eq!(fov_result.fully_visible_squares.len(), 0);
+    }
+
+    #[test]
     fn test_one_octant_with_one_portal() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(0, 0);
-        let entrance_square = center + STEP_RIGHT;
-        let exit_square = center + STEP_LEFT * 5;
+        let entrance_square = center + STEP_RIGHT * 3;
+        let exit_square = center + STEP_DOWN_LEFT * 15;
         portal_geometry.create_portal(
             SquareWithOrthogonalDir::new(entrance_square, STEP_RIGHT),
-            SquareWithOrthogonalDir::new(exit_square, STEP_UP),
+            SquareWithOrthogonalDir::new(exit_square, STEP_DOWN),
         );
 
         let fov_result = single_octant_field_of_view(
