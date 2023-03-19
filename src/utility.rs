@@ -96,6 +96,11 @@ impl QuarterTurnsAnticlockwise {
             }
         })
     }
+    pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
+        standardize_angle(Angle::<f32>::degrees(
+            angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
+        ))
+    }
 }
 
 impl Neg for QuarterTurnsAnticlockwise {

@@ -1493,13 +1493,21 @@ impl Game {
     }
 
     pub fn set_up_columns(&mut self) {
-        self.place_block(self.player_square() + STEP_RIGHT * 4);
-        self.place_block(self.player_square() + STEP_RIGHT * 7);
-        self.place_block(self.player_square() + STEP_RIGHT * 4 + STEP_UP * 3);
-        self.place_block(self.player_square() + STEP_RIGHT * 7 + STEP_UP * 3);
+        let block_square = self.player_square() + STEP_RIGHT * 4;
+        self.place_block(block_square);
+        self.place_block(block_square + STEP_RIGHT * 3);
+        self.place_block(block_square + STEP_UP * 3);
+        self.place_block(block_square + STEP_UP_RIGHT * 3);
         self.place_linear_death_cube(
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
+        );
+        self.place_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(block_square + STEP_RIGHT, STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_dir(
+                block_square + STEP_DOWN_RIGHT * 4,
+                STEP_LEFT,
+            ),
         );
         //self.place_death_turret(self.player_square() + STEP_LEFT * 14);
     }

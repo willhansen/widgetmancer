@@ -14,8 +14,8 @@ use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
-    STEP_UP_RIGHT,
+    standardize_angle, Octant, QuarterTurnsAnticlockwise, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
@@ -290,6 +290,12 @@ impl AngleInterval {
             },
             clockwise_is_closer,
         )
+    }
+    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+        AngleInterval {
+            clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
+            anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),
+        }
     }
 }
 

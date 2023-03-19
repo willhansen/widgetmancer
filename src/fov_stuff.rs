@@ -470,6 +470,7 @@ impl FovResult {
     }
 
     pub fn visibility_of_relative_square(&self, relative_square: WorldStep) -> SquareVisibility {
+        //dbg!( "asdfasdf B", relative_square, self.fully_visible_squares.clone(), self.only_partially_visible_squares() );
         let top_level_visibility =
             self.visibility_of_relative_square_in_untransformed_view(relative_square);
         if top_level_visibility.is_visible() {
@@ -569,6 +570,8 @@ pub fn field_of_view_within_arc_in_single_octant(
         let visibility_of_this_square: SquareVisibility =
             visibility_of_square(view_arc, relative_square);
 
+        //if octant.number() == 2 { dbg!( "asdfasdf E sub-arc candidate", relative_square, absolute_square, visibility_of_this_square.is_visible ); }
+
         if visibility_of_this_square.is_visible() {
             fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
@@ -622,9 +625,10 @@ pub fn field_of_view_within_arc_in_single_octant(
                         transformed_center,
                         radius,
                         transform.transform_octant(octant),
-                        portal_view_arc,
+                        transform.transform_arc(portal_view_arc),
                         prev_step_in_fov_sequence,
                     );
+                    //dbg!( "asdfasdf D", sub_arc_fov.at_least_partially_visible_squares() );
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
                 },
             );
@@ -1324,7 +1328,7 @@ mod tests {
         );
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
-        assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
+        assert!(fov_result.can_fully_see_relative_square(STEP_RIGHT * 2));
         assert_false!(fov_result.can_see_absolute_square(entrance_square + STEP_RIGHT));
         assert!(fov_result.can_see_absolute_square(exit_square));
 

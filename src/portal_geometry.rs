@@ -6,6 +6,7 @@ use derive_more::Constructor;
 use itertools::Itertools;
 use ntest::assert_false;
 
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
 use crate::utility::{
     is_orthogonal, rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
@@ -33,6 +34,9 @@ impl ViewTransform {
     }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(*self.0.rotation())
+    }
+    pub fn transform_arc(&self, arc: AngleInterval) -> AngleInterval {
+        arc.rotated(*self.0.rotation())
     }
     pub fn from_start_and_end_poses(
         start: SquareWithOrthogonalDir,
