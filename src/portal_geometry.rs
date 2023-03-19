@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ntest::assert_false;
 
 use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::{WorldSquare, WorldStep};
+use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     is_orthogonal, rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
     SquareWithAdjacentDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_ZERO,
@@ -26,17 +26,32 @@ impl ViewTransform {
             quarter_rotations_anticlockwise,
         ))
     }
+    pub fn step(&self) -> WorldStep {
+        *self.0.step()
+    }
+    pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
+        *self.0.rotation()
+    }
     pub fn transform_pose(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_turns(
-            pose.square() + *self.0.step(),
-            pose.direction_in_quarter_turns() + *self.0.rotation(),
+            pose.square() + self.step(),
+            pose.direction_in_quarter_turns() + self.rotation(),
         )
     }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
-        octant.with_n_quarter_turns_anticlockwise(*self.0.rotation())
+        octant.with_n_quarter_turns_anticlockwise(self.rotation())
     }
     pub fn transform_arc(&self, arc: AngleInterval) -> AngleInterval {
-        arc.rotated(*self.0.rotation())
+        arc.rotated(self.rotation())
+    }
+    pub fn rotate_step(&self, step: WorldStep) -> WorldStep {
+        self.rotation().rotate_vector(step)
+    }
+    pub fn rotate_steps(&self, steps: &StepSet) -> StepSet {
+        steps
+            .iter()
+            .map(|&step: &WorldStep| self.rotation().rotate_vector(step))
+            .collect()
     }
     pub fn from_start_and_end_poses(
         start: SquareWithOrthogonalDir,

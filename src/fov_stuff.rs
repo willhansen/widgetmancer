@@ -225,21 +225,38 @@ impl FovResult {
         self.fully_visible_squares
             .insert(square - self.root_square());
     }
-    pub fn at_least_partially_visible_relative_squares(&self) -> StepSet {
+    pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
+        let top_view_visible = self.at_least_partially_visible_relative_squares_main_view_only();
+
+        let mut all_visible = top_view_visible;
+
+        for sub_view in &self.transformed_sub_fovs {
+            let transform_from_sub_view = sub_view.view_transform_to(&self);
+            let relative_squares_in_sub_frame =
+                sub_view.at_least_partially_visible_relative_squares_main_view_only();
+            let visible_in_main_frame =
+                transform_from_sub_view.rotate_steps(&relative_squares_in_sub_frame);
+            visible_in_main_frame.iter().for_each(|&step| {
+                all_visible.insert(step);
+            });
+        }
+        all_visible
+    }
+    pub fn at_least_partially_visible_relative_squares_main_view_only(&self) -> StepSet {
         self.fully_visible_squares
-            .union(&self.only_partially_visible_squares())
+            .union(&self.only_partially_visible_squares_in_main_view_only())
             .copied()
             .collect()
     }
-    pub fn only_partially_visible_squares(&self) -> StepSet {
+    pub fn only_partially_visible_squares_in_main_view_only(&self) -> StepSet {
         self.partially_visible_squares.keys().copied().collect()
     }
     pub fn combined(&self, other: Self) -> Self {
         type PartialVisibilityMap = HashMap<WorldStep, PartialVisibilityOfASquare>;
 
         let squares_with_non_conflicting_partials: StepSet = self
-            .only_partially_visible_squares()
-            .symmetric_difference(&other.only_partially_visible_squares())
+            .only_partially_visible_squares_in_main_view_only()
+            .symmetric_difference(&other.only_partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
 
@@ -260,8 +277,8 @@ impl FovResult {
             .collect();
 
         let all_squares_with_partials: StepSet = self
-            .only_partially_visible_squares()
-            .union(&other.only_partially_visible_squares())
+            .only_partially_visible_squares_in_main_view_only()
+            .union(&other.only_partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
 
@@ -1347,7 +1364,7 @@ mod tests {
 
         assert_eq!(
             fov_result
-                .at_least_partially_visible_relative_squares()
+                .at_least_partially_visible_relative_squares_including_subviews()
                 .len(),
             radius as usize
         );
@@ -1428,9 +1445,17 @@ mod tests {
 
         main_fov.transformed_sub_fovs.push(sub_fov);
 
-        assert!(main_fov.can_fully_see_relative_square(vec2(-4, 0)));
+        let rel_from_main = STEP_LEFT * 4;
+
+        assert!(main_fov.can_fully_see_relative_square(rel_from_main));
         assert!(main_fov.can_see_absolute_square(point2(1, 4)));
+
+        assert_eq!(
+            main_fov.at_least_partially_visible_relative_squares_including_subviews(),
+            StepSet::from([rel_from_main])
+        )
     }
+
     #[test]
     fn test_square_fully_covered_by_face() {
         let view_arc_of_face = AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT);
@@ -1439,6 +1464,7 @@ mod tests {
         let visibility = visibility_of_square(view_arc_of_face, square);
         assert!(visibility.is_fully_visible());
     }
+
     #[test]
     fn test_square_fully_not_covered_by_adjacent() {
         let view_arc_of_face = AngleInterval::from_square_face(STEP_UP_RIGHT, STEP_RIGHT);
@@ -1447,6 +1473,7 @@ mod tests {
         let visibility = visibility_of_square(view_arc_of_face, square);
         assert_false!(visibility.is_visible());
     }
+
     #[test]
     fn test_octant_step_sequence() {
         let i_x_y = vec![

@@ -690,7 +690,7 @@ impl Graphics {
         let squares_on_screen_but_out_of_sight = squares_on_screen
             .difference(
                 &fov_mask
-                    .at_least_partially_visible_relative_squares()
+                    .at_least_partially_visible_relative_squares_main_view_only()
                     .iter()
                     .map(|step| fov_mask.root_square() + *step)
                     .collect(),

@@ -101,6 +101,12 @@ impl QuarterTurnsAnticlockwise {
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
+    pub fn rotate_vector<T, U>(&self, v: Vector2D<T, U>) -> Vector2D<T, U>
+    where
+        T: Signed + Copy,
+    {
+        rotated_n_quarter_turns_counter_clockwise(v, self.quarter_turns)
+    }
 }
 
 impl Neg for QuarterTurnsAnticlockwise {
