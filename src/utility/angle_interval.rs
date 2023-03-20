@@ -6,6 +6,7 @@ use std::ops::{Add, Sub};
 use derive_getters::Getters;
 use euclid::{default, vec2, Angle};
 use itertools::Itertools;
+use ntest::assert_false;
 use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
@@ -102,7 +103,25 @@ impl AngleInterval {
         }
     }
 
-    pub fn union(&self, other: AngleInterval) -> Self {
+    pub fn intersection(&self, other: Self) -> Self {
+        assert!(self.overlapping_but_not_exactly_touching(other));
+        assert_false!(self.has_wraparound_double_overlap_not_counting_touching(other));
+
+        AngleInterval {
+            anticlockwise_end: if self.contains_angle_not_including_edges(other.anticlockwise_end) {
+                other.anticlockwise_end
+            } else {
+                self.anticlockwise_end
+            },
+            clockwise_end: if self.contains_angle_not_including_edges(other.clockwise_end) {
+                other.clockwise_end
+            } else {
+                self.clockwise_end
+            },
+        }
+    }
+
+    pub fn union(&self, other: Self) -> Self {
         assert!(self.overlaps_or_touches(other));
         let result = AngleInterval {
             anticlockwise_end: if self.contains_angle_including_edges(other.anticlockwise_end) {
@@ -155,6 +174,20 @@ impl AngleInterval {
             sum += 1;
         }
         sum
+    }
+    fn num_contained_not_touching_edges(&self, other: AngleInterval) -> u32 {
+        let mut sum = 0;
+        if self.contains_angle_not_including_edges(other.anticlockwise_end) {
+            sum += 1;
+        }
+        if self.contains_angle_not_including_edges(other.clockwise_end) {
+            sum += 1;
+        }
+        sum
+    }
+    fn has_wraparound_double_overlap_not_counting_touching(&self, other: AngleInterval) -> bool {
+        self.num_contained_not_touching_edges(other) == 2
+            && other.num_contained_not_touching_edges(*self) == 2
     }
     pub fn partially_overlaps_other_while_including_edges(&self, other: AngleInterval) -> bool {
         let contained_in_self = self.num_contained_or_touching_edges(other);
@@ -591,6 +624,38 @@ mod tests {
             AngleInterval::from_degrees(40.0, 100.0),
             "from exactly touching"
         );
+    }
+
+    #[test]
+    fn test_angle_interval_intersection__simple_overlap() {
+        assert_eq!(
+            AngleInterval::from_degrees(80.0, 100.0)
+                .intersection(AngleInterval::from_degrees(40.0, 90.0)),
+            AngleInterval::from_degrees(80.0, 90.0),
+            "from overlap"
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn test_angle_interval_intersection__no_overlap() {
+        AngleInterval::from_degrees(95.0, 100.0)
+            .intersection(AngleInterval::from_degrees(40.0, 90.0));
+    }
+
+    #[test]
+    fn test_angle_interval_intersection__full_overlap() {
+        let small = AngleInterval::from_degrees(80.0, 100.0);
+        let big = AngleInterval::from_degrees(60.0, 120.0);
+        assert_eq!(big.intersection(small), small);
+        assert_eq!(small.intersection(big), small);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_angle_interval_intersection__wraparound_double_overlap() {
+        let small = AngleInterval::from_degrees(80.0, 100.0);
+        let big = AngleInterval::from_degrees(60.0, 120.0);
+        big.intersection(small.complement());
     }
 
     #[test]

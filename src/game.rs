@@ -1503,7 +1503,7 @@ impl Game {
             vec2(0.1, 0.3),
         );
         self.place_portal(
-            SquareWithOrthogonalDir::from_square_and_dir(block_square + STEP_RIGHT, STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_dir(block_square + STEP_UP_RIGHT, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_dir(
                 block_square + STEP_DOWN_RIGHT * 4,
                 STEP_LEFT,
