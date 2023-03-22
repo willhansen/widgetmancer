@@ -8,10 +8,10 @@ use std::mem;
 use std::ops::{Add, Neg, Sub};
 
 use approx::AbsDiffEq;
-use derive_getters::Getters;
 use derive_more::{Constructor, Display};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
+use getset::CopyGetters;
 use itertools::Itertools;
 use line_drawing::Point;
 use ntest::about_eq;
@@ -63,7 +63,8 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_LEFT,
 ];
 
-#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, CopyGetters)]
+#[get_copy = "pub"]
 pub struct QuarterTurnsAnticlockwise {
     quarter_turns: i32,
 }
@@ -73,9 +74,6 @@ impl QuarterTurnsAnticlockwise {
         QuarterTurnsAnticlockwise {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
-    }
-    pub fn quarter_turns(&self) -> i32 {
-        self.quarter_turns
     }
     pub fn to_vector(&self) -> WorldStep {
         rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
@@ -135,6 +133,7 @@ impl Sub for QuarterTurnsAnticlockwise {
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
+
 impl Octant {
     pub fn new(octant: i32) -> Self {
         Octant(octant.rem_euclid(8))
@@ -372,6 +371,7 @@ pub fn get_8_octants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<
 pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
     format!("(x: {}, y: {})", point.x, point.y)
 }
+
 pub fn vector2_to_string<T: Display, U>(vec: Vector2D<T, U>) -> String {
     format!("(dx: {}, dy: {})", vec.x, vec.y)
 }
@@ -786,7 +786,8 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters, Constructor)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters, Constructor)]
+#[get_copy = "pub"]
 pub struct StepWithQuarterRotations {
     step: WorldStep,
     rotation: QuarterTurnsAnticlockwise,
@@ -863,10 +864,10 @@ impl TryFrom<SquareWithAdjacentDir> for SquareWithOrthogonalDir {
     type Error = ();
 
     fn try_from(value: SquareWithAdjacentDir) -> Result<Self, Self::Error> {
-        if is_orthogonal(*value.direction()) {
+        if is_orthogonal(value.direction()) {
             Ok(SquareWithOrthogonalDir::new(
-                *value.square(),
-                *value.direction(),
+                value.square(),
+                value.direction(),
             ))
         } else {
             Err(())
@@ -874,7 +875,8 @@ impl TryFrom<SquareWithAdjacentDir> for SquareWithOrthogonalDir {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
+#[get_copy = "pub"]
 pub struct SquareWithAdjacentDir {
     square: WorldSquare,
     direction: WorldStep,
@@ -905,7 +907,8 @@ impl From<SquareWithOrthogonalDir> for SquareWithAdjacentDir {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, Getters)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
+#[get_copy = "pub"]
 pub struct TranslationAndRotationTransform {
     translation: WorldStep,
     quarter_rotations_counterclockwise: u32,

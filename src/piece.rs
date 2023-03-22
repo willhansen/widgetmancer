@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 use std::f32::consts::PI;
 
-use derive_getters::Getters;
 use derive_more::Constructor;
 use euclid::*;
+use getset::CopyGetters;
 use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::Display;
@@ -77,7 +77,8 @@ impl FactionFactory {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, Getters)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, CopyGetters)]
+#[get_copy = "pub"]
 pub struct NStep {
     step: WorldStep,
     n: Option<u32>,

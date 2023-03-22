@@ -4,7 +4,6 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use ::num::clamp;
-use derive_getters::Getters;
 use derive_more::Constructor;
 use euclid::*;
 use itertools::Itertools;
@@ -846,15 +845,14 @@ impl Game {
         for i in 0..range_cap {
             let distance = i + 1;
             // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
-            let square = if is_king_step(*repeating_step.step()) {
-                *self
-                    .multiple_portal_aware_steps(
-                        SquareWithAdjacentDir::new(start_square, *repeating_step.step()),
-                        distance,
-                    )
-                    .square()
+            let square = if is_king_step(repeating_step.step()) {
+                self.multiple_portal_aware_steps(
+                    SquareWithAdjacentDir::new(start_square, repeating_step.step()),
+                    distance,
+                )
+                .square()
             } else {
-                start_square + *repeating_step.step() * distance as i32
+                start_square + repeating_step.step() * distance as i32
             };
             if !self.square_is_on_board(square) {
                 break;
@@ -1266,7 +1264,7 @@ impl Game {
         let spear_length = 5;
 
         for i in 1..=spear_length {
-            let target_square = *self
+            let target_square = self
                 .multiple_portal_aware_steps(self.player_pose(), i)
                 .square();
             if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {

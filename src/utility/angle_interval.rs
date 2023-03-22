@@ -3,8 +3,8 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
-use derive_getters::Getters;
 use euclid::{default, vec2, Angle};
+use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 use num::traits::FloatConst;
@@ -19,7 +19,8 @@ use crate::utility::{
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Getters)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, CopyGetters)]
+#[get_copy = "pub"]
 pub struct AngleInterval {
     clockwise_end: Angle<f32>,
     anticlockwise_end: Angle<f32>,
@@ -332,7 +333,8 @@ impl AngleInterval {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Getters)]
+#[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
+#[get_copy = "pub"]
 pub struct DirectionalAngularEdge {
     angle: Angle<f32>,
     is_clockwise_edge: bool,

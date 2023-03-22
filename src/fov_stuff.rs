@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
-use derive_getters::Getters;
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
+use getset::CopyGetters;
 use itertools::*;
 use ntest::assert_false;
 use num::abs;
@@ -48,7 +48,8 @@ impl SquareVisibility {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Copy, Getters)]
+#[derive(Clone, PartialEq, Debug, Copy, CopyGetters)]
+#[get_copy = "pub"]
 pub struct PartialVisibilityOfASquare {
     left_char_shadow: Option<CharacterShadow>,
     right_char_shadow: Option<CharacterShadow>,
@@ -501,7 +502,7 @@ impl FovResult {
     ) -> SquareVisibility {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
-        let quarter_rotations: QuarterTurnsAnticlockwise = *view_transform_to_sub_view.0.rotation();
+        let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.0.rotation();
 
         let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(
             relative_square,
@@ -822,7 +823,7 @@ fn partial_visibility_of_square_from_one_view_arc(
 
     let shadow_line_from_center: WorldLine = Line {
         p1: point2(0.0, 0.0),
-        p2: unit_vector_from_angle(*overlapped_shadow_edge.angle())
+        p2: unit_vector_from_angle(overlapped_shadow_edge.angle())
             .to_point()
             .cast_unit(),
     };

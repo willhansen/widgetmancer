@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Add;
 
-use derive_getters::Getters;
 use derive_more::Constructor;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -27,10 +26,10 @@ impl ViewTransform {
         ))
     }
     pub fn step(&self) -> WorldStep {
-        *self.0.step()
+        self.0.step()
     }
     pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
-        *self.0.rotation()
+        self.0.rotation()
     }
     pub fn transform_pose(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_turns(
