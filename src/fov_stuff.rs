@@ -238,7 +238,6 @@ impl FovResult {
                 let relative_squares_in_sub_frame = subview
                     .fully_visible_relative_squares_in_main_view_only
                     .clone();
-                //dbg!("asdfasdf 4", &relative_squares_in_sub_frame);
                 let visible_in_main_frame =
                     transform_from_subview.rotate_steps(&relative_squares_in_sub_frame);
                 all_visible = union(&all_visible, &visible_in_main_frame);
@@ -248,7 +247,6 @@ impl FovResult {
 
     pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
         let top_view_visible = self.at_least_partially_visible_relative_squares_main_view_only();
-        //dbg!("asdfasdf 2", top_view_visible.len());
 
         let mut all_visible = top_view_visible;
 
@@ -262,11 +260,9 @@ impl FovResult {
                 all_visible.insert(step);
             });
         }
-        //dbg!("asdfasdf 3", all_visible.len());
         all_visible
     }
     pub fn at_least_partially_visible_relative_squares_main_view_only(&self) -> StepSet {
-        // dbg!( "asdfasdf 4", self.root_square(), &self.fully_visible_relative_squares_in_main_view_only, self.only_partially_visible_squares_in_main_view_only() );
         self.fully_visible_relative_squares_in_main_view_only
             .union(&self.only_partially_visible_squares_in_main_view_only())
             .copied()
@@ -435,7 +431,7 @@ impl FovResult {
     ) -> Vec<SquareVisibility> {
         // Due to portals, this may see the same square multiple times
         let rel_to_root = world_square - self.root_square();
-        // dbg!("asdfasdf 1", world_square, rel_to_root);
+        dbg!("asdfasdf B", self.root_square(), rel_to_root);
         let visibility_in_untransformed_view =
             self.visibility_of_relative_square_in_untransformed_view(rel_to_root);
 
@@ -453,6 +449,7 @@ impl FovResult {
         visibilities
     }
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
+        dbg!("asdfasdf A", world_square);
         self.visibility_of_absolute_square(world_square)
             .into_iter()
             .any(|vis: SquareVisibility| vis.is_visible())
@@ -517,7 +514,6 @@ impl FovResult {
     }
 
     pub fn visibility_of_relative_square(&self, relative_square: WorldStep) -> SquareVisibility {
-        //dbg!( "asdfasdf B", relative_square, self.fully_visible_squares.clone(), self.only_partially_visible_squares() );
         let top_level_visibility =
             self.visibility_of_relative_square_in_untransformed_view(relative_square);
         if top_level_visibility.is_visible() {
@@ -601,7 +597,6 @@ pub fn field_of_view_within_arc_in_single_octant(
     view_arc: AngleInterval,
     mut prev_step_in_fov_sequence: u32,
 ) -> FovResult {
-    //dbg!("asdfasdf 6", view_arc.to_string());
     let mut fov_result = FovResult::new_oriented_empty_fov_at(oriented_center_square);
 
     for relative_square in OctantFOVSquareSequenceIter::new(octant, prev_step_in_fov_sequence) {
@@ -619,11 +614,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         let visibility_of_this_square: SquareVisibility =
             visibility_of_square(view_arc, relative_square);
 
-        // if octant.number() == 2 { dbg!( "asdfasdf E sub-arc candidate", relative_square, absolute_square, visibility_of_this_square.is_visible ); }
-
-        if octant.number() != 0 && visibility_of_this_square.is_visible {
-            // dbg!( "asdfasdf 5", relative_square, visibility_of_this_square.is_fully_visible(), view_arc.to_string(), view_arc_of_this_square.to_string() );
-        }
+        if octant.number() != 0 && visibility_of_this_square.is_visible {}
         if visibility_of_this_square.is_visible() {
             fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
@@ -670,7 +661,10 @@ pub fn field_of_view_within_arc_in_single_octant(
             portal_view_arcs.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
-                    let transformed_center = transform.transform_pose(oriented_center_square);
+                    let transformed_center = virtual_absolute_pose_of_fov_center_near_portal_exit(
+                        oriented_center_square,
+                        portal,
+                    );
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
@@ -680,7 +674,6 @@ pub fn field_of_view_within_arc_in_single_octant(
                         transform.transform_arc(view_arc.intersection(portal_view_arc)),
                         prev_step_in_fov_sequence,
                     );
-                    //dbg!( "asdfasdf D", sub_arc_fov.at_least_partially_visible_squares() );
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
                 },
             );
@@ -793,6 +786,13 @@ pub fn field_of_view_from_square(
 
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
+}
+
+fn virtual_absolute_pose_of_fov_center_near_portal_exit(
+    pose_near_entrance: SquareWithOrthogonalDir,
+    portal: Portal,
+) -> SquareWithOrthogonalDir {
+    todo!()
 }
 
 fn visibility_of_square(view_arc: AngleInterval, rel_square: WorldStep) -> SquareVisibility {
@@ -1406,7 +1406,8 @@ mod tests {
             .into_iter()
             .map(|dx| center + STEP_RIGHT * dx)
             .collect();
-        let should_be_visible_after_portal: SquareSet = ((dx_to_portal_square + 1)..=radius as i32)
+        let squares_after_portal = radius - (dx_to_portal_square.abs() as u32 + 1);
+        let should_be_visible_after_portal: SquareSet = (0..squares_after_portal as i32)
             .into_iter()
             .map(|dy| exit_square + STEP_DOWN * dy)
             .collect();
@@ -1555,5 +1556,12 @@ mod tests {
                 (x, y)
             )
         });
+    }
+    #[test]
+    fn test_virtual_fov_center_from_portal() {
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 4), STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(point2(50, 70), STEP_LEFT);
+
+        todo!()
     }
 }

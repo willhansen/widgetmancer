@@ -153,7 +153,6 @@ impl Game {
         self.running
     }
 
-    #[deprecated(note = "Use try_slide_player_v2 instead")]
     pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         assert!(is_orthodiagonal(movement));
         let movement_direction = round_to_king_step(movement);
