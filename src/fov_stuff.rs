@@ -15,7 +15,7 @@ use crate::glyph::glyph_constants::{
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::{Portal, PortalGeometry, ViewTransform};
+use crate::portal_geometry::{Portal, PortalGeometry, SlideRotation};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -207,10 +207,10 @@ impl FovResult {
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
     }
-    pub fn view_transform_to(&self, other: &FovResult) -> ViewTransform {
+    pub fn view_transform_to(&self, other: &FovResult) -> SlideRotation {
         let start = self.root_square_with_direction;
         let end = other.root_square_with_direction;
-        ViewTransform::from_start_and_end_poses(start, end)
+        SlideRotation::from_start_and_end_poses(start, end)
     }
     pub fn partially_visible_squares_as_glyph_mask(&self) -> WorldSquareGlyphMap {
         let mut the_map = WorldSquareGlyphMap::new();
@@ -499,7 +499,7 @@ impl FovResult {
     ) -> SquareVisibility {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
-        let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.0.rotation();
+        let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.rotation();
 
         let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(
             relative_square,
@@ -661,9 +661,12 @@ pub fn field_of_view_within_arc_in_single_octant(
             portal_view_arcs.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
-                    let transformed_center = virtual_absolute_pose_of_fov_center_near_portal_exit(
+                    let transformed_center = transform.transform_pose(oriented_center_square);
+                    dbg!(
+                        "asdfasdf E",
                         oriented_center_square,
-                        portal,
+                        transform,
+                        transformed_center
                     );
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
@@ -786,13 +789,6 @@ pub fn field_of_view_from_square(
 
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
-}
-
-fn virtual_absolute_pose_of_fov_center_near_portal_exit(
-    pose_near_entrance: SquareWithOrthogonalDir,
-    portal: Portal,
-) -> SquareWithOrthogonalDir {
-    todo!()
 }
 
 fn visibility_of_square(view_arc: AngleInterval, rel_square: WorldStep) -> SquareVisibility {
@@ -1448,17 +1444,13 @@ mod tests {
             );
         });
     }
-
     #[test]
-    fn test_one_octant_with_one_portal() {
+    fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
-        let center = point2(0, 0);
-        let entrance_square = center + STEP_RIGHT * 3;
-        let exit_square = center + STEP_DOWN_LEFT * 15;
-        portal_geometry.create_portal(
-            SquareWithOrthogonalDir::new(entrance_square, STEP_RIGHT),
-            SquareWithOrthogonalDir::new(exit_square, STEP_DOWN),
-        );
+        let center = point2(-15, 50);
+        let portal_entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit = SquareWithOrthogonalDir::new(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+        portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
             &Default::default(),
@@ -1469,23 +1461,46 @@ mod tests {
         );
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
-        assert!(fov_result.can_fully_see_relative_square(STEP_RIGHT * 2));
-        assert_false!(fov_result.can_see_absolute_square(entrance_square + STEP_RIGHT));
-        assert!(fov_result.can_see_absolute_square(exit_square));
-
-        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
         assert_eq!(
             fov_result.view_transform_to(&fov_result.transformed_sub_fovs[0]),
-            ViewTransform::new(STEP_LEFT * 6, QuarterTurnsAnticlockwise::new(1))
+            SlideRotation::from_start_and_end_poses(portal_entrance, portal_exit.stepped_back())
         );
         assert_eq!(
             fov_result.transformed_sub_fovs[0]
                 .root_square_with_direction
                 .square(),
-            point2(-5, -2)
+            portal_exit.square() + STEP_UP * 2
         );
+    }
+
+    #[test]
+    fn test_one_octant_with_one_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        let center = point2(-15, 50);
+        let portal_entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit = SquareWithOrthogonalDir::new(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+        dbg!("asdfasdf D", portal_exit);
+        portal_geometry.create_portal(portal_entrance, portal_exit);
+
+        let fov_result = single_octant_field_of_view(
+            &Default::default(),
+            &portal_geometry,
+            center,
+            3,
+            Octant::new(0),
+        );
+
+        assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
+        dbg!(
+            "asdfasdf C",
+            &fov_result.transformed_sub_fovs[0].root_square_with_direction
+        );
+        // Not fully visible because only one octant
+        assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
+        assert_false!(fov_result.can_see_absolute_square(portal_entrance.square() + STEP_RIGHT));
+        assert!(fov_result.can_see_absolute_square(portal_exit.square()));
+
         assert_false!(fov_result.transformed_sub_fovs[0].can_fully_see_relative_square(STEP_ZERO));
-        assert!(fov_result.transformed_sub_fovs[0].can_fully_see_relative_square(STEP_UP * 2));
     }
 
     #[test]
@@ -1558,10 +1573,47 @@ mod tests {
         });
     }
     #[test]
-    fn test_virtual_fov_center_from_portal() {
+    fn test_portal_pose_transform() {
         let entrance = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 4), STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::from_square_and_dir(point2(50, 70), STEP_LEFT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(point2(50, 70), STEP_DOWN);
+        let portal = Portal::new(entrance, exit);
 
-        todo!()
+        let transform = portal.get_transform();
+        assert_eq!(transform.translation(), vec2(47, 67));
+        assert_eq!(transform.rotation(), QuarterTurnsAnticlockwise::new(3));
+
+        let entrance_offset_and_direction_exit_offset_and_direction = vec![
+            (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
+            (STEP_LEFT, STEP_RIGHT, STEP_UP * 2, STEP_DOWN),
+            (STEP_ZERO, STEP_RIGHT, STEP_UP, STEP_DOWN),
+            (
+                STEP_UP + STEP_LEFT * 2,
+                STEP_DOWN,
+                STEP_RIGHT + STEP_UP * 3,
+                STEP_LEFT,
+            ),
+        ];
+        for (
+            offset_from_entrance,
+            direction_near_entrance,
+            offset_from_exit,
+            direction_near_exit,
+        ) in entrance_offset_and_direction_exit_offset_and_direction
+        {
+            let actual_center = entrance
+                .with_offset(offset_from_entrance)
+                .with_direction(direction_near_entrance);
+            let virtual_center_at_exit = portal.get_transform().transform_pose(actual_center);
+            let correct_center_at_exit = exit
+                .with_offset(offset_from_exit)
+                .with_direction(direction_near_exit);
+            dbg!(
+                "asdfasdf",
+                actual_center,
+                virtual_center_at_exit,
+                correct_center_at_exit
+            );
+            assert_eq!(virtual_center_at_exit, correct_center_at_exit);
+        }
     }
 }

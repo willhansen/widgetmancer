@@ -2,13 +2,13 @@ extern crate num;
 
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
-use std::fmt::Display;
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg, Sub};
 
 use approx::AbsDiffEq;
-use derive_more::{Constructor, Display};
+use derive_more::{Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
@@ -786,10 +786,10 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters, Constructor)]
+#[derive(Clone, Hash, Eq, PartialEq, Neg, Debug, Copy, CopyGetters, Constructor)]
 #[get_copy = "pub"]
 pub struct StepWithQuarterRotations {
-    step: WorldStep,
+    stepp: WorldStep,
     rotation: QuarterTurnsAnticlockwise,
 }
 
@@ -814,28 +814,26 @@ impl Add for StepWithQuarterRotations {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        StepWithQuarterRotations::new(self.step + rhs.step, self.rotation + rhs.rotation)
+        StepWithQuarterRotations::new(self.stepp + rhs.stepp, self.rotation + rhs.rotation)
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+#[derive(Clone, Hash, Eq, PartialEq, Neg, Copy, CopyGetters)]
+#[get_copy = "pub"]
 pub struct SquareWithOrthogonalDir {
     square: WorldSquare,
-    direction: QuarterTurnsAnticlockwise,
+    direction_in_quarter_turns: QuarterTurnsAnticlockwise,
 }
 
 impl SquareWithOrthogonalDir {
     pub fn from_square_and_dir(square: WorldSquare, direction: WorldStep) -> Self {
         SquareWithOrthogonalDir {
             square,
-            direction: QuarterTurnsAnticlockwise::from_vector(direction),
+            direction_in_quarter_turns: QuarterTurnsAnticlockwise::from_vector(direction),
         }
     }
     pub fn new(square: WorldSquare, direction: WorldStep) -> Self {
-        SquareWithOrthogonalDir {
-            square,
-            direction: QuarterTurnsAnticlockwise::from_vector(direction),
-        }
+        Self::from_square_and_dir(square, direction)
     }
     pub fn from_square_and_turns(
         square: WorldSquare,
@@ -843,19 +841,36 @@ impl SquareWithOrthogonalDir {
     ) -> Self {
         SquareWithOrthogonalDir::new(square, quarter_turns.to_vector())
     }
-    pub fn square(&self) -> WorldSquare {
-        self.square
-    }
-    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
-        self.direction
-    }
     pub fn direction_vector(&self) -> WorldStep {
-        self.direction.to_vector()
+        self.direction_in_quarter_turns.to_vector()
     }
     pub fn stepped(&self) -> Self {
         SquareWithOrthogonalDir::new(
             self.square + self.direction_vector(),
             self.direction_vector(),
+        )
+    }
+    pub fn stepped_back(&self) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square - self.direction_vector(),
+            self.direction_vector(),
+        )
+    }
+    pub fn with_offset(&self, offset: WorldStep) -> Self {
+        Self::from_square_and_turns(self.square + offset, self.direction_in_quarter_turns)
+    }
+    pub fn with_direction(&self, dir: WorldStep) -> Self {
+        Self::new(self.square, dir)
+    }
+}
+
+impl Debug for SquareWithOrthogonalDir {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Pos: {}, Dir: {}",
+            point_to_string(self.square),
+            vector2_to_string(self.direction_vector())
         )
     }
 }
@@ -872,6 +887,28 @@ impl TryFrom<SquareWithAdjacentDir> for SquareWithOrthogonalDir {
         } else {
             Err(())
         }
+    }
+}
+
+impl Add<StepWithQuarterRotations> for SquareWithOrthogonalDir {
+    type Output = Self;
+
+    fn add(self, rhs: StepWithQuarterRotations) -> Self::Output {
+        SquareWithOrthogonalDir::from_square_and_turns(
+            self.square + rhs.stepp,
+            self.direction_in_quarter_turns + rhs.rotation,
+        )
+    }
+}
+
+impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
+    type Output = StepWithQuarterRotations;
+
+    fn sub(self, rhs: SquareWithOrthogonalDir) -> Self::Output {
+        StepWithQuarterRotations::new(
+            self.square - rhs.square,
+            self.direction_in_quarter_turns - rhs.direction_in_quarter_turns,
+        )
     }
 }
 
@@ -953,6 +990,15 @@ pub fn angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
             .radians
             .abs(),
     )
+}
+
+pub fn revolve_square(
+    moving_square: WorldSquare,
+    pivot_square: WorldSquare,
+    rotation: QuarterTurnsAnticlockwise,
+) -> WorldSquare {
+    let rel_square = moving_square - pivot_square;
+    pivot_square + rotation.rotate_vector(rel_square)
 }
 
 #[cfg(test)]
@@ -1216,5 +1262,24 @@ mod tests {
             WorldPoint::new(-29.5, 5.0),
             WorldPoint::new(-27.589872, 4.703601),
         ));
+    }
+
+    #[test]
+    fn test_revolve_square() {
+        assert_eq!(
+            revolve_square(
+                point2(3, 4),
+                point2(5, 5),
+                QuarterTurnsAnticlockwise::new(3),
+            ),
+            point2(4, 7)
+        );
+    }
+
+    #[test]
+    fn test_step_back_pose() {
+        let pose = SquareWithOrthogonalDir::from_square_and_dir(point2(4, 6), STEP_RIGHT);
+        let back = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 6), STEP_RIGHT);
+        assert_eq!(pose.stepped_back(), back);
     }
 }
