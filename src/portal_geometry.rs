@@ -99,7 +99,7 @@ impl Portal {
     }
 }
 
-#[derive(Constructor, Default)]
+#[derive(Constructor, Default, Debug)]
 pub struct PortalGeometry {
     portal_exits_by_entrance: HashMap<SquareWithOrthogonalDir, SquareWithOrthogonalDir>,
 }

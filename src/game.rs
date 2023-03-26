@@ -19,7 +19,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::{field_of_view_from_square, FovResult};
+use crate::fov_stuff::{
+    field_of_view_from_square, portal_aware_field_of_view_from_square, FovResult,
+};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
@@ -1546,7 +1548,12 @@ impl Game {
     }
     fn player_field_of_view(&self) -> FovResult {
         let start_square = self.player_square();
-        field_of_view_from_square(start_square, PLAYER_SIGHT_RADIUS, &self.blocks)
+        portal_aware_field_of_view_from_square(
+            start_square,
+            PLAYER_SIGHT_RADIUS,
+            &self.blocks,
+            &self.portal_geometry,
+        )
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
@@ -2315,7 +2322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_see_through_portal__no_rotation() {
+    fn test_see_through_portal() {
         let mut game = set_up_10x10_game();
 
         let player_square = point2(2, 2);
@@ -2324,12 +2331,23 @@ mod tests {
         let enemy_square = player_square + STEP_UP * 2;
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
-        let entrance = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::new(enemy_square, STEP_RIGHT);
+        let entrance = SquareWithOrthogonalDir::new(player_square + STEP_RIGHT, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::new(enemy_square + STEP_DOWN, STEP_UP);
         game.place_portal(entrance, exit);
 
         game.draw_headless_now();
-        let visible_enemy_square = player_square + STEP_RIGHT;
+        let visible_enemy_square = player_square + STEP_RIGHT * 3;
+
+        game.graphics.print_draw_buffer(
+            world_square_to_left_world_character_square(player_square),
+            5,
+        );
+        game.graphics.print_screen_buffer();
+
+        let fov = game.player_field_of_view();
+
+        assert_eq!(fov.sub_fovs().len(), 1);
+        assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
         assert_false!(game
             .graphics
             .get_glyphs_for_square_from_screen_buffer(visible_enemy_square)

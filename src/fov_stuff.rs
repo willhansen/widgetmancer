@@ -226,6 +226,9 @@ impl FovResult {
         self.fully_visible_relative_squares_in_main_view_only
             .insert(square - self.root_square());
     }
+    pub fn sub_fovs(&self) -> &Vec<FovResult> {
+        &self.transformed_sub_fovs
+    }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
         let mut all_visible = self
             .fully_visible_relative_squares_in_main_view_only
@@ -431,7 +434,6 @@ impl FovResult {
     ) -> Vec<SquareVisibility> {
         // Due to portals, this may see the same square multiple times
         let rel_to_root = world_square - self.root_square();
-        dbg!("asdfasdf B", self.root_square(), rel_to_root);
         let visibility_in_untransformed_view =
             self.visibility_of_relative_square_in_untransformed_view(rel_to_root);
 
@@ -623,6 +625,9 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
         let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
+        if relative_square == vec2(2, 0) {
+            dbg!("asdfasdf H", portal_geometry);
+        }
 
         let maybe_view_blocking_arc: Option<AngleInterval>;
 
@@ -630,6 +635,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         if square_blocks_sight {
             maybe_view_blocking_arc = Some(view_arc_of_this_square);
         } else if square_has_portal {
+            dbg!("asdfasdf G", absolute_square, relative_square);
             let portals_for_square: Vec<Portal> =
                 portal_geometry.portals_entering_from_square(absolute_square);
 
@@ -774,6 +780,7 @@ pub fn portal_aware_field_of_view_from_square(
         .departialized()
 }
 
+#[deprecated(note = "use portal_aware_field_of_view_from_square instead")]
 pub fn field_of_view_from_square(
     start_square: WorldSquare,
     radius: u32,
@@ -1444,6 +1451,7 @@ mod tests {
             );
         });
     }
+
     #[test]
     fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
@@ -1572,6 +1580,7 @@ mod tests {
             )
         });
     }
+
     #[test]
     fn test_portal_pose_transform() {
         let entrance = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 4), STEP_RIGHT);
