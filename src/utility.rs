@@ -236,6 +236,16 @@ impl<U> Line<f32, U> {
         self.point_is_approx_on_line(other.p1, tolerance)
             && self.point_is_approx_on_line(other.p2, tolerance)
     }
+
+    pub fn angle_with_positive_x_axis(&self) -> Angle<f32> {
+        let angle_a = better_angle_from_x_axis(self.p1 - self.p2);
+        let angle_b = better_angle_from_x_axis(self.p2 - self.p1);
+        if angle_a.radians.cos() < 0.0 {
+            angle_b
+        } else {
+            angle_a
+        }
+    }
 }
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
@@ -467,7 +477,7 @@ pub fn unit_vector_from_angle(angle: Angle<f32>) -> FVector {
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
     (0..4)
         .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
-        .min_by_key(|&snap_angle| OrderedFloat(angle_distance(snap_angle, angle).radians))
+        .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
         .unwrap()
 }
 
@@ -983,7 +993,7 @@ pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
     }
 }
 
-pub fn angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
+pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
     Angle::radians(
         standardize_angle(a)
             .angle_to(standardize_angle(b))

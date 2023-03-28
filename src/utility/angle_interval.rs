@@ -14,7 +14,7 @@ use termion::cursor::Left;
 use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
-    angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
+    abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, Octant, QuarterTurnsAnticlockwise, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
@@ -312,9 +312,9 @@ impl AngleInterval {
         assert!(self.touches_or_overlaps(other));
 
         // Select edge of self closest to the other's center
-        let dist_from_clockwise_edge = angle_distance(self.clockwise_end, other.center_angle());
+        let dist_from_clockwise_edge = abs_angle_distance(self.clockwise_end, other.center_angle());
         let dist_from_anticlockwise_edge =
-            angle_distance(self.anticlockwise_end, other.center_angle());
+            abs_angle_distance(self.anticlockwise_end, other.center_angle());
         let clockwise_is_closer = dist_from_clockwise_edge < dist_from_anticlockwise_edge;
         DirectionalAngularEdge::new(
             if clockwise_is_closer {

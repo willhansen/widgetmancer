@@ -2346,6 +2346,13 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
+        dbg!(
+            "asdfasdf J",
+            fov.sub_fovs()
+                .iter()
+                .map(|fov: &FovResult| fov.root_square())
+                .collect::<Vec<_>>()
+        );
         assert_eq!(fov.sub_fovs().len(), 1);
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
         assert_false!(game

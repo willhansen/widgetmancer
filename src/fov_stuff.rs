@@ -57,6 +57,7 @@ pub struct PartialVisibilityOfASquare {
 }
 
 type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
+type SquareShadow = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 impl PartialVisibilityOfASquare {
     pub fn get(&self, i: usize) -> &Option<CharacterShadow> {
@@ -75,6 +76,35 @@ impl PartialVisibilityOfASquare {
             right_char_shadow,
             tie_break_bias_direction: Angle::degrees(45.0),
         }
+    }
+
+    pub fn top_half_visible() -> Self {
+        Self::half_visible(Angle::degrees(270.0))
+    }
+    pub fn bottom_half_visible() -> Self {
+        Self::half_visible(Angle::degrees(90.0))
+    }
+
+    fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
+        shadow_direction = standardize_angle(shadow_direction);
+        Self::from_square_shadow(HalfPlane::new(
+            Line::new(
+                point2(0.0, 0.0),
+                rotated_n_quarter_turns_counter_clockwise(
+                    unit_vector_from_angle(shadow_direction),
+                    1,
+                )
+                .to_point()
+                .cast_unit(),
+            ),
+            unit_vector_from_angle(shadow_direction)
+                .to_point()
+                .cast_unit(),
+        ))
+    }
+
+    fn from_square_shadow(square_shadow: SquareShadow) -> Self {
+        todo!()
     }
 
     pub fn rebiased(&self, bias_angle: Angle<f32>) -> Self {
@@ -451,7 +481,6 @@ impl FovResult {
         visibilities
     }
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
-        dbg!("asdfasdf A", world_square);
         self.visibility_of_absolute_square(world_square)
             .into_iter()
             .any(|vis: SquareVisibility| vis.is_visible())
@@ -625,9 +654,6 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
         let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
-        if relative_square == vec2(2, 0) {
-            dbg!("asdfasdf H", portal_geometry);
-        }
 
         let maybe_view_blocking_arc: Option<AngleInterval>;
 
@@ -683,7 +709,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                         transform.transform_arc(view_arc.intersection(portal_view_arc)),
                         prev_step_in_fov_sequence,
                     );
+                    dbg!("asdfasdf I1", fov_result.transformed_sub_fovs.len());
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
+                    dbg!("asdfasdf I2", fov_result.transformed_sub_fovs.len());
                 },
             );
 
@@ -1624,5 +1652,84 @@ mod tests {
             );
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
+    }
+    #[test]
+    fn test_sub_fovs_combine() {
+        let mut fov = FovResult::new_empty_fov_at(point2(5, 5));
+        let mut sub_fov_1 = FovResult::new_empty_fov_at(point2(15, 5));
+        let mut sub_fov_2 = FovResult::new_empty_fov_at(point2(15, 5));
+
+        let rel_square = STEP_RIGHT * 3;
+        sub_fov_1
+            .partially_visible_squares
+            .insert(rel_square, PartialVisibilityOfASquare::top_half_visible());
+        sub_fov_2.partially_visible_squares.insert(
+            rel_square,
+            PartialVisibilityOfASquare::bottom_half_visible(),
+        );
+
+        fov.transformed_sub_fovs.push(sub_fov_1);
+        fov.transformed_sub_fovs.push(sub_fov_2);
+
+        fov = fov.departialized();
+
+        assert_eq!(
+            fov.fully_visible_relative_squares_including_subviews()
+                .len(),
+            1
+        );
+        assert_eq!(
+            fov.at_least_partially_visible_relative_squares_including_subviews()
+                .len(),
+            1
+        );
+        assert!(fov.can_fully_see_relative_square(rel_square));
+        assert_eq!(fov.transformed_sub_fovs.len(), 1);
+    }
+
+    #[test]
+    fn test_create_square_half_visibility_from_angle() {
+        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(0.0));
+        assert!(vis.right_char_shadow.is_some());
+        assert!(vis.left_char_shadow.is_none());
+
+        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(180.0));
+        assert!(vis.right_char_shadow.is_none());
+        assert!(vis.left_char_shadow.is_some());
+
+        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(90.0));
+        assert_eq!(
+            vis.right_char_shadow
+                .unwrap()
+                .dividing_line
+                .angle_with_positive_x_axis()
+                .to_degrees(),
+            0.0
+        );
+        assert_eq!(
+            vis.left_char_shadow
+                .unwrap()
+                .dividing_line
+                .angle_with_positive_x_axis()
+                .to_degrees(),
+            0.0
+        );
+        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(270.0));
+        assert_eq!(
+            vis.right_char_shadow
+                .unwrap()
+                .dividing_line
+                .angle_with_positive_x_axis()
+                .to_degrees(),
+            0.0
+        );
+        assert_eq!(
+            vis.left_char_shadow
+                .unwrap()
+                .dividing_line
+                .angle_with_positive_x_axis()
+                .to_degrees(),
+            0.0
+        );
     }
 }
