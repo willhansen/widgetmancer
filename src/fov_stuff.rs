@@ -85,6 +85,17 @@ impl PartialVisibilityOfASquare {
         Self::half_visible(Angle::degrees(90.0))
     }
 
+    fn standardized(&self) -> Self {
+        let f = |maybe_shadow: Option<CharacterShadow>| {
+            if maybe_shadow.is_some_and(|x: CharacterShadow| x.complement().covers_unit_square()) {
+                None
+            } else {
+                maybe_shadow
+            }
+        };
+        Self::new(f(self.left_char_shadow), f(self.right_char_shadow))
+    }
+
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         shadow_direction = standardize_angle(shadow_direction);
         Self::from_square_shadow(HalfPlane::new(
@@ -104,7 +115,17 @@ impl PartialVisibilityOfASquare {
     }
 
     fn from_square_shadow(square_shadow: SquareShadow) -> Self {
-        todo!()
+        Self::new(
+            Some(local_square_half_plane_to_local_character_half_plane(
+                square_shadow,
+                0,
+            )),
+            Some(local_square_half_plane_to_local_character_half_plane(
+                square_shadow,
+                1,
+            )),
+        )
+        .standardized()
     }
 
     pub fn rebiased(&self, bias_angle: Angle<f32>) -> Self {
@@ -398,6 +419,9 @@ impl FovResult {
             partially_visible_squares: all_partials,
             transformed_sub_fovs: all_sub_fovs,
         }
+    }
+    pub fn with_combined_sub_views(&self) -> Self {
+        todo!()
     }
 
     pub fn departialized(&self) -> Self {
@@ -1653,8 +1677,9 @@ mod tests {
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
     }
+
     #[test]
-    fn test_sub_fovs_combine() {
+    fn test_sub_fovs_combine_with_each_other() {
         let mut fov = FovResult::new_empty_fov_at(point2(5, 5));
         let mut sub_fov_1 = FovResult::new_empty_fov_at(point2(15, 5));
         let mut sub_fov_2 = FovResult::new_empty_fov_at(point2(15, 5));
@@ -1671,7 +1696,7 @@ mod tests {
         fov.transformed_sub_fovs.push(sub_fov_1);
         fov.transformed_sub_fovs.push(sub_fov_2);
 
-        fov = fov.departialized();
+        fov = fov.with_combined_sub_views();
 
         assert_eq!(
             fov.fully_visible_relative_squares_including_subviews()
@@ -1688,14 +1713,54 @@ mod tests {
     }
 
     #[test]
+    fn test_sub_fovs_combine_with_main_fov() {
+        let center = point2(5, 5);
+        let mut fov = FovResult::new_empty_fov_at(center);
+        let mut sub_fov_1 = FovResult::new_empty_fov_at(center);
+
+        let rel_square = STEP_RIGHT * 3;
+        sub_fov_1
+            .partially_visible_squares
+            .insert(rel_square, PartialVisibilityOfASquare::top_half_visible());
+        fov.partially_visible_squares.insert(
+            rel_square,
+            PartialVisibilityOfASquare::bottom_half_visible(),
+        );
+
+        fov.transformed_sub_fovs.push(sub_fov_1);
+
+        fov = fov.with_combined_sub_views();
+
+        assert_eq!(
+            fov.fully_visible_relative_squares_including_subviews()
+                .len(),
+            1
+        );
+        assert_eq!(
+            fov.at_least_partially_visible_relative_squares_including_subviews()
+                .len(),
+            1
+        );
+        assert!(fov.can_fully_see_relative_square(rel_square));
+        assert_eq!(fov.transformed_sub_fovs.len(), 0);
+    }
+
+    #[test]
     fn test_create_square_half_visibility_from_angle() {
         let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(0.0));
-        assert!(vis.right_char_shadow.is_some());
-        assert!(vis.left_char_shadow.is_none());
+        dbg!(vis.right_char_shadow);
+        assert!(vis
+            .right_char_shadow
+            .is_some_and(|p: CharacterShadow| p.covers_unit_square()));
+        assert!(vis
+            .left_char_shadow
+            .is_some_and(|p: CharacterShadow| p.complement().covers_unit_square()));
 
         let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(180.0));
-        assert!(vis.right_char_shadow.is_none());
-        assert!(vis.left_char_shadow.is_some());
+        assert!(vis
+            .right_char_shadow
+            .is_some_and(|p: CharacterShadow| p.complement().covers_unit_square()));
+        assert!(vis.left_char_shadow.is_some_and(|p| p.covers_unit_square()));
 
         let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(90.0));
         assert_eq!(

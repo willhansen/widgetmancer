@@ -1,5 +1,6 @@
 extern crate num;
 
+#[feature(unboxed_closures)]
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
@@ -246,6 +247,15 @@ impl<U> Line<f32, U> {
             angle_a
         }
     }
+
+    pub fn reflect_point_over_line(&self, point: Point2D<f32, U>) -> Point2D<f32, U> {
+        let p1_to_p = point - self.p1;
+        let p1_to_p2 = self.p2 - self.p1;
+        let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
+        let perpendicular_part = p1_to_p - parallel_part;
+        let p1_to_reflected_p = parallel_part - perpendicular_part;
+        self.p1 + p1_to_reflected_p
+    }
 }
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
@@ -280,7 +290,15 @@ impl<U: Copy> HalfPlane<f32, U> {
     }
 
     pub fn complement(&self) -> Self {
-        todo!()
+        HalfPlane {
+            dividing_line: self.dividing_line,
+            point_on_half_plane: self.point_off_half_plane(),
+        }
+    }
+
+    pub fn point_off_half_plane(&self) -> Point2D<f32, U> {
+        self.dividing_line
+            .reflect_point_over_line(self.point_on_half_plane)
     }
 
     pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
@@ -296,8 +314,35 @@ impl<U: Copy> HalfPlane<f32, U> {
     pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
         same_side_of_line(self.dividing_line, self.point_on_half_plane, point)
     }
+    pub fn point_is_on_or_touching_half_plane(&self, point: Point2D<f32, U>) -> bool {
+        !same_side_of_line(self.dividing_line, self.point_off_half_plane(), point)
+    }
     pub fn covers_origin(&self) -> bool {
         self.point_is_on_half_plane(point2(0.0, 0.0))
+    }
+    pub fn covers_unit_square(&self) -> bool {
+        DIAGONAL_STEPS
+            .map(Vector2D::to_f32)
+            .map(Vector2D::to_point)
+            .map(Point2D::cast_unit)
+            .iter()
+            .all(|&p| self.point_is_on_or_touching_half_plane(p))
+    }
+
+    //Fn(Point2D<f32, U>) -> Point2D<f32, V>,
+    //fun: Box<dyn Fn<Point2D<f32, U>, Output = Point2D<f32, V>>>,
+    pub fn with_transformed_points<F, V>(&self, fun: F) -> HalfPlane<f32, V>
+    where
+        V: Copy,
+        F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
+    {
+        HalfPlane::new(
+            Line {
+                p1: fun(self.dividing_line.p1),
+                p2: fun(self.dividing_line.p2),
+            },
+            fun(self.point_on_half_plane),
+        )
     }
 }
 
@@ -1291,5 +1336,35 @@ mod tests {
         let pose = SquareWithOrthogonalDir::from_square_and_dir(point2(4, 6), STEP_RIGHT);
         let back = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 6), STEP_RIGHT);
         assert_eq!(pose.stepped_back(), back);
+    }
+    #[test]
+    fn test_line_point_reflection() {
+        let line = Line::new(WorldPoint::new(1.0, 5.0), WorldPoint::new(2.4, 5.0));
+
+        assert_about_eq!(
+            line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
+            WorldPoint::new(0.0, 7.0).to_array()
+        );
+        assert_ne!(
+            line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
+            WorldPoint::new(0.0, 8.0).to_array()
+        );
+    }
+    #[test]
+    fn test_half_plane_cover_unit_square() {
+        let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
+            [0.0, 0.01, -0.01].map(|dx| {
+                HalfPlane::new(
+                    Line::new(
+                        WorldPoint::new(-0.5 + dx, 0.0),
+                        point2(-0.5 + 2.0 * dx, 1.0),
+                    ),
+                    point2(1.5, 0.0),
+                )
+            });
+
+        assert!(more_than_cover.covers_unit_square());
+        assert_false!(less_than_cover.covers_unit_square());
+        assert!(exactly_cover.covers_unit_square());
     }
 }

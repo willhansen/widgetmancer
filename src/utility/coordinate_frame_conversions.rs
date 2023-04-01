@@ -127,23 +127,27 @@ pub fn local_square_point_to_local_character_point(
     world_point_to_local_character_point(world_point, ref_character_square)
 }
 // TODO: make this more general
+pub fn world_half_plane_to_local_square_half_plane(
+    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
+    ref_square: WorldSquare,
+) -> HalfPlane<f32, SquareGridInLocalSquareFrame> {
+    world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
+}
+pub fn local_square_half_plane_to_local_character_half_plane(
+    square_half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
+    character_index_in_square: usize,
+) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+    square_half_plane.with_transformed_points(|p| {
+        local_square_point_to_local_character_point(p, character_index_in_square)
+    })
+}
+
 pub fn world_half_plane_to_local_character_half_plane(
     world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
     ref_char_square: WorldCharacterSquare,
 ) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
-    HalfPlane::new(
-        Line {
-            p1: world_point_to_local_character_point(
-                world_half_plane.dividing_line.p1,
-                ref_char_square,
-            ),
-            p2: world_point_to_local_character_point(
-                world_half_plane.dividing_line.p2,
-                ref_char_square,
-            ),
-        },
-        world_point_to_local_character_point(world_half_plane.point_on_half_plane, ref_char_square),
-    )
+    world_half_plane
+        .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }
 
 pub fn world_point_to_world_character_point(
