@@ -365,7 +365,17 @@ impl Game {
         if self.player_is_alive() {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
-            //self.graphics .draw_field_of_view_mask(self.player_field_of_view());
+        }
+
+        self.update_screen(&mut writer);
+    }
+
+    pub fn update_screen_headless(&mut self) {
+        self.update_screen(&mut None);
+    }
+
+    fn update_screen(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
+        if self.player_is_alive() {
             self.graphics.center_screen_at_square(self.player_square());
             self.graphics
                 .load_screen_buffer_from_fov(self.player_field_of_view());
@@ -373,7 +383,6 @@ impl Game {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
         }
-        //self.graphics .load_screen_buffer_from_absolute_positions_in_draw_buffer();
 
         self.graphics.display(&mut writer);
     }
@@ -2337,6 +2346,10 @@ mod tests {
         game.draw_headless_now();
         let visible_enemy_square = player_square + STEP_RIGHT * 3;
 
+        game.graphics
+            .draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
+        game.update_screen_headless();
+
         game.graphics.print_draw_buffer(
             world_square_to_left_world_character_square(player_square),
             5,
@@ -2352,7 +2365,7 @@ mod tests {
                 .map(|fov: &FovResult| fov.root_square())
                 .collect::<Vec<_>>()
         );
-        dbg!("asdfasdf A1", fov.sub_fovs());
+        // dbg!("asdfasdf A1", fov.sub_fovs());
         assert_eq!(fov.sub_fovs().len(), 1);
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
         assert_false!(game

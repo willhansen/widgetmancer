@@ -9,6 +9,7 @@ use std::ptr::hash;
 use std::time::{Duration, Instant};
 
 use euclid::*;
+use itertools::Itertools;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
@@ -39,7 +40,9 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{hue_to_rgb, is_world_character_square_left_square_of_world_square};
+use crate::utility::{
+    hue_to_rgb, is_world_character_square_left_square_of_world_square, STEP_RIGHT,
+};
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
     Game, IPoint, PieceType, RIGHT_I,
@@ -335,7 +338,7 @@ impl Graphics {
     pub fn draw_string_below_board(&mut self, string: String) {
         let left_of_screen_under_board =
             self.world_square_to_left_screen_square(point2(0, 0)) + vec2(0, -1);
-        self.draw_string(left_of_screen_under_board, &string);
+        self.draw_string_to_screen(left_of_screen_under_board, &string);
     }
 
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
@@ -518,7 +521,24 @@ impl Graphics {
         // if associated world square is in draw buffer, put it on screen
     }
 
-    pub fn draw_string(
+    pub fn draw_string_to_draw_buffer(&mut self, world_pos: WorldSquare, the_string: &str) {
+        let glyphs = the_string
+            .chars()
+            .map(|c: char| Glyph::fg_only(c, RED))
+            .collect_vec();
+        let start_char_square = world_square_to_left_world_character_square(world_pos);
+        let glyphs_to_draw: WorldCharacterSquareGlyphMap = glyphs
+            .into_iter()
+            .enumerate()
+            .map(|(i, glyph): (usize, Glyph)| {
+                (start_char_square + STEP_RIGHT.cast_unit() * i as i32, glyph)
+            })
+            .collect();
+
+        self.draw_glyphs(glyphs_to_draw);
+    }
+
+    pub fn draw_string_to_screen(
         &mut self,
         screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
         the_string: &str,
