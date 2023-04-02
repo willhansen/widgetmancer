@@ -330,14 +330,7 @@ impl FovResult {
             .collect()
     }
 
-    fn with_main_view_only_combined(&self, other: &Self) -> Self {
-        todo!()
-    }
-    fn with_sub_views_only_combined(&self, other: &Self) -> Self {
-        todo!()
-    }
-
-    pub fn combined(&self, other: &Self) -> Self {
+    fn combined_main_view_only(&self, other: &Self) -> Self {
         assert_eq!(
             self.root_square_with_direction,
             other.root_square_with_direction
@@ -350,8 +343,6 @@ impl FovResult {
             .symmetric_difference(&other.only_partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
-
-        let target = WorldSquare::new(5, 6);
 
         let self_non_conflicting_partials: PartialVisibilityMap = self
             .partially_visible_relative_squares_in_main_view_only
@@ -426,15 +417,55 @@ impl FovResult {
             "{:?}",
             squares_somehow_both_fully_and_partially_visible
         );
-
-        let mut all_sub_fovs = self.transformed_sub_fovs.clone();
-        all_sub_fovs.append(&mut other.transformed_sub_fovs.clone());
         FovResult {
             root_square_with_direction: self.root_square_with_direction,
             fully_visible_relative_squares_in_main_view_only: all_fully_visible,
             partially_visible_relative_squares_in_main_view_only: all_partials,
-            transformed_sub_fovs: all_sub_fovs,
+            transformed_sub_fovs: vec![],
         }
+    }
+
+    fn combined_sub_fovs(
+        sub_fovs_1: &Vec<FovResult>,
+        sub_fovs_2: &Vec<FovResult>,
+    ) -> Vec<FovResult> {
+        let mut clone1 = sub_fovs_1.clone();
+        let mut clone2 = sub_fovs_2.clone();
+        clone1.append(&mut clone2);
+
+        let combined_sub_fovs = clone1;
+
+        let grouped_by_root = combined_sub_fovs
+            .into_iter()
+            .into_group_map_by(|fov: &FovResult| fov.root_square_with_direction);
+
+        let combined_by_root: Vec<FovResult> = grouped_by_root
+            .into_iter()
+            .map(
+                |(root, fov_list): (SquareWithOrthogonalDir, Vec<FovResult>)| {
+                    fov_list.iter().fold(
+                        Self::new_empty_fov_with_root(root),
+                        |acc: FovResult, next_fov: &FovResult| acc.combined(next_fov),
+                    )
+                },
+            )
+            .collect();
+
+        combined_by_root
+    }
+
+    pub fn combined(&self, other: &Self) -> Self {
+        assert_eq!(
+            self.root_square_with_direction,
+            other.root_square_with_direction
+        );
+
+        let mut top_view_combined_fov = self.combined_main_view_only(other);
+
+        top_view_combined_fov.transformed_sub_fovs =
+            Self::combined_sub_fovs(&self.transformed_sub_fovs, &other.transformed_sub_fovs);
+
+        top_view_combined_fov
     }
     fn without_sub_views(&self) -> Self {
         FovResult {
