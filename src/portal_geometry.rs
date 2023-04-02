@@ -16,19 +16,18 @@ use crate::utility::{
     StepWithQuarterRotations, STEP_RIGHT, STEP_ZERO,
 };
 
-// This is just an affine transform for now.  Colors/blur later
 #[derive(Hash, Neg, Clone, Copy, Debug)]
-pub struct SlideRotation {
+pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
     end_pose: SquareWithOrthogonalDir,
 }
 
-impl SlideRotation {
+impl RigidTransform {
     pub fn from_start_and_end_poses(
         start: SquareWithOrthogonalDir,
         end: SquareWithOrthogonalDir,
     ) -> Self {
-        SlideRotation {
+        RigidTransform {
             start_pose: start,
             end_pose: end,
         }
@@ -64,17 +63,17 @@ impl SlideRotation {
     }
 }
 
-impl PartialEq for SlideRotation {
+impl PartialEq for RigidTransform {
     fn eq(&self, other: &Self) -> bool {
         self.transform_pose(other.start_pose) == other.end_pose
     }
 }
 
-impl Eq for SlideRotation {}
+impl Eq for RigidTransform {}
 
-impl Default for SlideRotation {
+impl Default for RigidTransform {
     fn default() -> Self {
-        SlideRotation::from_start_and_end_poses(
+        RigidTransform::from_start_and_end_poses(
             SquareWithOrthogonalDir::from_square_and_dir(point2(0, 0), STEP_RIGHT),
             SquareWithOrthogonalDir::from_square_and_dir(point2(0, 0), STEP_RIGHT),
         )
@@ -94,8 +93,8 @@ impl Portal {
         assert_ne!(exit, entrance.stepped());
         Portal { entrance, exit }
     }
-    pub fn get_transform(&self) -> SlideRotation {
-        SlideRotation::from_start_and_end_poses(self.entrance, self.exit.stepped_back())
+    pub fn get_transform(&self) -> RigidTransform {
+        RigidTransform::from_start_and_end_poses(self.entrance, self.exit.stepped_back())
     }
 }
 
@@ -168,7 +167,7 @@ mod tests {
     // NO TESTS HERE YET
     #[test]
     fn test_slide_rotation_transform() {
-        let transform = SlideRotation::from_start_and_end_poses(
+        let transform = RigidTransform::from_start_and_end_poses(
             SquareWithOrthogonalDir::from_square_and_dir(point2(1, 2), STEP_UP),
             SquareWithOrthogonalDir::from_square_and_dir(point2(5, 5), STEP_RIGHT),
         );

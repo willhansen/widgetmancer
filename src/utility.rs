@@ -164,7 +164,7 @@ impl Octant {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Copy)]
 pub struct Line<T, U> {
     pub p1: Point2D<T, U>,
     pub p2: Point2D<T, U>,
@@ -258,6 +258,20 @@ impl<U> Line<f32, U> {
     }
 }
 
+impl<T, U> Debug for Line<T, U>
+where
+    T: Display + Copy,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "p1: {}, p2: {}",
+            point_to_string(self.p1),
+            point_to_string(self.p2),
+        )
+    }
+}
+
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
     type Output = Line<f32, U>;
 
@@ -275,12 +289,15 @@ pub struct Ray<U> {
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct HalfPlane<T, U> {
+pub struct HalfPlane<T, U>
+where
+    T: Display + Copy,
+{
     pub dividing_line: Line<T, U>,
     pub point_on_half_plane: Point2D<T, U>,
 }
 
-impl<U: Copy> HalfPlane<f32, U> {
+impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn new(line: Line<f32, U>, point: Point2D<f32, U>) -> Self {
         assert!(!line.point_is_on_line(point));
         HalfPlane {
@@ -323,6 +340,7 @@ impl<U: Copy> HalfPlane<f32, U> {
     pub fn covers_unit_square(&self) -> bool {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
+            .map(|x| x * 0.5)
             .map(Vector2D::to_point)
             .map(Point2D::cast_unit)
             .iter()
@@ -333,7 +351,7 @@ impl<U: Copy> HalfPlane<f32, U> {
     //fun: Box<dyn Fn<Point2D<f32, U>, Output = Point2D<f32, V>>>,
     pub fn with_transformed_points<F, V>(&self, fun: F) -> HalfPlane<f32, V>
     where
-        V: Copy,
+        V: Copy + Debug,
         F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
     {
         HalfPlane::new(
@@ -700,6 +718,15 @@ pub fn same_side_of_line<U>(
 ) -> bool {
     let point_a = line.p1;
     let point_b = line.p2;
+    let c_on_line = line.point_is_on_line(point_c);
+    let d_on_line = line.point_is_on_line(point_d);
+
+    if c_on_line {
+        return if d_on_line { true } else { false };
+    } else if d_on_line {
+        return false;
+    }
+
     is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
 }
 
@@ -1337,6 +1364,7 @@ mod tests {
         let back = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 6), STEP_RIGHT);
         assert_eq!(pose.stepped_back(), back);
     }
+
     #[test]
     fn test_line_point_reflection() {
         let line = Line::new(WorldPoint::new(1.0, 5.0), WorldPoint::new(2.4, 5.0));
@@ -1350,6 +1378,7 @@ mod tests {
             WorldPoint::new(0.0, 8.0).to_array()
         );
     }
+
     #[test]
     fn test_half_plane_cover_unit_square() {
         let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
@@ -1366,5 +1395,28 @@ mod tests {
         assert!(more_than_cover.covers_unit_square());
         assert_false!(less_than_cover.covers_unit_square());
         assert!(exactly_cover.covers_unit_square());
+    }
+
+    #[test]
+    fn test_same_side_of_line() {
+        let line = Line::<_, WorldPoint>::new(point2(1.0, 1.0), point2(2.0, 1.0));
+        let low = point2(0.0, 0.0);
+        let low2 = point2(9.0, 0.3);
+        let high = point2(0.0, 10.0);
+        let high2 = point2(5.0, 10.0);
+        let on = point2(0.0, 1.0);
+        let on2 = point2(5.0, 1.0);
+
+        assert!(same_side_of_line(line, low, low2));
+
+        assert!(same_side_of_line(line, high, high2));
+        assert!(same_side_of_line(line, high2, high));
+
+        assert!(same_side_of_line(line, on, on2));
+        assert!(same_side_of_line(line, on2, on));
+
+        assert_false!(same_side_of_line(line, low, on2));
+        assert_false!(same_side_of_line(line, high, on));
+        assert_false!(same_side_of_line(line, low, high2));
     }
 }
