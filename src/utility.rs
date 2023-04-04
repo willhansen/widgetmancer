@@ -1083,6 +1083,10 @@ pub fn revolve_square(
     pivot_square + rotation.rotate_vector(rel_square)
 }
 
+pub fn rgb_to_string(rgb: RGB8) -> String {
+    format!("( {:>3}, {:>3}, {:>3} )", rgb.r, rgb.g, rgb.b)
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

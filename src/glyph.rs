@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use ::num::clamp;
@@ -11,12 +12,12 @@ use rgb::*;
 use termion::color;
 use termion::color::Black;
 
-use crate::glyph::floating_square::character_for_square_with_1d_offset;
-use crate::piece::Upgrade;
 use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
 
+use crate::glyph::floating_square::character_for_square_with_1d_offset;
+use crate::piece::Upgrade;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::sign;
 use crate::utility::*;
@@ -57,7 +58,7 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 //	🩐 	🩑 	🩒 	🩓
 //	🩠 	🩡 	🩢 	🩣 	🩤 	🩥 	🩦 	🩧 	🩨 	🩩 	🩪 	🩫 	🩬 	🩭
 
-#[derive(Clone, PartialEq, Eq, Debug, Copy)]
+#[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Glyph {
     pub character: char,
     pub fg_color: RGB8,
@@ -439,6 +440,22 @@ impl Glyph {
     }
 }
 
+impl Debug for Glyph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "char: {}\n\
+             fg: {}\n\
+             bg: {}\n\
+             bg_transparent: {}",
+            self.character,
+            rgb_to_string(self.fg_color),
+            rgb_to_string(self.bg_color),
+            self.bg_transparent
+        )
+    }
+}
+
 pub trait DoubleGlyphFunctions {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
@@ -533,8 +550,9 @@ fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ntest::assert_false;
+
+    use super::*;
 
     #[test]
     fn test_double_glyph_square_offset__up() {
@@ -788,6 +806,7 @@ mod tests {
         assert_eq!(combo_glyphs[0].character, '🬒');
         assert_eq!(combo_glyphs[0].fg_color, RED);
     }
+
     #[test]
     fn test_space_drawn_over_hextant_does_nothing() {
         let the_char = '🬒';
@@ -849,6 +868,7 @@ mod tests {
         assert_eq!(combo_glyphs[1].character, halfwidth_char);
         assert_eq!(combo_glyphs[1].fg_color, bottom_color);
     }
+
     #[test]
     fn test_two_halfwidth_chars_drawn_over_fullwidth_char() {
         let halfwidth_char = 'a';
@@ -867,6 +887,7 @@ mod tests {
         assert_eq!(combo_glyphs[1].fg_color, top_color);
         assert_eq!(combo_glyphs[1].bg_color, bottom_color);
     }
+
     #[test]
     fn test_fullwidth_char_drawn_over_fullwidth_char() {
         let fullwidth_char = '🢃';

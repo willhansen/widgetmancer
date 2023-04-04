@@ -2368,10 +2368,12 @@ mod tests {
         // dbg!("asdfasdf A1", fov.sub_fovs());
         assert_eq!(fov.sub_fovs().len(), 1);
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
-        assert_false!(game
-            .graphics
-            .get_glyphs_for_square_from_screen_buffer(visible_enemy_square)
-            .looks_solid())
+        assert_eq!(
+            game.graphics
+                .get_glyphs_for_square_from_screen_buffer(visible_enemy_square),
+            game.graphics
+                .get_glyphs_for_square_from_draw_buffer(enemy_square)
+        );
     }
 
     #[ignore = "Turns out not a great feature"]
