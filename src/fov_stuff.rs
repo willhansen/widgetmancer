@@ -445,7 +445,7 @@ impl FovResult {
                 |(root, fov_list): (SquareWithOrthogonalDir, Vec<FovResult>)| {
                     fov_list.iter().fold(
                         Self::new_empty_fov_with_root(root),
-                        |acc: FovResult, next_fov: &FovResult| acc.combined(next_fov),
+                        |acc: FovResult, next_fov: &FovResult| acc.combined_with(next_fov),
                     )
                 },
             )
@@ -454,7 +454,7 @@ impl FovResult {
         combined_by_root
     }
 
-    pub fn combined(&self, other: &Self) -> Self {
+    pub fn combined_with(&self, other: &Self) -> Self {
         assert_eq!(
             self.root_square_with_direction,
             other.root_square_with_direction
@@ -532,6 +532,7 @@ impl FovResult {
             .is_fully_visible()
     }
 
+    #[deprecated(note = "use visibility_of_relative_square instead")]
     pub fn visibility_of_absolute_square_as_seen_from_fov_center(
         &self,
         absolute_square: WorldSquare,
@@ -566,6 +567,30 @@ impl FovResult {
         self.visibility_of_absolute_square(world_square)
             .into_iter()
             .any(|vis: SquareVisibility| vis.is_visible())
+    }
+
+    pub fn relative_to_absolute(&self, rel_square: WorldStep) -> Option<WorldSquare> {
+        // TODO: account for multiple fovs seeing part of the same relative square
+
+        if self
+            .fully_visible_relative_squares_in_main_view_only
+            .contains(&rel_square)
+            || self
+                .partially_visible_relative_squares_in_main_view_only
+                .keys()
+                .contains(&rel_square)
+        {
+            return Some(self.root_square() + rel_square);
+        } else {
+            let results_from_sub_fovs: Vec<Option<WorldSquare>> = self
+                .transformed_sub_fovs
+                .iter()
+                .map(|fov: &FovResult| fov.relative_to_absolute(rel_square))
+                .collect();
+            let maybe_a_found_absolute_square =
+                results_from_sub_fovs.iter().flatten().next().copied();
+            return maybe_a_found_absolute_square;
+        }
     }
 
     fn visibility_of_relative_square_in_untransformed_view(
@@ -837,7 +862,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         new_sub_arc,
                         prev_step_in_fov_sequence,
                     );
-                    fov_result = fov_result.combined(&sub_arc_fov);
+                    fov_result = fov_result.combined_with(&sub_arc_fov);
                 });
             break;
         }
@@ -887,7 +912,7 @@ pub fn portal_aware_field_of_view_from_square(
                     radius,
                     Octant::new(octant_number),
                 );
-                let combined_fov = fov_result_accumulator.combined(&new_fov_result);
+                let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
                 combined_fov
             },
         )
@@ -1776,7 +1801,7 @@ mod tests {
         fov_1.transformed_sub_fovs.push(sub_fov_1);
         fov_2.transformed_sub_fovs.push(sub_fov_2);
 
-        let combined_fov = fov_1.combined(&fov_2);
+        let combined_fov = fov_1.combined_with(&fov_2);
 
         assert_eq!(combined_fov.transformed_sub_fovs.len(), 1);
         assert_eq!(

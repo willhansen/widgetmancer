@@ -86,6 +86,13 @@ pub fn world_square_to_both_world_character_squares(
     [left_char_square, left_char_square + STEP_RIGHT.cast_unit()]
 }
 
+pub fn world_square_to_world_character_squares(
+    world_square: WorldSquare,
+    index: usize,
+) -> WorldCharacterSquare {
+    world_square_to_both_world_character_squares(world_square)[index]
+}
+
 pub fn world_point_to_local_character_point(
     world_point: WorldPoint,
     origin_character_square: WorldCharacterSquare,

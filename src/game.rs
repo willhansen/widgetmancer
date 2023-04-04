@@ -367,14 +367,14 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
         }
 
-        self.update_screen(&mut writer);
+        self.update_screen_from_draw_buffer(&mut writer);
     }
 
-    pub fn update_screen_headless(&mut self) {
-        self.update_screen(&mut None);
+    pub fn update_screen_from_draw_buffer_headless(&mut self) {
+        self.update_screen_from_draw_buffer(&mut None);
     }
 
-    fn update_screen(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
+    fn update_screen_from_draw_buffer(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         if self.player_is_alive() {
             self.graphics.center_screen_at_square(self.player_square());
             self.graphics
@@ -2349,7 +2349,7 @@ mod tests {
         // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
         game.graphics
             .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
-        game.update_screen_headless();
+        game.update_screen_from_draw_buffer_headless();
 
         game.graphics.print_draw_buffer(
             world_square_to_left_world_character_square(player_square),
