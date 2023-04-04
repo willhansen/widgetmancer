@@ -65,6 +65,7 @@ pub mod utils_for_tests;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
+        stdout().flush().expect("flush stdout");
         write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
         write!(stdout(), "{:?}", panic_info).expect("display panic info");
     }));
