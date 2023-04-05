@@ -274,10 +274,6 @@ impl FovResult {
             });
         the_map
     }
-    pub fn manually_add_fully_visible_square(&mut self, square: WorldSquare) {
-        self.fully_visible_relative_squares_in_main_view_only
-            .insert(square - self.root_square());
-    }
     pub fn sub_fovs(&self) -> &Vec<FovResult> {
         &self.transformed_sub_fovs
     }
@@ -572,7 +568,7 @@ impl FovResult {
     pub fn relative_to_absolute(&self, rel_square: WorldStep) -> Option<WorldSquare> {
         // TODO: account for multiple fovs seeing part of the same relative square
 
-        if self
+        return if self
             .fully_visible_relative_squares_in_main_view_only
             .contains(&rel_square)
             || self
@@ -580,17 +576,21 @@ impl FovResult {
                 .keys()
                 .contains(&rel_square)
         {
-            return Some(self.root_square() + rel_square);
+            Some(self.root_square() + rel_square)
         } else {
             let results_from_sub_fovs: Vec<Option<WorldSquare>> = self
                 .transformed_sub_fovs
                 .iter()
-                .map(|fov: &FovResult| fov.relative_to_absolute(rel_square))
+                .map(|fov: &FovResult| {
+                    let rotation = self.view_transform_to(fov).rotation();
+                    let rotated_rel_square = rotation.rotate_vector(rel_square);
+                    fov.relative_to_absolute(rotated_rel_square)
+                })
                 .collect();
             let maybe_a_found_absolute_square =
                 results_from_sub_fovs.iter().flatten().next().copied();
-            return maybe_a_found_absolute_square;
-        }
+            maybe_a_found_absolute_square
+        };
     }
 
     fn visibility_of_relative_square_in_untransformed_view(
@@ -680,6 +680,10 @@ impl FovResult {
         } else {
             panic!("told to add non-visible square");
         }
+    }
+    pub fn add_fully_visible_square(&mut self, relative_square: WorldStep) {
+        self.fully_visible_relative_squares_in_main_view_only
+            .insert(relative_square);
     }
 }
 
@@ -1898,5 +1902,65 @@ mod tests {
             0.0,
             1e-5
         );
+    }
+    #[test]
+    fn test_fov_relative_to_absolute__top_level() {
+        let main_center = point2(5, 5);
+
+        let mut fov = FovResult::new_empty_fov_at(main_center);
+
+        let rel_square = STEP_DOWN_LEFT * 3;
+        let abs_square = main_center + rel_square;
+
+        fov.add_fully_visible_square(rel_square);
+
+        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+    }
+
+    #[test]
+    fn test_fov_relative_to_absolute__sub_view_no_rotation() {
+        let main_center = point2(5, 5);
+        let sub_center = point2(34, -7);
+
+        let mut fov = FovResult::new_empty_fov_at(main_center);
+        let mut sub_fov = FovResult::new_empty_fov_at(sub_center);
+
+        let rel_square = STEP_DOWN_LEFT * 3;
+        let abs_square = sub_center + rel_square;
+
+        sub_fov.add_fully_visible_square(rel_square);
+
+        fov.transformed_sub_fovs.push(sub_fov);
+
+        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+    }
+
+    #[test]
+    fn test_fov_relative_to_absolute__sub_view_with_rotation() {
+        let main_center = point2(5, 5);
+        let sub_center = point2(34, -7);
+
+        let mut fov = FovResult::new_empty_fov_at(main_center);
+
+        let quarter_turns = 3;
+
+        let sub_fov_direction = rotated_n_quarter_turns_counter_clockwise(
+            fov.root_square_with_direction.direction_vector(),
+            quarter_turns,
+        );
+        let mut sub_fov = FovResult::new_empty_fov_with_root(SquareWithOrthogonalDir::new(
+            sub_center,
+            sub_fov_direction,
+        ));
+
+        let rel_square = STEP_DOWN_LEFT * 3;
+        let rotated_rel_square =
+            rotated_n_quarter_turns_counter_clockwise(rel_square, quarter_turns);
+        let abs_square = sub_center + rotated_rel_square;
+
+        sub_fov.add_fully_visible_square(rotated_rel_square);
+        fov.transformed_sub_fovs.push(sub_fov);
+
+        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
     }
 }
