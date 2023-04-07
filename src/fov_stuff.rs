@@ -209,7 +209,7 @@ impl PartialVisibilityOfASquare {
             .all(|shadow_optional: &Option<CharacterShadow>| {
                 shadow_optional.is_none()
                     || shadow_optional.is_some_and(|shadow: CharacterShadow| {
-                        !line_intersects_with_centered_unit_square(shadow.dividing_line)
+                        !line_intersects_with_centered_unit_square(shadow.dividing_line())
                             && !shadow.covers_origin()
                     })
             })
@@ -226,7 +226,7 @@ impl PartialVisibilityOfASquare {
             .iter()
             .all(|shadow_optional: &Option<CharacterShadow>| {
                 shadow_optional.is_some_and(|shadow: CharacterShadow| {
-                    !line_intersects_with_centered_unit_square(shadow.dividing_line)
+                    !line_intersects_with_centered_unit_square(shadow.dividing_line())
                         && shadow.covers_origin()
                 })
             })
@@ -979,7 +979,6 @@ fn partial_visibility_of_square_from_one_view_arc(
         square_relative_to_center.to_point().cast_unit(),
     );
     let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
-    dbg!("asdfasdf ", square_relative_to_center, visibility_arc);
     let left_char_shadow = Some(world_half_plane_to_local_character_half_plane(
         shadow_half_plane,
         left_character_square,
@@ -1105,20 +1104,20 @@ mod tests {
     fn test_partially_visible_square_knows_if_its_fully_visible() {
         // Data from failure case
         let partial = PartialVisibilityOfASquare::new(
-            Some(HalfPlane {
-                dividing_line: Line {
+            Some(HalfPlane::from_line_and_point_on_half_plane(
+                Line {
                     p1: point2(2.5, 2.0),
                     p2: point2(1.0857863, 1.2928933),
                 },
-                point_on_half_plane: point2(1.061038, 1.3054879),
-            }),
-            Some(HalfPlane {
-                dividing_line: Line {
+                point2(1.061038, 1.3054879),
+            )),
+            Some(HalfPlane::from_line_and_point_on_half_plane(
+                Line {
                     p1: point2(1.5, 2.0),
                     p2: point2(0.08578634, 1.2928933),
                 },
-                point_on_half_plane: point2(0.061038017, 1.3054879),
-            }),
+                point2(0.061038017, 1.3054879),
+            )),
         );
         assert!(partial.to_glyphs().looks_solid());
         assert_eq!(partial.to_glyphs().to_clean_string(), "  ");
@@ -1216,52 +1215,52 @@ mod tests {
     #[test]
     fn test_partial_visibility_to_glyphs__data_from_failure() {
         let partial_visibility = PartialVisibilityOfASquare::new(
-            Some(HalfPlane {
-                dividing_line: Line {
+            Some(HalfPlane::from_line_and_point_on_half_plane(
+                Line {
                     p1: point2(-1.5, -1.0),
                     p2: point2(-0.08578646, -0.29289323),
                 },
-                point_on_half_plane: point2(-0.061038256, -0.30548787),
-            }),
-            Some(HalfPlane {
-                dividing_line: Line {
+                point2(-0.061038256, -0.30548787),
+            )),
+            Some(HalfPlane::from_line_and_point_on_half_plane(
+                Line {
                     p1: point2(-2.5, -1.0),
                     p2: point2(-1.0857865, -0.29289323),
                 },
-                point_on_half_plane: point2(-1.0610383, -0.30548787),
-            }),
+                point2(-1.0610383, -0.30548787),
+            )),
         );
         assert!(is_clockwise(
             partial_visibility
                 .left_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .p1,
             partial_visibility
                 .left_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .p2,
             partial_visibility
                 .left_char_shadow
                 .unwrap()
-                .point_on_half_plane,
+                .point_on_half_plane(),
         ));
         assert!(is_clockwise(
             partial_visibility
                 .right_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .p1,
             partial_visibility
                 .right_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .p2,
             partial_visibility
                 .right_char_shadow
                 .unwrap()
-                .point_on_half_plane,
+                .point_on_half_plane(),
         ));
         let string = partial_visibility.to_glyphs().to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
@@ -1823,7 +1822,7 @@ mod tests {
         assert_about_eq!(
             vis.right_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees()
                 .abs(),
@@ -1833,7 +1832,7 @@ mod tests {
         assert_about_eq!(
             vis.left_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees()
                 .abs(),
@@ -1848,7 +1847,7 @@ mod tests {
         assert_about_eq!(
             vis.right_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0,
@@ -1857,7 +1856,7 @@ mod tests {
         assert_about_eq!(
             vis.left_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0,
@@ -1871,7 +1870,7 @@ mod tests {
         assert_about_eq!(
             vis.right_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0,
@@ -1880,7 +1879,7 @@ mod tests {
         assert_about_eq!(
             vis.left_char_shadow
                 .unwrap()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0,

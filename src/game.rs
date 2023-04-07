@@ -2352,11 +2352,11 @@ mod tests {
             .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
         game.update_screen_from_draw_buffer_headless();
 
-        game.graphics.print_draw_buffer(
-            world_square_to_left_world_character_square(player_square),
-            5,
-        );
-        game.graphics.print_screen_buffer();
+        // game.graphics.print_draw_buffer(
+        //     world_square_to_left_world_character_square(player_square),
+        //     5,
+        // );
+        // game.graphics.print_screen_buffer();
 
         let fov = game.player_field_of_view();
 

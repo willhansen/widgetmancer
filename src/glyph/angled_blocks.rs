@@ -237,7 +237,7 @@ pub fn half_plane_to_angled_block_character(
         .collect();
 
     let raw_intersection_points =
-        line_intersections_with_centered_unit_square(half_plane.dividing_line);
+        line_intersections_with_centered_unit_square(half_plane.dividing_line());
     assert!(raw_intersection_points.len() <= 2);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
@@ -261,8 +261,8 @@ pub fn half_plane_to_angled_block_character(
 
     if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
         if same_side_of_line(
-            half_plane.dividing_line,
-            half_plane.point_on_half_plane,
+            half_plane.dividing_line(),
+            half_plane.point_on_half_plane(),
             point2(0.0, 0.0),
         ) {
             FULL_BLOCK
@@ -277,9 +277,9 @@ pub fn half_plane_to_angled_block_character(
             snap_to_grid(snapped_points[1]),
         );
         if !is_clockwise(
-            half_plane.dividing_line.p1,
-            half_plane.dividing_line.p2,
-            half_plane.point_on_half_plane,
+            half_plane.dividing_line().p1,
+            half_plane.dividing_line().p2,
+            half_plane.point_on_half_plane(),
         ) {
             grid_line.reverse();
         }
@@ -453,13 +453,13 @@ mod tests {
 
     #[test]
     fn test_half_plane_to_character__from_failure_data() {
-        let half_plane = HalfPlane {
-            dividing_line: Line {
+        let half_plane = HalfPlane::from_line_and_point_on_half_plane(
+            Line {
                 p1: point2(-1.5, -1.0),
                 p2: point2(-0.08, -0.3),
             },
-            point_on_half_plane: point2(-0.06, -0.3),
-        };
+            point2(-0.06, -0.3),
+        );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
         assert!(['🭈', '🭊'].contains(&the_char));
     }

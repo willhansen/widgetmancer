@@ -293,8 +293,8 @@ pub struct HalfPlane<T, U>
 where
     T: Display + Copy,
 {
-    pub dividing_line: Line<T, U>,
-    pub point_on_half_plane: Point2D<T, U>,
+    dividing_line: Line<T, U>,
+    point_on_half_plane: Point2D<T, U>,
 }
 
 impl<U: Copy + Debug> HalfPlane<f32, U> {
@@ -305,12 +305,28 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             point_on_half_plane: point,
         }
     }
+    pub fn from_line_and_point_on_half_plane(
+        dividing_line: Line<f32, U>,
+        point_on_half_plane: Point2D<f32, U>,
+    ) -> Self {
+        HalfPlane {
+            dividing_line,
+            point_on_half_plane,
+        }
+    }
 
     pub fn complement(&self) -> Self {
         HalfPlane {
             dividing_line: self.dividing_line,
             point_on_half_plane: self.point_off_half_plane(),
         }
+    }
+    pub fn dividing_line(&self) -> Line<f32, U> {
+        self.dividing_line
+    }
+
+    pub fn point_on_half_plane(&self) -> Point2D<f32, U> {
+        self.point_on_half_plane
     }
 
     pub fn point_off_half_plane(&self) -> Point2D<f32, U> {
@@ -354,12 +370,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         V: Copy + Debug,
         F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
     {
-        dbg!(
-            "asdfasdf Points in transformed half plane",
-            point_transform_function(self.dividing_line.p1),
-            point_transform_function(self.dividing_line.p2),
-            point_transform_function(self.point_on_half_plane)
-        );
         HalfPlane::new(
             Line {
                 p1: point_transform_function(self.dividing_line.p1),
