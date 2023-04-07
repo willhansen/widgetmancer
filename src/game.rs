@@ -1517,6 +1517,7 @@ impl Game {
             ),
         );
         //self.place_death_turret(self.player_square() + STEP_LEFT * 14);
+        self.set_up_n_pillars(3);
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
@@ -2359,14 +2360,6 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
-        dbg!(
-            "asdfasdf J",
-            fov.sub_fovs()
-                .iter()
-                .map(|fov: &FovResult| fov.root_square())
-                .collect::<Vec<_>>()
-        );
-        // dbg!("asdfasdf A1", fov.sub_fovs());
         assert_eq!(fov.sub_fovs().len(), 1);
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
         assert_eq!(
@@ -2431,5 +2424,18 @@ mod tests {
         game.place_block(player_square + block_offset);
         game.draw_headless_now();
         // shouldn't crash
+    }
+    #[test]
+    fn test_observed_crash_seeing_back_of_portal() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        let block_square = game.player_square() + STEP_RIGHT * 4;
+        let entrance_square = block_square + STEP_UP_RIGHT;
+        let exit_square = block_square + STEP_DOWN_RIGHT * 4;
+        game.place_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_LEFT),
+        );
+        game.draw_headless_now();
     }
 }

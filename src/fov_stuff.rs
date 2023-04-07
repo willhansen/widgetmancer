@@ -775,7 +775,6 @@ pub fn field_of_view_within_arc_in_single_octant(
         if square_blocks_sight {
             maybe_view_blocking_arc = Some(view_arc_of_this_square);
         } else if square_has_portal {
-            dbg!("asdfasdf G", absolute_square, relative_square);
             let portals_for_square: Vec<Portal> =
                 portal_geometry.portals_entering_from_square(absolute_square);
 
@@ -792,8 +791,8 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             // Break the view arc around the (up to 2) portals and recurse
             let portal_view_arcs: HashMap<Portal, AngleInterval> = visible_portals_for_square
-                .into_iter()
-                .map(|portal: Portal| {
+                .iter()
+                .map(|&portal: &Portal| {
                     (
                         portal.clone(),
                         AngleInterval::from_square_face(
@@ -808,12 +807,6 @@ pub fn field_of_view_within_arc_in_single_octant(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
                     let transformed_center = transform.transform_pose(oriented_center_square);
-                    dbg!(
-                        "asdfasdf E",
-                        oriented_center_square,
-                        transform,
-                        transformed_center
-                    );
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
@@ -823,28 +816,29 @@ pub fn field_of_view_within_arc_in_single_octant(
                         transform.transform_arc(view_arc.intersection(portal_view_arc)),
                         prev_step_in_fov_sequence,
                     );
-                    dbg!("asdfasdf I1", fov_result.transformed_sub_fovs.len());
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
-                    dbg!("asdfasdf I2", fov_result.transformed_sub_fovs.len());
                 },
             );
 
             // a max of two portals are visible in one square, touching each other at a corner
-            // TODO: turn this into a constructor for angleintervals
-            let combined_view_arc: AngleInterval = if portal_view_arcs.len() == 1 {
-                *portal_view_arcs.values().next().unwrap()
-            } else if portal_view_arcs.len() == 2 {
-                let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
-                arcs[0].union(*arcs[1])
+            if visible_portals_for_square.len() > 0 {
+                // TODO: turn this into a constructor for angleintervals
+                let combined_view_arc: AngleInterval = if portal_view_arcs.len() == 1 {
+                    *portal_view_arcs.values().next().unwrap()
+                } else if portal_view_arcs.len() == 2 {
+                    let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
+                    arcs[0].union(*arcs[1])
+                } else {
+                    panic!(
+                        "There should be exactly one or two portals here.  found {}: {:?}",
+                        portal_view_arcs.len(),
+                        portal_view_arcs
+                    );
+                };
+                maybe_view_blocking_arc = Some(combined_view_arc);
             } else {
-                panic!(
-                    "There should be exactly one or two portals here.  found {}: {:?}",
-                    portal_view_arcs.len(),
-                    portal_view_arcs
-                );
+                maybe_view_blocking_arc = None;
             };
-
-            maybe_view_blocking_arc = Some(combined_view_arc);
         } else {
             maybe_view_blocking_arc = None;
         }
@@ -1642,7 +1636,6 @@ mod tests {
         let center = point2(-15, 50);
         let portal_entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT, STEP_RIGHT);
         let portal_exit = SquareWithOrthogonalDir::new(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
-        dbg!("asdfasdf D", portal_exit);
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1654,10 +1647,6 @@ mod tests {
         );
 
         assert_eq!(fov_result.transformed_sub_fovs.len(), 1);
-        dbg!(
-            "asdfasdf C",
-            &fov_result.transformed_sub_fovs[0].root_square_with_direction
-        );
         // Not fully visible because only one octant
         assert!(fov_result.can_see_relative_square(STEP_RIGHT * 2));
         assert_false!(fov_result.can_see_absolute_square(portal_entrance.square() + STEP_RIGHT));
@@ -1771,12 +1760,6 @@ mod tests {
             let correct_center_at_exit = exit
                 .with_offset(offset_from_exit)
                 .with_direction(direction_near_exit);
-            dbg!(
-                "asdfasdf",
-                actual_center,
-                virtual_center_at_exit,
-                correct_center_at_exit
-            );
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
     }
@@ -1903,6 +1886,7 @@ mod tests {
             1e-5
         );
     }
+
     #[test]
     fn test_fov_relative_to_absolute__top_level() {
         let main_center = point2(5, 5);
