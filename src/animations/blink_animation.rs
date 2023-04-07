@@ -105,7 +105,7 @@ impl Animation for BlinkAnimation {
         let blink_line = Line::new(start_point, end_point);
         let visible_points: Vec<WorldPoint> = moved_points
             .into_iter()
-            .filter(|&point| blink_line.point_is_on_or_normal_to_line(point))
+            .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))
             .collect();
 
         points_to_hextant_chars(visible_points)

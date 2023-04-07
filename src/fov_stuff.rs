@@ -20,7 +20,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-#[derive(Clone, PartialEq, Debug, Copy, Constructor)]
+#[derive(Clone, Debug, Copy, Constructor)]
 pub struct SquareVisibility {
     is_visible: bool,
     partial_visibility: Option<PartialVisibilityOfASquare>,
@@ -48,7 +48,7 @@ impl SquareVisibility {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Copy, CopyGetters)]
+#[derive(Clone, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialVisibilityOfASquare {
     left_char_shadow: Option<CharacterShadow>,
@@ -98,7 +98,7 @@ impl PartialVisibilityOfASquare {
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         shadow_direction = standardize_angle(shadow_direction);
-        Self::from_square_shadow(HalfPlane::new(
+        Self::from_square_shadow(HalfPlane::from_line_and_point_on_half_plane(
             Line::new(
                 point2(0.0, 0.0),
                 rotated_n_quarter_turns_counter_clockwise(
@@ -971,7 +971,8 @@ fn partial_visibility_of_square_from_one_view_arc(
         .to_point()
         .cast_unit();
 
-    let shadow_half_plane = HalfPlane::new(shadow_line_from_center, point_in_shadow);
+    let shadow_half_plane =
+        HalfPlane::from_line_and_point_on_half_plane(shadow_line_from_center, point_in_shadow);
 
     // do a few forbidden conversions here.
     // TODO: FIX
@@ -1192,14 +1193,14 @@ mod tests {
     #[test]
     fn test_partial_visibility_to_glyphs() {
         let partial_visibility = PartialVisibilityOfASquare::new(
-            Some(HalfPlane::new(
+            Some(HalfPlane::from_line_and_point_on_half_plane(
                 Line {
                     p1: point2(-0.5, -0.5),
                     p2: point2(1.5, 0.5),
                 },
                 point2(2.0, 0.0),
             )),
-            Some(HalfPlane::new(
+            Some(HalfPlane::from_line_and_point_on_half_plane(
                 Line {
                     p1: point2(-1.5, -0.5),
                     p2: point2(0.5, 0.5),
@@ -1298,8 +1299,8 @@ mod tests {
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::new(line, p1);
-        let half_plane_2 = HalfPlane::new(line, p2);
+        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
         let partial_1 = PartialVisibilityOfASquare::new(Some(half_plane_1), Some(half_plane_1));

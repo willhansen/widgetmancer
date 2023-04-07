@@ -170,12 +170,19 @@ pub struct Line<T, U> {
     pub p2: Point2D<T, U>,
 }
 
-impl<T, U> Line<T, U> {
+impl<T, U> Line<T, U>
+where
+    T: Clone + Debug + PartialEq,
+{
     pub fn new(p1: Point2D<T, U>, p2: Point2D<T, U>) -> Line<T, U> {
+        assert_ne!(p1, p2);
         Line { p1, p2 }
     }
     pub fn reverse(&mut self) {
         mem::swap(&mut self.p2, &mut self.p1);
+    }
+    pub fn reversed(&self) -> Self {
+        Self::new(self.p2.clone(), self.p1.clone())
     }
 }
 
@@ -196,10 +203,19 @@ impl<U> Line<f32, U> {
     pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
+    pub fn point_anticlockwise_of_line(&self) -> Point2D<f32, U> {
+        rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
+    }
+    pub fn point_right_of_line(&self) -> Point2D<f32, U> {
+        self.point_clockwise_of_line()
+    }
+    pub fn point_left_of_line(&self) -> Point2D<f32, U> {
+        self.point_anticlockwise_of_line()
+    }
     pub fn lerp(&self, t: f32) -> Point2D<f32, U> {
         lerp2d(self.p1, self.p2, t)
     }
-    pub fn point_is_on_or_normal_to_line(&self, point: Point2D<f32, U>) -> bool {
+    pub fn point_is_on_or_normal_to_line_segment(&self, point: Point2D<f32, U>) -> bool {
         let start_point = self.p1;
         let end_point = self.p2;
 
@@ -288,50 +304,47 @@ pub struct Ray<U> {
     pub angle: Angle<f32>,
 }
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, Debug, Copy)]
 pub struct HalfPlane<T, U>
 where
     T: Display + Copy,
 {
+    // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     dividing_line: Line<T, U>,
-    point_on_half_plane: Point2D<T, U>,
 }
 
 impl<U: Copy + Debug> HalfPlane<f32, U> {
-    pub fn new(line: Line<f32, U>, point: Point2D<f32, U>) -> Self {
-        assert!(!line.point_is_on_line(point));
-        HalfPlane {
-            dividing_line: line,
-            point_on_half_plane: point,
-        }
-    }
     pub fn from_line_and_point_on_half_plane(
         dividing_line: Line<f32, U>,
         point_on_half_plane: Point2D<f32, U>,
     ) -> Self {
         HalfPlane {
-            dividing_line,
-            point_on_half_plane,
+            dividing_line: if is_clockwise(dividing_line.p1, dividing_line.p2, point_on_half_plane)
+            {
+                dividing_line
+            } else {
+                dividing_line.reversed()
+            },
         }
     }
 
     pub fn complement(&self) -> Self {
-        HalfPlane {
-            dividing_line: self.dividing_line,
-            point_on_half_plane: self.point_off_half_plane(),
-        }
+        HalfPlane::from_line_and_point_on_half_plane(
+            self.dividing_line,
+            self.point_off_half_plane(),
+        )
     }
     pub fn dividing_line(&self) -> Line<f32, U> {
         self.dividing_line
     }
 
     pub fn point_on_half_plane(&self) -> Point2D<f32, U> {
-        self.point_on_half_plane
+        self.dividing_line.point_right_of_line()
     }
 
     pub fn point_off_half_plane(&self) -> Point2D<f32, U> {
         self.dividing_line
-            .reflect_point_over_line(self.point_on_half_plane)
+            .reflect_point_over_line(self.point_on_half_plane())
     }
 
     pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
@@ -339,13 +352,13 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .approx_on_same_line(other.dividing_line, tolerance)
             && !same_side_of_line(
                 self.dividing_line,
-                self.point_on_half_plane,
-                other.point_on_half_plane,
+                self.point_on_half_plane(),
+                other.point_on_half_plane(),
             )
     }
 
     pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
-        same_side_of_line(self.dividing_line, self.point_on_half_plane, point)
+        same_side_of_line(self.dividing_line, self.point_on_half_plane(), point)
     }
     pub fn point_is_on_or_touching_half_plane(&self, point: Point2D<f32, U>) -> bool {
         !same_side_of_line(self.dividing_line, self.point_off_half_plane(), point)
@@ -370,12 +383,12 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         V: Copy + Debug,
         F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
     {
-        HalfPlane::new(
+        HalfPlane::from_line_and_point_on_half_plane(
             Line {
                 p1: point_transform_function(self.dividing_line.p1),
                 p2: point_transform_function(self.dividing_line.p2),
             },
-            point_transform_function(self.point_on_half_plane),
+            point_transform_function(self.point_on_half_plane()),
         )
     }
 }
@@ -1283,9 +1296,9 @@ mod tests {
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::new(line, p1);
-        let half_plane_2 = HalfPlane::new(line, p2);
-        let half_plane_3 = HalfPlane::new(line2, p2);
+        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
+        let half_plane_3 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
         assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
@@ -1302,8 +1315,8 @@ mod tests {
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::new(line, p1);
-        let half_plane_2 = HalfPlane::new(line2, p2);
+        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
     }
@@ -1403,7 +1416,7 @@ mod tests {
     fn test_half_plane_cover_unit_square() {
         let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
             [0.0, 0.01, -0.01].map(|dx| {
-                HalfPlane::new(
+                HalfPlane::from_line_and_point_on_half_plane(
                     Line::new(
                         WorldPoint::new(-0.5 + dx, 0.0),
                         point2(-0.5 + 2.0 * dx, 1.0),
