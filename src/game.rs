@@ -2426,7 +2426,7 @@ mod tests {
         // shouldn't crash
     }
     #[test]
-    fn test_observed_crash_seeing_back_of_portal() {
+    fn test_observed_crash_from_seeing_back_of_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         let block_square = game.player_square() + STEP_RIGHT * 4;
@@ -2435,6 +2435,22 @@ mod tests {
         game.place_portal(
             SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_LEFT),
+        );
+        game.draw_headless_now();
+    }
+    #[test]
+    fn test_observed_crash_from_being_near_portal() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        game.place_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(
+                game.player_square() + STEP_DOWN_RIGHT,
+                STEP_DOWN,
+            ),
+            SquareWithOrthogonalDir::from_square_and_dir(
+                game.player_square() + STEP_DOWN_LEFT * 3,
+                STEP_RIGHT,
+            ),
         );
         game.draw_headless_now();
     }

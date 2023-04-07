@@ -153,6 +153,10 @@ pub fn world_half_plane_to_local_character_half_plane(
     world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
     ref_char_square: WorldCharacterSquare,
 ) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+    dbg!(
+        "asfasdf Half plane to be transformed to local",
+        &world_half_plane
+    );
     world_half_plane
         .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }

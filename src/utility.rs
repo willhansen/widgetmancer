@@ -349,17 +349,23 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 
     //Fn(Point2D<f32, U>) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<Point2D<f32, U>, Output = Point2D<f32, V>>>,
-    pub fn with_transformed_points<F, V>(&self, fun: F) -> HalfPlane<f32, V>
+    pub fn with_transformed_points<F, V>(&self, point_transform_function: F) -> HalfPlane<f32, V>
     where
         V: Copy + Debug,
         F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
     {
+        dbg!(
+            "asdfasdf Points in transformed half plane",
+            point_transform_function(self.dividing_line.p1),
+            point_transform_function(self.dividing_line.p2),
+            point_transform_function(self.point_on_half_plane)
+        );
         HalfPlane::new(
             Line {
-                p1: fun(self.dividing_line.p1),
-                p2: fun(self.dividing_line.p2),
+                p1: point_transform_function(self.dividing_line.p1),
+                p2: point_transform_function(self.dividing_line.p2),
             },
-            fun(self.point_on_half_plane),
+            point_transform_function(self.point_on_half_plane),
         )
     }
 }

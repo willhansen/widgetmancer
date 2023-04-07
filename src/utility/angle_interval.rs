@@ -27,7 +27,7 @@ pub struct AngleInterval {
 }
 
 impl AngleInterval {
-    fn new(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
+    pub fn new(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
         AngleInterval {
             clockwise_end: standardize_angle(clockwise_end),
             anticlockwise_end: standardize_angle(anticlockwise_end),

@@ -979,6 +979,7 @@ fn partial_visibility_of_square_from_one_view_arc(
         square_relative_to_center.to_point().cast_unit(),
     );
     let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
+    dbg!("asdfasdf ", square_relative_to_center, visibility_arc);
     let left_char_shadow = Some(world_half_plane_to_local_character_half_plane(
         shadow_half_plane,
         left_character_square,
@@ -1946,5 +1947,12 @@ mod tests {
         fov.transformed_sub_fovs.push(sub_fov);
 
         assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+    }
+    #[test]
+    fn test_partial_visibility_in_blindspot_of_nearly_full_arc() {
+        let rel_square = vec2(4, 4);
+        // These values are from an observed failure.  NOT ARBITRARY
+        let arc = AngleInterval::new(Angle::radians(0.7853978), Angle::radians(0.7853982));
+        let visibility = partial_visibility_of_square_from_one_view_arc(arc, rel_square);
     }
 }
