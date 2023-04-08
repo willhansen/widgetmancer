@@ -2454,4 +2454,20 @@ mod tests {
         );
         game.draw_headless_now();
     }
+    #[test]
+    fn test_observed_crash_from_being_near_portal__2() {
+        let mut game = set_up_nxn_game(20);
+        game.place_player(point2(5, 5));
+        game.place_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(
+                game.player_square() + STEP_DOWN_LEFT,
+                STEP_DOWN,
+            ),
+            SquareWithOrthogonalDir::from_square_and_dir(
+                game.player_square() + STEP_DOWN_LEFT * 3,
+                STEP_RIGHT,
+            ),
+        );
+        game.draw_headless_now();
+    }
 }

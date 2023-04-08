@@ -779,7 +779,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 portal_geometry.portals_entering_from_square(absolute_square);
 
             // portals are only visible if you see the entrance from the correct side
-            let visible_portals_for_square: Vec<Portal> = portals_for_square
+            let portals_at_square_facing_viewer: Vec<Portal> = portals_for_square
                 .into_iter()
                 .filter(|portal| {
                     unit_vector_from_angle(view_arc.center_angle())
@@ -790,7 +790,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .collect();
 
             // Break the view arc around the (up to 2) portals and recurse
-            let portal_view_arcs: HashMap<Portal, AngleInterval> = visible_portals_for_square
+            let portal_view_arcs: HashMap<Portal, AngleInterval> = portals_at_square_facing_viewer
                 .iter()
                 .map(|&portal: &Portal| {
                     (
@@ -803,17 +803,28 @@ pub fn field_of_view_within_arc_in_single_octant(
                 })
                 .collect();
 
-            portal_view_arcs.iter().for_each(
+            let visible_portals_in_sight: HashMap<Portal, AngleInterval> = portal_view_arcs
+                .clone()
+                .into_iter()
+                .filter(|(portal, portal_arc): &(Portal, AngleInterval)| {
+                    portal_arc.overlapping_but_not_exactly_touching(view_arc)
+                })
+                .collect();
+
+            visible_portals_in_sight.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
                     let transformed_center = transform.transform_pose(oriented_center_square);
+                    let visible_arc_of_portal = view_arc.intersection(portal_view_arc);
+                    let transformed_visible_arc_of_portal =
+                        transform.transform_arc(visible_arc_of_portal);
                     let mut sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
                         transformed_center,
                         radius,
                         transform.transform_octant(octant),
-                        transform.transform_arc(view_arc.intersection(portal_view_arc)),
+                        transformed_visible_arc_of_portal,
                         prev_step_in_fov_sequence,
                     );
                     fov_result.transformed_sub_fovs.push(sub_arc_fov);
@@ -821,7 +832,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             );
 
             // a max of two portals are visible in one square, touching each other at a corner
-            if visible_portals_for_square.len() > 0 {
+            if portals_at_square_facing_viewer.len() > 0 {
                 // TODO: turn this into a constructor for angleintervals
                 let combined_view_arc: AngleInterval = if portal_view_arcs.len() == 1 {
                     *portal_view_arcs.values().next().unwrap()
