@@ -1420,6 +1420,15 @@ impl Game {
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
     }
+    pub fn place_double_sided_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.portal_geometry.create_portal(entrance_step, exit_step);
+        self.portal_geometry
+            .create_portal(exit_step.backward(), entrance_step.backward());
+    }
 
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
@@ -1509,7 +1518,7 @@ impl Game {
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
         );
-        self.place_portal(
+        self.place_double_sided_portal(
             SquareWithOrthogonalDir::from_square_and_dir(block_square + STEP_UP_RIGHT, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_dir(
                 block_square + STEP_DOWN_RIGHT * 4,
@@ -1592,7 +1601,9 @@ mod tests {
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::{BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, RED_PAWN_COLOR};
+    use crate::glyph::glyph_constants::{
+        BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
+    };
     use crate::glyph::DoubleGlyphFunctions;
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
@@ -2348,9 +2359,9 @@ mod tests {
         let visible_enemy_square = player_square + STEP_RIGHT * 3;
 
         // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
-        game.graphics
-            .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
-        game.update_screen_from_draw_buffer_headless();
+        // game.graphics
+        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
+        // game.update_screen_from_draw_buffer_headless();
 
         // game.graphics.print_draw_buffer(
         //     world_square_to_left_world_character_square(player_square),
@@ -2469,5 +2480,87 @@ mod tests {
             ),
         );
         game.draw_headless_now();
+    }
+
+    #[test]
+    fn test_see_through_portal_while_next_to_it() {
+        let mut game = set_up_10x10_game();
+
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+
+        let enemy_square = player_square + STEP_RIGHT * 2;
+        game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
+
+        let entrance = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::new(enemy_square, STEP_RIGHT);
+        game.place_portal(entrance, exit);
+
+        game.draw_headless_now();
+        let correct_apparent_enemy_square = player_square + STEP_RIGHT;
+
+        // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
+        // game.graphics
+        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
+        // game.update_screen_from_draw_buffer_headless();
+
+        // game.graphics.print_draw_buffer(
+        //     world_square_to_left_world_character_square(player_square),
+        //     5,
+        // );
+        // game.graphics.print_screen_buffer();
+
+        let fov = game.player_field_of_view();
+
+        assert_eq!(fov.sub_fovs().len(), 1);
+        assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 1);
+        assert_eq!(
+            game.graphics
+                .get_glyphs_for_square_from_screen_buffer(correct_apparent_enemy_square),
+            game.graphics
+                .get_glyphs_for_square_from_draw_buffer(enemy_square)
+        );
+    }
+    #[test]
+    fn test_portals_causing_shadows_at_certain_angles() {
+        let mut game = set_up_nxn_game(20);
+
+        let player_square = point2(10, 10);
+        game.place_player(player_square);
+
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_DOWN_RIGHT * 3, STEP_RIGHT);
+        let exit = entrance.with_offset(STEP_RIGHT * 2);
+        game.place_portal(entrance, exit);
+
+        game.draw_headless_now();
+        let square_that_should_be_visible = entrance.square() + STEP_DOWN_LEFT;
+        dbg!(square_that_should_be_visible);
+
+        // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
+        // game.graphics
+        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
+        // game.update_screen_from_draw_buffer_headless();
+
+        game.graphics.print_draw_buffer(
+            world_square_to_left_world_character_square(player_square),
+            5,
+        );
+        game.graphics.print_screen_buffer();
+
+        let fov = game.player_field_of_view();
+
+        assert_eq!(
+            fov.visibility_of_absolute_square(square_that_should_be_visible)
+                .len(),
+            1
+        );
+        assert_ne!(
+            game.graphics
+                .get_glyphs_for_square_from_draw_buffer(square_that_should_be_visible)
+                .get_solid_color()
+                .unwrap(),
+            OUT_OF_SIGHT_COLOR
+        );
     }
 }
