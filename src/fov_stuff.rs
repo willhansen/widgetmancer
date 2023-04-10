@@ -855,14 +855,6 @@ pub fn field_of_view_within_arc_in_single_octant(
                         portal_view_arcs
                     );
                 };
-                dbg!(
-                    "asdfasdf A",
-                    relative_square,
-                    absolute_square,
-                    view_arc.to_string(),
-                    view_arc_of_this_square.to_string(),
-                    combined_view_arc_of_portals.to_string()
-                );
                 maybe_view_blocking_arc = Some(combined_view_arc_of_portals);
             } else {
                 maybe_view_blocking_arc = None;
@@ -873,13 +865,11 @@ pub fn field_of_view_within_arc_in_single_octant(
 
         if let Some(view_blocking_arc) = maybe_view_blocking_arc {
             // split arc and recurse
-            let view_arcs_around_blocker: Vec<AngleInterval> =
-                view_arc.split_around_arc(view_blocking_arc);
+            let view_arcs_around_blocker: Vec<AngleInterval> = view_arc.subtract(view_blocking_arc);
             view_arcs_around_blocker
                 .into_iter()
                 .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
                 .for_each(|new_sub_arc| {
-                    dbg!("asdfasdf B", new_sub_arc.to_string());
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,

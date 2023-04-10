@@ -973,7 +973,7 @@ impl SquareWithOrthogonalDir {
     pub fn with_direction(&self, dir: WorldStep) -> Self {
         Self::new(self.square, dir)
     }
-    pub fn backward(&self) -> Self {
+    pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction_vector())
     }
 }

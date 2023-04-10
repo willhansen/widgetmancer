@@ -1413,21 +1413,32 @@ impl Game {
         self.place_piece(Piece::arrow(direction), square);
     }
 
-    pub fn place_portal(
+    pub fn place_single_sided_one_way_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
     }
-    pub fn place_double_sided_portal(
+    pub fn place_single_sided_two_way_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
         self.portal_geometry
-            .create_portal(exit_step.backward(), entrance_step.backward());
+            .create_portal(exit_step.reversed(), entrance_step.reversed());
+    }
+    pub fn place_double_sided_two_way_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.place_single_sided_two_way_portal(entrance_step, exit_step);
+        self.place_single_sided_two_way_portal(
+            entrance_step.stepped().reversed(),
+            exit_step.reversed().stepped(),
+        );
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1518,7 +1529,7 @@ impl Game {
             self.player_square().to_f32() - vec2(5.0, 3.0),
             vec2(0.1, 0.3),
         );
-        self.place_double_sided_portal(
+        self.place_double_sided_two_way_portal(
             SquareWithOrthogonalDir::from_square_and_dir(block_square + STEP_UP_RIGHT, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_dir(
                 block_square + STEP_DOWN_RIGHT * 4,
@@ -2244,7 +2255,7 @@ mod tests {
     fn test_player_can_step_through_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
-        game.place_portal(
+        game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::new(point2(5, 5), STEP_RIGHT),
             SquareWithOrthogonalDir::new(point2(5, 7), STEP_LEFT),
         );
@@ -2259,7 +2270,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let entrance_step = SquareWithOrthogonalDir::new(point2(2, 6), STEP_UP);
         let exit_step = SquareWithOrthogonalDir::new(point2(5, 2), STEP_RIGHT);
-        game.place_portal(entrance_step, exit_step);
+        game.place_single_sided_one_way_portal(entrance_step, exit_step);
         assert_eq!(
             game.portal_aware_single_step(entrance_step.into()),
             exit_step.into()
@@ -2272,8 +2283,8 @@ mod tests {
         let start = SquareWithOrthogonalDir::new(point2(2, 6), STEP_RIGHT);
         let mid = SquareWithOrthogonalDir::new(point2(5, 5), STEP_DOWN);
         let end = SquareWithOrthogonalDir::new(point2(5, 2), STEP_LEFT);
-        game.place_portal(start, mid);
-        game.place_portal(mid, end);
+        game.place_single_sided_one_way_portal(start, mid);
+        game.place_single_sided_one_way_portal(mid, end);
         assert_eq!(
             game.multiple_portal_aware_steps(start.into(), 2),
             end.into()
@@ -2285,7 +2296,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let start = SquareWithOrthogonalDir::new(point2(2, 6), STEP_RIGHT);
         let end = SquareWithOrthogonalDir::new(point2(5, 2), STEP_DOWN);
-        game.place_portal(start, end);
+        game.place_single_sided_one_way_portal(start, end);
         game.place_arrow(start.square(), start.direction_vector());
         game.tick_arrows();
         assert_eq!(game.arrows().get(&end.square()), Some(&STEP_DOWN));
@@ -2298,7 +2309,7 @@ mod tests {
         let player_square = point2(2, 2);
         let entrance = SquareWithOrthogonalDir::new(enemy_square, STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::new(player_square, STEP_DOWN);
-        game.place_portal(entrance, exit);
+        game.place_single_sided_one_way_portal(entrance, exit);
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
         game.place_player(player_square);
         assert!(game.player_is_alive());
@@ -2315,7 +2326,7 @@ mod tests {
         let entrance = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::new(enemy_square, STEP_DOWN);
 
-        game.place_portal(entrance, exit);
+        game.place_single_sided_one_way_portal(entrance, exit);
 
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
@@ -2353,7 +2364,7 @@ mod tests {
 
         let entrance = SquareWithOrthogonalDir::new(player_square + STEP_RIGHT, STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::new(enemy_square + STEP_DOWN, STEP_UP);
-        game.place_portal(entrance, exit);
+        game.place_single_sided_one_way_portal(entrance, exit);
 
         game.draw_headless_now();
         let visible_enemy_square = player_square + STEP_RIGHT * 3;
@@ -2443,7 +2454,7 @@ mod tests {
         let block_square = game.player_square() + STEP_RIGHT * 4;
         let entrance_square = block_square + STEP_UP_RIGHT;
         let exit_square = block_square + STEP_DOWN_RIGHT * 4;
-        game.place_portal(
+        game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_LEFT),
         );
@@ -2453,7 +2464,7 @@ mod tests {
     fn test_observed_crash_from_being_near_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
-        game.place_portal(
+        game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::from_square_and_dir(
                 game.player_square() + STEP_DOWN_RIGHT,
                 STEP_DOWN,
@@ -2469,7 +2480,7 @@ mod tests {
     fn test_observed_crash_from_being_near_portal__2() {
         let mut game = set_up_nxn_game(20);
         game.place_player(point2(5, 5));
-        game.place_portal(
+        game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::from_square_and_dir(
                 game.player_square() + STEP_DOWN_LEFT,
                 STEP_DOWN,
@@ -2494,7 +2505,7 @@ mod tests {
 
         let entrance = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::new(enemy_square, STEP_RIGHT);
-        game.place_portal(entrance, exit);
+        game.place_single_sided_one_way_portal(entrance, exit);
 
         game.draw_headless_now();
         let correct_apparent_enemy_square = player_square + STEP_RIGHT;
@@ -2531,7 +2542,7 @@ mod tests {
         let entrance =
             SquareWithOrthogonalDir::new(player_square + STEP_DOWN_RIGHT * 3, STEP_RIGHT);
         let exit = entrance.with_offset(STEP_RIGHT * 2);
-        game.place_portal(entrance, exit);
+        game.place_single_sided_one_way_portal(entrance, exit);
 
         game.draw_headless_now();
         let square_that_should_be_visible = entrance.square() + STEP_DOWN_LEFT;
