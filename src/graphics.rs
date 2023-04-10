@@ -1,3 +1,5 @@
+pub mod screen;
+
 use std::any::Any;
 use std::borrow::Borrow;
 use std::cmp::min;
@@ -37,6 +39,7 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
+use crate::graphics::screen::Screen;
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
@@ -49,14 +52,8 @@ use crate::{
 };
 
 pub struct Graphics {
-    screen_buffer_origin: WorldCharacterSquare,
+    screen: Screen,
     draw_buffer: HashMap<WorldCharacterSquare, Glyph>,
-    screen_buffer: Vec<Vec<Glyph>>,
-    // (x,y), left to right, top to bottom
-    current_screen_state: Vec<Vec<Glyph>>,
-    // (x,y), left to right, top to bottom
-    terminal_width: u16,
-    terminal_height: u16,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<SelectorAnimation>,
     board_animation: Option<Box<dyn BoardAnimation>>,
@@ -66,18 +63,20 @@ pub struct Graphics {
 impl Graphics {
     pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         Graphics {
-            screen_buffer_origin: point2(0, terminal_height as i32 - 1),
+            screen: Screen {
+                screen_buffer_origin: point2(0, terminal_height as i32 - 1),
+                screen_buffer: vec![
+                    vec![Glyph::from_char(' '); terminal_height as usize];
+                    terminal_width as usize
+                ],
+                current_screen_state: vec![
+                    vec![Glyph::from_char('x'); terminal_height as usize];
+                    terminal_width as usize
+                ],
+                terminal_width,
+                terminal_height,
+            },
             draw_buffer: HashMap::default(),
-            screen_buffer: vec![
-                vec![Glyph::from_char(' '); terminal_height as usize];
-                terminal_width as usize
-            ],
-            current_screen_state: vec![
-                vec![Glyph::from_char('x'); terminal_height as usize];
-                terminal_width as usize
-            ],
-            terminal_width,
-            terminal_height,
             active_animations: vec![],
             selectors: vec![],
             board_animation: None,
@@ -90,21 +89,21 @@ impl Graphics {
     }
 
     fn terminal_width(&self) -> i32 {
-        self.terminal_width as i32
+        self.screen.terminal_width as i32
     }
 
     fn terminal_height(&self) -> i32 {
-        self.terminal_height as i32
+        self.screen.terminal_height as i32
     }
 
     fn set_screen_center(&mut self, world_character_square: WorldCharacterSquare) {
-        self.screen_buffer_origin = point2(
+        self.screen.screen_buffer_origin = point2(
             world_character_square.x - self.terminal_width() / 2,
             world_character_square.y + self.terminal_height() / 2,
         );
     }
     fn set_screen_origin(&mut self, world_character_square: WorldCharacterSquare) {
-        self.screen_buffer_origin = world_character_square;
+        self.screen.screen_buffer_origin = world_character_square;
     }
 
     pub fn center_screen_at_square(&mut self, world_square: WorldSquare) {
@@ -113,8 +112,8 @@ impl Graphics {
 
     fn screen_center(&self) -> WorldCharacterSquare {
         point2(
-            self.screen_buffer_origin.x + self.terminal_width() / 2,
-            self.screen_buffer_origin.y - self.terminal_height() / 2,
+            self.screen.screen_buffer_origin.x + self.terminal_width() / 2,
+            self.screen.screen_buffer_origin.y - self.terminal_height() / 2,
         )
     }
 
@@ -140,9 +139,9 @@ impl Graphics {
         buffer_char_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> bool {
         return buffer_char_pos.x >= 0
-            && buffer_char_pos.x < self.terminal_width as i32
+            && buffer_char_pos.x < self.screen.terminal_width as i32
             && buffer_char_pos.y >= 0
-            && buffer_char_pos.y < self.terminal_height as i32;
+            && buffer_char_pos.y < self.screen.terminal_height as i32;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -160,7 +159,7 @@ impl Graphics {
         // buffer indexes from 0, and the y axis goes top to bottom
         // world indexes from 0, origin at bottom left
         // origin of buffer is a world character point
-        let buffer_origin_point = self.screen_buffer_origin.to_f32();
+        let buffer_origin_point = self.screen.screen_buffer_origin.to_f32();
 
         let new_x = world_character_point.x - buffer_origin_point.x;
         let new_unflipped_y = world_character_point.y - buffer_origin_point.y;
@@ -178,7 +177,7 @@ impl Graphics {
         // world indexes from 0, origin at bottom left
         // origin of buffer is a world character point
 
-        let buffer_origin_point = self.screen_buffer_origin.to_f32();
+        let buffer_origin_point = self.screen.screen_buffer_origin.to_f32();
 
         point2(
             buffer_point.x + buffer_origin_point.x,
@@ -350,9 +349,9 @@ impl Graphics {
         self.fill_output_buffer_with_solid_color(BLACK);
     }
     pub fn fill_output_buffer_with_solid_color(&mut self, color: RGB8) {
-        for x in 0..self.terminal_width as usize {
-            for y in 0..self.terminal_height as usize {
-                self.screen_buffer[x][y] = Glyph::new(' ', WHITE, color);
+        for x in 0..self.screen.terminal_width as usize {
+            for y in 0..self.screen.terminal_height as usize {
+                self.screen.screen_buffer[x][y] = Glyph::new(' ', WHITE, color);
             }
         }
     }
@@ -401,7 +400,7 @@ impl Graphics {
         &self,
         pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> &Glyph {
-        return &self.screen_buffer[pos.x as usize][pos.y as usize];
+        return &self.screen.screen_buffer[pos.x as usize][pos.y as usize];
     }
 
     fn set_buffered_glyph(
@@ -409,7 +408,7 @@ impl Graphics {
         pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
         new_glyph: Glyph,
     ) {
-        self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
+        self.screen.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
     }
 
     pub fn print_draw_buffer(&self, center: WorldCharacterSquare, radius: u32) {
@@ -434,7 +433,7 @@ impl Graphics {
         for y in 0..self.terminal_height() as usize {
             let mut row_string = String::new();
             for x in 0..self.terminal_width() as usize {
-                row_string += &self.screen_buffer[x][y].to_string();
+                row_string += &self.screen.screen_buffer[x][y].to_string();
             }
             row_string += &Glyph::reset_colors();
             if y % 5 == 0 || y == self.terminal_height() as usize - 1 {
@@ -463,7 +462,7 @@ impl Graphics {
         if optional_writer.is_some() {
             self.update_screen(optional_writer.as_mut().unwrap());
         }
-        self.current_screen_state = self.screen_buffer.clone();
+        self.screen.current_screen_state = self.screen.screen_buffer.clone();
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
@@ -555,7 +554,7 @@ impl Graphics {
         for i in 0..the_string.chars().count() {
             let character: char = the_string.chars().nth(i).unwrap();
             let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-            self.screen_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
+            self.screen.screen_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
                 Glyph::from_char(character);
         }
     }
@@ -565,7 +564,7 @@ impl Graphics {
         screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
     ) -> char {
         let buffer_pos = self.screen_square_to_buffer_square(screen_pos);
-        get_by_point(&self.current_screen_state, buffer_pos).character
+        get_by_point(&self.screen.current_screen_state, buffer_pos).character
     }
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
@@ -604,7 +603,7 @@ impl Graphics {
             );
         }
 
-        self.screen_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
+        self.screen.screen_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
     pub fn draw_piece_with_color(
@@ -848,8 +847,9 @@ impl Graphics {
             for buffer_y in 0..self.terminal_height() {
                 let buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
-                if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
-                    != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
+                if self.screen.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                    != self.screen.current_screen_state[buffer_pos.x as usize]
+                        [buffer_pos.y as usize]
                 {
                     let screen_pos: Point2D<i32, CharacterGridInScreenFrame> =
                         self.screen_buffer_square_to_screen_square(buffer_pos);
@@ -862,7 +862,7 @@ impl Graphics {
                     write!(
                         writer,
                         "{}",
-                        self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                        self.screen.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
                             .to_string()
                     )
                     .unwrap();
@@ -948,7 +948,7 @@ mod tests {
         let screen_character_square: ScreenCharacterSquare = point2(1, 5);
         let screen_pos_1 = g.world_square_to_left_buffer_square(world_square);
 
-        g.set_screen_origin(g.screen_buffer_origin + STEP_RIGHT.cast_unit());
+        g.set_screen_origin(g.screen.screen_buffer_origin + STEP_RIGHT.cast_unit());
 
         let screen_pos_2 = g.world_square_to_left_buffer_square(world_square);
 
