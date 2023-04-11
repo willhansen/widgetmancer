@@ -63,19 +63,7 @@ pub struct Graphics {
 impl Graphics {
     pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         Graphics {
-            screen: Screen {
-                screen_buffer_origin: point2(0, terminal_height as i32 - 1),
-                screen_buffer: vec![
-                    vec![Glyph::from_char(' '); terminal_height as usize];
-                    terminal_width as usize
-                ],
-                current_screen_state: vec![
-                    vec![Glyph::from_char('x'); terminal_height as usize];
-                    terminal_width as usize
-                ],
-                terminal_width,
-                terminal_height,
-            },
+            screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),
             active_animations: vec![],
             selectors: vec![],

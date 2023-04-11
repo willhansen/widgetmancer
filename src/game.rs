@@ -2464,6 +2464,7 @@ mod tests {
         game.draw_headless_now();
         // shouldn't crash
     }
+
     #[test]
     fn test_observed_crash_from_seeing_back_of_portal() {
         let mut game = set_up_10x10_game();
@@ -2477,6 +2478,7 @@ mod tests {
         );
         game.draw_headless_now();
     }
+
     #[test]
     fn test_observed_crash_from_being_near_portal() {
         let mut game = set_up_10x10_game();
@@ -2493,6 +2495,7 @@ mod tests {
         );
         game.draw_headless_now();
     }
+
     #[test]
     fn test_observed_crash_from_being_near_portal__2() {
         let mut game = set_up_nxn_game(20);
@@ -2550,6 +2553,7 @@ mod tests {
                 .get_glyphs_for_square_from_draw_buffer(enemy_square)
         );
     }
+
     #[test]
     fn test_portals_causing_shadows_at_certain_angles() {
         let mut game = set_up_nxn_game(20);
@@ -2571,11 +2575,11 @@ mod tests {
         //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
         // game.update_screen_from_draw_buffer_headless();
 
-        game.graphics.print_draw_buffer(
-            world_square_to_left_world_character_square(player_square),
-            5,
-        );
-        game.graphics.screen.print_screen_buffer();
+        // game.graphics.print_draw_buffer(
+        //     world_square_to_left_world_character_square(player_square),
+        //     5,
+        // );
+        // game.graphics.screen.print_screen_buffer();
 
         let fov = game.player_field_of_view();
 
@@ -2590,6 +2594,69 @@ mod tests {
                 .get_solid_color()
                 .unwrap(),
             OUT_OF_SIGHT_COLOR
+        );
+    }
+
+    #[test]
+    fn test_rotate_screen() {
+        let mut game = set_up_nxn_game(20);
+
+        let player_square = point2(10, 10);
+        game.place_player(player_square);
+        game.raw_set_player_faced_direction(STEP_RIGHT);
+
+        let step_to_enemy = STEP_RIGHT * 2;
+
+        let enemy_square = player_square + step_to_enemy;
+        game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
+
+        game.draw_headless_now();
+        let enemy_chars = game
+            .graphics
+            .get_glyphs_for_square_from_draw_buffer(enemy_square)
+            .to_clean_string();
+
+        assert_eq!(
+            game.graphics
+                .screen
+                .get_glyphs_for_square_from_screen_buffer(enemy_square)
+                .to_clean_string(),
+            enemy_chars
+        );
+
+        let player_screen_char_square = game
+            .graphics
+            .screen
+            .world_square_to_left_screen_square(game.player_square());
+
+        assert_eq!(
+            game.graphics
+                .screen
+                .get_char_at_screen_pos(player_screen_char_square + STEP_RIGHT.cast_unit() * 4),
+            enemy_chars.chars().collect_vec()[0]
+        );
+
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(3));
+
+        assert_eq!(
+            game.graphics
+                .screen
+                .get_glyphs_for_square_from_screen_buffer(enemy_square)
+                .to_clean_string(),
+            enemy_chars
+        );
+        let player_screen_char_square = game
+            .graphics
+            .screen
+            .world_square_to_left_screen_square(game.player_square());
+
+        assert_eq!(
+            game.graphics
+                .screen
+                .get_char_at_screen_pos(player_screen_char_square + STEP_UP.cast_unit() * 2),
+            enemy_chars.chars().collect_vec()[0]
         );
     }
 }

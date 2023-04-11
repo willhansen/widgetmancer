@@ -6,10 +6,10 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, AddAssign, Neg, Sub};
 
 use approx::AbsDiffEq;
-use derive_more::{Constructor, Display, Neg};
+use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
@@ -64,7 +64,7 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_LEFT,
 ];
 
-#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, CopyGetters)]
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
 #[get_copy = "pub"]
 pub struct QuarterTurnsAnticlockwise {
     quarter_turns: i32,
