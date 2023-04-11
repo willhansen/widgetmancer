@@ -343,9 +343,33 @@ mod tests {
     use crate::utility::{STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP_LEFT};
     use pretty_assertions::{assert_eq, assert_ne};
 
+    fn set_up_screen(terminal_width: u16, terminal_height: u16) -> Screen {
+        Screen {
+            screen_buffer_origin: point2(0, terminal_height as i32 - 1),
+            screen_buffer: vec![
+                vec![Glyph::from_char(' '); terminal_height as usize];
+                terminal_width as usize
+            ],
+            current_screen_state: vec![
+                vec![Glyph::from_char('x'); terminal_height as usize];
+                terminal_width as usize
+            ],
+            terminal_width,
+            terminal_height,
+        }
+    }
+    fn set_up_10x10_screen() -> Screen {
+        let terminal_width = 10;
+        let terminal_height = 10;
+        set_up_screen(terminal_width, terminal_height)
+    }
+    fn set_up_nxn_screen(n: u16) -> Screen {
+        set_up_screen(n, n)
+    }
+
     #[test]
     fn test_world_to_screen() {
-        let g = set_up_graphics();
+        let g = set_up_10x10_screen();
 
         let world_square: WorldSquare = point2(0, 0);
         let screen_character_square: ScreenCharacterSquare = point2(1, g.terminal_height());
@@ -363,13 +387,13 @@ mod tests {
     }
     #[test]
     fn test_world_to_screen__with_screen_motion() {
-        let mut g = set_up_graphics();
+        let mut g = set_up_10x10_screen();
 
         let world_square: WorldSquare = point2(0, 0);
         let screen_character_square: ScreenCharacterSquare = point2(1, 5);
         let screen_pos_1 = g.world_square_to_left_buffer_square(world_square);
 
-        g.set_screen_origin(g.screen.screen_buffer_origin + STEP_RIGHT.cast_unit());
+        g.set_screen_origin(g.screen_buffer_origin + STEP_RIGHT.cast_unit());
 
         let screen_pos_2 = g.world_square_to_left_buffer_square(world_square);
 
@@ -378,7 +402,7 @@ mod tests {
     }
     #[test]
     fn test_world_character_is_on_screen() {
-        let mut g = Graphics::new(41, 20, Instant::now());
+        let mut g = set_up_screen(41, 20);
 
         assert!(g.world_character_is_on_screen(point2(0, 0)), "bottom_left");
         assert!(
@@ -413,7 +437,7 @@ mod tests {
     }
     #[test]
     fn test_world_character_grid_to_screen_buffer_grid_conversions() {
-        let mut g = set_up_graphics_with_nxn_world_squares(3);
+        let mut g = set_up_screen(6, 3);
         g.set_screen_origin(WorldCharacterSquare::new(5, 2));
         let world_character_square = WorldCharacterSquare::new(6, 0);
         let screen_buffer_square = ScreenBufferCharacterSquare::new(1, 2);
@@ -429,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_screen_buffer_step_to_world_character_step_conversion() {
-        let g = set_up_graphics_with_nxn_world_squares(5);
+        let g = set_up_screen(10, 5);
         assert_eq!(
             g.screen_buffer_step_to_world_character_step(STEP_UP_LEFT.cast_unit()),
             STEP_DOWN_LEFT.cast_unit()

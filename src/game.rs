@@ -376,7 +376,9 @@ impl Game {
 
     fn update_screen_from_draw_buffer(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
         if self.player_is_alive() {
-            self.graphics.center_screen_at_square(self.player_square());
+            self.graphics
+                .screen
+                .center_screen_at_square(self.player_square());
             self.graphics
                 .load_screen_buffer_from_fov(self.player_field_of_view());
         } else {
@@ -1760,6 +1762,7 @@ mod tests {
         game.draw_headless_now();
         let glyphs = game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(square);
         assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
     }
@@ -1864,6 +1867,7 @@ mod tests {
         game.draw_headless_now();
         assert!(game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(test_square)
             .looks_solid());
 
@@ -1873,6 +1877,7 @@ mod tests {
         game.draw_headless_now();
         assert!(!game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(test_square)
             .looks_solid());
     }
@@ -1895,6 +1900,7 @@ mod tests {
             (0..4)
                 .map(|dx| {
                     game.graphics
+                        .screen
                         .get_glyphs_for_square_from_screen_buffer(test_square + STEP_RIGHT * dx)
                         .looks_solid()
                 })
@@ -1926,12 +1932,14 @@ mod tests {
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.0));
         let cube_color_1 = game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(test_square)
             .get_solid_color()
             .unwrap();
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.23432));
         let cube_color_2 = game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(test_square)
             .get_solid_color()
             .unwrap();
@@ -2003,6 +2011,7 @@ mod tests {
             let square = point2(x, start_pos.y);
             let glyphs = game
                 .graphics
+                .screen
                 .get_glyphs_for_square_from_screen_buffer(square);
             //assert!(!glyphs.looks_solid());
             assert!(
@@ -2031,6 +2040,7 @@ mod tests {
                 let square = start_pos + vec2(dx, 0);
                 let glyphs = game
                     .graphics
+                    .screen
                     .get_glyphs_for_square_from_screen_buffer(square);
                 //dbg!(glyphs);
                 // There might not be particles in every character square.  Don't test the empty ones
@@ -2060,6 +2070,7 @@ mod tests {
         game.draw_headless_now();
         let pawn_glyphs = game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(square1);
 
         assert_eq!(pawn_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
@@ -2214,6 +2225,7 @@ mod tests {
         game.draw_headless_now();
         let glyphs = game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(square);
         assert_false!(glyphs.looks_solid());
     }
@@ -2386,6 +2398,7 @@ mod tests {
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
         assert_eq!(
             game.graphics
+                .screen
                 .get_glyphs_for_square_from_screen_buffer(visible_enemy_square),
             game.graphics
                 .get_glyphs_for_square_from_draw_buffer(enemy_square)
@@ -2402,37 +2415,41 @@ mod tests {
         let square3 = point2(start_square.x + recenter_radius + 1, 5);
         game.place_player(start_square);
         game.borrow_graphics_mut()
+            .screen
             .center_screen_at_square(start_square);
         game.draw_headless_now();
         assert_eq!(
-            game.graphics.screen_center_world_square(),
+            game.graphics.screen.screen_center_world_square(),
             game.player_square()
         );
 
         assert_false!(game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(game.player_square())
             .looks_solid());
 
         game.move_player_to(square2);
         game.draw_headless_now();
         assert_ne!(
-            game.graphics.screen_center_world_square(),
+            game.graphics.screen.screen_center_world_square(),
             game.player_square()
         );
         assert!(game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(game.player_square())
             .looks_solid());
 
         game.move_player_to(square3);
         game.draw_headless_now();
         assert_eq!(
-            game.graphics.screen_center_world_square(),
+            game.graphics.screen.screen_center_world_square(),
             game.player_square()
         );
         assert_false!(game
             .graphics
+            .screen
             .get_glyphs_for_square_from_screen_buffer(game.player_square())
             .looks_solid());
     }
@@ -2527,6 +2544,7 @@ mod tests {
         assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 1);
         assert_eq!(
             game.graphics
+                .screen
                 .get_glyphs_for_square_from_screen_buffer(correct_apparent_enemy_square),
             game.graphics
                 .get_glyphs_for_square_from_draw_buffer(enemy_square)
@@ -2557,7 +2575,7 @@ mod tests {
             world_square_to_left_world_character_square(player_square),
             5,
         );
-        game.graphics.print_screen_buffer();
+        game.graphics.screen.print_screen_buffer();
 
         let fov = game.player_field_of_view();
 

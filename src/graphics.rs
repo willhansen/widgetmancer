@@ -52,7 +52,7 @@ use crate::{
 };
 
 pub struct Graphics {
-    screen: Screen,
+    pub screen: Screen,
     draw_buffer: HashMap<WorldCharacterSquare, Glyph>,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<SelectorAnimation>,
