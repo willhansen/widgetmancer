@@ -39,7 +39,10 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::screen::Screen;
+use crate::graphics::screen::{
+    CharacterGridInScreenBufferFrame, CharacterGridInScreenFrame, Screen,
+    ScreenBufferCharacterSquare,
+};
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
@@ -81,7 +84,8 @@ impl Graphics {
             count_braille_dots(
                 self.screen
                     .get_screen_buffered_glyph(
-                        self.screen.world_square_to_left_buffer_square(square),
+                        self.screen
+                            .world_square_to_left_screen_buffer_square(square),
                     )
                     .character,
             )
@@ -106,8 +110,10 @@ impl Graphics {
     }
 
     pub fn draw_string_below_board(&mut self, string: String) {
-        let left_of_screen_under_board =
-            self.screen.world_square_to_left_screen_square(point2(0, 0)) + vec2(0, -1);
+        let left_of_screen_under_board = self
+            .screen
+            .world_square_to_left_screen_character_square(point2(0, 0))
+            + vec2(0, -1);
         self.screen
             .draw_string_to_screen(left_of_screen_under_board, &string);
     }
@@ -605,9 +611,11 @@ mod tests {
         let world_pos = point2(5, 5); // arbitrary
         let screen_pos1 = g
             .screen
-            .world_square_to_left_screen_square(world_pos + RIGHT_I.cast_unit());
-        let screen_pos2 =
-            g.screen.world_square_to_left_screen_square(world_pos) + RIGHT_I.cast_unit() * 2;
+            .world_square_to_left_screen_character_square(world_pos + RIGHT_I.cast_unit());
+        let screen_pos2 = g
+            .screen
+            .world_square_to_left_screen_character_square(world_pos)
+            + RIGHT_I.cast_unit() * 2;
         assert_eq!(screen_pos1, screen_pos2);
     }
 
@@ -742,11 +750,12 @@ mod tests {
         g.draw_buffer
             .insert(point2(0, 0), Glyph::fg_only('#', GREEN));
         let fov = field_of_view_from_square(point2(0, 0), 5, &Default::default());
-        g.screen.center_screen_at_square(fov.root_square());
+        g.screen
+            .set_screen_center_by_world_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square = g
             .screen
-            .world_character_square_to_buffer_square(world_character_square);
+            .world_character_square_to_screen_buffer_character_square(world_character_square);
         //g.print_draw_buffer(point2(0, 0), 3);
         //g.print_screen_buffer();
         //dbg!( screen_buffer_square, world_character_square, g.get_screen_buffered_glyph(point2(8, 0)).fg_color );

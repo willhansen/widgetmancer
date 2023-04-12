@@ -378,7 +378,7 @@ impl Game {
         if self.player_is_alive() {
             self.graphics
                 .screen
-                .center_screen_at_square(self.player_square());
+                .set_screen_center_by_world_square(self.player_square());
             self.graphics
                 .load_screen_buffer_from_fov(self.player_field_of_view());
         } else {
@@ -2416,7 +2416,7 @@ mod tests {
         game.place_player(start_square);
         game.borrow_graphics_mut()
             .screen
-            .center_screen_at_square(start_square);
+            .set_screen_center_by_world_square(start_square);
         game.draw_headless_now();
         assert_eq!(
             game.graphics.screen.screen_center_world_square(),
@@ -2616,46 +2616,37 @@ mod tests {
             .get_glyphs_for_square_from_draw_buffer(enemy_square)
             .to_clean_string();
 
+        let player_square = game.player_square();
+        let screen = &mut game.graphics.screen;
+
         assert_eq!(
-            game.graphics
-                .screen
+            screen
                 .get_glyphs_for_square_from_screen_buffer(enemy_square)
                 .to_clean_string(),
             enemy_chars
         );
 
-        let player_screen_char_square = game
-            .graphics
-            .screen
-            .world_square_to_left_screen_square(game.player_square());
+        let player_screen_char_square =
+            screen.world_square_to_left_screen_character_square(player_square);
 
         assert_eq!(
-            game.graphics
-                .screen
-                .get_char_at_screen_pos(player_screen_char_square + STEP_RIGHT.cast_unit() * 4),
+            screen.get_char_at_screen_pos(player_screen_char_square + STEP_RIGHT.cast_unit() * 4),
             enemy_chars.chars().collect_vec()[0]
         );
 
-        game.graphics
-            .screen
-            .rotate(QuarterTurnsAnticlockwise::new(3));
+        screen.rotate(QuarterTurnsAnticlockwise::new(3));
 
         assert_eq!(
-            game.graphics
-                .screen
+            screen
                 .get_glyphs_for_square_from_screen_buffer(enemy_square)
                 .to_clean_string(),
             enemy_chars
         );
-        let player_screen_char_square = game
-            .graphics
-            .screen
-            .world_square_to_left_screen_square(game.player_square());
+        let player_screen_char_square =
+            screen.world_square_to_left_screen_character_square(player_square);
 
         assert_eq!(
-            game.graphics
-                .screen
-                .get_char_at_screen_pos(player_screen_char_square + STEP_UP.cast_unit() * 2),
+            screen.get_char_at_screen_pos(player_screen_char_square + STEP_UP.cast_unit() * 2),
             enemy_chars.chars().collect_vec()[0]
         );
     }

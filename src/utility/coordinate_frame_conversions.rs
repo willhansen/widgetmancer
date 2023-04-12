@@ -6,10 +6,7 @@ use crate::utility::*;
 pub struct SquareGridInWorldFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInWorldFrame;
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInScreenBufferFrame;
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInScreenFrame;
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInLocalCharacterFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -43,19 +40,11 @@ pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
-pub type ScreenBufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
-pub type BufferCharacterPoint = Point2D<f32, CharacterGridInScreenBufferFrame>;
-pub type BufferCharacterStep = Vector2D<i32, CharacterGridInScreenBufferFrame>;
-
-pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
-pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
-
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
 pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
 
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
-pub type BufferGlyphMap = HashMap<ScreenBufferCharacterSquare, Glyph>;
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
 ) -> WorldCharacterSquareGlyphMap {
