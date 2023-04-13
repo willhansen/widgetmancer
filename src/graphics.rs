@@ -202,7 +202,7 @@ impl Graphics {
 
                 let world_character_square = self
                     .screen
-                    .buffer_square_to_world_character_square(buffer_character_square);
+                    .screen_buffer_square_to_world_character_square(buffer_character_square);
                 let character_square_position_in_world_square =
                     if is_world_character_square_left_square_of_world_square(world_character_square)
                     {
@@ -251,7 +251,7 @@ impl Graphics {
                     point2(buffer_x, buffer_y);
                 let world_character_square = self
                     .screen
-                    .buffer_square_to_world_character_square(buffer_square);
+                    .screen_buffer_square_to_world_character_square(buffer_square);
                 if let Some(&glyph) = self.draw_buffer.get(&world_character_square) {
                     self.screen
                         .draw_glyph_straight_to_screen_buffer(buffer_square, glyph);
@@ -535,7 +535,7 @@ impl Graphics {
                 {
                     let screen_pos: Point2D<i32, CharacterGridInScreenFrame> = self
                         .screen
-                        .screen_buffer_square_to_screen_square(buffer_pos);
+                        .screen_buffer_character_square_to_screen_character_square(buffer_pos);
                     write!(
                         writer,
                         "{}",
