@@ -80,7 +80,7 @@ impl Graphics {
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
-        return if self.screen.square_is_on_screen(square) {
+        return if self.screen.world_square_is_on_screen(square) {
             count_braille_dots(
                 self.screen
                     .get_screen_buffered_glyph(
@@ -589,7 +589,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::fov_stuff::field_of_view_from_square;
+    use crate::fov_stuff::{field_of_view_from_square, portal_aware_field_of_view_from_square};
     use crate::piece::PieceType::TurningPawn;
     use crate::utility::*;
     use crate::{LEFT_I, RIGHT_I};
@@ -749,7 +749,12 @@ mod tests {
             .insert(world_character_square, Glyph::fg_only('#', color));
         g.draw_buffer
             .insert(point2(0, 0), Glyph::fg_only('#', GREEN));
-        let fov = field_of_view_from_square(point2(0, 0), 5, &Default::default());
+        let fov = portal_aware_field_of_view_from_square(
+            point2(0, 0),
+            5,
+            &Default::default(),
+            &Default::default(),
+        );
         g.screen
             .set_screen_center_by_world_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
