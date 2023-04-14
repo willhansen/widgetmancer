@@ -5,8 +5,10 @@ use crate::utility::coordinate_frame_conversions::{
     SquareSet, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterStep, WorldPoint,
     WorldSquare,
 };
-use crate::utility::{get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I};
-use euclid::{point2, Point2D, Vector2D};
+use crate::utility::{
+    get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT,
+};
+use euclid::{point2, vec2, Point2D, Vector2D};
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -102,7 +104,7 @@ impl Screen {
     }
 
     pub fn world_square_is_on_screen(&self, square: WorldSquare) -> bool {
-        self.world_square_to_multiple_screen_buffer_squares(square)
+        self.world_square_to_screen_buffer_character_squares(square)
             .into_iter()
             .all(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
     }
@@ -197,15 +199,12 @@ impl Screen {
         )
     }
 
-    pub fn world_square_to_multiple_screen_buffer_squares(
+    pub fn world_square_to_screen_buffer_character_squares(
         &self,
         world_position: WorldSquare,
     ) -> [ScreenBufferCharacterSquare; 2] {
-        let left_square = self.screen_character_square_to_buffer_character_square(
-            self.world_square_to_left_screen_character_square(world_position),
-        );
-        let right_square = left_square + RIGHT_I.cast_unit();
-        [left_square, right_square]
+        let screen_square = self.world_square_to_centered_screen_buffer_square(world_position);
+        self.centered_screen_buffer_square_to_screen_buffer_character_squares(screen_square)
     }
 
     pub fn screen_buffer_character_square_to_world_square(
@@ -301,6 +300,31 @@ impl Screen {
             character_step_from_screen_center.x / 2,
             character_step_from_screen_center.y,
         )
+    }
+
+    pub fn centered_screen_buffer_square_to_left_screen_buffer_character_square(
+        &self,
+        centered_screen_buffer_square: CenteredScreenBufferSquare,
+    ) -> ScreenBufferCharacterSquare {
+        let left_character_step_from_screen_center = vec2(
+            centered_screen_buffer_square.x * 2,
+            centered_screen_buffer_square.y,
+        );
+        self.screen_center_in_screen_space() + left_character_step_from_screen_center
+    }
+
+    pub fn centered_screen_buffer_square_to_screen_buffer_character_squares(
+        &self,
+        centered_screen_buffer_square: CenteredScreenBufferSquare,
+    ) -> [ScreenBufferCharacterSquare; 2] {
+        let left_screen_buffer_character_square = self
+            .centered_screen_buffer_square_to_left_screen_buffer_character_square(
+                centered_screen_buffer_square,
+            );
+        [
+            left_screen_buffer_character_square,
+            left_screen_buffer_character_square + STEP_RIGHT.cast_unit(),
+        ]
     }
 
     pub fn world_square_to_centered_screen_buffer_square(
