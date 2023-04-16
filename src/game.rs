@@ -2419,7 +2419,7 @@ mod tests {
             .set_screen_center_by_world_square(start_square);
         game.draw_headless_now();
         assert_eq!(
-            game.graphics.screen.screen_center_world_square(),
+            game.graphics.screen.screen_center_as_world_square(),
             game.player_square()
         );
 
@@ -2432,7 +2432,7 @@ mod tests {
         game.move_player_to(square2);
         game.draw_headless_now();
         assert_ne!(
-            game.graphics.screen.screen_center_world_square(),
+            game.graphics.screen.screen_center_as_world_square(),
             game.player_square()
         );
         assert!(game
@@ -2444,7 +2444,7 @@ mod tests {
         game.move_player_to(square3);
         game.draw_headless_now();
         assert_eq!(
-            game.graphics.screen.screen_center_world_square(),
+            game.graphics.screen.screen_center_as_world_square(),
             game.player_square()
         );
         assert_false!(game
