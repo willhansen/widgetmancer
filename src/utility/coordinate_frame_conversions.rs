@@ -4,6 +4,8 @@ use crate::utility::*;
 // empty enums for euclid typing
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInWorldFrame;
+
+#[deprecated(note = "Obselete since screen rotation")]
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInWorldFrame;
 
@@ -30,8 +32,11 @@ pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
 
+#[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterStep = Vector2D<i32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
@@ -75,7 +80,7 @@ pub fn world_square_to_both_world_character_squares(
     [left_char_square, left_char_square + STEP_RIGHT.cast_unit()]
 }
 
-pub fn world_square_to_world_character_squares(
+pub fn world_square_to_world_character_square(
     world_square: WorldSquare,
     index: usize,
 ) -> WorldCharacterSquare {

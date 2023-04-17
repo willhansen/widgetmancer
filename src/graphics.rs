@@ -85,7 +85,7 @@ impl Graphics {
                 self.screen
                     .get_screen_buffered_glyph(
                         self.screen
-                            .world_square_to_left_screen_buffer_square(square),
+                            .world_square_to_left_screen_buffer_character_square(square),
                     )
                     .character,
             )
@@ -197,12 +197,27 @@ impl Graphics {
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
         for buffer_x in 0..self.screen.terminal_width() {
             for buffer_y in 0..self.screen.terminal_height() {
-                let buffer_character_square: ScreenBufferCharacterSquare =
+                let screen_buffer_character_square: ScreenBufferCharacterSquare =
                     point2(buffer_x, buffer_y);
+                if !self
+                    .screen
+                    .screen_buffer_character_square_is_left_glyph_of_screen_square(
+                        screen_buffer_character_square,
+                    )
+                {
+                    continue;
+                }
+                let screen_square = self
+                    .screen
+                    .screen_buffer_character_square_to_centered_screen_buffer_square(
+                        screen_buffer_character_square,
+                    );
 
                 let world_character_square = self
                     .screen
-                    .screen_buffer_square_to_world_character_square(buffer_character_square);
+                    .screen_buffer_character_square_to_world_character_square(
+                        screen_buffer_character_square,
+                    );
                 let character_square_position_in_world_square =
                     if is_world_character_square_left_square_of_world_square(world_character_square)
                     {
@@ -211,7 +226,9 @@ impl Graphics {
                         1
                     };
 
-                let world_square = world_character_square_to_world_square(world_character_square);
+                let world_square = self
+                    .screen
+                    .centered_screen_buffer_square_to_world_square(screen_square);
 
                 let relative_world_square = world_square - field_of_view.root_square();
                 let visibility = field_of_view.visibility_of_relative_square(relative_world_square);
@@ -220,24 +237,25 @@ impl Graphics {
                     let absolute_world_square_seen: WorldSquare = field_of_view
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
-                    let absolute_world_character_square_seen: WorldCharacterSquare =
-                        world_square_to_world_character_squares(
-                            absolute_world_square_seen,
-                            character_square_position_in_world_square,
-                        );
+                    let absolute_world_character_squares_seen =
+                        world_square_to_both_world_character_squares(absolute_world_square_seen);
 
-                    let mut glyph: Glyph = *self
-                        .draw_buffer
-                        .get(&absolute_world_character_square_seen)
-                        .unwrap_or(&Glyph::default_background());
+                    let unshadowed_glyphs: DoubleGlyph =
+                        absolute_world_character_squares_seen.map(|character_square| {
+                            *self
+                                .draw_buffer
+                                .get(&character_square)
+                                .unwrap_or(&Glyph::default_background())
+                        });
 
-                    if let Some(partial) = visibility.partial_visibility() {
-                        let shadow_glyph =
-                            partial.to_glyphs()[character_square_position_in_world_square];
-                        glyph = shadow_glyph.drawn_over(glyph);
-                    }
+                    let shadowed_glyphs = if let Some(partial) = visibility.partial_visibility() {
+                        partial.to_glyphs().drawn_over(unshadowed_glyphs)
+                    } else {
+                        unshadowed_glyphs
+                    };
+
                     self.screen
-                        .draw_glyph_straight_to_screen_buffer(buffer_character_square, glyph);
+                        .draw_glyphs_straight_to_screen_square(shadowed_glyphs, screen_square);
                 }
             }
         }
@@ -251,10 +269,10 @@ impl Graphics {
                     point2(buffer_x, buffer_y);
                 let world_character_square = self
                     .screen
-                    .screen_buffer_square_to_world_character_square(buffer_square);
+                    .screen_buffer_character_square_to_world_character_square(buffer_square);
                 if let Some(&glyph) = self.draw_buffer.get(&world_character_square) {
                     self.screen
-                        .draw_glyph_straight_to_screen_buffer(buffer_square, glyph);
+                        .draw_glyph_straight_to_screen_buffer(glyph, buffer_square);
                 }
             }
         }

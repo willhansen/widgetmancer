@@ -367,6 +367,7 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
         }
 
+        dbg!("asdfasdf");
         self.update_screen_from_draw_buffer(&mut writer);
     }
 
@@ -1861,8 +1862,10 @@ mod tests {
 
     #[test]
     fn test_death_cube_can_be_seen() {
+        dbg!("asdfasdf");
         let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
+        dbg!("asdfasdf");
 
         game.draw_headless_now();
         assert!(game
@@ -1870,6 +1873,7 @@ mod tests {
             .screen
             .get_glyphs_for_square_from_screen_buffer(test_square)
             .looks_solid());
+        dbg!("asdfasdf");
 
         let death_cube_start_pos = test_square.to_f32() + vec2(0.3, 0.0);
         game.place_linear_death_cube(death_cube_start_pos, vec2(0.0, 0.0));
@@ -2627,10 +2631,12 @@ mod tests {
         );
 
         let player_screen_char_square =
-            screen.world_square_to_left_screen_character_square(player_square);
+            screen.world_square_to_left_screen_buffer_character_square(player_square);
 
         assert_eq!(
-            screen.get_char_at_screen_pos(player_screen_char_square + STEP_RIGHT.cast_unit() * 4),
+            screen
+                .get_screen_buffered_glyph(player_screen_char_square + STEP_RIGHT.cast_unit() * 4)
+                .character,
             enemy_chars.chars().collect_vec()[0]
         );
 
@@ -2643,10 +2649,12 @@ mod tests {
             enemy_chars
         );
         let player_screen_char_square =
-            screen.world_square_to_left_screen_character_square(player_square);
+            screen.world_square_to_left_screen_buffer_character_square(player_square);
 
         assert_eq!(
-            screen.get_char_at_screen_pos(player_screen_char_square + STEP_UP.cast_unit() * 2),
+            screen
+                .get_screen_buffered_glyph(player_screen_char_square + STEP_UP.cast_unit() * 2)
+                .character,
             enemy_chars.chars().collect_vec()[0]
         );
     }
