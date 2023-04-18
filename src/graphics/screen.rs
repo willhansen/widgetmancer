@@ -479,6 +479,10 @@ impl Screen {
     pub fn get_screen_buffered_glyph(&self, pos: ScreenBufferCharacterSquare) -> &Glyph {
         return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }
+    pub fn get_glyphs_at_screen_square(&self, square: ScreenBufferSquare) -> DoubleGlyph {
+        self.screen_buffer_square_to_both_screen_buffer_character_squares(square)
+            .map(|s| *self.get_screen_buffered_glyph(s))
+    }
 
     fn set_buffered_glyph(
         &mut self,
@@ -614,43 +618,40 @@ mod tests {
                 1,
                 g.terminal_height() - 2,
             )),
-            point2(1, 1),
+            point2(2, 1),
         );
     }
 
     #[test]
     fn test_world_to_screen__should_bias_up_left() {
         let s0 = set_up_nxn_square_screen(5);
-        assert_eq!(s0.screen_origin_as_world_character_square(), point2(0, 4));
-        assert_eq!(s0.screen_center_as_world_character_square(), point2(4, 2));
+        assert_eq!(s0.screen_origin_as_world_square(), point2(0, 4));
         assert_eq!(s0.screen_center_as_world_square(), point2(2, 2));
         assert_eq!(
             s0.world_square_to_screen_buffer_square(point2(0, 0)),
-            point2(-2, -2)
+            point2(0, 4)
         );
 
         let s1 = set_up_nxn_square_screen(19);
-        assert_eq!(s1.screen_center_as_world_character_square(), point2(18, 9));
         assert_eq!(s1.screen_center_as_world_square(), point2(9, 9));
         assert_eq!(
             s1.world_square_to_screen_buffer_square(point2(0, 0)),
-            point2(-9, -9)
+            point2(0, 18)
         );
 
         let s2 = set_up_nxn_square_screen(20);
-        assert_eq!(s2.screen_origin_as_world_character_square(), point2(0, 19));
-        assert_eq!(s2.screen_center_as_world_character_square(), point2(19, 10));
+        assert_eq!(s2.screen_origin_as_world_square(), point2(0, 19));
         assert_eq!(s2.screen_center_as_world_square(), point2(9, 10));
         assert_eq!(
             s2.world_square_to_screen_buffer_square(point2(0, 0)),
-            point2(-9, -10)
+            point2(0, 19)
         );
 
         let s3 = set_up_nxn_square_screen(21);
         assert_eq!(s3.screen_center_as_world_square(), point2(10, 10));
         assert_eq!(
             s3.world_square_to_screen_buffer_square(point2(0, 0)),
-            point2(-10, -10)
+            point2(0, 20)
         );
     }
 
@@ -685,17 +686,14 @@ mod tests {
         let mut g = set_up_10x10_character_screen();
 
         let world_square: WorldSquare = point2(0, 0);
-        let screen_character_square: ScreenCharacterSquare = point2(1, 5);
         let screen_pos_1 = g.world_square_to_left_screen_buffer_character_square(world_square);
 
-        g.set_screen_origin_by_world_character_square(
-            g.screen_origin_as_world_character_square() + STEP_RIGHT.cast_unit(),
-        );
+        g.set_screen_origin_by_world_square(g.screen_origin_as_world_square() + STEP_RIGHT);
 
         let screen_pos_2 = g.world_square_to_left_screen_buffer_character_square(world_square);
 
         assert_ne!(screen_pos_1, screen_pos_2);
-        assert_eq!(screen_pos_2, screen_pos_1 + STEP_LEFT.cast_unit());
+        assert_eq!(screen_pos_2, screen_pos_1 + STEP_LEFT.cast_unit() * 2);
     }
 
     #[test]

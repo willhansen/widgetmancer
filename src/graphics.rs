@@ -709,12 +709,10 @@ mod tests {
     #[test]
     fn test_draw_buffer_to_screen_through_field_of_view() {
         let mut g = set_up_graphics_with_nxn_world_squares(5);
-        let world_character_square = WorldCharacterSquare::new(3, 2);
+        let world_square = WorldSquare::new(1, 2);
         let color = CYAN;
-        g.draw_buffer
-            .insert(world_character_square, Glyph::fg_only('#', color));
-        g.draw_buffer
-            .insert(point2(0, 0), Glyph::fg_only('#', GREEN));
+        g.draw_glyphs_for_square_to_draw_buffer(world_square, DoubleGlyph::fg_only("# ", color));
+        g.draw_glyphs_for_square_to_draw_buffer(point2(0, 0), DoubleGlyph::fg_only("# ", GREEN));
         let fov = portal_aware_field_of_view_from_square(
             point2(0, 0),
             5,
@@ -724,17 +722,13 @@ mod tests {
         g.screen
             .set_screen_center_by_world_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
-        let screen_buffer_square = g
-            .screen
-            .world_character_square_to_screen_buffer_character_square(world_character_square);
+        let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
         //g.print_draw_buffer(point2(0, 0), 3);
         //g.print_screen_buffer();
         //dbg!( screen_buffer_square, world_character_square, g.get_screen_buffered_glyph(point2(8, 0)).fg_color );
         assert_eq!(screen_buffer_square, point2(8, 0));
         assert_eq!(
-            g.screen
-                .get_screen_buffered_glyph(screen_buffer_square)
-                .fg_color,
+            g.screen.get_glyphs_at_screen_square(screen_buffer_square)[0].fg_color,
             color
         );
     }

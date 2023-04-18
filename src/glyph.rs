@@ -463,6 +463,7 @@ pub trait DoubleGlyphFunctions {
     fn to_clean_string(&self) -> String;
     fn get_solid_color(&self) -> Option<RGB8>;
     fn looks_solid(&self) -> bool;
+    fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -481,6 +482,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
             })
         }
     }
+
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
         let top_left = self[0];
         let top_right = self[1];
@@ -511,14 +513,13 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
         return output;
     }
-
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()
     }
+
     fn to_clean_string(&self) -> String {
         self[0].character.to_string() + &self[1].character.to_string()
     }
-
     fn get_solid_color(&self) -> Option<RGB8> {
         let left_solid_color_optional = self[0].get_solid_color();
         let right_solid_color_optional = self[1].get_solid_color();
@@ -533,6 +534,11 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
     fn looks_solid(&self) -> bool {
         self.get_solid_color().is_some()
+    }
+
+    fn fg_only(string: &str, color: RGB8) -> DoubleGlyph {
+        assert_eq!(string.chars().count(), 2);
+        [0, 1].map(|i| Glyph::fg_only(string.chars().nth(i).unwrap(), color))
     }
 }
 
