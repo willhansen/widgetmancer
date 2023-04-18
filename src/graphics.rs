@@ -189,7 +189,7 @@ impl Graphics {
 
     pub fn display(&mut self, optional_writer: &mut Option<Box<dyn Write>>) {
         if optional_writer.is_some() {
-            self.update_screen(optional_writer.as_mut().unwrap());
+            self.screen.update_screen(optional_writer.as_mut().unwrap());
         }
         self.screen.current_screen_state = self.screen.screen_buffer.clone();
     }
@@ -209,26 +209,13 @@ impl Graphics {
                 }
                 let screen_square = self
                     .screen
-                    .screen_buffer_character_square_to_centered_screen_buffer_square(
+                    .screen_buffer_character_square_to_screen_buffer_square(
                         screen_buffer_character_square,
                     );
-
-                let world_character_square = self
-                    .screen
-                    .screen_buffer_character_square_to_world_character_square(
-                        screen_buffer_character_square,
-                    );
-                let character_square_position_in_world_square =
-                    if is_world_character_square_left_square_of_world_square(world_character_square)
-                    {
-                        0
-                    } else {
-                        1
-                    };
 
                 let world_square = self
                     .screen
-                    .centered_screen_buffer_square_to_world_square(screen_square);
+                    .screen_buffer_square_to_world_square(screen_square);
 
                 let relative_world_square = world_square - field_of_view.root_square();
                 let visibility = field_of_view.visibility_of_relative_square(relative_world_square);
@@ -539,45 +526,6 @@ impl Graphics {
         self.active_animations
             .drain_filter(|x| x.finished_at_time(time));
         self.selectors.drain_filter(|x| x.finished_at_time(time));
-    }
-
-    pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
-        // Now update the graphics where applicable
-        for buffer_x in 0..self.screen.terminal_width() {
-            for buffer_y in 0..self.screen.terminal_height() {
-                let buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame> =
-                    point2(buffer_x, buffer_y);
-                if self.screen.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
-                    != self.screen.current_screen_state[buffer_pos.x as usize]
-                        [buffer_pos.y as usize]
-                {
-                    let screen_pos: Point2D<i32, CharacterGridInScreenFrame> = self
-                        .screen
-                        .screen_buffer_character_square_to_screen_character_square(buffer_pos);
-                    write!(
-                        writer,
-                        "{}",
-                        termion::cursor::Goto(screen_pos.x as u16, screen_pos.y as u16)
-                    )
-                    .unwrap();
-                    write!(
-                        writer,
-                        "{}",
-                        self.screen.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
-                            .to_string()
-                    )
-                    .unwrap();
-                }
-            }
-        }
-        //write!(
-        //stdout,
-        //"{}{}",
-        //termion::cursor::Goto(1, 1),
-        //self.fps() as i32
-        //)
-        //.unwrap();
-        writer.flush().unwrap();
     }
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {

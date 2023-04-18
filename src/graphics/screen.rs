@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Write;
 
 use euclid::{point2, vec2, Point2D, Vector2D};
 
@@ -10,7 +11,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldSquare, WorldStep,
 };
 use crate::utility::{
-    get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
+    flip_y, get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
 };
 
 #[deprecated(note = "Screen square origin should be screen character square origin")]
@@ -48,6 +49,18 @@ pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub type ScreenBufferGlyphMap = HashMap<ScreenBufferCharacterSquare, Glyph>;
 
+// Flipped y axis from the world step constants
+pub const SCREEN_STEP_ZERO: ScreenBufferStep = vec2(0, 0);
+pub const SCREEN_STEP_UP: ScreenBufferStep = vec2(0, -1);
+pub const SCREEN_STEP_DOWN: ScreenBufferStep = vec2(0, 1);
+pub const SCREEN_STEP_RIGHT: ScreenBufferStep = vec2(1, 0);
+pub const SCREEN_STEP_LEFT: ScreenBufferStep = vec2(-1, 0);
+
+pub const SCREEN_STEP_UP_RIGHT: ScreenBufferStep = vec2(1, -1);
+pub const SCREEN_STEP_UP_LEFT: ScreenBufferStep = vec2(-1, -1);
+pub const SCREEN_STEP_DOWN_LEFT: ScreenBufferStep = vec2(-1, 1);
+pub const SCREEN_STEP_DOWN_RIGHT: ScreenBufferStep = vec2(1, 1);
+
 pub struct Screen {
     screen_origin: WorldSquare,
     rotation: QuarterTurnsAnticlockwise,
@@ -75,6 +88,9 @@ impl Screen {
             terminal_width,
             terminal_height,
         }
+    }
+    pub fn new_by_square_dimensions(width: u16, height: u16) -> Self {
+        Self::new(width * 2, height)
     }
     pub(crate) fn terminal_width(&self) -> i32 {
         self.terminal_width as i32
@@ -110,18 +126,22 @@ impl Screen {
     }
 
     fn set_screen_origin_by_world_square(&mut self, world_square: WorldSquare) {
-        let world_character_square = world_square_to_left_world_character_square(world_square);
-        self.set_screen_origin_by_world_character_square(world_character_square);
+        self.screen_origin = world_square;
     }
 
     pub fn set_screen_center_by_world_square(&mut self, world_square: WorldSquare) {
         self.screen_origin = world_square - self.world_step_from_origin_to_center();
     }
 
+    #[deprecated(note = "Invalidated by screen rotation")]
     fn screen_max_as_world_character_square(&self) -> WorldCharacterSquare {
         self.screen_origin_as_world_character_square()
             + self.world_character_step_from_origin_to_max()
     }
+    fn screen_max_as_world_square(&self) -> WorldSquare {
+        self.screen_origin_as_world_square() + self.world_step_from_origin_to_max()
+    }
+    #[deprecated(note = "Invalidated by screen rotation")]
     fn world_character_step_from_origin_to_max(&self) -> WorldCharacterStep {
         let unrotated = self
             .screen_buffer_character_step_from_origin_to_max()
@@ -137,6 +157,7 @@ impl Screen {
         self.rotation.rotate_vector(unrotated)
     }
 
+    #[deprecated(note = "Invalidated by screen rotation")]
     fn world_character_step_from_origin_to_center(&self) -> WorldCharacterStep {
         self.world_character_step_from_origin_to_max() / 2
     }
@@ -150,6 +171,7 @@ impl Screen {
         vec2(self.terminal_width() / 2 - 1, self.terminal_height() - 1)
     }
 
+    #[deprecated(note = "Invalidated by screen rotation")]
     fn screen_center_as_world_character_square(&self) -> WorldCharacterSquare {
         world_square_to_left_world_character_square(self.screen_center_as_world_square())
     }
@@ -176,20 +198,57 @@ impl Screen {
         self.screen_buffer_step_from_origin_to_center().to_point()
     }
 
+    #[deprecated(note = "Invalidated by screen rotation")]
     fn world_character_square_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
-        dbg!("asdfasdf", character_square);
         self.world_square_is_on_screen(world_character_square_to_world_square(character_square))
     }
 
     pub fn world_square_is_on_screen(&self, square: WorldSquare) -> bool {
-        dbg!(
-            "asdfasdf",
-            square,
-            self.world_square_to_both_screen_buffer_character_squares(square)
-        );
+        // dbg!(
+        //     "asdfasdf",
+        //     square,
+        //     self.world_square_to_both_screen_buffer_character_squares(square)
+        // );
         self.world_square_to_both_screen_buffer_character_squares(square)
             .into_iter()
             .all(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
+    }
+
+    pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
+        // Now update the graphics where applicable
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame> =
+                    point2(buffer_x, buffer_y);
+                if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                    != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
+                {
+                    let screen_pos: Point2D<i32, CharacterGridInScreenFrame> =
+                        self.screen_buffer_character_square_to_screen_character_square(buffer_pos);
+                    write!(
+                        writer,
+                        "{}",
+                        termion::cursor::Goto(screen_pos.x as u16, screen_pos.y as u16)
+                    )
+                    .unwrap();
+                    write!(
+                        writer,
+                        "{}",
+                        self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
+                            .to_string()
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        //write!(
+        //stdout,
+        //"{}{}",
+        //termion::cursor::Goto(1, 1),
+        //self.fps() as i32
+        //)
+        //.unwrap();
+        writer.flush().unwrap();
     }
 
     fn buffer_character_square_is_on_screen(
@@ -203,10 +262,14 @@ impl Screen {
     }
 
     pub fn rotate(&mut self, rotation: QuarterTurnsAnticlockwise) {
+        let old_center = self.screen_center_as_world_square();
         self.rotation += rotation;
+        self.set_screen_center_by_world_square(old_center);
     }
     pub fn set_rotation(&mut self, rotation: QuarterTurnsAnticlockwise) {
+        let old_center = self.screen_center_as_world_square();
         self.rotation = rotation;
+        self.set_screen_center_by_world_square(old_center);
     }
     pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
         self.rotation
@@ -244,13 +307,14 @@ impl Screen {
         world_square: WorldSquare,
     ) -> ScreenBufferCharacterSquare {
         let screen_square = self.world_square_to_screen_buffer_square(world_square);
-        dbg!(
-            "asdfasdf B",
-            world_square,
-            screen_square,
-            self.screen_center_as_world_square(),
-            self.screen_origin_as_world_character_square()
-        );
+        // dbg!(
+        //     "asdfasdf B",
+        //     world_square,
+        //     screen_square,
+        //     self.screen_center_as_world_square(),
+        //     self.screen_origin_as_world_character_square(),
+        //     self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square)
+        // );
         self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square)
     }
 
@@ -259,13 +323,13 @@ impl Screen {
         world_position: WorldSquare,
     ) -> [ScreenBufferCharacterSquare; 2] {
         let screen_square = self.world_square_to_screen_buffer_square(world_position);
-        dbg!(
-            "asdfasdf",
-            world_position,
-            screen_square,
-            self.screen_center_as_world_square(),
-            self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square)
-        );
+        // dbg!(
+        //     "asdfasdf",
+        //     world_position,
+        //     screen_square,
+        //     self.screen_center_as_world_square(),
+        //     self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square)
+        // );
         self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square)
     }
 
@@ -273,8 +337,8 @@ impl Screen {
         &self,
         buffer_square: ScreenBufferCharacterSquare,
     ) -> WorldSquare {
-        self.centered_screen_buffer_square_to_world_square(
-            self.screen_buffer_character_square_to_centered_screen_buffer_square(buffer_square),
+        self.screen_buffer_square_to_world_square(
+            self.screen_buffer_character_square_to_screen_buffer_square(buffer_square),
         )
     }
 
@@ -338,16 +402,11 @@ impl Screen {
         self.screen_buffer_character_square_to_screen_character_square(buffer_square)
     }
 
-    pub fn screen_buffer_character_square_to_centered_screen_buffer_square(
+    pub fn screen_buffer_character_square_to_screen_buffer_square(
         &self,
         screen_character_square: ScreenBufferCharacterSquare,
-    ) -> CenteredScreenBufferSquare {
-        let character_step_from_screen_center =
-            screen_character_square - self.screen_center_as_screen_buffer_character_square();
-        point2(
-            character_step_from_screen_center.x / 2,
-            character_step_from_screen_center.y,
-        )
+    ) -> ScreenBufferSquare {
+        point2(screen_character_square.x / 2, screen_character_square.y)
     }
 
     pub fn screen_buffer_square_to_left_screen_buffer_character_square(
@@ -369,28 +428,28 @@ impl Screen {
         ]
     }
 
+    pub fn world_step_to_screen_step(&self, world_step: WorldStep) -> ScreenBufferStep {
+        let rotated: WorldStep = (-self.rotation()).rotate_vector(world_step);
+        let flipped: WorldStep = flip_y(rotated);
+        flipped.cast_unit()
+    }
+    pub fn screen_step_to_world_step(&self, screen_step: ScreenBufferStep) -> WorldStep {
+        let flipped: ScreenBufferStep = flip_y(screen_step);
+        let rotated: ScreenBufferStep = self.rotation().rotate_vector(flipped);
+        rotated.cast_unit()
+    }
+
     pub fn world_square_to_screen_buffer_square(
         &self,
         world_square: WorldSquare,
     ) -> ScreenBufferSquare {
-        let step_in_world_from_screen_center = world_square - self.screen_center_as_world_square();
-
-        let screen_rotation = self.rotation();
-        dbg!(
-            "asdfasdf A",
-            screen_rotation,
-            step_in_world_from_screen_center
-        );
+        let world_step_from_screen_center = world_square - self.screen_center_as_world_square();
 
         // compensate for screen rotation
-        let step_in_screen_from_screen_center = (-screen_rotation)
-            .rotate_vector(step_in_world_from_screen_center)
-            .cast_unit();
+        let screen_step_from_screen_center =
+            self.world_step_to_screen_step(world_step_from_screen_center);
 
-        let screen_square = point2(0, 0)
-            + self.screen_buffer_step_from_origin_to_center()
-            + step_in_screen_from_screen_center;
-        screen_square
+        self.screen_center_as_screen_buffer_square() + screen_step_from_screen_center
     }
 
     pub fn screen_buffer_square_to_world_square(
@@ -398,11 +457,10 @@ impl Screen {
         screen_square: ScreenBufferSquare,
     ) -> WorldSquare {
         let screen_step_from_center = screen_square - self.screen_center_as_screen_buffer_square();
-        self.screen_center_as_world_square()
-            + self
-                .rotation()
-                .rotate_vector(screen_step_from_center)
-                .cast_unit()
+
+        let world_step_from_screen_center = self.screen_step_to_world_step(screen_step_from_center);
+
+        self.screen_center_as_world_square() + world_step_from_screen_center
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -484,10 +542,10 @@ impl Screen {
     pub fn draw_glyphs_straight_to_screen_square(
         &mut self,
         glyphs: DoubleGlyph,
-        screen_square: CenteredScreenBufferSquare,
+        screen_square: ScreenBufferSquare,
     ) {
         let buffer_squares =
-            self.centered_screen_buffer_square_to_screen_buffer_character_squares(screen_square);
+            self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square);
         (0..2)
             .for_each(|i| self.draw_glyph_straight_to_screen_buffer(glyphs[i], buffer_squares[i]));
     }
@@ -522,7 +580,7 @@ mod tests {
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::utility::{STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
+    use crate::utility::{STEP_DOWN, STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
 
     use super::*;
 
@@ -544,6 +602,8 @@ mod tests {
     fn test_world_to_screen_buffer() {
         let g = set_up_10x10_character_screen();
 
+        assert_eq!(g.screen_origin_as_world_square(), point2(0, 9));
+
         assert_eq!(
             g.world_square_to_left_screen_buffer_character_square(point2(0, 0)),
             point2(0, 9)
@@ -552,7 +612,7 @@ mod tests {
         assert_eq!(
             g.world_square_to_left_screen_buffer_character_square(point2(
                 1,
-                g.terminal_height() - 2
+                g.terminal_height() - 2,
             )),
             point2(1, 1),
         );
@@ -565,7 +625,7 @@ mod tests {
         assert_eq!(s0.screen_center_as_world_character_square(), point2(4, 2));
         assert_eq!(s0.screen_center_as_world_square(), point2(2, 2));
         assert_eq!(
-            s0.world_square_to_centered_screen_buffer_square(point2(0, 0)),
+            s0.world_square_to_screen_buffer_square(point2(0, 0)),
             point2(-2, -2)
         );
 
@@ -573,7 +633,7 @@ mod tests {
         assert_eq!(s1.screen_center_as_world_character_square(), point2(18, 9));
         assert_eq!(s1.screen_center_as_world_square(), point2(9, 9));
         assert_eq!(
-            s1.world_square_to_centered_screen_buffer_square(point2(0, 0)),
+            s1.world_square_to_screen_buffer_square(point2(0, 0)),
             point2(-9, -9)
         );
 
@@ -582,14 +642,14 @@ mod tests {
         assert_eq!(s2.screen_center_as_world_character_square(), point2(19, 10));
         assert_eq!(s2.screen_center_as_world_square(), point2(9, 10));
         assert_eq!(
-            s2.world_square_to_centered_screen_buffer_square(point2(0, 0)),
+            s2.world_square_to_screen_buffer_square(point2(0, 0)),
             point2(-9, -10)
         );
 
         let s3 = set_up_nxn_square_screen(21);
         assert_eq!(s3.screen_center_as_world_square(), point2(10, 10));
         assert_eq!(
-            s3.world_square_to_centered_screen_buffer_square(point2(0, 0)),
+            s3.world_square_to_screen_buffer_square(point2(0, 0)),
             point2(-10, -10)
         );
     }
@@ -605,18 +665,19 @@ mod tests {
     #[test]
     fn test_screen_max_position() {
         let mut s = set_up_nxn_square_screen(5);
-        s.set_screen_origin_by_world_character_square(point2(3, 79));
 
-        assert_eq!(s.screen_max_as_world_character_square(), point2(12, 75));
+        s.set_screen_origin_by_world_square(point2(7, 95));
+
+        assert_eq!(s.screen_max_as_world_square(), point2(11, 91));
     }
 
     #[test]
     fn test_screen_max_position__with_rotation() {
         let mut s = set_up_nxn_square_screen(5);
         s.set_rotation(QuarterTurnsAnticlockwise::new(3));
-        s.set_screen_origin_by_world_character_square(point2(3, 79));
+        s.set_screen_origin_by_world_square(point2(3, 79));
 
-        assert_eq!(s.screen_max_as_world_character_square(), point2(-1, 70));
+        assert_eq!(s.screen_max_as_world_square(), point2(-1, 75));
     }
 
     #[test]
@@ -680,53 +741,65 @@ mod tests {
     #[test]
     fn test_screen_rotation__square_to_square() {
         let mut s = Screen::new(20, 20);
-        s.set_screen_center_by_world_square(point2(3, 5));
+        let center = point2(3, 5);
+        s.set_screen_center_by_world_square(center);
+        assert_eq!(s.screen_center_as_world_square(), center);
 
         assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(0));
         assert_eq!(
-            s.world_square_to_centered_screen_buffer_square(point2(3, 7)),
-            point2(0, 2)
+            s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
+            point2(4, 7)
         );
         assert_eq!(
-            s.centered_screen_buffer_square_to_world_square(point2(0, 2)),
-            point2(3, 7)
+            s.screen_buffer_square_to_world_square(point2(0, -2)),
+            point2(-1, 16)
         );
 
         s.rotate(QuarterTurnsAnticlockwise::new(1));
 
         assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(1));
+        assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
-            s.world_square_to_centered_screen_buffer_square(point2(3, 7)),
-            point2(2, 0)
+            s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
+            s.screen_center_as_screen_buffer_square() + SCREEN_STEP_RIGHT * 2
         );
         assert_eq!(
-            s.centered_screen_buffer_square_to_world_square(point2(2, 0)),
-            point2(3, 7)
+            s.screen_buffer_square_to_world_square(
+                s.screen_center_as_screen_buffer_square() + SCREEN_STEP_RIGHT * 2
+            ),
+            center + STEP_UP * 2
         );
         s.rotate(QuarterTurnsAnticlockwise::new(6));
 
         assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(3));
+        assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
-            s.world_square_to_centered_screen_buffer_square(point2(2, 5)),
-            point2(0, -1)
+            s.world_square_to_screen_buffer_square(center + STEP_LEFT),
+            s.screen_center_as_screen_buffer_square() + SCREEN_STEP_DOWN
         );
         assert_eq!(
-            s.centered_screen_buffer_square_to_world_square(point2(0, -1)),
+            s.screen_buffer_square_to_world_square(
+                s.screen_center_as_screen_buffer_square() + SCREEN_STEP_DOWN
+            ),
             point2(2, 5)
         );
     }
 
     #[test]
-    fn test_world_character_is_on_screen__with_screen_rotation() {
-        let mut s = Screen::new(100, 5);
+    fn test_world_square_is_on_screen__with_screen_rotation() {
+        let mut s = Screen::new_by_square_dimensions(100, 5);
         s.set_screen_center_by_world_square(point2(300, 20));
-        assert!(s.world_square_is_on_screen(point2(320, 22)));
-        assert_false!(s.world_square_is_on_screen(point2(330, 20)));
+        assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
+
+        assert!(s.world_square_is_on_screen(point2(340, 22)));
+        assert_false!(s.world_square_is_on_screen(point2(370, 20)));
         assert_false!(s.world_square_is_on_screen(point2(300, 26)));
 
         s.set_rotation(QuarterTurnsAnticlockwise::new(1));
-        assert_false!(s.world_square_is_on_screen(point2(320, 22)));
-        assert!(s.world_square_is_on_screen(point2(330, 20)));
+        assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
+
+        assert_false!(s.world_square_is_on_screen(point2(340, 22)));
+        assert!(s.world_square_is_on_screen(point2(302, -20)));
         assert!(s.world_square_is_on_screen(point2(300, 26)));
     }
 

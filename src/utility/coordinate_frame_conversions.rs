@@ -65,6 +65,7 @@ pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_character_glyph_map
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_square_to_left_world_character_square(
     world_square: WorldSquare,
 ) -> WorldCharacterSquare {
@@ -163,6 +164,7 @@ pub fn world_character_point_to_world_point(
     point2((pos.x - 0.5) / 2.0, pos.y)
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
     world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
 }
@@ -178,6 +180,7 @@ pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
     point.round().to_i32()
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_character_point_to_world_character_square(
     point: WorldCharacterPoint,
 ) -> WorldCharacterSquare {

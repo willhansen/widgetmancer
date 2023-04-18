@@ -1119,6 +1119,19 @@ pub fn rgb_to_string(rgb: RGB8) -> String {
     format!("( {:>3}, {:>3}, {:>3} )", rgb.r, rgb.g, rgb.b)
 }
 
+pub fn flip_y<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
+where
+    T: Signed,
+{
+    vec2(v.x, -v.y)
+}
+pub fn flip_x<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
+where
+    T: Signed,
+{
+    vec2(-v.x, v.y)
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

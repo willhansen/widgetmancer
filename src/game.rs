@@ -367,7 +367,6 @@ impl Game {
                 .draw_player(self.player_square(), self.player_faced_direction());
         }
 
-        dbg!("asdfasdf");
         self.update_screen_from_draw_buffer(&mut writer);
     }
 
