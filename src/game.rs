@@ -158,10 +158,10 @@ impl Game {
         assert!(is_orthodiagonal(movement));
         let movement_direction = round_to_king_step(movement);
         let movement_length = king_distance(movement);
-        self.try_slide_player_v2(movement_direction, movement_length)
+        self.try_slide_player_by_direction(movement_direction, movement_length)
     }
 
-    pub fn try_slide_player_v2(
+    pub fn try_slide_player_by_direction(
         &mut self,
         direction: WorldStep,
         num_squares: u32,
@@ -182,6 +182,11 @@ impl Game {
         }
 
         self.try_set_player_position(new_pos)
+    }
+
+    pub fn slide_player_by_direction(&mut self, direction: WorldStep, num_squares: u32) {
+        self.try_slide_player_by_direction(direction, num_squares)
+            .expect("should have slid");
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
@@ -2665,6 +2670,33 @@ mod tests {
                 )
                 .character,
             enemy_chars.chars().collect_vec()[0]
+        );
+    }
+    #[test]
+    fn test_screen_rotates_when_stepping_through_portal() {
+        let mut game = set_up_nxn_game(20);
+        let player_square = point2(10, 10);
+        game.place_player(player_square);
+        let entrance_step = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
+        let exit_step = SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 5, STEP_UP);
+        game.place_single_sided_one_way_portal(entrance_step, exit_step);
+
+        game.draw_headless_now();
+        assert_eq!(
+            game.graphics.screen.rotation(),
+            QuarterTurnsAnticlockwise::new(0)
+        );
+
+        game.slide_player_by_direction(STEP_RIGHT, 1);
+        assert_eq!(
+            game.portal_aware_single_step(entrance_step.into()),
+            exit_step.into()
+        );
+
+        game.draw_headless_now();
+        assert_eq!(
+            game.graphics.screen.rotation(),
+            QuarterTurnsAnticlockwise::new(3)
         );
     }
 }
