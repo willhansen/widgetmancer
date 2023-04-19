@@ -464,6 +464,7 @@ pub trait DoubleGlyphFunctions {
     fn get_solid_color(&self) -> Option<RGB8>;
     fn looks_solid(&self) -> bool;
     fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
+    fn fg_colors(&self) -> [RGB8; 2];
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -539,6 +540,10 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     fn fg_only(string: &str, color: RGB8) -> DoubleGlyph {
         assert_eq!(string.chars().count(), 2);
         [0, 1].map(|i| Glyph::fg_only(string.chars().nth(i).unwrap(), color))
+    }
+
+    fn fg_colors(&self) -> [RGB8; 2] {
+        [0, 1].map(|i| self[i].fg_color)
     }
 }
 

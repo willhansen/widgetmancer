@@ -467,7 +467,7 @@ impl Screen {
     // CONVERSIONS END
     ////////////////////////////////////////////////////////////////////////////////
 
-    pub fn get_glyphs_for_square_from_screen_buffer(&self, world_pos: WorldSquare) -> DoubleGlyph {
+    pub fn get_screen_glyphs_at_world_square(&self, world_pos: WorldSquare) -> DoubleGlyph {
         let buffer_pos = self.world_square_to_left_screen_buffer_character_square(world_pos);
         [
             self.get_screen_buffered_glyph(buffer_pos).clone(),

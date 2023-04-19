@@ -35,9 +35,7 @@ fn test_player_drawn_to_screen() {
     game.raw_set_player_faced_direction(RIGHT_I.cast_unit());
     game.draw_headless_now();
     let graphics = game.borrow_graphics_mut();
-    let drawn_glyphs = graphics
-        .screen
-        .get_glyphs_for_square_from_screen_buffer(start_pos);
+    let drawn_glyphs = graphics.screen.get_screen_glyphs_at_world_square(start_pos);
     assert_ne!(drawn_glyphs[0].character, ' ');
 }
 
@@ -88,13 +86,11 @@ fn test_checkerboard_background() {
 
     let start_square_glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(start_square);
+        .get_screen_glyphs_at_world_square(start_square);
     let left_square_glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(left_square);
-    let up_square_glyphs = graphics
-        .screen
-        .get_glyphs_for_square_from_screen_buffer(up_square);
+        .get_screen_glyphs_at_world_square(left_square);
+    let up_square_glyphs = graphics.screen.get_screen_glyphs_at_world_square(up_square);
 
     // same color within square
     assert_eq!(start_square_glyphs[0], start_square_glyphs[1]);
@@ -118,7 +114,7 @@ fn test_draw_placed_pawn() {
     let pawn_glyphs = game
         .borrow_graphics_mut()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(one_left);
+        .get_screen_glyphs_at_world_square(one_left);
     assert_ne!(pawn_glyphs[0].character, ' ', "There should be a ");
 }
 
@@ -209,7 +205,7 @@ fn test_visible_laser() {
     let drawn_glyphs = game
         .borrow_graphics_mut()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(inspection_square);
+        .get_screen_glyphs_at_world_square(inspection_square);
 
     assert_eq!(drawn_glyphs[0].fg_color, RED);
 }
@@ -225,7 +221,7 @@ fn test_player_background_is_transparent() {
 
         game.borrow_graphics_mut()
             .screen
-            .get_glyphs_for_square_from_screen_buffer(inspection_square)
+            .get_screen_glyphs_at_world_square(inspection_square)
     };
 
     let drawn_glyphs_at_pos_1 = player_glyph(&mut game);
@@ -260,11 +256,11 @@ fn test_laser_background_is_transparent() {
     let glyphs_a = game
         .borrow_graphics_mut()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(test_point_a);
+        .get_screen_glyphs_at_world_square(test_point_a);
     let glyphs_b = game
         .borrow_graphics_mut()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(test_point_b);
+        .get_screen_glyphs_at_world_square(test_point_b);
 
     assert_ne!(glyphs_a[0].bg_color, glyphs_b[0].bg_color);
 }
@@ -281,8 +277,8 @@ fn test_pawn_background_is_transparent() {
 
     let gr = game.borrow_graphics_mut();
 
-    let pawn1_glyphs = gr.screen.get_glyphs_for_square_from_screen_buffer(square1);
-    let pawn2_glyphs = gr.screen.get_glyphs_for_square_from_screen_buffer(square2);
+    let pawn1_glyphs = gr.screen.get_screen_glyphs_at_world_square(square1);
+    let pawn2_glyphs = gr.screen.get_screen_glyphs_at_world_square(square2);
 
     assert_ne!(pawn1_glyphs[0].bg_color, pawn2_glyphs[0].bg_color,);
 }
@@ -309,7 +305,7 @@ fn test_particles_on_piece_death() {
 
     let glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(pawn_square);
+        .get_screen_glyphs_at_world_square(pawn_square);
     assert!(glyphs[0].is_braille() || (glyphs[1].is_braille()))
 }
 
@@ -326,7 +322,7 @@ fn test_piece_death_animation_finishes() {
 
     let glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(pawn_square);
+        .get_screen_glyphs_at_world_square(pawn_square);
     assert!(!glyphs[0].is_braille() || (!glyphs[1].is_braille()));
     assert!(glyphs.looks_solid());
 }
@@ -472,7 +468,7 @@ fn test_draw_danger_squares() {
     let actual_glyphs = game
         .borrow_graphics_mut()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(danger_square);
+        .get_screen_glyphs_at_world_square(danger_square);
 
     assert_eq!(actual_glyphs[0].character, MOVE_AND_CAPTURE_SQUARE_CHARS[0]);
     assert_eq!(actual_glyphs[1].character, MOVE_AND_CAPTURE_SQUARE_CHARS[1]);
@@ -517,10 +513,10 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
     let graphics = game.borrow_graphics_mut();
     let test_square_glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(square_to_check);
+        .get_screen_glyphs_at_world_square(square_to_check);
     let pawn_square_glyphs = graphics
         .screen
-        .get_glyphs_for_square_from_screen_buffer(pawn_square);
+        .get_screen_glyphs_at_world_square(pawn_square);
     assert_false!(test_square_glyphs.looks_solid());
     assert_eq!(pawn_square_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
     assert_eq!(pawn_square_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
@@ -539,11 +535,11 @@ fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
     let move_glyphs = game
         .graphics()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(move_square);
+        .get_screen_glyphs_at_world_square(move_square);
     let capture_glyphs = game
         .graphics()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(capture_square);
+        .get_screen_glyphs_at_world_square(capture_square);
 
     assert_false!(move_glyphs.looks_solid());
     assert_false!(capture_glyphs.looks_solid());
@@ -584,7 +580,7 @@ fn test_draw_pathfind_paths() {
     let path_glyphs = game
         .graphics()
         .screen
-        .get_glyphs_for_square_from_screen_buffer(test_square);
+        .get_screen_glyphs_at_world_square(test_square);
 
     assert_eq!(path_glyphs[0].character, KING_PATH_GLYPHS[0]);
     assert_eq!(path_glyphs[1].character, KING_PATH_GLYPHS[1]);
@@ -632,7 +628,7 @@ fn test_blocks_visibly_block_view() {
         assert!(game
             .graphics()
             .screen
-            .get_glyphs_for_square_from_screen_buffer(test_square + STEP_DOWN * dy)
+            .get_screen_glyphs_at_world_square(test_square + STEP_DOWN * dy)
             .iter()
             .all(|g| g.looks_solid_color(OUT_OF_SIGHT_COLOR)));
     }

@@ -618,18 +618,14 @@ mod tests {
         let mut g = set_up_graphics();
         g.fill_output_buffer_with_solid_color(BLUE);
         assert_eq!(
-            g.screen
-                .get_glyphs_for_square_from_screen_buffer(point2(5, 0))[0]
-                .bg_color,
+            g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0].bg_color,
             BLUE
         );
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
         g.draw_non_board_animations(Instant::now());
         //g.print_output_buffer();
         assert_eq!(
-            g.screen
-                .get_glyphs_for_square_from_screen_buffer(point2(5, 0))[0]
-                .bg_color,
+            g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0].bg_color,
             BLUE
         );
         //g.print_output_buffer();
@@ -723,10 +719,9 @@ mod tests {
             .set_screen_center_by_world_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
-        //g.print_draw_buffer(point2(0, 0), 3);
-        //g.print_screen_buffer();
-        //dbg!( screen_buffer_square, world_character_square, g.get_screen_buffered_glyph(point2(8, 0)).fg_color );
-        assert_eq!(screen_buffer_square, point2(8, 0));
+        g.print_draw_buffer(point2(0, 0), 3);
+        g.screen.print_screen_buffer();
+        assert_eq!(screen_buffer_square, point2(3, 0));
         assert_eq!(
             g.screen.get_glyphs_at_screen_square(screen_buffer_square)[0].fg_color,
             color

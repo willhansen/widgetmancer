@@ -1618,6 +1618,7 @@ mod tests {
         BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
     };
     use crate::glyph::DoubleGlyphFunctions;
+    use crate::graphics::screen::SCREEN_STEP_UP;
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
     use crate::utility::{
@@ -1763,7 +1764,7 @@ mod tests {
         let glyphs = game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(square);
+            .get_screen_glyphs_at_world_square(square);
         assert_eq!(glyphs.get(0).unwrap().fg_color, RED_PAWN_COLOR);
     }
 
@@ -1870,7 +1871,7 @@ mod tests {
         assert!(game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(test_square)
+            .get_screen_glyphs_at_world_square(test_square)
             .looks_solid());
         dbg!("asdfasdf");
 
@@ -1881,7 +1882,7 @@ mod tests {
         assert!(!game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(test_square)
+            .get_screen_glyphs_at_world_square(test_square)
             .looks_solid());
     }
 
@@ -1904,7 +1905,7 @@ mod tests {
                 .map(|dx| {
                     game.graphics
                         .screen
-                        .get_glyphs_for_square_from_screen_buffer(test_square + STEP_RIGHT * dx)
+                        .get_screen_glyphs_at_world_square(test_square + STEP_RIGHT * dx)
                         .looks_solid()
                 })
                 .collect()
@@ -1936,14 +1937,14 @@ mod tests {
         let cube_color_1 = game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(test_square)
+            .get_screen_glyphs_at_world_square(test_square)
             .get_solid_color()
             .unwrap();
         game.draw_headless_at_duration_from_start(Duration::from_secs_f32(1.23432));
         let cube_color_2 = game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(test_square)
+            .get_screen_glyphs_at_world_square(test_square)
             .get_solid_color()
             .unwrap();
         assert_ne!(cube_color_1, cube_color_2);
@@ -2015,7 +2016,7 @@ mod tests {
             let glyphs = game
                 .graphics
                 .screen
-                .get_glyphs_for_square_from_screen_buffer(square);
+                .get_screen_glyphs_at_world_square(square);
             //assert!(!glyphs.looks_solid());
             assert!(
                 glyphs[0].fg_color == BLINK_EFFECT_COLOR
@@ -2044,7 +2045,7 @@ mod tests {
                 let glyphs = game
                     .graphics
                     .screen
-                    .get_glyphs_for_square_from_screen_buffer(square);
+                    .get_screen_glyphs_at_world_square(square);
                 //dbg!(glyphs);
                 // There might not be particles in every character square.  Don't test the empty ones
                 if !glyphs[0].looks_solid() {
@@ -2074,7 +2075,7 @@ mod tests {
         let pawn_glyphs = game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(square1);
+            .get_screen_glyphs_at_world_square(square1);
 
         assert_eq!(pawn_glyphs[0].bg_color, DANGER_SQUARE_COLOR);
         assert_eq!(pawn_glyphs[1].bg_color, DANGER_SQUARE_COLOR);
@@ -2229,7 +2230,7 @@ mod tests {
         let glyphs = game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(square);
+            .get_screen_glyphs_at_world_square(square);
         assert_false!(glyphs.looks_solid());
     }
 
@@ -2402,7 +2403,7 @@ mod tests {
         assert_eq!(
             game.graphics
                 .screen
-                .get_glyphs_for_square_from_screen_buffer(visible_enemy_square),
+                .get_screen_glyphs_at_world_square(visible_enemy_square),
             game.graphics
                 .get_glyphs_for_square_from_draw_buffer(enemy_square)
         );
@@ -2429,7 +2430,7 @@ mod tests {
         assert_false!(game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .get_screen_glyphs_at_world_square(game.player_square())
             .looks_solid());
 
         game.move_player_to(square2);
@@ -2441,7 +2442,7 @@ mod tests {
         assert!(game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .get_screen_glyphs_at_world_square(game.player_square())
             .looks_solid());
 
         game.move_player_to(square3);
@@ -2453,7 +2454,7 @@ mod tests {
         assert_false!(game
             .graphics
             .screen
-            .get_glyphs_for_square_from_screen_buffer(game.player_square())
+            .get_screen_glyphs_at_world_square(game.player_square())
             .looks_solid());
     }
 
@@ -2551,7 +2552,7 @@ mod tests {
         assert_eq!(
             game.graphics
                 .screen
-                .get_glyphs_for_square_from_screen_buffer(correct_apparent_enemy_square),
+                .get_screen_glyphs_at_world_square(correct_apparent_enemy_square),
             game.graphics
                 .get_glyphs_for_square_from_draw_buffer(enemy_square)
         );
@@ -2620,39 +2621,52 @@ mod tests {
             .to_clean_string();
 
         let player_square = game.player_square();
-        let screen = &mut game.graphics.screen;
 
         assert_eq!(
-            screen
-                .get_glyphs_for_square_from_screen_buffer(enemy_square)
+            game.graphics
+                .screen
+                .get_screen_glyphs_at_world_square(enemy_square)
                 .to_clean_string(),
             enemy_chars
         );
 
-        let player_screen_char_square =
-            screen.world_square_to_left_screen_buffer_character_square(player_square);
+        let player_screen_char_square = game
+            .graphics
+            .screen
+            .world_square_to_left_screen_buffer_character_square(player_square);
 
         assert_eq!(
-            screen
+            game.graphics
+                .screen
                 .get_screen_buffered_glyph(player_screen_char_square + STEP_RIGHT.cast_unit() * 4)
                 .character,
             enemy_chars.chars().collect_vec()[0]
         );
 
-        screen.rotate(QuarterTurnsAnticlockwise::new(3));
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(3));
+
+        game.draw_headless_now();
 
         assert_eq!(
-            screen
-                .get_glyphs_for_square_from_screen_buffer(enemy_square)
+            game.graphics
+                .screen
+                .get_screen_glyphs_at_world_square(enemy_square)
                 .to_clean_string(),
             enemy_chars
         );
-        let player_screen_char_square =
-            screen.world_square_to_left_screen_buffer_character_square(player_square);
+        let player_screen_char_square = game
+            .graphics
+            .screen
+            .world_square_to_left_screen_buffer_character_square(player_square);
 
         assert_eq!(
-            screen
-                .get_screen_buffered_glyph(player_screen_char_square + STEP_UP.cast_unit() * 2)
+            game.graphics
+                .screen
+                .get_screen_buffered_glyph(
+                    player_screen_char_square + SCREEN_STEP_UP.cast_unit() * 2
+                )
                 .character,
             enemy_chars.chars().collect_vec()[0]
         );
