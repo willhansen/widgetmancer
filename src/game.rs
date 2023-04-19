@@ -181,6 +181,10 @@ impl Game {
             return Err(());
         }
 
+        let rotation =
+            -QuarterTurnsAnticlockwise::from_start_and_end_directions(direction, new_dir);
+        self.graphics.screen.rotate(rotation);
+
         self.try_set_player_position(new_pos)
     }
 

@@ -95,6 +95,18 @@ impl QuarterTurnsAnticlockwise {
             }
         })
     }
+
+    pub fn from_start_and_end_directions(start: WorldStep, end: WorldStep) -> Self {
+        assert!(is_king_step(start));
+        assert!(is_king_step(end));
+        // needs to be quarter turn, no eighths
+        assert_eq!(is_diagonal(start), is_diagonal(end));
+
+        let d_angle = start.to_f32().angle_to(end.to_f32());
+        let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
+        Self::new(quarter_turns)
+    }
+
     pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
         standardize_angle(Angle::<f32>::degrees(
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
@@ -1080,6 +1092,8 @@ pub fn intersection<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> Has
     a.intersection(b).cloned().collect()
 }
 
+// TODO: remember the reason for this existing (there IS a good reason)
+// related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
 pub fn better_angle_from_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
     Angle::radians(v.y.atan2(v.x))
 }
@@ -1404,6 +1418,29 @@ mod tests {
                 QuarterTurnsAnticlockwise::new(3),
             ),
             point2(4, 7)
+        );
+    }
+
+    #[test]
+    fn test_quarter_turns_from_vectors() {
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_UP),
+            QuarterTurnsAnticlockwise::new(0)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
+            QuarterTurnsAnticlockwise::new(3)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
+            QuarterTurnsAnticlockwise::new(2)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(
+                STEP_DOWN_LEFT,
+                STEP_DOWN_RIGHT
+            ),
+            QuarterTurnsAnticlockwise::new(1)
         );
     }
 
