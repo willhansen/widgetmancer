@@ -708,7 +708,6 @@ mod tests {
             !g.world_character_square_is_on_screen(point2(-1, 0)),
             "one step left of bottom left"
         );
-        dbg!("asdfasdf", g.screen_origin_as_world_character_square());
         assert!(
             !g.world_character_square_is_on_screen(point2(0, -1)),
             "one step down of bottom left"

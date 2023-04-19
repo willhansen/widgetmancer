@@ -1862,10 +1862,8 @@ mod tests {
 
     #[test]
     fn test_death_cube_can_be_seen() {
-        dbg!("asdfasdf");
         let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
-        dbg!("asdfasdf");
 
         game.draw_headless_now();
         assert!(game
@@ -1873,7 +1871,6 @@ mod tests {
             .screen
             .get_screen_glyphs_at_world_square(test_square)
             .looks_solid());
-        dbg!("asdfasdf");
 
         let death_cube_start_pos = test_square.to_f32() + vec2(0.3, 0.0);
         game.place_linear_death_cube(death_cube_start_pos, vec2(0.0, 0.0));
@@ -2572,7 +2569,6 @@ mod tests {
 
         game.draw_headless_now();
         let square_that_should_be_visible = entrance.square() + STEP_DOWN_LEFT;
-        dbg!(square_that_should_be_visible);
 
         // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
         // game.graphics

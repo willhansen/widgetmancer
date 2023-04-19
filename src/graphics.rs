@@ -719,8 +719,8 @@ mod tests {
             .set_screen_center_by_world_square(fov.root_square());
         g.load_screen_buffer_from_fov(fov);
         let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
-        g.print_draw_buffer(point2(0, 0), 3);
-        g.screen.print_screen_buffer();
+        // g.print_draw_buffer(point2(0, 0), 3);
+        // g.screen.print_screen_buffer();
         assert_eq!(screen_buffer_square, point2(3, 0));
         assert_eq!(
             g.screen.get_glyphs_at_screen_square(screen_buffer_square)[0].fg_color,
