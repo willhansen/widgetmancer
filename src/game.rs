@@ -22,6 +22,7 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::FovResult;
 use crate::fov_stuff::{field_of_view_from_square, portal_aware_field_of_view_from_square};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
+use crate::graphics::screen::ScreenBufferStep;
 use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
@@ -161,6 +162,16 @@ impl Game {
         self.try_slide_player_by_direction(movement_direction, movement_length)
     }
 
+    pub fn slide_player(&mut self, movement: WorldStep) {
+        let movement_direction = round_to_king_step(movement);
+        let movement_length = king_distance(movement);
+        self.slide_player_by_direction(movement_direction, movement_length)
+    }
+    pub fn slide_player_relative_to_screen(&mut self, screen_step: ScreenBufferStep) {
+        let world_step = self.graphics.screen.screen_step_to_world_step(screen_step);
+        self.slide_player(world_step);
+    }
+
     pub fn try_slide_player_by_direction(
         &mut self,
         direction: WorldStep,
@@ -181,8 +192,7 @@ impl Game {
             return Err(());
         }
 
-        let rotation =
-            -QuarterTurnsAnticlockwise::from_start_and_end_directions(direction, new_dir);
+        let rotation = QuarterTurnsAnticlockwise::from_start_and_end_directions(direction, new_dir);
         self.graphics.screen.rotate(rotation);
 
         self.try_set_player_position(new_pos)
@@ -196,6 +206,11 @@ impl Game {
     pub fn move_player_to(&mut self, square: WorldSquare) {
         self.try_set_player_position(square)
             .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
+    }
+
+    pub fn player_blink_relative_to_screen(&mut self, screen_step: ScreenBufferStep) {
+        let world_step = self.graphics.screen.screen_step_to_world_step(screen_step);
+        self.player_blink(world_step);
     }
 
     pub fn player_blink(&mut self, direction: WorldStep) {
@@ -1619,6 +1634,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::game;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -1627,7 +1643,7 @@ mod tests {
         BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
     };
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::graphics::screen::SCREEN_STEP_UP;
+    use crate::graphics::screen::{SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT};
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
     use crate::utility::{
@@ -2678,18 +2694,19 @@ mod tests {
     }
     #[test]
     fn test_screen_rotates_when_stepping_through_portal() {
-        let mut game = set_up_nxn_game(20);
-        let player_square = point2(10, 10);
+        let mut game = set_up_10x10_game();
+        let player_square = point2(5, 5);
         game.place_player(player_square);
         let entrance_step = SquareWithOrthogonalDir::new(player_square, STEP_RIGHT);
-        let exit_step = SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 5, STEP_UP);
-        game.place_single_sided_one_way_portal(entrance_step, exit_step);
+        let exit_step = SquareWithOrthogonalDir::new(player_square + STEP_DOWN_RIGHT * 3, STEP_UP);
+        game.place_single_sided_two_way_portal(entrance_step, exit_step);
 
         game.draw_headless_now();
         assert_eq!(
             game.graphics.screen.rotation(),
             QuarterTurnsAnticlockwise::new(0)
         );
+        game.graphics.screen.print_screen_buffer(); // asdfasdf
 
         game.slide_player_by_direction(STEP_RIGHT, 1);
         assert_eq!(
@@ -2698,9 +2715,72 @@ mod tests {
         );
 
         game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer(); // asdfasdf
         assert_eq!(
             game.graphics.screen.rotation(),
-            QuarterTurnsAnticlockwise::new(3)
+            QuarterTurnsAnticlockwise::new(1)
         );
+    }
+
+    #[test]
+    fn test_move_relative_to_screen() {
+        let mut game = set_up_10x10_game();
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(1));
+        game.slide_player_relative_to_screen(SCREEN_STEP_UP);
+        assert_eq!(game.player_square(), player_square + STEP_LEFT);
+    }
+    #[test]
+    fn test_blink_relative_to_screen() {
+        let mut game = set_up_10x10_game();
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(1));
+        game.player_blink_relative_to_screen(SCREEN_STEP_UP);
+        assert_eq!(game.player_square().y, player_square.y);
+        assert!(game.player_square().x < player_square.x);
+    }
+    #[test]
+    fn test_rotated_shadows() {
+        let player_square = point2(5, 5);
+
+        let mut unrotated_game = set_up_10x10_game();
+        let mut rotated_game = set_up_10x10_game();
+        rotated_game
+            .graphics
+            .screen
+            .rotate(QuarterTurnsAnticlockwise::new(-1));
+
+        let mut games = [unrotated_game, rotated_game];
+        let shadow_glyphs = games
+            .iter_mut()
+            .map(|game: &mut Game| {
+                game.place_player(player_square);
+                let right_of_player = player_square
+                    + game
+                        .graphics
+                        .screen
+                        .screen_step_to_world_step(SCREEN_STEP_RIGHT);
+
+                game.place_block(right_of_player);
+                game.draw_headless_now();
+
+                let shadow_screen_square = game
+                    .graphics
+                    .screen
+                    .world_square_to_screen_buffer_square(player_square)
+                    + SCREEN_STEP_UP_RIGHT;
+                game.graphics.screen.print_screen_buffer(); // asdfasdf
+                game.graphics
+                    .screen
+                    .get_glyphs_at_screen_square(shadow_screen_square)
+            })
+            .collect_vec();
+        assert_eq!(shadow_glyphs[0], shadow_glyphs[1]);
     }
 }
