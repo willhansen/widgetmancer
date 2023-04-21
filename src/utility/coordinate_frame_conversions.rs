@@ -1,3 +1,4 @@
+use crate::graphics::drawable::Drawable;
 use crate::piece::NStep;
 use crate::utility::*;
 
@@ -45,8 +46,11 @@ pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
+#[deprecated(note = "World does not know about glyphs")]
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
+#[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
+pub type WorldSquareDrawableMap = HashMap<WorldSquare, Box<dyn Drawable>>;
 
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 

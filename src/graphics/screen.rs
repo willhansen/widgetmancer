@@ -4,6 +4,7 @@ use std::io::Write;
 use euclid::{point2, vec2, Point2D, Vector2D};
 
 use crate::glyph::{DoubleGlyph, Glyph};
+use crate::graphics::drawable::Drawable;
 use crate::utility::coordinate_frame_conversions::{
     world_character_square_to_world_square, world_point_to_world_character_point,
     world_square_to_left_world_character_square, CharacterGridInWorldFrame, SquareGridInWorldFrame,
@@ -528,7 +529,7 @@ impl Screen {
                 Glyph::from_char(character);
         }
     }
-    pub fn draw_glyph_straight_to_screen_buffer(
+    fn draw_glyph_straight_to_screen_buffer(
         &mut self,
         new_glyph: Glyph,
         buffer_square: ScreenBufferCharacterSquare,
@@ -543,7 +544,7 @@ impl Screen {
         self.screen_buffer[buffer_square.x as usize][buffer_square.y as usize] = new_glyph;
     }
 
-    pub fn draw_glyphs_straight_to_screen_square(
+    fn draw_glyphs_straight_to_screen_square(
         &mut self,
         glyphs: DoubleGlyph,
         screen_square: ScreenBufferSquare,
@@ -552,6 +553,14 @@ impl Screen {
             self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square);
         (0..2)
             .for_each(|i| self.draw_glyph_straight_to_screen_buffer(glyphs[i], buffer_squares[i]));
+    }
+
+    pub fn draw_drawable(
+        &mut self,
+        drawable: &Box<dyn Drawable>,
+        screen_square: ScreenBufferSquare,
+    ) {
+        self.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_square);
     }
 
     #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]

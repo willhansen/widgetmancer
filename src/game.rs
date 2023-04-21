@@ -2420,7 +2420,9 @@ mod tests {
                 .screen
                 .get_screen_glyphs_at_world_square(visible_enemy_square),
             game.graphics
-                .get_glyphs_for_square_from_draw_buffer(enemy_square)
+                .get_drawable_for_square_from_draw_buffer(enemy_square)
+                .unwrap()
+                .to_glyphs()
         );
     }
 
@@ -2569,7 +2571,9 @@ mod tests {
                 .screen
                 .get_screen_glyphs_at_world_square(correct_apparent_enemy_square),
             game.graphics
-                .get_glyphs_for_square_from_draw_buffer(enemy_square)
+                .get_drawable_for_square_from_draw_buffer(enemy_square)
+                .unwrap()
+                .to_glyphs()
         );
     }
 
@@ -2608,7 +2612,9 @@ mod tests {
         );
         assert_ne!(
             game.graphics
-                .get_glyphs_for_square_from_draw_buffer(square_that_should_be_visible)
+                .get_drawable_for_square_from_draw_buffer(square_that_should_be_visible)
+                .unwrap()
+                .to_glyphs()
                 .get_solid_color()
                 .unwrap(),
             OUT_OF_SIGHT_COLOR
@@ -2631,7 +2637,9 @@ mod tests {
         game.draw_headless_now();
         let enemy_chars = game
             .graphics
-            .get_glyphs_for_square_from_draw_buffer(enemy_square)
+            .get_drawable_for_square_from_draw_buffer(enemy_square)
+            .unwrap()
+            .to_glyphs()
             .to_clean_string();
 
         let player_square = game.player_square();

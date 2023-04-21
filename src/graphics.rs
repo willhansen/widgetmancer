@@ -1,6 +1,3 @@
-mod drawable;
-pub mod screen;
-
 use std::any::Any;
 use std::borrow::Borrow;
 use std::cmp::min;
@@ -16,6 +13,7 @@ use itertools::Itertools;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
+use termion::color::Black;
 use termion::input::MouseTerminal;
 use termion::raw::RawTerminal;
 use termion::terminal_size;
@@ -40,6 +38,7 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
+use crate::graphics::drawable::{Drawable, TextDrawable};
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, CharacterGridInScreenFrame, Screen,
     ScreenBufferCharacterSquare,
@@ -55,9 +54,12 @@ use crate::{
     Game, IPoint, PieceType, RIGHT_I,
 };
 
+pub(crate) mod drawable;
+pub mod screen;
+
 pub struct Graphics {
     pub screen: Screen,
-    draw_buffer: HashMap<WorldCharacterSquare, Glyph>,
+    draw_buffer: HashMap<WorldSquare, Box<dyn Drawable>>,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<SelectorAnimation>,
     board_animation: Option<Box<dyn BoardAnimation>>,
@@ -156,14 +158,11 @@ impl Graphics {
             BOARD_BLACK
         }
     }
-    pub fn get_glyphs_for_square_from_draw_buffer(&self, world_square: WorldSquare) -> DoubleGlyph {
-        let world_character_squares = world_square_to_both_world_character_squares(world_square);
-        world_character_squares.map(|char_square| {
-            *self
-                .draw_buffer
-                .get(&char_square)
-                .unwrap_or(&Glyph::default_background())
-        })
+    pub fn get_drawable_for_square_from_draw_buffer(
+        &self,
+        world_square: WorldSquare,
+    ) -> Option<&Box<dyn Drawable>> {
+        self.draw_buffer.get(&world_square)
     }
 
     pub fn print_draw_buffer(&self, center: WorldCharacterSquare, radius: u32) {
@@ -174,10 +173,13 @@ impl Graphics {
                 .into_iter()
                 .map(|column| center.x - radius as i32 + column as i32)
                 .map(|x| {
-                    self.draw_buffer
-                        .get(&point2(x, y))
-                        .unwrap_or(&Glyph::fg_only('*', RED))
-                        .to_string()
+                    if let Some(drawable) = self.draw_buffer.get(&point2(x, y)) {
+                        drawable.to_glyphs().to_string()
+                    } else {
+                        Box::new(TextDrawable::new("**", RED, BLACK, false))
+                            .to_glyphs()
+                            .to_clean_string()
+                    }
                 })
                 .fold(String::new(), |acc, other| acc + &other)
                 + &Glyph::reset_colors();
@@ -221,29 +223,33 @@ impl Graphics {
                 let relative_world_square = world_square - field_of_view.root_square();
                 let visibility = field_of_view.visibility_of_relative_square(relative_world_square);
 
+                // TODO: break up this function a bit
                 if visibility.is_visible() {
                     let absolute_world_square_seen: WorldSquare = field_of_view
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
-                    let absolute_world_character_squares_seen =
-                        world_square_to_both_world_character_squares(absolute_world_square_seen);
 
-                    let unshadowed_glyphs: DoubleGlyph =
-                        absolute_world_character_squares_seen.map(|character_square| {
-                            *self
-                                .draw_buffer
-                                .get(&character_square)
-                                .unwrap_or(&Glyph::default_background())
-                        });
+                    let maybe_unshadowed_drawable: Option<&Box<dyn Drawable>> =
+                        self.draw_buffer.get(&absolute_world_square_seen);
+                    if let Some(to_draw_over) = maybe_unshadowed_drawable {
+                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> =
+                            if let Some(partial) = visibility.partial_visibility() {
+                                let trait_box: Box<dyn Drawable> =
+                                    Box::new(partial.to_shadow_drawable());
+                                Some(trait_box)
+                            } else {
+                                None
+                            };
 
-                    let shadowed_glyphs = if let Some(partial) = visibility.partial_visibility() {
-                        partial.to_glyphs().drawn_over(unshadowed_glyphs)
-                    } else {
-                        unshadowed_glyphs
-                    };
-
-                    self.screen
-                        .draw_glyphs_straight_to_screen_square(shadowed_glyphs, screen_square);
+                        let to_draw = if let Some(shadow) = maybe_shadow_drawable {
+                            let mut combo = shadow.clone();
+                            combo.draw_over(to_draw_over);
+                            combo
+                        } else {
+                            (*to_draw_over).clone()
+                        };
+                        self.screen.draw_drawable(&to_draw, screen_square);
+                    }
                 }
             }
         }
@@ -253,14 +259,31 @@ impl Graphics {
         // for character squares on screen
         for buffer_x in 0..self.screen.terminal_width() {
             for buffer_y in 0..self.screen.terminal_height() {
-                let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
+                let screen_buffer_character_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
                     point2(buffer_x, buffer_y);
+                if !self
+                    .screen
+                    .screen_buffer_character_square_is_left_glyph_of_screen_square(
+                        screen_buffer_character_square,
+                    )
+                {
+                    continue;
+                }
+                let world_square = self
+                    .screen
+                    .screen_buffer_character_square_to_world_square(screen_buffer_character_square);
                 let world_character_square = self
                     .screen
-                    .screen_buffer_character_square_to_world_character_square(buffer_square);
-                if let Some(&glyph) = self.draw_buffer.get(&world_character_square) {
-                    self.screen
-                        .draw_glyph_straight_to_screen_buffer(glyph, buffer_square);
+                    .screen_buffer_character_square_to_world_character_square(
+                        screen_buffer_character_square,
+                    );
+                if let Some(drawable) = self.draw_buffer.get(&world_square) {
+                    let screen_buffer_square = self
+                        .screen
+                        .screen_buffer_character_square_to_screen_buffer_square(
+                            screen_buffer_character_square,
+                        );
+                    self.screen.draw_drawable(drawable, screen_buffer_square);
                 }
             }
         }
@@ -293,20 +316,24 @@ impl Graphics {
         self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
+    pub fn draw_above(&mut self, drawable: &Box<dyn Drawable>, world_square: WorldSquare) {
+        let to_draw = if let Some(below) = self.draw_buffer.get(&world_square) {
+            let mut combo = drawable.clone();
+            combo.draw_over(below);
+            combo
+        } else {
+            drawable.clone()
+        };
+        self.draw_buffer.insert(world_square, to_draw);
+    }
+    #[deprecated(note = "Graphics should not know about glyphs")]
     pub fn draw_glyphs_for_square_to_draw_buffer(
         &mut self,
         world_square: WorldSquare,
         glyphs: DoubleGlyph,
     ) {
-        let world_character_squares = world_square_to_both_world_character_squares(world_square);
-        let background_glyphs = self.get_glyphs_for_square_from_draw_buffer(world_square);
-
-        let combined_glyphs = glyphs.drawn_over(background_glyphs);
-
-        (0..2).for_each(|i| {
-            self.draw_buffer
-                .insert(world_character_squares[i], combined_glyphs[i]);
-        });
+        let trait_box: Box<dyn Drawable> = Box::new(TextDrawable::from_glyphs(glyphs));
+        self.draw_above(&trait_box, world_square);
     }
 
     pub fn draw_piece_with_color(
@@ -396,28 +423,6 @@ impl Graphics {
 
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
         self.draw_same_glyphs_at_squares(Glyph::block_glyphs(), block_squares);
-    }
-
-    #[deprecated(note = "draw the fields of view directly instead")]
-    pub fn draw_field_of_view_mask(&mut self, fov_mask: FovResult) {
-        let glyph_mask_for_partially_visible_squares: WorldSquareGlyphMap =
-            fov_mask.partially_visible_squares_as_glyph_mask();
-        let squares_on_screen = self.screen.all_squares_on_screen();
-        let squares_on_screen_but_out_of_sight = squares_on_screen
-            .difference(
-                &fov_mask
-                    .at_least_partially_visible_relative_squares_main_view_only()
-                    .iter()
-                    .map(|step| fov_mask.root_square() + *step)
-                    .collect(),
-            )
-            .copied()
-            .collect();
-        self.draw_glyphs_at_squares(glyph_mask_for_partially_visible_squares);
-        self.draw_same_glyphs_at_squares(
-            Glyph::out_of_sight_glyphs(),
-            &squares_on_screen_but_out_of_sight,
-        );
     }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
@@ -529,15 +534,20 @@ impl Graphics {
         self.selectors.drain_filter(|x| x.finished_at_time(time));
     }
 
+    #[deprecated(note = "This should be a test function")]
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {
         let mut count: u32 = 0;
         for x in rect.min.x..=rect.max.x {
             for y in rect.min.y..=rect.max.y {
                 let square = WorldSquare::new(x, y);
-                let glyphs = self.get_glyphs_for_square_from_draw_buffer(square);
-                for glyph in glyphs {
-                    let character = glyph.character;
-                    count += count_braille_dots(character);
+                let maybe_glyphs = self
+                    .get_drawable_for_square_from_draw_buffer(square)
+                    .map(|d: &Box<dyn Drawable>| d.to_glyphs());
+                if let Some(glyphs) = maybe_glyphs {
+                    for glyph in glyphs {
+                        let character = glyph.character;
+                        count += count_braille_dots(character);
+                    }
                 }
             }
         }
@@ -596,7 +606,10 @@ mod tests {
 
         let test_square = WorldSquare::new(4, 4);
 
-        let [glyph_left, glyph_right] = g.get_glyphs_for_square_from_draw_buffer(test_square);
+        let [glyph_left, glyph_right] = g
+            .get_drawable_for_square_from_draw_buffer(test_square)
+            .unwrap()
+            .to_glyphs();
         //g.print_output_buffer();
 
         assert_eq!(glyph_left.fg_color, RED);
@@ -643,9 +656,10 @@ mod tests {
     fn test_overlapped_glyphs_change_background_color() {
         let mut g = set_up_graphics_with_nxn_world_squares(6);
         let test_square = WorldSquare::new(3, 4);
-        let glyphs_at_start = g.get_glyphs_for_square_from_draw_buffer(test_square);
-        assert_ne!(glyphs_at_start[0].bg_color, ENEMY_PIECE_COLOR);
-        assert_ne!(glyphs_at_start[1].bg_color, ENEMY_PIECE_COLOR);
+        let maybe_glyphs_at_start = g
+            .get_drawable_for_square_from_draw_buffer(test_square)
+            .map(|d| d.to_glyphs());
+        assert!(maybe_glyphs_at_start.is_none());
 
         g.draw_piece_with_color(
             test_square,
@@ -659,7 +673,10 @@ mod tests {
             test_square.to_f32() + vec2(1.0, 0.0),
             line_color,
         );
-        let glyphs_at_end = g.get_glyphs_for_square_from_draw_buffer(test_square);
+        let glyphs_at_end = g
+            .get_drawable_for_square_from_draw_buffer(test_square)
+            .unwrap()
+            .to_glyphs();
 
         assert_eq!(glyphs_at_end[0].bg_color, ENEMY_PIECE_COLOR);
         //assert_eq!(glyphs_at_end[1].bg_color, ENEMY_PIECE_COLOR);
@@ -677,7 +694,10 @@ mod tests {
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
-        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
+        let drawn_glyphs = g
+            .get_drawable_for_square_from_draw_buffer(the_square)
+            .unwrap()
+            .to_glyphs();
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);
         assert_eq!(drawn_glyphs[0].bg_color, BOARD_WHITE);
@@ -687,22 +707,6 @@ mod tests {
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
     }
 
-    #[test]
-    fn test_field_of_view_mask_is_fully_transparent() {
-        let mut g = set_up_graphics_with_nxn_world_squares(1);
-        let the_square = WorldSquare::new(0, 0);
-        g.draw_piece_with_color(the_square, TurningPawn, WHITE);
-
-        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
-        assert_eq!(drawn_glyphs[0].character, '♟');
-
-        let mut fov = FovResult::new_empty_fov_at(point2(0, 0));
-        fov.add_fully_visible_square(the_square - fov.root_square());
-        g.draw_field_of_view_mask(fov);
-
-        let drawn_glyphs = g.get_glyphs_for_square_from_draw_buffer(the_square);
-        assert_eq!(drawn_glyphs[0].character, '♟');
-    }
     #[test]
     fn test_draw_buffer_to_screen_through_field_of_view() {
         let mut g = set_up_graphics_with_nxn_world_squares(5);

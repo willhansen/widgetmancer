@@ -135,6 +135,11 @@ impl Glyph {
         dup.bg_color = new_bg;
         dup
     }
+    pub fn with_transparent_bg(&self, bg_transparent: bool) -> Glyph {
+        let mut dup = self.clone();
+        dup.bg_transparent = bg_transparent;
+        dup
+    }
 
     pub fn reset_colors() -> String {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)

@@ -14,6 +14,8 @@ use crate::glyph::glyph_constants::{
     BLACK, CYAN, DARK_CYAN, FULL_BLOCK, OUT_OF_SIGHT_COLOR, RED, SPACE,
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use crate::graphics;
+use crate::graphics::drawable::{Drawable, TextDrawable};
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
 use crate::utility::angle_interval::AngleInterval;
@@ -144,13 +146,14 @@ impl PartialVisibilityOfASquare {
         vec![self.left_char_shadow, self.right_char_shadow]
     }
 
-    pub fn to_glyphs(&self) -> DoubleGlyph {
+    pub fn to_shadow_drawable(&self) -> TextDrawable {
         let left_character_square = world_square_to_left_world_character_square(point2(0, 0));
         let character_squares = vec![
             left_character_square,
             left_character_square + STEP_RIGHT.cast_unit(),
         ];
-        self.shadows()
+        let glyphs = self
+            .shadows()
             .iter()
             .map(|optional_shadow| {
                 if let Some(half_plane) = optional_shadow {
@@ -165,7 +168,8 @@ impl PartialVisibilityOfASquare {
             })
             .collect::<Vec<Glyph>>()
             .try_into()
-            .unwrap()
+            .unwrap();
+        TextDrawable::from_glyphs(glyphs)
     }
 
     pub fn combine_while_increasing_visibility(&self, other: &Self) -> Self {
@@ -197,7 +201,7 @@ impl PartialVisibilityOfASquare {
         }
     }
     pub fn is_fully_visible(&self) -> bool {
-        self.to_glyphs().looks_solid()
+        self.to_shadow_drawable().to_glyphs().looks_solid()
             && self.shadows().iter().all(|optional_shadow| {
                 optional_shadow.is_none()
                     || optional_shadow.is_some_and(|shadow| !shadow.covers_origin())
@@ -215,7 +219,7 @@ impl PartialVisibilityOfASquare {
             })
     }
     pub fn is_fully_non_visible(&self) -> bool {
-        self.to_glyphs().looks_solid()
+        self.to_shadow_drawable().to_glyphs().looks_solid()
             && self
                 .shadows()
                 .iter()
@@ -264,14 +268,19 @@ impl FovResult {
         let end = other.root_square_with_direction;
         RigidTransform::from_start_and_end_poses(start, end)
     }
-    pub fn partially_visible_squares_as_glyph_mask(&self) -> WorldSquareGlyphMap {
-        let mut the_map = WorldSquareGlyphMap::new();
+    pub fn partially_visible_squares_as_drawable_shadow_mask(&self) -> WorldSquareDrawableMap {
+        let mut the_map = WorldSquareDrawableMap::new();
 
         self.partially_visible_relative_squares_in_main_view_only
             .iter()
-            .for_each(|(&step, partial_visibility)| {
-                the_map.insert(self.root_square() + step, partial_visibility.to_glyphs());
-            });
+            .for_each(
+                |(&step, &partial_visibility): (&WorldStep, &PartialVisibilityOfASquare)| {
+                    the_map.insert(
+                        self.root_square() + step,
+                        Box::new(partial_visibility.to_shadow_drawable()),
+                    );
+                },
+            );
         the_map
     }
     pub fn sub_fovs(&self) -> &Vec<FovResult> {
@@ -1138,8 +1147,11 @@ mod tests {
                 point2(0.061038017, 1.3054879),
             )),
         );
-        assert!(partial.to_glyphs().looks_solid());
-        assert_eq!(partial.to_glyphs().to_clean_string(), "  ");
+        assert!(partial.to_shadow_drawable().to_glyphs().looks_solid());
+        assert_eq!(
+            partial.to_shadow_drawable().to_glyphs().to_clean_string(),
+            "  "
+        );
         assert!(partial.is_fully_visible());
     }
 
@@ -1171,6 +1183,7 @@ mod tests {
             .all(
                 |(&_step, partial_visibility): (&WorldStep, &PartialVisibilityOfASquare)| {
                     partial_visibility
+                        .to_shadow_drawable()
                         .to_glyphs()
                         .iter()
                         .any(|glyph: &Glyph| !glyph.looks_solid())
@@ -1191,7 +1204,10 @@ mod tests {
                 .get(&step)
                 .unwrap();
             //dbg!(partial_visibility);
-            let string = partial_visibility.to_glyphs().to_clean_string();
+            let string = partial_visibility
+                .to_shadow_drawable()
+                .to_glyphs()
+                .to_clean_string();
             // one of these two is right.  Not sure which
             assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
         }
@@ -1203,7 +1219,10 @@ mod tests {
         let square_relative_to_center = vec2(1, 1);
         let visibility =
             partial_visibility_of_square_from_one_view_arc(interval, square_relative_to_center);
-        let string = visibility.to_glyphs().to_clean_string();
+        let string = visibility
+            .to_shadow_drawable()
+            .to_glyphs()
+            .to_clean_string();
         //dbg!(visibility);
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
@@ -1227,7 +1246,10 @@ mod tests {
             )),
         );
 
-        let string = partial_visibility.to_glyphs().to_clean_string();
+        let string = partial_visibility
+            .to_shadow_drawable()
+            .to_glyphs()
+            .to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
 
@@ -1281,7 +1303,10 @@ mod tests {
                 .unwrap()
                 .point_on_half_plane(),
         ));
-        let string = partial_visibility.to_glyphs().to_clean_string();
+        let string = partial_visibility
+            .to_shadow_drawable()
+            .to_glyphs()
+            .to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
 
@@ -1302,6 +1327,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             visibility_of_test_square
+                .to_shadow_drawable()
                 .to_glyphs()
                 .to_clean_string()
                 .chars()
@@ -1351,7 +1377,7 @@ mod tests {
         let partial = partial_visibility_of_square_from_one_view_arc(arc, square);
         assert!(!partial.is_fully_visible());
         assert_eq!(
-            partial.to_glyphs().to_clean_string(),
+            partial.to_shadow_drawable().to_glyphs().to_clean_string(),
             [SPACE, FULL_BLOCK].into_iter().collect::<String>()
         );
     }
@@ -1387,7 +1413,10 @@ mod tests {
             .iter()
             .map(
                 |(step, partial): (&WorldStep, &PartialVisibilityOfASquare)| {
-                    (step, partial.to_glyphs().to_clean_string())
+                    (
+                        step,
+                        partial.to_shadow_drawable().to_glyphs().to_clean_string(),
+                    )
                 },
             )
             .for_each(|(step, char_string): (&WorldStep, String)| {
@@ -1404,6 +1433,7 @@ mod tests {
 
     fn assert_shadow_is_horizontally_continuous(partial: PartialVisibilityOfASquare) {
         let chars = partial
+            .to_shadow_drawable()
             .to_glyphs()
             .to_clean_string()
             .chars()
@@ -1477,17 +1507,17 @@ mod tests {
     #[test]
     fn test_vertical_shadow_symmetry() {
         let block_square = STEP_RIGHT * 3;
-        let above_glyphs =
-            partial_from_block_and_square(block_square, block_square + STEP_UP).to_glyphs();
-        let below_glyphs =
-            partial_from_block_and_square(block_square, block_square + STEP_DOWN).to_glyphs();
+        let above_glyphs = partial_from_block_and_square(block_square, block_square + STEP_UP)
+            .to_shadow_drawable();
+        let below_glyphs = partial_from_block_and_square(block_square, block_square + STEP_DOWN)
+            .to_shadow_drawable();
         assert_eq!(
-            above_glyphs[0].character,
-            angled_block_flip_y(below_glyphs[0].character)
+            above_glyphs.to_glyphs()[0].character,
+            angled_block_flip_y(below_glyphs.to_glyphs()[0].character)
         );
         assert_eq!(
-            above_glyphs[1].character,
-            angled_block_flip_y(below_glyphs[1].character)
+            above_glyphs.to_glyphs()[1].character,
+            angled_block_flip_y(below_glyphs.to_glyphs()[1].character)
         );
     }
 
@@ -1520,6 +1550,7 @@ mod tests {
             |(block_square, shadow_square, correct_string)| {
                 assert_eq!(
                     partial_from_block_and_square(block_square, shadow_square)
+                        .to_shadow_drawable()
                         .to_glyphs()
                         .to_clean_string(),
                     correct_string,
