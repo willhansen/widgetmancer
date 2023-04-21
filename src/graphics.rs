@@ -40,8 +40,7 @@ use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{Drawable, TextDrawable};
 use crate::graphics::screen::{
-    CharacterGridInScreenBufferFrame, CharacterGridInScreenFrame, Screen,
-    ScreenBufferCharacterSquare,
+    CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
 };
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
@@ -50,8 +49,8 @@ use crate::utility::{
     hue_to_rgb, is_world_character_square_left_square_of_world_square, STEP_RIGHT,
 };
 use crate::{
-    get_by_point, glyph, pair_up_glyph_map, point_to_string, print_glyph_map, DoubleGlyphFunctions,
-    Game, IPoint, PieceType, RIGHT_I,
+    get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
+    PieceType, RIGHT_I,
 };
 
 pub(crate) mod drawable;
@@ -83,7 +82,10 @@ impl Graphics {
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
-        return if self.screen.world_square_is_on_screen(square) {
+        return if self
+            .screen
+            .world_square_is_at_least_partially_on_screen(square)
+        {
             count_braille_dots(
                 self.screen
                     .get_screen_buffered_glyph(
@@ -110,15 +112,6 @@ impl Graphics {
         for (world_square, glyph) in glyph_map {
             self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
         }
-    }
-
-    pub fn draw_string_below_board(&mut self, string: String) {
-        let left_of_screen_under_board = self
-            .screen
-            .world_square_to_left_screen_character_square(point2(0, 0))
-            + vec2(0, -1);
-        self.screen
-            .draw_string_to_screen(left_of_screen_under_board, &string);
     }
 
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
@@ -272,11 +265,6 @@ impl Graphics {
                 let world_square = self
                     .screen
                     .screen_buffer_character_square_to_world_square(screen_buffer_character_square);
-                let world_character_square = self
-                    .screen
-                    .screen_buffer_character_square_to_world_character_square(
-                        screen_buffer_character_square,
-                    );
                 if let Some(drawable) = self.draw_buffer.get(&world_square) {
                     let screen_buffer_square = self
                         .screen
@@ -579,21 +567,6 @@ mod tests {
 
     fn set_up_graphics_with_nxn_world_squares(board_length: u16) -> Graphics {
         Graphics::new(board_length * 2, board_length, Instant::now())
-    }
-
-    #[test]
-    fn test_one_world_square_is_two_characters() {
-        let g = set_up_graphics();
-
-        let world_pos = point2(5, 5); // arbitrary
-        let screen_pos1 = g
-            .screen
-            .world_square_to_left_screen_character_square(world_pos + RIGHT_I.cast_unit());
-        let screen_pos2 = g
-            .screen
-            .world_square_to_left_screen_character_square(world_pos)
-            + RIGHT_I.cast_unit() * 2;
-        assert_eq!(screen_pos1, screen_pos2);
     }
 
     #[test]

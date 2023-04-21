@@ -7,17 +7,12 @@ use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::Drawable;
 use crate::utility::coordinate_frame_conversions::{
     world_character_square_to_world_square, world_point_to_world_character_point,
-    world_square_to_left_world_character_square, CharacterGridInWorldFrame, SquareGridInWorldFrame,
-    SquareSet, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterStep, WorldPoint,
-    WorldSquare, WorldStep,
+    world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
+    WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
     flip_y, get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
 };
-
-#[deprecated(note = "Screen square origin should be screen character square origin")]
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct SquareGridInCenteredScreenBufferFrame;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -25,28 +20,11 @@ pub struct CharacterGridInScreenBufferFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInScreenBufferFrame;
 
-#[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInScreenFrame;
-
-#[deprecated(note = "Screen square origin should be screen character square origin")]
-pub type CenteredScreenBufferSquare = Point2D<i32, SquareGridInCenteredScreenBufferFrame>;
-#[deprecated(note = "Screen square origin should be screen character square origin")]
-pub type CenteredScreenBufferStep = Vector2D<i32, SquareGridInCenteredScreenBufferFrame>;
-
 pub type ScreenBufferCharacterSquare = Point2D<i32, CharacterGridInScreenBufferFrame>;
 pub type ScreenBufferCharacterStep = Vector2D<i32, CharacterGridInScreenBufferFrame>;
 
 pub type ScreenBufferSquare = Point2D<i32, SquareGridInScreenBufferFrame>;
 pub type ScreenBufferStep = Vector2D<i32, SquareGridInScreenBufferFrame>;
-
-#[deprecated(note = "Screen should not care about points")]
-pub type ScreenBufferCharacterPoint = Point2D<f32, CharacterGridInScreenBufferFrame>;
-
-#[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
-#[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
 
 pub type ScreenBufferGlyphMap = HashMap<ScreenBufferCharacterSquare, Glyph>;
 
@@ -101,31 +79,6 @@ impl Screen {
         self.terminal_height as i32
     }
 
-    #[deprecated(note = "Invalidated by screen rotation")]
-    pub fn screen_origin_as_world_character_square(&self) -> WorldCharacterSquare {
-        self.screen_center_as_world_character_square()
-            - self.world_character_step_from_origin_to_center()
-    }
-
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn set_screen_center_by_world_character_square(
-        &mut self,
-        world_character_square: WorldCharacterSquare,
-    ) {
-        self.set_screen_center_by_world_square(world_character_square_to_world_square(
-            world_character_square,
-        ))
-    }
-
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn set_screen_origin_by_world_character_square(
-        &mut self,
-        world_character_square: WorldCharacterSquare,
-    ) {
-        let new_center = world_character_square - self.world_character_step_from_origin_to_center();
-        self.set_screen_center_by_world_character_square(new_center)
-    }
-
     fn set_screen_origin_by_world_square(&mut self, world_square: WorldSquare) {
         self.screen_origin = world_square;
     }
@@ -134,22 +87,10 @@ impl Screen {
         self.screen_origin = world_square - self.world_step_from_origin_to_center();
     }
 
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn screen_max_as_world_character_square(&self) -> WorldCharacterSquare {
-        self.screen_origin_as_world_character_square()
-            + self.world_character_step_from_origin_to_max()
-    }
     fn screen_max_as_world_square(&self) -> WorldSquare {
         self.screen_origin_as_world_square() + self.world_step_from_origin_to_max()
     }
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn world_character_step_from_origin_to_max(&self) -> WorldCharacterStep {
-        let unrotated = self
-            .screen_buffer_character_step_from_origin_to_max()
-            .reflect(STEP_UP.cast_unit())
-            .cast_unit();
-        self.rotation.rotate_vector(unrotated)
-    }
+
     fn world_step_from_origin_to_max(&self) -> WorldStep {
         let unrotated = self
             .screen_step_from_origin_to_max()
@@ -158,10 +99,6 @@ impl Screen {
         self.rotation.rotate_vector(unrotated)
     }
 
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn world_character_step_from_origin_to_center(&self) -> WorldCharacterStep {
-        self.world_character_step_from_origin_to_max() / 2
-    }
     fn world_step_from_origin_to_center(&self) -> WorldStep {
         self.world_step_from_origin_to_max() / 2
     }
@@ -172,10 +109,6 @@ impl Screen {
         vec2(self.terminal_width() / 2 - 1, self.terminal_height() - 1)
     }
 
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn screen_center_as_world_character_square(&self) -> WorldCharacterSquare {
-        world_square_to_left_world_character_square(self.screen_center_as_world_square())
-    }
     fn screen_buffer_character_step_from_origin_to_center(&self) -> ScreenBufferCharacterStep {
         self.screen_buffer_character_step_from_origin_to_max() / 2
     }
@@ -199,12 +132,7 @@ impl Screen {
         self.screen_buffer_step_from_origin_to_center().to_point()
     }
 
-    #[deprecated(note = "Invalidated by screen rotation")]
-    fn world_character_square_is_on_screen(&self, character_square: WorldCharacterSquare) -> bool {
-        self.world_square_is_on_screen(world_character_square_to_world_square(character_square))
-    }
-
-    pub fn world_square_is_on_screen(&self, square: WorldSquare) -> bool {
+    pub fn world_square_is_at_least_partially_on_screen(&self, square: WorldSquare) -> bool {
         // dbg!(
         //     "asdfasdf",
         //     square,
@@ -212,7 +140,7 @@ impl Screen {
         // );
         self.world_square_to_both_screen_buffer_character_squares(square)
             .into_iter()
-            .all(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
+            .any(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
     }
 
     pub fn update_screen(&mut self, writer: &mut Box<dyn Write>) {
@@ -224,12 +152,14 @@ impl Screen {
                 if self.screen_buffer[buffer_pos.x as usize][buffer_pos.y as usize]
                     != self.current_screen_state[buffer_pos.x as usize][buffer_pos.y as usize]
                 {
-                    let screen_pos: Point2D<i32, CharacterGridInScreenFrame> =
-                        self.screen_buffer_character_square_to_screen_character_square(buffer_pos);
+                    let screen_pos_starting_at_1 = buffer_pos + vec2(1, 1);
                     write!(
                         writer,
                         "{}",
-                        termion::cursor::Goto(screen_pos.x as u16, screen_pos.y as u16)
+                        termion::cursor::Goto(
+                            screen_pos_starting_at_1.x as u16,
+                            screen_pos_starting_at_1.y as u16
+                        )
                     )
                     .unwrap();
                     write!(
@@ -283,25 +213,6 @@ impl Screen {
     // world point -> world character point -> buffer point -> screen point
     //       ↓                 ↓                    ↓               ↓
     // world square   world_character square   buffer square   screen square
-
-    #[deprecated(note = "Invalidated by screen rotation")]
-    pub fn world_character_square_to_screen_buffer_character_square(
-        &self,
-        world_character_square: WorldCharacterSquare,
-    ) -> ScreenBufferCharacterSquare {
-        self.world_square_to_left_screen_buffer_character_square(
-            world_character_square_to_world_square(world_character_square),
-        )
-    }
-    #[deprecated(note = "Invalidated by screen rotation")]
-    pub fn screen_buffer_character_square_to_world_character_square(
-        &self,
-        screen_buffer_character_square: ScreenBufferCharacterSquare,
-    ) -> WorldCharacterSquare {
-        world_square_to_left_world_character_square(
-            self.screen_buffer_character_square_to_world_square(screen_buffer_character_square),
-        )
-    }
 
     pub fn world_square_to_left_screen_buffer_character_square(
         &self,
@@ -357,50 +268,6 @@ impl Screen {
         buffer_character_square: ScreenBufferCharacterSquare,
     ) -> bool {
         self.screen_buffer_character_square_is_left_glyph_of_world_square(buffer_character_square)
-    }
-
-    #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-    pub fn screen_buffer_character_point_to_screen_character_point(
-        buffer_point: ScreenBufferCharacterPoint,
-    ) -> ScreenCharacterPoint {
-        // Buffer indexes from 0
-        // Screen indexes from 1
-        point2(buffer_point.x + 1.0, buffer_point.y + 1.0)
-    }
-
-    #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-    pub fn screen_buffer_character_square_to_screen_character_square(
-        &self,
-        buffer_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
-    ) -> Point2D<i32, CharacterGridInScreenFrame> {
-        // Terminal indexes from 1, and the y axis goes top to bottom
-        // The screen buffer indexes from 0, but the y axis also goes top to bottom
-        // End result is just an off-by-one offset on both axes
-        point2(buffer_pos.x + 1, buffer_pos.y + 1)
-    }
-
-    #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-    pub fn screen_character_square_to_buffer_character_square(
-        &self,
-        screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
-    ) -> Point2D<i32, CharacterGridInScreenBufferFrame> {
-        // Terminal indexes from 1, and the y axis goes top to bottom
-        // The screen buffer indexes from 0, but the y axis also goes top to bottom
-        // End result is just an off-by-one offset on both axes
-        point2(screen_pos.x - 1, screen_pos.y - 1)
-    }
-
-    #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-    pub fn world_square_to_left_screen_character_square(
-        &self,
-        world_position: WorldSquare,
-    ) -> Point2D<i32, CharacterGridInScreenFrame> {
-        // terminal indexes from 1, and the y axis goes top to bottom
-        // world indexes from 0, origin at bottom left
-        let world_char_square = world_square_to_left_world_character_square(world_position);
-        let buffer_square =
-            self.world_character_square_to_screen_buffer_character_square(world_char_square);
-        self.screen_buffer_character_square_to_screen_character_square(buffer_square)
     }
 
     pub fn screen_buffer_character_square_to_screen_buffer_square(
@@ -517,14 +384,11 @@ impl Screen {
         println!("{}", x_markings);
         println!("{}", x_numbers);
     }
-    pub fn draw_string_to_screen(
-        &mut self,
-        screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
-        the_string: &str,
-    ) {
+    pub fn draw_string_to_screen(&mut self, screen_square: ScreenBufferSquare, the_string: &str) {
         for i in 0..the_string.chars().count() {
             let character: char = the_string.chars().nth(i).unwrap();
-            let buffer_pos = self.screen_character_square_to_buffer_character_square(screen_pos);
+            let buffer_pos =
+                self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square);
             self.screen_buffer[buffer_pos.x as usize + i][buffer_pos.y as usize] =
                 Glyph::from_char(character);
         }
@@ -561,30 +425,6 @@ impl Screen {
         screen_square: ScreenBufferSquare,
     ) {
         self.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_square);
-    }
-
-    #[deprecated(note = "Avoid using the raw screen frame, use the screen buffer frame instead")]
-    pub fn get_char_at_screen_pos(
-        &self,
-        screen_pos: Point2D<i32, CharacterGridInScreenFrame>,
-    ) -> char {
-        let buffer_pos = self.screen_character_square_to_buffer_character_square(screen_pos);
-        get_by_point(&self.current_screen_state, buffer_pos).character
-    }
-    pub fn all_squares_on_screen(&self) -> SquareSet {
-        let mut all_squares = SquareSet::new();
-        for buffer_x in 0..self.terminal_width() {
-            for buffer_y in 0..self.terminal_height() {
-                let buffer_square: Point2D<i32, CharacterGridInScreenBufferFrame> =
-                    point2(buffer_x, buffer_y);
-                let world_square =
-                    self.screen_buffer_character_square_to_world_square(buffer_square);
-                if self.world_square_is_on_screen(world_square) {
-                    all_squares.insert(world_square);
-                }
-            }
-        }
-        all_squares
     }
 }
 
@@ -668,8 +508,8 @@ mod tests {
     fn test_screen_origin_set_get_consistency() {
         let mut s = set_up_nxn_square_screen(23);
         let new_center = point2(24, 89);
-        s.set_screen_center_by_world_character_square(new_center);
-        assert_eq!(s.screen_center_as_world_character_square(), new_center);
+        s.set_screen_center_by_world_square(new_center);
+        assert_eq!(s.screen_center_as_world_square(), new_center);
     }
 
     #[test]
@@ -706,41 +546,39 @@ mod tests {
     }
 
     #[test]
-    fn test_world_character_is_on_screen() {
+    fn test_world_square_is_on_screen() {
         let mut g = Screen::new(41, 20);
+        let xmax = 20;
+        let ymax = 19;
 
         assert!(
-            g.world_character_square_is_on_screen(point2(0, 0)),
+            g.world_square_is_at_least_partially_on_screen(point2(0, 0)),
             "bottom_left"
         );
         assert!(
-            !g.world_character_square_is_on_screen(point2(-1, 0)),
+            !g.world_square_is_at_least_partially_on_screen(point2(-1, 0)),
             "one step left of bottom left"
         );
         assert!(
-            !g.world_character_square_is_on_screen(point2(0, -1)),
+            !g.world_square_is_at_least_partially_on_screen(point2(0, -1)),
             "one step down of bottom left"
         );
 
         assert!(
-            g.world_character_square_is_on_screen(point2(39, 19)),
-            "top right of visible board squares"
+            g.world_square_is_at_least_partially_on_screen(point2(xmax, ymax)),
+            "top right of visible board squares.  Partially visible"
         );
         assert!(
-            !g.world_character_square_is_on_screen(point2(40, 19)),
-            "top right of terminal, but on cut-off square"
-        );
-        assert!(
-            !g.world_character_square_is_on_screen(point2(39, 20)),
+            !g.world_square_is_at_least_partially_on_screen(point2(xmax, ymax + 1)),
             "one step up of top right of visible board"
         );
         assert!(
-            !g.world_character_square_is_on_screen(point2(40, 20)),
-            "one step up of top right of screen"
+            !g.world_square_is_at_least_partially_on_screen(point2(xmax, -1)),
+            "one down of bottom right"
         );
         assert!(
-            !g.world_character_square_is_on_screen(point2(41, 19)),
-            "one step right of top right of screen"
+            !g.world_square_is_at_least_partially_on_screen(point2(xmax + 1, ymax)),
+            "one right of top right"
         );
     }
 
@@ -797,16 +635,16 @@ mod tests {
         s.set_screen_center_by_world_square(point2(300, 20));
         assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
 
-        assert!(s.world_square_is_on_screen(point2(340, 22)));
-        assert_false!(s.world_square_is_on_screen(point2(370, 20)));
-        assert_false!(s.world_square_is_on_screen(point2(300, 26)));
+        assert!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
+        assert_false!(s.world_square_is_at_least_partially_on_screen(point2(370, 20)));
+        assert_false!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
 
         s.set_rotation(QuarterTurnsAnticlockwise::new(1));
         assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
 
-        assert_false!(s.world_square_is_on_screen(point2(340, 22)));
-        assert!(s.world_square_is_on_screen(point2(302, -20)));
-        assert!(s.world_square_is_on_screen(point2(300, 26)));
+        assert_false!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
+        assert!(s.world_square_is_at_least_partially_on_screen(point2(302, -20)));
+        assert!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
     }
 
     #[test]
@@ -814,17 +652,17 @@ mod tests {
         let mut s = Screen::new(20, 20);
         let center = point2(3, 5);
         s.set_screen_center_by_world_square(center);
-        let start_origin = s.screen_origin_as_world_character_square();
+        let start_origin = s.screen_origin_as_world_square();
 
         assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(0));
         assert_eq!(s.screen_center_as_world_square(), center);
-        assert_eq!(s.screen_origin_as_world_character_square(), start_origin);
+        assert_eq!(s.screen_origin_as_world_square(), start_origin);
         (0..3).for_each(|i| {
             s.rotate(QuarterTurnsAnticlockwise::new(1));
 
             assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(i + 1));
             assert_eq!(s.screen_center_as_world_square(), center);
-            assert_ne!(s.screen_origin_as_world_character_square(), start_origin);
+            assert_ne!(s.screen_origin_as_world_square(), start_origin);
         });
     }
 }

@@ -613,6 +613,7 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
+#[deprecated(note = "worldcharactersquareglyphmap is bad")]
 pub fn pair_up_glyph_map(character_glyph_map: WorldCharacterSquareGlyphMap) -> WorldSquareGlyphMap {
     let mut output_map = WorldSquareGlyphMap::new();
     character_glyph_map
@@ -657,10 +658,6 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
         string += "\n";
     }
     string
-}
-
-pub fn print_glyph_map(glyph_map: &WorldCharacterSquareGlyphMap) {
-    print!("{}", glyph_map_to_string(glyph_map));
 }
 
 pub fn line_intersects_with_centered_unit_square<U>(line: Line<f32, U>) -> bool {
@@ -801,6 +798,7 @@ pub fn in_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) ->
     ab.cross(ac) == 0.0
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn is_world_character_square_left_square_of_world_square(
     character_square: WorldCharacterSquare,
 ) -> bool {

@@ -173,13 +173,6 @@ pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> Worl
     world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
 }
 
-pub fn world_character_step_to_world_step(char_step: WorldCharacterStep) -> WorldStep {
-    let char_square_relative_to_zero = char_step.to_point();
-    let world_square_relative_to_zero =
-        world_character_square_to_world_square(char_square_relative_to_zero);
-    world_square_relative_to_zero.to_vector()
-}
-
 pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
     point.round().to_i32()
 }
