@@ -70,7 +70,8 @@ impl InputMap {
                         if Self::is_shifted_key(ke) {
                             game.player_blink_relative_to_screen(screen_direction);
                         } else {
-                            game.slide_player_relative_to_screen(screen_direction);
+                            game.try_slide_player_relative_to_screen(screen_direction)
+                                .ok();
                         }
                     }
                 }
