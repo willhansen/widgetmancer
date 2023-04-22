@@ -50,6 +50,7 @@ impl SquareVisibility {
     }
 }
 
+#[deprecated(note = "Use shadowDrawable instead")]
 #[derive(Clone, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialVisibilityOfASquare {
@@ -59,7 +60,7 @@ pub struct PartialVisibilityOfASquare {
 }
 
 type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
-type SquareShadow = HalfPlane<f32, SquareGridInLocalSquareFrame>;
+pub type SquareShadow = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 impl PartialVisibilityOfASquare {
     pub fn get(&self, i: usize) -> &Option<CharacterShadow> {

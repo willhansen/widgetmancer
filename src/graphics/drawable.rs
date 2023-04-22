@@ -1,15 +1,17 @@
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::QuarterTurnsAnticlockwise;
 use dyn_clone::DynClone;
 use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
 
+use crate::fov_stuff::SquareShadow;
+use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use crate::utility::QuarterTurnsAnticlockwise;
+
 // This is kinda magic.  Not great, but if it works, it works.
 dyn_clone::clone_trait_object!(Drawable);
 
 pub trait Drawable: DynClone {
-    fn rotate(&mut self, rotation: QuarterTurnsAnticlockwise);
+    fn rotate(&mut self, quarter_rotations_anticlockwise: i32);
     fn to_glyphs(&self) -> DoubleGlyph;
     fn draw_over(&mut self, other: &Box<dyn Drawable>);
 }
@@ -35,7 +37,7 @@ impl TextDrawable {
 }
 
 impl Drawable for TextDrawable {
-    fn rotate(&mut self, rotation: QuarterTurnsAnticlockwise) {
+    fn rotate(&mut self, quarter_rotations_anticlockwise: i32) {
         // lmao no
     }
 
@@ -48,8 +50,28 @@ impl Drawable for TextDrawable {
     }
 }
 
+#[derive(Debug, Clone, CopyGetters)]
 pub struct ShadowDrawable {
-    // todo
+    shadows: Vec<SquareShadow>,
+    bg_color: RGB8,
+}
+
+impl Drawable for ShadowDrawable {
+    fn rotate(&mut self, quarter_rotations_anticlockwise: i32) {
+        self.shadows = self
+            .shadows
+            .iter()
+            .map(|shadow: &SquareShadow| shadow.rotated(quarter_rotations_anticlockwise))
+            .collect_vec();
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        todo!()
+    }
+
+    fn draw_over(&mut self, other: &Box<dyn Drawable>) {
+        self.bg_color = other.to_glyphs().solid_color_if_backgroundified()[0];
+    }
 }
 
 pub struct BrailleDrawable {

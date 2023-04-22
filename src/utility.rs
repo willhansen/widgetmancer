@@ -184,7 +184,7 @@ pub struct Line<T, U> {
 
 impl<T, U> Line<T, U>
 where
-    T: Clone + Debug + PartialEq,
+    T: Clone + Debug + PartialEq + Signed + Copy,
 {
     pub fn new(p1: Point2D<T, U>, p2: Point2D<T, U>) -> Line<T, U> {
         assert_ne!(p1, p2);
@@ -195,6 +195,22 @@ where
     }
     pub fn reversed(&self) -> Self {
         Self::new(self.p2.clone(), self.p1.clone())
+    }
+    pub fn get(&self, index: u32) -> Point2D<T, U> {
+        match index {
+            0 => self.p1.clone(),
+            1 => self.p2.clone(),
+            _ => panic!("only two points defining the line"),
+        }
+    }
+    pub fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+        let new_points = [0, 1].map(|i| {
+            point_rotated_n_quarter_turns_counter_clockwise(
+                self.get(i),
+                quarter_rotations_anticlockwise,
+            )
+        });
+        Self::new(new_points[0].clone(), new_points[1].clone())
     }
 }
 
@@ -403,6 +419,14 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             point_transform_function(self.point_on_half_plane()),
         )
     }
+    pub fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+        let line = self.dividing_line();
+        let point = self.point_on_half_plane();
+        let new_point =
+            point_rotated_n_quarter_turns_counter_clockwise(point, quarter_rotations_anticlockwise);
+        let new_line = line.rotated(quarter_rotations_anticlockwise);
+        Self::from_line_and_point_on_half_plane(new_line, new_point)
+    }
 }
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
@@ -447,6 +471,13 @@ pub fn rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
         v.x * int_to_T(int_cos(quarter_turns)) - v.y * int_to_T(int_sin(quarter_turns)),
         v.x * int_to_T(int_sin(quarter_turns)) + v.y * int_to_T(int_cos(quarter_turns)),
     )
+}
+
+pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
+    p: Point2D<T, U>,
+    quarter_turns: i32,
+) -> Point2D<T, U> {
+    rotated_n_quarter_turns_counter_clockwise(p.to_vector(), quarter_turns).to_point()
 }
 
 pub fn int_cos(quarter_periods: i32) -> i32 {
@@ -1137,6 +1168,7 @@ where
 {
     vec2(v.x, -v.y)
 }
+
 pub fn flip_x<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
 where
     T: Signed,
@@ -1436,7 +1468,7 @@ mod tests {
         assert_eq!(
             QuarterTurnsAnticlockwise::from_start_and_end_directions(
                 STEP_DOWN_LEFT,
-                STEP_DOWN_RIGHT
+                STEP_DOWN_RIGHT,
             ),
             QuarterTurnsAnticlockwise::new(1)
         );
