@@ -19,8 +19,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::FovResult;
 use crate::fov_stuff::{field_of_view_from_square, portal_aware_field_of_view_from_square};
+use crate::fov_stuff::{FieldOfView, SquareVisibility};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::screen::ScreenBufferStep;
 use crate::graphics::Graphics;
@@ -1585,16 +1585,15 @@ impl Game {
         let target_square_relative_to_player = square - self.player_square();
         self.player_field_of_view()
             .visibility_of_relative_square(target_square_relative_to_player)
-            .is_fully_visible()
+            .is_some_and(|v| v.is_fully_visible())
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
-        !self
-            .player_field_of_view()
+        self.player_field_of_view()
             .visibility_of_relative_square(target_square_relative_to_player)
-            .is_visible()
+            .is_none()
     }
-    fn player_field_of_view(&self) -> FovResult {
+    fn player_field_of_view(&self) -> FieldOfView {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,

@@ -33,12 +33,12 @@ use crate::animations::smite_from_above::SmiteFromAbove;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::FovResult;
+use crate::fov_stuff::FieldOfView;
 use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::drawable::{Drawable, TextDrawable};
+use crate::graphics::drawable::{Drawable, ShadowDrawable, TextDrawable};
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
 };
@@ -190,7 +190,7 @@ impl Graphics {
         self.screen.current_screen_state = self.screen.screen_buffer.clone();
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FovResult) {
+    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
         for buffer_x in 0..self.screen.terminal_width() {
             for buffer_y in 0..self.screen.terminal_height() {
                 let screen_buffer_character_square: ScreenBufferCharacterSquare =
@@ -214,10 +214,10 @@ impl Graphics {
                     .screen_buffer_square_to_world_square(screen_square);
 
                 let relative_world_square = world_square - field_of_view.root_square();
-                let visibility = field_of_view.visibility_of_relative_square(relative_world_square);
-
                 // TODO: break up this function a bit
-                if visibility.is_visible() {
+                if let Some(square_visibility) =
+                    field_of_view.visibility_of_relative_square(relative_world_square)
+                {
                     let absolute_world_square_seen: WorldSquare = field_of_view
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
@@ -225,14 +225,15 @@ impl Graphics {
                     let maybe_unshadowed_drawable: Option<&Box<dyn Drawable>> =
                         self.draw_buffer.get(&absolute_world_square_seen);
                     if let Some(to_draw_over) = maybe_unshadowed_drawable {
-                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> =
-                            if let Some(partial) = visibility.partial_visibility() {
-                                let trait_box: Box<dyn Drawable> =
-                                    Box::new(partial.to_shadow_drawable());
-                                Some(trait_box)
-                            } else {
-                                None
-                            };
+                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> = if !square_visibility
+                            .is_fully_visible()
+                        {
+                            let trait_box: Box<dyn Drawable> =
+                                Box::new(ShadowDrawable::from_square_visibility(square_visibility));
+                            Some(trait_box)
+                        } else {
+                            None
+                        };
 
                         let to_draw = if let Some(shadow) = maybe_shadow_drawable {
                             let mut combo = shadow.clone();

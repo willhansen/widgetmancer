@@ -394,7 +394,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn covers_origin(&self) -> bool {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
-    pub fn covers_unit_square(&self) -> bool {
+    pub fn fully_covers_unit_square(&self) -> bool {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
             .map(|x| x * 0.5)
@@ -402,6 +402,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .map(Point2D::cast_unit)
             .iter()
             .all(|&p| self.point_is_on_or_touching_half_plane(p))
+    }
+
+    pub fn at_least_partially_covers_unit_square(&self) -> bool {
+        !self.complement().fully_covers_unit_square()
     }
 
     //Fn(Point2D<f32, U>) -> Point2D<f32, V>,
@@ -1508,9 +1512,9 @@ mod tests {
                 )
             });
 
-        assert!(more_than_cover.covers_unit_square());
-        assert_false!(less_than_cover.covers_unit_square());
-        assert!(exactly_cover.covers_unit_square());
+        assert!(more_than_cover.fully_covers_unit_square());
+        assert_false!(less_than_cover.fully_covers_unit_square());
+        assert!(exactly_cover.fully_covers_unit_square());
     }
 
     #[test]
