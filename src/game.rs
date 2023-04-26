@@ -2745,7 +2745,6 @@ mod tests {
         assert_eq!(game.player_square().y, player_square.y);
         assert!(game.player_square().x < player_square.x);
     }
-    #[ignore = "TODO"]
     #[test]
     fn test_rotated_shadows() {
         let player_square = point2(5, 5);
@@ -2791,5 +2790,31 @@ mod tests {
         game.place_block(game.player_square() + STEP_RIGHT);
         game.try_slide_player_relative_to_screen(SCREEN_STEP_RIGHT)
             .ok();
+    }
+    #[test]
+    fn test_partial_shadows_are_drawn() {
+        let player_square = point2(5, 5);
+        let mut game = set_up_10x10_game();
+        game.place_player(player_square);
+        let right_of_player = player_square
+            + game
+                .graphics
+                .screen
+                .screen_step_to_world_step(SCREEN_STEP_RIGHT);
+
+        game.place_block(right_of_player);
+        game.draw_headless_now();
+
+        let shadow_screen_square = game
+            .graphics
+            .screen
+            .world_square_to_screen_buffer_square(player_square)
+            + SCREEN_STEP_UP_RIGHT;
+        let glyphs = game
+            .graphics
+            .screen
+            .get_glyphs_at_screen_square(shadow_screen_square);
+        assert!(["🭈🭄", "🭊🭂"].contains(&&*glyphs.to_clean_string()));
+        assert_ne!(glyphs[0].fg_color, glyphs[1].bg_color);
     }
 }
