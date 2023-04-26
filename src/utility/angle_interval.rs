@@ -39,6 +39,12 @@ impl AngleInterval {
             Angle::degrees(anticlockwise_end_in_degrees),
         )
     }
+    pub fn from_radians(clockwise_end_in_radians: f32, anticlockwise_end_in_radians: f32) -> Self {
+        Self::new(
+            Angle::radians(clockwise_end_in_radians),
+            Angle::radians(anticlockwise_end_in_radians),
+        )
+    }
     pub fn to_degrees(&self) -> (f32, f32) {
         (
             self.clockwise_end.to_degrees(),
@@ -46,9 +52,11 @@ impl AngleInterval {
         )
     }
     pub fn from_octant(octant: Octant) -> Self {
-        let low_degrees = 45 * octant.number();
-        let high_degrees = low_degrees + 45;
-        Self::from_degrees(low_degrees as f32, high_degrees as f32)
+        let n = octant.number();
+        let positive_y = n < 4;
+
+        let step_length = PI / 4.0;
+        Self::from_radians(n as f32 * step_length, (n + 1) as f32 * step_length)
     }
 
     pub fn from_square(relative_square: WorldStep) -> Self {
@@ -1044,5 +1052,35 @@ mod tests {
 
         assert_false!(arc.exactly_touches_arc(arc));
         assert!(arc.exactly_touches_arc(arc.complement()))
+    }
+    #[test]
+    fn test_angle_interval_from_octant() {
+        // Are the exact values really important?
+        let octant_start_end = vec![
+            (0, 0.0, PI / 4.0),
+            (1, PI / 4.0, PI / 2.0),
+            (2, PI / 2.0, PI * 3.0 / 4.0),
+            (3, PI * 3.0 / 4.0, PI),
+            (4, PI, -PI * 3.0 / 4.0),
+            (5, -PI * 3.0 / 4.0, -PI / 2.0),
+            (6, -PI / 2.0, -PI / 4.0),
+            (7, -PI / 4.0, 0.0),
+        ];
+        octant_start_end
+            .into_iter()
+            .for_each(|(octant, start, end)| {
+                assert_about_eq!(
+                    AngleInterval::from_octant(Octant::new(octant))
+                        .clockwise_end
+                        .radians,
+                    start
+                );
+                assert_about_eq!(
+                    AngleInterval::from_octant(Octant::new(octant))
+                        .anticlockwise_end
+                        .radians,
+                    end
+                );
+            })
     }
 }

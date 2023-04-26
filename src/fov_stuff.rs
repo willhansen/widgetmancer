@@ -31,6 +31,10 @@ impl SquareVisibility {
     pub fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
+    pub fn is_nearly_fully_visible(&self, tolerance: f32) -> bool {
+        self.visible_portion
+            .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
+    }
     #[deprecated(note = "Always true")]
     pub fn is_visible(&self) -> bool {
         true
@@ -57,8 +61,8 @@ impl SquareVisibility {
         // TODO: fix
         self.clone()
     }
-    // todo: may be backwards
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
+        // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
         Self::new_partially_visible(HalfPlane::from_line_and_point_on_half_plane(
             Line::new(
@@ -80,6 +84,20 @@ impl SquareVisibility {
     }
     pub fn bottom_half_visible() -> Self {
         Self::half_visible(Angle::degrees(90.0))
+    }
+    pub fn combined_increasing_visibility(&self, other: &Self) -> Self {
+        if self.is_fully_visible() || other.is_fully_visible() {
+            Self::new_fully_visible()
+        } else if self
+            .visible_portion
+            .unwrap()
+            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+        {
+            Self::new_fully_visible()
+        } else {
+            // TODO: better combination method
+            self.clone()
+        }
     }
 }
 
@@ -376,7 +394,6 @@ impl FieldOfView {
             other.root_square_with_direction
         );
 
-        type PartialVisibilityMap = HashMap<WorldStep, PartialVisibilityOfASquare>;
         type SquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
         let squares_with_non_conflicting_partials: StepSet = self
@@ -385,14 +402,14 @@ impl FieldOfView {
             .copied()
             .collect();
 
-        let self_non_conflicting_partials: SquareVisibilityMap = self
+        let non_conflicting_partials_from_self: SquareVisibilityMap = self
             .partially_visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
             .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
             .collect();
 
-        let other_non_conflicting_partials: SquareVisibilityMap = other
+        let non_conflicting_partials_from_other: SquareVisibilityMap = other
             .partially_visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
@@ -413,12 +430,18 @@ impl FieldOfView {
         let combined_partials: SquareVisibilityMap = squares_with_conflicting_partials
             .into_iter()
             .map(|square| {
-                let partial = self
+                let partial_A = self
                     .partially_visible_relative_squares_in_main_view_only
                     .get(&square)
                     .unwrap()
                     .clone();
-                (square, partial)
+                let partial_B = other
+                    .partially_visible_relative_squares_in_main_view_only
+                    .get(&square)
+                    .unwrap()
+                    .clone();
+                let combined = partial_A.combined_increasing_visibility(&partial_B);
+                (square, combined)
             })
             .collect();
 
@@ -434,8 +457,8 @@ impl FieldOfView {
             .filter(|(square, partial)| !partial.is_fully_visible())
             .collect();
 
-        let mut all_partials: SquareVisibilityMap = self_non_conflicting_partials;
-        all_partials.extend(other_non_conflicting_partials);
+        let mut all_partials: SquareVisibilityMap = non_conflicting_partials_from_self;
+        all_partials.extend(non_conflicting_partials_from_other);
         all_partials.extend(conflicting_partials_that_remain_partials);
 
         let all_fully_visible: StepSet = union(
@@ -496,6 +519,7 @@ impl FieldOfView {
             other.root_square_with_direction
         );
 
+        // TODO: combine these somehow
         let mut top_view_combined_fov = self.combined_main_view_only(other);
 
         top_view_combined_fov.transformed_sub_fovs =
@@ -666,7 +690,7 @@ impl FieldOfView {
     }
 
     pub fn add_visible_square(&mut self, relative_square: WorldStep, visibility: SquareVisibility) {
-        if visibility.is_fully_visible() {
+        if visibility.is_fully_visible() || visibility.is_nearly_fully_visible(1e-3) {
             self.fully_visible_relative_squares_in_main_view_only
                 .insert(relative_square);
         } else if let Some(partial) = visibility.visible_portion() {
@@ -933,20 +957,6 @@ pub fn portal_aware_field_of_view_from_square(
     //.departialized_within_each_fov()
 }
 
-#[deprecated(note = "use portal_aware_field_of_view_from_square instead")]
-pub fn field_of_view_from_square(
-    start_square: WorldSquare,
-    radius: u32,
-    sight_blockers: &HashSet<WorldSquare>,
-) -> FieldOfView {
-    portal_aware_field_of_view_from_square(
-        start_square,
-        radius,
-        sight_blockers,
-        &PortalGeometry::default(),
-    )
-}
-
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
 }
@@ -1113,14 +1123,19 @@ mod tests {
     #[test]
     fn test_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
-        let fov_result =
-            field_of_view_from_square(start_square, SIGHT_RADIUS, &SquareSet::default());
+        let fov_radius = 2;
+        let fov_result = portal_aware_field_of_view_from_square(
+            start_square,
+            fov_radius,
+            &SquareSet::default(),
+            &PortalGeometry::default(),
+        );
         //dbg!(&fov_result.partially_visible_squares);
         assert!(fov_result
             .partially_visible_relative_squares_in_main_view_only
             .is_empty());
         assert!(fov_result.can_fully_see_absolute_square_relative_to_root(start_square));
-        let square_area = (SIGHT_RADIUS * 2 + 1).pow(2);
+        let square_area = (fov_radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result
                 .fully_visible_relative_squares_in_main_view_only
@@ -1186,7 +1201,12 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_UP * 2;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, 5, &blocks);
+        let fov_result = portal_aware_field_of_view_from_square(
+            start_square,
+            5,
+            &blocks,
+            &PortalGeometry::default(),
+        );
         assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square));
         assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_DOWN));
         assert_false!(
@@ -1199,7 +1219,12 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_DOWN * 2;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
+        let fov_result = portal_aware_field_of_view_from_square(
+            start_square,
+            SIGHT_RADIUS,
+            &blocks,
+            &PortalGeometry::default(),
+        );
         assert!(!fov_result
             .partially_visible_relative_squares_in_main_view_only
             .is_empty());
@@ -1221,7 +1246,12 @@ mod tests {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_RIGHT;
         let blocks = SquareSet::from([block_square]);
-        let fov_result = field_of_view_from_square(start_square, SIGHT_RADIUS, &blocks);
+        let fov_result = portal_aware_field_of_view_from_square(
+            start_square,
+            SIGHT_RADIUS,
+            &blocks,
+            &PortalGeometry::default(),
+        );
         for i in 1..=5 {
             let step = STEP_UP_RIGHT * i;
             let square_visibility = fov_result
@@ -1340,10 +1370,11 @@ mod tests {
         let block_square = player_square + STEP_UP_RIGHT * 2;
         let test_square = block_square + STEP_UP;
 
-        let fov_result = field_of_view_from_square(
+        let fov_result = portal_aware_field_of_view_from_square(
             player_square,
             SIGHT_RADIUS,
             &SquareSet::from([block_square]),
+            &PortalGeometry::default(),
         );
         let visibility_of_test_square = fov_result
             .visibility_of_absolute_square_as_seen_from_fov_center(test_square)
@@ -1428,7 +1459,12 @@ mod tests {
         let player_square = point2(5, 5);
         let block_square = player_square + STEP_DOWN_LEFT;
         let sight_blockers = HashSet::from([block_square]);
-        let fov_result = field_of_view_from_square(player_square, 20, &sight_blockers);
+        let fov_result = portal_aware_field_of_view_from_square(
+            player_square,
+            20,
+            &sight_blockers,
+            &PortalGeometry::default(),
+        );
 
         fov_result
             .partially_visible_relative_squares_in_main_view_only
@@ -1772,7 +1808,16 @@ mod tests {
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
-        assert_false!(visibility.unwrap().is_visible());
+        assert!(visibility.is_none());
+    }
+
+    #[test]
+    fn test_square_fully_inside_view_arc__near_edge() {
+        let square = vec2(1, -2);
+        let arc = AngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
+        assert!(visibility_of_square(arc, square)
+            .unwrap()
+            .is_fully_visible());
     }
 
     #[test]

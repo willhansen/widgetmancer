@@ -300,6 +300,10 @@ impl<U> Line<f32, U> {
         let p1_to_reflected_p = parallel_part - perpendicular_part;
         self.p1 + p1_to_reflected_p
     }
+
+    pub fn direction(&self) -> Angle<f32> {
+        better_angle_from_x_axis(self.p2 - self.p1)
+    }
 }
 
 impl<T, U> Debug for Line<T, U>
@@ -388,20 +392,38 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
         same_side_of_line(self.dividing_line, self.point_on_half_plane(), point)
     }
-    pub fn point_is_on_or_touching_half_plane(&self, point: Point2D<f32, U>) -> bool {
+    pub fn overlapping_or_touching_point(&self, point: Point2D<f32, U>) -> bool {
         !same_side_of_line(self.dividing_line, self.point_off_half_plane(), point)
     }
     pub fn covers_origin(&self) -> bool {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
     pub fn fully_covers_unit_square(&self) -> bool {
+        self.fully_covers_expanded_unit_square(0.0)
+    }
+    pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> bool {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
-            .map(|x| x * 0.5)
+            .map(|x| x * (0.5 + per_face_extension))
             .map(Vector2D::to_point)
             .map(Point2D::cast_unit)
             .iter()
-            .all(|&p| self.point_is_on_or_touching_half_plane(p))
+            .all(|&p| self.overlapping_or_touching_point(p))
+    }
+    pub fn extended(&self, extended_distance: f32) -> Self {
+        let direction = self.direction_away_from_plane();
+        let move_vector = Vector2D::from_angle_and_length(direction, extended_distance);
+
+        let line = self.dividing_line();
+        let point = self.point_on_half_plane();
+
+        let shifted_point = point + move_vector;
+        let shifted_line = Line::new(line.p1 + move_vector, line.p2 + move_vector);
+
+        Self::from_line_and_point_on_half_plane(shifted_line, shifted_point)
+    }
+    pub fn direction_away_from_plane(&self) -> Angle<f32> {
+        self.dividing_line.direction() + Angle::degrees(90.0)
     }
 
     pub fn at_least_partially_covers_unit_square(&self) -> bool {
@@ -1538,5 +1560,16 @@ mod tests {
         assert_false!(same_side_of_line(line, low, on2));
         assert_false!(same_side_of_line(line, high, on));
         assert_false!(same_side_of_line(line, low, high2));
+    }
+    #[test]
+    fn test_halfplane_covers_expanded_unit_square() {
+        let the_plane = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(1.0, 5.0), point2(1.0, 6.0)),
+            point2(-5.0, 0.0),
+        );
+        assert!(the_plane.fully_covers_expanded_unit_square(0.0));
+        assert!(the_plane.fully_covers_expanded_unit_square(0.49));
+        assert_false!(the_plane.fully_covers_expanded_unit_square(0.51));
+        assert_false!(the_plane.fully_covers_expanded_unit_square(100.0));
     }
 }

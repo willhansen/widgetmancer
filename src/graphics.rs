@@ -555,7 +555,7 @@ impl Graphics {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::fov_stuff::{field_of_view_from_square, portal_aware_field_of_view_from_square};
+    use crate::fov_stuff::portal_aware_field_of_view_from_square;
     use crate::piece::PieceType::TurningPawn;
     use crate::utility::*;
     use crate::{LEFT_I, RIGHT_I};

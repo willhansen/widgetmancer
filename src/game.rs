@@ -19,8 +19,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::{field_of_view_from_square, portal_aware_field_of_view_from_square};
-use crate::fov_stuff::{FieldOfView, SquareVisibility};
+use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfView, SquareVisibility};
 use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::screen::ScreenBufferStep;
 use crate::graphics::Graphics;
