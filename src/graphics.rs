@@ -225,15 +225,15 @@ impl Graphics {
                     let maybe_unshadowed_drawable: Option<&Box<dyn Drawable>> =
                         self.draw_buffer.get(&absolute_world_square_seen);
                     if let Some(to_draw_over) = maybe_unshadowed_drawable {
-                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> = if !square_visibility
-                            .is_fully_visible()
-                        {
-                            let trait_box: Box<dyn Drawable> =
-                                Box::new(ShadowDrawable::from_square_visibility(square_visibility));
-                            Some(trait_box)
-                        } else {
-                            None
-                        };
+                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> =
+                            if !square_visibility.is_fully_visible() {
+                                Some(
+                                    ShadowDrawable::from_square_visibility(square_visibility)
+                                        .as_drawable_object(),
+                                )
+                            } else {
+                                None
+                            };
 
                         let to_draw = if let Some(shadow) = maybe_shadow_drawable {
                             let mut combo = shadow.clone();

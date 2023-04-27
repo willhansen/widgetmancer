@@ -18,6 +18,8 @@ pub trait Drawable: DynClone {
     fn rotate(&mut self, quarter_rotations_anticlockwise: i32);
     fn to_glyphs(&self) -> DoubleGlyph;
     fn draw_over(&mut self, other: &Box<dyn Drawable>);
+    fn as_drawable_object(&self) -> Box<dyn Drawable>;
+    fn color_if_backgroundified(&self) -> RGB8;
 }
 
 #[derive(Debug, Clone, PartialEq, CopyGetters)]
@@ -51,6 +53,15 @@ impl Drawable for TextDrawable {
 
     fn draw_over(&mut self, other: &Box<dyn Drawable>) {
         self.glyphs = self.to_glyphs().drawn_over(other.to_glyphs())
+    }
+
+    fn as_drawable_object(&self) -> Box<dyn Drawable> {
+        let trait_box: Box<dyn Drawable> = Box::new((*self).clone());
+        trait_box
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        self.glyphs.solid_color_if_backgroundified()[0]
     }
 }
 
@@ -87,7 +98,7 @@ impl Drawable for ShadowDrawable {
             .map(|shadow| {
                 let angle_char =
                     half_plane_to_angled_block_character(*shadow, self.tie_break_bias_direction);
-                Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
+                Glyph::new(angle_char, OUT_OF_SIGHT_COLOR, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
             .try_into()
@@ -96,7 +107,16 @@ impl Drawable for ShadowDrawable {
     }
 
     fn draw_over(&mut self, other: &Box<dyn Drawable>) {
-        self.bg_color = other.to_glyphs().solid_color_if_backgroundified()[0];
+        self.bg_color = other.color_if_backgroundified();
+    }
+
+    fn as_drawable_object(&self) -> Box<dyn Drawable> {
+        let trait_box: Box<dyn Drawable> = Box::new((*self).clone());
+        trait_box
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        self.bg_color
     }
 }
 
@@ -110,4 +130,36 @@ pub struct HextantDrawable {
 
 pub struct ArrowDrawable {
     // todo
+}
+#[cfg(test)]
+mod tests {
+    use crate::glyph::glyph_constants::GREEN;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
+
+    #[test]
+    fn test_shadow_over_text() {
+        let shadow =
+            ShadowDrawable::from_square_visibility(SquareVisibility::bottom_half_visible());
+        let text = TextDrawable::new("a ", RED, GREEN, false);
+
+        let mut stacked = shadow.clone();
+        stacked.draw_over(&text.as_drawable_object());
+
+        assert_eq!(
+            stacked.to_glyphs().to_clean_string(),
+            shadow.to_glyphs().to_clean_string()
+        );
+        assert_ne!(
+            stacked.to_glyphs()[0].fg_color,
+            stacked.to_glyphs()[0].bg_color
+        );
+    }
+
+    #[test]
+    fn test_text_background() {
+        let text = TextDrawable::new("a ", RED, GREEN, false);
+        assert_eq!(text.color_if_backgroundified(), RED);
+    }
 }
