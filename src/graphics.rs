@@ -235,13 +235,15 @@ impl Graphics {
                                 None
                             };
 
-                        let to_draw = if let Some(shadow) = maybe_shadow_drawable {
+                        let mut to_draw = if let Some(shadow) = maybe_shadow_drawable {
                             let mut combo = shadow.clone();
                             combo.draw_over(to_draw_over);
                             combo
                         } else {
                             (*to_draw_over).clone()
                         };
+
+                        to_draw.rotate(-self.screen.rotation().quarter_turns());
                         self.screen.draw_drawable(&to_draw, screen_square);
                     }
                 }

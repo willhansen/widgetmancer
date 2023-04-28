@@ -52,8 +52,18 @@ impl SquareVisibility {
 
     pub fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
         assert!(visible_portion.at_least_partially_covers_unit_square());
+        assert!(!visible_portion.fully_covers_unit_square());
         SquareVisibility {
             visible_portion: Some(visible_portion),
+        }
+    }
+    pub fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Self> {
+        if visible_portion.fully_covers_unit_square() {
+            Some(Self::new_fully_visible())
+        } else if visible_portion.at_least_partially_covers_unit_square() {
+            Some(Self::new_partially_visible(visible_portion))
+        } else {
+            None
         }
     }
 
@@ -115,177 +125,6 @@ pub struct PartialVisibilityOfASquare {
 
 type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
-
-impl PartialVisibilityOfASquare {
-    pub fn get(&self, i: usize) -> &Option<CharacterShadow> {
-        match i {
-            0 => &self.left_char_shadow,
-            1 => &self.right_char_shadow,
-            _ => panic!("tried getting invalid character of square: {}", i),
-        }
-    }
-    pub fn new(
-        left_char_shadow: Option<CharacterShadow>,
-        right_char_shadow: Option<CharacterShadow>,
-    ) -> Self {
-        PartialVisibilityOfASquare {
-            left_char_shadow,
-            right_char_shadow,
-            tie_break_bias_direction: Angle::degrees(45.0),
-        }
-    }
-
-    fn standardized(&self) -> Self {
-        let f = |maybe_shadow: Option<CharacterShadow>| {
-            if maybe_shadow
-                .is_some_and(|x: CharacterShadow| x.complement().fully_covers_unit_square())
-            {
-                None
-            } else {
-                maybe_shadow
-            }
-        };
-        Self::new(f(self.left_char_shadow), f(self.right_char_shadow))
-    }
-
-    fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
-        shadow_direction = standardize_angle(shadow_direction);
-        Self::from_square_shadow(HalfPlane::from_line_and_point_on_half_plane(
-            Line::new(
-                point2(0.0, 0.0),
-                rotated_n_quarter_turns_counter_clockwise(
-                    unit_vector_from_angle(shadow_direction),
-                    1,
-                )
-                .to_point()
-                .cast_unit(),
-            ),
-            unit_vector_from_angle(shadow_direction)
-                .to_point()
-                .cast_unit(),
-        ))
-    }
-
-    fn from_square_shadow(square_shadow: LocalSquareHalfPlane) -> Self {
-        Self::new(
-            Some(local_square_half_plane_to_local_character_half_plane(
-                square_shadow,
-                0,
-            )),
-            Some(local_square_half_plane_to_local_character_half_plane(
-                square_shadow,
-                1,
-            )),
-        )
-        .standardized()
-    }
-
-    pub fn rebiased(&self, bias_angle: Angle<f32>) -> Self {
-        PartialVisibilityOfASquare {
-            left_char_shadow: self.left_char_shadow,
-            right_char_shadow: self.right_char_shadow,
-            tie_break_bias_direction: standardize_angle(bias_angle),
-        }
-    }
-
-    pub fn fully_visible() -> Self {
-        PartialVisibilityOfASquare::new(None, None)
-    }
-
-    pub fn shadows(&self) -> Vec<Option<CharacterShadow>> {
-        vec![self.left_char_shadow, self.right_char_shadow]
-    }
-
-    pub fn to_shadow_drawable(&self) -> TextDrawable {
-        let left_character_square = world_square_to_left_world_character_square(point2(0, 0));
-        let character_squares = vec![
-            left_character_square,
-            left_character_square + STEP_RIGHT.cast_unit(),
-        ];
-        let glyphs = self
-            .shadows()
-            .iter()
-            .map(|optional_shadow| {
-                if let Some(half_plane) = optional_shadow {
-                    let angle_char = half_plane_to_angled_block_character(
-                        *half_plane,
-                        self.tie_break_bias_direction,
-                    );
-                    Glyph::fg_only(angle_char, OUT_OF_SIGHT_COLOR)
-                } else {
-                    Glyph::transparent_glyph()
-                }
-            })
-            .collect::<Vec<Glyph>>()
-            .try_into()
-            .unwrap();
-        TextDrawable::from_glyphs(glyphs)
-    }
-
-    pub fn combine_while_increasing_visibility(&self, other: &Self) -> Self {
-        let complement_tolerance = 1e-6;
-        let combined_shadows: Vec<Option<HalfPlane<_, _>>> = (0..2)
-            .map(|i| {
-                let self_shadow = *self.get(i);
-                let other_shadow = *other.get(i);
-                if self_shadow.is_none() || other_shadow.is_none() {
-                    None
-                } else {
-                    if self_shadow
-                        .unwrap()
-                        .is_about_complementary_to(other_shadow.unwrap(), complement_tolerance)
-                    {
-                        None
-                    } else {
-                        // TODO: better combination method than taking just one
-                        self_shadow
-                    }
-                }
-            })
-            .collect();
-
-        PartialVisibilityOfASquare {
-            left_char_shadow: combined_shadows[0],
-            right_char_shadow: combined_shadows[1],
-            tie_break_bias_direction: self.tie_break_bias_direction,
-        }
-    }
-    pub fn is_fully_visible(&self) -> bool {
-        self.to_shadow_drawable().to_glyphs().looks_solid()
-            && self.shadows().iter().all(|optional_shadow| {
-                optional_shadow.is_none()
-                    || optional_shadow.is_some_and(|shadow| !shadow.covers_origin())
-            })
-    }
-    pub fn is_fully_visible__old_version(&self) -> bool {
-        self.shadows()
-            .iter()
-            .all(|shadow_optional: &Option<CharacterShadow>| {
-                shadow_optional.is_none()
-                    || shadow_optional.is_some_and(|shadow: CharacterShadow| {
-                        !line_intersects_with_centered_unit_square(shadow.dividing_line())
-                            && !shadow.covers_origin()
-                    })
-            })
-    }
-    pub fn is_fully_non_visible(&self) -> bool {
-        self.to_shadow_drawable().to_glyphs().looks_solid()
-            && self
-                .shadows()
-                .iter()
-                .all(|optional_shadow| optional_shadow.is_some_and(|shadow| shadow.covers_origin()))
-    }
-    pub fn is_fully_non_visible__old_version(&self) -> bool {
-        self.shadows()
-            .iter()
-            .all(|shadow_optional: &Option<CharacterShadow>| {
-                shadow_optional.is_some_and(|shadow: CharacterShadow| {
-                    !line_intersects_with_centered_unit_square(shadow.dividing_line())
-                        && shadow.covers_origin()
-                })
-            })
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct FieldOfView {
@@ -1010,57 +849,6 @@ fn square_visibility_from_one_view_arc(
     }
 }
 
-#[deprecated(note = "use square_visibility_from_one_view_arc")]
-fn partial_visibility_of_square_from_one_view_arc(
-    visibility_arc: AngleInterval,
-    square_relative_to_center: WorldStep,
-) -> PartialVisibilityOfASquare {
-    let square_arc = AngleInterval::from_square(square_relative_to_center);
-    assert!(visibility_arc.touches_or_overlaps(square_arc));
-
-    let shadow_arc = visibility_arc.complement();
-    let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
-
-    let shadow_line_from_center: WorldLine = Line {
-        p1: point2(0.0, 0.0),
-        p2: unit_vector_from_angle(overlapped_shadow_edge.angle())
-            .to_point()
-            .cast_unit(),
-    };
-    let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
-        .to_point()
-        .cast_unit();
-
-    let shadow_half_plane =
-        HalfPlane::from_line_and_point_on_half_plane(shadow_line_from_center, point_in_shadow);
-
-    // do a few forbidden conversions here.
-    // TODO: FIX
-    let left_character_square = world_square_to_left_world_character_square(
-        square_relative_to_center.to_point().cast_unit(),
-    );
-    let right_character_square = left_character_square + STEP_RIGHT.cast_unit();
-    let left_char_shadow = Some(world_half_plane_to_local_character_half_plane(
-        shadow_half_plane,
-        left_character_square,
-    ));
-    let right_char_shadow = Some(world_half_plane_to_local_character_half_plane(
-        shadow_half_plane,
-        right_character_square,
-    ));
-
-    let partial = PartialVisibilityOfASquare::new(left_char_shadow, right_char_shadow)
-        .rebiased(overlapped_shadow_edge.direction_to_inside());
-    //Angle::radians(visibility_arc.center_angle().radians + PI),
-
-    partial
-}
-
-#[deprecated(note = "use AngleInterval::from_square instead")]
-pub fn angle_interval_of_square(relative_square: WorldStep) -> AngleInterval {
-    AngleInterval::from_square(relative_square)
-}
-
 #[cfg(test)]
 mod tests {
     use euclid::point2;
@@ -1087,7 +875,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__horizontal() {
-        let view_angle = angle_interval_of_square(vec2(3, 0));
+        let view_angle = AngleInterval::from_square(vec2(3, 0));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
 
@@ -1103,7 +891,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__diagonalish() {
-        let view_angle = angle_interval_of_square(vec2(5, 3));
+        let view_angle = AngleInterval::from_square(vec2(5, 3));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
 
@@ -1167,29 +955,17 @@ mod tests {
     }
 
     #[test]
-    fn test_partially_visible_square_knows_if_its_fully_visible() {
-        // Data from failure case
-        let partial = PartialVisibilityOfASquare::new(
-            Some(HalfPlane::from_line_and_point_on_half_plane(
+    fn test_square_visibility_knows_if_its_fully_visible() {
+        let partial = SquareVisibility::from_visible_half_plane(
+            HalfPlane::from_line_and_point_on_half_plane(
                 Line {
-                    p1: point2(2.5, 2.0),
-                    p2: point2(1.0857863, 1.2928933),
+                    p1: point2(-5.0, 2.0),
+                    p2: point2(5.0, 2.2928933),
                 },
-                point2(1.061038, 1.3054879),
-            )),
-            Some(HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(1.5, 2.0),
-                    p2: point2(0.08578634, 1.2928933),
-                },
-                point2(0.061038017, 1.3054879),
-            )),
-        );
-        assert!(partial.to_shadow_drawable().to_glyphs().looks_solid());
-        assert_eq!(
-            partial.to_shadow_drawable().to_glyphs().to_clean_string(),
-            "  "
-        );
+                point2(-12.061038, -1.3054879),
+            ),
+        )
+        .unwrap();
         assert!(partial.is_fully_visible());
     }
 
@@ -1268,96 +1044,11 @@ mod tests {
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let interval = AngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
-        let visibility =
-            partial_visibility_of_square_from_one_view_arc(interval, square_relative_to_center);
-        let string = visibility
-            .to_shadow_drawable()
+        let visibility = square_visibility_from_one_view_arc(interval, square_relative_to_center);
+        let string = ShadowDrawable::from_square_visibility(visibility.unwrap())
             .to_glyphs()
             .to_clean_string();
         //dbg!(visibility);
-        assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
-    }
-
-    #[test]
-    fn test_partial_visibility_to_glyphs() {
-        let partial_visibility = PartialVisibilityOfASquare::new(
-            Some(HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(-0.5, -0.5),
-                    p2: point2(1.5, 0.5),
-                },
-                point2(2.0, 0.0),
-            )),
-            Some(HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(-1.5, -0.5),
-                    p2: point2(0.5, 0.5),
-                },
-                point2(2.0, 0.0),
-            )),
-        );
-
-        let string = partial_visibility
-            .to_shadow_drawable()
-            .to_glyphs()
-            .to_clean_string();
-        assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
-    }
-
-    #[test]
-    fn test_partial_visibility_to_glyphs__data_from_failure() {
-        let partial_visibility = PartialVisibilityOfASquare::new(
-            Some(HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(-1.5, -1.0),
-                    p2: point2(-0.08578646, -0.29289323),
-                },
-                point2(-0.061038256, -0.30548787),
-            )),
-            Some(HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(-2.5, -1.0),
-                    p2: point2(-1.0857865, -0.29289323),
-                },
-                point2(-1.0610383, -0.30548787),
-            )),
-        );
-        assert!(is_clockwise(
-            partial_visibility
-                .left_char_shadow
-                .unwrap()
-                .dividing_line()
-                .p1,
-            partial_visibility
-                .left_char_shadow
-                .unwrap()
-                .dividing_line()
-                .p2,
-            partial_visibility
-                .left_char_shadow
-                .unwrap()
-                .point_on_half_plane(),
-        ));
-        assert!(is_clockwise(
-            partial_visibility
-                .right_char_shadow
-                .unwrap()
-                .dividing_line()
-                .p1,
-            partial_visibility
-                .right_char_shadow
-                .unwrap()
-                .dividing_line()
-                .p2,
-            partial_visibility
-                .right_char_shadow
-                .unwrap()
-                .point_on_half_plane(),
-        ));
-        let string = partial_visibility
-            .to_shadow_drawable()
-            .to_glyphs()
-            .to_clean_string();
         assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
     }
 
@@ -1397,10 +1088,10 @@ mod tests {
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
-        let partial_1 = PartialVisibilityOfASquare::new(Some(half_plane_1), Some(half_plane_1));
-        let partial_2 = PartialVisibilityOfASquare::new(Some(half_plane_2), Some(half_plane_2));
+        let partial_1 = SquareVisibility::from_visible_half_plane(half_plane_1).unwrap();
+        let partial_2 = SquareVisibility::from_visible_half_plane(half_plane_2).unwrap();
 
-        let combined_partial = partial_1.combine_while_increasing_visibility(&partial_2);
+        let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
         //dbg!( &partial_1.to_glyphs().to_clean_string(), &partial_2.to_glyphs().to_clean_string(), &combined_partial.to_glyphs().to_clean_string() );
         assert!(combined_partial.is_fully_visible());
     }
@@ -1424,10 +1115,12 @@ mod tests {
     fn test_partial_visibility_of_one_square__one_step_up() {
         let arc = AngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
-        let partial = partial_visibility_of_square_from_one_view_arc(arc, square);
-        assert!(!partial.is_fully_visible());
+        let partial = square_visibility_from_one_view_arc(arc, square);
+        assert!(!partial.unwrap().is_fully_visible());
         assert_eq!(
-            partial.to_shadow_drawable().to_glyphs().to_clean_string(),
+            ShadowDrawable::from_square_visibility(partial.unwrap())
+                .to_glyphs()
+                .to_clean_string(),
             [SPACE, FULL_BLOCK].into_iter().collect::<String>()
         );
     }
@@ -1934,87 +1627,6 @@ mod tests {
     }
 
     #[test]
-    fn test_create_square_half_visibility_from_angle__shadow_right() {
-        // TODO: make test better
-        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(0.0));
-        assert!(vis
-            .right_char_shadow
-            .is_some_and(|p: CharacterShadow| p.fully_covers_unit_square()));
-        assert!(vis.left_char_shadow.is_none());
-    }
-
-    #[test]
-    fn test_create_square_half_visibility_from_angle__shadow_left() {
-        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(180.0));
-        assert_about_eq!(
-            vis.right_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees()
-                .abs(),
-            90.0,
-            1e-5
-        );
-        assert_about_eq!(
-            vis.left_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees()
-                .abs(),
-            90.0,
-            1e-5
-        );
-    }
-
-    #[test]
-    fn test_create_square_half_visibility_from_angle__shadow_up() {
-        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(90.0));
-        assert_about_eq!(
-            vis.right_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees(),
-            0.0,
-            1e-5
-        );
-        assert_about_eq!(
-            vis.left_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees(),
-            0.0,
-            1e-5
-        );
-    }
-
-    #[test]
-    fn test_create_square_half_visibility_from_angle__shadow_down() {
-        let vis = PartialVisibilityOfASquare::half_visible(Angle::degrees(270.0));
-        assert_about_eq!(
-            vis.right_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees(),
-            0.0,
-            1e-5
-        );
-        assert_about_eq!(
-            vis.left_char_shadow
-                .unwrap()
-                .dividing_line()
-                .angle_with_positive_x_axis()
-                .to_degrees(),
-            0.0,
-            1e-5
-        );
-    }
-
-    #[test]
     fn test_fov_relative_to_absolute__top_level() {
         let main_center = point2(5, 5);
 
@@ -2080,6 +1692,6 @@ mod tests {
         let rel_square = vec2(4, 4);
         // These values are from an observed failure.  NOT ARBITRARY
         let arc = AngleInterval::new(Angle::radians(0.7853978), Angle::radians(0.7853982));
-        let visibility = partial_visibility_of_square_from_one_view_arc(arc, rel_square);
+        let visibility = square_visibility_from_one_view_arc(arc, rel_square);
     }
 }
