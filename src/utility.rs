@@ -423,7 +423,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         Self::from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
     pub fn direction_away_from_plane(&self) -> Angle<f32> {
-        self.dividing_line.direction() + Angle::degrees(90.0)
+        standardize_angle(self.dividing_line.direction() + Angle::degrees(90.0))
+    }
+    pub fn direction_toward_plane(&self) -> Angle<f32> {
+        standardize_angle(-self.direction_away_from_plane())
     }
 
     pub fn at_least_partially_covers_unit_square(&self) -> bool {

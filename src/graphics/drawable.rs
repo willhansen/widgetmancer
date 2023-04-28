@@ -70,7 +70,6 @@ pub struct ShadowDrawable {
     // TODO: more shadows
     the_shadow: LocalSquareHalfPlane,
     bg_color: RGB8,
-    tie_break_bias_direction: Angle<f32>,
 }
 
 impl ShadowDrawable {
@@ -78,8 +77,7 @@ impl ShadowDrawable {
         assert!(!square_viz.is_fully_visible());
         ShadowDrawable {
             the_shadow: square_viz.visible_portion().unwrap().complement(),
-            bg_color: RED,                                  // TODO: no default color
-            tie_break_bias_direction: Angle::degrees(45.0), // TODO: fix
+            bg_color: RED, // TODO: no default color
         }
     }
 }
@@ -93,11 +91,12 @@ impl Drawable for ShadowDrawable {
         let character_shadows = [0, 1]
             .map(|i| local_square_half_plane_to_local_character_half_plane(self.the_shadow, i));
 
+        let bias_direction = self.the_shadow.direction_toward_plane();
+
         let glyphs = character_shadows
             .iter()
             .map(|shadow| {
-                let angle_char =
-                    half_plane_to_angled_block_character(*shadow, self.tie_break_bias_direction);
+                let angle_char = half_plane_to_angled_block_character(*shadow, bias_direction);
                 Glyph::new(angle_char, OUT_OF_SIGHT_COLOR, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
