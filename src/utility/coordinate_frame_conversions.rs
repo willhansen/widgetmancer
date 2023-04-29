@@ -1,4 +1,4 @@
-use crate::graphics::drawable::Drawable;
+use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 
@@ -50,8 +50,9 @@ pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
 #[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
-pub type WorldSquareDrawableMap = HashMap<WorldSquare, Box<dyn Drawable>>;
+pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
 
+#[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
 pub fn world_square_glyph_map_to_world_character_glyph_map(

@@ -419,11 +419,7 @@ impl Screen {
             .for_each(|i| self.draw_glyph_straight_to_screen_buffer(glyphs[i], buffer_squares[i]));
     }
 
-    pub fn draw_drawable(
-        &mut self,
-        drawable: &Box<dyn Drawable>,
-        screen_square: ScreenBufferSquare,
-    ) {
+    pub fn draw_drawable<T: Drawable>(&mut self, drawable: &T, screen_square: ScreenBufferSquare) {
         self.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_square);
     }
 }

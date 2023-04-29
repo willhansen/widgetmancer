@@ -38,7 +38,7 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::drawable::{Drawable, ShadowDrawable, TextDrawable};
+use crate::graphics::drawable::{Drawable, DrawableEnum, ShadowDrawable, TextDrawable};
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
 };
@@ -58,7 +58,7 @@ pub mod screen;
 
 pub struct Graphics {
     pub screen: Screen,
-    draw_buffer: HashMap<WorldSquare, Box<dyn Drawable>>,
+    draw_buffer: HashMap<WorldSquare, DrawableEnum>,
     active_animations: Vec<Box<dyn Animation>>,
     selectors: Vec<SelectorAnimation>,
     board_animation: Option<Box<dyn BoardAnimation>>,
@@ -154,7 +154,7 @@ impl Graphics {
     pub fn get_drawable_for_square_from_draw_buffer(
         &self,
         world_square: WorldSquare,
-    ) -> Option<&Box<dyn Drawable>> {
+    ) -> Option<&DrawableEnum> {
         self.draw_buffer.get(&world_square)
     }
 
@@ -222,29 +222,26 @@ impl Graphics {
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
 
-                    let maybe_unshadowed_drawable: Option<&Box<dyn Drawable>> =
+                    let maybe_unshadowed_drawable: Option<&DrawableEnum> =
                         self.draw_buffer.get(&absolute_world_square_seen);
                     if let Some(to_draw_over) = maybe_unshadowed_drawable {
-                        let maybe_shadow_drawable: Option<Box<dyn Drawable>> =
+                        let maybe_shadow_drawable: Option<DrawableEnum> =
                             if !square_visibility.is_fully_visible() {
-                                Some(
-                                    ShadowDrawable::from_square_visibility(square_visibility)
-                                        .as_drawable_object(),
-                                )
+                                Some(DrawableEnum::Shadow(
+                                    ShadowDrawable::from_square_visibility(square_visibility),
+                                ))
                             } else {
                                 None
                             };
 
-                        let mut to_draw = if let Some(shadow) = maybe_shadow_drawable {
-                            let mut combo = shadow.clone();
-                            combo.draw_over(to_draw_over);
-                            combo
+                        let mut unrotated = if let Some(shadow) = maybe_shadow_drawable {
+                            shadow.drawn_over(to_draw_over)
                         } else {
                             (*to_draw_over).clone()
                         };
 
-                        to_draw.rotate(-self.screen.rotation().quarter_turns());
-                        self.screen.draw_drawable(&to_draw, screen_square);
+                        let rotated = unrotated.rotated(-self.screen.rotation().quarter_turns());
+                        self.screen.draw_drawable(&rotated, screen_square);
                     }
                 }
             }
@@ -307,15 +304,13 @@ impl Graphics {
         self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
-    pub fn draw_above(&mut self, drawable: &Box<dyn Drawable>, world_square: WorldSquare) {
+    pub fn draw_above<T: Drawable>(&mut self, drawable: &T, world_square: WorldSquare) {
         let to_draw = if let Some(below) = self.draw_buffer.get(&world_square) {
-            let mut combo = drawable.clone();
-            combo.draw_over(below);
-            combo
+            drawable.drawn_over(below)
         } else {
             drawable.clone()
         };
-        self.draw_buffer.insert(world_square, to_draw);
+        self.draw_buffer.insert(world_square, to_draw.to_enum());
     }
     #[deprecated(note = "Graphics should not know about glyphs")]
     pub fn draw_glyphs_for_square_to_draw_buffer(
@@ -323,8 +318,7 @@ impl Graphics {
         world_square: WorldSquare,
         glyphs: DoubleGlyph,
     ) {
-        let trait_box: Box<dyn Drawable> = Box::new(TextDrawable::from_glyphs(glyphs));
-        self.draw_above(&trait_box, world_square);
+        self.draw_above(&TextDrawable::from_glyphs(glyphs), world_square);
     }
 
     pub fn draw_piece_with_color(
@@ -532,7 +526,7 @@ impl Graphics {
                 let square = WorldSquare::new(x, y);
                 let maybe_glyphs = self
                     .get_drawable_for_square_from_draw_buffer(square)
-                    .map(|d: &Box<dyn Drawable>| d.to_glyphs());
+                    .map(|d: &DrawableEnum| d.to_glyphs());
                 if let Some(glyphs) = maybe_glyphs {
                     for glyph in glyphs {
                         let character = glyph.character;

@@ -15,7 +15,7 @@ use crate::glyph::glyph_constants::{
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::graphics;
-use crate::graphics::drawable::{Drawable, ShadowDrawable, TextDrawable};
+use crate::graphics::drawable::{Drawable, DrawableEnum, ShadowDrawable, TextDrawable};
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
 use crate::utility::angle_interval::AngleInterval;
@@ -161,7 +161,9 @@ impl FieldOfView {
                 |(&step, &partial_visibility): (&WorldStep, &SquareVisibility)| {
                     the_map.insert(
                         self.root_square() + step,
-                        Box::new(ShadowDrawable::from_square_visibility(partial_visibility)),
+                        DrawableEnum::Shadow(ShadowDrawable::from_square_visibility(
+                            partial_visibility,
+                        )),
                     );
                 },
             );

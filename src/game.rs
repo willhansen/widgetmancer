@@ -1634,6 +1634,7 @@ mod tests {
         BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
     };
     use crate::glyph::DoubleGlyphFunctions;
+    use crate::graphics::drawable::Drawable;
     use crate::graphics::screen::{SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT};
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
