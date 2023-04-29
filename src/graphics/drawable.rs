@@ -6,6 +6,7 @@ use rgb::RGB8;
 
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
+use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
 use crate::glyph::glyph_constants::{OUT_OF_SIGHT_COLOR, RED};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::local_square_half_plane_to_local_character_half_plane;
@@ -119,8 +120,33 @@ impl Drawable for ShadowDrawable {
     }
 }
 
+#[derive(Debug, Clone, CopyGetters)]
 pub struct BrailleDrawable {
-    // todo
+    dot_array: DoubleBrailleArray,
+    dot_color: RGB8,
+    bg_color: RGB8,
+}
+
+impl Drawable for BrailleDrawable {
+    fn rotate(&mut self, quarter_rotations_anticlockwise: i32) {
+        todo!()
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        todo!()
+    }
+
+    fn draw_over(&mut self, other: &Box<dyn Drawable>) {
+        todo!()
+    }
+
+    fn as_drawable_object(&self) -> Box<dyn Drawable> {
+        todo!()
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        todo!()
+    }
 }
 
 pub struct HextantDrawable {
@@ -130,10 +156,12 @@ pub struct HextantDrawable {
 pub struct ArrowDrawable {
     // todo
 }
+
 #[cfg(test)]
 mod tests {
-    use crate::glyph::glyph_constants::GREEN;
     use pretty_assertions::{assert_eq, assert_ne};
+
+    use crate::glyph::glyph_constants::GREEN;
 
     use super::*;
 

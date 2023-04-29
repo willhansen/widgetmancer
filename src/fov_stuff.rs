@@ -35,10 +35,6 @@ impl SquareVisibility {
         self.visible_portion
             .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
     }
-    #[deprecated(note = "Always true")]
-    pub fn is_visible(&self) -> bool {
-        true
-    }
 
     pub fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
         self.visible_portion
@@ -265,17 +261,17 @@ impl FieldOfView {
         let combined_partials: SquareVisibilityMap = squares_with_conflicting_partials
             .into_iter()
             .map(|square| {
-                let partial_A = self
+                let partial_a = self
                     .partially_visible_relative_squares_in_main_view_only
                     .get(&square)
                     .unwrap()
                     .clone();
-                let partial_B = other
+                let partial_b = other
                     .partially_visible_relative_squares_in_main_view_only
                     .get(&square)
                     .unwrap()
                     .clone();
-                let combined = partial_A.combined_increasing_visibility(&partial_B);
+                let combined = partial_a.combined_increasing_visibility(&partial_b);
                 (square, combined)
             })
             .collect();
@@ -405,9 +401,7 @@ impl FieldOfView {
         visibilities
     }
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
-        self.visibility_of_absolute_square(world_square)
-            .into_iter()
-            .any(|vis: SquareVisibility| vis.is_visible())
+        !self.visibility_of_absolute_square(world_square).is_empty()
     }
 
     pub fn relative_to_absolute(&self, rel_square: WorldStep) -> Option<WorldSquare> {

@@ -525,7 +525,6 @@ impl Graphics {
         self.selectors.drain_filter(|x| x.finished_at_time(time));
     }
 
-    #[deprecated(note = "This should be a test function")]
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {
         let mut count: u32 = 0;
         for x in rect.min.x..=rect.max.x {
