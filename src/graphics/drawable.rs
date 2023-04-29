@@ -43,7 +43,7 @@ impl TextDrawable {
 }
 
 impl Drawable for TextDrawable {
-    fn rotate(&mut self, quarter_rotations_anticlockwise: i32) {
+    fn rotate(&mut self, _quarter_rotations_anticlockwise: i32) {
         // lmao no
     }
 

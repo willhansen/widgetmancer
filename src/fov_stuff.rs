@@ -383,20 +383,6 @@ impl FieldOfView {
         self.visibility_of_relative_square(step).is_some()
     }
 
-    pub fn can_fully_see_absolute_square_relative_to_root(&self, square: WorldSquare) -> bool {
-        self.visibility_of_absolute_square_as_seen_from_fov_center(square)
-            .is_some_and(|v| v.is_fully_visible())
-    }
-
-    #[deprecated(note = "use visibility_of_relative_square instead")]
-    pub fn visibility_of_absolute_square_as_seen_from_fov_center(
-        &self,
-        absolute_square: WorldSquare,
-    ) -> Option<SquareVisibility> {
-        let relative_square = absolute_square - self.root_square();
-        self.visibility_of_relative_square(relative_square)
-    }
-
     pub fn visibility_of_absolute_square(
         &self,
         world_square: WorldSquare,
@@ -919,7 +905,7 @@ mod tests {
         assert!(fov_result
             .partially_visible_relative_squares_in_main_view_only
             .is_empty());
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(start_square));
+        assert!(fov_result.can_fully_see_relative_square(STEP_ZERO));
         let square_area = (fov_radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result
@@ -944,7 +930,7 @@ mod tests {
         assert!(fov_result
             .partially_visible_relative_squares_in_main_view_only
             .is_empty());
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(start_square));
+        assert!(fov_result.can_fully_see_relative_square(STEP_ZERO));
         let square_area = (radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result
@@ -972,7 +958,8 @@ mod tests {
     #[test]
     fn test_field_of_view_includes_blocks() {
         let start_square = point2(5, 5);
-        let block_square = start_square + STEP_UP * 2;
+        let block_step = STEP_UP * 2;
+        let block_square = start_square + block_step;
         let blocks = SquareSet::from([block_square]);
         let fov_result = portal_aware_field_of_view_from_square(
             start_square,
@@ -980,11 +967,9 @@ mod tests {
             &blocks,
             &PortalGeometry::default(),
         );
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square));
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_DOWN));
-        assert_false!(
-            fov_result.can_fully_see_absolute_square_relative_to_root(block_square + STEP_UP)
-        );
+        assert!(fov_result.can_fully_see_relative_square(block_step));
+        assert!(fov_result.can_fully_see_relative_square(block_step + STEP_DOWN));
+        assert_false!(fov_result.can_fully_see_relative_square(block_step + STEP_UP));
     }
 
     #[test]
@@ -1056,7 +1041,7 @@ mod tests {
     fn test_observed_bright_spot_in_shadow() {
         let player_square = point2(3, 3);
         let block_square = player_square + STEP_UP_RIGHT * 2;
-        let test_square = block_square + STEP_UP;
+        let test_rel_square = (block_square + STEP_UP) - player_square;
 
         let fov_result = portal_aware_field_of_view_from_square(
             player_square,
@@ -1065,7 +1050,7 @@ mod tests {
             &PortalGeometry::default(),
         );
         let visibility_of_test_square = fov_result
-            .visibility_of_absolute_square_as_seen_from_fov_center(test_square)
+            .visibility_of_relative_square(test_rel_square)
             .unwrap();
         assert_eq!(
             ShadowDrawable::from_square_visibility(visibility_of_test_square)
@@ -1137,11 +1122,9 @@ mod tests {
             10,
             Octant::new(0),
         );
-        let visible_square = mid_square + STEP_RIGHT * 5 + STEP_UP * 2;
-        assert!(
-            fov_result.can_fully_see_absolute_square_relative_to_root((visible_square + STEP_LEFT))
-        );
-        assert!(fov_result.can_fully_see_absolute_square_relative_to_root(visible_square));
+        let visible_rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
+        assert!(fov_result.can_fully_see_relative_square((visible_rel_square + STEP_LEFT)));
+        assert!(fov_result.can_fully_see_relative_square(visible_rel_square));
     }
 
     #[test]
