@@ -133,11 +133,6 @@ impl Screen {
     }
 
     pub fn world_square_is_at_least_partially_on_screen(&self, square: WorldSquare) -> bool {
-        // dbg!(
-        //     "asdfasdf",
-        //     square,
-        //     self.world_square_to_both_screen_buffer_character_squares(square)
-        // );
         self.world_square_to_both_screen_buffer_character_squares(square)
             .into_iter()
             .any(|buffer_square| self.buffer_character_square_is_on_screen(buffer_square))
@@ -219,14 +214,6 @@ impl Screen {
         world_square: WorldSquare,
     ) -> ScreenBufferCharacterSquare {
         let screen_square = self.world_square_to_screen_buffer_square(world_square);
-        // dbg!(
-        //     "asdfasdf B",
-        //     world_square,
-        //     screen_square,
-        //     self.screen_center_as_world_square(),
-        //     self.screen_origin_as_world_character_square(),
-        //     self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square)
-        // );
         self.screen_buffer_square_to_left_screen_buffer_character_square(screen_square)
     }
 
@@ -235,13 +222,6 @@ impl Screen {
         world_position: WorldSquare,
     ) -> [ScreenBufferCharacterSquare; 2] {
         let screen_square = self.world_square_to_screen_buffer_square(world_position);
-        // dbg!(
-        //     "asdfasdf",
-        //     world_position,
-        //     screen_square,
-        //     self.screen_center_as_world_square(),
-        //     self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square)
-        // );
         self.screen_buffer_square_to_both_screen_buffer_character_squares(screen_square)
     }
 
@@ -342,6 +322,14 @@ impl Screen {
             self.get_screen_buffered_glyph(buffer_pos + RIGHT_I.cast_unit())
                 .clone(),
         ]
+    }
+    pub fn get_screen_glyphs_at_visual_offset_from_center(
+        &self,
+        visual_offset: ScreenBufferStep,
+    ) -> DoubleGlyph {
+        self.get_glyphs_at_screen_square(
+            self.screen_center_as_screen_buffer_square() + visual_offset,
+        )
     }
 
     pub fn get_screen_buffered_glyph(&self, pos: ScreenBufferCharacterSquare) -> &Glyph {

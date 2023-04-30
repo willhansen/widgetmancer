@@ -1536,6 +1536,32 @@ impl Game {
     pub fn set_up_n_pillars(&mut self, n: u32) {
         (0..n).for_each(|i| self.place_block(self.player_square() + STEP_RIGHT * (i as i32 + 4)));
     }
+    pub fn set_up_simple_portal_map(&mut self) {
+        let entrance_square = self.player_square() + STEP_RIGHT * 2;
+        let exit_square = entrance_square + STEP_RIGHT * 4;
+
+        self.place_block(entrance_square + STEP_UP_RIGHT);
+        self.place_block(entrance_square + STEP_DOWN_RIGHT);
+        self.place_block(exit_square + STEP_UP_LEFT);
+        self.place_block(exit_square + STEP_DOWN_LEFT);
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+
+        self.place_double_sided_two_way_portal(entrance, exit);
+    }
+    pub fn set_up_portal_across_wall_map(&mut self) {
+        let entrance_square = self.player_square() + STEP_RIGHT * 2;
+        let exit_square = entrance_square + STEP_RIGHT * 2;
+
+        let n = 7;
+        (0..n).for_each(|i| {
+            self.place_block(entrance_square + STEP_RIGHT + STEP_UP * i + STEP_DOWN * n / 2)
+        });
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+
+        self.place_double_sided_two_way_portal(entrance, exit);
+    }
 
     pub fn set_up_columns(&mut self) {
         let block_square = self.player_square() + STEP_RIGHT * 4;
@@ -1625,11 +1651,11 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::game;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
 
+    use crate::game;
     use crate::glyph::glyph_constants::{
         BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
     };
@@ -2692,6 +2718,7 @@ mod tests {
             enemy_chars.chars().collect_vec()[0]
         );
     }
+
     #[test]
     fn test_screen_rotates_when_stepping_through_portal() {
         let mut game = set_up_10x10_game();
@@ -2706,7 +2733,6 @@ mod tests {
             game.graphics.screen.rotation(),
             QuarterTurnsAnticlockwise::new(0)
         );
-        game.graphics.screen.print_screen_buffer(); // asdfasdf
 
         game.try_slide_player_by_direction(STEP_RIGHT, 1).ok();
         assert_eq!(
@@ -2715,7 +2741,6 @@ mod tests {
         );
 
         game.draw_headless_now();
-        game.graphics.screen.print_screen_buffer(); // asdfasdf
         assert_eq!(
             game.graphics.screen.rotation(),
             QuarterTurnsAnticlockwise::new(1)
@@ -2734,6 +2759,7 @@ mod tests {
             .expect("slide");
         assert_eq!(game.player_square(), player_square + STEP_LEFT);
     }
+
     #[test]
     fn test_blink_relative_to_screen() {
         let mut game = set_up_10x10_game();
@@ -2746,6 +2772,7 @@ mod tests {
         assert_eq!(game.player_square().y, player_square.y);
         assert!(game.player_square().x < player_square.x);
     }
+
     #[test]
     fn test_rotated_shadows() {
         let player_square = point2(5, 5);
@@ -2776,7 +2803,6 @@ mod tests {
                     .screen
                     .world_square_to_screen_buffer_square(player_square)
                     + SCREEN_STEP_UP_RIGHT;
-                game.graphics.screen.print_screen_buffer(); // asdfasdf
                 game.graphics
                     .screen
                     .get_glyphs_at_screen_square(shadow_screen_square)
@@ -2784,6 +2810,7 @@ mod tests {
             .collect_vec();
         assert_eq!(shadow_glyphs[0], shadow_glyphs[1]);
     }
+
     #[test]
     fn test_can_fail_to_walk_into_block_without_crashing() {
         let mut game = set_up_10x10_game();
@@ -2792,6 +2819,7 @@ mod tests {
         game.try_slide_player_relative_to_screen(SCREEN_STEP_RIGHT)
             .ok();
     }
+
     #[test]
     fn test_partial_shadows_are_drawn() {
         let player_square = point2(5, 5);
@@ -2817,5 +2845,34 @@ mod tests {
             .get_glyphs_at_screen_square(shadow_screen_square);
         assert!(["🭈🭄", "🭊🭂"].contains(&&*glyphs.to_clean_string()));
         assert_ne!(glyphs[0].fg_color, glyphs[1].bg_color);
+    }
+
+    #[test]
+    fn test_do_not_see_block_through_portal() {
+        let player_square = point2(5, 5);
+        let mut game = set_up_10x10_game();
+        game.place_player(player_square);
+
+        let entrance_square = player_square;
+        let exit_square = entrance_square + STEP_RIGHT * 2;
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+        game.place_double_sided_two_way_portal(entrance, exit);
+
+        let n = 5;
+        (0..n).for_each(|i| {
+            game.place_block(entrance_square + STEP_RIGHT + STEP_UP * n / 2 + STEP_DOWN * i)
+        });
+
+        game.draw_headless_now();
+
+        game.graphics.screen.print_screen_buffer();
+
+        let up_right_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP_RIGHT);
+        dbg!(up_right_glyphs);
+        assert_false!(up_right_glyphs.looks_solid());
     }
 }

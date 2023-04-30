@@ -266,6 +266,8 @@ impl Glyph {
             Some(self.fg_color)
         } else if KNOWN_BG_ONLY_CHARS.contains(&self.character) {
             Some(self.bg_color)
+        } else if self.fg_color == self.bg_color {
+            Some(self.fg_color)
         } else {
             None
         }
