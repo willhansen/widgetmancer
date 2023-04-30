@@ -1549,6 +1549,15 @@ impl Game {
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
+    pub fn set_up_simple_freestanding_portal(&mut self) {
+        let entrance_square = self.player_square() + STEP_RIGHT * 8;
+        let exit_square = entrance_square + STEP_RIGHT * 3 + STEP_UP * 5;
+
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+
+        self.place_double_sided_two_way_portal(entrance, exit);
+    }
     pub fn set_up_portal_across_wall_map(&mut self) {
         let entrance_square = self.player_square() + STEP_RIGHT * 2;
         let exit_square = entrance_square + STEP_RIGHT * 2;
@@ -2843,7 +2852,7 @@ mod tests {
             .graphics
             .screen
             .get_glyphs_at_screen_square(shadow_screen_square);
-        assert!(["🭈🭄", "🭊🭂"].contains(&&*glyphs.to_clean_string()));
+        assert_eq!("🭞🭚", glyphs.to_clean_string());
         assert_ne!(glyphs[0].fg_color, glyphs[1].bg_color);
     }
 

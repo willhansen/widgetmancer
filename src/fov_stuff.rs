@@ -152,23 +152,6 @@ impl FieldOfView {
         let end = other.root_square_with_direction;
         RigidTransform::from_start_and_end_poses(start, end)
     }
-    pub fn partially_visible_squares_as_drawable_shadow_mask(&self) -> WorldSquareDrawableMap {
-        let mut the_map = WorldSquareDrawableMap::new();
-
-        self.partially_visible_relative_squares_in_main_view_only
-            .iter()
-            .for_each(
-                |(&step, &partial_visibility): (&WorldStep, &SquareVisibility)| {
-                    the_map.insert(
-                        self.root_square() + step,
-                        DrawableEnum::PartialVisibility(
-                            PartialVisibilityDrawable::from_square_visibility(partial_visibility),
-                        ),
-                    );
-                },
-            );
-        the_map
-    }
     pub fn sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
@@ -840,10 +823,10 @@ mod tests {
     use rgb::RGB8;
 
     use crate::glyph::angled_blocks::{
-        angle_block_chars_are_horizontally_continuous, angled_block_char_to_snap_points_map,
-        angled_block_flip_y, SnapGridPoint,
+        angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
+        angled_block_char_to_snap_points_map, angled_block_flip_y, SnapGridPoint,
     };
-    use crate::glyph::glyph_constants::FULL_BLOCK;
+    use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
         better_angle_from_x_axis, line_intersections_with_centered_unit_square,
@@ -1016,8 +999,7 @@ mod tests {
             let string = PartialVisibilityDrawable::from_square_visibility(*square_visibility)
                 .to_glyphs()
                 .to_clean_string();
-            // one of these two is right.  Not sure which
-            assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
+            assert_eq!(&string, "🭞🭚");
         }
     }
 
@@ -1029,8 +1011,7 @@ mod tests {
         let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
             .to_glyphs()
             .to_clean_string();
-        //dbg!(visibility);
-        assert!(["🭈🭄", "🭊🭂"].contains(&&*string));
+        assert_eq!(&string, "🭞🭚");
     }
 
     #[test]
@@ -1055,7 +1036,7 @@ mod tests {
                 .chars()
                 .nth(1)
                 .unwrap(),
-            FULL_BLOCK
+            SPACE
         );
     }
 
@@ -1102,7 +1083,7 @@ mod tests {
             PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
                 .to_glyphs()
                 .to_clean_string(),
-            [SPACE, FULL_BLOCK].into_iter().collect::<String>()
+            [FULL_BLOCK, SPACE].into_iter().collect::<String>()
         );
     }
 
@@ -1286,7 +1267,11 @@ mod tests {
             (STEP_DOWN * 2, STEP_DOWN * 2 + STEP_RIGHT, "🭀 "),
         ];
         block_shadow_string_tuples.into_iter().for_each(
-            |(block_square, shadow_square, correct_string)| {
+            |(block_square, shadow_square, shadow_string)| {
+                let complement_string: String = shadow_string
+                    .chars()
+                    .map(angle_block_char_complement)
+                    .collect();
                 assert_eq!(
                     PartialVisibilityDrawable::from_square_visibility(
                         square_visibility_from_block_and_square(block_square, shadow_square)
@@ -1294,11 +1279,11 @@ mod tests {
                     )
                     .to_glyphs()
                     .to_clean_string(),
-                    correct_string,
+                    complement_string,
                     "block_square: {:?}, shadow_square: {:?}, correct_string: {}",
                     block_square,
                     shadow_square,
-                    correct_string,
+                    complement_string,
                 );
             },
         );

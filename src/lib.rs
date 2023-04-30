@@ -111,6 +111,7 @@ pub fn do_everything() {
     //game.set_up_columns();
     // game.set_up_simple_portal_map();
     game.set_up_portal_across_wall_map();
+    game.set_up_simple_freestanding_portal();
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();

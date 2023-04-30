@@ -77,6 +77,23 @@ pub fn angled_block_char_to_snap_points_map() -> HashMap<char, (SnapGridPoint, S
         .collect()
 }
 
+pub fn angle_block_char_complement(c: char) -> char {
+    if c == FULL_BLOCK {
+        return SPACE;
+    }
+    if c == SPACE {
+        return FULL_BLOCK;
+    }
+    let points_for_block = angled_block_char_to_snap_points_map()
+        .get(&c)
+        .unwrap()
+        .clone();
+    let points_for_complement = (points_for_block.1, points_for_block.0);
+    *points_to_angled_block_mapping()
+        .get(&points_for_complement)
+        .unwrap()
+}
+
 //                                                           🬼 	🬽 	🬾 	🬿
 //U+1FB4x 	🭀 	🭁 	🭂 	🭃 	🭄 	🭅 	🭆 	🭇 	🭈 	🭉 	🭊 	🭋 	🭌 	🭍 	🭎 	🭏
 //U+1FB5x 	🭐 	🭑 	🭒 	🭓 	🭔 	🭕 	🭖 	🭗 	🭘 	🭙 	🭚 	🭛 	🭜 	🭝 	🭞 	🭟
@@ -462,5 +479,18 @@ mod tests {
         );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
         assert!(['🭈', '🭊'].contains(&the_char));
+    }
+
+    //                                                           🬼 	🬽 	🬾 	🬿
+    //U+1FB4x 	🭀 	🭁 	🭂 	🭃 	🭄 	🭅 	🭆 	🭇 	🭈 	🭉 	🭊 	🭋 	🭌 	🭍 	🭎 	🭏
+    //U+1FB5x 	🭐 	🭑 	🭒 	🭓 	🭔 	🭕 	🭖 	🭗 	🭘 	🭙 	🭚 	🭛 	🭜 	🭝 	🭞 	🭟
+    //U+1FB6x 	🭠 	🭡 	🭢 	🭣 	🭤 	🭥 	🭦 	🭧
+
+    #[test]
+    fn test_angle_block_char_complement() {
+        assert_eq!(angle_block_char_complement('🭦'), '🭐');
+        assert_eq!(angle_block_char_complement('🭗'), '🭁');
+        assert_eq!(angle_block_char_complement(FULL_BLOCK), SPACE);
+        assert_eq!(angle_block_char_complement(SPACE), FULL_BLOCK);
     }
 }
