@@ -38,7 +38,7 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::drawable::{Drawable, DrawableEnum, ShadowDrawable, TextDrawable};
+use crate::graphics::drawable::{Drawable, DrawableEnum, PartialVisibilityDrawable, TextDrawable};
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
 };
@@ -222,25 +222,22 @@ impl Graphics {
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
 
-                    let maybe_unshadowed_drawable: Option<&DrawableEnum> =
+                    let maybe_base_drawable: Option<&DrawableEnum> =
                         self.draw_buffer.get(&absolute_world_square_seen);
-                    if let Some(to_draw_over) = maybe_unshadowed_drawable {
-                        let maybe_shadow_drawable: Option<DrawableEnum> =
-                            if !square_visibility.is_fully_visible() {
-                                Some(DrawableEnum::Shadow(
-                                    ShadowDrawable::from_square_visibility(square_visibility),
-                                ))
-                            } else {
-                                None
-                            };
-
-                        let mut unrotated = if let Some(shadow) = maybe_shadow_drawable {
-                            shadow.drawn_over(to_draw_over)
+                    if let Some(base_drawable) = maybe_base_drawable {
+                        let unrotated: DrawableEnum = if !square_visibility.is_fully_visible() {
+                            DrawableEnum::PartialVisibility(
+                                PartialVisibilityDrawable::from_partially_visible_drawable(
+                                    base_drawable,
+                                    square_visibility,
+                                ),
+                            )
                         } else {
-                            (*to_draw_over).clone()
+                            base_drawable.clone()
                         };
 
-                        let rotated = unrotated.rotated(-self.screen.rotation().quarter_turns());
+                        let rotated: DrawableEnum =
+                            unrotated.rotated(-self.screen.rotation().quarter_turns());
                         self.screen.draw_drawable(&rotated, screen_square);
                     }
                 }

@@ -8,7 +8,7 @@ use rgb::RGB8;
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
-use crate::glyph::glyph_constants::{OUT_OF_SIGHT_COLOR, RED};
+use crate::glyph::glyph_constants::{GREEN, OUT_OF_SIGHT_COLOR, RED};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::local_square_half_plane_to_local_character_half_plane;
 use crate::utility::QuarterTurnsAnticlockwise;
@@ -24,16 +24,17 @@ pub trait Drawable: Clone {
 #[derive(Debug, Clone, From)]
 pub enum DrawableEnum {
     Text(TextDrawable),
-    Shadow(ShadowDrawable),
+    PartialVisibility(PartialVisibilityDrawable),
     Braille(BrailleDrawable),
 }
 
 // TODO: Somehow reduce code duplication here
+
 impl Drawable for DrawableEnum {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
         match self {
             DrawableEnum::Text(v) => v.rotated(quarter_rotations_anticlockwise).into(),
-            DrawableEnum::Shadow(v) => v.rotated(quarter_rotations_anticlockwise).into(),
+            DrawableEnum::PartialVisibility(v) => v.rotated(quarter_rotations_anticlockwise).into(),
             DrawableEnum::Braille(v) => v.rotated(quarter_rotations_anticlockwise).into(),
         }
     }
@@ -41,7 +42,7 @@ impl Drawable for DrawableEnum {
     fn to_glyphs(&self) -> DoubleGlyph {
         match self {
             DrawableEnum::Text(v) => v.to_glyphs(),
-            DrawableEnum::Shadow(v) => v.to_glyphs(),
+            DrawableEnum::PartialVisibility(v) => v.to_glyphs(),
             DrawableEnum::Braille(v) => v.to_glyphs(),
         }
     }
@@ -49,7 +50,7 @@ impl Drawable for DrawableEnum {
     fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
         match self {
             DrawableEnum::Text(v) => v.drawn_over(other).into(),
-            DrawableEnum::Shadow(v) => v.drawn_over(other).into(),
+            DrawableEnum::PartialVisibility(v) => v.drawn_over(other).into(),
             DrawableEnum::Braille(v) => v.drawn_over(other).into(),
         }
     }
@@ -57,7 +58,7 @@ impl Drawable for DrawableEnum {
     fn color_if_backgroundified(&self) -> RGB8 {
         match self {
             DrawableEnum::Text(v) => v.color_if_backgroundified(),
-            DrawableEnum::Shadow(v) => v.color_if_backgroundified(),
+            DrawableEnum::PartialVisibility(v) => v.color_if_backgroundified(),
             DrawableEnum::Braille(v) => v.color_if_backgroundified(),
         }
     }
@@ -112,40 +113,65 @@ impl Drawable for TextDrawable {
 }
 
 #[derive(Debug, Clone, CopyGetters)]
-pub struct ShadowDrawable {
+pub struct PartialVisibilityDrawable {
     // TODO: more shadows
-    the_shadow: LocalSquareHalfPlane,
+    visibility: SquareVisibility,
+    fg_color: RGB8,
     bg_color: RGB8,
 }
 
-impl ShadowDrawable {
+impl PartialVisibilityDrawable {
+    #[deprecated(
+        note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
+    )]
     pub fn from_square_visibility(square_viz: SquareVisibility) -> Self {
         assert!(!square_viz.is_fully_visible());
-        ShadowDrawable {
-            the_shadow: square_viz.visible_portion().unwrap().complement(),
-            bg_color: RED, // TODO: no default color
+        PartialVisibilityDrawable {
+            visibility: square_viz,
+            fg_color: GREEN,              // TODO: no default color
+            bg_color: OUT_OF_SIGHT_COLOR, // TODO: no default color
+        }
+    }
+    pub fn from_partially_visible_drawable<T: Drawable>(
+        original_drawable: &T,
+        square_viz: SquareVisibility,
+    ) -> Self {
+        assert!(!square_viz.is_fully_visible());
+        PartialVisibilityDrawable {
+            visibility: square_viz,
+            fg_color: original_drawable.color_if_backgroundified(),
+            //bg_color: OUT_OF_SIGHT_COLOR,
+            bg_color: GREEN,
         }
     }
 }
 
-impl Drawable for ShadowDrawable {
+impl Drawable for PartialVisibilityDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
         let mut the_clone = self.clone();
-        the_clone.the_shadow = self.the_shadow.rotated(quarter_rotations_anticlockwise);
+        the_clone.visibility = self.visibility.rotated(quarter_rotations_anticlockwise);
         the_clone
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        let character_shadows = [0, 1]
-            .map(|i| local_square_half_plane_to_local_character_half_plane(self.the_shadow, i));
+        let character_visible_portions = [0, 1].map(|i| {
+            local_square_half_plane_to_local_character_half_plane(
+                self.visibility.visible_portion().unwrap(),
+                i,
+            )
+        });
 
-        let bias_direction = self.the_shadow.direction_toward_plane();
+        let bias_direction = self
+            .visibility
+            .visible_portion()
+            .unwrap()
+            .direction_away_from_plane();
 
-        let glyphs = character_shadows
+        let glyphs = character_visible_portions
             .iter()
-            .map(|shadow| {
-                let angle_char = half_plane_to_angled_block_character(*shadow, bias_direction);
-                Glyph::new(angle_char, OUT_OF_SIGHT_COLOR, self.bg_color)
+            .map(|vis_portion| {
+                let angle_char = half_plane_to_angled_block_character(*vis_portion, bias_direction);
+                Glyph::new(angle_char, self.fg_color, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
             .try_into()
@@ -160,7 +186,7 @@ impl Drawable for ShadowDrawable {
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {
-        self.bg_color
+        self.fg_color
     }
 
     fn to_enum(&self) -> DrawableEnum {
@@ -215,8 +241,9 @@ mod tests {
 
     #[test]
     fn test_shadow_over_text() {
-        let shadow =
-            ShadowDrawable::from_square_visibility(SquareVisibility::bottom_half_visible());
+        let shadow = PartialVisibilityDrawable::from_square_visibility(
+            SquareVisibility::bottom_half_visible(),
+        );
         let text = TextDrawable::new("a ", RED, GREEN, false);
 
         let stacked = shadow.drawn_over(&text);
