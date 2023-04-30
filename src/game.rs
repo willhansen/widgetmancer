@@ -2847,8 +2847,7 @@ mod tests {
         assert_ne!(glyphs[0].fg_color, glyphs[1].bg_color);
     }
 
-    #[test]
-    fn test_do_not_see_block_through_portal() {
+    fn set_up_player_just_left_of_portal_through_wall() -> Game {
         let player_square = point2(5, 5);
         let mut game = set_up_10x10_game();
         game.place_player(player_square);
@@ -2859,10 +2858,17 @@ mod tests {
         let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
         game.place_double_sided_two_way_portal(entrance, exit);
 
-        let n = 5;
+        let r = 2;
+        let n = 2 * r + 1;
         (0..n).for_each(|i| {
-            game.place_block(entrance_square + STEP_RIGHT + STEP_UP * n / 2 + STEP_DOWN * i)
+            game.place_block(entrance_square + STEP_RIGHT + STEP_UP * r + STEP_DOWN * i)
         });
+        game
+    }
+
+    #[test]
+    fn test_do_not_see_block_through_portal() {
+        let mut game = set_up_player_just_left_of_portal_through_wall();
 
         game.draw_headless_now();
 
