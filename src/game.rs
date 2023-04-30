@@ -2890,4 +2890,28 @@ mod tests {
         dbg!(up_right_glyphs);
         assert_false!(up_right_glyphs.looks_solid());
     }
+
+    #[test]
+    fn test_freestanding_portals_are_seemless() {
+        let player_square = point2(5, 5);
+        let mut game = set_up_10x10_game();
+        game.place_player(player_square);
+
+        let entrance_square = game.player_square();
+        let exit_square = entrance_square + STEP_RIGHT * 3;
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+        game.place_double_sided_two_way_portal(entrance, exit);
+
+        game.draw_headless_now();
+
+        game.graphics.screen.print_screen_buffer();
+
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP_RIGHT);
+
+        assert!(glyphs.looks_solid());
+    }
 }
