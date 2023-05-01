@@ -125,8 +125,7 @@ pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 #[derive(Debug, Clone)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
-    fully_visible_relative_squares_in_main_view_only: StepSet,
-    partially_visible_relative_squares_in_main_view_only: HashMap<WorldStep, SquareVisibility>,
+    visible_relative_squares_in_main_view_only: HashMap<WorldStep, SquareVisibility>,
     transformed_sub_fovs: Vec<FieldOfView>,
 }
 
@@ -134,8 +133,7 @@ impl FieldOfView {
     pub fn new_empty_fov_with_root(root: SquareWithOrthogonalDir) -> Self {
         FieldOfView {
             root_square_with_direction: root,
-            fully_visible_relative_squares_in_main_view_only: Default::default(),
-            partially_visible_relative_squares_in_main_view_only: Default::default(),
+            visible_relative_squares_in_main_view_only: Default::default(),
             transformed_sub_fovs: vec![],
         }
     }
@@ -155,18 +153,22 @@ impl FieldOfView {
     pub fn sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
+    pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
+        self.visible_relative_squares_in_main_view_only
+            .iter()
+            .filter(|(square, vis): &(&WorldStep, &SquareVisibility)| vis.is_fully_visible())
+            .map(|(&square, vis): (&WorldStep, &SquareVisibility)| square)
+            .collect()
+    }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
-        let mut all_visible = self
-            .fully_visible_relative_squares_in_main_view_only
-            .clone();
+        let mut all_visible = self.fully_visible_relative_squares_in_main_view_only();
 
         self.transformed_sub_fovs
             .iter()
             .for_each(|subview: &FieldOfView| {
                 let transform_from_subview = subview.view_transform_to(&self);
-                let relative_squares_in_sub_frame = subview
-                    .fully_visible_relative_squares_in_main_view_only
-                    .clone();
+                let relative_squares_in_sub_frame =
+                    subview.fully_visible_relative_squares_in_main_view_only();
                 let visible_in_main_frame =
                     transform_from_subview.rotate_steps(&relative_squares_in_sub_frame);
                 all_visible = union(&all_visible, &visible_in_main_frame);
@@ -192,15 +194,23 @@ impl FieldOfView {
         all_visible
     }
     pub fn at_least_partially_visible_relative_squares_main_view_only(&self) -> StepSet {
-        self.fully_visible_relative_squares_in_main_view_only
-            .union(&self.only_partially_visible_squares_in_main_view_only())
-            .copied()
+        set_of_keys(&self.visible_relative_squares_in_main_view_only)
+    }
+
+    pub fn partially_visible_squares_in_main_view_only(&self) -> StepSet {
+        self.visible_relative_squares_in_main_view_only
+            .iter()
+            .filter(|(square, vis)| !vis.is_fully_visible())
+            .map(|(&square, vis)| square)
             .collect()
     }
-    pub fn only_partially_visible_squares_in_main_view_only(&self) -> StepSet {
-        self.partially_visible_relative_squares_in_main_view_only
-            .keys()
-            .copied()
+    pub fn visibilities_of_partially_visible_squares_in_main_view_only(
+        &self,
+    ) -> HashMap<WorldStep, SquareVisibility> {
+        self.visible_relative_squares_in_main_view_only
+            .iter()
+            .filter(|(square, vis)| !vis.is_fully_visible())
+            .map(|(square, vis)| (square.clone(), vis.clone()))
             .collect()
     }
 
@@ -213,28 +223,28 @@ impl FieldOfView {
         type SquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
         let squares_with_non_conflicting_partials: StepSet = self
-            .only_partially_visible_squares_in_main_view_only()
-            .symmetric_difference(&other.only_partially_visible_squares_in_main_view_only())
+            .partially_visible_squares_in_main_view_only()
+            .symmetric_difference(&other.partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
 
         let non_conflicting_partials_from_self: SquareVisibilityMap = self
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
             .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
             .collect();
 
         let non_conflicting_partials_from_other: SquareVisibilityMap = other
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
             .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
             .collect();
 
         let all_squares_with_partials: StepSet = self
-            .only_partially_visible_squares_in_main_view_only()
-            .union(&other.only_partially_visible_squares_in_main_view_only())
+            .partially_visible_squares_in_main_view_only()
+            .union(&other.partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
 
@@ -247,12 +257,12 @@ impl FieldOfView {
             .into_iter()
             .map(|square| {
                 let partial_a = self
-                    .partially_visible_relative_squares_in_main_view_only
+                    .visible_relative_squares_in_main_view_only
                     .get(&square)
                     .unwrap()
                     .clone();
                 let partial_b = other
-                    .partially_visible_relative_squares_in_main_view_only
+                    .visible_relative_squares_in_main_view_only
                     .get(&square)
                     .unwrap()
                     .clone();
@@ -279,8 +289,8 @@ impl FieldOfView {
 
         let all_fully_visible: StepSet = union(
             &union(
-                &self.fully_visible_relative_squares_in_main_view_only,
-                &other.fully_visible_relative_squares_in_main_view_only,
+                &self.fully_visible_relative_squares_in_main_view_only(),
+                &other.fully_visible_relative_squares_in_main_view_only(),
             ),
             &conflicting_partials_that_combine_to_full_visibility,
         );
@@ -294,8 +304,7 @@ impl FieldOfView {
         );
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
-            fully_visible_relative_squares_in_main_view_only: all_fully_visible,
-            partially_visible_relative_squares_in_main_view_only: all_partials,
+            visible_relative_squares_in_main_view_only: all_partials,
             transformed_sub_fovs: vec![],
         }
     }
@@ -346,22 +355,20 @@ impl FieldOfView {
     fn without_sub_views(&self) -> Self {
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
-            fully_visible_relative_squares_in_main_view_only: self
-                .fully_visible_relative_squares_in_main_view_only
-                .clone(),
-            partially_visible_relative_squares_in_main_view_only: self
-                .partially_visible_relative_squares_in_main_view_only
+            visible_relative_squares_in_main_view_only: self
+                .visible_relative_squares_in_main_view_only
                 .clone(),
             transformed_sub_fovs: vec![],
         }
     }
 
-    pub fn can_fully_see_relative_square(&self, step: WorldStep) -> bool {
-        self.visibility_of_relative_square(step)
-            .is_some_and(|v| v.is_fully_visible())
+    pub fn can_fully_see_relative_square_as_single_square(&self, step: WorldStep) -> bool {
+        let visibility = self.visibilities_of_relative_square(step);
+        return visibility.len() == 1 && visibility.get(0).unwrap().is_fully_visible();
     }
+
     pub fn can_see_relative_square(&self, step: WorldStep) -> bool {
-        self.visibility_of_relative_square(step).is_some()
+        !self.visibilities_of_relative_square(step).is_empty()
     }
 
     pub fn visibility_of_absolute_square(
@@ -372,7 +379,7 @@ impl FieldOfView {
         let rel_to_root = world_square - self.root_square();
         let mut visibilities = vec![];
         if let Some(visibility_in_untransformed_view) =
-            self.visibility_of_relative_square_in_untransformed_view(rel_to_root)
+            self.visibility_of_relative_square_in_main_view(rel_to_root)
         {
             visibilities.push(visibility_in_untransformed_view);
         }
@@ -389,71 +396,77 @@ impl FieldOfView {
         !self.visibility_of_absolute_square(world_square).is_empty()
     }
 
-    pub fn relative_to_absolute(&self, rel_square: WorldStep) -> Option<WorldSquare> {
-        // TODO: account for multiple fovs seeing part of the same relative square
+    pub fn relative_to_absolute(
+        &self,
+        rel_square: WorldStep,
+    ) -> HashMap<WorldSquare, SquareVisibility> {
+        let mut absolute_squares: HashMap<WorldSquare, SquareVisibility> = Default::default();
+        if let Some(main_view_absolute_square) =
+            self.relative_to_absolute_from_main_view_only(rel_square)
+        {
+            absolute_squares.push(main_view_absolute_square);
+        }
 
-        return if self
-            .fully_visible_relative_squares_in_main_view_only
+        let mut results_from_sub_fovs: Vec<WorldSquare> = self
+            .transformed_sub_fovs
+            .iter()
+            .map(|fov: &FieldOfView| {
+                let rotation = self.view_transform_to(fov).rotation();
+                let rotated_rel_square = rotation.rotate_vector(rel_square);
+                fov.relative_to_absolute(rotated_rel_square)
+            })
+            .flatten()
+            .collect();
+
+        absolute_squares.append(&mut results_from_sub_fovs);
+
+        absolute_squares
+    }
+    pub fn relative_to_absolute_from_main_view_only(
+        &self,
+        rel_square: WorldStep,
+    ) -> Option<WorldSquare> {
+        if self
+            .visible_relative_squares_in_main_view_only
+            .keys()
             .contains(&rel_square)
-            || self
-                .partially_visible_relative_squares_in_main_view_only
-                .keys()
-                .contains(&rel_square)
         {
             Some(self.root_square() + rel_square)
         } else {
-            let results_from_sub_fovs: Vec<Option<WorldSquare>> = self
-                .transformed_sub_fovs
-                .iter()
-                .map(|fov: &FieldOfView| {
-                    let rotation = self.view_transform_to(fov).rotation();
-                    let rotated_rel_square = rotation.rotate_vector(rel_square);
-                    fov.relative_to_absolute(rotated_rel_square)
-                })
-                .collect();
-            let maybe_a_found_absolute_square =
-                results_from_sub_fovs.iter().flatten().next().copied();
-            maybe_a_found_absolute_square
-        };
+            None
+        }
     }
 
-    fn visibility_of_relative_square_in_untransformed_view(
+    fn visibility_of_relative_square_in_main_view(
         &self,
         relative_square: WorldStep,
     ) -> Option<SquareVisibility> {
-        if self
-            .fully_visible_relative_squares_in_main_view_only
-            .contains(&relative_square)
-        {
-            Some(SquareVisibility::new_fully_visible())
-        } else {
-            self.partially_visible_relative_squares_in_main_view_only
-                .get(&relative_square)
-                .copied()
-        }
+        self.visible_relative_squares_in_main_view_only
+            .get(&relative_square)
+            .copied()
     }
 
     fn transformed_visibility_of_relative_square_in_sub_views(
         &self,
         relative_square: WorldStep,
-    ) -> Option<SquareVisibility> {
+    ) -> Vec<SquareVisibility> {
         self.transformed_sub_fovs
             .iter()
             .map(|sub_fov| {
-                self.transformed_visibility_of_relative_square_in_one_sub_view(
+                self.transformed_visibilities_of_relative_square_in_one_sub_view(
                     relative_square,
                     sub_fov,
                 )
             })
-            .find(|vis| vis.is_some())
             .flatten()
+            .collect_vec()
     }
 
-    fn transformed_visibility_of_relative_square_in_one_sub_view(
+    fn transformed_visibilities_of_relative_square_in_one_sub_view(
         &self,
         relative_square: WorldStep,
         sub_view: &FieldOfView,
-    ) -> Option<SquareVisibility> {
+    ) -> Vec<SquareVisibility> {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
         let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.rotation();
@@ -463,50 +476,44 @@ impl FieldOfView {
             quarter_rotations.quarter_turns(),
         );
 
-        let rotated_visibility = sub_view.visibility_of_relative_square(rotated_relative_square);
+        let rotated_visibilities =
+            sub_view.visibilities_of_relative_square(rotated_relative_square);
 
-        let derotated_visibility =
-            rotated_visibility.map(|v| v.rotated(-quarter_rotations.quarter_turns()));
+        let derotated_visibility = rotated_visibilities
+            .iter()
+            .map(|v| v.rotated(-quarter_rotations.quarter_turns()))
+            .collect_vec();
 
         derotated_visibility
     }
 
-    pub fn visibility_of_relative_square(
+    pub fn visibilities_of_relative_square(
         &self,
         relative_square: WorldStep,
-    ) -> Option<SquareVisibility> {
-        let top_level_visibility =
-            self.visibility_of_relative_square_in_untransformed_view(relative_square);
-        if top_level_visibility.is_some() {
-            return top_level_visibility;
+    ) -> Vec<SquareVisibility> {
+        let mut visibilities: Vec<SquareVisibility> = vec![];
+
+        if let Some(top_level_visibility) =
+            self.visibility_of_relative_square_in_main_view(relative_square)
+        {
+            visibilities.push(top_level_visibility);
         }
 
-        let sub_view_visibility =
+        let mut sub_view_visibilities: Vec<SquareVisibility> =
             self.transformed_visibility_of_relative_square_in_sub_views(relative_square);
-        if sub_view_visibility.is_some() {
-            return sub_view_visibility;
-        }
+        visibilities.append(&mut sub_view_visibilities);
 
-        return None;
+        visibilities
     }
 
     pub fn add_visible_square(&mut self, relative_square: WorldStep, visibility: SquareVisibility) {
-        if visibility.is_fully_visible() || visibility.is_nearly_fully_visible(1e-3) {
-            self.fully_visible_relative_squares_in_main_view_only
-                .insert(relative_square);
-        } else if let Some(partial) = visibility.visible_portion() {
-            self.partially_visible_relative_squares_in_main_view_only
-                .insert(
-                    relative_square,
-                    SquareVisibility::new_partially_visible(partial),
-                );
-        } else {
-            panic!("told to add non-visible square");
-        }
+        self.visible_relative_squares_in_main_view_only
+            .insert(relative_square, visibility);
     }
+
     pub fn add_fully_visible_square(&mut self, relative_square: WorldStep) {
-        self.fully_visible_relative_squares_in_main_view_only
-            .insert(relative_square);
+        self.visible_relative_squares_in_main_view_only
+            .insert(relative_square, SquareVisibility::new_fully_visible());
     }
 }
 
@@ -729,9 +736,7 @@ pub fn single_octant_field_of_view(
         AngleInterval::from_octant(octant),
         0,
     );
-    fov_result
-        .fully_visible_relative_squares_in_main_view_only
-        .insert(STEP_ZERO);
+    fov_result.add_fully_visible_square(STEP_ZERO);
     fov_result
 }
 
@@ -882,13 +887,13 @@ mod tests {
         );
         //dbg!(&fov_result.partially_visible_squares);
         assert!(fov_result
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .is_empty());
-        assert!(fov_result.can_fully_see_relative_square(STEP_ZERO));
+        assert!(fov_result.can_fully_see_relative_square_as_single_square(STEP_ZERO));
         let square_area = (fov_radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result
-                .fully_visible_relative_squares_in_main_view_only
+                .fully_visible_relative_squares_in_main_view_only()
                 .len(),
             square_area as usize
         );
@@ -907,13 +912,13 @@ mod tests {
 
         //dbg!(set_of_keys(&fov_result.partially_visible_squares));
         assert!(fov_result
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .is_empty());
-        assert!(fov_result.can_fully_see_relative_square(STEP_ZERO));
+        assert!(fov_result.can_fully_see_relative_square_as_single_square(STEP_ZERO));
         let square_area = (radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result
-                .fully_visible_relative_squares_in_main_view_only
+                .fully_visible_relative_squares_in_main_view_only()
                 .len(),
             square_area as usize
         );
@@ -946,9 +951,11 @@ mod tests {
             &blocks,
             &PortalGeometry::default(),
         );
-        assert!(fov_result.can_fully_see_relative_square(block_step));
-        assert!(fov_result.can_fully_see_relative_square(block_step + STEP_DOWN));
-        assert_false!(fov_result.can_fully_see_relative_square(block_step + STEP_UP));
+        assert!(fov_result.can_fully_see_relative_square_as_single_square(block_step));
+        assert!(fov_result.can_fully_see_relative_square_as_single_square(block_step + STEP_DOWN));
+        assert_false!(
+            fov_result.can_fully_see_relative_square_as_single_square(block_step + STEP_UP)
+        );
     }
 
     #[test]
@@ -963,10 +970,10 @@ mod tests {
             &PortalGeometry::default(),
         );
         assert!(!fov_result
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .is_empty());
         assert!(fov_result
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .iter()
             .all(
                 |(&_step, &square_visibility): (&WorldStep, &SquareVisibility)| {
@@ -992,7 +999,7 @@ mod tests {
         for i in 1..=5 {
             let step = STEP_UP_RIGHT * i;
             let square_visibility = fov_result
-                .partially_visible_relative_squares_in_main_view_only
+                .visible_relative_squares_in_main_view_only
                 .get(&step)
                 .unwrap();
             //dbg!(partial_visibility);
@@ -1027,10 +1034,11 @@ mod tests {
             &PortalGeometry::default(),
         );
         let visibility_of_test_square = fov_result
-            .visibility_of_relative_square(test_rel_square)
+            .visibilities_of_relative_square(test_rel_square)
+            .get(0)
             .unwrap();
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(visibility_of_test_square)
+            PartialVisibilityDrawable::from_square_visibility(*visibility_of_test_square)
                 .to_glyphs()
                 .to_clean_string()
                 .chars()
@@ -1100,8 +1108,9 @@ mod tests {
             Octant::new(0),
         );
         let visible_rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
-        assert!(fov_result.can_fully_see_relative_square((visible_rel_square + STEP_LEFT)));
-        assert!(fov_result.can_fully_see_relative_square(visible_rel_square));
+        assert!(fov_result
+            .can_fully_see_relative_square_as_single_square((visible_rel_square + STEP_LEFT)));
+        assert!(fov_result.can_fully_see_relative_square_as_single_square(visible_rel_square));
     }
 
     #[test]
@@ -1117,7 +1126,7 @@ mod tests {
         );
 
         fov_result
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .iter()
             .map(|(step, square_vis): (&WorldStep, &SquareVisibility)| {
                 (
@@ -1294,13 +1303,11 @@ mod tests {
         let center: WorldSquare = point2(5, 5);
         let mut fov_result = FieldOfView::new_empty_fov_at(center);
         let relative_square = vec2(2, 2);
-        fov_result
-            .fully_visible_relative_squares_in_main_view_only
-            .insert(relative_square);
+        fov_result.add_fully_visible_square(relative_square);
 
-        let square_visibility = fov_result.visibility_of_relative_square(relative_square);
-        assert!(square_visibility.unwrap().is_fully_visible());
-        assert!(square_visibility.unwrap().visible_portion.is_none());
+        let square_visibility = fov_result.visibilities_of_relative_square(relative_square);
+        assert!(square_visibility.get(0).unwrap().is_fully_visible());
+        assert!(square_visibility.get(0).unwrap().visible_portion.is_none());
     }
 
     #[test]
@@ -1343,7 +1350,7 @@ mod tests {
 
         assert_eq!(
             fov_result
-                .fully_visible_relative_squares_in_main_view_only
+                .fully_visible_relative_squares_in_main_view_only()
                 .len(),
             1
         );
@@ -1429,7 +1436,8 @@ mod tests {
         assert_false!(fov_result.can_see_absolute_square(portal_entrance.square() + STEP_RIGHT));
         assert!(fov_result.can_see_absolute_square(portal_exit.square()));
 
-        assert_false!(fov_result.transformed_sub_fovs[0].can_fully_see_relative_square(STEP_ZERO));
+        assert_false!(fov_result.transformed_sub_fovs[0]
+            .can_fully_see_relative_square_as_single_square(STEP_ZERO));
     }
 
     #[test]
@@ -1444,15 +1452,13 @@ mod tests {
 
         let target_square = point2(1, 4);
 
-        sub_fov
-            .fully_visible_relative_squares_in_main_view_only
-            .insert(target_square - sub_fov.root_square());
+        sub_fov.add_fully_visible_square(target_square - sub_fov.root_square());
 
         main_fov.transformed_sub_fovs.push(sub_fov);
 
         let rel_from_main = STEP_LEFT * 4;
 
-        assert!(main_fov.can_fully_see_relative_square(rel_from_main));
+        assert!(main_fov.can_fully_see_relative_square_as_single_square(rel_from_main));
         assert!(main_fov.can_see_absolute_square(point2(1, 4)));
 
         assert_eq!(
@@ -1563,10 +1569,10 @@ mod tests {
 
         let rel_square = STEP_RIGHT * 3;
         sub_fov_1
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .insert(rel_square, SquareVisibility::top_half_visible());
         sub_fov_2
-            .partially_visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only
             .insert(rel_square, SquareVisibility::bottom_half_visible());
 
         fov_1.transformed_sub_fovs.push(sub_fov_1);
@@ -1587,7 +1593,7 @@ mod tests {
                 .len(),
             1
         );
-        assert!(combined_fov.can_fully_see_relative_square(rel_square));
+        assert!(combined_fov.can_fully_see_relative_square_as_single_square(rel_square));
     }
 
     #[test]
@@ -1601,7 +1607,10 @@ mod tests {
 
         fov.add_fully_visible_square(rel_square);
 
-        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+        assert_eq!(
+            *fov.relative_to_absolute(rel_square).get(0).unwrap(),
+            abs_square
+        );
     }
 
     #[test]
@@ -1619,7 +1628,10 @@ mod tests {
 
         fov.transformed_sub_fovs.push(sub_fov);
 
-        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+        assert_eq!(
+            *fov.relative_to_absolute(rel_square).get(0).unwrap(),
+            abs_square
+        );
     }
 
     #[test]
@@ -1648,7 +1660,10 @@ mod tests {
         sub_fov.add_fully_visible_square(rotated_rel_square);
         fov.transformed_sub_fovs.push(sub_fov);
 
-        assert_eq!(fov.relative_to_absolute(rel_square).unwrap(), abs_square);
+        assert_eq!(
+            *fov.relative_to_absolute(rel_square).get(0).unwrap(),
+            abs_square
+        );
     }
 
     #[test]
@@ -1657,5 +1672,27 @@ mod tests {
         // These values are from an observed failure.  NOT ARBITRARY
         let arc = AngleInterval::new(Angle::radians(0.7853978), Angle::radians(0.7853982));
         let visibility = square_visibility_from_one_view_arc(arc, rel_square);
+    }
+
+    #[test]
+    fn test_visibility_of_multiple_squares_in_one_square() {
+        let main_center = point2(5, 5);
+        let other_center = point2(15, 5);
+
+        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
+        let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
+
+        let rel_square = STEP_RIGHT * 3;
+        fov_1
+            .visible_relative_squares_in_main_view_only
+            .insert(rel_square, SquareVisibility::bottom_half_visible());
+        sub_fov_1
+            .visible_relative_squares_in_main_view_only
+            .insert(rel_square, SquareVisibility::top_half_visible());
+
+        fov_1.transformed_sub_fovs.push(sub_fov_1);
+
+        assert_eq!(fov_1.visibilities_of_relative_square(rel_square).len(), 2);
+        assert_eq!(fov_1.relative_to_absolute(rel_square).len(), 2);
     }
 }

@@ -215,9 +215,9 @@ impl Graphics {
 
                 let relative_world_square = world_square - field_of_view.root_square();
                 // TODO: break up this function a bit
-                if let Some(square_visibility) =
-                    field_of_view.visibility_of_relative_square(relative_world_square)
-                {
+                let square_visibilities =
+                    field_of_view.visibilities_of_relative_square(relative_world_square);
+                if !square_visibilities.is_empty() {
                     let absolute_world_square_seen: WorldSquare = field_of_view
                         .relative_to_absolute(relative_world_square)
                         .unwrap();
