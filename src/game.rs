@@ -1617,15 +1617,16 @@ impl Game {
     }
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
-        self.player_field_of_view()
-            .visibilities_of_relative_square(target_square_relative_to_player)
-            .is_some_and(|v| v.is_fully_visible())
+        let visibilities = self
+            .player_field_of_view()
+            .visibilities_of_relative_square(target_square_relative_to_player);
+        visibilities.len() == 1 && visibilities.get(0).unwrap().is_fully_visible()
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         self.player_field_of_view()
             .visibilities_of_relative_square(target_square_relative_to_player)
-            .is_none()
+            .is_empty()
     }
     fn player_field_of_view(&self) -> FieldOfView {
         let start_square = self.player_square();

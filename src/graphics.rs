@@ -33,7 +33,7 @@ use crate::animations::smite_from_above::SmiteFromAbove;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::FieldOfView;
+use crate::fov_stuff::{FieldOfView, SquareVisibility};
 use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
@@ -215,31 +215,37 @@ impl Graphics {
 
                 let relative_world_square = world_square - field_of_view.root_square();
                 // TODO: break up this function a bit
-                let square_visibilities =
-                    field_of_view.visibilities_of_relative_square(relative_world_square);
-                if !square_visibilities.is_empty() {
-                    let absolute_world_square_seen: WorldSquare = field_of_view
-                        .relative_to_absolute(relative_world_square)
-                        .unwrap();
+                let absolute_world_squares_with_visibility: HashMap<WorldSquare, SquareVisibility> =
+                    field_of_view.relative_to_absolute(relative_world_square);
+                let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
+                    .iter()
+                    .filter(
+                        |(&abs_square, &visibility): &(&WorldSquare, &SquareVisibility)| {
+                            self.draw_buffer.contains_key(&abs_square)
+                        },
+                    )
+                    .map(
+                        |(&abs_square, &visibility): (&WorldSquare, &SquareVisibility)| {
+                            let base_drawable: &DrawableEnum =
+                                self.draw_buffer.get(&abs_square).unwrap();
+                            if !visibility.is_fully_visible() {
+                                DrawableEnum::PartialVisibility(
+                                    PartialVisibilityDrawable::from_partially_visible_drawable(
+                                        base_drawable,
+                                        visibility,
+                                    ),
+                                )
+                            } else {
+                                base_drawable.clone()
+                            }
+                        },
+                    )
+                    .reduce(|bottom, top| top.drawn_over(&bottom));
 
-                    let maybe_base_drawable: Option<&DrawableEnum> =
-                        self.draw_buffer.get(&absolute_world_square_seen);
-                    if let Some(base_drawable) = maybe_base_drawable {
-                        let unrotated: DrawableEnum = if !square_visibility.is_fully_visible() {
-                            DrawableEnum::PartialVisibility(
-                                PartialVisibilityDrawable::from_partially_visible_drawable(
-                                    base_drawable,
-                                    square_visibility,
-                                ),
-                            )
-                        } else {
-                            base_drawable.clone()
-                        };
-
-                        let rotated: DrawableEnum =
-                            unrotated.rotated(-self.screen.rotation().quarter_turns());
-                        self.screen.draw_drawable(&rotated, screen_square);
-                    }
+                if let Some(unrotated) = maybe_unrotated {
+                    let rotated: DrawableEnum =
+                        unrotated.rotated(-self.screen.rotation().quarter_turns());
+                    self.screen.draw_drawable(&rotated, screen_square);
                 }
             }
         }

@@ -456,6 +456,15 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         let new_line = line.rotated(quarter_rotations_anticlockwise);
         Self::from_line_and_point_on_half_plane(new_line, new_point)
     }
+    pub fn top_half_plane() -> Self {
+        Self::from_line_and_point_on_half_plane(
+            Line::<f32, U> {
+                p1: Point2D::new(1.0, 0.0),
+                p2: Point2D::new(-1.0, 0.0),
+            },
+            Point2D::<f32, U>::new(0.0, 1.0),
+        )
+    }
 }
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
