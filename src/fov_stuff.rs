@@ -22,6 +22,8 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
+type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+
 #[derive(Clone, Debug, Copy, Constructor)]
 pub struct SquareVisibility {
     visible_portion: Option<LocalSquareHalfPlane>,
@@ -128,7 +130,7 @@ pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 #[derive(Debug, Clone)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
-    visible_relative_squares_in_main_view_only: HashMap<WorldStep, SquareVisibility>,
+    visible_relative_squares_in_main_view_only: StepVisibilityMap,
     transformed_sub_fovs: Vec<FieldOfView>,
 }
 
@@ -247,91 +249,63 @@ impl FieldOfView {
             other.root_square_with_direction
         );
 
-        type SquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
-
-        let squares_with_non_conflicting_partials: StepSet = self
-            .partially_visible_squares_in_main_view_only()
-            .symmetric_difference(&other.partially_visible_squares_in_main_view_only())
+        let squares_visible_in_only_one_view: StepSet = self
+            .at_least_partially_visible_relative_squares_main_view_only()
+            .symmetric_difference(
+                &other.at_least_partially_visible_relative_squares_main_view_only(),
+            )
             .copied()
             .collect();
 
-        let non_conflicting_partials_from_self: SquareVisibilityMap = self
+        let visibility_of_squares_only_visible_in_self: StepVisibilityMap = self
             .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
-            .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
+            .filter(|(square, partial)| squares_visible_in_only_one_view.contains(square))
             .collect();
 
-        let non_conflicting_partials_from_other: SquareVisibilityMap = other
+        let visibility_of_squares_only_visible_in_other: StepVisibilityMap = other
             .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
-            .filter(|(square, partial)| squares_with_non_conflicting_partials.contains(square))
+            .filter(|(square, partial)| squares_visible_in_only_one_view.contains(square))
             .collect();
 
-        let all_squares_with_partials: StepSet = self
+        let all_visible_squares: StepSet = self
             .partially_visible_squares_in_main_view_only()
             .union(&other.partially_visible_squares_in_main_view_only())
             .copied()
             .collect();
 
-        let squares_with_conflicting_partials: StepSet = all_squares_with_partials
-            .difference(&squares_with_non_conflicting_partials)
+        let squares_visible_in_both_views: StepSet = all_visible_squares
+            .difference(&squares_visible_in_only_one_view)
             .copied()
             .collect();
 
-        let combined_partials: SquareVisibilityMap = squares_with_conflicting_partials
-            .into_iter()
-            .map(|square| {
-                let partial_a = self
-                    .visible_relative_squares_in_main_view_only
-                    .get(&square)
-                    .unwrap()
-                    .clone();
-                let partial_b = other
-                    .visible_relative_squares_in_main_view_only
-                    .get(&square)
-                    .unwrap()
-                    .clone();
-                let combined = partial_a.combined_increasing_visibility(&partial_b);
-                (square, combined)
-            })
-            .collect();
+        let visibility_of_squares_visible_in_both_views: StepVisibilityMap =
+            squares_visible_in_both_views
+                .into_iter()
+                .map(|square| {
+                    let partial_a = self
+                        .visible_relative_squares_in_main_view_only
+                        .get(&square)
+                        .unwrap();
+                    let partial_b = other
+                        .visible_relative_squares_in_main_view_only
+                        .get(&square)
+                        .unwrap();
+                    let combined = partial_a.combined_increasing_visibility(&partial_b);
+                    (square, combined)
+                })
+                .collect();
 
-        let conflicting_partials_that_combine_to_full_visibility: StepSet = combined_partials
-            .iter()
-            .filter(|(square, partial)| partial.is_fully_visible())
-            .map(|(square, partial)| square)
-            .copied()
-            .collect();
+        let mut all_visibilities: StepVisibilityMap = visibility_of_squares_only_visible_in_self;
+        all_visibilities.extend(visibility_of_squares_only_visible_in_other);
+        all_visibilities.extend(visibility_of_squares_visible_in_both_views);
 
-        let conflicting_partials_that_remain_partials: SquareVisibilityMap = combined_partials
-            .into_iter()
-            .filter(|(square, partial)| !partial.is_fully_visible())
-            .collect();
-
-        let mut all_partials: SquareVisibilityMap = non_conflicting_partials_from_self;
-        all_partials.extend(non_conflicting_partials_from_other);
-        all_partials.extend(conflicting_partials_that_remain_partials);
-
-        let all_fully_visible: StepSet = union(
-            &union(
-                &self.fully_visible_relative_squares_in_main_view_only(),
-                &other.fully_visible_relative_squares_in_main_view_only(),
-            ),
-            &conflicting_partials_that_combine_to_full_visibility,
-        );
-
-        let squares_somehow_both_fully_and_partially_visible =
-            intersection(&set_of_keys(&all_partials), &all_fully_visible);
-        assert!(
-            squares_somehow_both_fully_and_partially_visible.is_empty(),
-            "{:?}",
-            squares_somehow_both_fully_and_partially_visible
-        );
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
-            visible_relative_squares_in_main_view_only: all_partials,
+            visible_relative_squares_in_main_view_only: all_visibilities,
             transformed_sub_fovs: vec![],
         }
     }
@@ -371,7 +345,6 @@ impl FieldOfView {
             other.root_square_with_direction
         );
 
-        // TODO: combine these somehow
         let mut top_view_combined_fov = self.combined_main_view_only(other);
 
         top_view_combined_fov.transformed_sub_fovs =
@@ -910,7 +883,7 @@ mod tests {
     #[test]
     fn test_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
-        let fov_radius = 2;
+        let fov_radius = 10;
         let fov_result = portal_aware_field_of_view_from_square(
             start_square,
             fov_radius,
@@ -942,7 +915,7 @@ mod tests {
             &PortalGeometry::default(),
         );
 
-        dbg!(fov_result.partially_visible_squares_in_main_view_only());
+        dbg!(fov_result.fully_visible_relative_squares_in_main_view_only());
         assert!(fov_result
             .partially_visible_squares_in_main_view_only()
             .is_empty());
@@ -1588,6 +1561,54 @@ mod tests {
                 .with_direction(direction_near_exit);
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
+    }
+    #[test]
+    fn test_simple_fov_combination() {
+        let main_center = point2(5, 5);
+        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
+        fov_1.add_fully_visible_square(STEP_RIGHT);
+        fov_2.add_fully_visible_square(STEP_UP);
+
+        let combined = fov_1.combined_with(&fov_2);
+
+        assert_eq!(
+            combined
+                .fully_visible_relative_squares_including_subviews()
+                .len(),
+            2
+        );
+        assert_eq!(
+            combined
+                .fully_visible_relative_squares_in_main_view_only()
+                .len(),
+            2
+        );
+    }
+    #[test]
+    fn test_combined_fovs_combine_visibility() {
+        let main_center = point2(5, 5);
+        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
+        let rel_square = STEP_RIGHT * 3;
+        fov_1
+            .visible_relative_squares_in_main_view_only
+            .insert(rel_square, SquareVisibility::top_half_visible());
+        fov_2
+            .visible_relative_squares_in_main_view_only
+            .insert(rel_square, SquareVisibility::bottom_half_visible());
+
+        let combined = fov_1.combined_with(&fov_2);
+
+        assert_eq!(
+            combined
+                .fully_visible_relative_squares_including_subviews()
+                .len(),
+            1
+        );
+        assert!(combined
+            .partially_visible_squares_in_main_view_only()
+            .is_empty());
     }
 
     #[test]
