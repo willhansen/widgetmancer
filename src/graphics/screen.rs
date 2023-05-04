@@ -332,6 +332,26 @@ impl Screen {
         )
     }
 
+    pub fn all_screen_squares(&self) -> Vec<ScreenBufferSquare> {
+        let mut the_squares = vec![];
+        for buffer_x in 0..self.terminal_width() {
+            for buffer_y in 0..self.terminal_height() {
+                let screen_buffer_character_square: ScreenBufferCharacterSquare =
+                    point2(buffer_x, buffer_y);
+                if !self.screen_buffer_character_square_is_left_glyph_of_screen_square(
+                    screen_buffer_character_square,
+                ) {
+                    continue;
+                }
+                let screen_square = self.screen_buffer_character_square_to_screen_buffer_square(
+                    screen_buffer_character_square,
+                );
+                the_squares.push(screen_square);
+            }
+        }
+        the_squares
+    }
+
     pub fn get_screen_buffered_glyph(&self, pos: ScreenBufferCharacterSquare) -> &Glyph {
         return &self.screen_buffer[pos.x as usize][pos.y as usize];
     }

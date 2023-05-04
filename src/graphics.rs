@@ -158,7 +158,7 @@ impl Graphics {
         self.draw_buffer.get(&world_square)
     }
 
-    pub fn print_draw_buffer(&self, center: WorldCharacterSquare, radius: u32) {
+    pub fn print_draw_buffer(&self, center: WorldSquare, radius: u32) {
         let l = 2 * radius + 1;
         for row in 0..l {
             let y = center.y + radius as i32 - row as i32;
@@ -191,62 +191,44 @@ impl Graphics {
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
-        for buffer_x in 0..self.screen.terminal_width() {
-            for buffer_y in 0..self.screen.terminal_height() {
-                let screen_buffer_character_square: ScreenBufferCharacterSquare =
-                    point2(buffer_x, buffer_y);
-                if !self
-                    .screen
-                    .screen_buffer_character_square_is_left_glyph_of_screen_square(
-                        screen_buffer_character_square,
-                    )
-                {
-                    continue;
-                }
-                let screen_square = self
-                    .screen
-                    .screen_buffer_character_square_to_screen_buffer_square(
-                        screen_buffer_character_square,
-                    );
+        for screen_square in self.screen.all_screen_squares() {
+            let world_square = self
+                .screen
+                .screen_buffer_square_to_world_square(screen_square);
 
-                let world_square = self
-                    .screen
-                    .screen_buffer_square_to_world_square(screen_square);
+            let relative_world_square = world_square - field_of_view.root_square();
+            // TODO: break up this function a bit
+            let absolute_world_squares_with_visibility: HashMap<WorldSquare, SquareVisibility> =
+                field_of_view.relative_to_absolute(relative_world_square);
+            let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
+                .iter()
+                .filter(
+                    |(&abs_square, &visibility): &(&WorldSquare, &SquareVisibility)| {
+                        self.draw_buffer.contains_key(&abs_square)
+                    },
+                )
+                .map(
+                    |(&abs_square, &visibility): (&WorldSquare, &SquareVisibility)| {
+                        let base_drawable: &DrawableEnum =
+                            self.draw_buffer.get(&abs_square).unwrap();
+                        if !visibility.is_fully_visible() {
+                            DrawableEnum::PartialVisibility(
+                                PartialVisibilityDrawable::from_partially_visible_drawable(
+                                    base_drawable,
+                                    visibility,
+                                ),
+                            )
+                        } else {
+                            base_drawable.clone()
+                        }
+                    },
+                )
+                .reduce(|bottom, top| top.drawn_over(&bottom));
 
-                let relative_world_square = world_square - field_of_view.root_square();
-                // TODO: break up this function a bit
-                let absolute_world_squares_with_visibility: HashMap<WorldSquare, SquareVisibility> =
-                    field_of_view.relative_to_absolute(relative_world_square);
-                let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
-                    .iter()
-                    .filter(
-                        |(&abs_square, &visibility): &(&WorldSquare, &SquareVisibility)| {
-                            self.draw_buffer.contains_key(&abs_square)
-                        },
-                    )
-                    .map(
-                        |(&abs_square, &visibility): (&WorldSquare, &SquareVisibility)| {
-                            let base_drawable: &DrawableEnum =
-                                self.draw_buffer.get(&abs_square).unwrap();
-                            if !visibility.is_fully_visible() {
-                                DrawableEnum::PartialVisibility(
-                                    PartialVisibilityDrawable::from_partially_visible_drawable(
-                                        base_drawable,
-                                        visibility,
-                                    ),
-                                )
-                            } else {
-                                base_drawable.clone()
-                            }
-                        },
-                    )
-                    .reduce(|bottom, top| top.drawn_over(&bottom));
-
-                if let Some(unrotated) = maybe_unrotated {
-                    let rotated: DrawableEnum =
-                        unrotated.rotated(-self.screen.rotation().quarter_turns());
-                    self.screen.draw_drawable(&rotated, screen_square);
-                }
+            if let Some(unrotated) = maybe_unrotated {
+                let rotated: DrawableEnum =
+                    unrotated.rotated(-self.screen.rotation().quarter_turns());
+                self.screen.draw_drawable(&rotated, screen_square);
             }
         }
     }
