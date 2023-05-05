@@ -975,19 +975,8 @@ mod tests {
             &PortalGeometry::default(),
         );
         assert!(!fov_result
-            .visible_relative_squares_in_main_view_only
+            .only_partially_visible_relative_squares_in_main_view_only()
             .is_empty());
-        assert!(fov_result
-            .visible_relative_squares_in_main_view_only
-            .iter()
-            .all(
-                |(&_step, &square_visibility): (&WorldStep, &SquareVisibility)| {
-                    PartialVisibilityDrawable::from_square_visibility(square_visibility)
-                        .to_glyphs()
-                        .iter()
-                        .any(|glyph: &Glyph| !glyph.looks_solid())
-                }
-            ));
     }
 
     #[test]
@@ -1134,6 +1123,7 @@ mod tests {
         fov_result
             .visible_relative_squares_in_main_view_only
             .iter()
+            .filter(|(step, vis)| !vis.is_fully_visible())
             .map(|(step, square_vis): (&WorldStep, &SquareVisibility)| {
                 (
                     step,
