@@ -5,8 +5,11 @@ use crate::utility::{LEFT_I, RIGHT_I, UP_I};
 use euclid::point2;
 use std::time::Instant;
 
+pub fn set_up_nxm_game(rows: u32, cols: u32) -> Game {
+    Game::new(cols as u16 * 2, rows as u16, Instant::now())
+}
 pub fn set_up_nxn_game(board_size: u32) -> Game {
-    Game::new(board_size as u16 * 2, board_size as u16, Instant::now())
+    set_up_nxm_game(board_size, board_size)
 }
 pub fn set_up_10x10_game() -> Game {
     set_up_nxn_game(10)

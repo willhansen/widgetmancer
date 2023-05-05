@@ -112,6 +112,11 @@ pub fn do_everything() {
     //game.set_up_simple_portal_map();
     game.set_up_portal_across_wall_map();
     game.set_up_simple_freestanding_portal();
+    game.place_dense_horizontal_portals(
+        game.player_square() + STEP_RIGHT * 10 + STEP_DOWN_RIGHT * 5,
+        3,
+        6,
+    );
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();

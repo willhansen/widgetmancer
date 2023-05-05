@@ -1458,6 +1458,24 @@ impl Game {
             exit_step.reversed().stepped(),
         );
     }
+    pub fn place_dense_horizontal_portals(
+        &mut self,
+        top_left: WorldSquare,
+        portal_rows: u32,
+        portal_cols: u32,
+    ) {
+        (0..portal_rows).for_each(|row| {
+            (0..portal_cols).for_each(|col| {
+                let entrance_square =
+                    top_left + STEP_RIGHT * col as i32 * 2 + STEP_DOWN * row as i32;
+                let exit_square = entrance_square + STEP_RIGHT * 2;
+                let entrance =
+                    SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+                let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+                self.place_double_sided_two_way_portal(entrance, exit);
+            });
+        });
+    }
 
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
@@ -2919,14 +2937,10 @@ mod tests {
     #[test]
     fn test_portal_edges_are_stable() {
         let player_square = point2(0, 5);
-        let mut game = set_up_10x10_game();
+        let mut game = set_up_nxm_game(10, 30);
         game.place_player(player_square);
 
-        let entrance_square = game.player_square();
-        let exit_square = entrance_square + STEP_RIGHT * 2;
-        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
-        game.place_double_sided_two_way_portal(entrance, exit);
+        game.place_dense_horizontal_portals(player_square, 3, 6);
 
         let n = 5;
         let consecutive_frames = (0..n)
