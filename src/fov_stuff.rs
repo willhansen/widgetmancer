@@ -396,18 +396,18 @@ impl FieldOfView {
         !self.visibility_of_absolute_square(world_square).is_empty()
     }
 
-    pub fn relative_to_absolute(
+    pub fn relative_to_absolute_with_top_view_first(
         &self,
         rel_square: WorldStep,
-    ) -> HashMap<WorldSquare, SquareVisibility> {
-        let mut absolute_squares: HashMap<WorldSquare, SquareVisibility> = Default::default();
+    ) -> Vec<(WorldSquare, SquareVisibility)> {
+        let mut absolute_squares: Vec<(WorldSquare, SquareVisibility)> = Default::default();
         if let Some(main_view_absolute_square) =
             self.relative_to_absolute_from_main_view_only(rel_square)
         {
             let visibility = self
                 .visibility_of_relative_square_in_main_view(rel_square)
                 .unwrap();
-            absolute_squares.insert(main_view_absolute_square, visibility);
+            absolute_squares.push((main_view_absolute_square, visibility));
         }
 
         let mut results_from_sub_fovs: HashMap<WorldSquare, SquareVisibility> = self
@@ -417,7 +417,7 @@ impl FieldOfView {
                 // TODO: have this rotation done in one function only
                 let rotation = self.view_transform_to(fov).rotation();
                 let rotated_rel_square = rotation.rotate_vector(rel_square);
-                fov.relative_to_absolute(rotated_rel_square)
+                fov.relative_to_absolute_with_top_view_first(rotated_rel_square)
             })
             .flatten()
             .collect();
@@ -1651,8 +1651,11 @@ mod tests {
 
         fov.add_fully_visible_square(rel_square);
 
-        let (&abs_square, &visibility) =
-            fov.relative_to_absolute(rel_square).iter().next().unwrap();
+        let &(abs_square, visibility): &(WorldSquare, SquareVisibility) = fov
+            .relative_to_absolute_with_top_view_first(rel_square)
+            .iter()
+            .next()
+            .unwrap();
         assert_eq!(abs_square, correct_abs_square);
         assert_eq!(
             fov.at_least_partially_visible_relative_squares_including_subviews()
@@ -1678,7 +1681,7 @@ mod tests {
         fov.transformed_sub_fovs.push(sub_fov);
 
         assert_eq!(
-            *fov.relative_to_absolute(rel_square)
+            fov.relative_to_absolute_with_top_view_first(rel_square)
                 .iter()
                 .next()
                 .unwrap()
@@ -1714,7 +1717,7 @@ mod tests {
         fov.transformed_sub_fovs.push(sub_fov);
 
         assert_eq!(
-            *fov.relative_to_absolute(rel_square)
+            fov.relative_to_absolute_with_top_view_first(rel_square)
                 .iter()
                 .next()
                 .unwrap()
@@ -1750,7 +1753,12 @@ mod tests {
         fov_1.transformed_sub_fovs.push(sub_fov_1);
 
         assert_eq!(fov_1.visibilities_of_relative_square(rel_square).len(), 2);
-        assert_eq!(fov_1.relative_to_absolute(rel_square).len(), 2);
+        assert_eq!(
+            fov_1
+                .relative_to_absolute_with_top_view_first(rel_square)
+                .len(),
+            2
+        );
     }
     #[test]
     fn test_rounding_towards_full_visibility() {

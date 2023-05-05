@@ -46,7 +46,7 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    hue_to_rgb, is_world_character_square_left_square_of_world_square, STEP_RIGHT,
+    hue_to_rgb, is_world_character_square_left_square_of_world_square, reversed, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -198,17 +198,19 @@ impl Graphics {
 
             let relative_world_square = world_square - field_of_view.root_square();
             // TODO: break up this function a bit
-            let absolute_world_squares_with_visibility: HashMap<WorldSquare, SquareVisibility> =
-                field_of_view.relative_to_absolute(relative_world_square);
+            let absolute_world_squares_with_visibility: Vec<(WorldSquare, SquareVisibility)> =
+                reversed(
+                    field_of_view.relative_to_absolute_with_top_view_first(relative_world_square),
+                );
             let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
                 .iter()
                 .filter(
-                    |(&abs_square, &visibility): &(&WorldSquare, &SquareVisibility)| {
+                    |&(abs_square, visibility): &&(WorldSquare, SquareVisibility)| {
                         self.draw_buffer.contains_key(&abs_square)
                     },
                 )
                 .map(
-                    |(&abs_square, &visibility): (&WorldSquare, &SquareVisibility)| {
+                    |&(abs_square, visibility): &(WorldSquare, SquareVisibility)| {
                         let base_drawable: &DrawableEnum =
                             self.draw_buffer.get(&abs_square).unwrap();
                         if !visibility.is_fully_visible() {

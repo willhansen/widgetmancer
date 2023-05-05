@@ -2932,12 +2932,16 @@ mod tests {
         let consecutive_frames = (0..n)
             .map(|_i| {
                 game.draw_headless_now();
-                //game.graphics.screen.print_screen_buffer();
+                game.graphics.screen.print_screen_buffer();
                 game.graphics.screen.current_screen_state.clone()
             })
             .collect_vec();
 
         assert_eq!(consecutive_frames.len(), n);
+        let first_frame = consecutive_frames.iter().next().unwrap();
+        consecutive_frames
+            .iter()
+            .for_each(|f| assert_eq!(f, first_frame));
         assert!(consecutive_frames.iter().all_equal());
     }
 }
