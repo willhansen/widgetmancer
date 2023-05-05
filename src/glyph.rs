@@ -228,7 +228,7 @@ impl Glyph {
             )),
             Glyph::from_char(' '),
         ];
-        glyphs[0].fg_color = PLAYER_GREEN;
+        glyphs[0].fg_color = PLAYER_COLOR;
 
         glyphs
     }

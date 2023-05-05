@@ -2915,4 +2915,29 @@ mod tests {
 
         assert!(glyphs.looks_solid());
     }
+
+    #[test]
+    fn test_portal_edges_are_stable() {
+        let player_square = point2(0, 5);
+        let mut game = set_up_10x10_game();
+        game.place_player(player_square);
+
+        let entrance_square = game.player_square();
+        let exit_square = entrance_square + STEP_RIGHT * 2;
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+        game.place_double_sided_two_way_portal(entrance, exit);
+
+        let n = 5;
+        let consecutive_frames = (0..n)
+            .map(|_i| {
+                game.draw_headless_now();
+                //game.graphics.screen.print_screen_buffer();
+                game.graphics.screen.current_screen_state.clone()
+            })
+            .collect_vec();
+
+        assert_eq!(consecutive_frames.len(), n);
+        assert!(consecutive_frames.iter().all_equal());
+    }
 }

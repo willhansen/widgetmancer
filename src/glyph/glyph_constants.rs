@@ -1,6 +1,7 @@
 use rgb::*;
 
-pub const PLAYER_GREEN: RGB8 = RGB8::new(50, 170, 50);
+pub const EGYPTIAN_BLUE: RGB8 = RGB8::new(20, 52, 164);
+pub const PLAYER_COLOR: RGB8 = EGYPTIAN_BLUE;
 pub const RED: RGB8 = RGB8::new(255, 0, 0);
 pub const MAROON: RGB8 = RGB8::new(127, 0, 0);
 pub const DARKER_RED: RGB8 = RGB8::new(63, 0, 0);
