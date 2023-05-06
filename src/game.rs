@@ -1468,13 +1468,23 @@ impl Game {
             (0..portal_cols).for_each(|col| {
                 let entrance_square =
                     top_left + STEP_RIGHT * col as i32 * 2 + STEP_DOWN * row as i32;
-                let exit_square = entrance_square + STEP_RIGHT * 2;
-                let entrance =
-                    SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
-                let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
-                self.place_double_sided_two_way_portal(entrance, exit);
+                self.place_offset_rightward_double_sided_two_way_portal(
+                    entrance_square,
+                    STEP_RIGHT,
+                );
             });
         });
+    }
+
+    pub fn place_offset_rightward_double_sided_two_way_portal(
+        &mut self,
+        start_square: WorldSquare,
+        offset: WorldStep,
+    ) {
+        let exit_square = start_square + STEP_RIGHT + offset;
+        let entrance = SquareWithOrthogonalDir::from_square_and_dir(start_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);
+        self.place_double_sided_two_way_portal(entrance, exit);
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -2941,6 +2951,30 @@ mod tests {
         game.place_player(player_square);
 
         game.place_dense_horizontal_portals(player_square, 3, 6);
+
+        let n = 5;
+        let consecutive_frames = (0..n)
+            .map(|_i| {
+                game.draw_headless_now();
+                game.graphics.screen.print_screen_buffer();
+                game.graphics.screen.current_screen_state.clone()
+            })
+            .collect_vec();
+
+        assert_eq!(consecutive_frames.len(), n);
+        let first_frame = consecutive_frames.iter().next().unwrap();
+        consecutive_frames
+            .iter()
+            .for_each(|f| assert_eq!(f, first_frame));
+        assert!(consecutive_frames.iter().all_equal());
+    }
+    #[test]
+    fn test_portal_edges_are_stable__simple_case() {
+        let player_square = point2(0, 2);
+        let mut game = set_up_nxm_game(5, 5);
+        game.place_player(player_square);
+
+        game.place_offset_rightward_double_sided_two_way_portal(player_square, STEP_RIGHT);
 
         let n = 5;
         let consecutive_frames = (0..n)
