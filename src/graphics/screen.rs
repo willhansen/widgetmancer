@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use euclid::{point2, vec2, Point2D, Vector2D};
+use rgb::RGB8;
 
+use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::Drawable;
 use crate::utility::coordinate_frame_conversions::{
@@ -368,23 +370,29 @@ impl Screen {
         self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
     }
     pub fn print_screen_buffer(&self) {
-        for y in 0..self.terminal_height() as usize {
+        Self::print_buffer_of_glyphs(&self.screen_buffer);
+    }
+
+    pub fn print_buffer_of_glyphs(buffer: &Vec<Vec<Glyph>>) {
+        let buffer_width = buffer.len();
+        let buffer_height = buffer[0].len();
+        for y in 0..buffer_height as usize {
             let mut row_string = String::new();
-            for x in 0..self.terminal_width() as usize {
-                row_string += &self.screen_buffer[x][y].to_string();
+            for x in 0..buffer_width as usize {
+                row_string += &buffer[x][y].to_string();
             }
             row_string += &Glyph::reset_colors();
-            if y % 5 == 0 || y == self.terminal_height() as usize - 1 {
+            if y % 5 == 0 || y == buffer_height as usize - 1 {
                 row_string += &format!("――{}", y);
             }
             println!("{}", row_string);
         }
 
-        let mut x_markings = " ".repeat(self.terminal_width() as usize);
-        let mut x_numbers = " ".repeat(self.terminal_width() as usize);
+        let mut x_markings = " ".repeat(buffer_width as usize);
+        let mut x_numbers = " ".repeat(buffer_width as usize);
 
-        for x in 0..self.terminal_width() as usize {
-            if x % 5 == 0 || x == self.terminal_width() as usize - 1 {
+        for x in 0..buffer_width as usize {
+            if x % 5 == 0 || x == buffer_width as usize - 1 {
                 x_markings.insert_str(x, "|");
                 x_numbers.insert_str(x, &(x.to_string()));
             }
@@ -392,6 +400,7 @@ impl Screen {
         println!("{}", x_markings);
         println!("{}", x_numbers);
     }
+
     pub fn draw_string_to_screen(&mut self, screen_square: ScreenBufferSquare, the_string: &str) {
         for i in 0..the_string.chars().count() {
             let character: char = the_string.chars().nth(i).unwrap();
@@ -429,6 +438,14 @@ impl Screen {
 
     pub fn draw_drawable<T: Drawable>(&mut self, drawable: &T, screen_square: ScreenBufferSquare) {
         self.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_square);
+    }
+
+    pub fn fill_screen_buffer(&mut self, color: RGB8) {
+        for x in 0..self.terminal_width as usize {
+            for y in 0..self.terminal_height as usize {
+                self.screen_buffer[x][y] = Glyph::new(' ', WHITE, color);
+            }
+        }
     }
 }
 

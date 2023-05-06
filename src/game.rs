@@ -20,7 +20,7 @@ use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfView, SquareVisibility};
-use crate::glyph::glyph_constants::{ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
+use crate::glyph::glyph_constants::{BLACK, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE};
 use crate::graphics::screen::ScreenBufferStep;
 use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
@@ -338,7 +338,7 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
-        self.graphics.fill_output_buffer_with_black();
+        self.graphics.clear_draw_buffer();
         self.graphics.draw_board_animation(time);
 
         // TODO: fix redundant calculation
@@ -391,6 +391,7 @@ impl Game {
     }
 
     fn update_screen_from_draw_buffer(&mut self, mut writer: &mut Option<Box<dyn Write>>) {
+        self.graphics.screen.fill_screen_buffer(BLACK);
         if self.player_is_alive() {
             self.graphics
                 .screen
@@ -1699,7 +1700,9 @@ mod tests {
     };
     use crate::glyph::DoubleGlyphFunctions;
     use crate::graphics::drawable::Drawable;
-    use crate::graphics::screen::{SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT};
+    use crate::graphics::screen::{
+        Screen, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
+    };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
     use crate::utility::{
@@ -2944,29 +2947,37 @@ mod tests {
         assert!(glyphs.looks_solid());
     }
 
-    #[test]
-    fn test_portal_edges_are_stable() {
-        let player_square = point2(0, 5);
-        let mut game = set_up_nxm_game(10, 30);
-        game.place_player(player_square);
-
-        game.place_dense_horizontal_portals(player_square, 3, 6);
-
-        let n = 5;
+    fn assert_screen_is_stable(mut game: &mut Game, n: usize) {
         let consecutive_frames = (0..n)
             .map(|_i| {
                 game.draw_headless_now();
-                game.graphics.screen.print_screen_buffer();
                 game.graphics.screen.current_screen_state.clone()
             })
             .collect_vec();
 
         assert_eq!(consecutive_frames.len(), n);
-        let first_frame = consecutive_frames.iter().next().unwrap();
-        consecutive_frames
-            .iter()
-            .for_each(|f| assert_eq!(f, first_frame));
+
+        let mut the_iter = consecutive_frames.iter();
+        let first_frame = the_iter.next().unwrap();
+        the_iter.for_each(|f| {
+            if f != first_frame {
+                Screen::print_buffer_of_glyphs(first_frame);
+                Screen::print_buffer_of_glyphs(f);
+            }
+            assert_eq!(f, first_frame)
+        });
+
         assert!(consecutive_frames.iter().all_equal());
+    }
+
+    #[test]
+    fn test_portal_edges_are_stable__dense_horizontal() {
+        let player_square = point2(0, 5);
+        let mut game = set_up_nxm_game(10, 30);
+        game.place_player(player_square);
+
+        game.place_dense_horizontal_portals(player_square, 3, 6);
+        assert_screen_is_stable(&mut game, 5);
     }
     #[test]
     fn test_portal_edges_are_stable__simple_case() {
@@ -2976,20 +2987,16 @@ mod tests {
 
         game.place_offset_rightward_double_sided_two_way_portal(player_square, STEP_RIGHT);
 
-        let n = 5;
-        let consecutive_frames = (0..n)
-            .map(|_i| {
-                game.draw_headless_now();
-                game.graphics.screen.print_screen_buffer();
-                game.graphics.screen.current_screen_state.clone()
-            })
-            .collect_vec();
+        assert_screen_is_stable(&mut game, 5);
+    }
+    #[test]
+    fn test_portal_edges_are_stable__two_deep() {
+        let player_square = point2(0, 2);
+        let mut game = set_up_nxm_game(5, 10);
+        game.place_player(player_square);
 
-        assert_eq!(consecutive_frames.len(), n);
-        let first_frame = consecutive_frames.iter().next().unwrap();
-        consecutive_frames
-            .iter()
-            .for_each(|f| assert_eq!(f, first_frame));
-        assert!(consecutive_frames.iter().all_equal());
+        game.place_dense_horizontal_portals(player_square, 1, 2);
+
+        assert_screen_is_stable(&mut game, 10);
     }
 }

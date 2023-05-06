@@ -67,14 +67,16 @@ pub struct Graphics {
 
 impl Graphics {
     pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
-        Graphics {
+        let mut g = Graphics {
             screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),
             active_animations: vec![],
             selectors: vec![],
             board_animation: None,
             start_time,
-        }
+        };
+        g.screen.fill_screen_buffer(BLACK);
+        g
     }
 
     pub fn start_time(&self) -> Instant {
@@ -99,6 +101,10 @@ impl Graphics {
         };
     }
 
+    pub fn clear_draw_buffer(&mut self) {
+        self.draw_buffer.clear();
+    }
+
     fn draw_braille_point(&mut self, pos: WorldPoint, color: RGB8) {
         self.draw_braille_line(pos, pos, color);
     }
@@ -117,17 +123,6 @@ impl Graphics {
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
         self.draw_glyphs(line_glyphs);
-    }
-
-    pub fn fill_output_buffer_with_black(&mut self) {
-        self.fill_output_buffer_with_solid_color(BLACK);
-    }
-    pub fn fill_output_buffer_with_solid_color(&mut self, color: RGB8) {
-        for x in 0..self.screen.terminal_width as usize {
-            for y in 0..self.screen.terminal_height as usize {
-                self.screen.screen_buffer[x][y] = Glyph::new(' ', WHITE, color);
-            }
-        }
     }
 
     pub fn set_empty_board_animation(&mut self, board_size: BoardSize) {
@@ -586,18 +581,15 @@ mod tests {
     #[test]
     fn test_laser_has_transparent_background() {
         let mut g = set_up_graphics();
-        g.fill_output_buffer_with_solid_color(BLUE);
-        assert_eq!(
-            g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0].bg_color,
-            BLUE
-        );
+        g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
+        let glyph1 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
         g.add_simple_laser(point2(0.0, 0.0), point2(10.0, 0.0));
         g.draw_non_board_animations(Instant::now());
+        g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
         //g.print_output_buffer();
-        assert_eq!(
-            g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0].bg_color,
-            BLUE
-        );
+        let glyph2 = g.screen.get_screen_glyphs_at_world_square(point2(5, 0))[0];
+        assert_eq!(glyph1.bg_color, glyph2.bg_color);
+        assert_ne!(glyph1.fg_color, glyph2.fg_color);
         //g.print_output_buffer();
     }
 

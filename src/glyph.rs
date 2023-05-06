@@ -255,7 +255,7 @@ impl Glyph {
     pub fn solid_bg(color: RGB8) -> Glyph {
         Glyph {
             character: SPACE,
-            fg_color: RED,
+            fg_color: MAGENTA,
             bg_color: color,
             bg_transparent: false,
         }
