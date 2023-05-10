@@ -1587,13 +1587,17 @@ impl Game {
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
-    pub fn set_up_portal_across_wall_map(&mut self) {
+    pub fn set_up_portal_across_wall_map(&mut self, width: u32, height_radius: u32) {
         let entrance_square = self.player_square() + STEP_RIGHT * 2;
-        let exit_square = entrance_square + STEP_RIGHT * 2;
+        let exit_square = entrance_square + STEP_RIGHT * (width as i32 + 1);
 
-        let n = 7;
-        (0..n).for_each(|i| {
-            self.place_block(entrance_square + STEP_RIGHT + STEP_UP * i + STEP_DOWN * n / 2)
+        let n: i32 = (height_radius * 2 + 1) as i32;
+        (0..width as i32).for_each(|x| {
+            (0..n).for_each(|i| {
+                self.place_block(
+                    entrance_square + STEP_RIGHT * (x + 1) + STEP_UP * i + STEP_DOWN * n / 2,
+                )
+            });
         });
         let entrance = SquareWithOrthogonalDir::from_square_and_dir(entrance_square, STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::from_square_and_dir(exit_square, STEP_RIGHT);

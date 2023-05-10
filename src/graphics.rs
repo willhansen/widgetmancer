@@ -129,16 +129,43 @@ impl Graphics {
         self.board_animation = Some(Box::new(StaticBoard::new(board_size)));
     }
 
+    #[deprecated(note = "use more descriptive")]
     pub fn square_is_white(square: WorldSquare) -> bool {
         (square.x + square.y) % 2 == 0
     }
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
+        //Self::checkerboard_square_function(square)
+        Self::hollow_brick_floor_pattern(square)
+    }
+    fn hollow_brick_floor_pattern(square: WorldSquare) -> RGB8 {
+        let brick_width = 5;
+        let brick_height = 4;
+        let brick_gap = 1;
+        let vertical_period = (brick_height + brick_gap) * 2;
+        let half_vertical_period = vertical_period / 2;
+        let horizontal_period = brick_width + brick_gap;
+
+        // TODO.  asdfasdf
+        if square.y % 5 == 4 {
+            return BOARD_WHITE;
+        }
+        if square.x % 8 == 4 {
+            return BOARD_WHITE;
+        }
+        if square.y % 5 < 3 || square.x % 7 < 5 {
+            BOARD_BLACK
+        } else {
+            BOARD_WHITE
+        }
+    }
+    fn checkerboard_square_function(square: WorldSquare) -> RGB8 {
         if Graphics::square_is_white(square) {
             BOARD_WHITE
         } else {
             BOARD_BLACK
         }
     }
+    #[deprecated(note = "use more descriptive")]
     pub fn off_board_color_at_square(square: WorldSquare) -> RGB8 {
         if !Graphics::square_is_white(square) {
             BOARD_WHITE

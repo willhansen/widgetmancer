@@ -747,7 +747,7 @@ pub fn single_octant_field_of_view(
 pub fn portal_aware_field_of_view_from_square(
     center_square: WorldSquare,
     radius: u32,
-    sight_blockers: &HashSet<WorldSquare>,
+    sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfView {
     (0..8)
@@ -1827,5 +1827,22 @@ mod tests {
             .get(&STEP_ZERO)
             .unwrap()
             .is_fully_visible());
+    }
+    #[test]
+    fn test_adjacent_wall_all_fully_visible() {
+        let player_square = point2(5, 5);
+        let rel_blocks = (0..10).map(|i| STEP_RIGHT + STEP_UP * i).collect_vec();
+        let abs_squares = rel_blocks.iter().map(|v| player_square + *v).collect_vec();
+        let blocks = SquareSet::from_iter(abs_squares);
+        let fov =
+            portal_aware_field_of_view_from_square(player_square, 5, &blocks, &Default::default());
+
+        rel_blocks.iter().for_each(|rel_block| {
+            assert!(
+                fov.can_fully_see_relative_square_as_single_square(*rel_block),
+                "rel_block: {:?}",
+                rel_block
+            )
+        });
     }
 }
