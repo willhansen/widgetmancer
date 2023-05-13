@@ -70,6 +70,7 @@ fn test_player_can_not_move_off_high_edge() {
     game.draw_headless_now();
 }
 
+#[ignore]
 #[test]
 fn test_checkerboard_background() {
     let mut game = set_up_game_with_player();

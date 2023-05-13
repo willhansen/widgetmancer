@@ -25,6 +25,7 @@ pub trait Drawable: Clone {
 pub enum DrawableEnum {
     Text(TextDrawable),
     PartialVisibility(PartialVisibilityDrawable),
+    SolidColor(SolidColorDrawable),
     Braille(BrailleDrawable),
 }
 
@@ -36,6 +37,7 @@ impl Drawable for DrawableEnum {
             DrawableEnum::Text(v) => v.rotated(quarter_rotations_anticlockwise).into(),
             DrawableEnum::PartialVisibility(v) => v.rotated(quarter_rotations_anticlockwise).into(),
             DrawableEnum::Braille(v) => v.rotated(quarter_rotations_anticlockwise).into(),
+            DrawableEnum::SolidColor(v) => v.rotated(quarter_rotations_anticlockwise).into(),
         }
     }
 
@@ -44,6 +46,7 @@ impl Drawable for DrawableEnum {
             DrawableEnum::Text(v) => v.to_glyphs(),
             DrawableEnum::PartialVisibility(v) => v.to_glyphs(),
             DrawableEnum::Braille(v) => v.to_glyphs(),
+            DrawableEnum::SolidColor(v) => v.to_glyphs(),
         }
     }
 
@@ -52,6 +55,7 @@ impl Drawable for DrawableEnum {
             DrawableEnum::Text(v) => v.drawn_over(other).into(),
             DrawableEnum::PartialVisibility(v) => v.drawn_over(other).into(),
             DrawableEnum::Braille(v) => v.drawn_over(other).into(),
+            DrawableEnum::SolidColor(v) => v.drawn_over(other).into(),
         }
     }
 
@@ -60,6 +64,7 @@ impl Drawable for DrawableEnum {
             DrawableEnum::Text(v) => v.color_if_backgroundified(),
             DrawableEnum::PartialVisibility(v) => v.color_if_backgroundified(),
             DrawableEnum::Braille(v) => v.color_if_backgroundified(),
+            DrawableEnum::SolidColor(v) => v.color_if_backgroundified(),
         }
     }
 
@@ -220,6 +225,39 @@ impl Drawable for BrailleDrawable {
 
     fn to_enum(&self) -> DrawableEnum {
         todo!()
+    }
+}
+
+#[derive(Debug, Clone, Copy, CopyGetters)]
+pub struct SolidColorDrawable {
+    color: RGB8,
+}
+
+impl SolidColorDrawable {
+    pub fn new(color: RGB8) -> Self {
+        SolidColorDrawable { color }
+    }
+}
+
+impl Drawable for SolidColorDrawable {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+        *self
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        DoubleGlyph::solid_color(self.color)
+    }
+
+    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
+        *self
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        self.color
+    }
+
+    fn to_enum(&self) -> DrawableEnum {
+        self.clone().into()
     }
 }
 

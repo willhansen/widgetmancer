@@ -1652,13 +1652,13 @@ impl Game {
         let target_square_relative_to_player = square - self.player_square();
         let visibilities = self
             .player_field_of_view()
-            .visibilities_of_relative_square(target_square_relative_to_player);
+            .visibilities_of_relative_square_rotated_to_main_view(target_square_relative_to_player);
         visibilities.len() == 1 && visibilities.get(0).unwrap().is_fully_visible()
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         self.player_field_of_view()
-            .visibilities_of_relative_square(target_square_relative_to_player)
+            .visibilities_of_relative_square_rotated_to_main_view(target_square_relative_to_player)
             .is_empty()
     }
     fn player_field_of_view(&self) -> FieldOfView {
@@ -2484,7 +2484,7 @@ mod tests {
         let fov = game.player_field_of_view();
 
         assert_eq!(fov.sub_fovs().len(), 1);
-        assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 2);
+        assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 2);
         assert_eq!(
             game.graphics
                 .screen
@@ -2635,7 +2635,7 @@ mod tests {
         let fov = game.player_field_of_view();
 
         assert_eq!(fov.sub_fovs().len(), 1);
-        assert_eq!(fov.visibility_of_absolute_square(enemy_square).len(), 1);
+        assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 1);
         assert_eq!(
             game.graphics
                 .screen
@@ -2676,7 +2676,7 @@ mod tests {
         let fov = game.player_field_of_view();
 
         assert_eq!(
-            fov.visibility_of_absolute_square(square_that_should_be_visible)
+            fov.visibilities_of_absolute_square(square_that_should_be_visible)
                 .len(),
             1
         );

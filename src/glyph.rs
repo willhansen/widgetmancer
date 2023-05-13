@@ -472,6 +472,7 @@ pub trait DoubleGlyphFunctions {
     fn looks_solid(&self) -> bool;
     fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
     fn fg_colors(&self) -> [RGB8; 2];
+    fn solid_color(color: RGB8) -> DoubleGlyph;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -551,6 +552,10 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
     fn fg_colors(&self) -> [RGB8; 2] {
         [0, 1].map(|i| self[i].fg_color)
+    }
+
+    fn solid_color(color: RGB8) -> DoubleGlyph {
+        [Glyph::new(FULL_BLOCK, color, color); 2]
     }
 }
 
