@@ -33,7 +33,7 @@ use crate::animations::smite_from_above::SmiteFromAbove;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::{FieldOfView, SquareVisibility};
+use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
 use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
@@ -209,26 +209,33 @@ impl Graphics {
 
             let relative_world_square = world_square - field_of_view.root_square();
             // TODO: break up this function a bit
-            let absolute_world_squares_with_visibility: Vec<(WorldSquare, SquareVisibility)> =
-                reversed(
-                    field_of_view.relative_to_absolute_with_top_view_first(relative_world_square),
-                );
+            let absolute_world_squares_with_visibility: Vec<(
+                WorldSquare,
+                PositionedSquareVisibilityInFov,
+            )> = field_of_view
+                .relative_to_absolute(relative_world_square)
+                .into_iter()
+                .sorted_by_key(|(square, pos_vis)| pos_vis.portal_depth())
+                .collect_vec();
             let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
                 .iter()
                 .filter(
-                    |&(abs_square, visibility): &&(WorldSquare, SquareVisibility)| {
+                    |&(abs_square, _): &&(WorldSquare, PositionedSquareVisibilityInFov)| {
                         self.draw_buffer.contains_key(&abs_square)
                     },
                 )
                 .map(
-                    |&(abs_square, visibility): &(WorldSquare, SquareVisibility)| {
+                    |&(abs_square, positioned_visibility): &(
+                        WorldSquare,
+                        PositionedSquareVisibilityInFov,
+                    )| {
                         let base_drawable: &DrawableEnum =
                             self.draw_buffer.get(&abs_square).unwrap();
-                        if !visibility.is_fully_visible() {
+                        if !positioned_visibility.square_visibility().is_fully_visible() {
                             DrawableEnum::PartialVisibility(
                                 PartialVisibilityDrawable::from_partially_visible_drawable(
                                     base_drawable,
-                                    visibility,
+                                    positioned_visibility.square_visibility(),
                                 ),
                             )
                         } else {

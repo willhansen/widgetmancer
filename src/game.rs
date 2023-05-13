@@ -1705,7 +1705,7 @@ mod tests {
 
     use crate::game;
     use crate::glyph::glyph_constants::{
-        BLINK_EFFECT_COLOR, BLUE, DANGER_SQUARE_COLOR, GREY, OUT_OF_SIGHT_COLOR, RED,
+        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, GREY, OUT_OF_SIGHT_COLOR, RED,
         RED_PAWN_COLOR,
     };
     use crate::glyph::DoubleGlyphFunctions;
@@ -3009,29 +3009,51 @@ mod tests {
 
         assert_screen_is_stable(&mut game, 10);
     }
+    fn place_portal_capping_block_bar(game: &mut Game, square: WorldSquare, length: u32) {
+        game.place_offset_rightward_double_sided_two_way_portal(
+            square + STEP_LEFT,
+            STEP_RIGHT * length as i32,
+        );
+        (0..length)
+            .map(|i| square + STEP_RIGHT * i as i32)
+            .for_each(|abs_square| game.place_block(abs_square));
+    }
     #[test]
     fn test_portal_drawn_in_correct_order_over_partially_visible_block() {
-        let out_of_sight_color = RED;
-        let block_color = GREY;
-        let floor_color = BLUE;
-
         let player_square = point2(5, 5);
-        let relative_block_squares = vec![
-            STEP_DOWN_RIGHT + STEP_RIGHT,
-            STEP_DOWN_RIGHT + STEP_RIGHT * 2,
-        ];
         let test_square = SCREEN_STEP_DOWN_RIGHT + SCREEN_STEP_RIGHT * 2;
 
-        let rel_portal_square = STEP_DOWN_RIGHT;
         let mut game = set_up_nxm_game(10, 20);
         game.place_player(player_square);
+        place_portal_capping_block_bar(&mut game, player_square + STEP_DOWN_RIGHT + STEP_RIGHT, 5);
+
+        game.draw_headless_now();
+
+        game.graphics.screen.print_screen_buffer();
+        let test_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(test_square);
+
+        assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
+        assert_eq!(test_glyphs.map(|g| g.bg_color), [BLOCK_FG; 2]);
+    }
+    #[ignore = "May or may not want this"]
+    #[test]
+    fn test_shadow_arc_squashed_by_portal_still_looks_connected() {
+        let player_square = point2(5, 5);
+        let test_square = SCREEN_STEP_DOWN_RIGHT + SCREEN_STEP_RIGHT * 3;
+
+        let mut game = set_up_nxm_game(10, 10);
+        game.place_player(player_square);
+
+        let bar_left_end = player_square + STEP_DOWN_RIGHT + STEP_RIGHT;
         game.place_offset_rightward_double_sided_two_way_portal(
-            player_square + rel_portal_square,
-            STEP_RIGHT * 5,
+            bar_left_end + STEP_LEFT,
+            STEP_RIGHT * 20,
         );
-        relative_block_squares
-            .into_iter()
-            .map(|rel| player_square + rel)
+        (0..2)
+            .map(|i| bar_left_end + STEP_RIGHT * i)
             .for_each(|abs_square| game.place_block(abs_square));
 
         game.draw_headless_now();
@@ -3042,6 +3064,7 @@ mod tests {
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(test_square);
 
-        todo!()
+        todo!();
+        assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
     }
 }

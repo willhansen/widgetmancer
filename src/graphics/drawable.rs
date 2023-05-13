@@ -145,8 +145,7 @@ impl PartialVisibilityDrawable {
         PartialVisibilityDrawable {
             visibility: square_viz,
             fg_color: original_drawable.color_if_backgroundified(),
-            //bg_color: OUT_OF_SIGHT_COLOR,
-            bg_color: GREEN,
+            bg_color: OUT_OF_SIGHT_COLOR,
         }
     }
 }
