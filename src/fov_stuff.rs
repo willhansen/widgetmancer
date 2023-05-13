@@ -11,7 +11,7 @@ use ordered_float::OrderedFloat;
 
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::glyph_constants::{
-    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
+    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
 };
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::graphics;
@@ -831,6 +831,7 @@ fn square_visibility_from_one_view_arc(
 }
 
 fn print_fov(fov: &FieldOfView, radius: u32) {
+    let center_drawable = TextDrawable::new("@@", WHITE, GREY, true);
     let r = radius as i32;
     (-r..=r).for_each(|neg_y| {
         let y = -neg_y;
@@ -841,7 +842,7 @@ fn print_fov(fov: &FieldOfView, radius: u32) {
 
             let any_visible = visibilities_for_square.len() > 0;
             let to_draw = if any_visible {
-                let visible_base = SolidColorDrawable::new(WHITE).to_enum();
+                let visible_base = SolidColorDrawable::new(GREY).to_enum();
                 visibilities_for_square.into_iter().fold(
                     visible_base,
                     |base: DrawableEnum, visibility: SquareVisibility| {
@@ -859,7 +860,16 @@ fn print_fov(fov: &FieldOfView, radius: u32) {
                 SolidColorDrawable::new(BLACK).to_enum()
             };
 
-            print!("{}", to_draw.to_glyphs().to_string());
+            print!(
+                "{}",
+                if rel_square == STEP_ZERO {
+                    center_drawable.drawn_over(&to_draw).to_enum()
+                } else {
+                    to_draw
+                }
+                .to_glyphs()
+                .to_string()
+            );
         });
         print!("\n");
     });
