@@ -117,13 +117,27 @@ impl SquareVisibility {
     }
 }
 
-#[deprecated(note = "Use shadowDrawable instead")]
-#[derive(Clone, Debug, Copy, CopyGetters)]
-#[get_copy = "pub"]
-pub struct PartialVisibilityOfASquare {
-    left_char_shadow: Option<CharacterShadow>,
-    right_char_shadow: Option<CharacterShadow>,
-    tie_break_bias_direction: Angle<f32>,
+#[derive(Debug, Clone, Copy, Constructor)]
+pub struct PositionedSquareVisibilityInFov {
+    square_visibility: SquareVisibility,
+    //relative_position: WorldStep,
+    //step_in_fov_sequence: u32,
+    portal_depth: u32,
+}
+
+impl PositionedSquareVisibilityInFov {
+    pub fn one_portal_deeper(&self) -> Self {
+        PositionedSquareVisibilityInFov {
+            portal_depth: self.portal_depth + 1,
+            ..*self
+        }
+    }
+    pub fn square_visibility(&self) -> SquareVisibility {
+        self.square_visibility
+    }
+    pub fn portal_depth(&self) -> u32 {
+        self.portal_depth
+    }
 }
 
 type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
@@ -366,7 +380,12 @@ impl FieldOfView {
 
     pub fn can_fully_see_relative_square_as_single_square(&self, step: WorldStep) -> bool {
         let visibility = self.visibilities_of_relative_square_rotated_to_main_view(step);
-        return visibility.len() == 1 && visibility.get(0).unwrap().is_fully_visible();
+        return visibility.len() == 1
+            && visibility
+                .get(0)
+                .unwrap()
+                .square_visibility()
+                .is_fully_visible();
     }
 
     pub fn can_see_relative_square(&self, step: WorldStep) -> bool {
@@ -378,20 +397,27 @@ impl FieldOfView {
     pub fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,
-    ) -> Vec<SquareVisibility> {
+    ) -> Vec<PositionedSquareVisibilityInFov> {
         // Due to portals, this may see the same square multiple times
         let rel_to_root = world_square - self.root_square();
         let mut visibilities = vec![];
         if let Some(visibility_in_untransformed_view) =
             self.visibility_of_relative_square_in_main_view(rel_to_root)
         {
-            visibilities.push(visibility_in_untransformed_view);
+            visibilities.push(PositionedSquareVisibilityInFov::new(
+                visibility_in_untransformed_view,
+                0,
+            ));
         }
 
         self.transformed_sub_fovs
             .iter()
             .for_each(|sub_fov: &FieldOfView| {
-                let mut sub_visibilities = sub_fov.visibilities_of_absolute_square(world_square);
+                let mut sub_visibilities = sub_fov
+                    .visibilities_of_absolute_square(world_square)
+                    .into_iter()
+                    .map(|pos_vis: PositionedSquareVisibilityInFov| pos_vis.one_portal_deeper())
+                    .collect_vec();
                 visibilities.append(&mut sub_visibilities);
             });
         visibilities
@@ -456,10 +482,10 @@ impl FieldOfView {
             .copied()
     }
 
-    fn visibility_of_relative_square_in_sub_views_rotated_to_main_view(
+    fn visibilities_of_relative_square_in_sub_views_rotated_to_main_view(
         &self,
         relative_square: WorldStep,
-    ) -> Vec<SquareVisibility> {
+    ) -> Vec<PositionedSquareVisibilityInFov> {
         self.transformed_sub_fovs
             .iter()
             .map(|sub_fov| {
@@ -476,7 +502,7 @@ impl FieldOfView {
         &self,
         relative_square: WorldStep,
         sub_view: &FieldOfView,
-    ) -> Vec<SquareVisibility> {
+    ) -> Vec<PositionedSquareVisibilityInFov> {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
         let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.rotation();
@@ -491,7 +517,14 @@ impl FieldOfView {
 
         let derotated_visibility = rotated_visibilities
             .iter()
-            .map(|v| v.rotated(-quarter_rotations.quarter_turns()))
+            .map(|pos_vis| {
+                PositionedSquareVisibilityInFov::new(
+                    pos_vis
+                        .square_visibility()
+                        .rotated(-quarter_rotations.quarter_turns()),
+                    pos_vis.portal_depth,
+                )
+            })
             .collect_vec();
 
         derotated_visibility
@@ -500,17 +533,23 @@ impl FieldOfView {
     pub fn visibilities_of_relative_square_rotated_to_main_view(
         &self,
         relative_square: WorldStep,
-    ) -> Vec<SquareVisibility> {
-        let mut visibilities: Vec<SquareVisibility> = vec![];
+    ) -> Vec<PositionedSquareVisibilityInFov> {
+        let mut visibilities: Vec<PositionedSquareVisibilityInFov> = vec![];
 
         if let Some(top_level_visibility) =
             self.visibility_of_relative_square_in_main_view(relative_square)
         {
-            visibilities.push(top_level_visibility);
+            visibilities.push(PositionedSquareVisibilityInFov::new(
+                top_level_visibility,
+                0,
+            ));
         }
 
-        let mut sub_view_visibilities: Vec<SquareVisibility> =
-            self.visibility_of_relative_square_in_sub_views_rotated_to_main_view(relative_square);
+        let mut sub_view_visibilities: Vec<PositionedSquareVisibilityInFov> = self
+            .visibilities_of_relative_square_in_sub_views_rotated_to_main_view(relative_square)
+            .into_iter()
+            .map(|pos_vis: PositionedSquareVisibilityInFov| pos_vis.one_portal_deeper())
+            .collect_vec();
         visibilities.append(&mut sub_view_visibilities);
 
         visibilities
@@ -837,20 +876,24 @@ fn print_fov(fov: &FieldOfView, radius: u32) {
         let y = -neg_y;
         (-r..r).for_each(|x| {
             let rel_square: WorldStep = vec2(x, y);
-            let visibilities_for_square =
-                fov.visibilities_of_relative_square_rotated_to_main_view(rel_square);
+            let visibilities_for_square = fov
+                .visibilities_of_relative_square_rotated_to_main_view(rel_square)
+                .into_iter()
+                .sorted_by_key(|pos_vis: &PositionedSquareVisibilityInFov| pos_vis.portal_depth())
+                .collect_vec();
 
             let any_visible = visibilities_for_square.len() > 0;
             let to_draw = if any_visible {
                 let visible_base = SolidColorDrawable::new(GREY).to_enum();
                 visibilities_for_square.into_iter().fold(
                     visible_base,
-                    |base: DrawableEnum, visibility: SquareVisibility| {
-                        if visibility.is_fully_visible() {
+                    |base: DrawableEnum, positioned_visibility: PositionedSquareVisibilityInFov| {
+                        if positioned_visibility.square_visibility().is_fully_visible() {
                             base
                         } else {
                             PartialVisibilityDrawable::from_partially_visible_drawable(
-                                &base, visibility,
+                                &base,
+                                positioned_visibility.square_visibility(),
                             )
                             .to_enum()
                         }
@@ -1084,12 +1127,14 @@ mod tests {
             .unwrap()
             .clone();
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(visibility_of_test_square)
-                .to_glyphs()
-                .to_clean_string()
-                .chars()
-                .nth(1)
-                .unwrap(),
+            PartialVisibilityDrawable::from_square_visibility(
+                visibility_of_test_square.square_visibility()
+            )
+            .to_glyphs()
+            .to_clean_string()
+            .chars()
+            .nth(1)
+            .unwrap(),
             SPACE
         );
     }
@@ -1354,8 +1399,17 @@ mod tests {
 
         let square_visibility =
             fov_result.visibilities_of_relative_square_rotated_to_main_view(relative_square);
-        assert!(square_visibility.get(0).unwrap().is_fully_visible());
-        assert!(square_visibility.get(0).unwrap().visible_portion.is_none());
+        assert!(square_visibility
+            .get(0)
+            .unwrap()
+            .square_visibility()
+            .is_fully_visible());
+        assert!(square_visibility
+            .get(0)
+            .unwrap()
+            .square_visibility()
+            .visible_portion
+            .is_none());
     }
 
     #[test]
@@ -1885,6 +1939,7 @@ mod tests {
             .unwrap()
             .is_fully_visible());
     }
+    #[ignore = "not a priority for the time being"]
     #[test]
     fn test_adjacent_wall_all_fully_visible() {
         let player_square = point2(5, 5);

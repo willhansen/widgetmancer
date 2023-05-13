@@ -135,24 +135,13 @@ impl Graphics {
     }
     pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
         //Self::checkerboard_square_function(square)
-        Self::hollow_brick_floor_pattern(square)
+        Self::big_chess_pattern(square)
     }
-    fn hollow_brick_floor_pattern(square: WorldSquare) -> RGB8 {
-        let brick_width = 5;
-        let brick_height = 4;
-        let brick_gap = 1;
-        let vertical_period = (brick_height + brick_gap) * 2;
-        let half_vertical_period = vertical_period / 2;
-        let horizontal_period = brick_width + brick_gap;
+    fn big_chess_pattern(square: WorldSquare) -> RGB8 {
+        let y = square.y % 6 < 3;
+        let x = square.x % 6 < 3;
 
-        // TODO.  asdfasdf
-        if square.y % 5 == 4 {
-            return BOARD_WHITE;
-        }
-        if square.x % 8 == 4 {
-            return BOARD_WHITE;
-        }
-        if square.y % 5 < 3 || square.x % 7 < 5 {
+        if x ^ y {
             BOARD_BLACK
         } else {
             BOARD_WHITE

@@ -1653,7 +1653,12 @@ impl Game {
         let visibilities = self
             .player_field_of_view()
             .visibilities_of_relative_square_rotated_to_main_view(target_square_relative_to_player);
-        visibilities.len() == 1 && visibilities.get(0).unwrap().is_fully_visible()
+        visibilities.len() == 1
+            && visibilities
+                .get(0)
+                .unwrap()
+                .square_visibility()
+                .is_fully_visible()
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
@@ -1700,12 +1705,13 @@ mod tests {
 
     use crate::game;
     use crate::glyph::glyph_constants::{
-        BLINK_EFFECT_COLOR, DANGER_SQUARE_COLOR, OUT_OF_SIGHT_COLOR, RED_PAWN_COLOR,
+        BLINK_EFFECT_COLOR, BLUE, DANGER_SQUARE_COLOR, GREY, OUT_OF_SIGHT_COLOR, RED,
+        RED_PAWN_COLOR,
     };
     use crate::glyph::DoubleGlyphFunctions;
     use crate::graphics::drawable::Drawable;
     use crate::graphics::screen::{
-        Screen, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
+        Screen, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
     };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
@@ -3002,5 +3008,40 @@ mod tests {
         game.place_dense_horizontal_portals(player_square, 1, 2);
 
         assert_screen_is_stable(&mut game, 10);
+    }
+    #[test]
+    fn test_portal_drawn_in_correct_order_over_partially_visible_block() {
+        let out_of_sight_color = RED;
+        let block_color = GREY;
+        let floor_color = BLUE;
+
+        let player_square = point2(5, 5);
+        let relative_block_squares = vec![
+            STEP_DOWN_RIGHT + STEP_RIGHT,
+            STEP_DOWN_RIGHT + STEP_RIGHT * 2,
+        ];
+        let test_square = SCREEN_STEP_DOWN_RIGHT + SCREEN_STEP_RIGHT * 2;
+
+        let rel_portal_square = STEP_DOWN_RIGHT;
+        let mut game = set_up_nxm_game(10, 20);
+        game.place_player(player_square);
+        game.place_offset_rightward_double_sided_two_way_portal(
+            player_square + rel_portal_square,
+            STEP_RIGHT * 5,
+        );
+        relative_block_squares
+            .into_iter()
+            .map(|rel| player_square + rel)
+            .for_each(|abs_square| game.place_block(abs_square));
+
+        game.draw_headless_now();
+
+        game.graphics.screen.print_screen_buffer();
+        let test_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(test_square);
+
+        todo!()
     }
 }

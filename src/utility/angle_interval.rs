@@ -11,7 +11,7 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::{PartialVisibilityOfASquare, SquareVisibility};
+use crate::fov_stuff::SquareVisibility;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
