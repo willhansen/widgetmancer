@@ -123,12 +123,17 @@ pub struct PositionedSquareVisibilityInFov {
     //relative_position: WorldStep,
     //step_in_fov_sequence: u32,
     portal_depth: u32,
+    portal_rotation: QuarterTurnsAnticlockwise,
 }
 
 impl PositionedSquareVisibilityInFov {
-    pub fn one_portal_deeper(&self) -> Self {
+    pub fn one_portal_deeper(
+        &self,
+        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
+    ) -> Self {
         PositionedSquareVisibilityInFov {
             portal_depth: self.portal_depth + 1,
+            portal_rotation: self.portal_rotation + forward_rotation_through_portal,
             ..*self
         }
     }
@@ -138,8 +143,11 @@ impl PositionedSquareVisibilityInFov {
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
     }
+    pub fn portal_rotation(&self) -> QuarterTurnsAnticlockwise {
+        self.portal_rotation
+    }
     pub fn new_in_top_view(square_visibility: SquareVisibility) -> Self {
-        Self::new(square_visibility, 0)
+        Self::new(square_visibility, 0, QuarterTurnsAnticlockwise::default())
     }
 }
 
@@ -407,19 +415,21 @@ impl FieldOfView {
         if let Some(visibility_in_untransformed_view) =
             self.visibility_of_relative_square_in_main_view(rel_to_root)
         {
-            visibilities.push(PositionedSquareVisibilityInFov::new(
+            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
                 visibility_in_untransformed_view,
-                0,
             ));
         }
 
         self.transformed_sub_fovs
             .iter()
             .for_each(|sub_fov: &FieldOfView| {
+                let forward_rotation = self.view_transform_to(sub_fov).rotation();
                 let mut sub_visibilities = sub_fov
                     .visibilities_of_absolute_square(world_square)
                     .into_iter()
-                    .map(|pos_vis: PositionedSquareVisibilityInFov| pos_vis.one_portal_deeper())
+                    .map(|pos_vis: PositionedSquareVisibilityInFov| {
+                        pos_vis.one_portal_deeper(forward_rotation)
+                    })
                     .collect_vec();
                 visibilities.append(&mut sub_visibilities);
             });
@@ -454,11 +464,13 @@ impl FieldOfView {
             .iter()
             .map(|fov: &FieldOfView| {
                 // TODO: have this rotation done in one function only
-                let rotation = self.view_transform_to(fov).rotation();
-                let rotated_rel_square = rotation.rotate_vector(rel_square);
+                let forward_rotation = self.view_transform_to(fov).rotation();
+                let rotated_rel_square = forward_rotation.rotate_vector(rel_square);
                 fov.relative_to_absolute(rotated_rel_square)
                     .into_iter()
-                    .map(|(abs_square, pos_vis)| (abs_square, pos_vis.one_portal_deeper()))
+                    .map(|(abs_square, pos_vis)| {
+                        (abs_square, pos_vis.one_portal_deeper(forward_rotation))
+                    })
                     .collect_vec()
             })
             .flatten()
@@ -492,7 +504,7 @@ impl FieldOfView {
             .copied()
     }
 
-    fn visibilities_of_relative_square_in_sub_views_rotated_to_main_view(
+    fn visibilities_of_relative_square_in_all_sub_views_rotated_to_main_view(
         &self,
         relative_square: WorldStep,
     ) -> Vec<PositionedSquareVisibilityInFov> {
@@ -515,11 +527,12 @@ impl FieldOfView {
     ) -> Vec<PositionedSquareVisibilityInFov> {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
-        let quarter_rotations: QuarterTurnsAnticlockwise = view_transform_to_sub_view.rotation();
+        let rotation_moving_forward_through_portal: QuarterTurnsAnticlockwise =
+            view_transform_to_sub_view.rotation();
 
         let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(
             relative_square,
-            quarter_rotations.quarter_turns(),
+            rotation_moving_forward_through_portal.quarter_turns(),
         );
 
         let rotated_visibilities =
@@ -531,8 +544,9 @@ impl FieldOfView {
                 PositionedSquareVisibilityInFov::new(
                     pos_vis
                         .square_visibility()
-                        .rotated(-quarter_rotations.quarter_turns()),
-                    pos_vis.portal_depth,
+                        .rotated(-rotation_moving_forward_through_portal.quarter_turns()),
+                    pos_vis.portal_depth + 1,
+                    rotation_moving_forward_through_portal,
                 )
             })
             .collect_vec();
@@ -549,17 +563,13 @@ impl FieldOfView {
         if let Some(top_level_visibility) =
             self.visibility_of_relative_square_in_main_view(relative_square)
         {
-            visibilities.push(PositionedSquareVisibilityInFov::new(
+            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
                 top_level_visibility,
-                0,
             ));
         }
 
         let mut sub_view_visibilities: Vec<PositionedSquareVisibilityInFov> = self
-            .visibilities_of_relative_square_in_sub_views_rotated_to_main_view(relative_square)
-            .into_iter()
-            .map(|pos_vis: PositionedSquareVisibilityInFov| pos_vis.one_portal_deeper())
-            .collect_vec();
+            .visibilities_of_relative_square_in_all_sub_views_rotated_to_main_view(relative_square);
         visibilities.append(&mut sub_view_visibilities);
 
         visibilities

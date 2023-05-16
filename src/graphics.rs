@@ -241,6 +241,7 @@ impl Graphics {
                         } else {
                             base_drawable.clone()
                         }
+                        .rotated(-positioned_visibility.portal_rotation().quarter_turns())
                     },
                 )
                 .reduce(|bottom, top| top.drawn_over(&bottom));

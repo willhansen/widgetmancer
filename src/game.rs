@@ -1606,7 +1606,20 @@ impl Game {
     }
 
     pub fn set_up_test_map(&mut self) {
-        self.place_rotation_portal_square(self.player_square() + STEP_RIGHT * 4, 3);
+        let mut entrance_step = SquareWithOrthogonalDir::new(
+            self.player_square() + STEP_RIGHT * 3 + STEP_UP * 3,
+            STEP_RIGHT,
+        );
+        let mut exit_step = SquareWithOrthogonalDir::new(
+            self.player_square() + STEP_UP * 7 + STEP_RIGHT * 13,
+            STEP_DOWN,
+        );
+        (0..6).for_each(|_| {
+            self.place_double_sided_two_way_portal(entrance_step, exit_step);
+            entrance_step = entrance_step.strafed_right();
+            exit_step = exit_step.strafed_right();
+        });
+
         self.place_block(self.player_square() + STEP_RIGHT * 10);
     }
 
