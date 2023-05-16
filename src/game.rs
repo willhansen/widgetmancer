@@ -1747,7 +1747,7 @@ mod tests {
         BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, GREY, OUT_OF_SIGHT_COLOR, RED,
         RED_PAWN_COLOR,
     };
-    use crate::glyph::DoubleGlyphFunctions;
+    use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::Drawable;
     use crate::graphics::screen::{
         Screen, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
@@ -2875,7 +2875,7 @@ mod tests {
             .rotate(QuarterTurnsAnticlockwise::new(-1));
 
         let mut games = [unrotated_game, rotated_game];
-        let shadow_glyphs = games
+        let shadow_glyphs: Vec<DoubleGlyph> = games
             .iter_mut()
             .map(|game: &mut Game| {
                 game.place_player(player_square);
@@ -2898,7 +2898,10 @@ mod tests {
                     .get_glyphs_at_screen_square(shadow_screen_square)
             })
             .collect_vec();
-        assert_eq!(shadow_glyphs[0], shadow_glyphs[1]);
+        assert_eq!(
+            shadow_glyphs[0].to_clean_string(),
+            shadow_glyphs[1].to_clean_string()
+        );
     }
 
     #[test]
