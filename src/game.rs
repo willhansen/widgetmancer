@@ -1605,6 +1605,32 @@ impl Game {
         self.place_double_sided_two_way_portal(entrance, exit);
     }
 
+    pub fn set_up_test_map(&mut self) {
+        self.place_rotation_portal_square(self.player_square() + STEP_RIGHT * 4, 3);
+        self.place_block(self.player_square() + STEP_RIGHT * 10);
+    }
+
+    // TODO: fix
+    fn place_rotation_portal_square(&mut self, top_left: WorldSquare, side_length: u32) {
+        let mut entrance_step = SquareWithOrthogonalDir::new(top_left + STEP_LEFT, STEP_RIGHT);
+        let mut exit_step = SquareWithOrthogonalDir::new(top_left + STEP_DOWN, STEP_DOWN);
+
+        (0..4).for_each(|_| {
+            (0..side_length).for_each(|i| {
+                self.place_single_sided_one_way_portal(entrance_step, exit_step);
+                entrance_step = entrance_step.strafed_right();
+                exit_step = exit_step.strafed_right();
+            });
+            entrance_step = exit_step.turned_back();
+            exit_step = exit_step
+                .turned_left()
+                .stepped_n(side_length + 1)
+                .turned_left()
+                .stepped_n(side_length)
+                .turned_right();
+        })
+    }
+
     pub fn set_up_columns(&mut self) {
         let block_square = self.player_square() + STEP_RIGHT * 4;
         self.place_block(block_square);

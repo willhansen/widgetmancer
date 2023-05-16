@@ -1040,11 +1040,44 @@ impl SquareWithOrthogonalDir {
             self.direction_vector(),
         )
     }
+    pub fn stepped_n(&self, n: u32) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square + self.direction_vector() * n as i32,
+            self.direction_vector(),
+        )
+    }
     pub fn stepped_back(&self) -> Self {
         SquareWithOrthogonalDir::new(
             self.square - self.direction_vector(),
             self.direction_vector(),
         )
+    }
+    pub fn strafed_left(&self) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 1),
+            self.direction_vector(),
+        )
+    }
+    pub fn strafed_right(&self) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 3),
+            self.direction_vector(),
+        )
+    }
+    pub fn turned_left(&self) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square,
+            rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 1),
+        )
+    }
+    pub fn turned_right(&self) -> Self {
+        SquareWithOrthogonalDir::new(
+            self.square,
+            rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 3),
+        )
+    }
+    pub fn turned_back(&self) -> Self {
+        SquareWithOrthogonalDir::new(self.square, -self.direction_vector())
     }
     pub fn with_offset(&self, offset: WorldStep) -> Self {
         Self::from_square_and_turns(self.square + offset, self.direction_in_quarter_turns)
@@ -1517,6 +1550,19 @@ mod tests {
         let pose = SquareWithOrthogonalDir::from_square_and_dir(point2(4, 6), STEP_RIGHT);
         let back = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 6), STEP_RIGHT);
         assert_eq!(pose.stepped_back(), back);
+    }
+
+    #[test]
+    fn test_step_or_turn_pose() {
+        let p = SquareWithOrthogonalDir::from_square_and_dir;
+        let s = point2(5, 5);
+        assert_eq!(p(s, STEP_RIGHT).stepped(), p(s + STEP_RIGHT, STEP_RIGHT));
+        assert_eq!(p(s, STEP_UP).stepped(), p(s + STEP_UP, STEP_UP));
+        assert_eq!(p(s, STEP_DOWN).strafed_left(), p(s + STEP_RIGHT, STEP_DOWN));
+        assert_eq!(p(s, STEP_LEFT).strafed_right(), p(s + STEP_UP, STEP_LEFT));
+        assert_eq!(p(s, STEP_LEFT).turned_left(), p(s, STEP_DOWN));
+        assert_eq!(p(s, STEP_LEFT).turned_right(), p(s, STEP_UP));
+        assert_eq!(p(s, STEP_LEFT).turned_back(), p(s, STEP_RIGHT));
     }
 
     #[test]
