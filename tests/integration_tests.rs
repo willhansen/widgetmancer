@@ -243,6 +243,12 @@ fn test_player_background_is_transparent() {
 fn test_laser_background_is_transparent() {
     let mut game = set_up_10x10_game();
     let left_point: WorldPoint = point2(2.0, 2.0);
+    let test_point_a = left_point.round().to_i32() + RIGHT_I.cast_unit();
+    game.draw_headless_now();
+    let glyphs_before = game
+        .borrow_graphics_mut()
+        .screen
+        .get_screen_glyphs_at_world_square(test_point_a);
     // Two lasers, because it can make a difference
     for _ in 0..2 {
         game.borrow_graphics_mut()
@@ -251,19 +257,12 @@ fn test_laser_background_is_transparent() {
 
     game.draw_headless_now();
 
-    let test_point_a = left_point.round().to_i32() + RIGHT_I.cast_unit();
-    let test_point_b = test_point_a + RIGHT_I.cast_unit();
-
     let glyphs_a = game
         .borrow_graphics_mut()
         .screen
         .get_screen_glyphs_at_world_square(test_point_a);
-    let glyphs_b = game
-        .borrow_graphics_mut()
-        .screen
-        .get_screen_glyphs_at_world_square(test_point_b);
 
-    assert_ne!(glyphs_a[0].bg_color, glyphs_b[0].bg_color);
+    assert_eq!(glyphs_a[0].bg_color, glyphs_before[0].bg_color);
 }
 
 #[test]
