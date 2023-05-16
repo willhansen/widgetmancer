@@ -7,6 +7,10 @@
 #![feature(int_abs_diff)]
 #![feature(inline_const_pat)]
 #![feature(is_some_and)]
+#![feature(let_chains)]
+#![feature(drain_keep_rest)]
+#![feature(inherent_associated_types)]
+#![feature(iter_next_chunk)]
 
 #[macro_use]
 extern crate approx;
@@ -55,11 +59,13 @@ pub mod glyph;
 mod graphics;
 mod inputmap;
 pub mod piece;
+pub mod portal_geometry;
 pub mod utility;
 pub mod utils_for_tests;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
+        stdout().flush().expect("flush stdout");
         write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
         write!(stdout(), "{:?}", panic_info).expect("display panic info");
     }));
@@ -99,27 +105,45 @@ pub fn do_everything() {
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
     let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    game.set_up_test_map();
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
     //game.set_up_columns();
-    game.set_up_vs_mini_factions();
+    //game.set_up_simple_portal_map();
+    //game.set_up_portal_across_wall_map(2, 0);
+    //game.set_up_simple_freestanding_portal();
+    // game.place_dense_horizontal_portals(
+    //     game.player_square() + STEP_RIGHT * 10 + STEP_DOWN_RIGHT * 5,
+    //     3,
+    //     6,
+    // );
+    //game.set_up_vs_mini_factions();
+    //game.set_up_vs_red_pawns();
+    //game.set_up_upgrades_galore();
+    //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
+    //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
+    //game.set_up_vs_arrows();
 
-    let mut prev_start_time = Instant::now();
+    let mut prev_tick_start_time = Instant::now();
     while game.running() {
-        //let start_time = Instant::now();
+        let tick_start_time = Instant::now();
+        let delta = tick_start_time - prev_tick_start_time;
+        prev_tick_start_time = tick_start_time;
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
-        //prev_start_time = start_time;
 
         while let Ok(event) = event_receiver.try_recv() {
             game.on_turn_start();
 
             input_map.handle_event(&mut game, event);
-            game.move_one_piece_per_faction();
+
+            game.move_non_arrow_factions();
+            game.tick_arrows();
 
             game.on_turn_end();
         }
+        game.advance_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
     }

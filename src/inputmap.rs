@@ -3,7 +3,12 @@ use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
 use crate::game::Game;
+use crate::graphics::screen::{
+    ScreenBufferStep, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_LEFT, SCREEN_STEP_DOWN_RIGHT,
+    SCREEN_STEP_LEFT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_LEFT, SCREEN_STEP_UP_RIGHT,
+};
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::{FVector, IVector};
 use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
@@ -19,40 +24,57 @@ impl InputMap {
         }
     }
 
+    fn char_to_screen_direction(c: char) -> Option<ScreenBufferStep> {
+        match c.to_lowercase().next().unwrap() {
+            'k' | 'w' => Some(SCREEN_STEP_UP),
+            'j' | 's' => Some(SCREEN_STEP_DOWN),
+            'h' | 'a' => Some(SCREEN_STEP_LEFT),
+            'l' | 'd' => Some(SCREEN_STEP_RIGHT),
+            'y' => Some(SCREEN_STEP_UP_LEFT),
+            'u' => Some(SCREEN_STEP_UP_RIGHT),
+            'b' => Some(SCREEN_STEP_DOWN_LEFT),
+            'n' => Some(SCREEN_STEP_DOWN_RIGHT),
+            _ => None,
+        }
+    }
+
+    fn key_to_screen_direction(k: Key) -> Option<ScreenBufferStep> {
+        match k {
+            Key::Char(c) => Self::char_to_screen_direction(c),
+            Key::Up => Some(SCREEN_STEP_UP),
+            Key::Down => Some(SCREEN_STEP_DOWN),
+            Key::Left => Some(SCREEN_STEP_LEFT),
+            Key::Right => Some(SCREEN_STEP_RIGHT),
+            _ => None,
+        }
+    }
+    fn is_shifted_key(k: Key) -> bool {
+        if let Key::Char(c) = k {
+            // TODO: Don't know if this works with the number keys
+            c.is_uppercase()
+        } else {
+            false
+        }
+    }
+
     pub fn handle_event(&mut self, game: &mut Game, evt: Event) {
         match evt {
             Event::Key(ke) => match ke {
                 Key::Char('q') => game.quit(),
-                Key::Char(' ') => game.player_shoot_shotgun(),
-                Key::Char('f') => game.player_shoot_sniper(),
-
-                Key::Char('k') | Key::Char('w') | Key::Up => {
-                    game.move_player(UP_I.cast_unit()).ok();
+                Key::Char(' ') => game.do_player_radial_attack(),
+                Key::Char('f') => game.smite_selected_square(),
+                Key::Char('g') => game.do_player_spear_attack(),
+                Key::Char('t') => game.do_player_shoot_arrow(),
+                _ => {
+                    if let Some(screen_direction) = Self::key_to_screen_direction(ke) {
+                        if Self::is_shifted_key(ke) {
+                            game.player_blink_relative_to_screen(screen_direction);
+                        } else {
+                            game.try_slide_player_relative_to_screen(screen_direction)
+                                .ok();
+                        }
+                    }
                 }
-                Key::Char('h') | Key::Char('a') | Key::Left => {
-                    game.move_player(LEFT_I.cast_unit()).ok();
-                }
-                Key::Char('j') | Key::Char('s') | Key::Down => {
-                    game.move_player(DOWN_I.cast_unit()).ok();
-                }
-                Key::Char('l') | Key::Char('d') | Key::Right => {
-                    game.move_player(RIGHT_I.cast_unit()).ok();
-                }
-
-                Key::Char('y') => {
-                    game.move_player((UP_I + LEFT_I).cast_unit()).ok();
-                }
-                Key::Char('u') => {
-                    game.move_player((UP_I + RIGHT_I).cast_unit()).ok();
-                }
-                Key::Char('b') => {
-                    game.move_player((DOWN_I + LEFT_I).cast_unit()).ok();
-                }
-                Key::Char('n') => {
-                    game.move_player((DOWN_I + RIGHT_I).cast_unit()).ok();
-                }
-
-                _ => {}
             },
             Event::Mouse(me) => match me {
                 MouseEvent::Press(MouseButton::Left, term_x, term_y) => {

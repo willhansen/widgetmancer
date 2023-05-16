@@ -8,8 +8,10 @@ pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
 pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
 
 pub type BrailleArray = [[bool; 4]; 2];
+pub type DoubleBrailleArray = [[bool; 4]; 4];
 
 pub const EMPTY_BRAILLE: char = '\u{2800}';
+pub const FULL_BRAILLE: char = '⣿';
 
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
@@ -24,6 +26,12 @@ pub fn braille_array_to_braille_char(input: BrailleArray) -> char {
         }
     }
     return char::from_u32('\u{2800}' as u32 | dot_val).unwrap();
+}
+pub fn split_double_braille_array(double_array: DoubleBrailleArray) -> [BrailleArray; 2] {
+    todo!()
+}
+pub fn double_braille_array_to_braille_chars(double_array: DoubleBrailleArray) -> [char; 2] {
+    todo!()
 }
 
 pub fn braille_bit_for_pos(p: Point2D<i32, BrailleGridInWorldFrame>) -> u32 {
