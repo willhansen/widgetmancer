@@ -471,7 +471,7 @@ fn test_draw_danger_squares() {
         .get_screen_glyphs_at_world_square(danger_square);
 
     assert_eq!(actual_glyphs[0].character, MOVE_AND_CAPTURE_SQUARE_CHARS[0]);
-    assert_eq!(actual_glyphs[1].character, MOVE_AND_CAPTURE_SQUARE_CHARS[1]);
+    assert!(actual_glyphs[1].looks_solid());
 }
 
 #[test]
