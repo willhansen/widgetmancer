@@ -1,28 +1,32 @@
 use crate::animations::static_board::StaticBoard;
-use crate::animations::{Animation, BoardAnimation};
+use crate::animations::Animation;
 use crate::glyph::floating_square;
 use crate::glyph::Glyph;
-use crate::graphics::Graphics;
+use crate::graphics::{FloorColorEnum, Graphics};
 use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
-use crate::utility::{is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I};
+use crate::utility::{
+    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I, STEP_RIGHT,
+};
 use euclid::{vec2, Length};
+use rgb::RGB8;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
-#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct RadialShockwave {
     start_square: WorldSquare,
     start_time: Instant,
+    floor_color_enum: FloorColorEnum,
 }
 
 impl RadialShockwave {
-    pub fn new(start_square: WorldSquare) -> RadialShockwave {
+    pub fn new(start_square: WorldSquare, floor_color_enum: FloorColorEnum) -> RadialShockwave {
         RadialShockwave {
             start_square,
             start_time: Instant::now(),
+            floor_color_enum,
         }
     }
     fn normalized_single_period_triangle_sine_wave(x: f32) -> f32 {
@@ -100,8 +104,8 @@ impl Animation for RadialShockwave {
                             false,
                             (1.0 - height.abs()) * i,
                         ),
-                        Graphics::off_board_color_at_square(square),
-                        Graphics::board_color_at_square(square),
+                        self.floor_color_enum.color_at(square + STEP_RIGHT),
+                        self.floor_color_enum.color_at(square),
                     )
                 });
 
@@ -115,7 +119,8 @@ impl Animation for RadialShockwave {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::animations::recoiling_board::RecoilingBoard;
+    use crate::animations::recoiling_board::RecoilingBoardAnimation;
+    use crate::glyph::glyph_constants::RED;
     use euclid::point2;
     use ntest::assert_about_eq;
 
@@ -162,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_has_some_glyphs() {
-        let anim = RadialShockwave::new(point2(5, 5));
+        let anim = RadialShockwave::new(point2(5, 5), FloorColorEnum::Solid(RED));
         assert!(anim.glyphs_at_duration(Duration::from_secs_f32(0.0)).len() < 5);
         assert!(anim.glyphs_at_duration(Duration::from_secs_f32(2.0)).len() > 5);
     }

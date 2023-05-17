@@ -14,21 +14,21 @@ use std::f32::consts::{E, PI, TAU};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct SmiteFromAbove {
+pub struct SmiteAnimation {
     target: WorldSquare,
     start_time: Instant,
 }
 
-impl SmiteFromAbove {
-    pub fn new(square: WorldSquare) -> SmiteFromAbove {
-        SmiteFromAbove {
+impl SmiteAnimation {
+    pub fn new(square: WorldSquare) -> SmiteAnimation {
+        SmiteAnimation {
             target: square,
             start_time: Instant::now(),
         }
     }
 }
 
-impl Animation for SmiteFromAbove {
+impl Animation for SmiteAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
     }

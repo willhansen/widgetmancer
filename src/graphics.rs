@@ -23,13 +23,13 @@ use glyph::glyph_constants::*;
 use crate::animations::blink_animation::BlinkAnimation;
 use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
 use crate::animations::circle_attack_animation::CircleAttackAnimation;
-use crate::animations::floaty_laser::FloatyLaser;
+use crate::animations::floaty_laser::FloatyLaserAnimation;
 use crate::animations::piece_death_animation::PieceDeathAnimation;
 use crate::animations::radial_shockwave::RadialShockwave;
-use crate::animations::recoiling_board::RecoilingBoard;
+use crate::animations::recoiling_board::RecoilingBoardAnimation;
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::animations::simple_laser::SimpleLaser;
-use crate::animations::smite_from_above::SmiteFromAbove;
+use crate::animations::simple_laser::SimpleLaserAnimation;
+use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
@@ -56,13 +56,31 @@ use crate::{
 pub(crate) mod drawable;
 pub mod screen;
 
+pub type FloorColorFunction = fn(WorldSquare) -> RGB8;
+
+#[derive(Clone)]
+pub enum FloorColorEnum {
+    Function(FloorColorFunction),
+    Solid(RGB8),
+}
+
+impl FloorColorEnum {
+    pub fn color_at(&self, world_square: WorldSquare) -> RGB8 {
+        match self {
+            FloorColorEnum::Function(f) => f(world_square),
+            FloorColorEnum::Solid(color) => *color,
+        }
+    }
+}
+
 pub struct Graphics {
     pub screen: Screen,
     draw_buffer: HashMap<WorldSquare, DrawableEnum>,
-    active_animations: Vec<Box<dyn Animation>>,
+    active_animations: Vec<AnimationEnum>,
+    board_animation: Option<AnimationEnum>,
     selectors: Vec<SelectorAnimation>,
-    board_animation: Option<Box<dyn BoardAnimation>>,
     start_time: Instant,
+    floor_color_enum: FloorColorEnum,
 }
 
 impl Graphics {
@@ -71,9 +89,10 @@ impl Graphics {
             screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),
             active_animations: vec![],
-            selectors: vec![],
             board_animation: None,
+            selectors: vec![],
             start_time,
+            floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -120,24 +139,24 @@ impl Graphics {
         }
     }
 
+    pub fn set_solid_floor_color(&mut self, new_color: RGB8) {
+        self.floor_color_enum = FloorColorEnum::Solid(new_color)
+    }
+
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
         self.draw_glyphs(line_glyphs);
     }
 
-    pub fn set_empty_board_animation(&mut self, board_size: BoardSize) {
-        self.board_animation = Some(Box::new(StaticBoard::new(board_size)));
+    pub fn set_empty_board_animation(&mut self) {
+        self.board_animation = None
     }
 
     #[deprecated(note = "use more descriptive")]
     pub fn square_is_white(square: WorldSquare) -> bool {
         (square.x + square.y) % 2 == 0
     }
-    pub fn board_color_at_square(square: WorldSquare) -> RGB8 {
-        //Self::checkerboard_square_function(square)
-        Self::big_chess_pattern(square)
-    }
-    fn big_chess_pattern(square: WorldSquare) -> RGB8 {
+    pub fn big_chess_pattern(square: WorldSquare) -> RGB8 {
         let y = square.y % 6 < 3;
         let x = square.x % 6 < 3;
 
@@ -304,9 +323,6 @@ impl Graphics {
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
         let mut player_glyphs = Glyph::get_glyphs_for_player(faced_direction);
-        let square_color = Graphics::board_color_at_square(world_pos);
-        player_glyphs[0].bg_color = square_color;
-        player_glyphs[1].bg_color = square_color;
         self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
@@ -418,30 +434,38 @@ impl Graphics {
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations
-            .push(Box::new(SimpleLaser::new(start, end)));
+            .push(AnimationEnum::SimpleLaser(SimpleLaserAnimation::new(
+                start, end,
+            )));
     }
     pub fn add_floaty_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations
-            .push(Box::new(FloatyLaser::new(start, end)));
+            .push(AnimationEnum::FloatyLaser(FloatyLaserAnimation::new(
+                start, end,
+            )));
     }
 
     pub fn do_smite_animation(&mut self, square: WorldSquare) {
         self.active_animations
-            .push(Box::new(SmiteFromAbove::new(square)));
+            .push(AnimationEnum::Smite(SmiteAnimation::new(square)));
     }
 
     pub fn start_burst_explosion(&mut self, point: WorldPoint) {
         self.active_animations
-            .push(Box::new(BurstExplosionAnimation::new(point)));
+            .push(AnimationEnum::BurstExplosion(BurstExplosionAnimation::new(
+                point,
+            )));
     }
     pub fn start_circle_attack_animation(&mut self, square: WorldSquare, radius: f32) {
         self.active_animations
-            .push(Box::new(CircleAttackAnimation::new(
+            .push(AnimationEnum::CircleAttack(CircleAttackAnimation::new(
                 square.to_f32(),
                 radius,
             )));
-        self.active_animations
-            .push(Box::new(RadialShockwave::new(square)));
+        self.board_animation = Some(AnimationEnum::RadialShockwave(RadialShockwave::new(
+            square,
+            self.floor_color_enum.clone(),
+        )));
     }
     pub fn start_spear_attack_animation(
         &mut self,
@@ -450,7 +474,7 @@ impl Graphics {
         range: u32,
     ) {
         self.active_animations
-            .push(Box::new(SpearAttackAnimation::new(
+            .push(AnimationEnum::SpearAttack(SpearAttackAnimation::new(
                 start_square,
                 direction,
                 range,
@@ -459,17 +483,20 @@ impl Graphics {
 
     pub fn start_piece_death_animation_at(&mut self, square: WorldSquare) {
         self.active_animations
-            .push(Box::new(PieceDeathAnimation::new(square)));
+            .push(AnimationEnum::PieceDeath(PieceDeathAnimation::new(square)));
     }
 
     pub fn do_blink_animation(&mut self, start_square: WorldSquare, end_square: WorldSquare) {
         self.active_animations
-            .push(Box::new(BlinkAnimation::new(start_square, end_square)));
+            .push(AnimationEnum::Blink(BlinkAnimation::new(
+                start_square,
+                end_square,
+            )));
     }
 
     pub fn add_selector(&mut self, square: WorldSquare) {
         self.active_animations
-            .push(Box::new(SelectorAnimation::new(square)));
+            .push(AnimationEnum::Selector(SelectorAnimation::new(square)));
     }
     pub fn draw_paths(&mut self, paths: Vec<SquareList>) {
         let mut path_squares = HashSet::<WorldSquare>::new();
@@ -480,7 +507,11 @@ impl Graphics {
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
-        self.board_animation = Some(Box::new(RecoilingBoard::new(board_size, shot_direction)));
+        self.board_animation = Some(AnimationEnum::RecoilingBoard(RecoilingBoardAnimation::new(
+            board_size,
+            shot_direction,
+            self.floor_color_enum.clone(),
+        )));
     }
 
     pub fn draw_board_animation(&mut self, time: Instant) {
@@ -489,15 +520,15 @@ impl Graphics {
         }
     }
 
-    fn draw_animation(&mut self, animation: AnimationObject, time: Instant) {
-        self.draw_animations(vec![animation], time)
+    fn draw_animation(&mut self, animation: &AnimationEnum, time: Instant) {
+        let glyph_map = animation.glyphs_at_time(time);
+        self.draw_glyphs(glyph_map);
     }
 
     fn draw_animations(&mut self, animations: AnimationList, time: Instant) {
         animations
             .into_iter()
-            .map(|animation| animation.glyphs_at_time(time))
-            .for_each(|glyph_map| self.draw_glyphs(glyph_map));
+            .for_each(|animation| self.draw_animation(&animation, time))
     }
 
     pub fn draw_non_board_animations(&mut self, time: Instant) {
@@ -517,7 +548,7 @@ impl Graphics {
     pub fn remove_finished_animations(&mut self, time: Instant) {
         if let Some(board_animation) = &mut self.board_animation {
             if board_animation.finished_at_time(time) {
-                self.board_animation = Some(board_animation.next_animation())
+                self.board_animation = None;
             }
         }
         self.active_animations

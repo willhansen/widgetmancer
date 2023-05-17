@@ -1,7 +1,7 @@
 //#![allow(non_snake_case)]
 #![feature(is_sorted)]
 #![feature(drain_filter)]
-#![allow(warnings)]
+//#![allow(warnings)]
 #![feature(trait_upcasting)]
 #![feature(duration_consts_float)]
 #![feature(int_abs_diff)]
@@ -11,6 +11,7 @@
 #![feature(drain_keep_rest)]
 #![feature(inherent_associated_types)]
 #![feature(iter_next_chunk)]
+#![feature(trait_alias)]
 
 #[macro_use]
 extern crate approx;
@@ -21,11 +22,10 @@ extern crate shrinkwraprs;
 extern crate std;
 extern crate termion;
 
-use std::char;
 use std::cmp::{max, min};
-use std::collections::hash_map::Entry;
+
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Debug;
+
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;

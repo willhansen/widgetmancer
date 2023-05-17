@@ -105,7 +105,7 @@ impl Game {
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
 
-        game.graphics.set_empty_board_animation(board_size);
+        game.graphics.set_empty_board_animation();
         game
     }
     pub fn board_size(&self) -> BoardSize {
@@ -1751,6 +1751,7 @@ mod tests {
     use crate::graphics::drawable::Drawable;
     use crate::graphics::screen::{
         Screen, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
+        SCREEN_STEP_ZERO,
     };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
@@ -3108,5 +3109,25 @@ mod tests {
 
         todo!();
         assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
+    }
+    #[test]
+    fn test_set_floor_color() {
+        let mut game = set_up_nxm_game(10, 10);
+        game.draw_headless_now();
+        let default_floor_color: RGB8 = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO)
+            .get_solid_color()
+            .unwrap();
+        assert_ne!(default_floor_color, RED);
+        game.graphics.set_solid_floor_color(RED);
+        let new_floor_color: RGB8 = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO)
+            .get_solid_color()
+            .unwrap();
+        assert_eq!(new_floor_color, RED);
     }
 }

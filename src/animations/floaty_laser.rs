@@ -12,15 +12,15 @@ use std::f32::consts::{E, PI, TAU};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct FloatyLaser {
+pub struct FloatyLaserAnimation {
     start: WorldPoint,
     end: WorldPoint,
     start_time: Instant,
 }
 
-impl FloatyLaser {
-    pub fn new(start: WorldPoint, end: WorldPoint) -> FloatyLaser {
-        FloatyLaser {
+impl FloatyLaserAnimation {
+    pub fn new(start: WorldPoint, end: WorldPoint) -> FloatyLaserAnimation {
+        FloatyLaserAnimation {
             start,
             end,
             start_time: Instant::now(),
@@ -28,7 +28,7 @@ impl FloatyLaser {
     }
 }
 
-impl Animation for FloatyLaser {
+impl Animation for FloatyLaserAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
     }

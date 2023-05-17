@@ -87,6 +87,7 @@ impl InputMap {
                 MouseEvent::Hold(term_x, term_y) => {
                     let square = self.screen_to_world(&(term_x, term_y));
                     //game.place_line_of_blocks(self.prev_mouse_pos, (x, y), game.selected_block);
+                    game.try_set_player_position(square).unwrap_or_default();
                     self.prev_mouse_square = square;
                 }
                 _ => {}

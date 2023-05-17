@@ -5,15 +5,15 @@ use crate::utility::coordinate_frame_conversions::{WorldCharacterSquareGlyphMap,
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct SimpleLaser {
+pub struct SimpleLaserAnimation {
     start: WorldPoint,
     end: WorldPoint,
     start_time: Instant,
 }
 
-impl SimpleLaser {
-    pub fn new(start: WorldPoint, end: WorldPoint) -> SimpleLaser {
-        SimpleLaser {
+impl SimpleLaserAnimation {
+    pub fn new(start: WorldPoint, end: WorldPoint) -> SimpleLaserAnimation {
+        SimpleLaserAnimation {
             start,
             end,
             start_time: Instant::now(),
@@ -21,7 +21,7 @@ impl SimpleLaser {
     }
 }
 
-impl Animation for SimpleLaser {
+impl Animation for SimpleLaserAnimation {
     fn start_time(&self) -> Instant {
         self.start_time
     }

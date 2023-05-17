@@ -11,6 +11,17 @@ use static_board::StaticBoard;
 use termion::color::Black;
 use termion::style::Blink;
 
+use crate::animations::blink_animation::BlinkAnimation;
+use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
+use crate::animations::circle_attack_animation::CircleAttackAnimation;
+use crate::animations::floaty_laser::FloatyLaserAnimation;
+use crate::animations::piece_death_animation::PieceDeathAnimation;
+use crate::animations::radial_shockwave::RadialShockwave;
+use crate::animations::recoiling_board::RecoilingBoardAnimation;
+use crate::animations::selector_animation::SelectorAnimation;
+use crate::animations::simple_laser::SimpleLaserAnimation;
+use crate::animations::smite_from_above::SmiteAnimation;
+use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::glyph::braille::world_points_for_braille_line;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph_constants::*;
@@ -37,7 +48,22 @@ pub mod static_board;
 pub type AnimationObject = Box<dyn Animation>;
 pub type AnimationList = Vec<AnimationObject>;
 
-pub trait Animation: DynClone {
+#[derive(Animation)]
+pub enum AnimationEnum {
+    Blink(BlinkAnimation),
+    BurstExplosion(BurstExplosionAnimation),
+    CircleAttack(CircleAttackAnimation),
+    FloatyLaser(FloatyLaserAnimation),
+    PieceDeath(PieceDeathAnimation),
+    RadialShockwave(RadialShockwave),
+    RecoilingBoard(RecoilingBoardAnimation),
+    Selector(SelectorAnimation),
+    SimpleLaser(SimpleLaserAnimation),
+    Smite(SmiteAnimation),
+    SpearAttack(SpearAttackAnimation),
+}
+
+pub trait Animation {
     fn start_time(&self) -> Instant;
     fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
@@ -73,13 +99,6 @@ pub trait Animation: DynClone {
         time.duration_since(self.start_time())
     }
 }
-// This is kinda magic.  Not great, but if it works, it works.
-dyn_clone::clone_trait_object!(Animation);
-
-pub trait BoardAnimation: Animation {
-    fn next_animation(&self) -> Box<dyn BoardAnimation>;
-}
-dyn_clone::clone_trait_object!(BoardAnimation);
 
 pub const DOTS_IN_SELECTOR: u32 = 3;
 
@@ -87,20 +106,21 @@ pub const DOTS_IN_SELECTOR: u32 = 3;
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::animations::floaty_laser::FloatyLaser;
-    use crate::animations::recoiling_board::RecoilingBoard;
-    use crate::animations::simple_laser::SimpleLaser;
+    use crate::animations::floaty_laser::FloatyLaserAnimation;
+    use crate::animations::recoiling_board::RecoilingBoardAnimation;
+    use crate::animations::simple_laser::SimpleLaserAnimation;
+    use crate::graphics::FloorColorEnum;
     use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
 
     use super::*;
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
-        let peak_time = RecoilingBoard::TIME_TO_PEAK.as_secs_f32();
+        let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32();
         let mut prev_d = 0.0;
         let mut t = 0.0;
         loop {
-            let d = RecoilingBoard::recoil_distance_in_squares_at_age(t).abs();
+            let d = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(t).abs();
             if t >= peak_time {
                 break;
             }
@@ -119,9 +139,10 @@ mod tests {
     #[test]
     fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
         let board_length = 5;
-        let animation = RecoilingBoard::new(
+        let animation = RecoilingBoardAnimation::new(
             BoardSize::new(board_length, board_length),
             LEFT_I.cast_unit(),
+            FloorColorEnum::Function(Graphics::big_chess_pattern),
         );
         let start_time = animation.start_time();
 
@@ -152,9 +173,10 @@ mod tests {
     #[ignore = "More for visual debugging than an actual test"]
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
-        let animation = RecoilingBoard::new(
+        let animation = RecoilingBoardAnimation::new(
             BoardSize::new(board_length, board_length),
             RIGHT_I.cast_unit(),
+            FloorColorEnum::Function(Graphics::big_chess_pattern),
         );
         let start_time = animation.start_time();
 
@@ -175,28 +197,33 @@ mod tests {
 
     #[test]
     fn test_simple_laser_transparent_background() {
-        let animation = SimpleLaser::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
+        let animation =
+            SimpleLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
         let glyph_map = animation.glyphs_at_time(animation.start_time() + Duration::from_millis(1));
         assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
     }
 
     #[test]
     fn test_floaty_laser_transparent_background() {
-        let animation = FloatyLaser::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
+        let animation =
+            FloatyLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
         let glyph_map = animation.glyphs_at_time(animation.start_time() + Duration::from_millis(1));
         assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
     }
 
     #[test]
     fn test_recoil_function__start_at_zero() {
-        assert_eq!(RecoilingBoard::recoil_distance_in_squares_at_age(0.0), 0.0);
+        assert_eq!(
+            RecoilingBoardAnimation::recoil_distance_in_squares_at_age(0.0),
+            0.0
+        );
     }
 
     #[test]
     fn test_recoil_function__start_fast() {
         assert!(
             derivative(
-                RecoilingBoard::recoil_distance_in_squares_at_age,
+                RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
                 0.0,
                 0.0001,
             ) > 0.0
@@ -206,18 +233,18 @@ mod tests {
     #[test]
     fn test_recoil_function__hit_peak() {
         assert_eq!(
-            RecoilingBoard::recoil_distance_in_squares_at_age(
-                RecoilingBoard::TIME_TO_PEAK.as_secs_f32()
+            RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
+                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
             ),
-            RecoilingBoard::RECOIL_DISTANCE.0
+            RecoilingBoardAnimation::RECOIL_DISTANCE.0
         );
     }
 
     #[test]
     fn test_recoil_function__flat_peak() {
         let slope = derivative(
-            RecoilingBoard::recoil_distance_in_squares_at_age,
-            RecoilingBoard::TIME_TO_PEAK.as_secs_f32(),
+            RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
+            RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {slope}");
@@ -225,8 +252,8 @@ mod tests {
 
     #[test]
     fn test_recoil_function__fully_relax() {
-        let height = RecoilingBoard::recoil_distance_in_squares_at_age(
-            RecoilingBoard::RECOIL_DURATION.as_secs_f32(),
+        let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
+            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
         );
         assert!(height.abs() < 0.01, "height: {}", height);
     }
@@ -234,8 +261,8 @@ mod tests {
     #[test]
     fn test_recoil_function__relax_flat() {
         let slope = derivative(
-            RecoilingBoard::recoil_distance_in_squares_at_age,
-            RecoilingBoard::RECOIL_DURATION.as_secs_f32(),
+            RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
+            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {}", slope);

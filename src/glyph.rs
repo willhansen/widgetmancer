@@ -225,8 +225,9 @@ impl Glyph {
             Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
                 faced_direction,
                 "🢀🢂🢁🢃🢄🢅🢆🢇",
-            )),
-            Glyph::from_char(' '),
+            ))
+            .with_transparent_bg(true),
+            Glyph::transparent_glyph(),
         ];
         glyphs[0].fg_color = PLAYER_COLOR;
 
