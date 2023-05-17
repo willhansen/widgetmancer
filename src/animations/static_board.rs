@@ -11,6 +11,7 @@ use rgb::RGB8;
 use std::time;
 use std::time::{Duration, Instant};
 
+#[derive(Clone)]
 pub struct StaticBoard {
     board_size: BoardSize,
     floor_color_enum: FloorColorEnum,

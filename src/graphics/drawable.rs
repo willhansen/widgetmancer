@@ -1,3 +1,4 @@
+use ambassador::{delegatable_trait, Delegate};
 use derive_more::From;
 use dyn_clone::DynClone;
 use euclid::Angle;
@@ -13,64 +14,22 @@ use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::local_square_half_plane_to_local_character_half_plane;
 use crate::utility::QuarterTurnsAnticlockwise;
 
+#[delegatable_trait]
 pub trait Drawable: Clone {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self;
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum;
     fn to_glyphs(&self) -> DoubleGlyph;
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self;
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
     fn color_if_backgroundified(&self) -> RGB8;
     fn to_enum(&self) -> DrawableEnum;
 }
 
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone, From, Delegate)]
+#[delegate(Drawable)]
 pub enum DrawableEnum {
     Text(TextDrawable),
     PartialVisibility(PartialVisibilityDrawable),
     SolidColor(SolidColorDrawable),
     Braille(BrailleDrawable),
-}
-
-// TODO: Somehow reduce code duplication here
-
-impl Drawable for DrawableEnum {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
-        match self {
-            DrawableEnum::Text(v) => v.rotated(quarter_rotations_anticlockwise).into(),
-            DrawableEnum::PartialVisibility(v) => v.rotated(quarter_rotations_anticlockwise).into(),
-            DrawableEnum::Braille(v) => v.rotated(quarter_rotations_anticlockwise).into(),
-            DrawableEnum::SolidColor(v) => v.rotated(quarter_rotations_anticlockwise).into(),
-        }
-    }
-
-    fn to_glyphs(&self) -> DoubleGlyph {
-        match self {
-            DrawableEnum::Text(v) => v.to_glyphs(),
-            DrawableEnum::PartialVisibility(v) => v.to_glyphs(),
-            DrawableEnum::Braille(v) => v.to_glyphs(),
-            DrawableEnum::SolidColor(v) => v.to_glyphs(),
-        }
-    }
-
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
-        match self {
-            DrawableEnum::Text(v) => v.drawn_over(other).into(),
-            DrawableEnum::PartialVisibility(v) => v.drawn_over(other).into(),
-            DrawableEnum::Braille(v) => v.drawn_over(other).into(),
-            DrawableEnum::SolidColor(v) => v.drawn_over(other).into(),
-        }
-    }
-
-    fn color_if_backgroundified(&self) -> RGB8 {
-        match self {
-            DrawableEnum::Text(v) => v.color_if_backgroundified(),
-            DrawableEnum::PartialVisibility(v) => v.color_if_backgroundified(),
-            DrawableEnum::Braille(v) => v.color_if_backgroundified(),
-            DrawableEnum::SolidColor(v) => v.color_if_backgroundified(),
-        }
-    }
-
-    fn to_enum(&self) -> DrawableEnum {
-        self.clone()
-    }
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -94,18 +53,18 @@ impl TextDrawable {
 }
 
 impl Drawable for TextDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         // lmao no
-        self.clone()
+        self.clone().into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
         self.glyphs
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
         let glyphs = self.to_glyphs().drawn_over(other.to_glyphs());
-        Self::from_glyphs(glyphs)
+        Self::from_glyphs(glyphs).into()
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {
@@ -151,10 +110,10 @@ impl PartialVisibilityDrawable {
 }
 
 impl Drawable for PartialVisibilityDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         let mut the_clone = self.clone();
         the_clone.visibility = self.visibility.rotated(quarter_rotations_anticlockwise);
-        the_clone
+        the_clone.into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
@@ -183,10 +142,10 @@ impl Drawable for PartialVisibilityDrawable {
         glyphs
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
         let mut the_clone = self.clone();
         the_clone.bg_color = other.color_if_backgroundified();
-        the_clone
+        the_clone.into()
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {
@@ -206,7 +165,7 @@ pub struct BrailleDrawable {
 }
 
 impl Drawable for BrailleDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         todo!()
     }
 
@@ -214,7 +173,7 @@ impl Drawable for BrailleDrawable {
         todo!()
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
         todo!()
     }
 
@@ -239,16 +198,16 @@ impl SolidColorDrawable {
 }
 
 impl Drawable for SolidColorDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
-        *self
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        self.clone().into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
         DoubleGlyph::solid_color(self.color)
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self {
-        *self
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+        self.clone().into()
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {

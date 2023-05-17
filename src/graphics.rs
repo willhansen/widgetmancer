@@ -38,7 +38,9 @@ use crate::game::DeathCube;
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::drawable::{Drawable, DrawableEnum, PartialVisibilityDrawable, TextDrawable};
+use crate::graphics::drawable::{
+    Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
+};
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
 };
@@ -46,7 +48,8 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    hue_to_rgb, is_world_character_square_left_square_of_world_square, reversed, STEP_RIGHT,
+    hue_to_rgb, is_world_character_square_left_square_of_world_square, reversed, squares_on_board,
+    STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -326,11 +329,11 @@ impl Graphics {
         self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
-    pub fn draw_above<T: Drawable>(&mut self, drawable: &T, world_square: WorldSquare) {
+    pub fn draw_above_square<T: Drawable>(&mut self, drawable: &T, world_square: WorldSquare) {
         let to_draw = if let Some(below) = self.draw_buffer.get(&world_square) {
             drawable.drawn_over(below)
         } else {
-            drawable.clone()
+            drawable.clone().to_enum()
         };
         self.draw_buffer.insert(world_square, to_draw.to_enum());
     }
@@ -340,7 +343,7 @@ impl Graphics {
         world_square: WorldSquare,
         glyphs: DoubleGlyph,
     ) {
-        self.draw_above(&TextDrawable::from_glyphs(glyphs), world_square);
+        self.draw_above_square(&TextDrawable::from_glyphs(glyphs), world_square);
     }
 
     pub fn draw_piece_with_color(
@@ -514,9 +517,17 @@ impl Graphics {
         )));
     }
 
+    pub fn draw_static_board(&mut self, board_size: BoardSize) {
+        squares_on_board(board_size).into_iter().for_each(|square| {
+            let color = self.floor_color_enum.color_at(square);
+            let drawable = SolidColorDrawable::new(color);
+            self.draw_above_square(&drawable, square)
+        })
+    }
+
     pub fn draw_board_animation(&mut self, time: Instant) {
         if let Some(board_animation) = &self.board_animation {
-            self.draw_animation(board_animation.clone(), time);
+            self.draw_animation(&board_animation.clone(), time);
         }
     }
 
@@ -692,7 +703,7 @@ mod tests {
     fn test_draw_piece_on_board() {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
-        g.set_empty_board_animation(BoardSize::new(1, 1));
+        g.set_empty_board_animation();
         g.draw_board_animation(Instant::now());
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);

@@ -15,6 +15,7 @@ use rgb::RGB8;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
+#[derive(Clone)]
 pub struct RadialShockwave {
     start_square: WorldSquare,
     start_time: Instant,

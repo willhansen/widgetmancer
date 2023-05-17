@@ -12,6 +12,7 @@ use rgb::RGB8;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
+#[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
     orthogonal_shot_direction: WorldStep,

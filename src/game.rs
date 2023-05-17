@@ -339,6 +339,7 @@ impl Game {
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
         self.graphics.clear_draw_buffer();
+        self.graphics.draw_static_board(self.board_size);
         self.graphics.draw_board_animation(time);
 
         // TODO: fix redundant calculation
@@ -3121,7 +3122,9 @@ mod tests {
             .get_solid_color()
             .unwrap();
         assert_ne!(default_floor_color, RED);
+
         game.graphics.set_solid_floor_color(RED);
+        game.draw_headless_now();
         let new_floor_color: RGB8 = game
             .graphics
             .screen

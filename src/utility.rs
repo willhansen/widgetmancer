@@ -1247,6 +1247,14 @@ where
     vec2(-v.x, v.y)
 }
 
+// TODO: turn into iter
+pub fn squares_on_board(size: BoardSize) -> SquareSet {
+    (0..size.width)
+        .cartesian_product((0..size.height).into_iter())
+        .map(|(x, y)| WorldSquare::new(x as i32, y as i32))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -1629,5 +1637,12 @@ mod tests {
         assert!(the_plane.fully_covers_expanded_unit_square(0.49));
         assert_false!(the_plane.fully_covers_expanded_unit_square(0.51));
         assert_false!(the_plane.fully_covers_expanded_unit_square(100.0));
+    }
+    #[test]
+    fn test_squares_on_board() {
+        let size = BoardSize::new(5, 40);
+        let squares = squares_on_board(size);
+        assert!(squares.contains(&point2(4,20)));
+        assert_false!(squares.contains(&point2(14,2)));
     }
 }

@@ -1,3 +1,4 @@
+use ambassador::{delegatable_trait, Delegate};
 use std::collections::HashMap;
 use std::f32::consts::{E, PI, TAU};
 use std::time;
@@ -45,25 +46,10 @@ pub mod smite_from_above;
 pub mod spear_attack_animation;
 pub mod static_board;
 
-pub type AnimationObject = Box<dyn Animation>;
-pub type AnimationList = Vec<AnimationObject>;
+pub type AnimationList = Vec<AnimationEnum>;
 
-#[derive(Animation)]
-pub enum AnimationEnum {
-    Blink(BlinkAnimation),
-    BurstExplosion(BurstExplosionAnimation),
-    CircleAttack(CircleAttackAnimation),
-    FloatyLaser(FloatyLaserAnimation),
-    PieceDeath(PieceDeathAnimation),
-    RadialShockwave(RadialShockwave),
-    RecoilingBoard(RecoilingBoardAnimation),
-    Selector(SelectorAnimation),
-    SimpleLaser(SimpleLaserAnimation),
-    Smite(SmiteAnimation),
-    SpearAttack(SpearAttackAnimation),
-}
-
-pub trait Animation {
+#[delegatable_trait]
+pub trait Animation: Clone {
     fn start_time(&self) -> Instant;
     fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
@@ -98,6 +84,22 @@ pub trait Animation {
     fn age_at_time(&self, time: Instant) -> Duration {
         time.duration_since(self.start_time())
     }
+}
+
+#[derive(Delegate, Clone)]
+#[delegate(Animation)]
+pub enum AnimationEnum {
+    Blink(BlinkAnimation),
+    BurstExplosion(BurstExplosionAnimation),
+    CircleAttack(CircleAttackAnimation),
+    FloatyLaser(FloatyLaserAnimation),
+    PieceDeath(PieceDeathAnimation),
+    RadialShockwave(RadialShockwave),
+    RecoilingBoard(RecoilingBoardAnimation),
+    Selector(SelectorAnimation),
+    SimpleLaser(SimpleLaserAnimation),
+    Smite(SmiteAnimation),
+    SpearAttack(SpearAttackAnimation),
 }
 
 pub const DOTS_IN_SELECTOR: u32 = 3;
