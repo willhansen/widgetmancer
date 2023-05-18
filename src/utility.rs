@@ -1053,17 +1053,21 @@ impl SquareWithOrthogonalDir {
         )
     }
     pub fn strafed_left(&self) -> Self {
-        SquareWithOrthogonalDir::new(
-            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 1),
-            self.direction_vector(),
-        )
+        self.strafed_right_n(-1)
     }
     pub fn strafed_right(&self) -> Self {
+        self.strafed_right_n(1)
+    }
+    pub fn strafed_right_n(&self, n: i32) -> Self {
         SquareWithOrthogonalDir::new(
-            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 3),
+            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction_vector(), 3) * n,
             self.direction_vector(),
         )
     }
+    pub fn strafed_left_n(&self, n: i32) -> Self {
+        self.strafed_right_n(-n)
+    }
+
     pub fn turned_left(&self) -> Self {
         SquareWithOrthogonalDir::new(
             self.square,

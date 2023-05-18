@@ -1607,24 +1607,27 @@ impl Game {
     }
 
     pub fn set_up_test_map(&mut self) {
-        let mut entrance_step = SquareWithOrthogonalDir::new(
+        let left_entrance = SquareWithOrthogonalDir::new(
             self.player_square() + STEP_RIGHT * 3 + STEP_UP * 3,
             STEP_RIGHT,
         );
-        let mut exit_step = SquareWithOrthogonalDir::new(
-            self.player_square() + STEP_UP * 7 + STEP_RIGHT * 13,
-            STEP_DOWN,
+        let left_exit = SquareWithOrthogonalDir::new(
+            left_entrance.square() + STEP_UP * 2 + STEP_RIGHT * 2,
+            STEP_UP,
         );
-        (0..6).for_each(|_| {
-            self.place_double_sided_two_way_portal(entrance_step, exit_step);
-            entrance_step = entrance_step.strafed_right();
-            exit_step = exit_step.strafed_right();
+        (0..6).for_each(|i| {
+            let entrance = left_entrance.strafed_right_n(i);
+            let exit = left_exit.strafed_right_n(i);
+            self.place_double_sided_two_way_portal(entrance, exit);
         });
 
-        self.place_block(self.player_square() + STEP_RIGHT * 10);
+        self.place_block(left_entrance.square() + STEP_RIGHT * 2 + STEP_DOWN_RIGHT * 3);
+
+        self.place_dense_horizontal_portals(self.player_square() + STEP_RIGHT * 20, 1, 10);
     }
 
     // TODO: fix
+
     fn place_rotation_portal_square(&mut self, top_left: WorldSquare, side_length: u32) {
         let mut entrance_step = SquareWithOrthogonalDir::new(top_left + STEP_LEFT, STEP_RIGHT);
         let mut exit_step = SquareWithOrthogonalDir::new(top_left + STEP_DOWN, STEP_DOWN);
@@ -3033,6 +3036,7 @@ mod tests {
         game.place_dense_horizontal_portals(player_square, 3, 6);
         assert_screen_is_stable(&mut game, 5);
     }
+
     #[test]
     fn test_portal_edges_are_stable__simple_case() {
         let player_square = point2(0, 2);
@@ -3043,6 +3047,7 @@ mod tests {
 
         assert_screen_is_stable(&mut game, 5);
     }
+
     #[test]
     fn test_portal_edges_are_stable__two_deep() {
         let player_square = point2(0, 2);
@@ -3053,6 +3058,7 @@ mod tests {
 
         assert_screen_is_stable(&mut game, 10);
     }
+
     fn place_portal_capping_block_bar(game: &mut Game, square: WorldSquare, length: u32) {
         game.place_offset_rightward_double_sided_two_way_portal(
             square + STEP_LEFT,
@@ -3062,6 +3068,7 @@ mod tests {
             .map(|i| square + STEP_RIGHT * i as i32)
             .for_each(|abs_square| game.place_block(abs_square));
     }
+
     #[test]
     fn test_portal_drawn_in_correct_order_over_partially_visible_block() {
         let player_square = point2(5, 5);
@@ -3082,6 +3089,7 @@ mod tests {
         assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
         assert_eq!(test_glyphs.map(|g| g.bg_color), [BLOCK_FG; 2]);
     }
+
     #[ignore = "May or may not want this"]
     #[test]
     fn test_shadow_arc_squashed_by_portal_still_looks_connected() {
@@ -3111,6 +3119,7 @@ mod tests {
         todo!();
         assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
     }
+
     #[test]
     fn test_set_floor_color() {
         let mut game = set_up_nxm_game(10, 10);
