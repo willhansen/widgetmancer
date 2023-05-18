@@ -90,6 +90,13 @@ impl Glyph {
             bg_transparent: true,
         }
     }
+    fn tinted(&self, color: RGB8, strength: f32) -> Self {
+        Glyph {
+            fg_color: tint_color(self.fg_color, color, strength),
+            bg_color: tint_color(self.bg_color, color, strength),
+            ..*self
+        }
+    }
 
     pub fn to_string(&self) -> String {
         let mut output = self.character.to_string();
@@ -474,6 +481,7 @@ pub trait DoubleGlyphFunctions {
     fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
     fn fg_colors(&self) -> [RGB8; 2];
     fn solid_color(color: RGB8) -> DoubleGlyph;
+    fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -557,6 +565,10 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
     fn solid_color(color: RGB8) -> DoubleGlyph {
         [Glyph::new(FULL_BLOCK, color, color); 2]
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph {
+        self.map(|g| g.tinted(color, strength))
     }
 }
 

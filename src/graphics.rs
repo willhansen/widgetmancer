@@ -264,6 +264,10 @@ impl Graphics {
                             base_drawable.clone()
                         }
                         .rotated(-positioned_visibility.portal_rotation().quarter_turns())
+                        .tinted(
+                            RED,
+                            (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
+                        )
                     },
                 )
                 .reduce(|bottom, top| top.drawn_over(&bottom));

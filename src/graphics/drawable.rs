@@ -12,7 +12,7 @@ use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
 use crate::glyph::glyph_constants::{GREEN, OUT_OF_SIGHT_COLOR, RED};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::local_square_half_plane_to_local_character_half_plane;
-use crate::utility::QuarterTurnsAnticlockwise;
+use crate::utility::{tint_color, QuarterTurnsAnticlockwise};
 
 #[delegatable_trait]
 pub trait Drawable: Clone {
@@ -21,6 +21,7 @@ pub trait Drawable: Clone {
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
     fn color_if_backgroundified(&self) -> RGB8;
     fn to_enum(&self) -> DrawableEnum;
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum;
 }
 
 #[derive(Debug, Clone, From, Delegate)]
@@ -73,6 +74,10 @@ impl Drawable for TextDrawable {
 
     fn to_enum(&self) -> DrawableEnum {
         self.clone().into()
+    }
+
+    fn tinted(&self, color: RGB8, mut strength: f32) -> DrawableEnum {
+        Self::from_glyphs(self.glyphs.tinted(color, strength)).into()
     }
 }
 
@@ -155,6 +160,15 @@ impl Drawable for PartialVisibilityDrawable {
     fn to_enum(&self) -> DrawableEnum {
         self.clone().into()
     }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
+        Self {
+            fg_color: tint_color(self.fg_color, color, strength),
+            bg_color: tint_color(self.bg_color, color, strength),
+            ..self.clone()
+        }
+        .into()
+    }
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -182,6 +196,10 @@ impl Drawable for BrailleDrawable {
     }
 
     fn to_enum(&self) -> DrawableEnum {
+        todo!()
+    }
+
+    fn tinted(&self, tint: RGB8, strength: f32) -> DrawableEnum {
         todo!()
     }
 }
@@ -216,6 +234,13 @@ impl Drawable for SolidColorDrawable {
 
     fn to_enum(&self) -> DrawableEnum {
         self.clone().into()
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
+        SolidColorDrawable {
+            color: tint_color(self.color, color, strength),
+        }
+        .into()
     }
 }
 

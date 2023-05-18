@@ -3133,4 +3133,33 @@ mod tests {
             .unwrap();
         assert_eq!(new_floor_color, RED);
     }
+
+    #[test]
+    fn test_portals_tint_views() {
+        let test_square: ScreenBufferStep = SCREEN_STEP_RIGHT * 3;
+        let player_square: WorldSquare = point2(3, 3);
+        let mut game = set_up_10x10_game();
+        game.place_player(player_square);
+        game.graphics.set_solid_floor_color(GREY);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let get_color = |game: &Game| -> RGB8 {
+            game.graphics
+                .screen
+                .get_screen_glyphs_at_visual_offset_from_center(test_square)
+                .get_solid_color()
+                .unwrap()
+        };
+        let start_color: RGB8 = get_color(&game);
+
+        assert_eq!(start_color.b, start_color.r);
+
+        game.place_offset_rightward_double_sided_two_way_portal(player_square, STEP_UP * 5);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let end_color: RGB8 = get_color(&game);
+
+        assert!(end_color.b < end_color.r, "Should tint red");
+    }
 }

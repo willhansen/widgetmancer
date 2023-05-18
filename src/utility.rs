@@ -1255,6 +1255,18 @@ pub fn squares_on_board(size: BoardSize) -> SquareSet {
         .collect()
 }
 
+pub fn tint_color(original_color: RGB8, tint_color: RGB8, mut tint_strength: f32) -> RGB8 {
+    // basically just lerp for now, I guess
+    tint_strength = tint_strength.clamp(0.0, 1.0);
+    let c1: [u8; 3] = original_color.into();
+    let c2: [u8; 3] = tint_color.into();
+    (0..3)
+        .map(|i| lerp(c1[i] as f32, c2[i] as f32, tint_strength).round() as u8)
+        .collect_tuple::<(u8, u8, u8)>()
+        .unwrap()
+        .into()
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -1642,7 +1654,7 @@ mod tests {
     fn test_squares_on_board() {
         let size = BoardSize::new(5, 40);
         let squares = squares_on_board(size);
-        assert!(squares.contains(&point2(4,20)));
-        assert_false!(squares.contains(&point2(14,2)));
+        assert!(squares.contains(&point2(4, 20)));
+        assert_false!(squares.contains(&point2(14, 2)));
     }
 }
