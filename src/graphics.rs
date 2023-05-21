@@ -707,23 +707,21 @@ mod tests {
     fn test_draw_piece_on_board() {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
-        g.draw_static_board(BoardSize::new(20, 20));
-        let default_bg_color: RGB8 = g
-            .get_drawable_for_square_from_draw_buffer(the_square)
-            .unwrap()
-            .color_if_backgroundified();
+        g.set_empty_board_animation();
+        g.draw_board_animation(Instant::now());
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
-        let drawn_glyphs: DoubleGlyph = g
+        let drawn_glyphs = g
             .get_drawable_for_square_from_draw_buffer(the_square)
             .unwrap()
             .to_glyphs();
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);
-        assert_eq!(drawn_glyphs[0].bg_color, default_bg_color);
+        assert_eq!(drawn_glyphs[0].bg_color, BOARD_WHITE);
         assert_eq!(drawn_glyphs[0].bg_transparent, false);
-        assert_eq!(drawn_glyphs[1].get_solid_color(), Some(default_bg_color));
+        assert_eq!(drawn_glyphs[1].character, ' ');
+        assert_eq!(drawn_glyphs[1].bg_color, BOARD_WHITE);
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
     }
 
