@@ -127,7 +127,6 @@ mod tests {
                 break;
             }
             if t != 0.0 {
-                //dbg!(&d, &prev_d);
                 assert!(
                     d > prev_d,
                     "t_peak: {peak_time}\nt: {t}\nd: {d}\nprev_d: {prev_d}"

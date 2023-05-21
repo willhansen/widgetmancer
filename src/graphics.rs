@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
+use std::fmt::Debug;
 use std::io::Write;
 use std::mem::swap;
 use std::ptr::hash;
@@ -337,7 +338,11 @@ impl Graphics {
         self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
     }
 
-    pub fn draw_above_square<T: Drawable>(&mut self, drawable: &T, world_square: WorldSquare) {
+    pub fn draw_above_square<T: Drawable + Debug>(
+        &mut self,
+        drawable: &T,
+        world_square: WorldSquare,
+    ) {
         let to_draw = if let Some(below) = self.draw_buffer.get(&world_square) {
             drawable.drawn_over(below)
         } else {
@@ -716,10 +721,10 @@ mod tests {
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
-        let drawn_glyphs = g
+        let drawable = g
             .get_drawable_for_square_from_draw_buffer(the_square)
-            .unwrap()
-            .to_glyphs();
+            .unwrap();
+        let drawn_glyphs = drawable.to_glyphs();
         let correct_bg = g.floor_color_enum.color_at(the_square);
         g.print_draw_buffer(the_square, 0);
         assert_eq!(drawn_glyphs[0].character, '♟');

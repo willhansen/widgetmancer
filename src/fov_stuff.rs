@@ -1004,7 +1004,6 @@ mod tests {
             &SquareSet::default(),
             &PortalGeometry::default(),
         );
-        dbg!(&fov_result.visible_relative_squares_in_main_view_only);
         assert!(fov_result
             .only_partially_visible_relative_squares_in_main_view_only()
             .is_empty());
@@ -1029,7 +1028,6 @@ mod tests {
             &PortalGeometry::default(),
         );
 
-        dbg!(fov_result.fully_visible_relative_squares_in_main_view_only());
         assert!(fov_result
             .only_partially_visible_relative_squares_in_main_view_only()
             .is_empty());
@@ -1110,7 +1108,6 @@ mod tests {
                 .visible_relative_squares_in_main_view_only
                 .get(&step)
                 .unwrap();
-            //dbg!(partial_visibility);
             let string = PartialVisibilityDrawable::from_square_visibility(*square_visibility)
                 .to_glyphs()
                 .to_clean_string();
@@ -1173,7 +1170,6 @@ mod tests {
         let partial_2 = SquareVisibility::from_visible_half_plane(half_plane_2).unwrap();
 
         let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
-        //dbg!( &partial_1.to_glyphs().to_clean_string(), &partial_2.to_glyphs().to_clean_string(), &combined_partial.to_glyphs().to_clean_string() );
         assert!(combined_partial.is_fully_visible());
     }
 
@@ -1330,7 +1326,6 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_random_discontinuity() {
         // highest i observed before failure: 9
         for i in 0..30 {
-            //dbg!(i);
             assert_shadow_is_horizontally_continuous(
                 PartialVisibilityDrawable::from_square_visibility(
                     square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)).unwrap(),

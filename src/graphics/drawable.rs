@@ -256,7 +256,7 @@ pub struct ArrowDrawable {
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::GREEN;
+    use crate::glyph::glyph_constants::{BLUE, GREEN, SPACE};
 
     use super::*;
 
@@ -283,5 +283,13 @@ mod tests {
     fn test_text_background() {
         let text = TextDrawable::new("a ", RED, GREEN, false);
         assert_eq!(text.color_if_backgroundified(), RED);
+    }
+    #[test]
+    fn test_text_drawn_over_solid_to_glyphs_with_empty_space() {
+        let solid_drawable = SolidColorDrawable::new(GREEN);
+        let text_drawable = TextDrawable::new("♟ ", RED, BLUE, true);
+        let combo = text_drawable.drawn_over(&solid_drawable);
+        let glyphs = combo.to_glyphs();
+        assert_eq!(glyphs[1].character, SPACE);
     }
 }

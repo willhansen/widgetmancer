@@ -287,8 +287,6 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        //dbg!( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, is_clockwise( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, ) );
-
         let mut grid_line = Line::new(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),

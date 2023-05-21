@@ -1477,6 +1477,19 @@ impl Game {
             });
         });
     }
+    fn place_wide_portal(
+        &mut self,
+        left_entrance: SquareWithOrthogonalDir,
+        left_exit: SquareWithOrthogonalDir,
+        width: u32,
+    ) {
+        (0..width as i32).for_each(|i| {
+            self.place_double_sided_two_way_portal(
+                left_entrance.strafed_right_n(i),
+                left_exit.strafed_right_n(i),
+            )
+        });
+    }
 
     pub fn place_offset_rightward_double_sided_two_way_portal(
         &mut self,
@@ -1624,6 +1637,13 @@ impl Game {
         self.place_block(left_entrance.square() + STEP_RIGHT * 2 + STEP_DOWN_RIGHT * 3);
 
         self.place_dense_horizontal_portals(self.player_square() + STEP_RIGHT * 20, 1, 10);
+
+        (0..5).for_each(|i| {
+            self.place_offset_rightward_double_sided_two_way_portal(
+                self.player_square() + STEP_LEFT * 7 + STEP_UP * (3 - i),
+                STEP_RIGHT * 2,
+            )
+        });
     }
 
     // TODO: fix
@@ -1754,8 +1774,8 @@ mod tests {
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::Drawable;
     use crate::graphics::screen::{
-        Screen, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_RIGHT,
-        SCREEN_STEP_ZERO,
+        Screen, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP,
+        SCREEN_STEP_UP_RIGHT, SCREEN_STEP_ZERO,
     };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
@@ -2181,7 +2201,6 @@ mod tests {
                     .graphics
                     .screen
                     .get_screen_glyphs_at_world_square(square);
-                //dbg!(glyphs);
                 // There might not be particles in every character square.  Don't test the empty ones
                 if !glyphs[0].looks_solid() {
                     assert_eq!(glyphs[0].fg_color, BLINK_EFFECT_COLOR);
@@ -2980,12 +2999,11 @@ mod tests {
             .graphics
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP_RIGHT);
-        dbg!(up_right_glyphs);
         assert_false!(up_right_glyphs.looks_solid());
     }
 
     #[test]
-    fn test_freestanding_portals_are_seemless() {
+    fn test_freestanding_portals_can_be_seamless() {
         let player_square = point2(5, 5);
         let mut game = set_up_10x10_game();
         game.place_player(player_square);
@@ -3175,5 +3193,132 @@ mod tests {
         let end_color: RGB8 = get_color(&game);
 
         assert!(end_color.b < end_color.r, "Should tint red");
+    }
+
+    #[test]
+    fn test_horizontal_wide_portal_has_no_internal_defects() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(3, 15);
+        game.place_player(player_square);
+
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 2 + STEP_UP * 2, STEP_RIGHT);
+        let exit = entrance.stepped_n(5);
+        game.place_wide_portal(entrance, exit, 5);
+
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let top_left_test_square = SCREEN_STEP_RIGHT * 3;
+
+        (0..4).for_each(|dx| {
+            (0..3).for_each(|dy_down| {
+                let test_square =
+                    top_left_test_square + SCREEN_STEP_RIGHT * dx + SCREEN_STEP_DOWN * dy_down;
+                let glyphs = game
+                    .graphics
+                    .screen
+                    .get_screen_glyphs_at_visual_offset_from_center(test_square);
+                assert!(glyphs.looks_solid(), "offset: ({},{})", dx, dy_down);
+            })
+        });
+    }
+
+    #[test]
+    fn test_horizontal_wide_portal_has_smooth_edge() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(3, 15);
+        game.place_player(player_square);
+
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 0 + STEP_UP * 2, STEP_RIGHT);
+        let exit = entrance.stepped_n(5);
+        game.place_wide_portal(entrance, exit, 5);
+
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let test_squares_top_to_bottom = vec![
+            ScreenBufferStep::new(1, -4),
+            ScreenBufferStep::new(1, -3),
+            ScreenBufferStep::new(1, 3),
+            ScreenBufferStep::new(1, 4),
+        ];
+        let correct_strings_top_to_bottom = vec!["🭋█", "🭅█", "🭖█", "🭦█"];
+
+        (0..test_squares_top_to_bottom.len()).for_each(|i| {
+            assert_eq!(
+                game.graphics
+                    .screen
+                    .get_screen_glyphs_at_visual_offset_from_center(test_squares_top_to_bottom[i])
+                    .to_clean_string(),
+                correct_strings_top_to_bottom[i]
+            )
+        });
+    }
+
+    #[test]
+    fn test_vertical_wide_portals_are_seamless() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(15, 5);
+        game.place_player(player_square);
+
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_UP * 2 + STEP_LEFT * 2, STEP_UP);
+        let exit = entrance.stepped_n(3);
+        game.place_wide_portal(entrance, exit, 5);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let bottom_left_test_square = SCREEN_STEP_UP * 3;
+
+        (0..3).for_each(|dx| {
+            (0..4).for_each(|dy| {
+                let test_square =
+                    bottom_left_test_square + SCREEN_STEP_RIGHT * dx + SCREEN_STEP_UP * dy;
+                let glyphs = game
+                    .graphics
+                    .screen
+                    .get_screen_glyphs_at_visual_offset_from_center(test_square);
+                assert!(glyphs.looks_solid(), "offset: ({},{})", dx, dy);
+            })
+        });
+        todo!("check the edges");
+    }
+
+    #[test]
+    fn test_rotated_wide_portals_are_seamless() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(5, 5);
+        game.place_player(player_square);
+
+        let width = 5;
+        (0..width).for_each(|i| {
+            let entrance = SquareWithOrthogonalDir::new(
+                player_square + STEP_RIGHT * 2 + STEP_UP * (i - 2),
+                STEP_RIGHT,
+            );
+            let exit = SquareWithOrthogonalDir::new(
+                entrance.square() + STEP_UP * (width + 1) + STEP_RIGHT * (1 + i),
+                STEP_UP,
+            );
+            game.place_double_sided_two_way_portal(entrance, exit);
+        });
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let top_left_test_square = SCREEN_STEP_RIGHT * 3;
+
+        (0..4).for_each(|dx| {
+            (-2..3).for_each(|dy| {
+                let test_square =
+                    top_left_test_square + SCREEN_STEP_RIGHT * dx + SCREEN_STEP_UP * dy;
+                let glyphs = game
+                    .graphics
+                    .screen
+                    .get_screen_glyphs_at_visual_offset_from_center(test_square);
+                assert!(glyphs.looks_solid(), "offset: ({},{})", dx, dy);
+            })
+        })
     }
 }
