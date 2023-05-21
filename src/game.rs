@@ -2538,11 +2538,13 @@ mod tests {
         assert_eq!(
             game.graphics
                 .screen
-                .get_screen_glyphs_at_world_square(visible_enemy_square),
+                .get_screen_glyphs_at_world_square(visible_enemy_square)
+                .to_clean_string(),
             game.graphics
                 .get_drawable_for_square_from_draw_buffer(enemy_square)
                 .unwrap()
                 .to_glyphs()
+                .to_clean_string()
         );
     }
 
@@ -2689,11 +2691,13 @@ mod tests {
         assert_eq!(
             game.graphics
                 .screen
-                .get_screen_glyphs_at_world_square(correct_apparent_enemy_square),
+                .get_screen_glyphs_at_world_square(correct_apparent_enemy_square)
+                .to_clean_string(),
             game.graphics
                 .get_drawable_for_square_from_draw_buffer(enemy_square)
                 .unwrap()
                 .to_glyphs()
+                .to_clean_string()
         );
     }
 
@@ -2985,6 +2989,7 @@ mod tests {
         let player_square = point2(5, 5);
         let mut game = set_up_10x10_game();
         game.place_player(player_square);
+        game.graphics.tint_portals = false;
 
         let entrance_square = game.player_square();
         let exit_square = entrance_square + STEP_RIGHT * 3;

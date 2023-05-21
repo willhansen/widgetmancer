@@ -84,6 +84,7 @@ pub struct Graphics {
     selectors: Vec<SelectorAnimation>,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
+    pub tint_portals: bool,
 }
 
 impl Graphics {
@@ -96,6 +97,7 @@ impl Graphics {
             selectors: vec![],
             start_time,
             floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
+            tint_portals: true,
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -251,23 +253,25 @@ impl Graphics {
                         WorldSquare,
                         PositionedSquareVisibilityInFov,
                     )| {
-                        let base_drawable: &DrawableEnum =
-                            self.draw_buffer.get(&abs_square).unwrap();
+                        let mut drawable: DrawableEnum =
+                            self.draw_buffer.get(&abs_square).unwrap().clone();
                         if !positioned_visibility.square_visibility().is_fully_visible() {
-                            DrawableEnum::PartialVisibility(
+                            drawable = DrawableEnum::PartialVisibility(
                                 PartialVisibilityDrawable::from_partially_visible_drawable(
-                                    base_drawable,
+                                    &drawable,
                                     positioned_visibility.square_visibility(),
                                 ),
                             )
-                        } else {
-                            base_drawable.clone()
+                        };
+                        drawable = drawable
+                            .rotated(-positioned_visibility.portal_rotation().quarter_turns());
+                        if self.tint_portals {
+                            drawable = drawable.tinted(
+                                RED,
+                                (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
+                            );
                         }
-                        .rotated(-positioned_visibility.portal_rotation().quarter_turns())
-                        .tinted(
-                            RED,
-                            (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
-                        )
+                        drawable
                     },
                 )
                 .reduce(|bottom, top| top.drawn_over(&bottom));
@@ -708,7 +712,7 @@ mod tests {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
         g.set_empty_board_animation();
-        g.draw_board_animation(Instant::now());
+        g.draw_static_board(BoardSize::new(1, 1));
         //g.print_output_buffer();
         g.draw_piece_with_color(the_square, TurningPawn, WHITE);
         //g.print_output_buffer();
@@ -716,12 +720,14 @@ mod tests {
             .get_drawable_for_square_from_draw_buffer(the_square)
             .unwrap()
             .to_glyphs();
+        let correct_bg = g.floor_color_enum.color_at(the_square);
+        g.print_draw_buffer(the_square, 0);
         assert_eq!(drawn_glyphs[0].character, '♟');
         assert_eq!(drawn_glyphs[0].fg_color, ENEMY_PIECE_COLOR);
-        assert_eq!(drawn_glyphs[0].bg_color, BOARD_WHITE);
+        assert_eq!(drawn_glyphs[0].bg_color, correct_bg);
         assert_eq!(drawn_glyphs[0].bg_transparent, false);
         assert_eq!(drawn_glyphs[1].character, ' ');
-        assert_eq!(drawn_glyphs[1].bg_color, BOARD_WHITE);
+        assert_eq!(drawn_glyphs[1].bg_color, correct_bg);
         assert_eq!(drawn_glyphs[1].bg_transparent, false);
     }
 
