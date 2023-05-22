@@ -3320,7 +3320,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rotated_wide_portals_are_seamless() {
+    fn test_rotated_wide_portals_have_no_internal_defects() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(5, 5);
         game.place_player(player_square);
@@ -3353,5 +3353,37 @@ mod tests {
                 assert!(glyphs.looks_solid(), "offset: ({},{})", dx, dy);
             })
         })
+    }
+    #[test]
+    fn test_turning_wide_portal_specific_defect() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(5, 15);
+        game.place_player(player_square);
+
+        let width = 3;
+        (0..width).for_each(|i| {
+            let entrance = SquareWithOrthogonalDir::new(
+                player_square + STEP_RIGHT * 2 + STEP_DOWN * (i - 1),
+                STEP_RIGHT,
+            );
+            let exit = SquareWithOrthogonalDir::new(
+                game.player_square() + STEP_UP * 8 + STEP_RIGHT * (1 + i),
+                STEP_UP,
+            );
+            game.place_double_sided_two_way_portal(entrance, exit);
+        });
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let test_offset = SCREEN_STEP_RIGHT * 3 + SCREEN_STEP_UP;
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(test_offset);
+        assert!(
+            glyphs.looks_solid(),
+            "The glyphs: {}, the chars: {}",
+            glyphs.to_string(),
+            glyphs.to_clean_string()
+        );
     }
 }
