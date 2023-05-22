@@ -1638,12 +1638,12 @@ impl Game {
 
         self.place_dense_horizontal_portals(self.player_square() + STEP_RIGHT * 20, 1, 10);
 
-        (0..5).for_each(|i| {
-            self.place_offset_rightward_double_sided_two_way_portal(
-                self.player_square() + STEP_LEFT * 7 + STEP_UP * (3 - i),
-                STEP_RIGHT * 2,
-            )
-        });
+        let entrance = SquareWithOrthogonalDir::new(
+            self.player_square() + STEP_LEFT * 7 + STEP_UP * 3,
+            STEP_RIGHT,
+        );
+        let exit = entrance.stepped_n(5).strafed_right();
+        self.place_wide_portal(entrance, exit, 5);
     }
 
     // TODO: fix
