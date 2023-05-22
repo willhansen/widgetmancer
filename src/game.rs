@@ -3258,7 +3258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vertical_wide_portals_are_seamless() {
+    fn test_vertical_wide_portals_have_no_internal_defects() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(15, 5);
         game.place_player(player_square);
@@ -3283,7 +3283,40 @@ mod tests {
                 assert!(glyphs.looks_solid(), "offset: ({},{})", dx, dy);
             })
         });
-        todo!("check the edges");
+    }
+
+    #[test]
+    fn test_vertical_wide_portals_have_smooth_edges() {
+        let mut game = set_up_nxm_game(30, 30);
+        let player_square: WorldSquare = point2(15, 5);
+        game.place_player(player_square);
+
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_UP * 0 + STEP_LEFT * 2, STEP_UP);
+        let exit = entrance.stepped_n(3);
+        game.place_wide_portal(entrance, exit, 5);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+
+        let test_squares_left_to_right = vec![
+            ScreenBufferStep::new(-4, -1),
+            ScreenBufferStep::new(-3, -1),
+            ScreenBufferStep::new(3, -1),
+            ScreenBufferStep::new(4, -1),
+        ];
+        let correct_strings_left_to_right = vec!["🬎🬎", "🭓█", "█🭞", "🬎🬎"];
+
+        let bottom_left_test_square = SCREEN_STEP_UP * 3;
+
+        (0..test_squares_left_to_right.len()).for_each(|i| {
+            assert_eq!(
+                game.graphics
+                    .screen
+                    .get_screen_glyphs_at_visual_offset_from_center(test_squares_left_to_right[i])
+                    .to_clean_string(),
+                correct_strings_left_to_right[i]
+            )
+        });
     }
 
     #[test]
