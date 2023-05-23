@@ -1661,4 +1661,11 @@ mod tests {
         assert!(squares.contains(&point2(4, 20)));
         assert_false!(squares.contains(&point2(14, 2)));
     }
+    #[test]
+    fn test_line_intersection_with_square__no_mysterious_90_degree_rotation() {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(0.5, 0.0), point2(-1.5, 0.0));
+        let output_points = line_intersections_with_centered_unit_square(input_line);
+        assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
+    }
 }

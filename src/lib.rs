@@ -12,6 +12,7 @@
 #![feature(inherent_associated_types)]
 #![feature(iter_next_chunk)]
 #![feature(trait_alias)]
+#![allow(non_snake_case)]
 
 #[macro_use]
 extern crate approx;

@@ -139,6 +139,7 @@ impl Drawable for PartialVisibilityDrawable {
             .iter()
             .map(|vis_portion| {
                 let angle_char = half_plane_to_angled_block_character(*vis_portion, bias_direction);
+                dbg!("asdfasdf", bias_direction, vis_portion, angle_char);
                 Glyph::new(angle_char, self.fg_color, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
