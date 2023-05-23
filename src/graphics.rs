@@ -231,47 +231,44 @@ impl Graphics {
         fov: &FieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
-        let absolute_world_squares_with_visibility: Vec<(
-            WorldSquare,
-            PositionedSquareVisibilityInFov,
-        )> = fov
-            .relative_to_absolute(rel_square)
+        let visibilities: Vec<PositionedSquareVisibilityInFov> = fov
+            .visibilities_of_relative_square(rel_square)
             .into_iter()
-            .sorted_by_key(|(square, pos_vis)| pos_vis.portal_depth())
+            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
             .collect_vec();
-        let maybe_unrotated: Option<DrawableEnum> = absolute_world_squares_with_visibility
+        // if rel_square == STEP_RIGHT * 3 {
+        //     dbg!("asdfasdf", &visibilities);
+        // }
+        let maybe_unrotated: Option<DrawableEnum> = visibilities
             .iter()
-            .filter(
-                |&(abs_square, _): &&(WorldSquare, PositionedSquareVisibilityInFov)| {
-                    self.draw_buffer.contains_key(&abs_square)
-                },
-            )
-            .map(
-                |&(abs_square, positioned_visibility): &(
-                    WorldSquare,
-                    PositionedSquareVisibilityInFov,
-                )| {
-                    let mut drawable: DrawableEnum =
-                        self.draw_buffer.get(&abs_square).unwrap().clone();
-                    if !positioned_visibility.square_visibility().is_fully_visible() {
-                        drawable = DrawableEnum::PartialVisibility(
-                            PartialVisibilityDrawable::from_partially_visible_drawable(
-                                &drawable,
-                                positioned_visibility.square_visibility(),
-                            ),
-                        )
-                    };
-                    drawable =
-                        drawable.rotated(-positioned_visibility.portal_rotation().quarter_turns());
-                    if self.tint_portals {
-                        drawable = drawable.tinted(
-                            RED,
-                            (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
-                        );
-                    }
-                    drawable
-                },
-            )
+            .filter(|&vis: &&PositionedSquareVisibilityInFov| {
+                self.draw_buffer.contains_key(&vis.absolute_square())
+            })
+            .map(|&positioned_visibility: &PositionedSquareVisibilityInFov| {
+                let mut drawable: DrawableEnum = self
+                    .draw_buffer
+                    .get(&positioned_visibility.absolute_square())
+                    .unwrap()
+                    .clone();
+                if !positioned_visibility
+                    .unrotated_square_visibility()
+                    .is_fully_visible()
+                {
+                    drawable = DrawableEnum::PartialVisibility(
+                        PartialVisibilityDrawable::from_partially_visible_drawable(
+                            &drawable,
+                            positioned_visibility.rotated_square_visibility(),
+                        ),
+                    )
+                };
+                if self.tint_portals {
+                    drawable = drawable.tinted(
+                        RED,
+                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
+                    );
+                }
+                drawable
+            })
             .reduce(|bottom, top| top.drawn_over(&bottom));
         maybe_unrotated
     }

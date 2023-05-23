@@ -256,7 +256,6 @@ pub fn half_plane_to_angled_block_character(
     let raw_intersection_points =
         line_intersections_with_centered_unit_square(half_plane.dividing_line());
     assert!(raw_intersection_points.len() <= 2);
-    dbg!("asdfasdf", &raw_intersection_points);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
     let snapped_bias_direction = snap_angle_to_diagonal(bias_direction);
@@ -494,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_somehow_rotated_90_degrees_observed_error() {
+    fn test_top_half_visible_with_exactly_horizontal_line() {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::from_line_and_point_on_half_plane(
@@ -507,6 +506,22 @@ mod tests {
                 Angle::degrees(-90.0)
             ),
             '🬎',
+        );
+    }
+    #[test]
+    fn test_left_half_visible_with_exactly_vertical_line() {
+        assert_eq!(
+            half_plane_to_angled_block_character(
+                HalfPlane::from_line_and_point_on_half_plane(
+                    Line {
+                        p1: point2(0.0, 0.5),
+                        p2: point2(0.0, -1.5),
+                    },
+                    point2(-20.0, 0.0),
+                ),
+                Angle::degrees(0.0)
+            ),
+            LEFT_HALF_BLOCK,
         );
     }
 }

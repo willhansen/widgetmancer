@@ -23,6 +23,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
+use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
 
@@ -658,6 +659,11 @@ pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
+pub fn number_to_color(i: u32) -> RGB8 {
+    let in_order = vec![GREY, RED, BLUE, GREEN, YELLOW, CYAN, MAGENTA];
+    in_order[i as usize % in_order.len()]
+}
+
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
     if vector.length() == 0.0 {
         return vector;
@@ -751,7 +757,7 @@ pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Ve
     } else if is_horizontal_line {
         let y = line_point_a.y;
         if y.abs() <= 0.5 {
-            points_in_line_order(line, vec![point2(y, 0.5), point2(y, -0.5)])
+            points_in_line_order(line, vec![point2(0.5, y), point2(-0.5, y)])
         } else {
             vec![]
         }
@@ -1662,10 +1668,17 @@ mod tests {
         assert_false!(squares.contains(&point2(14, 2)));
     }
     #[test]
-    fn test_line_intersection_with_square__no_mysterious_90_degree_rotation() {
+    fn test_horizontal_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.5, 0.0), point2(-1.5, 0.0));
         let output_points = line_intersections_with_centered_unit_square(input_line);
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
+    }
+    #[test]
+    fn test_vertical_line_intersection_with_square() {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(0.0, 0.5), point2(0.0, -1.5));
+        let output_points = line_intersections_with_centered_unit_square(input_line);
+        assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
     }
 }
