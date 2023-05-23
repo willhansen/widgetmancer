@@ -254,9 +254,11 @@ pub struct ArrowDrawable {
 
 #[cfg(test)]
 mod tests {
+    use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::{BLUE, GREEN, SPACE};
+    use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE};
+    use crate::utility::Line;
 
     use super::*;
 
@@ -291,5 +293,19 @@ mod tests {
         let combo = text_drawable.drawn_over(&solid_drawable);
         let glyphs = combo.to_glyphs();
         assert_eq!(glyphs[1].character, SPACE);
+    }
+    #[test]
+    fn test_top_half_visible_glyphs() {
+        let base = SolidColorDrawable::new(RED).to_enum();
+        let visibility = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+                Line::new(point2(0.0, 0.0), point2(-1.0, 0.0)),
+                point2(0.0, 25.0),
+            ),
+        );
+        dbg!(visibility);
+        let top_half =
+            PartialVisibilityDrawable::from_partially_visible_drawable(&base, visibility);
+        assert_eq!(top_half.to_glyphs().to_clean_string(), "🬎🬎");
     }
 }

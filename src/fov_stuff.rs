@@ -668,12 +668,34 @@ pub fn field_of_view_within_arc_in_single_octant(
             } else {
                 visibility_of_square(view_arc, relative_square)
             };
+        dbg!(
+            "asdfasdf",
+            &maybe_visibility_of_this_square.map(|v: SquareVisibility| v.visible_portion.map(
+                |p: LocalSquareHalfPlane| p
+                    .dividing_line()
+                    .angle_with_positive_x_axis()
+                    .to_degrees()
+            ))
+        );
 
         if let Some(visibility_of_this_square) = maybe_visibility_of_this_square {
             fov_result.add_visible_square(relative_square, visibility_of_this_square);
         } else {
             continue;
         }
+        dbg!(
+            "asdfasdf",
+            fov_result
+                .visible_relative_squares_in_main_view_only
+                .iter()
+                .map(|(s, vis)| {
+                    vis.visible_portion.map(|p: LocalSquareHalfPlane| {
+                        p.dividing_line().angle_with_positive_x_axis().to_degrees()
+                    })
+                })
+                .collect_vec()
+        );
+        print_fov(&fov_result, 2); // asdfasdf
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
         let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
@@ -911,11 +933,18 @@ fn print_fov(fov: &FieldOfView, radius: u32) {
                         if positioned_visibility.square_visibility().is_fully_visible() {
                             base
                         } else {
-                            PartialVisibilityDrawable::from_partially_visible_drawable(
+                            let a = PartialVisibilityDrawable::from_partially_visible_drawable(
                                 &base,
                                 positioned_visibility.square_visibility(),
                             )
-                            .to_enum()
+                            .to_enum();
+                            dbg!(
+                                "asdfasdf",
+                                base.to_glyphs().to_clean_string(),
+                                positioned_visibility.square_visibility,
+                                &a.to_glyphs().to_clean_string()
+                            );
+                            a
                         }
                     },
                 )
@@ -1969,5 +1998,65 @@ mod tests {
                 rel_block
             )
         });
+    }
+
+    fn get_fov_for_first_quadrant_going_through_wide_turning_portal() -> FieldOfView {
+        let center = point2(5, 5);
+        let mut portal_geometry = PortalGeometry::default();
+        (0..2).for_each(|i| {
+            let entrance =
+                SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2, STEP_RIGHT).strafed_left_n(i);
+            let exit = SquareWithOrthogonalDir::new(center + STEP_UP * 8 + STEP_RIGHT, STEP_UP)
+                .strafed_left_n(i);
+            portal_geometry.create_portal(entrance, exit);
+        });
+        let new_fov_result = single_octant_field_of_view(
+            &Default::default(),
+            &portal_geometry,
+            center,
+            10,
+            Octant::new(0),
+        );
+        new_fov_result
+    }
+
+    #[test]
+    fn test_octant_edge_has_correct_rotation() {
+        // let new_fov_result = get_fov_for_first_quadrant_going_through_wide_turning_portal();
+        let center = point2(5, 5);
+        let new_fov_result = single_octant_field_of_view(
+            &Default::default(),
+            &Default::default(),
+            center,
+            1,
+            Octant::new(0),
+        );
+        print_fov(&new_fov_result, 2);
+        let visibilities_of_one_right =
+            new_fov_result.visibilities_of_relative_square_rotated_to_main_view(STEP_RIGHT);
+        assert_eq!(visibilities_of_one_right.len(), 1);
+        let the_positioned_visibility = visibilities_of_one_right[0];
+        assert_eq!(the_positioned_visibility.portal_depth, 0);
+        assert_eq!(
+            the_positioned_visibility.portal_rotation,
+            QuarterTurnsAnticlockwise::new(0)
+        );
+        let the_square_visibility = the_positioned_visibility.square_visibility;
+        assert_about_eq!(
+            the_square_visibility
+                .visible_portion
+                .unwrap()
+                .dividing_line()
+                .angle_with_positive_x_axis()
+                .to_degrees(),
+            0.0
+        );
+        let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
+            &SolidColorDrawable::new(RED),
+            the_square_visibility,
+        );
+        let the_glyphs = the_drawable.to_glyphs();
+        let the_clean_string = the_glyphs.to_clean_string();
+        assert_eq!(the_clean_string, "🬎🬎");
     }
 }
