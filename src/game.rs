@@ -338,6 +338,11 @@ impl Game {
     }
 
     pub fn draw(&mut self, mut writer: &mut Option<Box<dyn Write>>, time: Instant) {
+        self.populate_draw_buffer(time);
+        self.update_screen_from_draw_buffer(&mut writer);
+    }
+
+    pub fn populate_draw_buffer(&mut self, time: Instant) {
         self.graphics.clear_draw_buffer();
         self.graphics.draw_static_board(self.board_size);
         self.graphics.draw_board_animation(time);
@@ -383,8 +388,6 @@ impl Game {
             self.graphics
                 .draw_player(self.player_square(), self.player_faced_direction());
         }
-
-        self.update_screen_from_draw_buffer(&mut writer);
     }
 
     pub fn update_screen_from_draw_buffer_headless(&mut self) {
@@ -1772,7 +1775,7 @@ mod tests {
         RED_PAWN_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
-    use crate::graphics::drawable::Drawable;
+    use crate::graphics::drawable::{Drawable, DrawableEnum};
     use crate::graphics::screen::{
         Screen, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP,
         SCREEN_STEP_UP_RIGHT, SCREEN_STEP_ZERO,
@@ -3354,6 +3357,7 @@ mod tests {
             })
         })
     }
+
     #[test]
     fn test_turning_wide_portal_specific_defect() {
         let mut game = set_up_nxm_game(30, 30);
@@ -3372,13 +3376,17 @@ mod tests {
             );
             game.place_double_sided_two_way_portal(entrance, exit);
         });
-        game.draw_headless_now();
-        game.graphics.screen.print_screen_buffer();
-        let test_offset = SCREEN_STEP_RIGHT * 3 + SCREEN_STEP_UP;
-        let glyphs = game
+
+        game.populate_draw_buffer(Instant::now());
+
+        let rel_square = STEP_RIGHT * 3 + STEP_UP;
+        let player_fov = game.player_field_of_view();
+        let visibilities_at_rel_square = player_fov.visibilities_of_relative_square(rel_square);
+        assert_eq!(visibilities_at_rel_square.len(), 1);
+        let maybe_drawable: Option<DrawableEnum> = game
             .graphics
-            .screen
-            .get_screen_glyphs_at_visual_offset_from_center(test_offset);
+            .maybe_drawable_for_rel_square_of_fov(&player_fov, rel_square);
+        let glyphs = maybe_drawable.unwrap().to_glyphs();
         assert!(
             glyphs.looks_solid(),
             "The glyphs: {}, the chars: {}",

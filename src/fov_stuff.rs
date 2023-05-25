@@ -753,6 +753,8 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
     }
+    // asdfasdf
+    //print_fov(&fov_result, 10);
     fov_result
 }
 
@@ -784,7 +786,7 @@ pub fn portal_aware_field_of_view_from_square(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfView {
-    (0..8) // asdfasdf
+    (0..8)
         .fold(
             FieldOfView::new_empty_fov_at(center_square),
             |fov_result_accumulator: FieldOfView, octant_number: i32| {
@@ -1982,9 +1984,11 @@ mod tests {
     fn test_no_seam_for_wide_rotated_portal() {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
-        (0..2).for_each(|i| {
+        // TODO: find out why the bug only appears with 3 instead of 2
+        (0..3).for_each(|i| {
             let entrance =
-                SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2, STEP_RIGHT).strafed_left_n(i);
+                SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT)
+                    .strafed_right_n(i);
             let exit = SquareWithOrthogonalDir::new(center + STEP_UP * 8 + STEP_RIGHT, STEP_UP)
                 .strafed_left_n(i);
             portal_geometry.create_portal(entrance, exit);
@@ -1993,34 +1997,25 @@ mod tests {
             &Default::default(),
             &portal_geometry,
             center,
-            10,
+            3,
             Octant::new(0),
         );
 
-        print_fov(&new_fov_result, 10);
-        let visibilities_of_three_right =
-            new_fov_result.visibilities_of_relative_square(STEP_RIGHT * 3);
-        assert_eq!(visibilities_of_three_right.len(), 1);
-        let the_positioned_visibility = visibilities_of_three_right[0];
+        //print_fov(&new_fov_result, 10);
+
+        let test_square = STEP_RIGHT * 3 + STEP_UP;
+
+        let visibilities_of_test_square =
+            new_fov_result.visibilities_of_relative_square(test_square);
+        assert_eq!(visibilities_of_test_square.len(), 1);
+        let the_positioned_visibility = visibilities_of_test_square[0];
         assert_eq!(the_positioned_visibility.portal_depth, 1);
         assert_eq!(
             the_positioned_visibility.portal_rotation,
             QuarterTurnsAnticlockwise::new(1)
         );
-        let the_square_visibility = the_positioned_visibility.unrotated_square_visibility;
-        let dividing_line_angle = the_square_visibility
-            .visible_portion
-            .unwrap()
-            .dividing_line()
-            .angle_with_positive_x_axis()
-            .to_degrees();
-        dbg!("asdfasdf", dividing_line_angle);
-        assert_about_eq!(dividing_line_angle, 0.0, 1e-3);
-        let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
-            &SolidColorDrawable::new(RED),
-            the_square_visibility,
-        );
-        let the_glyphs = the_drawable.to_glyphs();
-        let the_clean_string = the_glyphs.to_clean_string();
+        let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
+        assert!(the_square_visibility.is_fully_visible());
+        todo!()
     }
 }
