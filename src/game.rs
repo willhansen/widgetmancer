@@ -1443,6 +1443,17 @@ impl Game {
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
     }
+    pub fn place_double_sided_one_way_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.portal_geometry.create_portal(entrance_step, exit_step);
+        self.portal_geometry.create_portal(
+            entrance_step.stepped().turned_back(),
+            exit_step.turned_back().stepped(),
+        );
+    }
     pub fn place_single_sided_two_way_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
@@ -1621,8 +1632,24 @@ impl Game {
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
+    pub fn set_up_simple_test_map(&mut self) {
+        let n = 3;
+        let left_entrance =
+            SquareWithOrthogonalDir::new(self.player_square() + STEP_RIGHT * 3, STEP_RIGHT);
+        let left_exit =
+            SquareWithOrthogonalDir::new(left_entrance.square() + STEP_UP_RIGHT * (n + 1), STEP_UP);
+        (0..n).for_each(|i| {
+            self.place_double_sided_two_way_portal(
+                left_entrance.strafed_right_n(i),
+                left_exit.strafed_right_n(i),
+            )
+        });
+    }
 
     pub fn set_up_test_map(&mut self) {
+        self.set_up_simple_test_map();
+        return;
+
         let left_entrance = SquareWithOrthogonalDir::new(
             self.player_square() + STEP_RIGHT * 3 + STEP_UP * 3,
             STEP_RIGHT,

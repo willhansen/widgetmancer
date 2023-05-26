@@ -49,8 +49,8 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    hue_to_rgb, is_world_character_square_left_square_of_world_square, reversed, squares_on_board,
-    STEP_RIGHT,
+    hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color, reversed,
+    squares_on_board, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -263,7 +263,8 @@ impl Graphics {
                 };
                 if self.tint_portals {
                     drawable = drawable.tinted(
-                        RED,
+                        // RED, // asdfasdf
+                        number_to_color(positioned_visibility.portal_depth()),
                         (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
                     );
                 }

@@ -450,6 +450,7 @@ impl FieldOfView {
                     .visibilities_of_absolute_square(world_square)
                     .into_iter()
                     .map(|pos_vis: PositionedSquareVisibilityInFov| {
+                        dbg!("asdfasdf", &pos_vis);
                         pos_vis.one_portal_deeper(forward_rotation)
                     })
                     .collect_vec();
@@ -508,7 +509,9 @@ impl FieldOfView {
         let visibilities_in_frame_of_main_view = visibilities_in_frame_of_sub_view
             .iter()
             .map(|pos_vis: &PositionedSquareVisibilityInFov| {
-                pos_vis.one_portal_deeper(rotation_moving_forward_through_portal)
+                let a = pos_vis.one_portal_deeper(rotation_moving_forward_through_portal);
+                //dbg!("asdfasdf", relative_square, &pos_vis, &a);
+                a
             })
             .collect_vec();
 
