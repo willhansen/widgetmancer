@@ -1448,31 +1448,24 @@ impl Game {
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
-        self.portal_geometry.create_portal(entrance_step, exit_step);
-        self.portal_geometry.create_portal(
-            entrance_step.stepped().turned_back(),
-            exit_step.turned_back().stepped(),
-        );
+        self.portal_geometry
+            .create_double_sided_one_way_portal(entrance_step, exit_step);
     }
     pub fn place_single_sided_two_way_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
-        self.portal_geometry.create_portal(entrance_step, exit_step);
         self.portal_geometry
-            .create_portal(exit_step.reversed(), entrance_step.reversed());
+            .create_single_sided_two_way_portal(entrance_step, exit_step);
     }
     pub fn place_double_sided_two_way_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
         exit_step: SquareWithOrthogonalDir,
     ) {
-        self.place_single_sided_two_way_portal(entrance_step, exit_step);
-        self.place_single_sided_two_way_portal(
-            entrance_step.stepped().reversed(),
-            exit_step.reversed().stepped(),
-        );
+        self.portal_geometry
+            .create_double_sided_two_way_portal(entrance_step, exit_step);
     }
     pub fn place_dense_horizontal_portals(
         &mut self,
@@ -1632,29 +1625,25 @@ impl Game {
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
-    pub fn set_up_corner_reflector_portals(&mut self) {
-        (0..5).for_each(|n| {
-            let width = n + 1;
-            let spacing = width * 2 + 1;
-            let left_entrance = SquareWithOrthogonalDir::new(
-                self.player_square() + STEP_RIGHT * (spacing * n),
-                STEP_RIGHT,
-            );
-            let left_exit = SquareWithOrthogonalDir::new(
-                left_entrance.square() + STEP_UP + STEP_RIGHT,
-                STEP_UP,
-            );
-            (0..width).for_each(|i| {
-                self.place_double_sided_two_way_portal(
-                    left_entrance.strafed_right_n(i),
-                    left_exit.strafed_right_n(i),
-                )
-            });
+    pub fn set_up_simple_test_map(&mut self) {
+        let width = 2;
+        let spacing = width * 2 + 1;
+        let left_entrance =
+            SquareWithOrthogonalDir::new(self.player_square() + STEP_RIGHT * 5, STEP_RIGHT);
+        let left_exit = SquareWithOrthogonalDir::new(
+            left_entrance.square() + STEP_UP + STEP_RIGHT * 3,
+            STEP_UP,
+        );
+        (0..width).for_each(|i| {
+            self.place_double_sided_two_way_portal(
+                left_entrance.strafed_right_n(i),
+                left_exit.strafed_right_n(i),
+            )
         });
     }
 
     pub fn set_up_test_map(&mut self) {
-        self.set_up_corner_reflector_portals();
+        self.set_up_simple_test_map();
         return;
 
         let left_entrance = SquareWithOrthogonalDir::new(
@@ -3400,14 +3389,14 @@ mod tests {
 
         let width = 3;
         (0..width).for_each(|i| {
-            let entrance = SquareWithOrthogonalDir::new(
-                player_square + STEP_RIGHT * 2 + STEP_DOWN * (i - 1),
-                STEP_RIGHT,
-            );
+            let entrance =
+                SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT)
+                    .strafed_right_n(i);
             let exit = SquareWithOrthogonalDir::new(
-                game.player_square() + STEP_UP * 8 + STEP_RIGHT * (1 + i),
+                game.player_square() + STEP_UP * 8 + STEP_RIGHT,
                 STEP_UP,
-            );
+            )
+            .strafed_right_n(i);
             game.place_double_sided_two_way_portal(entrance, exit);
         });
 

@@ -1985,40 +1985,52 @@ mod tests {
 
     #[test]
     fn test_no_seam_for_wide_rotated_portal() {
-        let center = point2(5, 5);
-        let mut portal_geometry = PortalGeometry::default();
-        // TODO: find out why the bug only appears with 3 instead of 2
-        (0..3).for_each(|i| {
+        (0..1).for_each(|dy| {
+            let center = point2(5, 5);
+            let mut portal_geometry = PortalGeometry::default();
             let entrance =
-                SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT)
-                    .strafed_right_n(i);
-            let exit = SquareWithOrthogonalDir::new(center + STEP_UP * 8 + STEP_RIGHT, STEP_UP)
-                .strafed_left_n(i);
-            portal_geometry.create_portal(entrance, exit);
+                SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
+
+            let exit =
+                SquareWithOrthogonalDir::new(entrance.square() + STEP_UP + STEP_RIGHT * 3, STEP_UP);
+
+            (0..2).for_each(|i| {
+                // TODO: why does this need to be double sided AND two way?
+                portal_geometry.create_double_sided_two_way_portal(
+                    entrance.strafed_right_n(i),
+                    exit.strafed_right_n(i),
+                );
+            });
+            // let new_fov_result = single_octant_field_of_view(
+            //     &Default::default(),
+            //     &portal_geometry,
+            //     center,
+            //     4,
+            //     Octant::new(0),
+            // );
+            let new_fov_result = portal_aware_field_of_view_from_square(
+                center,
+                10,
+                &Default::default(),
+                &portal_geometry,
+            );
+
+            print_fov(&new_fov_result, 10);
+
+            let test_square = STEP_RIGHT * 4;
+
+            let visibilities_of_test_square =
+                new_fov_result.visibilities_of_relative_square(test_square);
+            assert_eq!(visibilities_of_test_square.len(), 1);
+            let the_positioned_visibility = visibilities_of_test_square[0];
+            assert_eq!(the_positioned_visibility.portal_depth, 1);
+            assert_eq!(
+                the_positioned_visibility.portal_rotation,
+                QuarterTurnsAnticlockwise::new(1)
+            );
+            let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
+            assert!(the_square_visibility.is_fully_visible());
         });
-        let new_fov_result = single_octant_field_of_view(
-            &Default::default(),
-            &portal_geometry,
-            center,
-            3,
-            Octant::new(0),
-        );
-
-        //print_fov(&new_fov_result, 10);
-
-        let test_square = STEP_RIGHT * 3 + STEP_UP;
-
-        let visibilities_of_test_square =
-            new_fov_result.visibilities_of_relative_square(test_square);
-        assert_eq!(visibilities_of_test_square.len(), 1);
-        let the_positioned_visibility = visibilities_of_test_square[0];
-        assert_eq!(the_positioned_visibility.portal_depth, 1);
-        assert_eq!(
-            the_positioned_visibility.portal_rotation,
-            QuarterTurnsAnticlockwise::new(1)
-        );
-        let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
-        assert!(the_square_visibility.is_fully_visible());
         todo!()
     }
 }

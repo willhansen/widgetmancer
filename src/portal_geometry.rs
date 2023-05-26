@@ -113,6 +113,36 @@ impl PortalGeometry {
         self.portal_exits_by_entrance
             .insert(entrance_step, exit_step);
     }
+    pub fn create_double_sided_one_way_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.create_portal(entrance_step, exit_step);
+        self.create_portal(
+            entrance_step.stepped().turned_back(),
+            exit_step.turned_back().stepped(),
+        );
+    }
+    pub fn create_single_sided_two_way_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.create_portal(entrance_step, exit_step);
+        self.create_portal(exit_step.reversed(), entrance_step.reversed());
+    }
+    pub fn create_double_sided_two_way_portal(
+        &mut self,
+        entrance_step: SquareWithOrthogonalDir,
+        exit_step: SquareWithOrthogonalDir,
+    ) {
+        self.create_single_sided_two_way_portal(entrance_step, exit_step);
+        self.create_single_sided_two_way_portal(
+            entrance_step.stepped().reversed(),
+            exit_step.reversed().stepped(),
+        );
+    }
 
     pub fn portal_aware_single_step(&self, start: SquareWithAdjacentDir) -> SquareWithAdjacentDir {
         if let Ok(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
