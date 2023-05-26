@@ -1632,22 +1632,29 @@ impl Game {
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
-    pub fn set_up_simple_test_map(&mut self) {
-        let n = 3;
-        let left_entrance =
-            SquareWithOrthogonalDir::new(self.player_square() + STEP_RIGHT * 3, STEP_RIGHT);
-        let left_exit =
-            SquareWithOrthogonalDir::new(left_entrance.square() + STEP_UP_RIGHT * (n + 1), STEP_UP);
-        (0..n).for_each(|i| {
-            self.place_double_sided_two_way_portal(
-                left_entrance.strafed_right_n(i),
-                left_exit.strafed_right_n(i),
-            )
+    pub fn set_up_corner_reflector_portals(&mut self) {
+        (0..5).for_each(|n| {
+            let width = n + 1;
+            let spacing = width * 2 + 1;
+            let left_entrance = SquareWithOrthogonalDir::new(
+                self.player_square() + STEP_RIGHT * (spacing * n),
+                STEP_RIGHT,
+            );
+            let left_exit = SquareWithOrthogonalDir::new(
+                left_entrance.square() + STEP_UP + STEP_RIGHT,
+                STEP_UP,
+            );
+            (0..width).for_each(|i| {
+                self.place_double_sided_two_way_portal(
+                    left_entrance.strafed_right_n(i),
+                    left_exit.strafed_right_n(i),
+                )
+            });
         });
     }
 
     pub fn set_up_test_map(&mut self) {
-        self.set_up_simple_test_map();
+        self.set_up_corner_reflector_portals();
         return;
 
         let left_entrance = SquareWithOrthogonalDir::new(
