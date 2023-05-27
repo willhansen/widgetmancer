@@ -120,7 +120,7 @@ impl SquareVisibility {
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedSquareVisibilityInFov {
     unrotated_square_visibility: SquareVisibility,
-    relative_position: WorldStep,
+    relative_square: WorldStep,
     absolute_square: WorldSquare,
     //step_in_fov_sequence: u32,
     portal_depth: u32,
@@ -135,8 +135,8 @@ impl PositionedSquareVisibilityInFov {
         PositionedSquareVisibilityInFov {
             portal_depth: self.portal_depth + 1,
             portal_rotation: self.portal_rotation + forward_rotation_through_portal,
-            relative_position: rotated_n_quarter_turns_counter_clockwise(
-                self.relative_position,
+            relative_square: rotated_n_quarter_turns_counter_clockwise(
+                self.relative_square,
                 -forward_rotation_through_portal.quarter_turns(),
             ),
             ..*self
@@ -154,6 +154,9 @@ impl PositionedSquareVisibilityInFov {
     pub fn absolute_square(&self) -> WorldSquare {
         self.absolute_square
     }
+    pub fn relative_square(&self) -> WorldStep {
+        self.relative_square
+    }
     pub fn new_in_top_view(
         square_visibility: SquareVisibility,
         absolute_square: WorldSquare,
@@ -161,7 +164,7 @@ impl PositionedSquareVisibilityInFov {
     ) -> Self {
         PositionedSquareVisibilityInFov {
             unrotated_square_visibility: square_visibility,
-            relative_position: relative_square,
+            relative_square,
             absolute_square,
             portal_depth: 0,
             portal_rotation: Default::default(),
@@ -450,7 +453,6 @@ impl FieldOfView {
                     .visibilities_of_absolute_square(world_square)
                     .into_iter()
                     .map(|pos_vis: PositionedSquareVisibilityInFov| {
-                        dbg!("asdfasdf", &pos_vis);
                         pos_vis.one_portal_deeper(forward_rotation)
                     })
                     .collect_vec();

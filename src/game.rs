@@ -3352,16 +3352,15 @@ mod tests {
         game.place_player(player_square);
 
         let width = 5;
+        let entrance =
+            SquareWithOrthogonalDir::new(player_square + STEP_RIGHT * 2 + STEP_UP * 2, STEP_RIGHT);
+        let exit =
+            SquareWithOrthogonalDir::new(entrance.square() + STEP_UP + STEP_RIGHT * 3, STEP_UP);
         (0..width).for_each(|i| {
-            let entrance = SquareWithOrthogonalDir::new(
-                player_square + STEP_RIGHT * 2 + STEP_UP * (i - 2),
-                STEP_RIGHT,
+            game.place_double_sided_two_way_portal(
+                entrance.strafed_right_n(i),
+                exit.strafed_right_n(i),
             );
-            let exit = SquareWithOrthogonalDir::new(
-                entrance.square() + STEP_UP * (width + 1) + STEP_RIGHT * (1 + i),
-                STEP_UP,
-            );
-            game.place_double_sided_two_way_portal(entrance, exit);
         });
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
