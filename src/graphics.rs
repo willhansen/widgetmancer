@@ -231,47 +231,7 @@ impl Graphics {
         fov: &FieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
-        let visibilities: Vec<PositionedSquareVisibilityInFov> = fov
-            .visibilities_of_relative_square(rel_square)
-            .into_iter()
-            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
-            .collect_vec();
-        // if rel_square == STEP_RIGHT * 3 {
-        //     dbg!("asdfasdf", &visibilities);
-        // }
-        let maybe_unrotated: Option<DrawableEnum> = visibilities
-            .iter()
-            .filter(|&vis: &&PositionedSquareVisibilityInFov| {
-                self.draw_buffer.contains_key(&vis.absolute_square())
-            })
-            .map(|&positioned_visibility: &PositionedSquareVisibilityInFov| {
-                let mut drawable: DrawableEnum = self
-                    .draw_buffer
-                    .get(&positioned_visibility.absolute_square())
-                    .unwrap()
-                    .clone();
-                if !positioned_visibility
-                    .unrotated_square_visibility()
-                    .is_fully_visible()
-                {
-                    drawable = DrawableEnum::PartialVisibility(
-                        PartialVisibilityDrawable::from_partially_visible_drawable(
-                            &drawable,
-                            positioned_visibility.rotated_square_visibility(),
-                        ),
-                    )
-                };
-                if self.tint_portals {
-                    drawable = drawable.tinted(
-                        // RED, // asdfasdf
-                        number_to_color(positioned_visibility.portal_depth()),
-                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
-                    );
-                }
-                drawable
-            })
-            .reduce(|bottom, top| top.drawn_over(&bottom));
-        maybe_unrotated
+        fov.drawable_at_relative_square(rel_square, Some(&self.draw_buffer), self.tint_portals)
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
@@ -281,7 +241,6 @@ impl Graphics {
                 .screen_buffer_square_to_world_square(screen_square);
 
             let relative_world_square = world_square - field_of_view.root_square();
-            // TODO: break up this function a bit
             let maybe_unrotated =
                 self.maybe_drawable_for_rel_square_of_fov(&field_of_view, relative_world_square);
             if let Some(unrotated) = maybe_unrotated {
