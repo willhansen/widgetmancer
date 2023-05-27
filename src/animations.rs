@@ -28,10 +28,7 @@ use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid
 use crate::glyph_constants::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
-use crate::{
-    is_diagonal_king_step, is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics,
-    RIGHT_I, UP_I,
-};
+use crate::{is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics, RIGHT_I, UP_I};
 
 pub mod blink_animation;
 pub mod burst_explosion_animation;

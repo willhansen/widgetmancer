@@ -466,6 +466,14 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             Point2D::<f32, U>::new(0.0, 1.0),
         )
     }
+    pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
+        let dist = self.dividing_line().normal_distance_to_point(point);
+        if self.point_is_on_half_plane(point) {
+            dist
+        } else {
+            -dist
+        }
+    }
 }
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
@@ -1680,5 +1688,36 @@ mod tests {
             Line::new(point2(0.0, 0.5), point2(0.0, -1.5));
         let output_points = line_intersections_with_centered_unit_square(input_line);
         assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
+    }
+    #[test]
+    fn test_depth_of_point_in_half_plane() {
+        let horizontal = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
+            point2(0.0, 5.0),
+        );
+
+        assert_about_eq!(
+            horizontal.depth_of_point_in_half_plane(point2(0.0, 12.0)),
+            12.0
+        );
+        assert_about_eq!(
+            horizontal
+                .extended(3.0)
+                .depth_of_point_in_half_plane(point2(2000.0, 10.0)),
+            13.0
+        );
+        assert_about_eq!(
+            horizontal.depth_of_point_in_half_plane(point2(0.0, -1.0)),
+            -1.0
+        );
+
+        let diag = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(0.0, 0.0), point2(-1.0, 1.0)),
+            point2(0.0, 5.0),
+        );
+        assert_about_eq!(
+            diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),
+            1.0 / 2.0.sqrt()
+        );
     }
 }

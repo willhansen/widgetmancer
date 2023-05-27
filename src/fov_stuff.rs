@@ -111,8 +111,20 @@ impl SquareVisibility {
         {
             Self::new_fully_visible()
         } else {
-            // TODO: better combination method
-            self.clone()
+            let depth_a = self
+                .visible_portion
+                .unwrap()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+            let depth_b = other
+                .visible_portion
+                .unwrap()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+
+            if depth_a > depth_b {
+                self.clone()
+            } else {
+                other.clone()
+            }
         }
     }
 }
@@ -1989,12 +2001,10 @@ mod tests {
     fn test_no_seam_for_wide_rotated_portal() {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
-        let entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
 
-        let exit = SquareWithOrthogonalDir::new(
-            entrance.square() + STEP_UP * 15 + STEP_RIGHT * 3,
-            STEP_UP,
-        );
+        let entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
+        let exit =
+            SquareWithOrthogonalDir::new(entrance.square() + STEP_UP + STEP_RIGHT * 3, STEP_UP);
 
         (0..2).for_each(|i| {
             // TODO: why does this need to be double sided AND two way?
@@ -2019,6 +2029,8 @@ mod tests {
 
         print_fov(&new_fov_result, 4);
 
+        assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
+
         let test_square = STEP_RIGHT * 3;
 
         let visibilities_of_test_square =
@@ -2033,5 +2045,55 @@ mod tests {
         let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
         assert!(the_square_visibility.is_fully_visible());
         todo!()
+    }
+
+    #[test]
+    fn test_one_square_seen_through_seam_of_wide_portal_is_fully_visible() {
+        let center = point2(5, 5);
+        let mut portal_geometry = PortalGeometry::default();
+
+        let entrance_left_end = SquareWithOrthogonalDir::new(center, STEP_RIGHT);
+        let portal_step = STEP_RIGHT * 2;
+        let exit_left_end = SquareWithOrthogonalDir::new(
+            entrance_left_end.square() + STEP_RIGHT + portal_step,
+            STEP_RIGHT,
+        );
+
+        (0..2).for_each(|i| {
+            portal_geometry.create_double_sided_two_way_portal(
+                entrance_left_end.strafed_left_n(i),
+                exit_left_end.strafed_left_n(i),
+            );
+        });
+        // let new_fov_result = single_octant_field_of_view(
+        //     &Default::default(),
+        //     &portal_geometry,
+        //     center,
+        //     4,
+        //     Octant::new(0),
+        // );
+        let new_fov_result = portal_aware_field_of_view_from_square(
+            center,
+            5,
+            &Default::default(),
+            &portal_geometry,
+        );
+
+        print_fov(&new_fov_result, 7);
+
+        assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
+        let test_square = STEP_UP_RIGHT;
+        let visibilities_of_test_square =
+            new_fov_result.visibilities_of_relative_square(test_square);
+        assert_eq!(visibilities_of_test_square.len(), 1);
+        assert!(new_fov_result.can_fully_and_seamlessly_see_relative_square(test_square));
+        let the_positioned_visibility = visibilities_of_test_square[0];
+        assert_eq!(the_positioned_visibility.portal_depth, 1);
+        assert_eq!(
+            the_positioned_visibility.portal_rotation,
+            QuarterTurnsAnticlockwise::new(0)
+        );
+        let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
+        assert!(the_square_visibility.is_fully_visible());
     }
 }
