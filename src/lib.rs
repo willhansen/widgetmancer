@@ -14,7 +14,6 @@
 #![feature(trait_alias)]
 #![allow(non_snake_case)]
 
-#[macro_use]
 extern crate approx;
 extern crate core;
 extern crate line_drawing;
@@ -22,10 +21,6 @@ extern crate num;
 extern crate shrinkwraprs;
 extern crate std;
 extern crate termion;
-
-use std::cmp::{max, min};
-
-use std::collections::{HashMap, VecDeque};
 
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -35,11 +30,7 @@ use std::time::{Duration, Instant};
 use enum_as_inner::EnumAsInner;
 use euclid::default::Point2D;
 use euclid::point2;
-use ntest::timeout;
-use num::Integer;
 use rand::SeedableRng;
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
