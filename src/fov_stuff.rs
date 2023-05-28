@@ -597,21 +597,33 @@ impl FieldOfView {
             .insert(relative_square, SquareVisibility::new_fully_visible());
     }
 
+    fn sorted_by_draw_order(
+        visibilities: Vec<PositionedSquareVisibilityInFov>,
+    ) -> Vec<PositionedSquareVisibilityInFov> {
+        visibilities
+            .into_iter()
+            // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
+            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
+            .collect_vec()
+    }
+
     pub fn drawable_at_relative_square(
         &self,
         relative_square: WorldStep,
         maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
         tint_portals: bool,
+        render_portals_with_line_of_sight: bool,
     ) -> Option<DrawableEnum> {
-        let visibilities: Vec<PositionedSquareVisibilityInFov> = self
-            .visibilities_of_relative_square(relative_square)
-            .into_iter()
-            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
-            .collect_vec();
+        let visibilities: Vec<PositionedSquareVisibilityInFov> =
+            Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
+                self.visibilities_of_relative_square(relative_square)
+            } else {
+                self.visibilities_of_absolute_square(self.root_square() + relative_square)
+            });
         // if rel_square == STEP_RIGHT * 3 {
         //     dbg!("asdfasdf", &visibilities);
         // }
-        let maybe_unrotated: Option<DrawableEnum> = visibilities
+        let maybe_drawable: Option<DrawableEnum> = visibilities
             .iter()
             .filter(|&vis: &&PositionedSquareVisibilityInFov| {
                 if let Some(drawable_map) = maybe_drawable_map {
@@ -627,7 +639,21 @@ impl FieldOfView {
                         .unwrap()
                         .clone()
                 } else {
-                    SolidColorDrawable::new(GREY).to_enum()
+                    // SolidColorDrawable::new(GREY).to_enum()
+                    // SolidColorDrawable::new(number_to_hue_rotation(
+                    //     better_angle_from_x_axis(
+                    //         (positioned_visibility.absolute_square - self.root_square()).to_f32(),
+                    //     )
+                    //     .to_degrees(),
+                    //     360.0,
+                    // ))
+                    // .to_enum()
+                    SolidColorDrawable::new(number_to_hue_rotation(
+                        king_distance(positioned_visibility.absolute_square - self.root_square())
+                            as f32,
+                        10.0,
+                    ))
+                    .to_enum()
                 };
                 if !positioned_visibility
                     .unrotated_square_visibility()
@@ -636,7 +662,11 @@ impl FieldOfView {
                     drawable = DrawableEnum::PartialVisibility(
                         PartialVisibilityDrawable::from_partially_visible_drawable(
                             &drawable,
-                            positioned_visibility.rotated_square_visibility(),
+                            if render_portals_with_line_of_sight {
+                                positioned_visibility.rotated_square_visibility()
+                            } else {
+                                positioned_visibility.unrotated_square_visibility()
+                            },
                         ),
                     )
                 };
@@ -650,7 +680,7 @@ impl FieldOfView {
                 drawable
             })
             .reduce(|bottom, top| top.drawn_over(&bottom));
-        maybe_unrotated
+        maybe_drawable
     }
 }
 
@@ -959,21 +989,24 @@ fn square_visibility_from_one_view_arc(
     }
 }
 
-// TODO: make better
-
-fn print_fov(fov: &FieldOfView, radius: u32) {
+fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: bool) {
     let center_drawable = TextDrawable::new("@@", WHITE, GREY, true);
     let r = radius as i32;
     (-r..=r).for_each(|neg_y| {
         let y = -neg_y;
         (-r..=r).for_each(|x| {
             let rel_square: WorldStep = vec2(x, y);
-            let to_draw: DrawableEnum =
-                if let Some(drawable) = fov.drawable_at_relative_square(rel_square, None, true) {
-                    drawable
-                } else {
-                    SolidColorDrawable::new(OUT_OF_SIGHT_COLOR).to_enum()
-                };
+            let maybe_drawable = fov.drawable_at_relative_square(
+                rel_square,
+                None,
+                true,
+                render_portals_with_line_of_sight,
+            );
+            let to_draw: DrawableEnum = if let Some(drawable) = maybe_drawable {
+                drawable
+            } else {
+                SolidColorDrawable::new(OUT_OF_SIGHT_COLOR).to_enum()
+            };
 
             print!(
                 "{}",
@@ -988,6 +1021,13 @@ fn print_fov(fov: &FieldOfView, radius: u32) {
         });
         print!("\n");
     });
+}
+
+fn print_fov_as_relative(fov: &FieldOfView, radius: u32) {
+    print_fov(fov, radius, true)
+}
+fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
+    print_fov(fov, radius, false)
 }
 
 #[cfg(test)]
@@ -1080,7 +1120,7 @@ mod tests {
             &PortalGeometry::default(),
         );
 
-        print_fov(&fov_result, 5);
+        print_fov_as_relative(&fov_result, 5);
         assert!(fov_result
             .only_partially_visible_relative_squares_in_main_view_only()
             .is_empty());
@@ -2010,7 +2050,7 @@ mod tests {
         let fov =
             portal_aware_field_of_view_from_square(player_square, 5, &blocks, &Default::default());
 
-        print_fov(&fov, 5);
+        print_fov_as_relative(&fov, 5);
         rel_blocks.iter().for_each(|rel_block| {
             assert!(
                 fov.can_fully_and_seamlessly_see_relative_square(*rel_block),
@@ -2031,7 +2071,7 @@ mod tests {
             &Default::default(),
             &Default::default(),
         );
-        print_fov(&new_fov_result, 2);
+        print_fov_as_relative(&new_fov_result, 2);
         let visibilities_of_one_right = new_fov_result.visibilities_of_relative_square(STEP_RIGHT);
         assert_eq!(visibilities_of_one_right.len(), 1);
         let the_positioned_visibility = visibilities_of_one_right[0];
@@ -2091,7 +2131,7 @@ mod tests {
             &portal_geometry,
         );
 
-        print_fov(&new_fov_result, 7);
+        print_fov_as_relative(&new_fov_result, 7);
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
         let test_square = STEP_UP_RIGHT;
@@ -2115,8 +2155,7 @@ mod tests {
         let mut portal_geometry = PortalGeometry::default();
 
         let entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
-        let exit =
-            SquareWithOrthogonalDir::new(entrance.square() + STEP_UP + STEP_RIGHT * 3, STEP_UP);
+        let exit = SquareWithOrthogonalDir::new(entrance.square() + STEP_UP_LEFT * 5, STEP_UP);
 
         (0..2).for_each(|i| {
             // TODO: why does this need to be double sided AND two way?
@@ -2127,19 +2166,20 @@ mod tests {
         });
         let new_fov_result = single_octant_field_of_view(
             center,
-            3,
+            8,
             Octant::new(0),
             &Default::default(),
             &portal_geometry,
         );
         // let new_fov_result = portal_aware_field_of_view_from_square(
         //     center,
-        //     3,
+        //     8,
         //     &Default::default(),
         //     &portal_geometry,
         // );
 
-        print_fov(&new_fov_result, 4);
+        print_fov_as_relative(&new_fov_result, 10);
+        print_fov_as_absolute(&new_fov_result, 10);
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
 

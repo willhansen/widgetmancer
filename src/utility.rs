@@ -1285,6 +1285,10 @@ pub fn tint_color(original_color: RGB8, tint_color: RGB8, mut tint_strength: f32
         .into()
 }
 
+pub fn number_to_hue_rotation(x: f32, period: f32) -> RGB8 {
+    hue_to_rgb(x * 360.0 / period)
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

@@ -231,7 +231,13 @@ impl Graphics {
         fov: &FieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
-        fov.drawable_at_relative_square(rel_square, Some(&self.draw_buffer), self.tint_portals)
+        fov.drawable_at_relative_square(
+            rel_square,
+            Some(&self.draw_buffer),
+            self.tint_portals,
+            // true,
+            false, // asdfasdf
+        )
     }
 
     pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
