@@ -51,6 +51,9 @@ impl AngleInterval {
             self.anticlockwise_end.to_degrees(),
         )
     }
+    pub fn to_radians(&self) -> (f32, f32) {
+        (self.clockwise_end.radians, self.anticlockwise_end.radians)
+    }
     pub fn from_octant(octant: Octant) -> Self {
         let n = octant.number();
         let positive_y = n < 4;
@@ -270,6 +273,22 @@ impl AngleInterval {
         self.partially_or_fully_overlaps_without_exactly_touching(other)
             && !self.exactly_touches_arc(other)
     }
+    pub fn overlaps_other_by_at_least_this_much(
+        &self,
+        other: AngleInterval,
+        thresh: Angle<f32>,
+    ) -> bool {
+        let self_minus_other = self.subtract(other);
+
+        let sum_of_widths_of_self_minus_other = self_minus_other
+            .iter()
+            .map(|angle_interval| angle_interval.width())
+            .sum();
+
+        let overlap = self.width() - sum_of_widths_of_self_minus_other;
+
+        overlap.radians >= thresh.radians
+    }
 
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
         self.clockwise_end == angle || angle == self.anticlockwise_end
@@ -337,11 +356,17 @@ impl AngleInterval {
             clockwise_is_closer,
         )
     }
-    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
         AngleInterval {
             clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
             anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),
         }
+    }
+    pub fn rotated(&self, d_angle: Angle<f32>) -> Self {
+        AngleInterval::new(
+            self.clockwise_end + d_angle,
+            self.anticlockwise_end + d_angle,
+        )
     }
 }
 
@@ -1082,5 +1107,25 @@ mod tests {
                     end
                 );
             })
+    }
+    #[test]
+    fn test_overlap_at_least_this_much() {
+        let arc1 = AngleInterval::from_degrees(0.0, 90.0);
+        let arc2 = AngleInterval::from_degrees(90.0, 180.0);
+
+        assert_false!(arc1.overlaps_other_by_at_least_this_much(arc2, Angle::degrees(5.0)));
+        assert_false!(arc1.overlaps_other_by_at_least_this_much(
+            arc2.rotated(Angle::degrees(-4.9)),
+            Angle::degrees(5.0)
+        ));
+        assert!(arc1.overlaps_other_by_at_least_this_much(
+            arc2.rotated(Angle::degrees(-5.1)),
+            Angle::degrees(5.0)
+        ));
+        assert_false!(arc1.overlaps_other_by_at_least_this_much(
+            arc2.rotated(Angle::degrees(5.1)),
+            Angle::degrees(5.0)
+        ));
+        // TODO: more cases here
     }
 }

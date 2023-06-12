@@ -86,6 +86,7 @@ pub struct Graphics {
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
     pub tint_portals: bool,
+    render_portals_with_line_of_sight: bool,
 }
 
 impl Graphics {
@@ -99,6 +100,7 @@ impl Graphics {
             start_time,
             floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
             tint_portals: true,
+            render_portals_with_line_of_sight: true,
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -235,8 +237,7 @@ impl Graphics {
             rel_square,
             Some(&self.draw_buffer),
             self.tint_portals,
-            // true,
-            false, // asdfasdf
+            self.render_portals_with_line_of_sight,
         )
     }
 

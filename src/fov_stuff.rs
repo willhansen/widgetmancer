@@ -1,3 +1,4 @@
+use std::backtrace::Backtrace;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
@@ -26,6 +27,8 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+
+const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 #[derive(Clone, Debug, Copy, Constructor)]
 pub struct SquareVisibility {
@@ -454,8 +457,8 @@ impl FieldOfView {
         &self,
         world_square: WorldSquare,
     ) -> Vec<PositionedSquareVisibilityInFov> {
-        // Due to portals, this may see the same square multiple times
         let rel_square: WorldStep = world_square - self.root_square();
+        // Due to portals, this may see the same square multiple times
         let mut visibilities = vec![];
         if let Some(visibility_in_untransformed_view) =
             self.visibility_of_relative_square_in_main_view(rel_square)
@@ -533,9 +536,7 @@ impl FieldOfView {
         let visibilities_in_frame_of_main_view = visibilities_in_frame_of_sub_view
             .iter()
             .map(|pos_vis: &PositionedSquareVisibilityInFov| {
-                let a = pos_vis.one_portal_deeper(rotation_moving_forward_through_portal);
-                //dbg!("asdfasdf", relative_square, &pos_vis, &a);
-                a
+                pos_vis.one_portal_deeper(rotation_moving_forward_through_portal)
             })
             .collect_vec();
 
@@ -557,28 +558,12 @@ impl FieldOfView {
                 absolute_square,
                 relative_square,
             ));
-            // dbg!(
-            //     "asdfasdf main view",
-            //     relative_square,
-            //     top_level_visibility.as_string(),
-            //     &top_level_visibility
-            // );
         }
         let mut sub_view_visibilities: Vec<PositionedSquareVisibilityInFov> = self
             .transformed_sub_fovs
             .iter()
             .map(|sub_fov| {
-                let a =
-                    self.visibilities_of_relative_square_in_one_sub_view(relative_square, sub_fov);
-                // dbg!(
-                //     "asdfasdf sub view",
-                //     relative_square,
-                //     a.iter()
-                //         .map(|vis| vis.rotated_square_visibility().as_string())
-                //         .collect_vec(),
-                //     &a
-                // );
-                a
+                self.visibilities_of_relative_square_in_one_sub_view(relative_square, sub_fov)
             })
             .flatten()
             .collect_vec();
@@ -600,9 +585,9 @@ impl FieldOfView {
     fn sorted_by_draw_order(
         visibilities: Vec<PositionedSquareVisibilityInFov>,
     ) -> Vec<PositionedSquareVisibilityInFov> {
+        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
         visibilities
             .into_iter()
-            // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
             .sorted_by_key(|pos_vis| pos_vis.portal_depth())
             .collect_vec()
     }
@@ -620,9 +605,6 @@ impl FieldOfView {
             } else {
                 self.visibilities_of_absolute_square(self.root_square() + relative_square)
             });
-        // if rel_square == STEP_RIGHT * 3 {
-        //     dbg!("asdfasdf", &visibilities);
-        // }
         let maybe_drawable: Option<DrawableEnum> = visibilities
             .iter()
             .filter(|&vis: &&PositionedSquareVisibilityInFov| {
@@ -736,14 +718,15 @@ pub fn field_of_view_within_arc_in_single_octant(
     radius: u32,
     octant: Octant,
     view_arc: AngleInterval,
-    mut next_step_in_fov_sequence: u32,
+    starting_step_in_fov_sequence: u32,
 ) -> FieldOfView {
     let mut fov_result = FieldOfView::new_empty_fov_with_root(oriented_center_square);
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
-        OctantFOVSquareSequenceIter::new(octant, next_step_in_fov_sequence);
+        OctantFOVSquareSequenceIter::new(octant, starting_step_in_fov_sequence);
 
+    let mut next_step_in_fov_sequence = starting_step_in_fov_sequence;
     for relative_square in rel_squares_in_fov_sequence {
         next_step_in_fov_sequence += 1;
         let out_of_range =
@@ -810,15 +793,20 @@ pub fn field_of_view_within_arc_in_single_octant(
                 })
                 .collect();
 
-            let visible_portals_in_sight: HashMap<Portal, AngleInterval> = portal_view_arcs
-                .clone()
-                .into_iter()
-                .filter(|(portal, portal_arc): &(Portal, AngleInterval)| {
-                    portal_arc.overlapping_but_not_exactly_touching(view_arc)
-                })
-                .collect();
+            let significantly_visible_portals_in_sight: HashMap<Portal, AngleInterval> =
+                portal_view_arcs
+                    .clone()
+                    .into_iter()
+                    .filter(|(_portal, portal_arc): &(Portal, AngleInterval)| {
+                        // TODO: make the threshold a constant
+                        portal_arc.overlaps_other_by_at_least_this_much(
+                            view_arc,
+                            Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+                        )
+                    })
+                    .collect();
 
-            visible_portals_in_sight.iter().for_each(
+            significantly_visible_portals_in_sight.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
                     let transformed_center = transform.transform_pose(oriented_center_square);
@@ -882,8 +870,6 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
     }
-    // asdfasdf
-    //print_fov(&fov_result, 10);
     fov_result
 }
 
@@ -1026,6 +1012,7 @@ fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: 
 fn print_fov_as_relative(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, true)
 }
+
 fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, false)
 }
@@ -1530,7 +1517,11 @@ mod tests {
             SquareWithOrthogonalDir::new(exit_square, STEP_DOWN),
         );
 
-        let view_arc = AngleInterval::from_degrees(0.1, 0.11);
+        let clockwise_end_in_degrees = 0.1;
+        let view_arc = AngleInterval::from_degrees(
+            clockwise_end_in_degrees,
+            clockwise_end_in_degrees + NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES * 2.0,
+        );
 
         let radius = 10;
         let mut fov_result = field_of_view_within_arc_in_single_octant(
@@ -2155,7 +2146,7 @@ mod tests {
         let mut portal_geometry = PortalGeometry::default();
 
         let entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::new(entrance.square() + STEP_UP_LEFT * 5, STEP_UP);
+        let exit = SquareWithOrthogonalDir::new(entrance.square() + STEP_UP_LEFT * 50, STEP_UP);
 
         (0..2).for_each(|i| {
             // TODO: why does this need to be double sided AND two way?
@@ -2195,7 +2186,7 @@ mod tests {
             QuarterTurnsAnticlockwise::new(1)
         );
         let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
-        assert!(the_square_visibility.is_fully_visible());
+        assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
             &SolidColorDrawable::new(RED),
             the_square_visibility,
@@ -2203,6 +2194,5 @@ mod tests {
         let the_glyphs = the_drawable.to_glyphs();
         let the_clean_string = the_glyphs.to_clean_string();
         assert_eq!(the_clean_string, "🬎🬎");
-        todo!()
     }
 }

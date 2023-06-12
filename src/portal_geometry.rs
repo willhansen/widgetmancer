@@ -50,7 +50,7 @@ impl RigidTransform {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
     }
     pub fn transform_arc(&self, arc: AngleInterval) -> AngleInterval {
-        arc.rotated(self.rotation())
+        arc.rotated_quarter_turns(self.rotation())
     }
     pub fn rotate_step(&self, step: WorldStep) -> WorldStep {
         self.rotation().rotate_vector(step)

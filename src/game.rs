@@ -1643,8 +1643,8 @@ impl Game {
     }
 
     pub fn set_up_test_map(&mut self) {
-        self.set_up_simple_test_map();
-        return;
+        // self.set_up_simple_test_map();
+        // return;
 
         let left_entrance = SquareWithOrthogonalDir::new(
             self.player_square() + STEP_RIGHT * 3 + STEP_UP * 3,
