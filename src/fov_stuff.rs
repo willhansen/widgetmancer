@@ -654,8 +654,8 @@ impl FieldOfView {
                 };
                 if tint_portals {
                     drawable = drawable.tinted(
-                        // RED, // asdfasdf
-                        number_to_color(positioned_visibility.portal_depth()),
+                        RED,
+                        //number_to_color(positioned_visibility.portal_depth()),
                         (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
                     );
                 }
