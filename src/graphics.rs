@@ -43,14 +43,14 @@ use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
-    CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare,
+    CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
 };
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color, reversed,
-    squares_on_board, STEP_RIGHT,
+    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
+    reversed, squares_on_board, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -306,9 +306,9 @@ impl Graphics {
         self.draw_glyphs(glyphs_to_draw);
     }
 
-    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
-        let mut player_glyphs = Glyph::get_glyphs_for_player(faced_direction);
-        self.draw_glyphs_for_square_to_draw_buffer(world_pos, player_glyphs);
+    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: ScreenBufferStep) {
+        let player_glyphs = Glyph::get_glyphs_for_player(flip_y(faced_direction.cast_unit()));
+        self.draw_drawable_to_draw_buffer(world_pos, TextDrawable::from_glyphs(player_glyphs));
     }
 
     pub fn draw_above_square<T: Drawable + Debug>(
@@ -323,13 +323,23 @@ impl Graphics {
         };
         self.draw_buffer.insert(world_square, to_draw.to_enum());
     }
-    #[deprecated(note = "Graphics should not know about glyphs")]
+    #[deprecated(
+        note = "Graphics should not know about glyphs, use draw_drawable_to_draw_buffer instead"
+    )]
     pub fn draw_glyphs_for_square_to_draw_buffer(
         &mut self,
         world_square: WorldSquare,
         glyphs: DoubleGlyph,
     ) {
         self.draw_above_square(&TextDrawable::from_glyphs(glyphs), world_square);
+    }
+
+    pub fn draw_drawable_to_draw_buffer<T: Drawable + Debug>(
+        &mut self,
+        world_square: WorldSquare,
+        drawable: T,
+    ) {
+        self.draw_above_square(&drawable, world_square);
     }
 
     pub fn draw_piece_with_color(

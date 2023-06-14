@@ -132,6 +132,14 @@ impl Game {
             blink_range: 5,
         });
     }
+    pub fn place_player_with_direction(&mut self, square: WorldSquare, direction: WorldStep) {
+        assert!(is_king_step(direction));
+        self.player_optional = Some(Player {
+            position: square,
+            faced_direction: direction,
+            blink_range: 5,
+        });
+    }
 
     pub fn mid_square(&self) -> WorldSquare {
         point2(
@@ -292,6 +300,15 @@ impl Game {
             panic!("player is dead")
         }
     }
+    pub fn player_faced_direction_on_screen(&self) -> ScreenBufferStep {
+        if let Some(player) = &self.player_optional {
+            self.graphics
+                .screen
+                .world_step_to_screen_step(player.faced_direction)
+        } else {
+            panic!("player is dead")
+        }
+    }
 
     pub fn player_pose(&self) -> SquareWithAdjacentDir {
         SquareWithAdjacentDir::new(self.player_square(), self.player_faced_direction())
@@ -385,8 +402,10 @@ impl Game {
         self.graphics.remove_finished_animations(time);
         self.graphics.draw_non_board_animations(time);
         if self.player_is_alive() {
-            self.graphics
-                .draw_player(self.player_square(), self.player_faced_direction());
+            self.graphics.draw_player(
+                self.player_square(),
+                self.player_faced_direction_on_screen(),
+            );
         }
     }
 
@@ -3414,6 +3433,58 @@ mod tests {
             "The glyphs: {}, the chars: {}",
             glyphs.to_string(),
             glyphs.to_clean_string()
+        );
+    }
+    #[test]
+    fn test_player_rotates_with_portal() {
+        let mut game = set_up_10x10_game();
+        let player_square = point2(5, 5);
+        game.place_player_with_direction(player_square, STEP_RIGHT);
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(player_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_dir(player_square + STEP_UP_RIGHT, STEP_UP),
+        );
+        game.draw_headless_now();
+        //game.graphics.screen.print_screen_buffer();
+        let before_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO);
+        game.try_slide_player(STEP_RIGHT).expect("");
+        game.draw_headless_now();
+        //game.graphics.screen.print_screen_buffer();
+        let after_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO);
+
+        assert_eq!(
+            before_glyphs.to_clean_string(),
+            after_glyphs.to_clean_string()
+        );
+    }
+    #[test]
+    fn test_move_vertical_looks_right() {
+        let mut game = set_up_10x10_game();
+        game.place_player_with_direction(point2(5, 5), STEP_UP);
+        game.draw_headless_now();
+        let before_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO);
+        game.try_slide_player_relative_to_screen(SCREEN_STEP_UP)
+            .expect("");
+        let after_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO);
+        assert_eq!(
+            before_glyphs.to_clean_string(),
+            after_glyphs.to_clean_string()
+        );
+        assert_eq!(
+            before_glyphs.to_clean_string(),
+            Glyph::get_glyphs_for_player(STEP_UP).to_clean_string()
         );
     }
 }
