@@ -3487,4 +3487,30 @@ mod tests {
             Glyph::get_glyphs_for_player(STEP_UP).to_clean_string()
         );
     }
+
+    #[test]
+    fn test_player_seen_through_portal_is_rotated_correctly() {
+        let mut game = set_up_10x10_game();
+        let player_square = point2(5, 5);
+        game.place_player_with_direction(player_square, STEP_RIGHT);
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_dir(player_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_dir(player_square, STEP_DOWN),
+        );
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let player_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_ZERO);
+        let seen_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
+
+        assert_ne!(
+            player_glyphs.to_clean_string(),
+            seen_glyphs.to_clean_string()
+        );
+    }
 }
