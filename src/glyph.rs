@@ -225,6 +225,7 @@ impl Glyph {
         char_is_braille(self.character)
     }
 
+    #[deprecated(note = "Use ArrowDrawable instead")]
     pub fn get_glyphs_for_player(faced_direction: WorldStep) -> DoubleGlyph {
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
 

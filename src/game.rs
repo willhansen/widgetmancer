@@ -402,10 +402,8 @@ impl Game {
         self.graphics.remove_finished_animations(time);
         self.graphics.draw_non_board_animations(time);
         if self.player_is_alive() {
-            self.graphics.draw_player(
-                self.player_square(),
-                self.player_faced_direction_on_screen(),
-            );
+            self.graphics
+                .draw_player(self.player_square(), self.player_faced_direction());
         }
     }
 
@@ -3435,6 +3433,7 @@ mod tests {
             glyphs.to_clean_string()
         );
     }
+
     #[test]
     fn test_player_rotates_with_portal() {
         let mut game = set_up_10x10_game();
@@ -3463,6 +3462,7 @@ mod tests {
             after_glyphs.to_clean_string()
         );
     }
+
     #[test]
     fn test_move_vertical_looks_right() {
         let mut game = set_up_10x10_game();
@@ -3512,5 +3512,6 @@ mod tests {
             player_glyphs.to_clean_string(),
             seen_glyphs.to_clean_string()
         );
+        assert_eq!(seen_glyphs[0].character, '🢁');
     }
 }

@@ -24,12 +24,12 @@ use crate::utility::{
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self;
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum;
     fn to_glyphs(&self) -> DoubleGlyph;
-    fn drawn_over<T: Drawable>(&self, other: &T) -> Self;
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
     fn color_if_backgroundified(&self) -> RGB8;
     fn to_enum(&self) -> DrawableEnum;
-    fn tinted(&self, color: RGB8, strength: f32) -> Self;
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum;
 }
 
 #[derive(Debug, Clone, From, Delegate)]
@@ -63,7 +63,7 @@ impl TextDrawable {
 }
 
 impl Drawable for TextDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         // lmao no
         self.clone().into()
     }
@@ -188,7 +188,7 @@ pub struct BrailleDrawable {
 }
 
 impl Drawable for BrailleDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         todo!()
     }
 
@@ -225,7 +225,7 @@ impl SolidColorDrawable {
 }
 
 impl Drawable for SolidColorDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         self.clone().into()
     }
 
@@ -233,7 +233,7 @@ impl Drawable for SolidColorDrawable {
         DoubleGlyph::solid_color(self.color)
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: Drawable>(&self, _other: &T) -> DrawableEnum {
         self.clone().into()
     }
 
@@ -338,7 +338,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{Line, STEP_RIGHT};
+    use crate::utility::{Line, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -391,7 +391,12 @@ mod tests {
         assert_eq!(top_half.to_glyphs().to_clean_string(), "🬎🬎");
     }
     #[test]
-    fn test_arrow_drawable() {
+    fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
+        let character = d.rotated(1).to_glyphs()[0].character;
+        assert_eq!(
+            character,
+            Glyph::extract_arrow_from_arrow_string(STEP_UP, THICK_ARROWS)
+        );
     }
 }

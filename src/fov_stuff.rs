@@ -619,7 +619,7 @@ impl FieldOfView {
                     drawable_map
                         .get(&positioned_visibility.absolute_square())
                         .unwrap()
-                        .clone()
+                        .rotated(-positioned_visibility.portal_rotation.quarter_turns())
                 } else {
                     // SolidColorDrawable::new(GREY).to_enum()
                     // SolidColorDrawable::new(number_to_hue_rotation(
