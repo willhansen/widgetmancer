@@ -5,7 +5,9 @@ use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
     WorldStep,
 };
-use crate::utility::{better_angle_from_x_axis, is_orthodiagonal, rotate_vect, KING_STEPS};
+use crate::utility::{
+    better_angle_from_x_axis, is_king_step, is_orthodiagonal, rotate_vect, KING_STEPS,
+};
 use euclid::{point2, vec2, Angle};
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
@@ -26,7 +28,7 @@ impl SpearAttackAnimation {
         direction: WorldStep,
         range: u32,
     ) -> SpearAttackAnimation {
-        assert!(KING_STEPS.contains(&direction));
+        assert!(is_king_step(direction));
         SpearAttackAnimation {
             start_square,
             direction,

@@ -102,7 +102,8 @@ pub const EIGHTH_BLOCKS_FROM_TOP: &[char] = &[
 
 pub const SOLID_CHESS_PIECES: &[char] = &['♟', '♛', '♚', '♝', '♞', '♜'];
 
-pub const THICK_ARROWS: &[char] = &['🢀', '🢂', '🢁', '🢃', '🢄', '🢅', '🢆', '🢇'];
+pub const THICK_ARROWS: &str = "🢀🢂🢁🢃🢄🢅🢆🢇";
+pub const THIN_TRIANGLE_ARROWS: &str = "⭠⭢⭡⭣⭦⭧⭨⭩";
 
 // tiny squid: ᵜ
 // big squid: ᴥ (or a jelly thing from zelda)

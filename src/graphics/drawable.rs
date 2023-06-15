@@ -1,4 +1,7 @@
-use ambassador::{delegatable_trait, Delegate};
+use std::fmt::Debug;
+
+use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
+use derive_more::Constructor;
 use derive_more::From;
 use dyn_clone::DynClone;
 use euclid::Angle;
@@ -9,19 +12,24 @@ use rgb::RGB8;
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
-use crate::glyph::glyph_constants::{GREEN, OUT_OF_SIGHT_COLOR, RED};
+use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::coordinate_frame_conversions::local_square_half_plane_to_local_character_half_plane;
-use crate::utility::{tint_color, QuarterTurnsAnticlockwise};
+use crate::utility::coordinate_frame_conversions::{
+    local_square_half_plane_to_local_character_half_plane, WorldStep,
+};
+use crate::utility::{
+    rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingDirection,
+    QuarterTurnsAnticlockwise,
+};
 
 #[delegatable_trait]
-pub trait Drawable: Clone {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum;
+pub trait Drawable: Clone + Debug {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self;
     fn to_glyphs(&self) -> DoubleGlyph;
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
+    fn drawn_over<T: Drawable>(&self, other: &T) -> Self;
     fn color_if_backgroundified(&self) -> RGB8;
     fn to_enum(&self) -> DrawableEnum;
-    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum;
+    fn tinted(&self, color: RGB8, strength: f32) -> Self;
 }
 
 #[derive(Debug, Clone, From, Delegate)]
@@ -31,6 +39,7 @@ pub enum DrawableEnum {
     PartialVisibility(PartialVisibilityDrawable),
     SolidColor(SolidColorDrawable),
     Braille(BrailleDrawable),
+    Arrow(ArrowDrawable),
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -248,8 +257,79 @@ pub struct HextantDrawable {
     // todo
 }
 
+#[derive(Debug, Clone, CopyGetters)]
 pub struct ArrowDrawable {
-    // todo
+    direction: KingDirection,
+    arrow_string: String,
+    text_drawable: TextDrawable,
+}
+
+impl ArrowDrawable {
+    pub fn new(direction: KingDirection, arrow_string: &str, color: RGB8) -> Self {
+        let arrow_char = Glyph::extract_arrow_from_arrow_string(direction.into(), arrow_string);
+        let text_drawable = TextDrawable::new(&(arrow_char.to_string() + " "), color, BLACK, true);
+        ArrowDrawable {
+            direction,
+            arrow_string: arrow_string.to_string(),
+            text_drawable,
+        }
+    }
+
+    fn with_updated_text_drawable(&self) -> Self {
+        let mut the_clone = self.clone();
+        the_clone.text_drawable.glyphs[0].character =
+            Glyph::extract_arrow_from_arrow_string(self.direction.into(), &self.arrow_string);
+        the_clone
+    }
+}
+
+impl Drawable for ArrowDrawable {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        ArrowDrawable {
+            direction: rotated_n_quarter_turns_counter_clockwise(
+                self.direction.into(),
+                quarter_rotations_anticlockwise,
+            )
+            .into(),
+            ..self.clone()
+        }
+        .with_updated_text_drawable()
+        .into()
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        self.text_drawable.to_glyphs()
+    }
+
+    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+        match self.text_drawable.drawn_over(other) {
+            DrawableEnum::Text(text_drawable) => ArrowDrawable {
+                text_drawable,
+                ..self.clone()
+            }
+            .into(),
+            _ => panic!("should have still been text!"),
+        }
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        self.text_drawable.color_if_backgroundified()
+    }
+
+    fn to_enum(&self) -> DrawableEnum {
+        self.clone().into()
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
+        ArrowDrawable {
+            text_drawable: match self.text_drawable.tinted(color, strength) {
+                DrawableEnum::Text(text_drawable) => text_drawable,
+                _ => panic!("should have still been text!"),
+            },
+            ..self.clone()
+        }
+        .into()
+    }
 }
 
 #[cfg(test)]
@@ -257,8 +337,8 @@ mod tests {
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE};
-    use crate::utility::Line;
+    use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
+    use crate::utility::{Line, STEP_RIGHT};
 
     use super::*;
 
@@ -286,6 +366,7 @@ mod tests {
         let text = TextDrawable::new("a ", RED, GREEN, false);
         assert_eq!(text.color_if_backgroundified(), RED);
     }
+
     #[test]
     fn test_text_drawn_over_solid_to_glyphs_with_empty_space() {
         let solid_drawable = SolidColorDrawable::new(GREEN);
@@ -294,6 +375,7 @@ mod tests {
         let glyphs = combo.to_glyphs();
         assert_eq!(glyphs[1].character, SPACE);
     }
+
     #[test]
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
@@ -307,5 +389,9 @@ mod tests {
         let top_half =
             PartialVisibilityDrawable::from_partially_visible_drawable(&base, visibility);
         assert_eq!(top_half.to_glyphs().to_clean_string(), "🬎🬎");
+    }
+    #[test]
+    fn test_arrow_drawable() {
+        let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
     }
 }

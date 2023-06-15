@@ -24,6 +24,7 @@ use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
 use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
+use crate::piece::PieceType::King;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
 
@@ -976,7 +977,7 @@ pub fn hue_to_rgb(hue_360: f32) -> RGB8 {
 }
 
 pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
-    assert!(KING_STEPS.contains(&dir));
+    assert!(is_king_step(dir));
     if ORTHOGONAL_STEPS.contains(&dir) {
         if dir.x != 0 {
             HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
@@ -1158,6 +1159,31 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
+pub struct KingDirection {
+    dir: WorldStep,
+}
+
+impl KingDirection {
+    pub fn new(dir: WorldStep) -> Self {
+        assert!(is_king_step(dir));
+        KingDirection { dir }
+    }
+}
+
+impl From<WorldStep> for KingDirection {
+    fn from(value: WorldStep) -> Self {
+        KingDirection::new(value)
+    }
+}
+
+impl From<KingDirection> for WorldStep {
+    fn from(value: KingDirection) -> Self {
+        value.dir
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
+#[get_copy = "pub"]
 pub struct SquareWithAdjacentDir {
     square: WorldSquare,
     direction: WorldStep,
@@ -1165,7 +1191,7 @@ pub struct SquareWithAdjacentDir {
 
 impl SquareWithAdjacentDir {
     pub fn new(square: WorldSquare, direction: WorldStep) -> SquareWithAdjacentDir {
-        assert!(KING_STEPS.contains(&direction));
+        assert!(is_king_step(direction));
         SquareWithAdjacentDir { square, direction }
     }
     pub fn tuple(&self) -> (WorldSquare, WorldStep) {
@@ -1661,6 +1687,7 @@ mod tests {
         assert_false!(same_side_of_line(line, high, on));
         assert_false!(same_side_of_line(line, low, high2));
     }
+
     #[test]
     fn test_halfplane_covers_expanded_unit_square() {
         let the_plane = HalfPlane::from_line_and_point_on_half_plane(
@@ -1672,6 +1699,7 @@ mod tests {
         assert_false!(the_plane.fully_covers_expanded_unit_square(0.51));
         assert_false!(the_plane.fully_covers_expanded_unit_square(100.0));
     }
+
     #[test]
     fn test_squares_on_board() {
         let size = BoardSize::new(5, 40);
@@ -1679,6 +1707,7 @@ mod tests {
         assert!(squares.contains(&point2(4, 20)));
         assert_false!(squares.contains(&point2(14, 2)));
     }
+
     #[test]
     fn test_horizontal_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
@@ -1686,6 +1715,7 @@ mod tests {
         let output_points = line_intersections_with_centered_unit_square(input_line);
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
     }
+
     #[test]
     fn test_vertical_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
@@ -1693,6 +1723,7 @@ mod tests {
         let output_points = line_intersections_with_centered_unit_square(input_line);
         assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
     }
+
     #[test]
     fn test_depth_of_point_in_half_plane() {
         let horizontal = HalfPlane::from_line_and_point_on_half_plane(

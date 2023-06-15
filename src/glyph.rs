@@ -231,7 +231,7 @@ impl Glyph {
         let mut glyphs = [
             Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
                 faced_direction,
-                "🢀🢂🢁🢃🢄🢅🢆🢇",
+                THICK_ARROWS,
             ))
             .with_transparent_bg(true),
             Glyph::transparent_glyph(),
@@ -305,14 +305,14 @@ impl Glyph {
     }
     pub fn char_is_fullwidth(c: char) -> bool {
         Glyph::char_is_chess(c)
-            || THICK_ARROWS.contains(&c)
+            || THICK_ARROWS.contains(c)
             || c == MOVE_AND_CAPTURE_SQUARE_CHARS[0]
             || c == CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS[0]
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
-    fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
-        assert!(KING_STEPS.contains(&dir));
+    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
+        assert!(is_king_step(dir));
         assert_eq!(arrow_string.chars().count(), 8);
 
         let arrow_string_direction_order = [
@@ -335,7 +335,7 @@ impl Glyph {
     }
     pub fn char_for_flying_arrow(dir: WorldStep) -> char {
         //"🡐🡒🡑🡓🡔🡕🡖🡗")
-        Glyph::extract_arrow_from_arrow_string(dir, "⭠⭢⭡⭣⭦⭧⭨⭩")
+        Glyph::extract_arrow_from_arrow_string(dir, THIN_TRIANGLE_ARROWS)
     }
 
     pub fn glyphs_for_flying_arrow(dir: WorldStep) -> DoubleGlyph {

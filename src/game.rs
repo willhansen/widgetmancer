@@ -1451,7 +1451,7 @@ impl Game {
     }
 
     pub fn place_arrow(&mut self, square: WorldSquare, direction: WorldStep) {
-        assert!(KING_STEPS.contains(&direction));
+        assert!(is_king_step(direction));
         self.place_piece(Piece::arrow(direction), square);
     }
 
