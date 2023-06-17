@@ -1055,9 +1055,9 @@ impl SquareWithOrthogonalDir {
             self.direction_vector(),
         )
     }
-    pub fn stepped_n(&self, n: u32) -> Self {
+    pub fn stepped_n(&self, n: i32) -> Self {
         SquareWithOrthogonalDir::new(
-            self.square + self.direction_vector() * n as i32,
+            self.square + self.direction_vector() * n,
             self.direction_vector(),
         )
     }

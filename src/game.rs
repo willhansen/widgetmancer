@@ -1704,9 +1704,9 @@ impl Game {
             entrance_step = exit_step.turned_back();
             exit_step = exit_step
                 .turned_left()
-                .stepped_n(side_length + 1)
+                .stepped_n(side_length as i32 + 1)
                 .turned_left()
-                .stepped_n(side_length)
+                .stepped_n(side_length as i32)
                 .turned_right();
         })
     }
@@ -3513,5 +3513,156 @@ mod tests {
             seen_glyphs.to_clean_string()
         );
         assert_eq!(seen_glyphs[0].character, '🢁');
+    }
+    #[test]
+    fn test_player_diagonal_step_around_adjacent_portal() {
+        for orthodir in ORTHOGONAL_STEPS {
+            [-1, 1].into_iter().for_each(|i| {
+                let otherdir = rotated_n_quarter_turns_counter_clockwise(orthodir, i);
+                let diagdir = orthodir + otherdir;
+
+                let mut game = set_up_10x10_game();
+                let start_square = point2(5, 5);
+                game.place_player(start_square);
+                game.place_single_sided_one_way_portal(
+                    SquareWithOrthogonalDir::from_square_and_dir(game.player_square(), orthodir),
+                    SquareWithOrthogonalDir::from_square_and_dir(
+                        game.player_square() + STEP_UP * 30,
+                        STEP_UP,
+                    ),
+                );
+                game.try_slide_player(diagdir).expect("slide");
+                assert_eq!(game.player_square(), start_square + diagdir);
+            });
+        }
+    }
+    #[test]
+    fn test_player_diagonal_step_into_off_adjacent_portal() {
+        for orthodir in ORTHOGONAL_STEPS {
+            for i in [-1, 1] {
+                let strafedir = rotated_n_quarter_turns_counter_clockwise(orthodir, i);
+                let diagdir = orthodir + strafedir;
+
+                let mut game = set_up_10x10_game();
+                let start_square = point2(5, 5);
+                game.place_player(start_square);
+                let far_square = game.player_square() + STEP_UP * 30;
+                game.place_single_sided_one_way_portal(
+                    SquareWithOrthogonalDir::from_square_and_dir(
+                        game.player_square() + strafedir,
+                        orthodir,
+                    ),
+                    SquareWithOrthogonalDir::from_square_and_dir(far_square, STEP_UP),
+                );
+                game.try_slide_player(diagdir).expect("slide");
+                assert_eq!(game.player_square(), far_square);
+            }
+        }
+    }
+    #[test]
+    fn test_player_diagonal_step_into_matching_convex_corner_portal() {
+        for left_orthodir in ORTHOGONAL_STEPS {
+            let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
+            let diagonaldir = left_orthodir + right_orthodir;
+            let mut game = set_up_10x10_game();
+            let start_square = point2(5, 5);
+            game.place_player(start_square);
+
+            let left_entrance = SquareWithOrthogonalDir::from_square_and_dir(
+                start_square + left_orthodir,
+                right_orthodir,
+            );
+            let exit_offset = 3;
+            let left_exit = left_entrance.stepped().strafed_left_n(exit_offset);
+            let right_entrance = SquareWithOrthogonalDir::from_square_and_dir(
+                start_square + right_orthodir,
+                left_orthodir,
+            );
+            let right_exit = right_entrance.stepped().stepped_n(exit_offset);
+
+            game.place_single_sided_one_way_portal(left_entrance, left_exit);
+            game.place_single_sided_one_way_portal(right_entrance, right_exit);
+
+            game.try_slide_player(diagonaldir).expect("should slide");
+            assert_eq!(game.player_square(), left_exit.square());
+        }
+    }
+    #[test]
+    fn test_player_diagonal_step_into_mismatched_convex_corner_portal() {
+        for left_orthodir in ORTHOGONAL_STEPS {
+            let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
+            let diagonaldir = left_orthodir + right_orthodir;
+            let mut game = set_up_10x10_game();
+            let start_square = point2(5, 5);
+            game.place_player(start_square);
+
+            let left_entrance = SquareWithOrthogonalDir::from_square_and_dir(
+                start_square + left_orthodir,
+                right_orthodir,
+            );
+            let exit_offset = 3;
+            let left_exit = left_entrance.stepped().strafed_left_n(exit_offset);
+            let right_entrance = SquareWithOrthogonalDir::from_square_and_dir(
+                start_square + right_orthodir,
+                left_orthodir,
+            );
+            let right_exit = right_entrance.stepped().strafed_right_n(exit_offset);
+
+            game.place_single_sided_one_way_portal(left_entrance, left_exit);
+            game.place_single_sided_one_way_portal(right_entrance, right_exit);
+
+            game.try_slide_player(diagonaldir)
+                .expect_err("should not slide");
+            assert_eq!(game.player_square(), start_square);
+        }
+    }
+    #[test]
+    fn test_player_diagonal_step_into_matching_concave_corner_portal() {
+        for left_orthodir in ORTHOGONAL_STEPS {
+            let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
+            let diagonaldir = left_orthodir + right_orthodir;
+            let mut game = set_up_10x10_game();
+            let start_square = point2(5, 5);
+            game.place_player(start_square);
+
+            let left_entrance =
+                SquareWithOrthogonalDir::from_square_and_dir(start_square, left_orthodir);
+            let exit_offset = 3;
+            let left_exit = left_entrance.stepped().strafed_right_n(exit_offset);
+            let right_entrance =
+                SquareWithOrthogonalDir::from_square_and_dir(start_square, right_orthodir);
+            let right_exit = right_entrance.stepped().stepped_n(exit_offset);
+
+            game.place_single_sided_one_way_portal(left_entrance, left_exit);
+            game.place_single_sided_one_way_portal(right_entrance, right_exit);
+
+            game.try_slide_player(diagonaldir).expect("should slide");
+            assert_eq!(game.player_square(), left_exit.strafed_right().square());
+        }
+    }
+    #[test]
+    fn test_player_diagonal_step_into_mismatched_concave_corner_portal() {
+        for left_orthodir in ORTHOGONAL_STEPS {
+            let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
+            let diagonaldir = left_orthodir + right_orthodir;
+            let mut game = set_up_10x10_game();
+            let start_square = point2(5, 5);
+            game.place_player(start_square);
+
+            let left_entrance =
+                SquareWithOrthogonalDir::from_square_and_dir(start_square, left_orthodir);
+            let exit_offset = 3;
+            let left_exit = left_entrance.stepped().stepped_n(exit_offset);
+            let right_entrance =
+                SquareWithOrthogonalDir::from_square_and_dir(start_square, right_orthodir);
+            let right_exit = right_entrance.stepped().stepped_n(exit_offset);
+
+            game.place_single_sided_one_way_portal(left_entrance, left_exit);
+            game.place_single_sided_one_way_portal(right_entrance, right_exit);
+
+            game.try_slide_player(diagonaldir)
+                .expect_err("should not slide");
+            assert_eq!(game.player_square(), start_square);
+        }
     }
 }
