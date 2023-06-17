@@ -186,7 +186,7 @@ impl Game {
             .multiple_portal_aware_steps(
                 SquareWithAdjacentDir::new(self.player_square(), direction),
                 num_squares,
-            )
+            )?
             .tuple();
         //self.raw_set_player_faced_direction(round_to_king_step(movement));
         self.raw_set_player_faced_direction(new_dir);
@@ -550,22 +550,24 @@ impl Game {
         old_arrows
             .iter()
             .for_each(|(&square, &dir): (&WorldSquare, &WorldStep)| {
-                let (next_square, next_dir) = self
-                    .portal_aware_single_step(SquareWithAdjacentDir::new(square, dir))
-                    .tuple();
-                if self.is_piece_at(next_square) {
-                    capture_squares.insert(next_square);
-                }
-                if !self.is_block_at(next_square)
-                    && self.square_is_on_board(next_square)
-                    && !arrow_midair_collisions.contains(&next_square)
+                if let Ok(next_pose) =
+                    self.portal_aware_single_step(SquareWithAdjacentDir::new(square, dir))
                 {
-                    let is_new_midair_collision = next_arrows.contains_key(&next_square);
-                    if is_new_midair_collision {
-                        next_arrows.remove(&next_square);
-                        arrow_midair_collisions.insert(next_square);
-                    } else {
-                        next_arrows.insert(next_square, next_dir);
+                    let (next_square, next_dir) = next_pose.tuple();
+                    if self.is_piece_at(next_square) {
+                        capture_squares.insert(next_square);
+                    }
+                    if !self.is_block_at(next_square)
+                        && self.square_is_on_board(next_square)
+                        && !arrow_midair_collisions.contains(&next_square)
+                    {
+                        let is_new_midair_collision = next_arrows.contains_key(&next_square);
+                        if is_new_midair_collision {
+                            next_arrows.remove(&next_square);
+                            arrow_midair_collisions.insert(next_square);
+                        } else {
+                            next_arrows.insert(next_square, next_dir);
+                        }
                     }
                 }
             });
@@ -895,11 +897,14 @@ impl Game {
             let distance = i + 1;
             // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
             let square = if is_king_step(repeating_step.stepp()) {
-                self.multiple_portal_aware_steps(
+                if let Ok(end_pose) = self.multiple_portal_aware_steps(
                     SquareWithAdjacentDir::new(start_square, repeating_step.stepp()),
                     distance,
-                )
-                .square()
+                ) {
+                    end_pose.square()
+                } else {
+                    break;
+                }
             } else {
                 start_square + repeating_step.stepp() * distance as i32
             };
@@ -1313,13 +1318,15 @@ impl Game {
         let spear_length = 5;
 
         for i in 1..=spear_length {
-            let target_square = self
-                .multiple_portal_aware_steps(self.player_pose(), i)
-                .square();
-            if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
+            if let Ok(target_pose) = self.multiple_portal_aware_steps(self.player_pose(), i) {
+                let target_square = target_pose.square();
+                if !self.square_is_on_board(target_square) || self.is_block_at(target_square) {
+                    break;
+                }
+                self.try_capture_piece_at(target_square).ok();
+            } else {
                 break;
             }
-            self.try_capture_piece_at(target_square).ok();
         }
 
         self.graphics.start_spear_attack_animation(
@@ -1790,14 +1797,18 @@ impl Game {
         }
     }
 
-    pub fn portal_aware_single_step(&self, start: SquareWithAdjacentDir) -> SquareWithAdjacentDir {
+    pub fn portal_aware_single_step(
+        &self,
+        start: SquareWithAdjacentDir,
+    ) -> Result<SquareWithAdjacentDir, ()> {
         self.portal_geometry.portal_aware_single_step(start)
     }
+
     pub fn multiple_portal_aware_steps(
         &self,
         start: SquareWithAdjacentDir,
         num_steps: u32,
-    ) -> SquareWithAdjacentDir {
+    ) -> Result<SquareWithAdjacentDir, ()> {
         self.portal_geometry
             .multiple_portal_aware_steps(start, num_steps)
     }
@@ -2485,7 +2496,7 @@ mod tests {
         let exit_step = SquareWithOrthogonalDir::new(point2(5, 2), STEP_RIGHT);
         game.place_single_sided_one_way_portal(entrance_step, exit_step);
         assert_eq!(
-            game.portal_aware_single_step(entrance_step.into()),
+            game.portal_aware_single_step(entrance_step.into()).unwrap(),
             exit_step.into()
         );
     }
@@ -2499,7 +2510,7 @@ mod tests {
         game.place_single_sided_one_way_portal(start, mid);
         game.place_single_sided_one_way_portal(mid, end);
         assert_eq!(
-            game.multiple_portal_aware_steps(start.into(), 2),
+            game.multiple_portal_aware_steps(start.into(), 2).unwrap(),
             end.into()
         );
     }
@@ -2897,7 +2908,7 @@ mod tests {
 
         game.try_slide_player_by_direction(STEP_RIGHT, 1).ok();
         assert_eq!(
-            game.portal_aware_single_step(entrance_step.into()),
+            game.portal_aware_single_step(entrance_step.into()).unwrap(),
             exit_step.into()
         );
 

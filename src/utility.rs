@@ -1315,6 +1315,14 @@ pub fn number_to_hue_rotation(x: f32, period: f32) -> RGB8 {
     hue_to_rgb(x * 360.0 / period)
 }
 
+pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
+    match i {
+        0 => WorldStep::new(step.x, 0),
+        1 => WorldStep::new(0, step.y),
+        _ => panic!("Too many dimensions: {}", i),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
