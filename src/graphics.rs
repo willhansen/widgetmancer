@@ -51,7 +51,7 @@ use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
-    reversed, squares_on_board, STEP_RIGHT,
+    reversed, squares_on_board, KingWorldStep, OrthogonalWorldStep, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -307,7 +307,7 @@ impl Graphics {
         self.draw_glyphs(glyphs_to_draw);
     }
 
-    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: WorldStep) {
+    pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: KingWorldStep) {
         let drawable = ArrowDrawable::new(faced_direction.into(), THICK_ARROWS, PLAYER_COLOR);
         self.draw_drawable_to_draw_buffer(world_pos, drawable);
     }
@@ -360,7 +360,7 @@ impl Graphics {
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
         self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_upgrade(upgrade));
     }
-    pub fn draw_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
+    pub fn draw_arrow(&mut self, square: WorldSquare, dir: KingWorldStep) {
         self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_flying_arrow(dir))
     }
 
@@ -470,7 +470,7 @@ impl Graphics {
     pub fn start_spear_attack_animation(
         &mut self,
         start_square: WorldSquare,
-        direction: WorldStep,
+        direction: KingWorldStep,
         range: u32,
     ) {
         self.active_animations

@@ -220,8 +220,9 @@ impl FieldOfView {
         }
     }
     pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
-        Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_dir(
-            new_center, STEP_UP,
+        Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
+            new_center,
+            STEP_UP.into(),
         ))
     }
     pub fn root_square(&self) -> WorldSquare {
@@ -774,7 +775,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .filter(|portal| {
                     unit_vector_from_angle(view_arc.center_angle())
                         .cast_unit()
-                        .dot(portal.entrance().direction_vector().to_f32())
+                        .dot(portal.entrance().direction().step().to_f32())
                         > 0.0
                 })
                 .collect();
@@ -787,7 +788,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                         portal.clone(),
                         AngleInterval::from_square_face(
                             relative_square,
-                            portal.entrance().direction_vector(),
+                            portal.entrance().direction(),
                         ),
                     )
                 })
@@ -885,7 +886,7 @@ pub fn single_octant_field_of_view(
     let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_dir(center_square, STEP_UP),
+        SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP.into()),
         radius,
         octant,
         AngleInterval::from_octant(octant),
@@ -1513,8 +1514,8 @@ mod tests {
         let exit_square = center + STEP_LEFT * 5;
 
         portal_geometry.create_portal(
-            SquareWithOrthogonalDir::new(entrance_square, STEP_RIGHT),
-            SquareWithOrthogonalDir::new(exit_square, STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_worldstep(entrance_square, STEP_RIGHT.into()),
+            SquareWithOrthogonalDir::from_square_and_worldstep(exit_square, STEP_DOWN.into()),
         );
 
         let clockwise_end_in_degrees = 0.1;
@@ -1527,7 +1528,7 @@ mod tests {
         let mut fov_result = field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portal_geometry,
-            SquareWithOrthogonalDir::from_square_and_dir(center, STEP_UP),
+            SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP.into()),
             radius,
             Octant::new(0),
             view_arc,
@@ -1587,8 +1588,14 @@ mod tests {
     fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
-        let portal_entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT, STEP_RIGHT);
-        let portal_exit = SquareWithOrthogonalDir::new(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+        let portal_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_RIGHT,
+            STEP_RIGHT.into(),
+        );
+        let portal_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_DOWN_LEFT * 15,
+            STEP_DOWN.into(),
+        );
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1616,8 +1623,14 @@ mod tests {
     fn test_one_octant_with_one_portal() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
-        let portal_entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT, STEP_RIGHT);
-        let portal_exit = SquareWithOrthogonalDir::new(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+        let portal_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_RIGHT,
+            STEP_RIGHT.into(),
+        );
+        let portal_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_DOWN_LEFT * 15,
+            STEP_DOWN.into(),
+        );
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1640,11 +1653,13 @@ mod tests {
 
     #[test]
     fn test_sub_fov_view_transform() {
-        let sub_center = SquareWithOrthogonalDir::from_square_and_dir(point2(1, 0), STEP_RIGHT);
+        let sub_center =
+            SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT.into());
         let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center.square());
         sub_fov.root_square_with_direction = sub_center;
 
-        let main_center = SquareWithOrthogonalDir::from_square_and_dir(point2(50, 0), STEP_UP);
+        let main_center =
+            SquareWithOrthogonalDir::from_square_and_step(point2(50, 0), STEP_UP.into());
         let mut main_fov = FieldOfView::new_empty_fov_at(main_center.square());
         main_fov.root_square_with_direction = main_center;
 
@@ -1667,7 +1682,7 @@ mod tests {
 
     #[test]
     fn test_square_fully_covered_by_face() {
-        let view_arc_of_face = AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT);
+        let view_arc_of_face = AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT.into());
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
@@ -1676,7 +1691,7 @@ mod tests {
 
     #[test]
     fn test_square_fully_not_covered_by_adjacent() {
-        let view_arc_of_face = AngleInterval::from_square_face(STEP_UP_RIGHT, STEP_RIGHT);
+        let view_arc_of_face = AngleInterval::from_square_face(STEP_UP_RIGHT, STEP_RIGHT.into());
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
@@ -1718,8 +1733,9 @@ mod tests {
 
     #[test]
     fn test_portal_pose_transform() {
-        let entrance = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 4), STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::from_square_and_dir(point2(50, 70), STEP_DOWN);
+        let entrance =
+            SquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT.into());
+        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN.into());
         let portal = Portal::new(entrance, exit);
 
         let transform = portal.get_transform();
@@ -1905,13 +1921,15 @@ mod tests {
         let quarter_turns = 3;
 
         let sub_fov_direction = rotated_n_quarter_turns_counter_clockwise(
-            fov.root_square_with_direction.direction_vector(),
+            fov.root_square_with_direction.direction().step(),
             quarter_turns,
         );
-        let mut sub_fov = FieldOfView::new_empty_fov_with_root(SquareWithOrthogonalDir::new(
-            sub_center,
-            sub_fov_direction,
-        ));
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root(
+            SquareWithOrthogonalDir::from_square_and_worldstep(
+                sub_center,
+                sub_fov_direction.into(),
+            ),
+        );
 
         let rel_square = STEP_DOWN_LEFT * 3;
         let rotated_rel_square =
@@ -2095,9 +2113,10 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance_left_end = SquareWithOrthogonalDir::new(center, STEP_RIGHT);
+        let entrance_left_end =
+            SquareWithOrthogonalDir::from_square_and_worldstep(center, STEP_RIGHT.into());
         let portal_step = STEP_RIGHT * 2;
-        let exit_left_end = SquareWithOrthogonalDir::new(
+        let exit_left_end = SquareWithOrthogonalDir::from_square_and_worldstep(
             entrance_left_end.square() + STEP_RIGHT + portal_step,
             STEP_RIGHT,
         );
@@ -2145,8 +2164,14 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance = SquareWithOrthogonalDir::new(center + STEP_RIGHT * 2 + STEP_UP, STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::new(entrance.square() + STEP_UP_LEFT * 50, STEP_UP);
+        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            center + STEP_RIGHT * 2 + STEP_UP,
+            STEP_RIGHT,
+        );
+        let exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            entrance.square() + STEP_UP_LEFT * 50,
+            STEP_UP,
+        );
 
         (0..2).for_each(|i| {
             // TODO: why does this need to be double sided AND two way?

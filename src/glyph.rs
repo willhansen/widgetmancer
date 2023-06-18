@@ -226,7 +226,7 @@ impl Glyph {
     }
 
     #[deprecated(note = "Use ArrowDrawable instead")]
-    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> DoubleGlyph {
+    pub fn get_glyphs_for_player(faced_direction: KingWorldStep) -> DoubleGlyph {
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
 
         let mut glyphs = [
@@ -312,8 +312,7 @@ impl Glyph {
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
-    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
-        assert!(is_king_step(dir));
+    pub fn extract_arrow_from_arrow_string(dir: KingWorldStep, arrow_string: &str) -> char {
         assert_eq!(arrow_string.chars().count(), 8);
 
         let arrow_string_direction_order = [
@@ -329,17 +328,17 @@ impl Glyph {
 
         let index_of_char = arrow_string_direction_order
             .iter()
-            .position(|&arrow_dir| dir == arrow_dir)
+            .position(|&arrow_dir| dir.step() == arrow_dir)
             .unwrap();
 
         arrow_string.chars().nth(index_of_char).unwrap()
     }
-    pub fn char_for_flying_arrow(dir: WorldStep) -> char {
+    pub fn char_for_flying_arrow(dir: KingWorldStep) -> char {
         //"🡐🡒🡑🡓🡔🡕🡖🡗")
         Glyph::extract_arrow_from_arrow_string(dir, THIN_TRIANGLE_ARROWS)
     }
 
-    pub fn glyphs_for_flying_arrow(dir: WorldStep) -> DoubleGlyph {
+    pub fn glyphs_for_flying_arrow(dir: KingWorldStep) -> DoubleGlyph {
         [
             Glyph::fg_only(Glyph::char_for_flying_arrow(dir), RED),
             Glyph::transparent_glyph(),

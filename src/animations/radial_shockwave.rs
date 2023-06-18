@@ -1,3 +1,9 @@
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
+
+use euclid::{vec2, Length};
+use rgb::RGB8;
+
 use crate::animations::static_board::StaticBoard;
 use crate::animations::Animation;
 use crate::glyph::floating_square;
@@ -10,10 +16,6 @@ use crate::utility::coordinate_frame_conversions::{
 use crate::utility::{
     is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I, STEP_RIGHT,
 };
-use euclid::{vec2, Length};
-use rgb::RGB8;
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct RadialShockwave {
@@ -119,11 +121,13 @@ impl Animation for RadialShockwave {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::animations::recoiling_board::RecoilingBoardAnimation;
-    use crate::glyph::glyph_constants::RED;
     use euclid::point2;
     use ntest::assert_about_eq;
+
+    use crate::animations::recoiling_board::RecoilingBoardAnimation;
+    use crate::glyph::glyph_constants::RED;
+
+    use super::*;
 
     #[test]
     fn test_triangle_wave() {

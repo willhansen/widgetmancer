@@ -14,8 +14,8 @@ use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    adjacent_king_steps, get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS,
-    STEP_RIGHT,
+    adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
+    ORTHOGONAL_STEPS, STEP_RIGHT,
 };
 use crate::{
     get_4_rotations_of, get_8_octants_of, rotated_n_quarter_turns_counter_clockwise, Glyph,
@@ -113,7 +113,7 @@ impl NStep {
 pub struct Piece {
     pub piece_type: PieceType,
     pub faction: Faction,
-    faced_direction: Option<WorldStep>,
+    faced_direction: Option<KingWorldStep>,
 }
 
 impl Piece {
@@ -135,14 +135,14 @@ impl Piece {
     pub fn king() -> Piece {
         Piece::from_type(King)
     }
-    pub fn arrow(dir: WorldStep) -> Piece {
+    pub fn arrow(dir: KingWorldStep) -> Piece {
         let mut piece = Piece::from_type(Arrow);
         piece.set_faced_direction(dir);
         piece.faction = Faction::Unaligned;
         piece
     }
 
-    pub fn faced_direction(&self) -> WorldStep {
+    pub fn faced_direction(&self) -> KingWorldStep {
         if let Some(dir) = self.faced_direction {
             dir
         } else {
@@ -150,7 +150,7 @@ impl Piece {
         }
     }
 
-    pub fn set_faced_direction(&mut self, dir: WorldStep) {
+    pub fn set_faced_direction(&mut self, dir: KingWorldStep) {
         assert!(self.can_turn());
         self.faced_direction = Some(dir);
     }
@@ -164,10 +164,13 @@ impl Piece {
         Piece {
             piece_type: self.piece_type,
             faction: self.faction,
-            faced_direction: Some(rotated_n_quarter_turns_counter_clockwise(
-                self.faced_direction(),
-                quarter_turns,
-            )),
+            faced_direction: Some(
+                rotated_n_quarter_turns_counter_clockwise(
+                    self.faced_direction().into(),
+                    quarter_turns,
+                )
+                .into(),
+            ),
         }
     }
 
@@ -224,7 +227,7 @@ impl Piece {
             piece_type,
             faction,
             faced_direction: if TURNING_PIECE_TYPES.contains(&piece_type) {
-                Some(STEP_RIGHT)
+                Some(STEP_RIGHT.into())
             } else {
                 None
             },
@@ -240,7 +243,7 @@ impl Piece {
             OmniDirectionalPawn | OmniDirectionalSoldier => ORTHOGONAL_STEPS.map(NStep::one).into(),
             King => KING_STEPS.map(NStep::one).into(),
             Knight => NStep::one(WorldStep::new(1, 2)).octant_symmetries(),
-            TurningPawn | TurningSoldier => vec![NStep::one(self.faced_direction.unwrap())],
+            TurningPawn | TurningSoldier => vec![NStep::one(self.faced_direction.unwrap().into())],
             Bishop => DIAGONAL_STEPS.map(NStep::dir).into(),
             Rook => ORTHOGONAL_STEPS.map(NStep::dir).into(),
             Queen => KING_STEPS.map(NStep::dir).into(),
@@ -251,7 +254,7 @@ impl Piece {
     pub(crate) fn relative_captures(&self) -> NStepList {
         match self.piece_type {
             OmniDirectionalPawn => DIAGONAL_STEPS.map(NStep::one).into(),
-            TurningPawn => adjacent_king_steps(self.faced_direction.unwrap())
+            TurningPawn => adjacent_king_steps(self.faced_direction.unwrap().into())
                 .into_iter()
                 .map(NStep::one)
                 .collect(),

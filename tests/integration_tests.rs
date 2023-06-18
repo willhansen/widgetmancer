@@ -13,7 +13,8 @@ use rust_roguelike::glyph::{DoubleGlyph, DoubleGlyphFunctions};
 use rust_roguelike::piece::{Piece, PieceType};
 use rust_roguelike::utility::coordinate_frame_conversions::*;
 use rust_roguelike::utility::{
-    DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT, UP_I,
+    DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP,
+    STEP_UP_RIGHT, UP_I,
 };
 use rust_roguelike::utils_for_tests::*;
 
@@ -32,7 +33,7 @@ fn test_walk_in_circle() {
 fn test_player_drawn_to_screen() {
     let mut game = set_up_game_with_player();
     let start_pos = game.player_square();
-    game.raw_set_player_faced_direction(RIGHT_I.cast_unit());
+    game.raw_set_player_faced_direction(STEP_RIGHT.into());
     game.draw_headless_now();
     let graphics = game.borrow_graphics_mut();
     let drawn_glyphs = graphics.screen.get_screen_glyphs_at_world_square(start_pos);
@@ -180,7 +181,7 @@ fn test_move_to_turn() {
     game.try_slide_player(UP_I.cast_unit()).expect("step");
     assert_eq!(
         game.player_faced_direction(),
-        UP_I.cast_unit(),
+        STEP_UP.into(),
         "turn with step"
     );
 
@@ -188,7 +189,7 @@ fn test_move_to_turn() {
         .expect("step");
     assert_eq!(
         game.player_faced_direction(),
-        (DOWN_I + RIGHT_I).cast_unit(),
+        STEP_DOWN_RIGHT.into(),
         "only face directions with length one"
     );
 
@@ -199,7 +200,8 @@ fn test_move_to_turn() {
 #[test]
 fn test_visible_laser() {
     let mut game = set_up_game_with_player();
-    let inspection_square: WorldSquare = game.player_square() + game.player_faced_direction();
+    let inspection_square: WorldSquare =
+        game.player_square() + game.player_faced_direction().step();
     game.do_player_shoot_sniper();
     game.draw_headless_now();
 
@@ -589,13 +591,13 @@ fn test_draw_pathfind_paths() {
 #[test]
 fn test_turn_if_move_into_wall() {
     let mut game = set_up_game_with_player();
-    game.raw_set_player_faced_direction(STEP_UP);
+    game.raw_set_player_faced_direction(STEP_UP.into());
     game.place_block(game.player_square() + STEP_RIGHT);
 
     let start_square = game.player_square();
     game.try_slide_player(STEP_RIGHT).ok();
 
-    assert_eq!(game.player_faced_direction(), STEP_RIGHT);
+    assert_eq!(game.player_faced_direction(), STEP_RIGHT.into());
     assert_eq!(game.player_square(), start_square);
 }
 

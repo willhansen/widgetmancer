@@ -1,3 +1,9 @@
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
+
+use euclid::Length;
+use rgb::RGB8;
+
 use crate::animations::static_board::StaticBoard;
 use crate::animations::Animation;
 use crate::glyph::Glyph;
@@ -6,16 +12,15 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
-use crate::utility::{is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I};
-use euclid::Length;
-use rgb::RGB8;
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
+use crate::utility::{
+    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, OrthogonalWorldStep,
+    RIGHT_I,
+};
 
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
-    orthogonal_shot_direction: WorldStep,
+    orthogonal_shot_direction: OrthogonalWorldStep,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
 }
@@ -42,7 +47,7 @@ impl RecoilingBoardAnimation {
 
         RecoilingBoardAnimation {
             board_size,
-            orthogonal_shot_direction: orthogonalized_step,
+            orthogonal_shot_direction: orthogonalized_step.into(),
             start_time: Instant::now(),
             floor_color_enum,
         }
@@ -110,9 +115,8 @@ impl Animation for RecoilingBoardAnimation {
 
         let mut glyph_map = WorldSquareGlyphMap::new();
 
-        assert!(is_orthogonal_king_step(self.orthogonal_shot_direction));
         let offset_vector: WorldMove =
-            self.orthogonal_shot_direction.to_f32() * offset_distance_in_squares;
+            self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
 
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {

@@ -18,7 +18,7 @@ use crate::utility::coordinate_frame_conversions::{
     local_square_half_plane_to_local_character_half_plane, WorldStep,
 };
 use crate::utility::{
-    rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingDirection,
+    rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
     QuarterTurnsAnticlockwise,
 };
 
@@ -259,13 +259,13 @@ pub struct HextantDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct ArrowDrawable {
-    direction: KingDirection,
+    direction: KingWorldStep,
     arrow_string: String,
     text_drawable: TextDrawable,
 }
 
 impl ArrowDrawable {
-    pub fn new(direction: KingDirection, arrow_string: &str, color: RGB8) -> Self {
+    pub fn new(direction: KingWorldStep, arrow_string: &str, color: RGB8) -> Self {
         let arrow_char = Glyph::extract_arrow_from_arrow_string(direction.into(), arrow_string);
         let text_drawable = TextDrawable::new(&(arrow_char.to_string() + " "), color, BLACK, true);
         ArrowDrawable {
@@ -390,13 +390,14 @@ mod tests {
             PartialVisibilityDrawable::from_partially_visible_drawable(&base, visibility);
         assert_eq!(top_half.to_glyphs().to_clean_string(), "🬎🬎");
     }
+
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
         let character = d.rotated(1).to_glyphs()[0].character;
         assert_eq!(
             character,
-            Glyph::extract_arrow_from_arrow_string(STEP_UP, THICK_ARROWS)
+            Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
         );
     }
 }

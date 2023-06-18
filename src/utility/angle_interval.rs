@@ -15,8 +15,8 @@ use crate::fov_stuff::SquareVisibility;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, QuarterTurnsAnticlockwise, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise, ORTHOGONAL_STEPS,
+    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, CopyGetters)]
@@ -92,14 +92,18 @@ impl AngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_square_face(relative_square: WorldStep, face_direction: WorldStep) -> Self {
-        assert!(ORTHOGONAL_STEPS.contains(&face_direction));
-
+    pub fn from_square_face(
+        relative_square: WorldStep,
+        face_direction: OrthogonalWorldStep,
+    ) -> Self {
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.to_f32() / 2.0;
+        let face_center = square_center + face_direction.step().to_f32() / 2.0;
         let face_corners = [1, -1].map(|sign| {
             face_center
-                + rotated_n_quarter_turns_counter_clockwise(face_direction.to_f32() / 2.0, sign)
+                + rotated_n_quarter_turns_counter_clockwise(
+                face_direction.step().to_f32() / 2.0,
+                sign,
+                )
         });
 
         let center_angle = better_angle_from_x_axis(face_center);
@@ -517,10 +521,11 @@ impl Display for AngleIntervalSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
     use ntest::{assert_about_eq, assert_false};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
+
+    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -546,6 +551,7 @@ mod tests {
             "commutative"
         );
     }
+
     #[test]
     fn test_partial_overlap() {
         let arc_a = AngleInterval::from_degrees(0.0, 20.0);
@@ -568,12 +574,14 @@ mod tests {
             "should not count full overlaps"
         );
     }
+
     #[test]
     fn test_partial_overlap_on_both_ends() {
         let wrapping_angle = AngleInterval::from_degrees(45.0, 0.0);
         let zero_center_angle = AngleInterval::from_degrees(-45.0, 45.0);
         assert!(wrapping_angle.partially_overlaps_other_while_including_edges(zero_center_angle));
     }
+
     #[test]
     fn num_contained_edges_is_symmetric__weird_wrapping_case() {
         let arc_a = AngleInterval::from_degrees(45.0, 0.0);
@@ -583,6 +591,7 @@ mod tests {
             arc_b.num_contained_or_touching_edges(arc_a)
         );
     }
+
     #[test]
     fn num_contained_edges_is_symmetric__regular_case() {
         let arc_a = AngleInterval::from_degrees(0.0, 20.0);
@@ -667,6 +676,7 @@ mod tests {
             "from overlap"
         );
     }
+
     #[test]
     #[should_panic]
     fn test_angle_interval_intersection__no_overlap() {
@@ -851,7 +861,7 @@ mod tests {
             interval_set.most_overlapped_edge_of_set(single_interval),
             Some(DirectionalAngularEdge {
                 angle: Angle::degrees(0.0),
-                is_clockwise_edge: true
+                is_clockwise_edge: true,
             })
         );
     }
@@ -870,10 +880,11 @@ mod tests {
             interval_set.most_overlapped_edge_of_set(single_interval),
             Some(DirectionalAngularEdge {
                 angle: Angle::degrees(20.0),
-                is_clockwise_edge: false
+                is_clockwise_edge: false,
             })
         );
     }
+
     #[test]
     fn test_center_angle_of_interval() {
         assert_about_eq!(
@@ -895,6 +906,7 @@ mod tests {
             180.0
         );
     }
+
     #[test]
     fn test_angle_interval_width() {
         assert_about_eq!(
@@ -934,6 +946,7 @@ mod tests {
         assert_about_eq!(arc.clockwise_end.to_degrees(), -135.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), -45.0);
     }
+
     #[test]
     fn test_split_interval_around_interval() {
         let new_arcs = assert_eq!(
@@ -945,6 +958,7 @@ mod tests {
             ]
         );
     }
+
     #[test]
     fn test_interval_subtraction__touching_from_inside() {
         let new_arcs = assert_eq!(
@@ -958,37 +972,40 @@ mod tests {
     fn test_partial_overlap_includes_almost_peaking_out() {
         assert!(AngleInterval::from_degrees(10.0, 20.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
-                10.0, 15.0
+                10.0, 15.0,
             )));
         assert!(AngleInterval::from_degrees(10.0, 20.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
-                15.0, 20.0
+                15.0, 20.0,
             )));
         assert!(AngleInterval::from_degrees(10.0, 20.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
-                10.0, 20.0
+                10.0, 20.0,
             )));
     }
+
     #[test]
     fn test_partial_overlap_includes_almost_peaking_out__wraparound_case() {
         assert!(AngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
-                225.0, 315.0
+                225.0, 315.0,
             )));
     }
+
     #[test]
     fn test_angle_wraparound_invariance() {
         assert!(AngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
-                280.0, 315.0
+                280.0, 315.0,
             )));
 
         assert!(AngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
                 280.0 - 360.0,
-                315.0 - 360.0
+                315.0 - 360.0,
             )));
     }
+
     #[test]
     fn test_most_overlapped_edge_of_arc() {
         assert_eq!(
@@ -997,21 +1014,23 @@ mod tests {
             DirectionalAngularEdge::new(Angle::degrees(90.0), false)
         );
     }
+
     #[test]
     fn test_arc_from_square_face_is_smallish() {
         ORTHOGONAL_STEPS.into_iter().for_each(|step| {
             assert!(
-                AngleInterval::from_square_face(vec2(3, 6), step)
+                AngleInterval::from_square_face(vec2(3, 6), step.into())
                     .width()
                     .to_degrees()
                     < 45.0
             )
         });
     }
+
     #[test]
     fn test_arc_from_square_face__observed_failure_at_right_face_of_one_block_right() {
         assert_about_eq!(
-            AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT)
+            AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT.into())
                 .anticlockwise_end
                 .to_degrees(),
             AngleInterval::from_square(STEP_RIGHT * 2)
@@ -1019,6 +1038,7 @@ mod tests {
                 .to_degrees()
         );
     }
+
     #[test]
     fn test_arc_at_least_fully_overlap() {
         let cw = Angle::degrees(5.0);
@@ -1058,6 +1078,7 @@ mod tests {
         assert_false!(arc.at_least_fully_overlaps(arc_retract_cw.complement()));
         assert_false!(arc.at_least_fully_overlaps(arc_retract_ccw.complement()));
     }
+
     #[test]
     fn test_arc_exact_touch() {
         let cw = Angle::degrees(5.0);
@@ -1078,6 +1099,7 @@ mod tests {
         assert_false!(arc.exactly_touches_arc(arc));
         assert!(arc.exactly_touches_arc(arc.complement()))
     }
+
     #[test]
     fn test_angle_interval_from_octant() {
         // Are the exact values really important?
@@ -1108,6 +1130,7 @@ mod tests {
                 );
             })
     }
+
     #[test]
     fn test_overlap_at_least_this_much() {
         let arc1 = AngleInterval::from_degrees(0.0, 90.0);
@@ -1120,7 +1143,7 @@ mod tests {
         ));
         assert!(arc1.overlaps_other_by_at_least_this_much(
             arc2.rotated(Angle::degrees(-5.1)),
-            Angle::degrees(5.0)
+            Angle::degrees(5.0),
         ));
         assert_false!(arc1.overlaps_other_by_at_least_this_much(
             arc2.rotated(Angle::degrees(5.1)),

@@ -12,6 +12,7 @@ pub struct CharacterGridInWorldFrame;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInLocalCharacterFrame;
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInLocalSquareFrame;
 
@@ -133,6 +134,7 @@ pub fn local_square_point_to_local_character_point(
         };
     world_point_to_local_character_point(world_point, ref_character_square)
 }
+
 // TODO: make this more general
 pub fn world_half_plane_to_local_square_half_plane(
     world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
@@ -140,6 +142,7 @@ pub fn world_half_plane_to_local_square_half_plane(
 ) -> HalfPlane<f32, SquareGridInLocalSquareFrame> {
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
+
 pub fn local_square_half_plane_to_local_character_half_plane(
     square_half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
     character_index_in_square: usize,

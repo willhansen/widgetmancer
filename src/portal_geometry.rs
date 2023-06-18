@@ -43,9 +43,9 @@ impl RigidTransform {
         let end_square = revolve_square(pose.square(), self.start_pose.square(), self.rotation())
             + self.translation();
 
-        let end_direction = self.rotation().rotate_vector(pose.direction_vector());
+        let end_direction = self.rotation().rotate_vector(pose.direction().step());
 
-        SquareWithOrthogonalDir::from_square_and_dir(end_square, end_direction)
+        SquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
     }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
@@ -75,8 +75,8 @@ impl Eq for RigidTransform {}
 impl Default for RigidTransform {
     fn default() -> Self {
         RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_dir(point2(0, 0), STEP_RIGHT),
-            SquareWithOrthogonalDir::from_square_and_dir(point2(0, 0), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
         )
     }
 }
@@ -162,19 +162,19 @@ impl PortalGeometry {
             )
         } else {
             let diagonal_step = start.direction();
-            let x_step = WorldStep::new(diagonal_step.x, 0);
-            let y_step = WorldStep::new(0, diagonal_step.y);
+            let x_step = WorldStep::new(diagonal_step.step().x, 0);
+            let y_step = WorldStep::new(0, diagonal_step.step().y);
             let start_square = start.square();
             let x_dir_square = start_square + x_step;
             let y_dir_square = start_square + y_step;
             let first_x_entrance =
-                SquareWithOrthogonalDir::from_square_and_dir(start_square, x_step);
+                SquareWithOrthogonalDir::from_square_and_step(start_square, x_step);
             let second_x_entrance =
-                SquareWithOrthogonalDir::from_square_and_dir(x_dir_square, y_step);
+                SquareWithOrthogonalDir::from_square_and_step(x_dir_square, y_step);
             let first_y_entrance =
-                SquareWithOrthogonalDir::from_square_and_dir(start_square, y_step);
+                SquareWithOrthogonalDir::from_square_and_step(start_square, y_step);
             let second_y_entrance =
-                SquareWithOrthogonalDir::from_square_and_dir(y_dir_square, x_step);
+                SquareWithOrthogonalDir::from_square_and_step(y_dir_square, x_step);
 
             let maybe_first_x_portal: Option<Portal> =
                 self.get_portal_by_entrance(first_x_entrance);
@@ -189,9 +189,9 @@ impl PortalGeometry {
             if let Some(first_x_portal) = maybe_first_x_portal && let Some(first_y_portal) = maybe_first_y_portal {
                 if first_x_portal.is_coherent_with(&first_y_portal) {
                     // TODO: account for other second portals on the other side of the first ones.
-                    let dest_square = first_x_portal.exit.square() + first_y_portal.exit.direction_vector();
-                    let dest_dir = first_x_portal.exit.direction_vector() + first_y_portal.exit.direction_vector();
-                    Ok(SquareWithAdjacentDir::new(dest_square, dest_dir))
+                    let dest_square = first_x_portal.exit.square() + first_y_portal.exit.direction().step();
+                    let dest_dir = first_x_portal.exit.direction().step() + first_y_portal.exit.direction().step();
+                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
                 } else {
                     // Can't walk through a portal corner that goes to two different places
                     Err(())
@@ -202,8 +202,8 @@ impl PortalGeometry {
                 if let Some(second_x_portal) = maybe_second_x_portal && let Some(second_y_portal) = maybe_second_y_portal {
                     if second_x_portal.is_coherent_with(&second_y_portal) {
                         let dest_square = second_x_portal.exit.square();
-                        let dest_dir = second_x_portal.exit.direction_vector() + second_y_portal.exit.direction_vector();
-                        Ok(SquareWithAdjacentDir::new(dest_square, dest_dir))
+                        let dest_dir = second_x_portal.exit.direction().step() + second_y_portal.exit.direction().step();
+                        Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
                     } else {
                         // Can't step through mismatched corner
                         Err(())
@@ -211,28 +211,27 @@ impl PortalGeometry {
                 } else if let Some(second_x_portal) = maybe_second_x_portal && maybe_second_y_portal.is_none() {
                     // if the second portal is only on the x side, the player steps in the y direction to go through it, but then they need to go left or right on the other side to get to the real destination.
                     // step through, but turn left or right?
-                    let y_dir_to_x_dir_is_left =rotated_n_quarter_turns_counter_clockwise(y_step, 1) == x_step;
+                    let y_dir_to_x_dir_is_left = rotated_n_quarter_turns_counter_clockwise(y_step, 1) == x_step;
 
-                    let turn_after_portal = if y_dir_to_x_dir_is_left {1} else {-1};
+                    let turn_after_portal = if y_dir_to_x_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_x_portal.exit.direction_vector(), turn_after_portal);
+                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_x_portal.exit.direction().step(), turn_after_portal);
 
                     let dest_square = second_x_portal.exit.square();
-                    let dest_dir = second_x_portal.exit.direction_vector() + sideways_dir_after_portal;
+                    let dest_dir = second_x_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithAdjacentDir::new(dest_square, dest_dir))
-
+                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
                 } else if let Some(second_y_portal) = maybe_second_y_portal && maybe_second_x_portal.is_none() {
-                    let x_dir_to_y_dir_is_left =rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
+                    let x_dir_to_y_dir_is_left = rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
 
-                    let turn_after_portal = if x_dir_to_y_dir_is_left {1} else {-1};
+                    let turn_after_portal = if x_dir_to_y_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_y_portal.exit.direction_vector(), turn_after_portal);
+                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_y_portal.exit.direction().step(), turn_after_portal);
 
                     let dest_square = second_y_portal.exit.square();
-                    let dest_dir = second_y_portal.exit.direction_vector() + sideways_dir_after_portal;
+                    let dest_dir = second_y_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithAdjacentDir::new(dest_square, dest_dir))
+                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
                 } else {
                     // it's neither
                     Ok(start.stepped())
@@ -289,11 +288,11 @@ mod tests {
     #[test]
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_dir(point2(1, 2), STEP_UP),
-            SquareWithOrthogonalDir::from_square_and_dir(point2(5, 5), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(point2(1, 2), STEP_UP),
+            SquareWithOrthogonalDir::from_square_and_step(point2(5, 5), STEP_RIGHT),
         );
-        let pose1 = SquareWithOrthogonalDir::from_square_and_dir(point2(3, 3), STEP_RIGHT);
-        let pose2 = SquareWithOrthogonalDir::from_square_and_dir(point2(6, 3), STEP_DOWN);
+        let pose1 = SquareWithOrthogonalDir::from_square_and_step(point2(3, 3), STEP_RIGHT);
+        let pose2 = SquareWithOrthogonalDir::from_square_and_step(point2(6, 3), STEP_DOWN);
         assert_eq!(transform.transform_pose(pose1), pose2);
     }
 }

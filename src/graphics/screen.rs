@@ -155,7 +155,7 @@ impl Screen {
                         "{}",
                         termion::cursor::Goto(
                             screen_pos_starting_at_1.x as u16,
-                            screen_pos_starting_at_1.y as u16
+                            screen_pos_starting_at_1.y as u16,
                         )
                     )
                     .unwrap();
