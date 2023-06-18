@@ -3658,13 +3658,13 @@ mod tests {
                 let otherdir = rotated_n_quarter_turns_counter_clockwise(orthodir, i);
                 let diagdir = orthodir + otherdir;
 
-                let mut game = set_up_10x10_game();
+                let mut game = set_up_nxm_game(10, 25);
                 let start_square = point2(5, 5);
                 game.place_player(start_square);
                 game.place_single_sided_one_way_portal(
                     SquareWithOrthogonalDir::from_square_and_step(game.player_square(), orthodir),
                     SquareWithOrthogonalDir::from_square_and_step(
-                        game.player_square() + STEP_UP * 30,
+                        game.player_square() + STEP_RIGHT * 10,
                         STEP_UP,
                     ),
                 );
@@ -3681,10 +3681,10 @@ mod tests {
                 let strafedir = rotated_n_quarter_turns_counter_clockwise(orthodir, i);
                 let diagdir = orthodir + strafedir;
 
-                let mut game = set_up_10x10_game();
+                let mut game = set_up_nxm_game(10, 25);
                 let start_square = point2(5, 5);
                 game.place_player(start_square);
-                let far_square = game.player_square() + STEP_UP * 30;
+                let far_square = game.player_square() + STEP_RIGHT * 10;
                 game.place_single_sided_one_way_portal(
                     SquareWithOrthogonalDir::from_square_and_step(
                         game.player_square() + strafedir,
