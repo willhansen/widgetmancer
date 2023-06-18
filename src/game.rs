@@ -77,7 +77,7 @@ impl Pushable {
         Pushable { val, character }
     }
     pub fn drawable(&self) -> TextDrawable {
-        TextDrawable::new(&(self.character.to_string() + " "), DARK_CYAN, BLACK, true)
+        TextDrawable::new(&(self.character.to_string() + " "), BLACK, BLACK, true)
     }
 }
 
@@ -222,13 +222,43 @@ impl Game {
             return Err(());
         }
 
-        let rotation = QuarterTurnsAnticlockwise::from_start_and_end_directions(
+        let pushable_is_at_destination = self.pushables.contains_key(&new_pos);
+        if num_squares == 1 && pushable_is_at_destination {
+            self.try_push(new_pos, new_dir)?;
+        }
+
+        self.try_set_player_position(new_pos)?;
+
+        let rotation_from_portals = QuarterTurnsAnticlockwise::from_start_and_end_directions(
             direction.into(),
             new_dir.into(),
         );
-        self.graphics.screen.rotate(rotation);
+        self.graphics.screen.rotate(rotation_from_portals);
 
-        self.try_set_player_position(new_pos)
+        Ok(())
+    }
+
+    fn try_push(
+        &mut self,
+        pushable_start_square: WorldSquare,
+        push_direction: KingWorldStep,
+    ) -> Result<(), ()> {
+        assert!(self.pushables.contains_key(&pushable_start_square));
+        let (end_square, end_dir) = self
+            .portal_aware_single_step(SquareWithAdjacentDir::new(
+                pushable_start_square,
+                push_direction,
+            ))?
+            .tuple();
+        if self.pushables.contains_key(&end_square) {
+            self.try_push(end_square, end_dir)?;
+        }
+        if !self.square_is_empty(end_square) {
+            return Err(());
+        }
+        let the_pushable = self.pushables.remove(&pushable_start_square).unwrap();
+        self.pushables.insert(end_square, the_pushable);
+        return Ok(());
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
@@ -1709,8 +1739,13 @@ impl Game {
         // self.set_up_simple_test_map();
         // return;
 
+        let base_square = self.player_square();
+
+        self.place_pushable(Pushable::new(5), base_square + STEP_UP * 4);
+        self.place_pushable(Pushable::new(13), base_square + STEP_UP * 5);
+
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            self.player_square() + STEP_RIGHT * 3 + STEP_UP * 3,
+            base_square + STEP_RIGHT * 3 + STEP_UP * 3,
             STEP_RIGHT.into(),
         );
         let left_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
@@ -1725,10 +1760,10 @@ impl Game {
 
         self.place_block(left_entrance.square() + STEP_RIGHT * 2 + STEP_DOWN_RIGHT * 3);
 
-        self.place_dense_horizontal_portals(self.player_square() + STEP_RIGHT * 20, 1, 10);
+        self.place_dense_horizontal_portals(base_square + STEP_RIGHT * 20, 1, 10);
 
         let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            self.player_square() + STEP_LEFT * 7 + STEP_UP * 3,
+            base_square + STEP_LEFT * 7 + STEP_UP * 3,
             STEP_RIGHT.into(),
         );
         let exit = entrance.stepped_n(5).strafed_right();
