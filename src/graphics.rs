@@ -431,6 +431,17 @@ impl Graphics {
     pub fn draw_blocks(&mut self, block_squares: &SquareSet) {
         self.draw_same_glyphs_at_squares(Glyph::block_glyphs(), block_squares);
     }
+    pub fn draw_floor_push_arrows(
+        &mut self,
+        floor_push_arrows: &HashMap<WorldSquare, OrthogonalWorldStep>,
+    ) {
+        floor_push_arrows.iter().for_each(|(&square, &dir)| {
+            self.draw_drawable_to_draw_buffer(
+                square,
+                ArrowDrawable::new(dir.into(), "⯬⯮⯭⯯", DARK_GREY),
+            )
+        })
+    }
 
     pub fn add_simple_laser(&mut self, start: WorldPoint, end: WorldPoint) {
         self.active_animations

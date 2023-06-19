@@ -231,7 +231,7 @@ impl Glyph {
 
         let mut glyphs = [
             Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
-                faced_direction,
+                faced_direction.into(),
                 THICK_ARROWS,
             ))
             .with_transparent_bg(true),
@@ -312,8 +312,7 @@ impl Glyph {
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
-    pub fn extract_arrow_from_arrow_string(dir: KingWorldStep, arrow_string: &str) -> char {
-        assert_eq!(arrow_string.chars().count(), 8);
+    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
 
         let arrow_string_direction_order = [
             STEP_LEFT,
@@ -328,14 +327,14 @@ impl Glyph {
 
         let index_of_char = arrow_string_direction_order
             .iter()
-            .position(|&arrow_dir| dir.step() == arrow_dir)
+            .position(|&arrow_dir| dir == arrow_dir)
             .unwrap();
 
         arrow_string.chars().nth(index_of_char).unwrap()
     }
     pub fn char_for_flying_arrow(dir: KingWorldStep) -> char {
         //"🡐🡒🡑🡓🡔🡕🡖🡗")
-        Glyph::extract_arrow_from_arrow_string(dir, THIN_TRIANGLE_ARROWS)
+        Glyph::extract_arrow_from_arrow_string(dir.into(), THIN_TRIANGLE_ARROWS)
     }
 
     pub fn glyphs_for_flying_arrow(dir: KingWorldStep) -> DoubleGlyph {

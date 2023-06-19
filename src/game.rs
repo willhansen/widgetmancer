@@ -93,6 +93,7 @@ pub struct Game {
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     pushables: HashMap<WorldSquare, Pushable>,
+    floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -117,6 +118,7 @@ impl Game {
             upgrades: HashMap::new(),
             blocks: HashSet::new(),
             pushables: HashMap::new(),
+            floor_push_arrows: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -136,11 +138,6 @@ impl Game {
     }
     pub fn board_size(&self) -> BoardSize {
         self.board_size
-    }
-
-    #[deprecated(note = "'Dead' is a negative, use `player_is_alive` instead")]
-    pub fn player_is_dead(&self) -> bool {
-        self.player_optional.is_none()
     }
 
     pub fn player_is_alive(&self) -> bool {
@@ -242,8 +239,10 @@ impl Game {
         &mut self,
         pushable_start_square: WorldSquare,
         push_direction: KingWorldStep,
-    ) -> Result<(), ()> {
-        assert!(self.pushables.contains_key(&pushable_start_square));
+    ) -> Result<(WorldSquare), ()> {
+        if !self.pushables.contains_key(&pushable_start_square) {
+            return Err(());
+        }
         let (end_square, end_dir) = self
             .portal_aware_single_step(SquareWithAdjacentDir::new(
                 pushable_start_square,
@@ -258,7 +257,7 @@ impl Game {
         }
         let the_pushable = self.pushables.remove(&pushable_start_square).unwrap();
         self.pushables.insert(end_square, the_pushable);
-        return Ok(());
+        return Ok(end_square);
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
@@ -423,6 +422,8 @@ impl Game {
         //let king_paths = king_squares .iter() .filter_map(|&king_square| self.find_king_path(king_square, player_square)) .collect();
         //self.graphics.draw_paths(king_paths);
         //}
+        self.graphics
+            .draw_floor_push_arrows(&self.floor_push_arrows);
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -594,6 +595,28 @@ impl Game {
         new_arrows.into_iter().for_each(|(square, dir)| {
             self.pieces.insert(square, Piece::arrow(dir));
         });
+    }
+
+    pub fn tick_game_logic(&mut self) {
+        self.move_non_arrow_factions();
+        self.tick_arrows();
+        self.apply_floor_push_arrows();
+
+        self.on_turn_end();
+    }
+
+    fn apply_floor_push_arrows(&mut self) {
+        let mut push_end_squares = HashSet::new();
+        self.floor_push_arrows
+            .clone()
+            .iter()
+            .for_each(|(&square, &dir)| {
+                if !push_end_squares.contains(&square) {
+                    if let Ok(end_square) = self.try_push(square, dir.into()) {
+                        push_end_squares.insert(end_square);
+                    }
+                }
+            });
     }
 
     pub fn tick_arrows(&mut self) {
@@ -814,7 +837,6 @@ impl Game {
             })
             .cloned()
     }
-    pub fn on_turn_start(&mut self) {}
 
     pub fn on_turn_end(&mut self) {
         self.tick_pawn_incubation();
@@ -1596,6 +1618,9 @@ impl Game {
     pub fn place_pushable(&mut self, pushable: Pushable, square: WorldSquare) {
         self.pushables.insert(square, pushable);
     }
+    pub fn place_floor_push_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
+        self.floor_push_arrows.insert(square, dir.into());
+    }
 
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
@@ -1743,6 +1768,9 @@ impl Game {
 
         self.place_pushable(Pushable::new(5), base_square + STEP_UP * 4);
         self.place_pushable(Pushable::new(13), base_square + STEP_UP * 5);
+        self.place_floor_push_arrow(base_square + STEP_UP * 6, STEP_RIGHT);
+        self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT, STEP_RIGHT);
+        self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * 2, STEP_RIGHT);
 
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
             base_square + STEP_RIGHT * 3 + STEP_UP * 3,
@@ -3600,7 +3628,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_vertical_looks_right() {
+    fn test_move_vertical_looks_correct() {
         let mut game = set_up_10x10_game();
         game.place_player_with_direction(point2(5, 5), STEP_UP);
         game.draw_headless_now();
@@ -3841,5 +3869,34 @@ mod tests {
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
         assert_eq!(pushable_glyphs.to_clean_string(), "④ ")
+    }
+
+    #[test]
+    fn test_draw_floor_arrows() {
+        let mut game = set_up_10x10_game();
+        let start_square = point2(5, 5);
+        game.place_player(start_square);
+        let pushable_square = start_square + STEP_RIGHT;
+        game.place_floor_push_arrow(pushable_square, STEP_UP);
+        game.draw_headless_now();
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
+        //⯬ ⯭ ⯮ ⯯
+        assert_eq!(glyphs.to_clean_string(), "⯭ ")
+    }
+    #[test]
+    fn test_floor_arrows_push_pushables() {
+        let mut game = set_up_10x10_game();
+        let start_square = point2(5, 5);
+        //game.place_player(start_square);
+        let pushable_square = start_square + STEP_RIGHT;
+        game.place_pushable(Pushable::new(4), pushable_square);
+        game.place_floor_push_arrow(pushable_square, STEP_UP);
+
+        assert!(game.pushables.contains_key(&pushable_square));
+        game.tick_game_logic();
+        assert!(game.pushables.contains_key(&(pushable_square + STEP_UP)));
     }
 }

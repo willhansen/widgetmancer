@@ -126,14 +126,9 @@ pub fn do_everything() {
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
 
         while let Ok(event) = event_receiver.try_recv() {
-            game.on_turn_start();
-
             input_map.handle_event(&mut game, event);
 
-            game.move_non_arrow_factions();
-            game.tick_arrows();
-
-            game.on_turn_end();
+            game.tick_game_logic();
         }
         game.advance_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
