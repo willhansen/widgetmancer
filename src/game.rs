@@ -3899,4 +3899,36 @@ mod tests {
         game.tick_game_logic();
         assert!(game.pushables.contains_key(&(pushable_square + STEP_UP)));
     }
+    #[test]
+    fn test_pushable_visible_next_to_turning_portal() {
+        let mut game = set_up_10x10_game();
+        let start_square = point2(2, 2);
+        game.place_player(start_square);
+        let pushable_square = start_square + STEP_RIGHT * 2 + STEP_UP;
+        game.place_pushable(Pushable::new(4), pushable_square);
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(pushable_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_worldstep(
+                pushable_square + STEP_RIGHT * 3,
+                STEP_UP,
+            ),
+        );
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_worldstep(
+                pushable_square + STEP_DOWN,
+                STEP_RIGHT,
+            ),
+            SquareWithOrthogonalDir::from_square_and_worldstep(
+                pushable_square + STEP_RIGHT * 4,
+                STEP_UP,
+            ),
+        );
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP + SCREEN_STEP_RIGHT * 2);
+        assert_false!(glyphs.looks_solid());
+    }
 }
