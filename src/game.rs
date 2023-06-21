@@ -47,6 +47,23 @@ pub struct DeathCube {
     pub velocity: WorldMove,
 }
 
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub struct FloatingHunterDrone {
+    pub position: WorldPoint,
+    pub velocity: WorldMove,
+    pub sight_direction: Angle<f32>,
+}
+
+impl FloatingHunterDrone {
+    pub fn new(position: WorldPoint) -> Self {
+        FloatingHunterDrone {
+            position,
+            velocity: WorldMove::new(1.0, 0.0),
+            sight_direction: Angle::degrees(0.0),
+        }
+    }
+}
+
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: KingWorldStep,
@@ -104,6 +121,7 @@ pub struct Game {
     death_cubes: Vec<DeathCube>,
     death_cube_faction: Faction,
     portal_geometry: PortalGeometry,
+    floating_hunter_drones: Vec<FloatingHunterDrone>,
 }
 
 impl Game {
@@ -129,6 +147,7 @@ impl Game {
             death_cubes: vec![],
             death_cube_faction: Faction::DeathCube,
             portal_geometry: PortalGeometry::default(),
+            floating_hunter_drones: vec![],
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -693,6 +712,11 @@ impl Game {
 
     pub fn place_death_turret(&mut self, square: WorldSquare) {
         self.place_piece(Piece::new(DeathCubeTurret, self.death_cube_faction), square);
+    }
+
+    pub fn place_floating_hunter_drone(&mut self, point: WorldPoint) {
+        self.floating_hunter_drones
+            .push(FloatingHunterDrone::new(point));
     }
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
@@ -1932,9 +1956,10 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::game;
+    use crate::glyph::braille::char_is_braille;
     use crate::glyph::glyph_constants::{
-        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, GREY, OUT_OF_SIGHT_COLOR, RED,
-        RED_PAWN_COLOR,
+        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, GREY, HUNTER_DRONE_COLOR,
+        OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR, SIGHT_LINE_SEEKING_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::{Drawable, DrawableEnum};
@@ -3921,12 +3946,32 @@ mod tests {
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
         let fov = game.player_field_of_view();
-        let visibility = fov.visibilities_of_relative_square(STEP_UP + STEP_RIGHT * 2);
 
         let glyphs = game
             .graphics
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP + SCREEN_STEP_RIGHT * 2);
         assert_false!(glyphs.looks_solid());
+    }
+    #[test]
+    fn test_floating_hunter_drone__place_and_draw() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(4, 5));
+        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+        game.draw_headless_now();
+
+        let drone_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
+        let sight_line_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT * 3);
+
+        assert_eq!(drone_glyphs.get_solid_color().unwrap(), HUNTER_DRONE_COLOR);
+        assert!(char_is_braille(sight_line_glyphs[0].character));
+        assert!(char_is_braille(sight_line_glyphs[1].character));
+        assert_eq!(sight_line_glyphs[0].fg_color, SIGHT_LINE_SEEKING_COLOR);
     }
 }
