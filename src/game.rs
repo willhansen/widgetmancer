@@ -3906,25 +3906,23 @@ mod tests {
         game.place_player(start_square);
         let pushable_square = start_square + STEP_RIGHT * 2 + STEP_UP;
         game.place_pushable(Pushable::new(4), pushable_square);
-        game.place_single_sided_one_way_portal(
-            SquareWithOrthogonalDir::from_square_and_worldstep(pushable_square, STEP_RIGHT),
-            SquareWithOrthogonalDir::from_square_and_worldstep(
-                pushable_square + STEP_RIGHT * 3,
-                STEP_UP,
-            ),
-        );
-        game.place_single_sided_one_way_portal(
-            SquareWithOrthogonalDir::from_square_and_worldstep(
-                pushable_square + STEP_DOWN,
-                STEP_RIGHT,
-            ),
-            SquareWithOrthogonalDir::from_square_and_worldstep(
-                pushable_square + STEP_RIGHT * 4,
-                STEP_UP,
-            ),
-        );
+        for i in 0..2 {
+            game.place_single_sided_one_way_portal(
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    pushable_square + STEP_DOWN * i,
+                    STEP_RIGHT,
+                ),
+                SquareWithOrthogonalDir::from_square_and_worldstep(
+                    pushable_square + STEP_RIGHT * (3 + i) + STEP_UP * 3,
+                    STEP_UP,
+                ),
+            );
+        }
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
+        let fov = game.player_field_of_view();
+        let visibility = fov.visibilities_of_relative_square(STEP_UP + STEP_RIGHT * 2);
+
         let glyphs = game
             .graphics
             .screen

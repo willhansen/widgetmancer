@@ -744,6 +744,13 @@ pub fn field_of_view_within_arc_in_single_octant(
             AngleInterval::from_square(relative_square)
         };
 
+        if !view_arc_of_this_square.overlaps_other_by_at_least_this_much(
+            view_arc,
+            Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+        ) {
+            continue;
+        }
+
         let maybe_visibility_of_this_square: Option<SquareVisibility> =
             if relative_square == STEP_ZERO {
                 Some(SquareVisibility::new_fully_visible())
@@ -799,7 +806,6 @@ pub fn field_of_view_within_arc_in_single_octant(
                     .clone()
                     .into_iter()
                     .filter(|(_portal, portal_arc): &(Portal, AngleInterval)| {
-                        // TODO: make the threshold a constant
                         portal_arc.overlaps_other_by_at_least_this_much(
                             view_arc,
                             Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),

@@ -251,6 +251,7 @@ impl Graphics {
             let relative_world_square = world_square - field_of_view.root_square();
             let maybe_unrotated =
                 self.maybe_drawable_for_rel_square_of_fov(&field_of_view, relative_world_square);
+
             if let Some(unrotated) = maybe_unrotated {
                 let rotated: DrawableEnum =
                     unrotated.rotated(-self.screen.rotation().quarter_turns());
