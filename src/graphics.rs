@@ -35,7 +35,7 @@ use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
-use crate::game::DeathCube;
+use crate::game::{DeathCube, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
@@ -51,7 +51,8 @@ use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
-    reversed, squares_on_board, KingWorldStep, OrthogonalWorldStep, STEP_RIGHT,
+    reversed, squares_on_board, unit_vector_from_angle, KingWorldStep, OrthogonalWorldStep,
+    STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -411,9 +412,23 @@ impl Graphics {
     }
 
     pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
-        let character_grid_point = world_point_to_world_character_point(death_cube.position);
-        let characters_map = characters_for_full_square_at_point(character_grid_point);
         let color = self.technicolor_at_time(Instant::now());
+        self.draw_floating_square(death_cube.position, color);
+    }
+    pub fn draw_floating_hunter_drone(&mut self, drone: FloatingHunterDrone) {
+        self.draw_braille_line(
+            drone.position,
+            drone.position
+                + unit_vector_from_angle(drone.sight_direction).cast_unit()
+                    * HUNTER_DRONE_SIGHT_RANGE,
+            SIGHT_LINE_SEEKING_COLOR,
+        );
+        self.draw_floating_square(drone.position, HUNTER_DRONE_COLOR);
+    }
+
+    fn draw_floating_square(&mut self, pos: WorldPoint, color: RGB8) {
+        let character_grid_point = world_point_to_world_character_point(pos);
+        let characters_map = characters_for_full_square_at_point(character_grid_point);
         let glyphs = characters_map
             .into_iter()
             .map(|(char_square, char)| (char_square, Glyph::fg_only(char, color)))

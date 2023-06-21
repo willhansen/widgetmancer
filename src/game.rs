@@ -47,6 +47,8 @@ pub struct DeathCube {
     pub velocity: WorldMove,
 }
 
+pub const HUNTER_DRONE_SIGHT_RANGE: f32 = 5.0;
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct FloatingHunterDrone {
     pub position: WorldPoint,
@@ -471,6 +473,9 @@ impl Game {
         self.death_cubes
             .iter()
             .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
+        self.floating_hunter_drones
+            .iter()
+            .for_each(|thing| self.graphics.draw_floating_hunter_drone(*thing));
         self.pushables.iter().for_each(|(&square, pushable)| {
             self.graphics
                 .draw_drawable_to_draw_buffer(square, pushable.drawable())
@@ -551,6 +556,7 @@ impl Game {
 
     pub fn advance_realtime_effects(&mut self, delta: Duration) {
         self.move_death_cubes(delta);
+        self.advance_hunter_drones(delta);
         self.tick_realtime_turrets(delta);
     }
 
@@ -576,7 +582,7 @@ impl Game {
         });
     }
     pub fn move_death_cubes(&mut self, duration: Duration) {
-        let mut kill_squares = HashSet::new();
+        let mut kill_lines: Vec<(WorldSquare, WorldSquare)> = vec![];
         for cube in &mut self.death_cubes {
             let start_pos = cube.position;
             cube.position += cube.velocity * duration.as_secs_f32();
@@ -584,12 +590,18 @@ impl Game {
 
             let start_square = world_point_to_world_square(start_pos);
             let end_square = world_point_to_world_square(end_pos);
+            kill_lines.push((start_square, end_square));
+        }
+        kill_lines.iter().for_each(|(start_square, end_square)| {
+            self.kill_along_line(*start_square, *end_square);
+        });
+        self.remove_death_cubes_that_are_off_board();
+    }
 
-            for (x, y) in
-                line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple())
-            {
-                kill_squares.insert(point2(x, y));
-            }
+    fn kill_along_line(&mut self, start_square: WorldSquare, end_square: WorldSquare) {
+        let mut kill_squares = HashSet::new();
+        for (x, y) in line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple()) {
+            kill_squares.insert(point2(x, y));
         }
         kill_squares.into_iter().for_each(|square| {
             if let Some(piece) = self.get_piece_at(square) && piece.faction != self.death_cube_faction {
@@ -598,8 +610,15 @@ impl Game {
                 self.capture_piece_at(square);
             }
         });
+    }
 
-        self.remove_death_cubes_off_board();
+    fn advance_hunter_drones(&mut self, duration: Duration) {
+        self.floating_hunter_drones
+            .iter_mut()
+            .for_each(|drone: &mut FloatingHunterDrone| {
+                drone.position += drone.velocity * duration.as_secs_f32();
+                drone.sight_direction += Angle::degrees(90.0) * duration.as_secs_f32();
+            });
     }
 
     fn drain_arrows(&mut self) -> HashMap<WorldSquare, KingWorldStep> {
@@ -677,7 +696,7 @@ impl Game {
         self.set_arrows(next_arrows);
     }
 
-    pub fn remove_death_cubes_off_board(&mut self) {
+    pub fn remove_death_cubes_that_are_off_board(&mut self) {
         let cubes_on_board = self
             .death_cubes
             .iter()
@@ -1795,6 +1814,8 @@ impl Game {
         self.place_floor_push_arrow(base_square + STEP_UP * 6, STEP_RIGHT);
         self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT, STEP_RIGHT);
         self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * 2, STEP_RIGHT);
+
+        self.place_floating_hunter_drone((base_square + STEP_DOWN * 5).to_f32());
 
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
             base_square + STEP_RIGHT * 3 + STEP_UP * 3,
@@ -3959,6 +3980,7 @@ mod tests {
         game.place_player(point2(4, 5));
         game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
         game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
 
         let drone_glyphs = game
             .graphics
@@ -3973,5 +3995,31 @@ mod tests {
         assert!(char_is_braille(sight_line_glyphs[0].character));
         assert!(char_is_braille(sight_line_glyphs[1].character));
         assert_eq!(sight_line_glyphs[0].fg_color, SIGHT_LINE_SEEKING_COLOR);
+    }
+    #[test]
+    fn test_floating_hunter_drone__rotate_over_time() {
+        let mut game = set_up_10x10_game();
+        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+
+        let start_angle = game.floating_hunter_drones[0].sight_direction;
+
+        game.advance_realtime_effects(Duration::from_secs_f32(0.5));
+
+        let end_angle = game.floating_hunter_drones[0].sight_direction;
+
+        assert_ne!(start_angle, end_angle);
+    }
+    #[test]
+    fn test_floating_hunter_drone__move_over_time() {
+        let mut game = set_up_10x10_game();
+        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+
+        let start_pos = game.floating_hunter_drones[0].position;
+
+        game.advance_realtime_effects(Duration::from_secs_f32(0.5));
+
+        let end_pos = game.floating_hunter_drones[0].position;
+
+        assert_ne!(start_pos, end_pos);
     }
 }
