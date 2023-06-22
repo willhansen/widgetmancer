@@ -199,6 +199,7 @@ impl Game {
     }
 
     // TODO: test
+
     fn point_is_on_board(&self, point: WorldPoint) -> bool {
         point.x >= -0.5
             && point.x < self.board_size().width as f32 - 0.5
@@ -3965,6 +3966,7 @@ mod tests {
         //⯬ ⯭ ⯮ ⯯
         assert_eq!(glyphs.to_clean_string(), "⯭ ")
     }
+
     #[test]
     fn test_floor_arrows_push_pushables() {
         let mut game = set_up_10x10_game();
@@ -3978,6 +3980,7 @@ mod tests {
         game.tick_game_logic();
         assert!(game.pushables.contains_key(&(pushable_square + STEP_UP)));
     }
+
     #[test]
     fn test_pushable_visible_next_to_turning_portal() {
         let mut game = set_up_10x10_game();
@@ -4007,6 +4010,7 @@ mod tests {
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_UP + SCREEN_STEP_RIGHT * 2);
         assert_false!(glyphs.looks_solid());
     }
+
     #[test]
     fn test_floating_hunter_drone__place_and_draw() {
         let mut game = set_up_10x10_game();
@@ -4029,6 +4033,7 @@ mod tests {
         assert!(char_is_braille(sight_line_glyphs[1].character));
         assert_eq!(sight_line_glyphs[0].fg_color, SIGHT_LINE_SEEKING_COLOR);
     }
+
     #[test]
     fn test_floating_hunter_drone__rotate_over_time() {
         let mut game = set_up_10x10_game();
@@ -4042,6 +4047,7 @@ mod tests {
 
         assert_ne!(start_angle, end_angle);
     }
+
     #[test]
     fn test_floating_hunter_drone__move_over_time() {
         let mut game = set_up_10x10_game();
@@ -4055,6 +4061,7 @@ mod tests {
 
         assert_ne!(start_pos, end_pos);
     }
+
     #[test]
     fn test_floating_hunter_drone__bounce_off_board_edge() {
         let mut game = set_up_10x10_game();
@@ -4069,6 +4076,7 @@ mod tests {
 
         assert!(end_vel.x < 0.0);
     }
+
     #[test]
     fn test_reflect_off_board_edges() {
         let game = set_up_nxm_game(10, 20);
@@ -4112,6 +4120,40 @@ mod tests {
             game.reflect_off_board_edges(point2(19.6, 9.7), STEP_UP_RIGHT.to_f32()),
             STEP_DOWN_LEFT.to_f32(),
             "two edges at once"
+        );
+    }
+
+    #[test]
+    fn test_hunter_drone_rotates_with_screen_rotation() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        game.place_floating_hunter_drone(WorldPoint::new(6.5, 5.0));
+        game.graphics
+            .screen
+            .set_rotation(QuarterTurnsAnticlockwise::new(1));
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let upper_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+        let middle_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN * 2);
+        let lower_glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN * 3);
+        assert_eq!(upper_glyphs.to_clean_string(), "▄▄");
+        assert_eq!(middle_glyphs.to_clean_string(), "▀▀");
+        assert_eq!(
+            lower_glyphs
+                .map(|g| char_is_braille(g.character))
+                .into_iter()
+                .filter(|x| *x)
+                .count(),
+            1
         );
     }
 }
