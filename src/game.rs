@@ -113,6 +113,7 @@ pub struct Game {
     blocks: HashSet<WorldSquare>,
     pushables: HashMap<WorldSquare, Pushable>,
     floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
+    conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -139,6 +140,7 @@ impl Game {
             blocks: HashSet::new(),
             pushables: HashMap::new(),
             floor_push_arrows: HashMap::new(),
+            conveyor_belts: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -293,6 +295,10 @@ impl Game {
     pub fn move_player_to(&mut self, square: WorldSquare) {
         self.try_set_player_position(square)
             .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
+    }
+
+    fn floor_color_at_square(&self, square: WorldSquare) -> RGB8 {
+        self.graphics.floor_color_at_square(square)
     }
 
     pub fn player_blink_relative_to_screen(&mut self, screen_step: ScreenBufferStep) {
@@ -1698,6 +1704,9 @@ impl Game {
     pub fn place_floor_push_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
         self.floor_push_arrows.insert(square, dir.into());
     }
+    pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
+        self.conveyor_belts.insert(square, dir.into());
+    }
 
     pub fn place_block(&mut self, square: WorldSquare) {
         self.blocks.insert(square);
@@ -2013,8 +2022,8 @@ mod tests {
     use crate::game;
     use crate::glyph::braille::char_is_braille;
     use crate::glyph::glyph_constants::{
-        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, GREY, HUNTER_DRONE_COLOR,
-        OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR, SIGHT_LINE_SEEKING_COLOR,
+        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, FULL_BLOCK, GREY,
+        HUNTER_DRONE_COLOR, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR, SIGHT_LINE_SEEKING_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::{Drawable, DrawableEnum};
@@ -4155,5 +4164,30 @@ mod tests {
                 .count(),
             1
         );
+    }
+    #[test]
+    fn test_conveyor_belt__place_and_draw() {
+        let mut game = set_up_10x10_game();
+        game.place_player(point2(5, 5));
+        let square = point2(6, 5);
+        let belt_period: Duration = game.place_conveyor_belt(square, STEP_RIGHT).period();
+        game.draw_headless_now();
+        let glyphs1 = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+        assert_eq!(
+            glyphs1.get_solid_color(),
+            Some(game.floor_color_at_square(square))
+        );
+
+        game.advance_realtime_effects(Duration::from_secs_f32(belt_period.as_secs_f32() / 4.0));
+
+        let glyphs2 = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+
+        assert_ne!(glyphs1, glyphs2);
     }
 }

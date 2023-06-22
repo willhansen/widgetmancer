@@ -152,6 +152,9 @@ impl Graphics {
     pub fn set_solid_floor_color(&mut self, new_color: RGB8) {
         self.floor_color_enum = FloorColorEnum::Solid(new_color)
     }
+    pub fn floor_color_at_square(&self, square: WorldSquare) -> RGB8 {
+        self.floor_color_enum.color_at(square)
+    }
 
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
