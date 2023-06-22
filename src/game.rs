@@ -198,6 +198,14 @@ impl Game {
             && pos.y < self.board_size().height as i32
     }
 
+    // TODO: test
+    fn point_is_on_board(&self, point: WorldPoint) -> bool {
+        point.x >= -0.5
+            && point.x < self.board_size().width as f32 - 0.5
+            && point.y >= -0.5
+            && point.y < self.board_size().height as f32 - 0.5
+    }
+
     pub fn quit(&mut self) {
         self.running = false;
     }
@@ -613,12 +621,37 @@ impl Game {
     }
 
     fn advance_hunter_drones(&mut self, duration: Duration) {
-        self.floating_hunter_drones
-            .iter_mut()
-            .for_each(|drone: &mut FloatingHunterDrone| {
-                drone.position += drone.velocity * duration.as_secs_f32();
-                drone.sight_direction += Angle::degrees(90.0) * duration.as_secs_f32();
-            });
+        self.floating_hunter_drones = self
+            .floating_hunter_drones
+            .iter()
+            .map(|drone: &FloatingHunterDrone| {
+                let mut clone_drone = drone.clone();
+
+                clone_drone.position += drone.velocity * duration.as_secs_f32();
+                clone_drone.velocity =
+                    self.reflect_off_board_edges(clone_drone.position, clone_drone.velocity);
+
+                clone_drone.sight_direction += Angle::degrees(90.0) * duration.as_secs_f32();
+                clone_drone
+            })
+            .collect();
+    }
+
+    fn reflect_off_board_edges(&self, pos: WorldPoint, vel: WorldMove) -> WorldMove {
+        let mut out_vel = vel;
+
+        let xmin = -0.5;
+        let xmax = self.board_size().width as f32 - 0.5;
+        let ymin = -0.5;
+        let ymax = self.board_size().height as f32 - 0.5;
+
+        if (pos.x < xmin && vel.x < 0.0) || (pos.x > xmax && vel.x > 0.0) {
+            out_vel.x *= -1.0;
+        }
+        if (pos.y < ymin && vel.y < 0.0) || (pos.y > ymax && vel.y > 0.0) {
+            out_vel.y *= -1.0;
+        }
+        out_vel
     }
 
     fn drain_arrows(&mut self) -> HashMap<WorldSquare, KingWorldStep> {
@@ -4021,5 +4054,64 @@ mod tests {
         let end_pos = game.floating_hunter_drones[0].position;
 
         assert_ne!(start_pos, end_pos);
+    }
+    #[test]
+    fn test_floating_hunter_drone__bounce_off_board_edge() {
+        let mut game = set_up_10x10_game();
+        game.place_floating_hunter_drone(WorldPoint::new(9.0, 5.0));
+
+        let start_vel = game.floating_hunter_drones[0].velocity;
+
+        assert!(start_vel.x > 0.0);
+        game.advance_realtime_effects(Duration::from_secs_f32(5.0));
+
+        let end_vel = game.floating_hunter_drones[0].velocity;
+
+        assert!(end_vel.x < 0.0);
+    }
+    #[test]
+    fn test_reflect_off_board_edges() {
+        let game = set_up_nxm_game(10, 20);
+
+        assert_eq!(
+            game.reflect_off_board_edges(point2(0.0, 0.0), STEP_RIGHT.to_f32()),
+            STEP_RIGHT.to_f32(),
+            "at origin"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(-0.6, 0.0), STEP_LEFT.to_f32()),
+            STEP_RIGHT.to_f32(),
+            "left edge"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(5.0, 9.9), STEP_UP_LEFT.to_f32()),
+            STEP_DOWN_LEFT.to_f32(),
+            "top edge"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(5.0, -9.9), STEP_DOWN_LEFT.to_f32()),
+            STEP_UP_LEFT.to_f32(),
+            "bottom edge"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(5.0, -9.9), STEP_UP_LEFT.to_f32()),
+            STEP_UP_LEFT.to_f32(),
+            "bottom edge, after reflection"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(20.0, 5.0), STEP_RIGHT.to_f32()),
+            STEP_LEFT.to_f32(),
+            "right edge"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(20.0, 5.0), STEP_RIGHT.to_f32() * 5.0),
+            STEP_LEFT.to_f32() * 5.0,
+            "right edge, but faster"
+        );
+        assert_eq!(
+            game.reflect_off_board_edges(point2(19.6, 9.7), STEP_UP_RIGHT.to_f32()),
+            STEP_DOWN_LEFT.to_f32(),
+            "two edges at once"
+        );
     }
 }
