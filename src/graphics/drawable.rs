@@ -13,7 +13,7 @@ use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
 use crate::glyph::floating_square::characters_for_full_square_with_looping_1d_offset;
-use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED};
+use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, WHITE};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::{
     local_square_half_plane_to_local_character_half_plane, WorldStep,
@@ -341,6 +341,16 @@ pub struct ConveyorBeltDrawable {
     colors: [RGB8; 2],
 }
 
+impl ConveyorBeltDrawable {
+    pub fn new(direction: OrthogonalWorldStep, phase_offset: f32) -> Self {
+        ConveyorBeltDrawable {
+            direction,
+            phase_offset,
+            colors: [WHITE, BLACK],
+        }
+    }
+}
+
 impl StaticDrawable for ConveyorBeltDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         ConveyorBeltDrawable {
@@ -455,11 +465,7 @@ mod tests {
     }
     #[test]
     fn test_conveyor_belt_drawable__half_down() {
-        let drawable = ConveyorBeltDrawable {
-            direction: STEP_DOWN.into(),
-            phase_offset: 0.5,
-            colors: [RED, BLACK],
-        };
+        let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.5);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
 }

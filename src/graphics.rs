@@ -35,13 +35,13 @@ use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
-use crate::game::{DeathCube, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
+use crate::game::{DeathCube, FloatingHunterDrone, CONVEYOR_BELT_PERIOD, HUNTER_DRONE_SIGHT_RANGE};
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{
-    ArrowDrawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, StaticDrawable,
-    TextDrawable,
+    ArrowDrawable, ConveyorBeltDrawable, DrawableEnum, PartialVisibilityDrawable,
+    SolidColorDrawable, StaticDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
@@ -110,6 +110,10 @@ impl Graphics {
 
     pub fn start_time(&self) -> Instant {
         self.start_time
+    }
+
+    fn time_since_start(&self) -> Duration {
+        Instant::now().duration_since(self.start_time)
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
@@ -459,6 +463,15 @@ impl Graphics {
                 square,
                 ArrowDrawable::new(dir.into(), "⯬⯮⯭⯯", DARK_GREY),
             )
+        })
+    }
+    pub fn draw_conveyor_belts(
+        &mut self,
+        conveyor_belts: &HashMap<WorldSquare, OrthogonalWorldStep>,
+        global_phase: f32,
+    ) {
+        conveyor_belts.iter().for_each(|(&square, &dir)| {
+            self.draw_drawable_to_draw_buffer(square, ConveyorBeltDrawable::new(dir, global_phase))
         })
     }
 

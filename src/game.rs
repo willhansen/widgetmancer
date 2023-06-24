@@ -66,7 +66,7 @@ impl FloatingHunterDrone {
     }
 }
 
-const CONVEYOR_BELT_PERIOD: Duration = Duration::from_secs_f32(1.0);
+pub const CONVEYOR_BELT_PERIOD: Duration = Duration::from_secs_f32(1.0);
 
 pub struct Player {
     pub position: WorldSquare,
@@ -127,6 +127,8 @@ pub struct Game {
     death_cube_faction: Faction,
     portal_geometry: PortalGeometry,
     floating_hunter_drones: Vec<FloatingHunterDrone>,
+    world_start_time: Instant,
+    world_time: Instant,
 }
 
 impl Game {
@@ -154,6 +156,8 @@ impl Game {
             death_cube_faction: Faction::DeathCube,
             portal_geometry: PortalGeometry::default(),
             floating_hunter_drones: vec![],
+            world_start_time: Instant::now(),
+            world_time: Instant::now(),
         };
         game.default_enemy_faction = game.get_new_faction();
         assert_eq!(game.default_enemy_faction, Faction::default());
@@ -463,6 +467,11 @@ impl Game {
         self.graphics
             .draw_floor_push_arrows(&self.floor_push_arrows);
 
+        let global_phase: f32 =
+            self.world_time_since_start().as_secs_f32() % CONVEYOR_BELT_PERIOD.as_secs_f32();
+        self.graphics
+            .draw_conveyor_belts(&self.conveyor_belts, global_phase);
+
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
             self.squares_threatened_by_any_piece(false),
@@ -572,9 +581,14 @@ impl Game {
     }
 
     pub fn advance_realtime_effects(&mut self, delta: Duration) {
+        self.world_time += delta;
         self.move_death_cubes(delta);
         self.advance_hunter_drones(delta);
         self.tick_realtime_turrets(delta);
+    }
+
+    fn world_time_since_start(&self) -> Duration {
+        self.world_time.duration_since(self.world_start_time)
     }
 
     pub fn tick_realtime_turrets(&mut self, delta: Duration) {
@@ -1856,9 +1870,10 @@ impl Game {
 
         self.place_pushable(Pushable::new(5), base_square + STEP_UP * 4);
         self.place_pushable(Pushable::new(13), base_square + STEP_UP * 5);
-        self.place_floor_push_arrow(base_square + STEP_UP * 6, STEP_RIGHT);
-        self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT, STEP_RIGHT);
-        self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * 2, STEP_RIGHT);
+        for i in 0..3 {
+            self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * i, STEP_RIGHT);
+            self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);
+        }
 
         self.place_floating_hunter_drone((base_square + STEP_DOWN * 5).to_f32());
 
@@ -4170,8 +4185,9 @@ mod tests {
     #[test]
     fn test_conveyor_belt__place_and_draw() {
         let mut game = set_up_10x10_game();
-        game.place_player(point2(5, 5));
-        let square = point2(6, 5);
+        let player_square = point2(5, 5);
+        game.place_player(player_square);
+        let square = player_square + STEP_DOWN;
         game.place_conveyor_belt(square, STEP_RIGHT);
         game.draw_headless_now();
 
@@ -4183,6 +4199,7 @@ mod tests {
         assert!(glyphs1.get_solid_color().is_some());
 
         game.advance_realtime_effects(CONVEYOR_BELT_PERIOD.div_f32(4.0));
+        game.draw_headless_now();
 
         let glyphs2 = game
             .graphics
@@ -4192,6 +4209,7 @@ mod tests {
         assert_ne!(glyphs1, glyphs2);
 
         game.advance_realtime_effects(CONVEYOR_BELT_PERIOD);
+        game.draw_headless_now();
 
         let glyphs3 = game
             .graphics
