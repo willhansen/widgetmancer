@@ -471,7 +471,9 @@ impl Graphics {
         global_phase: f32,
     ) {
         conveyor_belts.iter().for_each(|(&square, &dir)| {
-            self.draw_drawable_to_draw_buffer(square, ConveyorBeltDrawable::new(dir, global_phase))
+            let square_is_odd = (square.x + square.y) % 2 == 1;
+            let phase = global_phase + if square_is_odd { 0.5 } else { 0.0 };
+            self.draw_drawable_to_draw_buffer(square, ConveyorBeltDrawable::new(dir, phase))
         })
     }
 

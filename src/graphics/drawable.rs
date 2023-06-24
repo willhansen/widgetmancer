@@ -337,7 +337,7 @@ impl StaticDrawable for ArrowDrawable {
 #[derive(Debug, Clone, CopyGetters)]
 pub struct ConveyorBeltDrawable {
     direction: OrthogonalWorldStep,
-    phase_offset: f32,
+    normalized_phase_offset: f32,
     colors: [RGB8; 2],
 }
 
@@ -345,7 +345,7 @@ impl ConveyorBeltDrawable {
     pub fn new(direction: OrthogonalWorldStep, phase_offset: f32) -> Self {
         ConveyorBeltDrawable {
             direction,
-            phase_offset,
+            normalized_phase_offset: phase_offset,
             colors: [WHITE, BLACK],
         }
     }
@@ -365,8 +365,10 @@ impl StaticDrawable for ConveyorBeltDrawable {
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        let chars =
-            characters_for_full_square_with_looping_1d_offset(self.direction, self.phase_offset);
+        let chars = characters_for_full_square_with_looping_1d_offset(
+            self.direction,
+            self.normalized_phase_offset * 2.0,
+        );
         chars.map(|c| Glyph::new(c, self.colors[0], self.colors[1]))
     }
 
@@ -375,7 +377,7 @@ impl StaticDrawable for ConveyorBeltDrawable {
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {
-        if (self.phase_offset % 1.0).abs() <= 0.5 {
+        if (self.normalized_phase_offset % 1.0).abs() <= 0.5 {
             self.colors[0]
         } else {
             self.colors[1]
@@ -465,7 +467,7 @@ mod tests {
     }
     #[test]
     fn test_conveyor_belt_drawable__half_down() {
-        let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.5);
+        let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
 }

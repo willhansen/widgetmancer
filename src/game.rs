@@ -66,7 +66,7 @@ impl FloatingHunterDrone {
     }
 }
 
-pub const CONVEYOR_BELT_PERIOD: Duration = Duration::from_secs_f32(1.0);
+pub const CONVEYOR_BELT_PERIOD: Duration = Duration::from_secs_f32(3.0);
 
 pub struct Player {
     pub position: WorldSquare,
@@ -467,10 +467,10 @@ impl Game {
         self.graphics
             .draw_floor_push_arrows(&self.floor_push_arrows);
 
-        let global_phase: f32 =
-            self.world_time_since_start().as_secs_f32() % CONVEYOR_BELT_PERIOD.as_secs_f32();
+        let global_phase_offset: f32 =
+            self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_PERIOD.as_secs_f32();
         self.graphics
-            .draw_conveyor_belts(&self.conveyor_belts, global_phase);
+            .draw_conveyor_belts(&self.conveyor_belts, global_phase_offset);
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -2040,7 +2040,8 @@ mod tests {
     use crate::glyph::braille::char_is_braille;
     use crate::glyph::glyph_constants::{
         BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, FULL_BLOCK, GREY,
-        HUNTER_DRONE_COLOR, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR, SIGHT_LINE_SEEKING_COLOR,
+        HUNTER_DRONE_COLOR, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR,
+        RIGHT_HALF_BLOCK, SIGHT_LINE_SEEKING_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::{DrawableEnum, StaticDrawable};
@@ -4189,32 +4190,29 @@ mod tests {
         game.place_player(player_square);
         let square = player_square + STEP_DOWN;
         game.place_conveyor_belt(square, STEP_RIGHT);
-        game.draw_headless_now();
+        let advance_and_get_glyphs = |game: &mut Game, duration: Duration| {
+            game.advance_realtime_effects(duration);
+            game.draw_headless_now();
 
-        let glyphs1 = game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+            game.graphics
+                .screen
+                .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN)
+        };
+
+        let glyphs1 = advance_and_get_glyphs(&mut game, Duration::from_secs_f32(0.0));
 
         assert!(glyphs1.get_solid_color().is_some());
 
-        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD.div_f32(4.0));
-        game.draw_headless_now();
-
-        let glyphs2 = game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+        let glyphs2 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_PERIOD.div_f32(8.0));
 
         assert_ne!(glyphs1, glyphs2);
+        assert_eq!(glyphs2.to_chars(), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
 
-        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD);
-        game.draw_headless_now();
+        let glyphs2_5 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_PERIOD.div_f32(2.0));
 
-        let glyphs3 = game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+        assert_eq!(glyphs2_5.to_chars(), [LEFT_HALF_BLOCK, SPACE]);
+
+        let glyphs3 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_PERIOD.div_f32(2.0));
 
         assert_eq!(glyphs2, glyphs3);
     }

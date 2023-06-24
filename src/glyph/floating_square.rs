@@ -663,5 +663,7 @@ mod tests {
             f(STEP_UP.into(), -1.7),
             "negative equivalence"
         );
+        assert_eq!(f(STEP_RIGHT.into(), 1.25), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(f(STEP_LEFT.into(), 1.25), [SPACE, RIGHT_HALF_BLOCK]);
     }
 }
