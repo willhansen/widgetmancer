@@ -82,20 +82,20 @@ pub struct IncubatingPawn {
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
-pub struct Pushable {
+pub struct Widget {
     val: u32,
     character: char,
 }
 
-impl Pushable {
+impl Widget {
     pub fn new(val: u32) -> Self {
         let character = char::from_u32(match val {
             0 => 0x24EA,
             1..=20 => 0x2460 - 1 + val,
-            _ => panic!("invalid pushable value: {}", val),
+            _ => panic!("invalid widget value: {}", val),
         })
         .unwrap();
-        Pushable { val, character }
+        Widget { val, character }
     }
     pub fn drawable(&self) -> TextDrawable {
         TextDrawable::new(&(self.character.to_string() + " "), BLACK, BLACK, true)
@@ -113,7 +113,7 @@ pub struct Game {
     pieces: HashMap<WorldSquare, Piece>,
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
-    pushables: HashMap<WorldSquare, Pushable>,
+    widgets: HashMap<WorldSquare, Widget>,
     floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
     conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
@@ -142,7 +142,7 @@ impl Game {
             pieces: HashMap::new(),
             upgrades: HashMap::new(),
             blocks: HashSet::new(),
-            pushables: HashMap::new(),
+            widgets: HashMap::new(),
             floor_push_arrows: HashMap::new(),
             conveyor_belts: HashMap::new(),
             turn_count: 0,
@@ -257,8 +257,8 @@ impl Game {
             return Err(());
         }
 
-        let pushable_is_at_destination = self.pushables.contains_key(&new_pos);
-        if num_squares == 1 && pushable_is_at_destination {
+        let widget_is_at_destination = self.widgets.contains_key(&new_pos);
+        if num_squares == 1 && widget_is_at_destination {
             self.try_push(new_pos, new_dir)?;
         }
 
@@ -278,7 +278,7 @@ impl Game {
         pushable_start_square: WorldSquare,
         push_direction: KingWorldStep,
     ) -> Result<(WorldSquare), ()> {
-        if !self.pushables.contains_key(&pushable_start_square) {
+        if !self.widgets.contains_key(&pushable_start_square) {
             return Err(());
         }
         let (end_square, end_dir) = self
@@ -287,14 +287,14 @@ impl Game {
                 push_direction,
             ))?
             .tuple();
-        if self.pushables.contains_key(&end_square) {
+        if self.widgets.contains_key(&end_square) {
             self.try_push(end_square, end_dir)?;
         }
         if !self.square_is_empty(end_square) {
             return Err(());
         }
-        let the_pushable = self.pushables.remove(&pushable_start_square).unwrap();
-        self.pushables.insert(end_square, the_pushable);
+        let the_pushable = self.widgets.remove(&pushable_start_square).unwrap();
+        self.widgets.insert(end_square, the_pushable);
         return Ok(end_square);
     }
 
@@ -502,7 +502,7 @@ impl Game {
         self.floating_hunter_drones
             .iter()
             .for_each(|thing| self.graphics.draw_floating_hunter_drone(*thing));
-        self.pushables.iter().for_each(|(&square, pushable)| {
+        self.widgets.iter().for_each(|(&square, pushable)| {
             self.graphics
                 .draw_drawable_to_draw_buffer(square, pushable.drawable())
         });
@@ -1714,14 +1714,17 @@ impl Game {
         self.place_double_sided_two_way_portal(entrance, exit);
     }
 
-    pub fn place_pushable(&mut self, pushable: Pushable, square: WorldSquare) {
-        self.pushables.insert(square, pushable);
+    pub fn place_widget(&mut self, pushable: Widget, square: WorldSquare) {
+        self.widgets.insert(square, pushable);
     }
     pub fn place_floor_push_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
         self.floor_push_arrows.insert(square, dir.into());
     }
     pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
         self.conveyor_belts.insert(square, dir.into());
+    }
+    pub fn conveyor_belt_speed() -> f32 {
+        2.0 / CONVEYOR_BELT_PERIOD.as_secs_f32()
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -1868,8 +1871,8 @@ impl Game {
 
         let base_square = self.player_square();
 
-        self.place_pushable(Pushable::new(5), base_square + STEP_UP * 4);
-        self.place_pushable(Pushable::new(13), base_square + STEP_UP * 5);
+        self.place_widget(Widget::new(5), base_square + STEP_UP * 4);
+        self.place_widget(Widget::new(13), base_square + STEP_UP * 5);
         for i in 0..3 {
             self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * i, STEP_RIGHT);
             self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);
@@ -3944,38 +3947,35 @@ mod tests {
     }
 
     #[test]
-    fn test_push_pushable() {
+    fn test_push_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
         game.place_player(start_square);
-        let pushable_val = 4;
-        game.place_pushable(Pushable::new(pushable_val), start_square + STEP_RIGHT);
+        let widget_val = 4;
+        game.place_widget(Widget::new(widget_val), start_square + STEP_RIGHT);
         game.try_slide_player(STEP_RIGHT).expect("should slide");
         assert_eq!(game.player_square(), start_square + STEP_RIGHT);
-        let correct_pushable_end_square = start_square + STEP_RIGHT * 2;
-        assert!(game.pushables.contains_key(&correct_pushable_end_square));
+        let correct_widget_end_square = start_square + STEP_RIGHT * 2;
+        assert!(game.widgets.contains_key(&correct_widget_end_square));
         assert_eq!(
-            game.pushables
-                .get(&correct_pushable_end_square)
-                .unwrap()
-                .val(),
-            pushable_val
+            game.widgets.get(&correct_widget_end_square).unwrap().val(),
+            widget_val
         );
     }
 
     #[test]
-    fn test_draw_pushable() {
+    fn test_draw_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
         game.place_player(start_square);
-        let pushable_val = 4;
-        game.place_pushable(Pushable::new(pushable_val), start_square + STEP_RIGHT);
+        let widget_val = 4;
+        game.place_widget(Widget::new(widget_val), start_square + STEP_RIGHT);
         game.draw_headless_now();
-        let pushable_glyphs = game
+        let widget_glyphs = game
             .graphics
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT);
-        assert_eq!(pushable_glyphs.to_clean_string(), "④ ")
+        assert_eq!(widget_glyphs.to_clean_string(), "④ ")
     }
 
     #[test]
@@ -3995,34 +3995,34 @@ mod tests {
     }
 
     #[test]
-    fn test_floor_arrows_push_pushables() {
+    fn test_floor_arrows_push_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
         //game.place_player(start_square);
-        let pushable_square = start_square + STEP_RIGHT;
-        game.place_pushable(Pushable::new(4), pushable_square);
-        game.place_floor_push_arrow(pushable_square, STEP_UP);
+        let widget_square = start_square + STEP_RIGHT;
+        game.place_widget(Widget::new(4), widget_square);
+        game.place_floor_push_arrow(widget_square, STEP_UP);
 
-        assert!(game.pushables.contains_key(&pushable_square));
+        assert!(game.widgets.contains_key(&widget_square));
         game.tick_game_logic();
-        assert!(game.pushables.contains_key(&(pushable_square + STEP_UP)));
+        assert!(game.widgets.contains_key(&(widget_square + STEP_UP)));
     }
 
     #[test]
-    fn test_pushable_visible_next_to_turning_portal() {
+    fn test_widget_visible_next_to_turning_portal() {
         let mut game = set_up_10x10_game();
         let start_square = point2(2, 2);
         game.place_player(start_square);
-        let pushable_square = start_square + STEP_RIGHT * 2 + STEP_UP;
-        game.place_pushable(Pushable::new(4), pushable_square);
+        let widget_square = start_square + STEP_RIGHT * 2 + STEP_UP;
+        game.place_widget(Widget::new(4), widget_square);
         for i in 0..2 {
             game.place_single_sided_one_way_portal(
                 SquareWithOrthogonalDir::from_square_and_worldstep(
-                    pushable_square + STEP_DOWN * i,
+                    widget_square + STEP_DOWN * i,
                     STEP_RIGHT,
                 ),
                 SquareWithOrthogonalDir::from_square_and_worldstep(
-                    pushable_square + STEP_RIGHT * (3 + i) + STEP_UP * 3,
+                    widget_square + STEP_RIGHT * (3 + i) + STEP_UP * 3,
                     STEP_UP,
                 ),
             );
@@ -4219,22 +4219,68 @@ mod tests {
 
     #[test]
     fn test_conveyor_belt__push_player() {
-        todo!()
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        let dir = STEP_RIGHT;
+        game.place_conveyor_belt(square, dir.into());
+
+        assert_eq!(game.player_square(), square);
+        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD.mul_f32(1.1));
+        assert_eq!(game.player_square(), square + dir);
     }
     #[test]
-    fn test_conveyor_belt__push_pushable() {
-        todo!()
+    fn test_conveyor_belt__push_widget() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_widget(Widget::new(5), square);
+        let dir = STEP_RIGHT;
+        game.place_conveyor_belt(square, dir.into());
+
+        assert!(game.widgets.contains_key(&square));
+        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD.mul_f32(1.1));
+        assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
     fn test_conveyor_belt__push_hunter_drone() {
-        todo!()
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_floating_hunter_drone(square.to_f32());
+        game.floating_hunter_drones
+            .iter_mut()
+            .next()
+            .unwrap()
+            .velocity = vec2(0.0, 0.0);
+        let dir = STEP_RIGHT;
+        game.place_conveyor_belt(square, dir.into());
+
+        let pos = game.floating_hunter_drones.iter().next().unwrap().position;
+        assert!((pos - square.to_f32()).length() < 0.001);
+
+        let dt = CONVEYOR_BELT_PERIOD.mul_f32(0.4635);
+        game.advance_realtime_effects(dt);
+
+        let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
+        let new_correct_pos =
+            square.to_f32() + STEP_RIGHT.to_f32() * dt.as_secs_f32() * Game::conveyor_belt_speed();
+
+        assert!((new_pos - new_correct_pos).length() < 0.001);
+
+        assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
-    fn test_floor_arrows_push_hunter_drones() {
+    fn test_floor_arrows_push_hunter_drone() {
         todo!()
     }
     #[test]
     fn test_floor_arrows_push_player() {
-        todo!()
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+        game.place_floor_push_arrow(square, STEP_RIGHT.into());
+
+        assert_eq!(game.player_square(), square);
+        game.tick_game_logic();
+        assert_eq!(game.player_square(), square + STEP_RIGHT);
     }
 }
