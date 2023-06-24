@@ -12,6 +12,7 @@ use rgb::RGB8;
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
+use crate::glyph::floating_square::characters_for_full_square_with_looping_1d_offset;
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::{
@@ -19,27 +20,28 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::{
     rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
-    QuarterTurnsAnticlockwise,
+    OrthogonalWorldStep, QuarterTurnsAnticlockwise,
 };
 
 #[delegatable_trait]
-pub trait Drawable: Clone + Debug {
+pub trait StaticDrawable: Clone + Debug {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum;
     fn to_glyphs(&self) -> DoubleGlyph;
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum;
     fn color_if_backgroundified(&self) -> RGB8;
     fn to_enum(&self) -> DrawableEnum;
     fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum;
 }
 
 #[derive(Debug, Clone, From, Delegate)]
-#[delegate(Drawable)]
+#[delegate(StaticDrawable)]
 pub enum DrawableEnum {
     Text(TextDrawable),
     PartialVisibility(PartialVisibilityDrawable),
     SolidColor(SolidColorDrawable),
     Braille(BrailleDrawable),
     Arrow(ArrowDrawable),
+    ConveyorBelt(ConveyorBeltDrawable),
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -62,7 +64,7 @@ impl TextDrawable {
     }
 }
 
-impl Drawable for TextDrawable {
+impl StaticDrawable for TextDrawable {
     fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         // lmao no
         self.clone().into()
@@ -72,7 +74,7 @@ impl Drawable for TextDrawable {
         self.glyphs
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum {
         let glyphs = self.to_glyphs().drawn_over(other.to_glyphs());
         Self::from_glyphs(glyphs).into()
     }
@@ -110,7 +112,7 @@ impl PartialVisibilityDrawable {
             bg_color: OUT_OF_SIGHT_COLOR, // TODO: no default color
         }
     }
-    pub fn from_partially_visible_drawable<T: Drawable>(
+    pub fn from_partially_visible_drawable<T: StaticDrawable>(
         original_drawable: &T,
         square_viz: SquareVisibility,
     ) -> Self {
@@ -123,7 +125,7 @@ impl PartialVisibilityDrawable {
     }
 }
 
-impl Drawable for PartialVisibilityDrawable {
+impl StaticDrawable for PartialVisibilityDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         let mut the_clone = self.clone();
         the_clone.visibility = self.visibility.rotated(quarter_rotations_anticlockwise);
@@ -156,7 +158,7 @@ impl Drawable for PartialVisibilityDrawable {
         glyphs
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum {
         let mut the_clone = self.clone();
         the_clone.bg_color = other.color_if_backgroundified();
         the_clone.into()
@@ -187,7 +189,7 @@ pub struct BrailleDrawable {
     bg_color: RGB8,
 }
 
-impl Drawable for BrailleDrawable {
+impl StaticDrawable for BrailleDrawable {
     fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         todo!()
     }
@@ -196,7 +198,7 @@ impl Drawable for BrailleDrawable {
         todo!()
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum {
         todo!()
     }
 
@@ -224,7 +226,7 @@ impl SolidColorDrawable {
     }
 }
 
-impl Drawable for SolidColorDrawable {
+impl StaticDrawable for SolidColorDrawable {
     fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         self.clone().into()
     }
@@ -233,7 +235,7 @@ impl Drawable for SolidColorDrawable {
         DoubleGlyph::solid_color(self.color)
     }
 
-    fn drawn_over<T: Drawable>(&self, _other: &T) -> DrawableEnum {
+    fn drawn_over<T: StaticDrawable>(&self, _other: &T) -> DrawableEnum {
         self.clone().into()
     }
 
@@ -283,7 +285,7 @@ impl ArrowDrawable {
     }
 }
 
-impl Drawable for ArrowDrawable {
+impl StaticDrawable for ArrowDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         ArrowDrawable {
             direction: rotated_n_quarter_turns_counter_clockwise(
@@ -301,7 +303,7 @@ impl Drawable for ArrowDrawable {
         self.text_drawable.to_glyphs()
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum {
         match self.text_drawable.drawn_over(other) {
             DrawableEnum::Text(text_drawable) => ArrowDrawable {
                 text_drawable,
@@ -332,13 +334,64 @@ impl Drawable for ArrowDrawable {
     }
 }
 
+#[derive(Debug, Clone, CopyGetters)]
+pub struct ConveyorBeltDrawable {
+    direction: OrthogonalWorldStep,
+    phase_offset: f32,
+    colors: [RGB8; 2],
+}
+
+impl StaticDrawable for ConveyorBeltDrawable {
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        ConveyorBeltDrawable {
+            direction: rotated_n_quarter_turns_counter_clockwise(
+                self.direction.into(),
+                quarter_rotations_anticlockwise,
+            )
+            .into(),
+            ..self.clone()
+        }
+        .to_enum()
+    }
+
+    fn to_glyphs(&self) -> DoubleGlyph {
+        let chars =
+            characters_for_full_square_with_looping_1d_offset(self.direction, self.phase_offset);
+        chars.map(|c| Glyph::new(c, self.colors[0], self.colors[1]))
+    }
+
+    fn drawn_over<T: StaticDrawable>(&self, other: &T) -> DrawableEnum {
+        self.to_enum()
+    }
+
+    fn color_if_backgroundified(&self) -> RGB8 {
+        if (self.phase_offset % 1.0).abs() <= 0.5 {
+            self.colors[0]
+        } else {
+            self.colors[1]
+        }
+    }
+
+    fn to_enum(&self) -> DrawableEnum {
+        self.clone().into()
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
+        ConveyorBeltDrawable {
+            colors: self.colors.map(|c| tint_color(c, color, strength)),
+            ..self.clone()
+        }
+        .into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{Line, STEP_RIGHT, STEP_UP};
+    use crate::utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -399,5 +452,14 @@ mod tests {
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
         );
+    }
+    #[test]
+    fn test_conveyor_belt_drawable__half_down() {
+        let drawable = ConveyorBeltDrawable {
+            direction: STEP_DOWN.into(),
+            phase_offset: 0.5,
+            colors: [RED, BLACK],
+        };
+        assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
 }

@@ -16,7 +16,7 @@ use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
 
-use crate::glyph::floating_square::character_for_square_with_1d_offset;
+use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
 use crate::piece::Upgrade;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::sign;
@@ -29,6 +29,7 @@ pub mod glyph_constants;
 pub mod hextant_blocks;
 
 // x, y
+pub type DoubleChar = [char; 2];
 pub type DoubleGlyph = [Glyph; 2];
 
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
@@ -174,7 +175,7 @@ impl Glyph {
             )
             .map(|character_offset| {
                 Glyph::new(
-                    character_for_square_with_1d_offset(true, character_offset),
+                    character_for_half_square_with_1d_offset(true, character_offset),
                     square_color,
                     background_color,
                 )
@@ -185,7 +186,7 @@ impl Glyph {
             );
             character_offsets.map(|character_offset| {
                 Glyph::new(
-                    character_for_square_with_1d_offset(false, character_offset),
+                    character_for_half_square_with_1d_offset(false, character_offset),
                     square_color,
                     background_color,
                 )
@@ -313,7 +314,6 @@ impl Glyph {
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
     pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
-
         let arrow_string_direction_order = [
             STEP_LEFT,
             STEP_RIGHT,

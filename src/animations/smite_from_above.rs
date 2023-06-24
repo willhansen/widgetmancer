@@ -45,7 +45,7 @@ impl Animation for SmiteAnimation {
 
         let one_horizontal_slice: DoubleGlyph = [1.0, -1.0].map(|i| {
             Glyph::fg_only(
-                floating_square::character_for_square_with_1d_offset(
+                floating_square::character_for_half_square_with_1d_offset(
                     false,
                     i * (1.0 - beam_width_fraction),
                 ),

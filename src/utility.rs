@@ -1372,6 +1372,14 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     }
 }
 
+pub fn snap_to_nths(x: f32, denominator: u32) -> f32 {
+    (x * denominator as f32).round() / denominator as f32
+}
+pub fn looping_clamp(a: f32, b: f32, x: f32) -> f32 {
+    assert!(a < b);
+    ((x - a).rem_euclid(b - a)) + a
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -1826,5 +1834,13 @@ mod tests {
             diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),
             1.0 / 2.0.sqrt()
         );
+    }
+    #[test]
+    fn test_looping_clamp() {
+        assert_about_eq!(looping_clamp(0.0, 5.0, 3.0), 3.0); // in range
+        assert_about_eq!(looping_clamp(0.0, 5.0, 5.1), 0.1); // above
+        assert_about_eq!(looping_clamp(0.0, 5.0, -0.1), 4.9); // below
+        assert_about_eq!(looping_clamp(-1.0, 5.0, 11.1), -0.9); // multiple periods above
+        assert_about_eq!(looping_clamp(-1.5, 1.5, 2.0), -1.0); // fraction above
     }
 }

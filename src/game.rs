@@ -66,6 +66,8 @@ impl FloatingHunterDrone {
     }
 }
 
+const CONVEYOR_BELT_PERIOD: Duration = Duration::from_secs_f32(1.0);
+
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: KingWorldStep,
@@ -2026,7 +2028,7 @@ mod tests {
         HUNTER_DRONE_COLOR, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR, SIGHT_LINE_SEEKING_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
-    use crate::graphics::drawable::{Drawable, DrawableEnum};
+    use crate::graphics::drawable::{DrawableEnum, StaticDrawable};
     use crate::graphics::screen::{
         Screen, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP,
         SCREEN_STEP_UP_RIGHT, SCREEN_STEP_ZERO,
@@ -4170,18 +4172,17 @@ mod tests {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         let square = point2(6, 5);
-        let belt_period: Duration = game.place_conveyor_belt(square, STEP_RIGHT).period();
+        game.place_conveyor_belt(square, STEP_RIGHT);
         game.draw_headless_now();
+
         let glyphs1 = game
             .graphics
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
-        assert_eq!(
-            glyphs1.get_solid_color(),
-            Some(game.floor_color_at_square(square))
-        );
 
-        game.advance_realtime_effects(Duration::from_secs_f32(belt_period.as_secs_f32() / 4.0));
+        assert!(glyphs1.get_solid_color().is_some());
+
+        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD.div_f32(4.0));
 
         let glyphs2 = game
             .graphics
@@ -4189,5 +4190,35 @@ mod tests {
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
 
         assert_ne!(glyphs1, glyphs2);
+
+        game.advance_realtime_effects(CONVEYOR_BELT_PERIOD);
+
+        let glyphs3 = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN);
+
+        assert_eq!(glyphs2, glyphs3);
+    }
+
+    #[test]
+    fn test_conveyor_belt__push_player() {
+        todo!()
+    }
+    #[test]
+    fn test_conveyor_belt__push_pushable() {
+        todo!()
+    }
+    #[test]
+    fn test_conveyor_belt__push_hunter_drone() {
+        todo!()
+    }
+    #[test]
+    fn test_floor_arrows_push_hunter_drones() {
+        todo!()
+    }
+    #[test]
+    fn test_floor_arrows_push_player() {
+        todo!()
     }
 }

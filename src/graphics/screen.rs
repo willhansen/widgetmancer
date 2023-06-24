@@ -6,7 +6,7 @@ use rgb::RGB8;
 
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
-use crate::graphics::drawable::Drawable;
+use crate::graphics::drawable::StaticDrawable;
 use crate::utility::coordinate_frame_conversions::{
     world_character_square_to_world_square, world_point_to_world_character_point,
     world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
@@ -436,7 +436,11 @@ impl Screen {
             .for_each(|i| self.draw_glyph_straight_to_screen_buffer(glyphs[i], buffer_squares[i]));
     }
 
-    pub fn draw_drawable<T: Drawable>(&mut self, drawable: &T, screen_square: ScreenBufferSquare) {
+    pub fn draw_drawable<T: StaticDrawable>(
+        &mut self,
+        drawable: &T,
+        screen_square: ScreenBufferSquare,
+    ) {
         self.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_square);
     }
 
