@@ -35,7 +35,9 @@ use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
-use crate::game::{DeathCube, FloatingHunterDrone, CONVEYOR_BELT_PERIOD, HUNTER_DRONE_SIGHT_RANGE};
+use crate::game::{
+    DeathCube, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD, HUNTER_DRONE_SIGHT_RANGE,
+};
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
