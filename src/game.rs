@@ -261,7 +261,7 @@ impl Game {
 
         let widget_is_at_destination = self.widgets.contains_key(&new_pos);
         if num_squares == 1 && widget_is_at_destination {
-            self.try_push_grid_entity_in_square(new_pos, new_dir)?;
+            self.try_push_grid_entity(new_pos, new_dir)?;
         }
 
         self.try_set_player_position(new_pos)?;
@@ -275,18 +275,22 @@ impl Game {
         Ok(())
     }
 
-    fn try_push_grid_entity_in_square(
+    fn try_push_grid_entity(
         &mut self,
         start_square: WorldSquare,
         push_direction: KingWorldStep,
     ) -> Result<SquareWithKingDir, ()> {
+        if !self.widgets.contains_key(&start_square) {
+            return Err(());
+        }
         let (end_square, end_dir) = self
             .portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?
             .tuple();
         if self.widgets.contains_key(&end_square) {
-            self.try_push_grid_entity_in_square(end_square, end_dir)?;
+            self.try_push_grid_entity(end_square, end_dir)?;
         }
 
+        // do the movement
         if let Some(the_pushable) = self.widgets.remove(&start_square) {
             self.widgets.insert(end_square, the_pushable);
             Ok(SquareWithKingDir::new(end_square, end_dir))
@@ -740,8 +744,70 @@ impl Game {
     }
 
     fn apply_floor_push_arrows(&mut self) {
+        let push_directions: HashMap<WorldSquare, KingWorldStep> = self
+            .floor_push_arrows
+            .iter()
+            .map(|(&start_square, &push_direction)| (start_square, push_direction.into()))
+            .collect();
+        self.simultaneously_push_several_grid_entities(&push_directions);
+        self.simultaneously_push_floating_entities_at_several_squares(&push_directions, 1.0);
+    }
+
+    fn tick_conveyor_belts(&mut self, delta: Duration) {
+        let prev_conveyor_periods_since_start = self.world_time_since_start().as_secs_f32()
+            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32();
+        let new_conveyor_periods_since_start = delta.as_secs_f32()
+            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
+            + prev_conveyor_periods_since_start;
+
+        let just_finished_full_movement_period =
+            new_conveyor_periods_since_start.floor() > prev_conveyor_periods_since_start.floor();
+
+        let push_directions: HashMap<WorldSquare, KingWorldStep> = self
+            .conveyor_belts
+            .iter()
+            .map(|(&start_square, &push_direction)| (start_square, push_direction.into()))
+            .collect();
+        if just_finished_full_movement_period {
+            self.simultaneously_push_several_grid_entities(&push_directions);
+        }
+
+        let conveyor_distance = Game::conveyor_belt_speed() * delta.as_secs_f32();
+        self.simultaneously_push_floating_entities_at_several_squares(
+            &push_directions,
+            conveyor_distance,
+        );
+    }
+
+    fn simultaneously_push_several_grid_entities(
+        &mut self,
+        push_directions: &HashMap<WorldSquare, KingWorldStep>,
+    ) {
         let mut push_end_squares = HashSet::new();
-        self.floor_push_arrows
+        push_directions
+            .iter()
+            .for_each(|(&start_square, &push_direction)| {
+                let already_pushed_something_to_here = push_end_squares.contains(&start_square);
+                if !already_pushed_something_to_here {
+                    let push_end_pose = self.portal_aware_single_step(SquareWithKingDir::new(
+                        start_square,
+                        push_direction.into(),
+                    ));
+                    if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
+                        self.try_push_grid_entity(start_square, push_direction.into())
+                            .ok();
+                        push_end_squares.insert(end_square);
+                    }
+                }
+            });
+    }
+    fn simultaneously_push_floating_entities_at_several_squares(
+        &mut self,
+        push_directions: &HashMap<WorldSquare, KingWorldStep>,
+        push_distance: f32,
+    ) {
+        let mut push_end_squares = HashSet::new();
+        push_directions
             .clone()
             .iter()
             .for_each(|(&start_square, &push_direction)| {
@@ -752,60 +818,12 @@ impl Game {
                         push_direction.into(),
                     ));
                     if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
-                        self.try_push_grid_entity_in_square(start_square, push_direction.into())
-                            .ok();
                         self.push_floating_entities_in_square(
                             start_square,
                             push_direction.into(),
-                            1.0,
+                            push_distance,
                         );
                         push_end_squares.insert(end_square);
-                    }
-                }
-            });
-    }
-    fn tick_conveyor_belts(&mut self, delta: Duration) {
-        let conveyor_periods_since_start = self.world_time_since_start().as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32();
-        let new_periods_since_start = delta.as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
-            + conveyor_periods_since_start;
-        let just_finished_full_movement_period =
-            new_periods_since_start.floor() > conveyor_periods_since_start.floor();
-
-        let conveyor_distance = Game::conveyor_belt_speed() * delta.as_secs_f32();
-
-        let mut push_end_squares = HashSet::new();
-        self.conveyor_belts
-            .clone()
-            .iter()
-            .for_each(|(&start_square, &push_direction)| {
-                self.push_floating_entities_in_square(
-                    start_square,
-                    push_direction.into(),
-                    conveyor_distance,
-                );
-
-                if just_finished_full_movement_period {
-                    let already_pushed_something_to_here = push_end_squares.contains(&start_square);
-                    if !already_pushed_something_to_here {
-                        let push_end_pose = self.portal_aware_single_step(SquareWithKingDir::new(
-                            start_square,
-                            push_direction.into(),
-                        ));
-                        if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
-                            self.try_push_grid_entity_in_square(
-                                start_square,
-                                push_direction.into(),
-                            )
-                            .ok();
-                            self.push_floating_entities_in_square(
-                                start_square,
-                                push_direction.into(),
-                                1.0,
-                            );
-                            push_end_squares.insert(end_square);
-                        }
                     }
                 }
             });
@@ -4398,5 +4416,16 @@ mod tests {
         assert_eq!(game.player_square(), square);
         game.tick_game_logic();
         assert_eq!(game.player_square(), square + STEP_RIGHT);
+    }
+    #[test]
+    fn test_floor_arrow_does_not_push_too_far() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_widget(Widget::new(5), square);
+        game.place_floor_push_arrow(square, STEP_RIGHT.into());
+        game.tick_game_logic();
+        assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
+        game.tick_game_logic();
+        assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
     }
 }

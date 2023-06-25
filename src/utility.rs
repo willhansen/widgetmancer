@@ -1023,6 +1023,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
+#[deprecated(note = "use (WorldSquare, OrthogonalWorldStep) instead")]
 #[derive(Clone, Hash, Eq, PartialEq, Neg, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct SquareWithOrthogonalDir {
@@ -1223,6 +1224,7 @@ impl From<KingWorldStep> for OrthogonalWorldStep {
     }
 }
 
+#[deprecated(note = "use (WorldSquare, KingWorldStep) instead")]
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct SquareWithKingDir {
