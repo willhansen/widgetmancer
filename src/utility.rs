@@ -1120,10 +1120,10 @@ impl Debug for SquareWithOrthogonalDir {
     }
 }
 
-impl TryFrom<SquareWithAdjacentDir> for SquareWithOrthogonalDir {
+impl TryFrom<SquareWithKingDir> for SquareWithOrthogonalDir {
     type Error = ();
 
-    fn try_from(value: SquareWithAdjacentDir) -> Result<Self, Self::Error> {
+    fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
         if is_orthogonal(value.direction().into()) {
             Ok(SquareWithOrthogonalDir::from_square_and_worldstep(
                 value.square(),
@@ -1225,19 +1225,16 @@ impl From<KingWorldStep> for OrthogonalWorldStep {
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
-pub struct SquareWithAdjacentDir {
+pub struct SquareWithKingDir {
     square: WorldSquare,
     direction: KingWorldStep,
 }
 
-impl SquareWithAdjacentDir {
+impl SquareWithKingDir {
     pub fn new(square: WorldSquare, direction: KingWorldStep) -> Self {
-        SquareWithAdjacentDir { square, direction }
+        SquareWithKingDir { square, direction }
     }
-    pub fn from_square_and_step(
-        square: WorldSquare,
-        direction: WorldStep,
-    ) -> SquareWithAdjacentDir {
+    pub fn from_square_and_step(square: WorldSquare, direction: WorldStep) -> SquareWithKingDir {
         Self::new(square, KingWorldStep::new(direction))
     }
     pub fn tuple(&self) -> (WorldSquare, KingWorldStep) {
@@ -1246,17 +1243,17 @@ impl SquareWithAdjacentDir {
     pub fn is_square_face(&self) -> bool {
         is_orthogonal(self.direction.step)
     }
-    pub fn stepped(&self) -> SquareWithAdjacentDir {
-        SquareWithAdjacentDir::from_square_and_step(
+    pub fn stepped(&self) -> SquareWithKingDir {
+        SquareWithKingDir::from_square_and_step(
             self.square + self.direction.step,
             self.direction.into(),
         )
     }
 }
 
-impl From<SquareWithOrthogonalDir> for SquareWithAdjacentDir {
+impl From<SquareWithOrthogonalDir> for SquareWithKingDir {
     fn from(value: SquareWithOrthogonalDir) -> Self {
-        SquareWithAdjacentDir {
+        SquareWithKingDir {
             square: value.square(),
             direction: value.direction().into(),
         }

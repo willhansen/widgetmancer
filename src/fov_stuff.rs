@@ -1040,7 +1040,7 @@ mod tests {
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
         better_angle_from_x_axis, line_intersections_with_centered_unit_square,
-        QuarterTurnsAnticlockwise, SquareWithAdjacentDir, SquareWithOrthogonalDir, STEP_DOWN,
+        QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir, STEP_DOWN,
         STEP_LEFT, STEP_UP,
     };
 

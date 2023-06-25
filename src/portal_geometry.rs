@@ -13,8 +13,7 @@ use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldSt
 use crate::utility::{
     is_orthogonal, ith_projection_of_step, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
-    SquareWithAdjacentDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_RIGHT,
-    STEP_ZERO,
+    SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Hash, Neg, Clone, Copy, Debug)]
@@ -150,8 +149,8 @@ impl PortalGeometry {
 
     pub fn portal_aware_single_step(
         &self,
-        start: SquareWithAdjacentDir,
-    ) -> Result<SquareWithAdjacentDir, ()> {
+        start: SquareWithKingDir,
+    ) -> Result<SquareWithKingDir, ()> {
         if let Ok(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
             Ok(
                 if let Some(&exit) = self.portal_exits_by_entrance.get(&ortho_start) {
@@ -191,7 +190,7 @@ impl PortalGeometry {
                     // TODO: account for other second portals on the other side of the first ones.
                     let dest_square = first_x_portal.exit.square() + first_y_portal.exit.direction().step();
                     let dest_dir = first_x_portal.exit.direction().step() + first_y_portal.exit.direction().step();
-                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
+                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
                 } else {
                     // Can't walk through a portal corner that goes to two different places
                     Err(())
@@ -203,7 +202,7 @@ impl PortalGeometry {
                     if second_x_portal.is_coherent_with(&second_y_portal) {
                         let dest_square = second_x_portal.exit.square();
                         let dest_dir = second_x_portal.exit.direction().step() + second_y_portal.exit.direction().step();
-                        Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
+                        Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
                     } else {
                         // Can't step through mismatched corner
                         Err(())
@@ -220,7 +219,7 @@ impl PortalGeometry {
                     let dest_square = second_x_portal.exit.square();
                     let dest_dir = second_x_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
+                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
                 } else if let Some(second_y_portal) = maybe_second_y_portal && maybe_second_x_portal.is_none() {
                     let x_dir_to_y_dir_is_left = rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
 
@@ -231,7 +230,7 @@ impl PortalGeometry {
                     let dest_square = second_y_portal.exit.square();
                     let dest_dir = second_y_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithAdjacentDir::from_square_and_step(dest_square, dest_dir))
+                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
                 } else {
                     // it's neither
                     Ok(start.stepped())
@@ -247,9 +246,9 @@ impl PortalGeometry {
 
     pub fn multiple_portal_aware_steps(
         &self,
-        start: SquareWithAdjacentDir,
+        start: SquareWithKingDir,
         num_steps: u32,
-    ) -> Result<SquareWithAdjacentDir, ()> {
+    ) -> Result<SquareWithKingDir, ()> {
         (0..num_steps).fold(Ok(start), |current_square_and_dir, _| {
             self.portal_aware_single_step(current_square_and_dir?)
         })

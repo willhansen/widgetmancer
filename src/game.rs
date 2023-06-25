@@ -244,7 +244,7 @@ impl Game {
     ) -> Result<(), ()> {
         let (new_pos, new_dir) = self
             .multiple_portal_aware_steps(
-                SquareWithAdjacentDir::new(self.player_square(), direction),
+                SquareWithKingDir::new(self.player_square(), direction),
                 num_squares,
             )?
             .tuple();
@@ -259,7 +259,7 @@ impl Game {
 
         let widget_is_at_destination = self.widgets.contains_key(&new_pos);
         if num_squares == 1 && widget_is_at_destination {
-            self.try_push(new_pos, new_dir)?;
+            self.push_everything_in_square(new_pos, new_dir)?;
         }
 
         self.try_set_player_position(new_pos)?;
@@ -273,29 +273,54 @@ impl Game {
         Ok(())
     }
 
-    fn try_push(
+    fn push_everything_in_square(
         &mut self,
-        pushable_start_square: WorldSquare,
+        start_square: WorldSquare,
         push_direction: KingWorldStep,
-    ) -> Result<(WorldSquare), ()> {
-        if !self.widgets.contains_key(&pushable_start_square) {
-            return Err(());
-        }
+    ) -> SquareWithKingDir {
         let (end_square, end_dir) = self
-            .portal_aware_single_step(SquareWithAdjacentDir::new(
-                pushable_start_square,
-                push_direction,
-            ))?
+            .portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?
+            .tuple();
+        self.try_push_grid_entity_in_square(start_square, push_direction)
+            .ok();
+        self.push_floating_entities_in_square(start_square, push_direction, 1.0)
+
+        SquareWithKingDir::new(end_square, end_dir)
+    }
+
+    fn try_push_grid_entity_in_square(
+        &mut self,
+        start_square: WorldSquare,
+        push_direction: KingWorldStep,
+    ) -> Result<SquareWithKingDir, ()> {
+        let (end_square, end_dir) = self
+            .portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?
             .tuple();
         if self.widgets.contains_key(&end_square) {
-            self.try_push(end_square, end_dir)?;
+            self.try_push_grid_entity_in_square(end_square, end_dir)?;
         }
-        if !self.square_is_empty(end_square) {
-            return Err(());
-        }
-        let the_pushable = self.widgets.remove(&pushable_start_square).unwrap();
+
+        let the_pushable = self.widgets.remove(&start_square).unwrap();
         self.widgets.insert(end_square, the_pushable);
-        return Ok(end_square);
+        todo!()
+    }
+    fn push_floating_entities_in_square(
+        &mut self,
+        start_square: WorldSquare,
+        push_direction: KingWorldStep,
+        push_length: f32,
+    ) -> SquareWithKingDir {
+        let (end_square, end_dir) = self
+            .portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?
+            .tuple();
+        let floating_entities_at_start: Vec::<&mut FloatingHunterDrone> = self.floating_entities_in_square(start_square);
+        floating_entities_at_start.iter().for_each(|e| e.position += push_direction.into() * push_length);
+        todo!()
+    }
+
+    fn floating_entities_in_square(&mut self, square: WorldSquare) -> Vec::<&mut FloatingHunterDrone> {
+
+    todo!()
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
@@ -409,8 +434,8 @@ impl Game {
         }
     }
 
-    pub fn player_pose(&self) -> SquareWithAdjacentDir {
-        SquareWithAdjacentDir::new(self.player_square(), self.player_faced_direction())
+    pub fn player_pose(&self) -> SquareWithKingDir {
+        SquareWithKingDir::new(self.player_square(), self.player_faced_direction())
     }
 
     pub fn raw_set_player_faced_direction(&mut self, new_dir: KingWorldStep) {
@@ -693,7 +718,7 @@ impl Game {
 
     pub fn tick_game_logic(&mut self) {
         self.move_non_arrow_factions();
-        self.tick_arrows();
+        self.tick_projectile_arrows();
         self.apply_floor_push_arrows();
 
         self.on_turn_end();
@@ -706,14 +731,13 @@ impl Game {
             .iter()
             .for_each(|(&square, &dir)| {
                 if !push_end_squares.contains(&square) {
-                    if let Ok(end_square) = self.try_push(square, dir.into()) {
-                        push_end_squares.insert(end_square);
-                    }
+                    let end_square = self.push_everything_in_square(square, dir.into()).square();
+                    push_end_squares.insert(end_square);
                 }
             });
     }
 
-    pub fn tick_arrows(&mut self) {
+    pub fn tick_projectile_arrows(&mut self) {
         let old_arrows = self.drain_arrows();
 
         // arrows that hit arrows, blocks, or board edges disappear
@@ -724,7 +748,7 @@ impl Game {
             .iter()
             .for_each(|(&square, &dir): (&WorldSquare, &KingWorldStep)| {
                 if let Ok(next_pose) =
-                    self.portal_aware_single_step(SquareWithAdjacentDir::new(square, dir))
+                    self.portal_aware_single_step(SquareWithKingDir::new(square, dir))
                 {
                     let (next_square, next_dir) = next_pose.tuple();
                     if self.is_piece_at(next_square) {
@@ -967,7 +991,7 @@ impl Game {
 
     pub fn move_all_pieces(&mut self) {
         self.move_non_arrow_factions();
-        self.tick_arrows();
+        self.tick_projectile_arrows();
         self.turn_count += 1;
     }
 
@@ -1075,7 +1099,7 @@ impl Game {
             // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
             let square = if is_king_step(repeating_step.stepp()) {
                 if let Ok(end_pose) = self.multiple_portal_aware_steps(
-                    SquareWithAdjacentDir::from_square_and_step(
+                    SquareWithKingDir::from_square_and_step(
                         start_square,
                         repeating_step.stepp().into(),
                     ),
@@ -2018,16 +2042,16 @@ impl Game {
 
     pub fn portal_aware_single_step(
         &self,
-        start: SquareWithAdjacentDir,
-    ) -> Result<SquareWithAdjacentDir, ()> {
+        start: SquareWithKingDir,
+    ) -> Result<SquareWithKingDir, ()> {
         self.portal_geometry.portal_aware_single_step(start)
     }
 
     pub fn multiple_portal_aware_steps(
         &self,
-        start: SquareWithAdjacentDir,
+        start: SquareWithKingDir,
         num_steps: u32,
-    ) -> Result<SquareWithAdjacentDir, ()> {
+    ) -> Result<SquareWithKingDir, ()> {
         self.portal_geometry
             .multiple_portal_aware_steps(start, num_steps)
     }
@@ -2645,7 +2669,7 @@ mod tests {
         game.place_arrow(square, STEP_RIGHT.into());
         assert!(game.is_arrow_at(square));
         assert_eq!(game.arrows().len(), 1);
-        game.tick_arrows();
+        game.tick_projectile_arrows();
         assert!(game.is_arrow_at(square + STEP_RIGHT));
         assert_eq!(game.arrows().len(), 1);
     }
@@ -2750,7 +2774,7 @@ mod tests {
             SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 2), STEP_DOWN.into());
         game.place_single_sided_one_way_portal(start, end);
         game.place_arrow(start.square(), start.direction().into());
-        game.tick_arrows();
+        game.tick_projectile_arrows();
         assert_eq!(game.arrows().get(&end.square()), Some(&STEP_DOWN.into()));
     }
 
@@ -4265,12 +4289,30 @@ mod tests {
             square.to_f32() + STEP_RIGHT.to_f32() * dt.as_secs_f32() * Game::conveyor_belt_speed();
 
         assert!((new_pos - new_correct_pos).length() < 0.001);
-
-        assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
     fn test_floor_arrows_push_hunter_drone() {
-        todo!()
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        let start_pos = square.to_f32() + vec2(0.123, 0.342);
+        game.place_floating_hunter_drone(start_pos);
+        game.floating_hunter_drones
+            .iter_mut()
+            .next()
+            .unwrap()
+            .velocity = vec2(0.0, 0.0);
+        let dir = STEP_RIGHT;
+        game.place_conveyor_belt(square, dir.into());
+
+        let pos = game.floating_hunter_drones.iter().next().unwrap().position;
+        assert!((pos - start_pos).length() < 0.001);
+
+        game.tick_game_logic();
+
+        let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
+        let new_correct_pos = start_pos + dir.to_f32();
+
+        assert!((new_pos - new_correct_pos).length() < 0.001);
     }
     #[test]
     fn test_floor_arrows_push_player() {
