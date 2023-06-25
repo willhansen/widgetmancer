@@ -53,8 +53,8 @@ use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
-    reversed, squares_on_board, unit_vector_from_angle, KingWorldStep, OrthogonalWorldStep,
-    STEP_RIGHT,
+    reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
+    OrthogonalWorldStep, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
@@ -473,8 +473,7 @@ impl Graphics {
         global_phase: f32,
     ) {
         conveyor_belts.iter().for_each(|(&square, &dir)| {
-            let square_is_odd = (square.x + square.y) % 2 == 1;
-            let phase = global_phase + if square_is_odd { 0.5 } else { 0.0 };
+            let phase = global_phase + if square_is_odd(square) { 0.5 } else { 0.0 };
             self.draw_drawable_to_draw_buffer(square, ConveyorBeltDrawable::new(dir, phase))
         })
     }

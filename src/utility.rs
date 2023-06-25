@@ -1379,6 +1379,13 @@ pub fn looping_clamp(a: f32, b: f32, x: f32) -> f32 {
     ((x - a).rem_euclid(b - a)) + a
 }
 
+pub fn square_is_odd(square: WorldSquare) -> bool {
+    (square.x + square.y) % 2 == 1
+}
+pub fn square_is_even(square: WorldSquare) -> bool {
+    !square_is_odd(square)
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

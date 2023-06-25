@@ -738,12 +738,12 @@ impl Game {
     pub fn tick_game_logic(&mut self) {
         self.move_non_arrow_factions();
         self.tick_projectile_arrows();
-        self.apply_floor_push_arrows();
+        self.tick_floor_push_arrows();
 
         self.on_turn_end();
     }
 
-    fn apply_floor_push_arrows(&mut self) {
+    fn tick_floor_push_arrows(&mut self) {
         let push_directions: HashMap<WorldSquare, KingWorldStep> = self
             .floor_push_arrows
             .iter()
@@ -4302,10 +4302,11 @@ mod tests {
     #[test]
     fn test_conveyor_belt__place_and_draw() {
         let mut game = set_up_10x10_game();
-        let player_square = point2(5, 5);
+        let player_square = point2(4, 5);
         game.place_player(player_square);
-        let square = player_square + STEP_DOWN;
-        game.place_conveyor_belt(square, STEP_RIGHT);
+        let belt_square = player_square + STEP_DOWN;
+        assert!(square_is_even(belt_square));
+        game.place_conveyor_belt(belt_square, STEP_RIGHT);
         let advance_and_get_glyphs = |game: &mut Game, duration: Duration| {
             game.advance_realtime_effects(duration);
             game.draw_headless_now();
@@ -4394,7 +4395,7 @@ mod tests {
             .unwrap()
             .velocity = vec2(0.0, 0.0);
         let dir = STEP_RIGHT;
-        game.place_conveyor_belt(square, dir.into());
+        game.place_floor_push_arrow(square, dir.into());
 
         let pos = game.floating_hunter_drones.iter().next().unwrap().position;
         assert!((pos - start_pos).length() < 0.001);
