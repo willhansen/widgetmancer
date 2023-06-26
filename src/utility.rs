@@ -1237,13 +1237,10 @@ impl SquareWithKingDir {
         SquareWithKingDir { square, direction }
     }
     pub fn from_square_and_step(square: WorldSquare, direction: WorldStep) -> SquareWithKingDir {
-        Self::new(square, KingWorldStep::new(direction))
+        Self::new(square, direction.into())
     }
     pub fn tuple(&self) -> (WorldSquare, KingWorldStep) {
         (self.square, self.direction)
-    }
-    pub fn is_square_face(&self) -> bool {
-        is_orthogonal(self.direction.step)
     }
     pub fn stepped(&self) -> SquareWithKingDir {
         SquareWithKingDir::from_square_and_step(

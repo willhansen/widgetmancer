@@ -70,6 +70,25 @@ impl FloatingHunterDrone {
 pub const CONVEYOR_BELT_MOVEMENT_PERIOD: Duration = Duration::from_secs_f32(2.0);
 pub const CONVEYOR_BELT_VISUAL_PERIOD: Duration = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(2.0);
 
+#[derive(Clone, Eq, PartialEq, Debug, Copy)]
+enum GridEntity {
+    Player,
+    Widget(Widget),
+    Block,
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+enum FloatingEntity {
+    DeathCube(DeathCube),
+    FloatingHunterDrone(FloatingHunterDrone),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Copy)]
+enum FloorFeature {
+    PushArrow(OrthogonalWorldStep),
+    ConveyorBelt(OrthogonalWorldStep),
+}
+
 pub struct Player {
     pub position: WorldSquare,
     pub faced_direction: KingWorldStep,
@@ -275,29 +294,54 @@ impl Game {
         Ok(())
     }
 
+    fn get_grid_entity_at_square(&self, square: WorldSquare) -> Option<GridEntity> {
+        if self.try_get_player_square() == Some(square) {
+            Some(GridEntity::Player)
+        } else if self.blocks.contains(&square) {
+            Some(GridEntity::Block)
+        } else if let Some(&widget) = self.widgets.get(&square) {
+            Some(GridEntity::Widget(widget))
+        } else {
+            None
+        }
+    }
+    fn square_has_grid_entity(&self, square: WorldSquare) -> bool {
+        self.get_grid_entity_at_square(square).is_some()
+    }
+
     fn try_push_grid_entity(
         &mut self,
         start_square: WorldSquare,
         push_direction: KingWorldStep,
     ) -> Result<SquareWithKingDir, ()> {
-        if !self.widgets.contains_key(&start_square) {
+        let pushee = self.get_grid_entity_at_square(start_square);
+        if pushee.is_none() || pushee == Some(GridEntity::Block) {
             return Err(());
         }
-        let (end_square, end_dir) = self
-            .portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?
-            .tuple();
-        if self.widgets.contains_key(&end_square) {
+        let end_pose =
+            self.portal_aware_single_step(SquareWithKingDir::new(start_square, push_direction))?;
+        let (end_square, end_dir) = end_pose.tuple();
+        if self.square_has_grid_entity(end_square) {
             self.try_push_grid_entity(end_square, end_dir)?;
         }
 
         // do the movement
-        if let Some(the_pushable) = self.widgets.remove(&start_square) {
-            self.widgets.insert(end_square, the_pushable);
-            Ok(SquareWithKingDir::new(end_square, end_dir))
-        } else {
-            Err(())
-        }
+        match pushee.unwrap() {
+            GridEntity::Player => self.try_slide_player(push_direction.step())?,
+            GridEntity::Widget(_) => self.move_widget(start_square, end_square),
+            GridEntity::Block => panic!("Can't push a block at: {:?}", start_square),
+        };
+        Ok(end_pose)
     }
+
+    fn move_widget(&mut self, start: WorldSquare, end: WorldSquare) {
+        assert!(self.widgets.contains_key(&start));
+        assert!(!self.widgets.contains_key(&end));
+
+        let widget = self.widgets.remove(&start).unwrap();
+        self.widgets.insert(end, widget);
+    }
+
     fn push_floating_entities_in_square(
         &mut self,
         start_square: WorldSquare,
@@ -4428,5 +4472,23 @@ mod tests {
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
         game.tick_game_logic();
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
+    }
+    #[test]
+    fn test_player_shall_not_walk_against_push_arrows() {
+        let mut game = set_up_10x10_game();
+        let square = point2(8, 5);
+        game.place_player(square);
+        for i in 0..5 {
+            game.place_floor_push_arrow(square + STEP_LEFT * (i + 1), STEP_RIGHT.into());
+        }
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        for i in 0..30 {
+            game.try_slide_player(STEP_LEFT).ok();
+            game.tick_game_logic();
+        }
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        assert_eq!(game.player_square(), square);
     }
 }
