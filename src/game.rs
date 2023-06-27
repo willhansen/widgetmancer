@@ -58,11 +58,11 @@ pub struct FloatingHunterDrone {
 }
 
 impl FloatingHunterDrone {
-    pub fn new(position: WorldPoint) -> Self {
+    pub fn new(position: WorldPoint, velocity: WorldMove, sight_direction: Angle<f32>) -> Self {
         FloatingHunterDrone {
             position,
-            velocity: WorldMove::new(1.0, 0.0),
-            sight_direction: Angle::degrees(0.0),
+            velocity,
+            sight_direction,
         }
     }
 }
@@ -99,6 +99,11 @@ pub struct Player {
 pub struct IncubatingPawn {
     pub age_in_turns: u32,
     pub faction: Faction,
+}
+
+struct RaycastResult {
+    grid_entities: Vec<(WorldStep, GridEntity)>,
+    floating_entities: Vec<FloatingEntity>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy, CopyGetters)]
@@ -653,9 +658,9 @@ impl Game {
         self.death_cubes.push(DeathCube { position, velocity });
     }
 
-    pub fn advance_realtime_effects(&mut self, delta: Duration) {
-        self.move_death_cubes(delta);
-        self.advance_hunter_drones(delta);
+    pub fn tick_realtime_effects(&mut self, delta: Duration) {
+        self.tick_death_cubes(delta);
+        self.tick_hunter_drones(delta);
         self.tick_realtime_turrets(delta);
         self.tick_conveyor_belts(delta);
         self.world_time += delta;
@@ -686,7 +691,7 @@ impl Game {
             }
         });
     }
-    pub fn move_death_cubes(&mut self, duration: Duration) {
+    pub fn tick_death_cubes(&mut self, duration: Duration) {
         let mut kill_lines: Vec<(WorldSquare, WorldSquare)> = vec![];
         for cube in &mut self.death_cubes {
             let start_pos = cube.position;
@@ -717,12 +722,37 @@ impl Game {
         });
     }
 
-    fn advance_hunter_drones(&mut self, duration: Duration) {
+    fn raycast(&self, start: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
+        todo!()
+    }
+
+    fn tick_hunter_drones(&mut self, duration: Duration) {
         self.floating_hunter_drones = self
             .floating_hunter_drones
             .iter()
             .map(|drone: &FloatingHunterDrone| {
                 let mut clone_drone = drone.clone();
+
+                let raycast_result = self.raycast(
+                    clone_drone.position,
+                    clone_drone.sight_direction,
+                    HUNTER_DRONE_SIGHT_RANGE,
+                );
+
+                let maybe_relative_player_square = raycast_result
+                    .grid_entities
+                    .iter()
+                    .find(|(_rel_square, grid_entity)| matches!(grid_entity, GridEntity::Player))
+                    .map(|(rel_square, _grid_entity)| rel_square);
+
+                if let Some(relative_player_square) = maybe_relative_player_square {
+                    let drone_position_in_its_square =
+                        clone_drone.position - clone_drone.position.round();
+                    let vec_to_player_center =
+                        relative_player_square.to_f32() - drone_position_in_its_square;
+                    clone_drone.velocity =
+                        vec_to_player_center.normalize() * clone_drone.velocity.length();
+                }
 
                 clone_drone = self.slide_hunter_drone_with_portal_awareness(
                     &clone_drone,
@@ -949,9 +979,14 @@ impl Game {
         self.place_piece(Piece::new(DeathCubeTurret, self.death_cube_faction), square);
     }
 
-    pub fn place_floating_hunter_drone(&mut self, point: WorldPoint) {
+    pub fn place_floating_hunter_drone(
+        &mut self,
+        point: WorldPoint,
+        velocity: WorldMove,
+        sight_angle: Angle<f32>,
+    ) {
         self.floating_hunter_drones
-            .push(FloatingHunterDrone::new(point));
+            .push(FloatingHunterDrone::new(point, velocity, sight_angle));
     }
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
@@ -2038,7 +2073,11 @@ impl Game {
             self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);
         }
 
-        self.place_floating_hunter_drone((base_square + STEP_DOWN * 5).to_f32());
+        self.place_floating_hunter_drone(
+            (base_square + STEP_DOWN * 5).to_f32(),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
 
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
             base_square + STEP_RIGHT * 3 + STEP_UP * 3,
@@ -2436,7 +2475,7 @@ mod tests {
         let death_cube_start_vel = STEP_RIGHT.to_f32() * 20.0;
         game.place_linear_death_cube(death_cube_start_pos, death_cube_start_vel);
         assert!(game.player_is_alive());
-        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        game.tick_death_cubes(Duration::from_secs_f32(1.0));
         assert_false!(game.player_is_alive());
     }
 
@@ -2449,7 +2488,7 @@ mod tests {
         let death_cube_start_vel = STEP_RIGHT.to_f32() * 20.0;
         game.place_linear_death_cube(death_cube_start_pos, death_cube_start_vel);
         assert!(!game.pieces.is_empty());
-        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        game.tick_death_cubes(Duration::from_secs_f32(1.0));
         assert!(game.pieces.is_empty());
     }
 
@@ -2480,7 +2519,7 @@ mod tests {
     fn test_death_cube_moves() {
         let mut game = set_up_10x10_game();
         game.place_linear_death_cube(point2(3.0, 4.5), vec2(1.0, 0.0));
-        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        game.tick_death_cubes(Duration::from_secs_f32(1.0));
         assert_about_eq!(game.death_cubes[0].position.x, 4.0);
     }
 
@@ -2511,7 +2550,7 @@ mod tests {
         let squares_that_look_solid = get_solidness(&game);
         assert_eq!(squares_that_look_solid, vec![false, false, true, true]);
 
-        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        game.tick_death_cubes(Duration::from_secs_f32(1.0));
 
         game.draw_headless_now();
         let squares_that_look_solid = get_solidness(&game);
@@ -2546,10 +2585,10 @@ mod tests {
         let turret_square = point2(5, 5);
         game.place_death_turret(turret_square);
         assert!(game.death_cubes.is_empty());
-        game.advance_realtime_effects(Duration::from_secs_f32(5.0));
+        game.tick_realtime_effects(Duration::from_secs_f32(5.0));
         assert!(!game.death_cubes.is_empty());
 
-        game.move_death_cubes(Duration::from_secs_f32(1.0));
+        game.tick_death_cubes(Duration::from_secs_f32(1.0));
         assert!(!game.pieces.is_empty());
     }
 
@@ -2558,7 +2597,7 @@ mod tests {
         let mut game = set_up_nxn_game(5);
         game.place_linear_death_cube(point2(4.9, 4.9), vec2(20.0, 0.0));
         assert!(!game.death_cubes.is_empty());
-        game.move_death_cubes(Duration::from_secs_f32(5.0));
+        game.tick_death_cubes(Duration::from_secs_f32(5.0));
         assert!(game.death_cubes.is_empty());
     }
 
@@ -4202,7 +4241,11 @@ mod tests {
     fn test_floating_hunter_drone__place_and_draw() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(4, 5));
-        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+        game.place_floating_hunter_drone(
+            WorldPoint::new(5.0, 5.0),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
 
@@ -4224,11 +4267,15 @@ mod tests {
     #[test]
     fn test_floating_hunter_drone__rotate_over_time() {
         let mut game = set_up_10x10_game();
-        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+        game.place_floating_hunter_drone(
+            WorldPoint::new(5.0, 5.0),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
 
         let start_angle = game.floating_hunter_drones[0].sight_direction;
 
-        game.advance_realtime_effects(Duration::from_secs_f32(0.5));
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
 
         let end_angle = game.floating_hunter_drones[0].sight_direction;
 
@@ -4238,11 +4285,15 @@ mod tests {
     #[test]
     fn test_floating_hunter_drone__move_over_time() {
         let mut game = set_up_10x10_game();
-        game.place_floating_hunter_drone(WorldPoint::new(5.0, 5.0));
+        game.place_floating_hunter_drone(
+            WorldPoint::new(5.0, 5.0),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
 
         let start_pos = game.floating_hunter_drones[0].position;
 
-        game.advance_realtime_effects(Duration::from_secs_f32(0.5));
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
 
         let end_pos = game.floating_hunter_drones[0].position;
 
@@ -4252,12 +4303,16 @@ mod tests {
     #[test]
     fn test_floating_hunter_drone__bounce_off_board_edge() {
         let mut game = set_up_10x10_game();
-        game.place_floating_hunter_drone(WorldPoint::new(9.0, 5.0));
+        game.place_floating_hunter_drone(
+            WorldPoint::new(9.0, 5.0),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
 
         let start_vel = game.floating_hunter_drones[0].velocity;
 
         assert!(start_vel.x > 0.0);
-        game.advance_realtime_effects(Duration::from_secs_f32(5.0));
+        game.tick_realtime_effects(Duration::from_secs_f32(5.0));
 
         let end_vel = game.floating_hunter_drones[0].velocity;
 
@@ -4314,7 +4369,11 @@ mod tests {
     fn test_hunter_drone_rotates_with_screen_rotation() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
-        game.place_floating_hunter_drone(WorldPoint::new(6.5, 5.0));
+        game.place_floating_hunter_drone(
+            WorldPoint::new(6.5, 5.0),
+            STEP_RIGHT.to_f32(),
+            Angle::degrees(0.0),
+        );
         game.graphics
             .screen
             .set_rotation(QuarterTurnsAnticlockwise::new(1));
@@ -4352,7 +4411,7 @@ mod tests {
         assert!(square_is_even(belt_square));
         game.place_conveyor_belt(belt_square, STEP_RIGHT);
         let advance_and_get_glyphs = |game: &mut Game, duration: Duration| {
-            game.advance_realtime_effects(duration);
+            game.tick_realtime_effects(duration);
             game.draw_headless_now();
 
             game.graphics
@@ -4387,7 +4446,7 @@ mod tests {
         game.place_conveyor_belt(square, dir.into());
 
         assert_eq!(game.player_square(), square);
-        game.advance_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
+        game.tick_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
         assert_eq!(game.player_square(), square + dir);
     }
     #[test]
@@ -4399,19 +4458,15 @@ mod tests {
         game.place_conveyor_belt(square, dir.into());
 
         assert!(game.widgets.contains_key(&square));
-        game.advance_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
+        game.tick_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
         assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
     fn test_conveyor_belt__push_hunter_drone() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
-        game.place_floating_hunter_drone(square.to_f32());
-        game.floating_hunter_drones
-            .iter_mut()
-            .next()
-            .unwrap()
-            .velocity = vec2(0.0, 0.0);
+        game.place_floating_hunter_drone(square.to_f32(), STEP_ZERO.to_f32(), Angle::degrees(0.0));
+
         let dir = STEP_RIGHT;
         game.place_conveyor_belt(square, dir.into());
 
@@ -4419,9 +4474,29 @@ mod tests {
         assert!((pos - square.to_f32()).length() < 0.001);
 
         let dt = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(0.4635);
-        game.advance_realtime_effects(dt);
+        game.tick_realtime_effects(dt);
 
         let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
+        let new_correct_pos =
+            square.to_f32() + STEP_RIGHT.to_f32() * dt.as_secs_f32() * Game::conveyor_belt_speed();
+
+        assert!((new_pos - new_correct_pos).length() < 0.001);
+    }
+    #[test]
+    fn test_conveyor_belt__pushes_death_cube() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_linear_death_cube(square.to_f32(), vec2(0.0, 0.0));
+        let dir = STEP_RIGHT;
+        game.place_conveyor_belt(square, dir.into());
+
+        let pos = game.death_cubes.get(0).unwrap().position;
+        assert!((pos - square.to_f32()).length() < 0.001);
+
+        let dt = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(0.4635);
+        game.tick_realtime_effects(dt);
+
+        let new_pos = game.death_cubes.get(0).unwrap().position;
         let new_correct_pos =
             square.to_f32() + STEP_RIGHT.to_f32() * dt.as_secs_f32() * Game::conveyor_belt_speed();
 
@@ -4432,12 +4507,11 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         let start_pos = square.to_f32() + vec2(0.123, 0.342);
-        game.place_floating_hunter_drone(start_pos);
-        game.floating_hunter_drones
-            .iter_mut()
-            .next()
-            .unwrap()
-            .velocity = vec2(0.0, 0.0);
+        game.place_floating_hunter_drone(
+            start_pos.to_f32(),
+            STEP_ZERO.to_f32(),
+            Angle::degrees(0.0),
+        );
         let dir = STEP_RIGHT;
         game.place_floor_push_arrow(square, dir.into());
 
@@ -4474,7 +4548,7 @@ mod tests {
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
     }
     #[test]
-    fn test_player_shall_not_walk_against_push_arrows() {
+    fn test_player_shant_walk_against_push_arrows() {
         let mut game = set_up_10x10_game();
         let square = point2(8, 5);
         game.place_player(square);
@@ -4490,5 +4564,27 @@ mod tests {
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
         assert_eq!(game.player_square(), square);
+    }
+    #[test]
+    fn test_hunter_drone_turns_towards_player_upon_detection() {
+        let mut game = set_up_10x10_game();
+        let square = point2(5, 5);
+        game.place_player(square);
+
+        let start_vel = STEP_RIGHT.to_f32();
+        game.place_floating_hunter_drone(
+            (square + STEP_DOWN * 3).to_f32(),
+            start_vel,
+            Angle::degrees(90.0),
+        );
+
+        game.tick_realtime_effects(Duration::from_secs_f32(0.001));
+
+        let drone: &mut FloatingHunterDrone = game.floating_hunter_drones.get_mut(0).unwrap();
+
+        let end_vel = drone.velocity;
+
+        assert_about_eq!(start_vel.x, end_vel.y);
+        assert_about_eq!(start_vel.length(), end_vel.length());
     }
 }

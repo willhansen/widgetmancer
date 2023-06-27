@@ -131,7 +131,7 @@ pub fn do_everything() {
 
             game.tick_game_logic();
         }
-        game.advance_realtime_effects(delta);
+        game.tick_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
     }
