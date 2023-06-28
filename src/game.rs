@@ -101,9 +101,10 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug)]
 struct RaycastResult {
     grid_entities: Vec<(WorldStep, GridEntity)>,
-    floating_entities: Vec<FloatingEntity>,
+    //floating_entities: Vec<FloatingEntity>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy, CopyGetters)]
@@ -722,8 +723,26 @@ impl Game {
         });
     }
 
-    fn raycast(&self, start: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
-        todo!()
+    fn raycast(&self, start_point: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
+        let mut result = RaycastResult {
+            grid_entities: vec![],
+        };
+        let end_point = start_point + unit_vector_from_angle(direction).cast_unit() * range;
+        let start_square = world_point_to_world_square(start_point);
+        let end_square = world_point_to_world_square(end_point);
+
+        let squares_on_line: Vec<WorldSquare> =
+            line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple())
+                .map(|(x, y)| point2(x, y))
+                .collect_vec();
+        result.grid_entities = squares_on_line
+            .iter()
+            .filter_map(|&square| {
+                self.get_grid_entity_at_square(square)
+                    .map(|entity| (square - start_square, entity))
+            })
+            .collect_vec();
+        result
     }
 
     fn tick_hunter_drones(&mut self, duration: Duration) {
@@ -4548,7 +4567,7 @@ mod tests {
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
     }
     #[test]
-    fn test_player_shant_walk_against_push_arrows() {
+    fn test_player_tries_to_walk_against_push_arrows() {
         let mut game = set_up_10x10_game();
         let square = point2(8, 5);
         game.place_player(square);
@@ -4586,5 +4605,59 @@ mod tests {
 
         assert_about_eq!(start_vel.x, end_vel.y);
         assert_about_eq!(start_vel.length(), end_vel.length());
+    }
+    #[test]
+    fn test_raycast__hit_nothing() {
+        let game = set_up_10x10_game();
+        let result = game.raycast(point2(5.0, 5.0), Angle::degrees(0.0), 3.0);
+        assert!(result.grid_entities.is_empty());
+    }
+    #[test]
+    fn test_raycast__hit_block() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(9, 5);
+        game.place_block(block_square);
+        let result = game.raycast(
+            (block_square + STEP_LEFT * 4).to_f32(),
+            Angle::degrees(0.0),
+            5.0,
+        );
+        assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
+    }
+    #[test]
+    fn test_raycast__not_enough_range_to_hit_block() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(9, 5);
+        game.place_block(block_square);
+        let result = game.raycast(
+            (block_square + STEP_LEFT * 4).to_f32(),
+            Angle::degrees(0.0),
+            3.0,
+        );
+        assert!(result.grid_entities.is_empty());
+    }
+    #[test]
+    fn test_raycast__barely_hit_block() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(9, 5);
+        game.place_block(block_square);
+        let result = game.raycast(
+            block_square.to_f32() - vec2(3.51, 0.0),
+            Angle::degrees(0.0),
+            3.02,
+        );
+        assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
+    }
+    #[test]
+    fn test_raycast__barely_out_of_range() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(9, 5);
+        game.place_block(block_square);
+        let result = game.raycast(
+            block_square.to_f32() - vec2(3.51, 0.0),
+            Angle::degrees(0.0),
+            3.0,
+        );
+        assert!(result.grid_entities.is_empty());
     }
 }
