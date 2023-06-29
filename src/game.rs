@@ -735,11 +735,42 @@ impl Game {
             line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple())
                 .map(|(x, y)| point2(x, y))
                 .collect_vec();
-        result.grid_entities = squares_on_line
+        let squares_on_line_relative_to_start = squares_on_line
             .iter()
-            .filter_map(|&square| {
+            .map(|&square| square - start_square)
+            .collect_vec();
+        let single_steps = (0..squares_on_line.len())
+            .tuple_windows()
+            .map(|(i, j)| squares_on_line[j] - squares_on_line[i])
+            .collect_vec();
+
+        let mut squares_on_portal_aware_line = vec![start_square];
+        let mut square_before_step = start_square;
+        let mut cumulative_rotation_from_portals = QuarterTurnsAnticlockwise::default();
+        for step in single_steps {
+            let pose_before_step: (WorldSquare, KingWorldStep) = (
+                square_before_step,
+                cumulative_rotation_from_portals.rotate_vector(step).into(),
+            );
+            if let Ok(pose_after_step) = self.portal_aware_single_step(pose_before_step.into()) {
+                let turn_from_step = QuarterTurnsAnticlockwise::from_start_and_end_directions(
+                    pose_before_step.1.into(),
+                    pose_after_step.direction().into(),
+                );
+                cumulative_rotation_from_portals += turn_from_step;
+                square_before_step = pose_after_step.square();
+                squares_on_portal_aware_line.push(pose_after_step.square());
+            } else {
+                break;
+            }
+        }
+
+        result.grid_entities = squares_on_portal_aware_line
+            .iter()
+            .zip(squares_on_line_relative_to_start.iter())
+            .filter_map(|(&square, &rel_square)| {
                 self.get_grid_entity_at_square(square)
-                    .map(|entity| (square - start_square, entity))
+                    .map(|entity| (rel_square, entity))
             })
             .collect_vec();
         result
@@ -2092,11 +2123,13 @@ impl Game {
             self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);
         }
 
-        self.place_floating_hunter_drone(
-            (base_square + STEP_DOWN * 5).to_f32(),
-            STEP_RIGHT.to_f32(),
-            Angle::degrees(0.0),
-        );
+        for i in 0..4 {
+            self.place_floating_hunter_drone(
+                (base_square + STEP_DOWN * (5 + i)).to_f32(),
+                STEP_RIGHT.to_f32() * i as f32,
+                Angle::degrees(0.0),
+            );
+        }
 
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
             base_square + STEP_RIGHT * 3 + STEP_UP * 3,
@@ -4659,5 +4692,52 @@ mod tests {
             3.0,
         );
         assert!(result.grid_entities.is_empty());
+    }
+    #[test]
+    fn test_raycast_goes_through_portal() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(9, 5);
+        game.place_block(block_square);
+
+        let dist_from_exit = 1;
+        let portal_entrance_square = block_square + STEP_UP_LEFT * 2;
+        let portal_exit_square = block_square + STEP_LEFT * dist_from_exit;
+
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_step(portal_entrance_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(portal_exit_square, STEP_RIGHT),
+        );
+
+        let dist_from_entrance = 3;
+        let result = game.raycast(
+            (portal_entrance_square + STEP_LEFT * dist_from_entrance).to_f32(),
+            Angle::degrees(0.0),
+            5.0,
+        );
+        let dist_from_portal_step = 1;
+        assert_eq!(
+            result.grid_entities[0],
+            (
+                STEP_RIGHT * (dist_from_exit + dist_from_entrance + dist_from_portal_step),
+                GridEntity::Block
+            )
+        );
+    }
+    #[test]
+    fn test_raycast_goes_through_turned_portal() {
+        let mut game = set_up_10x10_game();
+        let block_square = point2(5, 5);
+        game.place_block(block_square);
+
+        let portal_entrance_square = block_square + STEP_LEFT * 4;
+        let portal_exit_square = block_square;
+
+        game.place_single_sided_one_way_portal(
+            SquareWithOrthogonalDir::from_square_and_step(portal_entrance_square, STEP_UP),
+            SquareWithOrthogonalDir::from_square_and_step(portal_exit_square, STEP_RIGHT),
+        );
+
+        let result = game.raycast(portal_entrance_square.to_f32(), Angle::degrees(90.0), 5.0);
+        assert_eq!(result.grid_entities[0], (STEP_UP, GridEntity::Block));
     }
 }

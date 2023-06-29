@@ -1223,6 +1223,16 @@ impl From<KingWorldStep> for OrthogonalWorldStep {
         OrthogonalWorldStep::new(value.step)
     }
 }
+impl From<(WorldSquare, OrthogonalWorldStep)> for SquareWithOrthogonalDir {
+    fn from(value: (WorldSquare, OrthogonalWorldStep)) -> Self {
+        Self::from_square_and_step(value.0, value.1.into())
+    }
+}
+impl From<SquareWithOrthogonalDir> for (WorldSquare, OrthogonalWorldStep) {
+    fn from(value: SquareWithOrthogonalDir) -> (WorldSquare, OrthogonalWorldStep) {
+        (value.square, value.direction())
+    }
+}
 
 #[deprecated(note = "use (WorldSquare, KingWorldStep) instead")]
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
@@ -1256,6 +1266,17 @@ impl From<SquareWithOrthogonalDir> for SquareWithKingDir {
             square: value.square(),
             direction: value.direction().into(),
         }
+    }
+}
+
+impl From<(WorldSquare, KingWorldStep)> for SquareWithKingDir {
+    fn from(value: (WorldSquare, KingWorldStep)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}
+impl From<SquareWithKingDir> for (WorldSquare, KingWorldStep) {
+    fn from(value: SquareWithKingDir) -> (WorldSquare, KingWorldStep) {
+        (value.square, value.direction)
     }
 }
 
