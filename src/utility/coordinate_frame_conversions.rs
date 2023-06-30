@@ -1,4 +1,4 @@
-use crate::graphics::drawable::{DrawableEnum, StaticDrawable};
+use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 

@@ -18,7 +18,7 @@ use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::graphics;
 use crate::graphics::drawable::DrawableEnum::SolidColor;
 use crate::graphics::drawable::{
-    DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, StaticDrawable, TextDrawable,
+    Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};

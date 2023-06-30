@@ -42,8 +42,8 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::characters_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{
-    ArrowDrawable, ConveyorBeltDrawable, DrawableEnum, PartialVisibilityDrawable,
-    SolidColorDrawable, StaticDrawable, TextDrawable,
+    ArrowDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum, PartialVisibilityDrawable,
+    SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
@@ -323,7 +323,7 @@ impl Graphics {
         self.draw_drawable_to_draw_buffer(world_pos, drawable);
     }
 
-    pub fn draw_above_square<T: StaticDrawable + Debug>(
+    pub fn draw_above_square<T: Drawable + Debug>(
         &mut self,
         drawable: &T,
         world_square: WorldSquare,
@@ -346,7 +346,7 @@ impl Graphics {
         self.draw_above_square(&TextDrawable::from_glyphs(glyphs), world_square);
     }
 
-    pub fn draw_drawable_to_draw_buffer<T: StaticDrawable + Debug>(
+    pub fn draw_drawable_to_draw_buffer<T: Drawable + Debug>(
         &mut self,
         world_square: WorldSquare,
         drawable: T,

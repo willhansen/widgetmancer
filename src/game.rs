@@ -2298,7 +2298,7 @@ mod tests {
         RIGHT_HALF_BLOCK, SIGHT_LINE_SEEKING_COLOR,
     };
     use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
-    use crate::graphics::drawable::{DrawableEnum, StaticDrawable};
+    use crate::graphics::drawable::{Drawable, DrawableEnum};
     use crate::graphics::screen::{
         Screen, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP,
         SCREEN_STEP_UP_RIGHT, SCREEN_STEP_ZERO,
