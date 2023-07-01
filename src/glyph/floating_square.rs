@@ -270,7 +270,7 @@ pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleCha
         let scaled_x_offset = offset.x * 2.0;
         let shifted_toward_this_side = sign(scaled_x_offset) == i;
         let compensated_x_offset = if shifted_toward_this_side {
-            (scaled_x_offset.abs() - 1.0) * sign(scaled_x_offset)
+            (scaled_x_offset.abs() - 1.0).max(0.0) * sign(scaled_x_offset)
         } else {
             scaled_x_offset
         };

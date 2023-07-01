@@ -13,7 +13,9 @@ use rgb::RGB8;
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
-use crate::glyph::floating_square::characters_for_full_square_with_looping_1d_offset;
+use crate::glyph::floating_square::{
+    characters_for_full_square_with_2d_offset, characters_for_full_square_with_looping_1d_offset,
+};
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::{
@@ -452,11 +454,8 @@ impl Drawable for OffsetSquareDrawable {
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        let mut glyphs =
-            Glyph::orthogonally_offset_board_square_glyphs(self.offset, self.fg_color(), self.bg_color());
-        glyphs[0].bg_transparent = true;
-        glyphs[1].bg_transparent = true;
-        glyphs
+        characters_for_full_square_with_2d_offset(self.offset)
+            .map(|c| Glyph::new(c, self.fg_color(), self.bg_color()))
     }
 
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
@@ -554,5 +553,16 @@ mod tests {
     fn test_conveyor_belt_drawable__half_down() {
         let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
+    }
+    #[test]
+    fn test_offset_square_drawn_over_solid() {
+        let top = OffsetSquareDrawable {
+            offset: vec2(0.5, 0.0),
+            colors: [RED, BLUE],
+        };
+        let bottom = SolidColorDrawable::new(GREEN);
+        let combo = top.drawn_over(&bottom);
+        assert_eq!(combo.to_glyphs()[0].get_solid_color(), Some(GREEN));
+        assert_eq!(combo.to_glyphs()[1].get_solid_color(), Some(RED));
     }
 }
