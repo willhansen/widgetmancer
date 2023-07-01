@@ -1,3 +1,4 @@
+use crate::glyph::DoubleChar;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use euclid::{point2, Point2D};
@@ -7,8 +8,14 @@ pub struct BrailleGridInWorldFrame;
 pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
 pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
 
-pub type BrailleArray = [[bool; 4]; 2];
-pub type DoubleBrailleArray = [[bool; 4]; 4];
+#[derive(Debug, Clone)]
+pub struct BrailleArray {
+    array: [[bool; 2]; 4],
+}
+#[derive(Debug, Clone)]
+pub struct DoubleBrailleArray {
+    array: [[bool; 4]; 4],
+}
 
 pub const EMPTY_BRAILLE: char = '\u{2800}';
 pub const FULL_BRAILLE: char = '⣿';
@@ -16,17 +23,78 @@ pub const FULL_BRAILLE: char = '⣿';
 // All the braille unicode consecutively for easy reference
 //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
 
-pub fn braille_array_to_braille_char(input: BrailleArray) -> char {
-    let mut dot_val: u32 = 0;
-    for x in 0..2 {
-        for y in 0..4 {
-            if input[x][y] {
-                dot_val |= braille_bit_for_pos(point2(x as i32, y as i32));
+impl BrailleArray {
+    const WIDTH: usize = 2;
+    const HEIGHT: usize = 4;
+    pub fn from_char(c: char) -> Self {
+        todo!()
+    }
+    pub fn char(&self) -> char {
+        let mut dot_val: u32 = 0;
+        for x in 0..2 {
+            for y in 0..4 {
+                if self.get_xy(x, y) {
+                    dot_val |= braille_bit_for_pos(point2(x as i32, y as i32));
+                }
             }
         }
+        return char::from_u32('\u{2800}' as u32 | dot_val).unwrap();
     }
-    return char::from_u32('\u{2800}' as u32 | dot_val).unwrap();
+    pub fn from_array(array: [[bool; Self::WIDTH]; Self::HEIGHT]) -> Self {
+        Self { array }
+    }
+    pub fn empty() -> Self {
+        Self::from_array([[false; Self::WIDTH]; Self::HEIGHT])
+    }
+    pub fn get_xy(&self, x: usize, y: usize) -> bool {
+        self.get_row_col(Self::y_to_row(y), x)
+    }
+    pub fn set_xy(&mut self, x: usize, y: usize, val: bool) {
+        self.set_row_col(Self::y_to_row(y), x, val);
+    }
+    fn y_to_row(y: usize) -> usize {
+        Self::HEIGHT - 1 - y
+    }
+    pub fn get_row_col(&self, row: usize, col: usize) -> bool {
+        self.array[row][col]
+    }
+    pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
+        self.array[row][col] = val;
+    }
 }
+
+impl DoubleBrailleArray {
+    const WIDTH: usize = 4;
+    const HEIGHT: usize = 4;
+    pub fn from_chars(c: DoubleChar) -> Self {
+        todo!()
+    }
+    pub fn chars(&self) -> DoubleChar {
+        todo!()
+    }
+    pub fn from_array(array: [[bool; Self::WIDTH]; Self::HEIGHT]) -> Self {
+        Self { array }
+    }
+    pub fn empty() -> Self {
+        Self::from_array([[false; Self::WIDTH]; Self::HEIGHT])
+    }
+    pub fn get_xy(&self, x: usize, y: usize) -> bool {
+        self.get_row_col(Self::y_to_row(y), x)
+    }
+    pub fn set_xy(&mut self, x: usize, y: usize, val: bool) {
+        self.set_row_col(Self::y_to_row(y), x, val);
+    }
+    fn y_to_row(y: usize) -> usize {
+        Self::HEIGHT - 1 - y
+    }
+    pub fn get_row_col(&self, row: usize, col: usize) -> bool {
+        self.array[row][col]
+    }
+    pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
+        self.array[row][col] = val;
+    }
+}
+
 pub fn split_double_braille_array(double_array: DoubleBrailleArray) -> [BrailleArray; 2] {
     todo!()
 }
@@ -144,17 +212,17 @@ pub fn character_world_pos_to_braille_char(
 }
 
 pub fn local_braille_squares_to_braille_array(squares: Vec<WorldBrailleSquare>) -> BrailleArray {
-    let mut output_array: BrailleArray = [[false; 4]; 2];
+    let mut output_array: BrailleArray = BrailleArray::empty();
     for square in squares {
         assert!(square.x >= 0 || square.x < 2);
         assert!(square.y >= 0 || square.y < 4);
-        output_array[square.x as usize][square.y as usize] = true;
+        output_array.set_xy(square.x as usize, square.y as usize, true);
     }
     output_array
 }
 
 pub fn local_braille_squares_to_braille_char(squares: Vec<WorldBrailleSquare>) -> char {
-    braille_array_to_braille_char(local_braille_squares_to_braille_array(squares))
+    local_braille_squares_to_braille_array(squares).char()
 }
 
 pub fn get_chars_for_braille_line(
@@ -234,15 +302,21 @@ mod tests {
         // 00
         // 01
         // 01
-        let input = [[false, false, false, true], [true, true, false, false]];
-        assert_eq!(braille_array_to_braille_char(input), '⢡');
+        assert_eq!(
+            BrailleArray::from_array([[true, false], [false, false], [false, true], [false, true]])
+                .char(),
+            '⢡'
+        );
 
         // 00
         // 11
         // 01
         // 00
-        let input = [[false, false, true, false], [false, true, true, false]];
-        assert_eq!(braille_array_to_braille_char(input), '⠲');
+        assert_eq!(
+            BrailleArray::from_array([[false, false], [true, true], [false, true], [false, false]])
+                .char(),
+            '⠲'
+        );
     }
 
     #[test]
