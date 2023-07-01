@@ -8,6 +8,12 @@ pub struct BrailleGridInWorldFrame;
 pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
 pub type WorldBraillePoint = Point2D<f32, BrailleGridInWorldFrame>;
 
+pub const EMPTY_BRAILLE: char = '\u{2800}';
+pub const FULL_BRAILLE: char = '⣿';
+
+// All the braille unicode consecutively for easy reference
+//⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
+
 #[derive(Debug, Clone)]
 pub struct BrailleArray {
     array: [[bool; 2]; 4],
@@ -16,12 +22,6 @@ pub struct BrailleArray {
 pub struct DoubleBrailleArray {
     array: [[bool; 4]; 4],
 }
-
-pub const EMPTY_BRAILLE: char = '\u{2800}';
-pub const FULL_BRAILLE: char = '⣿';
-
-// All the braille unicode consecutively for easy reference
-//⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
 
 impl BrailleArray {
     const WIDTH: usize = 2;
@@ -71,6 +71,23 @@ impl DoubleBrailleArray {
     }
     pub fn chars(&self) -> DoubleChar {
         todo!()
+    }
+    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+        let rotation_function = match quarter_turns.quarter_turns() {
+            0 => |x, y| (x, y),
+            1 => |x, y| (Self::WIDTH - 1 - y, x),
+            2 => |x, y| (Self::WIDTH - 1 - x, Self::HEIGHT - 1 - y),
+            3 => |x, y| (y, Self::WIDTH - 1 - x),
+            _ => panic!("Malformed parameter"),
+        };
+        let mut the_clone = self.clone();
+        for x in 0..Self::WIDTH {
+            for y in 0..Self::HEIGHT {
+                let (new_x, new_y) = rotation_function(x, y);
+                the_clone.set_xy(new_x, new_y, self.get_xy(x, y));
+            }
+        }
+        the_clone
     }
     pub fn from_array(array: [[bool; Self::WIDTH]; Self::HEIGHT]) -> Self {
         Self { array }

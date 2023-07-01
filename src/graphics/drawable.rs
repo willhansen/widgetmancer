@@ -17,7 +17,7 @@ use crate::glyph::floating_square::{
     characters_for_full_square_with_2d_offset, characters_for_full_square_with_looping_1d_offset,
 };
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use crate::glyph::{DoubleChar, DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::{
     local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
     WorldPoint, WorldSquare, WorldStep,
@@ -189,14 +189,27 @@ impl Drawable for PartialVisibilityDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct BrailleDrawable {
-    dot_array: DoubleBrailleArray,
+    braille_array: DoubleBrailleArray,
     dot_color: RGB8,
     bg_color: RGB8,
 }
 
+impl BrailleDrawable {
+    pub fn from_chars(chars: DoubleChar, dot_color: RGB8) -> Self {
+        BrailleDrawable {
+            braille_array: DoubleBrailleArray::from_chars(chars),
+            dot_color,
+            bg_color: BLACK,
+        }
+    }
+}
+
 impl Drawable for BrailleDrawable {
-    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
-        todo!()
+    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        Self {
+            braille_array: self.braille_array.rotated(QuarterTurnsAnticlockwise::new(quarter_rotations_anticlockwise)),
+            ..self.clone()
+        }.into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
@@ -431,7 +444,7 @@ impl OffsetSquareDrawable {
                     offset: floating_square_offset_from_square_center,
                     colors: [color, BLACK],
                 };
-                let glyphs_round_to_empty_square = drawable.to_glyphs().to_chars() == [SPACE; 2];
+                let glyphs_round_to_empty_square = drawable.to_glyphs().chars() == [SPACE; 2];
                 if !glyphs_round_to_empty_square {
                     output.insert(square, drawable);
                 }
@@ -564,5 +577,16 @@ mod tests {
         let combo = top.drawn_over(&bottom);
         assert_eq!(combo.to_glyphs()[0].get_solid_color(), Some(GREEN));
         assert_eq!(combo.to_glyphs()[1].get_solid_color(), Some(RED));
+    }
+    // All the braille unicode consecutively for easy reference
+    //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
+    #[test]
+    fn test_braille_drawable_rotation() {
+        let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
+        let f = |i| drawable.rotated(i).to_glyphs().chars();
+        assert_eq!(f(-1), ['⠓', '⠃']);
+        assert_eq!(f(1), ['⢠', '⢤']);
+        assert_eq!(f(2), [' ', '⠯']);
+        assert_eq!(f(3), ['⠓', '⠃']);
     }
 }

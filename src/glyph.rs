@@ -475,7 +475,7 @@ pub trait DoubleGlyphFunctions {
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
     fn to_string(&self) -> String;
     fn to_clean_string(&self) -> String;
-    fn to_chars(&self) -> DoubleChar;
+    fn chars(&self) -> DoubleChar;
     fn get_solid_color(&self) -> Option<RGB8>;
     fn looks_solid(&self) -> bool;
     fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
@@ -538,7 +538,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     fn to_clean_string(&self) -> String {
         self[0].character.to_string() + &self[1].character.to_string()
     }
-    fn to_chars(&self) -> DoubleChar {
+    fn chars(&self) -> DoubleChar {
         self.map(|g| g.character)
     }
 

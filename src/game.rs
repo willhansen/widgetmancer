@@ -4478,11 +4478,11 @@ mod tests {
         let glyphs2 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(8.0));
 
         assert_ne!(glyphs1, glyphs2);
-        assert_eq!(glyphs2.to_chars(), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
+        assert_eq!(glyphs2.chars(), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
 
         let glyphs2_5 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
 
-        assert_eq!(glyphs2_5.to_chars(), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(glyphs2_5.chars(), [LEFT_HALF_BLOCK, SPACE]);
 
         let glyphs3 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
 
