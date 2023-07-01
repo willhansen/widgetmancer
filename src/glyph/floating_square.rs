@@ -3,7 +3,7 @@ use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offse
 use crate::glyph::DoubleChar;
 use crate::utility::coordinate_frame_conversions::{
     world_character_point_to_world_character_square, CharacterGridInLocalCharacterFrame,
-    WorldCharacterPoint, WorldCharacterSquare,
+    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, WorldMove,
 };
 use crate::utility::*;
 use euclid::{point2, vec2, Point2D};
@@ -237,7 +237,8 @@ pub fn character_for_half_square_with_2d_offset(offset: FVector) -> char {
         .unwrap()
 }
 
-pub fn characters_for_full_square_at_point(
+#[deprecated(note = "use drawables_for_floating_square_at_point instead")]
+pub fn character_map_for_full_square_at_point(
     point: WorldCharacterPoint,
 ) -> HashMap<WorldCharacterSquare, char> {
     let mut output_characters = HashMap::<WorldCharacterSquare, char>::new();
@@ -262,6 +263,20 @@ pub fn characters_for_full_square_at_point(
         })
     });
     output_characters
+}
+
+pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
+    let char_offsets = [-1.0, 1.0].map(|i| {
+        let scaled_x_offset = offset.x * 2.0;
+        let shifted_toward_this_side = sign(scaled_x_offset) == i;
+        let compensated_x_offset = if shifted_toward_this_side {
+            (scaled_x_offset.abs() - 1.0) * sign(scaled_x_offset)
+        } else {
+            scaled_x_offset
+        };
+        vec2(compensated_x_offset, offset.y)
+    });
+    char_offsets.map(|char_offset| character_for_half_square_with_2d_offset(char_offset))
 }
 
 pub fn characters_for_full_square_with_1d_offset(
@@ -554,7 +569,7 @@ mod tests {
 
     #[test]
     fn test_chars_for_floating_square__at_origin() {
-        let chars = characters_for_full_square_at_point(point2(0.0, 0.0));
+        let chars = character_map_for_full_square_at_point(point2(0.0, 0.0));
         assert_eq!(chars.len(), 3);
         assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
         assert_eq!(chars.get(&point2(-1, 0)), Some(&RIGHT_HALF_BLOCK));
@@ -562,7 +577,7 @@ mod tests {
     }
     #[test]
     fn test_chars_for_floating_square__at_square_center() {
-        let chars = characters_for_full_square_at_point(point2(0.5, 0.0));
+        let chars = character_map_for_full_square_at_point(point2(0.5, 0.0));
         assert_eq!(chars.len(), 2);
         assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
         assert_eq!(chars.get(&point2(1, 0)), Some(&FULL_BLOCK));
@@ -665,5 +680,19 @@ mod tests {
         );
         assert_eq!(f(STEP_RIGHT.into(), 1.25), [LEFT_HALF_BLOCK, SPACE]);
         assert_eq!(f(STEP_LEFT.into(), 1.25), [SPACE, RIGHT_HALF_BLOCK]);
+    }
+    #[test]
+    fn test_characters_for_full_square_with_2d_offset() {
+        let f = characters_for_full_square_with_2d_offset;
+        KING_STEPS
+            .iter()
+            .for_each(|step| assert_eq!(f(step.to_f32()), [SPACE; 2]));
+        assert_eq!(f(STEP_ZERO.to_f32()), [FULL_BLOCK; 2]);
+        assert_eq!(f(vec2(0.5, 0.0)), [SPACE, FULL_BLOCK]);
+        assert_eq!(f(vec2(-0.5, 0.0)), [FULL_BLOCK, SPACE]);
+        assert_eq!(
+            f(vec2(1.0 / 16.0, 0.0)),
+            [RIGHT_SEVEN_EIGHTHS_BLOCK, FULL_BLOCK]
+        );
     }
 }

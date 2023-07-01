@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;
 use dyn_clone::DynClone;
-use euclid::Angle;
+use euclid::{vec2, Angle};
 use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
@@ -13,10 +14,11 @@ use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
 use crate::glyph::floating_square::characters_for_full_square_with_looping_1d_offset;
-use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, WHITE};
+use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
 use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::utility::coordinate_frame_conversions::{
-    local_square_half_plane_to_local_character_half_plane, WorldMove, WorldStep,
+    local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
+    WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
     rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
@@ -410,6 +412,31 @@ impl OffsetSquareDrawable {
     fn set_bg_color(&mut self, new_bg_color: RGB8) {
         self.colors[1] = new_bg_color;
     }
+    pub fn drawables_for_floating_square_at_point(
+        point: WorldPoint,
+        color: RGB8,
+    ) -> HashMap<WorldSquare, OffsetSquareDrawable> {
+        let mut output = HashMap::<WorldSquare, OffsetSquareDrawable>::new();
+        let center_square = world_point_to_world_square(point);
+
+        (-1..=1).for_each(|dx| {
+            (-1..=1).for_each(|dy| {
+                let step = vec2(dx, dy);
+                let square = center_square + step;
+                let center_of_square = square.to_f32();
+                let floating_square_offset_from_square_center = point - center_of_square;
+                let drawable = OffsetSquareDrawable {
+                    offset: floating_square_offset_from_square_center,
+                    colors: [color, BLACK],
+                };
+                let glyphs_round_to_empty_square = drawable.to_glyphs().to_chars() == [SPACE; 2];
+                if !glyphs_round_to_empty_square {
+                    output.insert(square, drawable);
+                }
+            });
+        });
+        output
+    }
 }
 
 impl Drawable for OffsetSquareDrawable {
@@ -426,7 +453,7 @@ impl Drawable for OffsetSquareDrawable {
 
     fn to_glyphs(&self) -> DoubleGlyph {
         let mut glyphs =
-            Glyph::offset_board_square_glyphs(self.offset, self.fg_color(), self.bg_color());
+            Glyph::orthogonally_offset_board_square_glyphs(self.offset, self.fg_color(), self.bg_color());
         glyphs[0].bg_transparent = true;
         glyphs[1].bg_transparent = true;
         glyphs

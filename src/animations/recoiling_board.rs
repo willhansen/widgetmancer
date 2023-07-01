@@ -126,7 +126,7 @@ impl Animation for RecoilingBoardAnimation {
                     .floor_color_enum
                     .color_at(world_square + RIGHT_I.cast_unit());
 
-                let glyphs = Glyph::offset_board_square_glyphs(
+                let glyphs = Glyph::orthogonally_offset_board_square_glyphs(
                     offset_vector,
                     square_color,
                     other_square_color,

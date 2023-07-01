@@ -39,11 +39,11 @@ use crate::game::{
     DeathCube, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD, HUNTER_DRONE_SIGHT_RANGE,
 };
 use crate::glyph::braille::count_braille_dots;
-use crate::glyph::floating_square::characters_for_full_square_at_point;
+use crate::glyph::floating_square::character_map_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{
-    ArrowDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum, PartialVisibilityDrawable,
-    SolidColorDrawable, TextDrawable,
+    ArrowDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum, OffsetSquareDrawable,
+    PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
@@ -320,7 +320,7 @@ impl Graphics {
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: KingWorldStep) {
         let drawable = ArrowDrawable::new(faced_direction.into(), THICK_ARROWS, PLAYER_COLOR);
-        self.draw_drawable_to_draw_buffer(world_pos, drawable);
+        self.draw_drawable_to_draw_buffer(world_pos, &drawable);
     }
 
     pub fn draw_above_square<T: Drawable + Debug>(
@@ -349,9 +349,9 @@ impl Graphics {
     pub fn draw_drawable_to_draw_buffer<T: Drawable + Debug>(
         &mut self,
         world_square: WorldSquare,
-        drawable: T,
+        drawable: &T,
     ) {
-        self.draw_above_square(&drawable, world_square);
+        self.draw_above_square(drawable, world_square);
     }
 
     pub fn draw_piece_with_color(
@@ -436,13 +436,10 @@ impl Graphics {
     }
 
     fn draw_floating_square(&mut self, pos: WorldPoint, color: RGB8) {
-        let character_grid_point = world_point_to_world_character_point(pos);
-        let characters_map = characters_for_full_square_at_point(character_grid_point);
-        let glyphs = characters_map
-            .into_iter()
-            .map(|(char_square, char)| (char_square, Glyph::fg_only(char, color)))
-            .collect();
-        self.draw_glyphs(glyphs);
+        let drawables = OffsetSquareDrawable::drawables_for_floating_square_at_point(pos, color);
+        drawables
+            .iter()
+            .for_each(|(&square, drawable)| self.draw_drawable_to_draw_buffer(square, drawable));
     }
 
     pub fn technicolor_at_time(&self, time: Instant) -> RGB8 {
@@ -463,7 +460,7 @@ impl Graphics {
         floor_push_arrows.iter().for_each(|(&square, &dir)| {
             self.draw_drawable_to_draw_buffer(
                 square,
-                ArrowDrawable::new(dir.into(), "⯬⯮⯭⯯", DARK_GREY),
+                &ArrowDrawable::new(dir.into(), "⯬⯮⯭⯯", DARK_GREY),
             )
         })
     }
@@ -474,7 +471,7 @@ impl Graphics {
     ) {
         conveyor_belts.iter().for_each(|(&square, &dir)| {
             let phase = global_phase + if square_is_odd(square) { 0.5 } else { 0.0 };
-            self.draw_drawable_to_draw_buffer(square, ConveyorBeltDrawable::new(dir, phase))
+            self.draw_drawable_to_draw_buffer(square, &ConveyorBeltDrawable::new(dir, phase))
         })
     }
 

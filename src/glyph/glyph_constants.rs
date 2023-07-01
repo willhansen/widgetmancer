@@ -56,49 +56,77 @@ pub const FULL_BLOCK: char = '█';
 pub const SPACE: char = ' ';
 pub const GOOMBA: char = '⍾';
 
+pub const LEFT_ONE_EIGHTH_BLOCK: char = '▏';
+pub const LEFT_ONE_QUARTER_BLOCK: char = '▎';
+pub const LEFT_THREE_EIGHTHS_BLOCK: char = '▍';
+pub const LEFT_FIVE_EIGHTHS_BLOCK: char = '▋';
+pub const LEFT_THREE_QUARTERS_BLOCK: char = '▊';
+pub const LEFT_SEVEN_EIGHTHS_BLOCK: char = '▉';
+
+pub const RIGHT_ONE_EIGHTH_BLOCK: char = '▕';
+pub const RIGHT_ONE_QUARTER_BLOCK: char = '🮇';
+pub const RIGHT_THREE_EIGHTHS_BLOCK: char = '🮈';
+pub const RIGHT_FIVE_EIGHTHS_BLOCK: char = '🮉';
+pub const RIGHT_THREE_QUARTERS_BLOCK: char = '🮊';
+pub const RIGHT_SEVEN_EIGHTHS_BLOCK: char = '🮋';
+
+pub const LOWER_ONE_EIGHTH_BLOCK: char = '▁';
+pub const LOWER_ONE_QUARTER_BLOCK: char = '▂';
+pub const LOWER_THREE_EIGHTHS_BLOCK: char = '▃';
+pub const LOWER_FIVE_EIGHTHS_BLOCK: char = '▅';
+pub const LOWER_THREE_QUARTERS_BLOCK: char = '▆';
+pub const LOWER_SEVEN_EIGHTHS_BLOCK: char = '▇';
+
+pub const UPPER_ONE_EIGHTH_BLOCK: char = '▔';
+pub const UPPER_ONE_QUARTER_BLOCK: char = '🮂';
+pub const UPPER_THREE_EIGHTHS_BLOCK: char = '🮃';
+pub const UPPER_FIVE_EIGHTHS_BLOCK: char = '🮄';
+pub const UPPER_THREE_QUARTERS_BLOCK: char = '🮅';
+pub const UPPER_SEVEN_EIGHTHS_BLOCK: char = '🮆';
+
 pub const EIGHTH_BLOCKS_FROM_LEFT: &[char] = &[
     SPACE,
-    '▏',
-    '▎',
-    '▍',
+    LEFT_ONE_EIGHTH_BLOCK,
+    LEFT_ONE_QUARTER_BLOCK,
+    LEFT_THREE_EIGHTHS_BLOCK,
     LEFT_HALF_BLOCK,
-    '▋',
-    '▊',
-    '▉',
+    LEFT_FIVE_EIGHTHS_BLOCK,
+    LEFT_THREE_QUARTERS_BLOCK,
+    LEFT_SEVEN_EIGHTHS_BLOCK,
     FULL_BLOCK,
 ];
 pub const EIGHTH_BLOCKS_FROM_RIGHT: &[char] = &[
     SPACE,
-    '▕',
-    '🮇',
-    '🮈',
+    RIGHT_ONE_EIGHTH_BLOCK,
+    RIGHT_ONE_QUARTER_BLOCK,
+    RIGHT_THREE_EIGHTHS_BLOCK,
     RIGHT_HALF_BLOCK,
-    '🮉',
-    '🮊',
-    '🮋',
+    RIGHT_FIVE_EIGHTHS_BLOCK,
+    RIGHT_THREE_QUARTERS_BLOCK,
+    RIGHT_SEVEN_EIGHTHS_BLOCK,
     FULL_BLOCK,
 ];
 
 pub const EIGHTH_BLOCKS_FROM_BOTTOM: &[char] = &[
     SPACE,
-    '▁',
-    '▂',
-    '▃',
+    LOWER_ONE_EIGHTH_BLOCK,
+    LOWER_ONE_QUARTER_BLOCK,
+    LOWER_THREE_EIGHTHS_BLOCK,
     LOWER_HALF_BLOCK,
-    '▅',
-    '▆',
-    '▇',
+    LOWER_FIVE_EIGHTHS_BLOCK,
+    LOWER_THREE_QUARTERS_BLOCK,
+    LOWER_SEVEN_EIGHTHS_BLOCK,
     FULL_BLOCK,
 ];
 pub const EIGHTH_BLOCKS_FROM_TOP: &[char] = &[
     SPACE,
-    '▔',
-    '🮂',
-    '🮃',
+    UPPER_ONE_EIGHTH_BLOCK,
+    UPPER_ONE_QUARTER_BLOCK,
+    UPPER_THREE_EIGHTHS_BLOCK,
     UPPER_HALF_BLOCK,
-    '🮄',
-    '🮅',
-    '🮆',
+    UPPER_FIVE_EIGHTHS_BLOCK,
+    UPPER_THREE_QUARTERS_BLOCK,
+    UPPER_SEVEN_EIGHTHS_BLOCK,
     FULL_BLOCK,
 ];
 

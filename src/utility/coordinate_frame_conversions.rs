@@ -40,6 +40,8 @@ pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterStep = Vector2D<i32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
+pub type WorldCharacterMove = Vector2D<f32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;

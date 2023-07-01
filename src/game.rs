@@ -583,7 +583,7 @@ impl Game {
             .for_each(|thing| self.graphics.draw_floating_hunter_drone(*thing));
         self.widgets.iter().for_each(|(&square, pushable)| {
             self.graphics
-                .draw_drawable_to_draw_buffer(square, pushable.drawable())
+                .draw_drawable_to_draw_buffer(square, &pushable.drawable())
         });
         self.graphics.remove_finished_animations(time);
         self.graphics.draw_non_board_animations(time);
