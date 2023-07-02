@@ -207,29 +207,41 @@ impl BrailleDrawable {
 impl Drawable for BrailleDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
         Self {
-            braille_array: self.braille_array.rotated(QuarterTurnsAnticlockwise::new(quarter_rotations_anticlockwise)),
+            braille_array: self.braille_array.rotated(QuarterTurnsAnticlockwise::new(
+                quarter_rotations_anticlockwise,
+            )),
             ..self.clone()
-        }.into()
+        }
+        .into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        todo!()
+        self.braille_array
+            .to_two_braille_arrays()
+            .map(|b| Glyph::new(b.char(), self.dot_color, self.bg_color))
     }
 
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
-        todo!()
+        let mut the_clone = self.clone();
+        the_clone.bg_color = other.color_if_backgroundified();
+        the_clone.into()
     }
 
     fn color_if_backgroundified(&self) -> RGB8 {
-        todo!()
+        self.dot_color
     }
 
     fn to_enum(&self) -> DrawableEnum {
-        todo!()
+        self.clone().into()
     }
 
     fn tinted(&self, tint: RGB8, strength: f32) -> DrawableEnum {
-        todo!()
+        Self {
+            dot_color: tint_color(self.dot_color, tint, strength),
+            bg_color: tint_color(self.bg_color, tint, strength),
+            ..self.clone()
+        }
+        .into()
     }
 }
 
