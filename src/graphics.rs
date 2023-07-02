@@ -54,7 +54,7 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
     reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
-    OrthogonalWorldStep, STEP_RIGHT,
+    OrthogonalWorldStep, WorldLine, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
@@ -141,7 +141,7 @@ impl Graphics {
     }
 
     fn draw_braille_point(&mut self, pos: WorldPoint, color: RGB8) {
-        self.draw_braille_line(pos, pos, color);
+        self.draw_naive_braille_line(pos, pos, color);
     }
 
     fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareGlyphMap) {
@@ -168,7 +168,7 @@ impl Graphics {
         self.floor_color_enum.color_at(square)
     }
 
-    fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
+    fn draw_naive_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
         let drawables = BrailleDrawable::line(start_pos, end_pos, color);
         self.draw_drawables_at_squares(drawables);
     }
@@ -430,14 +430,14 @@ impl Graphics {
         let color = self.technicolor_at_time(Instant::now());
         self.draw_floating_square(death_cube.position, color);
     }
-    pub fn draw_floating_hunter_drone(&mut self, drone: FloatingHunterDrone) {
-        self.draw_braille_line(
-            drone.position,
-            drone.position
-                + unit_vector_from_angle(drone.sight_direction).cast_unit()
-                    * HUNTER_DRONE_SIGHT_RANGE,
-            SIGHT_LINE_SEEKING_COLOR,
-        );
+    pub fn draw_floating_hunter_drone(
+        &mut self,
+        drone: &FloatingHunterDrone,
+        sight_line_segments: &Vec<WorldLine>,
+    ) {
+        for line in sight_line_segments {
+            self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
+        }
         self.draw_floating_square(drone.position, HUNTER_DRONE_COLOR);
     }
 
@@ -665,7 +665,7 @@ mod tests {
         let line_start = WorldSquare::new(2, 2);
         let line_end = WorldSquare::new(7, 7);
 
-        g.draw_braille_line(line_start.to_f32(), line_end.to_f32(), RED);
+        g.draw_naive_braille_line(line_start.to_f32(), line_end.to_f32(), RED);
 
         let test_square = WorldSquare::new(4, 4);
 
@@ -728,7 +728,7 @@ mod tests {
         );
         let line_color = GREEN;
         assert_ne!(line_color, ENEMY_PIECE_COLOR);
-        g.draw_braille_line(
+        g.draw_naive_braille_line(
             test_square.to_f32() + vec2(-1.0, 0.0),
             test_square.to_f32() + vec2(1.0, 0.0),
             line_color,

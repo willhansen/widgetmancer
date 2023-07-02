@@ -3,17 +3,18 @@ use std::ops::Add;
 
 use derive_more::Constructor;
 use derive_more::Neg;
-use euclid::point2;
+use euclid::{point2, Angle};
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
 use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldStep};
+use crate::utility::coordinate_frame_conversions::{StepSet, WorldPoint, WorldSquare, WorldStep};
 use crate::utility::{
     is_orthogonal, ith_projection_of_step, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
-    SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations, STEP_RIGHT, STEP_ZERO,
+    SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT,
+    STEP_ZERO,
 };
 
 #[derive(Hash, Neg, Clone, Copy, Debug)]
@@ -274,6 +275,23 @@ impl PortalGeometry {
                 },
             )
             .collect()
+    }
+    pub fn ray_to_naive_line_segments(
+        &self,
+        start: WorldPoint,
+        angle: Angle<f32>,
+        range: f32,
+    ) -> Vec<WorldLine> {
+        let portal_entrance = self.first_portal_entrance_hit_by_ray(start, angle, range);
+        todo!()
+    }
+    fn first_portal_entrance_hit_by_ray(
+        &self,
+        start: WorldPoint,
+        angle: Angle<f32>,
+        range: f32,
+    ) -> Option<SquareWithOrthogonalDir> {
+        todo!()
     }
 }
 

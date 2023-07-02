@@ -578,9 +578,15 @@ impl Game {
         self.death_cubes
             .iter()
             .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
-        self.floating_hunter_drones
-            .iter()
-            .for_each(|thing| self.graphics.draw_floating_hunter_drone(*thing));
+        self.floating_hunter_drones.iter().for_each(|thing| {
+            let sight_line_segments = self.portal_geometry.ray_to_naive_lines(
+                thing.position,
+                drone.sight_direction,
+                HUNTER_DRONE_SIGHT_RANGE,
+            );
+            self.graphics
+                .draw_floating_hunter_drone(thing, &sight_line_segments);
+        });
         self.widgets.iter().for_each(|(&square, pushable)| {
             self.graphics
                 .draw_drawable_to_draw_buffer(square, &pushable.drawable())
@@ -4732,5 +4738,73 @@ mod tests {
 
         let result = game.raycast(portal_entrance_square.to_f32(), Angle::degrees(90.0), 5.0);
         assert_eq!(result.grid_entities[0], (STEP_UP, GridEntity::Block));
+    }
+    #[test]
+    fn test_hunter_drone_raycasts_visually_go_through_portal() {
+        let mut game = set_up_10x10_game();
+        let drone_square = point2(2, 2);
+        game.place_floating_hunter_drone(
+            drone_square.to_f32(),
+            STEP_ZERO.to_f32(),
+            Angle::degrees(90.0),
+        );
+        let test_square = drone_square + STEP_RIGHT * 5;
+        game.place_single_sided_one_way_portal(
+            (drone_square, STEP_UP.into()).into(),
+            (test_square, STEP_DOWN.into()).into(),
+        );
+        game.place_player(drone_square + STEP_DOWN);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let drawable = game
+            .graphics
+            .get_drawable_for_square_from_draw_buffer(test_square);
+
+        assert!(matches!(drawable, Some(DrawableEnum::Braille(_))));
+
+        let chars = drawable.unwrap().to_glyphs().chars();
+        assert!(char_is_braille(chars[0]) || char_is_braille(chars[1]));
+    }
+    #[test]
+    fn test_hunter_drone_moves_through_portal() {
+        let mut game = set_up_10x10_game();
+        let drone_square = point2(2, 2);
+        game.place_floating_hunter_drone(
+            drone_square.to_f32() + vec2(0.0, 0.49),
+            STEP_UP.to_f32(),
+            Angle::degrees(90.0),
+        );
+        let test_square = drone_square + STEP_RIGHT * 5;
+        game.place_single_sided_one_way_portal(
+            (drone_square, STEP_UP.into()).into(),
+            (test_square, STEP_DOWN.into()).into(),
+        );
+        game.tick_realtime_effects(Duration::from_secs_f32(0.5));
+        let drone = game.floating_hunter_drones[0];
+        assert!(drone.position.x > drone_square.x as f32 + 2.0);
+    }
+    #[test]
+    fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
+        let mut game = set_up_10x10_game();
+        let drone_square = point2(2, 2);
+        game.place_floating_hunter_drone(
+            drone_square.to_f32() + vec2(0.0, 0.49),
+            STEP_ZERO.to_f32(),
+            Angle::degrees(180.0),
+        );
+        let test_square = drone_square + STEP_RIGHT * 5;
+        game.place_single_sided_one_way_portal(
+            (drone_square, STEP_UP.into()).into(),
+            (test_square, STEP_DOWN.into()).into(),
+        );
+        game.place_player(drone_square + STEP_DOWN);
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+        let glyphs = game
+            .graphics
+            .screen
+            .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_RIGHT * 5 + SCREEN_STEP_UP);
+
+        assert_false!(glyphs.looks_solid());
     }
 }
