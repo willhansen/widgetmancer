@@ -24,18 +24,10 @@ pub const FULL_BRAILLE: char = '⣿';
 // All the braille unicode consecutively for easy reference
 pub const ALL_BRAILLE_IN_ONE_STRING: &str = "\u{2800}⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿";
 
-#[derive(Debug, Clone)]
-pub struct BrailleArray {
-    array: [[bool; 2]; 4],
-}
-#[derive(Debug, Clone)]
-pub struct DoubleBrailleArray {
-    array: [[bool; 4]; 4],
-}
+pub type BrailleArray = BoolArray2D<2, 4>;
+pub type DoubleBrailleArray = SquareBoolArray2D<4>;
 
 impl BrailleArray {
-    const WIDTH: usize = 2;
-    const HEIGHT: usize = 4;
     pub fn from_char(c: char) -> Self {
         let mut braille_array = BrailleArray::empty();
         let dot_val = (c as u32).bitxor(EMPTY_BRAILLE as u32);
@@ -61,32 +53,9 @@ impl BrailleArray {
         }
         return char::from_u32(EMPTY_BRAILLE as u32 | dot_val).unwrap();
     }
-    pub fn from_array(array: [[bool; Self::WIDTH]; Self::HEIGHT]) -> Self {
-        Self { array }
-    }
-    pub fn empty() -> Self {
-        Self::from_array([[false; Self::WIDTH]; Self::HEIGHT])
-    }
-    pub fn get_xy(&self, x: usize, y: usize) -> bool {
-        self.get_row_col(Self::y_to_row(y), x)
-    }
-    pub fn set_xy(&mut self, x: usize, y: usize, val: bool) {
-        self.set_row_col(Self::y_to_row(y), x, val);
-    }
-    fn y_to_row(y: usize) -> usize {
-        Self::HEIGHT - 1 - y
-    }
-    pub fn get_row_col(&self, row: usize, col: usize) -> bool {
-        self.array[row][col]
-    }
-    pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
-        self.array[row][col] = val;
-    }
 }
 
 impl DoubleBrailleArray {
-    const WIDTH: usize = 4;
-    const HEIGHT: usize = 4;
     pub fn from_chars(chars: DoubleChar) -> Self {
         Self::from_two_braille_arrays(chars.map(|c| BrailleArray::from_char(c)))
     }
@@ -96,10 +65,10 @@ impl DoubleBrailleArray {
     }
     pub fn from_two_braille_arrays(arrays: [BrailleArray; 2]) -> Self {
         let mut double_braille_array = Self::empty();
-        for row in 0..Self::HEIGHT {
-            for col in 0..Self::WIDTH {
-                let sub_col = col % BrailleArray::WIDTH;
-                let index = col / BrailleArray::WIDTH;
+        for row in 0..Self::height() {
+            for col in 0..Self::width() {
+                let sub_col = col % BrailleArray::width();
+                let index = col / BrailleArray::width();
                 double_braille_array.set_row_col(row, col, arrays[index].get_row_col(row, sub_col));
             }
         }
@@ -107,62 +76,14 @@ impl DoubleBrailleArray {
     }
     pub fn to_two_braille_arrays(&self) -> [BrailleArray; 2] {
         let mut arrays = [BrailleArray::empty(), BrailleArray::empty()];
-        for row in 0..Self::HEIGHT {
-            for col in 0..Self::WIDTH {
-                let sub_col = col % BrailleArray::WIDTH;
-                let index = col / BrailleArray::WIDTH;
+        for row in 0..Self::height() {
+            for col in 0..Self::width() {
+                let sub_col = col % BrailleArray::width();
+                let index = col / BrailleArray::width();
                 arrays[index].set_row_col(row, sub_col, self.get_row_col(row, col));
             }
         }
         arrays
-    }
-    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
-        let rotation_function = match quarter_turns.quarter_turns() {
-            0 => |x, y| (x, y),
-            1 => |x, y| (Self::WIDTH - 1 - y, x),
-            2 => |x, y| (Self::WIDTH - 1 - x, Self::HEIGHT - 1 - y),
-            3 => |x, y| (y, Self::HEIGHT - 1 - x),
-            _ => panic!("Malformed parameter"),
-        };
-        let mut the_clone = self.clone();
-        for x in 0..Self::WIDTH {
-            for y in 0..Self::HEIGHT {
-                let (new_x, new_y) = rotation_function(x, y);
-                the_clone.set_xy(new_x, new_y, self.get_xy(x, y));
-            }
-        }
-        the_clone
-    }
-    pub fn from_array(array: [[bool; Self::WIDTH]; Self::HEIGHT]) -> Self {
-        Self { array }
-    }
-    pub fn empty() -> Self {
-        Self::from_array([[false; Self::WIDTH]; Self::HEIGHT])
-    }
-    pub fn get_xy(&self, x: usize, y: usize) -> bool {
-        self.get_row_col(Self::y_to_row(y), x)
-    }
-    pub fn set_xy(&mut self, x: usize, y: usize, val: bool) {
-        self.set_row_col(Self::y_to_row(y), x, val);
-    }
-    fn y_to_row(y: usize) -> usize {
-        Self::HEIGHT - 1 - y
-    }
-    pub fn get_row_col(&self, row: usize, col: usize) -> bool {
-        self.array[row][col]
-    }
-    pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
-        self.array[row][col] = val;
-    }
-    pub fn print(&self) {
-        for row in 0..Self::HEIGHT {
-            let mut line = "".to_string();
-            for col in 0..Self::WIDTH {
-                let val = self.get_row_col(row, col);
-                line += if val { "o" } else { "." };
-            }
-            println!("{}", line);
-        }
     }
 }
 

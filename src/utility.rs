@@ -1405,6 +1405,72 @@ pub fn square_is_even(square: WorldSquare) -> bool {
     !square_is_odd(square)
 }
 
+#[derive(Debug, Clone)]
+pub struct BoolArray2D<const WIDTH: usize, const HEIGHT: usize> {
+    array: [[bool; WIDTH]; HEIGHT],
+}
+
+impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
+    pub fn from_array(array: [[bool; WIDTH]; HEIGHT]) -> Self {
+        Self { array }
+    }
+    pub fn empty() -> Self {
+        Self::from_array([[false; WIDTH]; HEIGHT])
+    }
+    pub fn get_xy(&self, x: usize, y: usize) -> bool {
+        self.get_row_col(Self::y_to_row(y), x)
+    }
+    pub fn set_xy(&mut self, x: usize, y: usize, val: bool) {
+        self.set_row_col(Self::y_to_row(y), x, val);
+    }
+    fn y_to_row(y: usize) -> usize {
+        HEIGHT - 1 - y
+    }
+    pub fn get_row_col(&self, row: usize, col: usize) -> bool {
+        self.array[row][col]
+    }
+    pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
+        self.array[row][col] = val;
+    }
+    pub fn print(&self) {
+        for row in 0..HEIGHT {
+            let mut line = "".to_string();
+            for col in 0..WIDTH {
+                let val = self.get_row_col(row, col);
+                line += if val { "o" } else { "." };
+            }
+            println!("{}", line);
+        }
+    }
+    pub fn height() -> usize {
+        HEIGHT
+    }
+    pub fn width() -> usize {
+        WIDTH
+    }
+}
+pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
+
+impl<const SIZE: usize> SquareBoolArray2D<SIZE> {
+    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+        let rotation_function = match quarter_turns.quarter_turns() {
+            0 => |x, y| (x, y),
+            1 => |x, y| (SIZE - 1 - y, x),
+            2 => |x, y| (SIZE - 1 - x, SIZE - 1 - y),
+            3 => |x, y| (y, SIZE - 1 - x),
+            _ => panic!("Malformed parameter"),
+        };
+        let mut the_clone = self.clone();
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                let (new_x, new_y) = rotation_function(x, y);
+                the_clone.set_xy(new_x, new_y, self.get_xy(x, y));
+            }
+        }
+        the_clone
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
