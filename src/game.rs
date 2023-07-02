@@ -2291,7 +2291,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::game;
-    use crate::glyph::braille::char_is_braille;
+    use crate::glyph::braille::{char_is_braille, EMPTY_BRAILLE};
     use crate::glyph::glyph_constants::{
         BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, FULL_BLOCK, GREY,
         HUNTER_DRONE_COLOR, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR,
@@ -4445,14 +4445,7 @@ mod tests {
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN * 3);
         assert_eq!(upper_glyphs.to_clean_string(), "▄▄");
         assert_eq!(middle_glyphs.to_clean_string(), "▀▀");
-        assert_eq!(
-            lower_glyphs
-                .map(|g| char_is_braille(g.character))
-                .into_iter()
-                .filter(|x| *x)
-                .count(),
-            1
-        );
+        assert_eq!(lower_glyphs.chars(), [EMPTY_BRAILLE, '⡇']); // Might need to flip horizontally at some point
     }
     #[test]
     fn test_conveyor_belt__place_and_draw() {

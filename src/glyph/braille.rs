@@ -154,6 +154,16 @@ impl DoubleBrailleArray {
     pub fn set_row_col(&mut self, row: usize, col: usize, val: bool) {
         self.array[row][col] = val;
     }
+    pub fn print(&self) {
+        for row in 0..Self::HEIGHT {
+            let mut line = "".to_string();
+            for col in 0..Self::WIDTH {
+                let val = self.get_row_col(row, col);
+                line += if val { "o" } else { "." };
+            }
+            println!("{}", line);
+        }
+    }
 }
 
 pub fn braille_bit_for_pos(p: Point2D<i32, BrailleGridInWorldFrame>) -> u32 {

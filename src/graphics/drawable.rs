@@ -222,10 +222,12 @@ impl BrailleDrawable {
 
 impl Drawable for BrailleDrawable {
     fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+        let r = self.braille_array.rotated(QuarterTurnsAnticlockwise::new(
+            quarter_rotations_anticlockwise,
+        ));
+        dbg!("asdf", self, &r);
         Self {
-            braille_array: self.braille_array.rotated(QuarterTurnsAnticlockwise::new(
-                quarter_rotations_anticlockwise,
-            )),
+            braille_array: r,
             ..self.clone()
         }
         .into()
@@ -524,6 +526,7 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph::braille::EMPTY_BRAILLE;
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -609,8 +612,15 @@ mod tests {
     // All the braille unicode consecutively for easy reference
     //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
     #[test]
+    fn test_braille_drawable_from_chars() {
+        let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
+        assert_eq!(drawable.braille_array.chars()[1], EMPTY_BRAILLE);
+        drawable.braille_array.print();
+    }
+    #[test]
     fn test_braille_drawable_rotation() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
+        drawable.braille_array.print();
         let f = |i| drawable.rotated(i).to_glyphs().chars();
         assert_eq!(f(-1), ['⠓', '⠃']);
         assert_eq!(f(1), ['⢠', '⢤']);
