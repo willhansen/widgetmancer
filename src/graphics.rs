@@ -42,8 +42,8 @@ use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::character_map_for_full_square_at_point;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{
-    ArrowDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum, OffsetSquareDrawable,
-    PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
+    ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
+    OffsetSquareDrawable, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
@@ -57,8 +57,8 @@ use crate::utility::{
     OrthogonalWorldStep, STEP_RIGHT,
 };
 use crate::{
-    get_by_point, glyph, pair_up_glyph_map, point_to_string, DoubleGlyphFunctions, Game, IPoint,
-    PieceType, RIGHT_I,
+    get_by_point, glyph, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
+    IPoint, PieceType, RIGHT_I,
 };
 
 pub(crate) mod drawable;
@@ -145,13 +145,18 @@ impl Graphics {
     }
 
     fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareGlyphMap) {
-        let world_square_glyph_map = pair_up_glyph_map(glyph_map);
+        let world_square_glyph_map = pair_up_character_square_map(glyph_map);
         self.draw_glyphs_at_squares(world_square_glyph_map);
     }
 
     fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
         for (world_square, glyph) in glyph_map {
             self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
+        }
+    }
+    fn draw_drawables_at_squares<T: Drawable>(&mut self, drawable_map: HashMap<WorldSquare, T>) {
+        for (world_square, drawable) in drawable_map {
+            self.draw_drawable_to_draw_buffer(world_square, &drawable);
         }
     }
 
@@ -163,8 +168,8 @@ impl Graphics {
     }
 
     fn draw_braille_line(&mut self, start_pos: WorldPoint, end_pos: WorldPoint, color: RGB8) {
-        let line_glyphs = Glyph::get_glyphs_for_colored_braille_line(start_pos, end_pos, color);
-        self.draw_glyphs(line_glyphs);
+        let drawables = BrailleDrawable::line(start_pos, end_pos, color);
+        self.draw_drawables_at_squares(drawables);
     }
 
     pub fn set_empty_board_animation(&mut self) {

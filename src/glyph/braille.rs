@@ -121,7 +121,7 @@ impl DoubleBrailleArray {
             0 => |x, y| (x, y),
             1 => |x, y| (Self::WIDTH - 1 - y, x),
             2 => |x, y| (Self::WIDTH - 1 - x, Self::HEIGHT - 1 - y),
-            3 => |x, y| (y, Self::WIDTH - 1 - x),
+            3 => |x, y| (y, Self::HEIGHT - 1 - x),
             _ => panic!("Malformed parameter"),
         };
         let mut the_clone = self.clone();
@@ -311,6 +311,19 @@ pub fn get_chars_for_braille_line(
         );
     }
     return char_map;
+}
+pub fn get_braille_arrays_for_braille_line(
+    start_pos: WorldPoint,
+    end_pos: WorldPoint,
+) -> HashMap<WorldSquare, DoubleBrailleArray> {
+    let chars = get_chars_for_braille_line(start_pos, end_pos);
+    let paired_chars = pair_up_character_square_map(chars);
+    paired_chars
+        .iter()
+        .map(|(&world_square, &double_char)| {
+            (world_square, DoubleBrailleArray::from_chars(double_char))
+        })
+        .collect()
 }
 pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareToCharMap {
     // bin braille squares by world character squares
@@ -617,5 +630,31 @@ mod tests {
         ALL_BRAILLE_IN_ONE_STRING
             .chars()
             .for_each(|c| assert_eq!(BrailleArray::from_char(c).char(), c));
+    }
+    #[test]
+    fn test_double_braille_array_rotation() {
+        let mut array = DoubleBrailleArray::empty();
+        array.set_xy(2, 0, true);
+        array.set_xy(2, 1, true);
+        // ....
+        // ....
+        // ..o.
+        // ..o.
+        let turns_xys = vec![
+            (1, vec![(2, 2), (3, 2)]),
+            (2, vec![(1, 3), (1, 2)]),
+            (3, vec![(0, 1), (1, 1)]),
+            (-1, vec![(0, 1), (1, 1)]),
+        ];
+        for t in turns_xys {
+            for p in t.1 {
+                assert_eq!(
+                    array
+                        .rotated(QuarterTurnsAnticlockwise::new(t.0))
+                        .get_xy(p.0, p.1),
+                    true
+                );
+            }
+        }
     }
 }

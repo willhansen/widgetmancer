@@ -12,7 +12,9 @@ use rgb::RGB8;
 
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
-use crate::glyph::braille::{BrailleArray, DoubleBrailleArray};
+use crate::glyph::braille::{
+    get_braille_arrays_for_braille_line, BrailleArray, DoubleBrailleArray,
+};
 use crate::glyph::floating_square::{
     characters_for_full_square_with_2d_offset, characters_for_full_square_with_looping_1d_offset,
 };
@@ -201,6 +203,20 @@ impl BrailleDrawable {
             dot_color,
             bg_color: BLACK,
         }
+    }
+    pub fn from_braille_array(array: DoubleBrailleArray, dot_color: RGB8) -> Self {
+        BrailleDrawable {
+            braille_array: array,
+            dot_color,
+            bg_color: BLACK,
+        }
+    }
+    pub fn line(start: WorldPoint, end: WorldPoint, color: RGB8) -> HashMap<WorldSquare, Self> {
+        let arrays = get_braille_arrays_for_braille_line(start, end);
+        arrays
+            .into_iter()
+            .map(|(square, array)| (square, Self::from_braille_array(array, color)))
+            .collect()
     }
 }
 

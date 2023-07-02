@@ -454,6 +454,12 @@ impl Glyph {
     }
 }
 
+impl Default for Glyph {
+    fn default() -> Self {
+        Glyph::default_transparent()
+    }
+}
+
 impl Debug for Glyph {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
