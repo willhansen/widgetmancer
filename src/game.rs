@@ -4445,7 +4445,7 @@ mod tests {
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN * 3);
         assert_eq!(upper_glyphs.to_clean_string(), "▄▄");
         assert_eq!(middle_glyphs.to_clean_string(), "▀▀");
-        assert_eq!(lower_glyphs.chars(), [EMPTY_BRAILLE, '⡇']); // Might need to flip horizontally at some point
+        assert_eq!(lower_glyphs.chars(), [SPACE, '⡇']); // Might need to flip horizontally at some point
     }
     #[test]
     fn test_conveyor_belt__place_and_draw() {

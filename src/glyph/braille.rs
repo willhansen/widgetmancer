@@ -1,3 +1,4 @@
+use crate::glyph::glyph_constants::SPACE;
 use crate::glyph::DoubleChar;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -22,13 +23,17 @@ pub const EMPTY_BRAILLE: char = '\u{2800}';
 pub const FULL_BRAILLE: char = '⣿';
 
 // All the braille unicode consecutively for easy reference
-pub const ALL_BRAILLE_IN_ONE_STRING: &str = "\u{2800}⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿";
+pub const ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING: &str = "⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿";
 
 pub type BrailleArray = BoolArray2D<2, 4>;
 pub type DoubleBrailleArray = SquareBoolArray2D<4>;
 
 impl BrailleArray {
-    pub fn from_char(c: char) -> Self {
+    pub fn from_char(mut c: char) -> Self {
+        if c == SPACE {
+            c = EMPTY_BRAILLE;
+        }
+        assert!(char_is_braille(c), "NOT BRAILLE: {}", c as u32);
         let mut braille_array = BrailleArray::empty();
         let dot_val = (c as u32).bitxor(EMPTY_BRAILLE as u32);
         for x in 0..2 {
@@ -51,7 +56,12 @@ impl BrailleArray {
                 }
             }
         }
-        return char::from_u32(EMPTY_BRAILLE as u32 | dot_val).unwrap();
+        let c = char::from_u32(EMPTY_BRAILLE as u32 | dot_val).unwrap();
+        if c == EMPTY_BRAILLE {
+            SPACE
+        } else {
+            c
+        }
     }
 }
 
@@ -248,7 +258,7 @@ pub fn get_braille_arrays_for_braille_line(
     end_pos: WorldPoint,
 ) -> HashMap<WorldSquare, DoubleBrailleArray> {
     let chars = get_chars_for_braille_line(start_pos, end_pos);
-    let paired_chars = pair_up_character_square_map(chars);
+    let paired_chars = pair_up_character_square_map(chars, SPACE);
     paired_chars
         .iter()
         .map(|(&world_square, &double_char)| {
@@ -292,6 +302,7 @@ pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareT
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::glyph::glyph_constants::SPACE;
     use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
@@ -552,13 +563,13 @@ mod tests {
     }
     #[test]
     fn test_the_big_braille_string() {
-        ALL_BRAILLE_IN_ONE_STRING
+        ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING
             .chars()
             .for_each(|c| assert!(char_is_braille(c)));
     }
     #[test]
     fn test_braille_array_to_and_from_char() {
-        ALL_BRAILLE_IN_ONE_STRING
+        ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING
             .chars()
             .for_each(|c| assert_eq!(BrailleArray::from_char(c).char(), c));
     }
@@ -587,5 +598,9 @@ mod tests {
                 );
             }
         }
+    }
+    #[test]
+    fn test_braille_array_parse_space() {
+        assert_eq!(BrailleArray::from_char(SPACE).char(), SPACE);
     }
 }

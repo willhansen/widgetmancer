@@ -225,7 +225,6 @@ impl Drawable for BrailleDrawable {
         let r = self.braille_array.rotated(QuarterTurnsAnticlockwise::new(
             quarter_rotations_anticlockwise,
         ));
-        dbg!("asdf", self, &r);
         Self {
             braille_array: r,
             ..self.clone()
@@ -614,7 +613,7 @@ mod tests {
     #[test]
     fn test_braille_drawable_from_chars() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
-        assert_eq!(drawable.braille_array.chars()[1], EMPTY_BRAILLE);
+        assert_eq!(drawable.braille_array.chars()[1], SPACE);
         drawable.braille_array.print();
     }
     #[test]

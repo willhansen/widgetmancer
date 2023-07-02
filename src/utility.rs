@@ -698,8 +698,9 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
 }
 
 #[deprecated(note = "worldcharactersquareglyphmap is bad")]
-pub fn pair_up_character_square_map<T: Default>(
+pub fn pair_up_character_square_map<T: Clone>(
     character_glyph_map: HashMap<WorldCharacterSquare, T>,
+    default_filler: T,
 ) -> HashMap<WorldSquare, [T; 2]> {
     let mut output_map = HashMap::<WorldSquare, [T; 2]>::new();
     character_glyph_map
@@ -714,7 +715,7 @@ pub fn pair_up_character_square_map<T: Default>(
                 let mut existing_double_value = output_map.get_mut(&world_square).unwrap();
                 existing_double_value[position_index] = value;
             } else {
-                let mut new_double_value = [T::default(), T::default()];
+                let mut new_double_value = [default_filler.clone(), default_filler.clone()];
                 new_double_value[position_index] = value;
                 output_map.insert(world_square, new_double_value);
             }
@@ -1517,7 +1518,8 @@ mod tests {
         for square in character_squares {
             character_glyph_map.insert(square, Glyph::default_transparent());
         }
-        let square_glyph_map = pair_up_character_square_map(character_glyph_map);
+        let square_glyph_map =
+            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
         let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
         assert_eq!(square_glyph_map.len(), correct_squares.len());
         for square in correct_squares {
@@ -1536,7 +1538,8 @@ mod tests {
         };
         character_glyph_map.insert(point2(0, 0), test_glyph);
         character_glyph_map.insert(point2(1, 0), test_glyph);
-        let square_glyph_map = pair_up_character_square_map(character_glyph_map);
+        let square_glyph_map =
+            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
         assert_eq!(square_glyph_map.len(), 1);
         assert_eq!(
             *square_glyph_map.get(&point2(0, 0)).unwrap(),

@@ -145,7 +145,8 @@ impl Graphics {
     }
 
     fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareGlyphMap) {
-        let world_square_glyph_map = pair_up_character_square_map(glyph_map);
+        let world_square_glyph_map =
+            pair_up_character_square_map(glyph_map, Glyph::transparent_glyph());
         self.draw_glyphs_at_squares(world_square_glyph_map);
     }
 
