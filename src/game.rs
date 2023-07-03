@@ -4750,8 +4750,8 @@ mod tests {
         );
         let test_square = drone_square + STEP_RIGHT * 5;
         game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP.into()).into(),
-            (test_square, STEP_DOWN.into()).into(),
+            (drone_square, STEP_UP).into(),
+            (test_square, STEP_DOWN).into(),
         );
         game.place_player(drone_square + STEP_DOWN);
         game.draw_headless_now();
@@ -4776,8 +4776,8 @@ mod tests {
         );
         let test_square = drone_square + STEP_RIGHT * 5;
         game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP.into()).into(),
-            (test_square, STEP_DOWN.into()).into(),
+            (drone_square, STEP_UP).into(),
+            (test_square, STEP_DOWN).into(),
         );
         game.tick_realtime_effects(Duration::from_secs_f32(0.5));
         let drone = game.floating_hunter_drones[0];
@@ -4794,8 +4794,8 @@ mod tests {
         );
         let test_square = drone_square + STEP_RIGHT * 5;
         game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP.into()).into(),
-            (test_square, STEP_DOWN.into()).into(),
+            (drone_square, STEP_UP).into(),
+            (test_square, STEP_DOWN).into(),
         );
         game.place_player(drone_square + STEP_DOWN);
         game.draw_headless_now();

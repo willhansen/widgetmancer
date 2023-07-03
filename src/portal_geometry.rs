@@ -302,6 +302,7 @@ impl PortalGeometry {
 #[cfg(test)]
 mod tests {
     use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT};
+    use ntest::assert_about_eq;
 
     use super::*;
 
@@ -314,5 +315,35 @@ mod tests {
         let pose1 = SquareWithOrthogonalDir::from_square_and_step(point2(3, 3), STEP_RIGHT);
         let pose2 = SquareWithOrthogonalDir::from_square_and_step(point2(6, 3), STEP_DOWN);
         assert_eq!(transform.transform_pose(pose1), pose2);
+    }
+    #[test]
+    fn test_ray_through_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            (WorldSquare::new(3, 3), STEP_UP).into(),
+            (WorldSquare::new(6, 5), STEP_RIGHT).into(),
+        );
+        let ray_segments =
+            portal_geometry.ray_to_naive_line_segments(point2(3.0, 2.0), Angle::degrees(90.0), 5.0);
+        let correct_points = vec![
+            point2(3.0, 2.0),
+            point2(3.0, 3.5),
+            point2(5.5, 5.0),
+            point2(9.0, 5.0),
+        ];
+        let actual_points = vec![
+            ray_segments[0].p1,
+            ray_segments[0].p2,
+            ray_segments[1].p1,
+            ray_segments[1].p2,
+        ];
+        for i in 0..correct_points.len() {
+            assert!(
+                (correct_points[i] - actual_points[i]).length() < 0.001,
+                "correct: {:?}, actual {:?}",
+                correct_points[i],
+                actual_points[i]
+            );
+        }
     }
 }

@@ -1227,6 +1227,11 @@ impl From<(WorldSquare, OrthogonalWorldStep)> for SquareWithOrthogonalDir {
         Self::from_square_and_step(value.0, value.1.into())
     }
 }
+impl From<(WorldSquare, WorldStep)> for SquareWithOrthogonalDir {
+    fn from(value: (WorldSquare, WorldStep)) -> Self {
+        Self::from_square_and_step(value.0, value.1)
+    }
+}
 impl From<SquareWithOrthogonalDir> for (WorldSquare, OrthogonalWorldStep) {
     fn from(value: SquareWithOrthogonalDir) -> (WorldSquare, OrthogonalWorldStep) {
         (value.square, value.direction())
@@ -2001,7 +2006,7 @@ mod tests {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2018,7 +2023,7 @@ mod tests {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let face = (point2(5, 6), STEP_DOWN.into()).into();
+        let face = (point2(5, 6), STEP_DOWN).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2034,7 +2039,7 @@ mod tests {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let face = (point2(6, 6), STEP_UP.into()).into();
+        let face = (point2(6, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2050,7 +2055,7 @@ mod tests {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 1.49;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2066,7 +2071,7 @@ mod tests {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 01.501;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2082,7 +2087,7 @@ mod tests {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
         let range = 1.0;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2098,7 +2103,7 @@ mod tests {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
         let range = 1.02;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2114,7 +2119,7 @@ mod tests {
         let start_point = point2(5.0, 6.49);
         let degrees = 90;
         let range = 0.001;
-        let face = (point2(5, 6), STEP_UP.into()).into();
+        let face = (point2(5, 6), STEP_UP).into();
 
         let result = does_ray_hit_oriented_square_face(
             start_point,
@@ -2131,7 +2136,7 @@ mod tests {
             point2(5.0, 6.49),
             Angle::degrees(90.0),
             0.02,
-            (point2(5, 6), STEP_UP.into()).into(),
+            (point2(5, 6), STEP_UP).into(),
         ));
     }
     #[test]
@@ -2140,7 +2145,7 @@ mod tests {
             point2(5.0, 5.49),
             Angle::degrees(45.0),
             5.0,
-            (point2(5, 6), STEP_UP.into()).into(),
+            (point2(5, 6), STEP_UP).into(),
         ));
     }
     #[test]
@@ -2149,7 +2154,7 @@ mod tests {
             point2(5.0, 5.49),
             Angle::degrees(45.0),
             5.0,
-            (point2(5, 6), STEP_RIGHT.into()).into(),
+            (point2(5, 6), STEP_RIGHT).into(),
         ));
     }
 }
