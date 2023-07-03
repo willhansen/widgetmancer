@@ -14,7 +14,7 @@ use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
-use line_drawing::{Bresenham, Point};
+use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;
 use num::traits::Signed;
@@ -305,6 +305,13 @@ impl<U> Line<f32, U> {
 
     pub fn direction(&self) -> Angle<f32> {
         better_angle_from_x_axis(self.p2 - self.p1)
+    }
+    pub fn from_ray(start: Point2D<f32, U>, angle: Angle<f32>, length: f32) -> Self {
+        assert!(length > 0.0);
+        Self::new(
+            start,
+            start + unit_vector_from_angle(angle).cast_unit() * length,
+        )
     }
 }
 
@@ -1480,25 +1487,59 @@ pub fn first_inside_square_face_hit_by_ray(
     inside_faces: &HashSet<SquareWithOrthogonalDir>,
 ) -> Option<SquareWithOrthogonalDir> {
     let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
-    let inside_faces_facing_ray: HashSet<&SquareWithOrthogonalDir> = inside_faces
+
+    let inside_faces_facing_ray: HashSet<SquareWithOrthogonalDir> = inside_faces
         .iter()
         .filter(|&&face| {
             let vector_into_face = face.direction();
             ray_direction.dot(vector_into_face.step().to_f32()) >= 0.0
         })
+        .cloned()
         .collect();
 
     let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
-    let squares_on_naive_line: HashSet<WorldSquare> = Bresenham::new(
+
+    let squares_on_naive_line: HashSet<WorldSquare> = Supercover::new(
         start.to_i32().to_tuple(),
         naive_end_point.to_i32().to_tuple(),
     )
     .map(|(x, y)| WorldSquare::new(x, y))
     .collect();
 
-    todo!();
+    let inside_faces_of_squares_touching_line: HashSet<SquareWithOrthogonalDir> =
+        inside_faces_facing_ray
+            .iter()
+            .filter(|face| squares_on_naive_line.contains(&face.square()))
+            .cloned()
+            .collect();
 
-    inside_faces_facing_ray.get(0).copied().copied()
+    inside_faces_of_squares_touching_line.iter().next().cloned()
+}
+pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
+    let square_center = square.to_f32();
+    let face_center = square_center + face_direction.step().to_f32() * 0.5;
+    let p1_direction = rotated_n_quarter_turns_counter_clockwise(face_direction.step(), 1);
+    let p2_direction = -p1_direction;
+    WorldLine::new(
+        face_center + p1_direction.to_f32() * 0.5,
+        face_center + p2_direction.to_f32() * 0.5,
+    )
+}
+pub fn does_ray_hit_oriented_square_face(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    face: SquareWithOrthogonalDir,
+) -> bool {
+    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
+    let face_is_facing_ray = ray_direction.dot(face.step().step().to_f32()) > 0.0;
+    if !face_is_facing_ray {
+        return false;
+    }
+    let face_line_segment = square_face_as_line(face.square, face.step);
+    let ray_line_segment = WorldLine::from_ray(start, angle, range);
+    ray_line_segment.
+    todo!()
 }
 
 #[cfg(test)]
@@ -1968,52 +2009,159 @@ mod tests {
     }
 
     #[test]
-    fn test_raycast_for_inside_square_faces__simple() {
+    fn test_ray_hit_face__simple() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let faces = vec![(point2(5, 6), STEP_UP.into()).into()];
+        let face = (point2(5, 6), STEP_UP.into()).into();
 
-        let result = first_inside_square_face_hit_by_ray(
+        let result = does_ray_hit_oriented_square_face(
             start_point,
             Angle::degrees(degrees as f32),
             range,
-            &faces,
+            face,
         );
 
-        assert_eq!(result, Some(faces[0]));
+        assert!(result);
     }
 
     #[test]
-    fn test_raycast_for_inside_square_faces__face_must_face_ray() {
+    fn test_ray_hit_face__face_must_face_ray() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let faces = vec![(point2(5, 6), STEP_DOWN.into()).into()];
+        let face = (point2(5, 6), STEP_DOWN.into()).into();
 
-        let result = first_inside_square_face_hit_by_ray(
+        let result = does_ray_hit_oriented_square_face(
             start_point,
             Angle::degrees(degrees as f32),
             range,
-            &faces,
+            face,
         );
 
-        assert_eq!(result, None);
+        assert_false!(result);
     }
     #[test]
-    fn test_raycast_for_inside_square_faces__miss() {
+    fn test_ray_hit_face__miss() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
-        let faces = vec![(point2(6, 6), STEP_UP.into()).into()];
+        let face = (point2(6, 6), STEP_UP.into()).into();
 
-        let result = first_inside_square_face_hit_by_ray(
+        let result = does_ray_hit_oriented_square_face(
             start_point,
             Angle::degrees(degrees as f32),
             range,
-            &faces,
+            face,
         );
 
-        assert_eq!(result, None);
+        assert_false!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__under_ranged() {
+        let start_point = point2(5.0, 5.0);
+        let degrees = 90;
+        let range = 1.49;
+        let face = (point2(5, 6), STEP_UP.into()).into();
+
+        let result = does_ray_hit_oriented_square_face(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            face,
+        );
+
+        assert_false!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__just_within_range() {
+        let start_point = point2(5.0, 5.0);
+        let degrees = 90;
+        let range = 01.501;
+        let face = (point2(5, 6), STEP_UP.into()).into();
+
+        let result = does_ray_hit_oriented_square_face(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            face,
+        );
+
+        assert!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__just_out_of_closer_range() {
+        let start_point = point2(5.0, 5.49);
+        let degrees = 90;
+        let range = 1.0;
+        let face = (point2(5, 6), STEP_UP.into()).into();
+
+        let result = does_ray_hit_oriented_square_face(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            face,
+        );
+
+        assert_false!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__just_within_closer_range() {
+        let start_point = point2(5.0, 5.49);
+        let degrees = 90;
+        let range = 1.02;
+        let face = (point2(5, 6), STEP_UP.into()).into();
+
+        let result = does_ray_hit_oriented_square_face(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            face,
+        );
+
+        assert!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__just_out_of_really_close_range() {
+        let start_point = point2(5.0, 6.49);
+        let degrees = 90;
+        let range = 0.001;
+        let face = (point2(5, 6), STEP_UP.into()).into();
+
+        let result = does_ray_hit_oriented_square_face(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            face,
+        );
+
+        assert_false!(result);
+    }
+    #[test]
+    fn test_ray_hit_face__just_within_really_close_range() {
+        assert!(does_ray_hit_oriented_square_face(
+            point2(5.0, 6.49),
+            Angle::degrees(90.0),
+            0.02,
+            (point2(5, 6), STEP_UP.into()).into(),
+        ));
+    }
+    #[test]
+    fn test_ray_hit_face__angled_miss() {
+        assert_false!(does_ray_hit_oriented_square_face(
+            point2(5.0, 5.49),
+            Angle::degrees(45.0),
+            5.0,
+            (point2(5, 6), STEP_UP.into()).into(),
+        ));
+    }
+    #[test]
+    fn test_ray_hit_face__angled_hit() {
+        assert_false!(does_ray_hit_oriented_square_face(
+            point2(5.0, 5.49),
+            Angle::degrees(45.0),
+            5.0,
+            (point2(5, 6), STEP_RIGHT.into()).into(),
+        ));
     }
 }

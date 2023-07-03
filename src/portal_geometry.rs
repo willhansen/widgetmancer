@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 
 use derive_more::Constructor;
@@ -293,8 +293,8 @@ impl PortalGeometry {
         angle: Angle<f32>,
         range: f32,
     ) -> Option<SquareWithOrthogonalDir> {
-        let all_entrances: Vec<SquareWithOrthogonalDir> =
-            self.portal_exits_by_entrance.keys().cloned().collect_vec();
+        let all_entrances: HashSet<SquareWithOrthogonalDir> =
+            self.portal_exits_by_entrance.keys().cloned().collect();
         first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
     }
 }
