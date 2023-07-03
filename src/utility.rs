@@ -216,7 +216,7 @@ where
     }
 }
 
-impl<U> Line<f32, U> {
+impl<U: Copy> Line<f32, U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         in_line(self.p1, self.p2, point)
     }
@@ -313,6 +313,106 @@ impl<U> Line<f32, U> {
             start + unit_vector_from_angle(angle).cast_unit() * length,
         )
     }
+    pub fn same_side_of_line(&self, point_c: Point2D<f32, U>, point_d: Point2D<f32, U>) -> bool {
+        let point_a = self.p1;
+        let point_b = self.p2;
+        let c_on_line = self.point_is_on_line(point_c);
+        let d_on_line = self.point_is_on_line(point_d);
+
+        if c_on_line {
+            return if d_on_line { true } else { false };
+        } else if d_on_line {
+            return false;
+        }
+
+        is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
+    }
+    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<Point2D<f32, U>> {
+        let line_point_a = self.p1;
+        let line_point_b = self.p2;
+        let is_same_point = line_point_a == line_point_b;
+        let is_vertical_line = line_point_a.x == line_point_b.x;
+        let is_horizontal_line = line_point_a.y == line_point_b.y;
+        if is_same_point {
+            panic!("gave same point {}", point_to_string(line_point_a));
+        } else if is_vertical_line {
+            let x = line_point_a.x;
+            if x.abs() <= 0.5 {
+                self.points_in_line_order(vec![point2(x, 0.5), point2(x, -0.5)])
+            } else {
+                vec![]
+            }
+        } else if is_horizontal_line {
+            let y = line_point_a.y;
+            if y.abs() <= 0.5 {
+                self.points_in_line_order(vec![point2(0.5, y), point2(-0.5, y)])
+            } else {
+                vec![]
+            }
+        } else {
+            // y = mx + b
+            let dy = line_point_b.y - line_point_a.y;
+            let dx = line_point_b.x - line_point_a.x;
+            let m = dy / dx;
+            // b = y - m*x
+            let b = line_point_a.y - m * line_point_a.x;
+
+            let side_positions = vec![0.5, -0.5];
+
+            let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
+            for &x in &side_positions {
+                let y = m * x + b;
+                if y.abs() <= 0.5 {
+                    candidate_intersections.push(point2(x, y));
+                }
+            }
+            for y in side_positions {
+                let x = (y - b) / m;
+                // top and bottom don't catch corners, sides do
+                if x.abs() < 0.5 {
+                    candidate_intersections.push(point2(x, y));
+                }
+            }
+            // this captures the edge case of corners
+            // remove duplicates
+            match candidate_intersections.len() {
+                2 => {
+                    if candidate_intersections[0] == candidate_intersections[1] {
+                        vec![candidate_intersections[0]]
+                    } else {
+                        self.points_in_line_order(candidate_intersections)
+                    }
+                }
+                1 => candidate_intersections,
+                0 => vec![],
+                _ => furthest_apart_points(candidate_intersections).into(),
+            }
+        }
+    }
+    pub fn line_intersects_with_centered_unit_square(&self) -> bool {
+        !self
+            .line_intersections_with_centered_unit_square()
+            .is_empty()
+    }
+    fn points_in_line_order(&self, mut points: Vec<Point2D<f32, U>>) -> Vec<Point2D<f32, U>> {
+        let normalized_line_direction = (self.p2 - self.p1).normalize();
+        points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
+        points
+    }
+
+    pub fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Point2D<f32, U> {
+        let t = rng.gen_range(0.0..=1.0);
+        self.lerp(t)
+    }
+
+    pub fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Point2D<f32, U> {
+        // TODO: make more uniform
+        self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
+    }
+
+    pub fn random_point_near_line(&self, radius: f32) -> Point2D<f32, U> {
+        self.seeded_random_point_near_line(&mut get_new_rng(), radius)
+    }
 }
 
 impl<T, U> Debug for Line<T, U>
@@ -391,18 +491,19 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line
             .approx_on_same_line(other.dividing_line, tolerance)
-            && !same_side_of_line(
-                self.dividing_line,
-                self.point_on_half_plane(),
-                other.point_on_half_plane(),
-            )
+            && !self
+                .dividing_line
+                .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
     pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
-        same_side_of_line(self.dividing_line, self.point_on_half_plane(), point)
+        self.dividing_line
+            .same_side_of_line(self.point_on_half_plane(), point)
     }
     pub fn overlapping_or_touching_point(&self, point: Point2D<f32, U>) -> bool {
-        !same_side_of_line(self.dividing_line, self.point_off_half_plane(), point)
+        !self
+            .dividing_line
+            .same_side_of_line(self.point_off_half_plane(), point)
     }
     pub fn covers_origin(&self) -> bool {
         self.point_is_on_half_plane(point2(0.0, 0.0))
@@ -753,73 +854,6 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
     string
 }
 
-pub fn line_intersects_with_centered_unit_square<U>(line: Line<f32, U>) -> bool {
-    !line_intersections_with_centered_unit_square(line).is_empty()
-}
-
-pub fn line_intersections_with_centered_unit_square<U>(line: Line<f32, U>) -> Vec<Point2D<f32, U>> {
-    let line_point_a = line.p1;
-    let line_point_b = line.p2;
-    let is_same_point = line_point_a == line_point_b;
-    let is_vertical_line = line_point_a.x == line_point_b.x;
-    let is_horizontal_line = line_point_a.y == line_point_b.y;
-    if is_same_point {
-        panic!("gave same point {}", point_to_string(line_point_a));
-    } else if is_vertical_line {
-        let x = line_point_a.x;
-        if x.abs() <= 0.5 {
-            points_in_line_order(line, vec![point2(x, 0.5), point2(x, -0.5)])
-        } else {
-            vec![]
-        }
-    } else if is_horizontal_line {
-        let y = line_point_a.y;
-        if y.abs() <= 0.5 {
-            points_in_line_order(line, vec![point2(0.5, y), point2(-0.5, y)])
-        } else {
-            vec![]
-        }
-    } else {
-        // y = mx + b
-        let dy = line_point_b.y - line_point_a.y;
-        let dx = line_point_b.x - line_point_a.x;
-        let m = dy / dx;
-        // b = y - m*x
-        let b = line_point_a.y - m * line_point_a.x;
-
-        let side_positions = vec![0.5, -0.5];
-
-        let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
-        for &x in &side_positions {
-            let y = m * x + b;
-            if y.abs() <= 0.5 {
-                candidate_intersections.push(point2(x, y));
-            }
-        }
-        for y in side_positions {
-            let x = (y - b) / m;
-            // top and bottom don't catch corners, sides do
-            if x.abs() < 0.5 {
-                candidate_intersections.push(point2(x, y));
-            }
-        }
-        // this captures the edge case of corners
-        // remove duplicates
-        match candidate_intersections.len() {
-            2 => {
-                if candidate_intersections[0] == candidate_intersections[1] {
-                    vec![candidate_intersections[0]]
-                } else {
-                    points_in_line_order(line, candidate_intersections)
-                }
-            }
-            1 => candidate_intersections,
-            0 => vec![],
-            _ => furthest_apart_points(candidate_intersections).into(),
-        }
-    }
-}
-
 fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
     assert!(points.len() >= 2);
     let furthest = points
@@ -831,52 +865,6 @@ fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2
         .unwrap();
     let furthest_values: Vec<Point2D<f32, U>> = furthest.into_iter().copied().collect();
     furthest_values.try_into().unwrap()
-}
-
-fn points_in_line_order<U>(
-    line: Line<f32, U>,
-    mut points: Vec<Point2D<f32, U>>,
-) -> Vec<Point2D<f32, U>> {
-    let normalized_line_direction = (line.p2 - line.p1).normalize();
-    points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
-    points
-}
-
-pub fn same_side_of_line<U>(
-    line: Line<f32, U>,
-    point_c: Point2D<f32, U>,
-    point_d: Point2D<f32, U>,
-) -> bool {
-    let point_a = line.p1;
-    let point_b = line.p2;
-    let c_on_line = line.point_is_on_line(point_c);
-    let d_on_line = line.point_is_on_line(point_d);
-
-    if c_on_line {
-        return if d_on_line { true } else { false };
-    } else if d_on_line {
-        return false;
-    }
-
-    is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
-}
-
-pub fn seeded_random_point_on_line<U>(rng: &mut StdRng, line: Line<f32, U>) -> Point2D<f32, U> {
-    let t = rng.gen_range(0.0..=1.0);
-    line.lerp(t)
-}
-
-pub fn seeded_random_point_near_line<U>(
-    rng: &mut StdRng,
-    line: Line<f32, U>,
-    radius: f32,
-) -> Point2D<f32, U> {
-    // TODO: make more uniform
-    seeded_random_point_on_line(rng, line) + seeded_rand_radial_offset(rng, radius).cast_unit()
-}
-
-pub fn random_point_near_line<U>(line: Line<f32, U>, radius: f32) -> Point2D<f32, U> {
-    seeded_random_point_near_line(&mut get_new_rng(), line, radius)
 }
 
 pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
@@ -1538,7 +1526,6 @@ pub fn does_ray_hit_oriented_square_face(
     }
     let face_line_segment = square_face_as_line(face.square, face.step);
     let ray_line_segment = WorldLine::from_ray(start, angle, range);
-    ray_line_segment.
     todo!()
 }
 
@@ -1665,7 +1652,7 @@ mod tests {
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(-1.5, -1.0), point2(0.0, 0.0));
-        let output_points = line_intersections_with_centered_unit_square(input_line);
+        let output_points = input_line.line_intersections_with_centered_unit_square();
         let output_line = Line::new(output_points[0], output_points[1]);
         let in_vec = input_line.p2 - input_line.p1;
         let out_vec = output_line.p2 - output_line.p1;
@@ -1679,7 +1666,7 @@ mod tests {
     ) {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(-0.5, -0.5), point2(-0.5, 0.5));
-        let output_points = line_intersections_with_centered_unit_square(input_line);
+        let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(input_line.p1, output_points[0]);
         assert_eq!(input_line.p2, output_points[1]);
     }
@@ -1689,7 +1676,7 @@ mod tests {
         let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
-        assert_false!(same_side_of_line(line, neg_point, origin))
+        assert_false!(line.same_side_of_line(neg_point, origin))
     }
 
     #[test]
@@ -1752,7 +1739,7 @@ mod tests {
     #[test]
     fn test_check_line_intersection_with_standard_square() {
         let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
-        assert_false!(line_intersects_with_centered_unit_square(line));
+        assert_false!(line.line_intersects_with_centered_unit_square());
     }
 
     #[test]
@@ -1801,10 +1788,11 @@ mod tests {
 
     #[test]
     fn test_line_intersections__observed_3_intersections() {
-        line_intersections_with_centered_unit_square(Line::new(
+        Line::new(
             WorldPoint::new(-29.5, 5.0),
             WorldPoint::new(-27.589872, 4.703601),
-        ));
+        )
+        .line_intersections_with_centered_unit_square();
     }
 
     #[test]
@@ -1919,17 +1907,17 @@ mod tests {
         let on = point2(0.0, 1.0);
         let on2 = point2(5.0, 1.0);
 
-        assert!(same_side_of_line(line, low, low2));
+        assert!(line.same_side_of_line(low, low2));
 
-        assert!(same_side_of_line(line, high, high2));
-        assert!(same_side_of_line(line, high2, high));
+        assert!(line.same_side_of_line(high, high2));
+        assert!(line.same_side_of_line(high2, high));
 
-        assert!(same_side_of_line(line, on, on2));
-        assert!(same_side_of_line(line, on2, on));
+        assert!(line.same_side_of_line(on, on2));
+        assert!(line.same_side_of_line(on2, on));
 
-        assert_false!(same_side_of_line(line, low, on2));
-        assert_false!(same_side_of_line(line, high, on));
-        assert_false!(same_side_of_line(line, low, high2));
+        assert_false!(line.same_side_of_line(low, on2));
+        assert_false!(line.same_side_of_line(high, on));
+        assert_false!(line.same_side_of_line(low, high2));
     }
 
     #[test]
@@ -1956,7 +1944,7 @@ mod tests {
     fn test_horizontal_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.5, 0.0), point2(-1.5, 0.0));
-        let output_points = line_intersections_with_centered_unit_square(input_line);
+        let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
     }
 
@@ -1964,7 +1952,7 @@ mod tests {
     fn test_vertical_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.0, 0.5), point2(0.0, -1.5));
-        let output_points = line_intersections_with_centered_unit_square(input_line);
+        let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
     }
 

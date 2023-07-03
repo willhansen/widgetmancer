@@ -11,7 +11,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
 };
-use crate::utility::{seeded_random_point_near_line, Line};
+use crate::utility::Line;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -90,11 +90,8 @@ impl Animation for BlinkAnimation {
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
             .map(|i| {
-                seeded_random_point_near_line(
-                    &mut rng,
-                    float_line_centered_on_start,
-                    point_spread_radius,
-                )
+                float_line_centered_on_start
+                    .seeded_random_point_near_line(&mut rng, point_spread_radius)
             })
             .map(snap_to_hextant_grid)
             .collect();

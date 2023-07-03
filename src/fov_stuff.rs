@@ -1039,9 +1039,8 @@ mod tests {
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        better_angle_from_x_axis, line_intersections_with_centered_unit_square,
-        QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir, STEP_DOWN,
-        STEP_LEFT, STEP_UP,
+        better_angle_from_x_axis, QuarterTurnsAnticlockwise, SquareWithKingDir,
+        SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
     use super::*;

@@ -4,7 +4,7 @@ use crate::utility::coordinate_frame_conversions::{
     LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,
     WorldPoint,
 };
-use crate::utility::{line_intersections_with_centered_unit_square, same_side_of_line, IVector};
+use crate::utility::IVector;
 use euclid::{point2, Point2D};
 use ordered_float::OrderedFloat;
 use std::collections::{HashMap, HashSet};

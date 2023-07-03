@@ -13,8 +13,7 @@ use crate::glyph::glyph_constants::{
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
+    is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -253,8 +252,9 @@ pub fn half_plane_to_angled_block_character(
         .map(local_snap_grid_to_local_character_frame)
         .collect();
 
-    let raw_intersection_points =
-        line_intersections_with_centered_unit_square(half_plane.dividing_line());
+    let raw_intersection_points = half_plane
+        .dividing_line()
+        .line_intersections_with_centered_unit_square();
     assert!(raw_intersection_points.len() <= 2);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
@@ -277,11 +277,10 @@ pub fn half_plane_to_angled_block_character(
         .collect();
 
     if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
-        if same_side_of_line(
-            half_plane.dividing_line(),
-            half_plane.point_on_half_plane(),
-            point2(0.0, 0.0),
-        ) {
+        if half_plane
+            .dividing_line()
+            .same_side_of_line(half_plane.point_on_half_plane(), point2(0.0, 0.0))
+        {
             FULL_BLOCK
         } else {
             SPACE
