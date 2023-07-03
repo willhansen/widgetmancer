@@ -14,7 +14,7 @@ use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
-use line_drawing::Point;
+use line_drawing::{Bresenham, Point};
 use ntest::about_eq;
 use num::traits::real::Real;
 use num::traits::Signed;
@@ -1025,19 +1025,21 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[deprecated(note = "use (WorldSquare, OrthogonalWorldStep) instead")]
-#[derive(Clone, Hash, Eq, PartialEq, Neg, Copy, CopyGetters)]
+#[derive(Clone, Hash, Eq, PartialEq, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct SquareWithOrthogonalDir {
     square: WorldSquare,
-    direction_in_quarter_turns: QuarterTurnsAnticlockwise,
+    step: OrthogonalWorldStep,
 }
 
 impl SquareWithOrthogonalDir {
+    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
+        QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.step.into())
+    }
     pub fn from_square_and_step(square: WorldSquare, direction: WorldStep) -> Self {
         SquareWithOrthogonalDir {
             square,
-            direction_in_quarter_turns: QuarterTurnsAnticlockwise::from_vector(direction.into()),
+            step: direction.into(),
         }
     }
     pub fn from_square_and_worldstep(square: WorldSquare, direction: WorldStep) -> Self {
@@ -1050,7 +1052,7 @@ impl SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_worldstep(square, quarter_turns.to_vector().into())
     }
     pub fn direction(&self) -> OrthogonalWorldStep {
-        self.direction_in_quarter_turns.to_vector().into()
+        self.step()
     }
     pub fn stepped(&self) -> Self {
         SquareWithOrthogonalDir::from_square_and_worldstep(
@@ -1102,7 +1104,7 @@ impl SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_worldstep(self.square, -self.direction().step())
     }
     pub fn with_offset(&self, offset: WorldStep) -> Self {
-        Self::from_square_and_turns(self.square + offset, self.direction_in_quarter_turns)
+        Self::from_square_and_step(self.square + offset, self.step().into())
     }
     pub fn with_direction(&self, dir: WorldStep) -> Self {
         Self::from_square_and_worldstep(self.square, dir)
@@ -1144,7 +1146,7 @@ impl Add<StepWithQuarterRotations> for SquareWithOrthogonalDir {
     fn add(self, rhs: StepWithQuarterRotations) -> Self::Output {
         SquareWithOrthogonalDir::from_square_and_turns(
             self.square + rhs.stepp,
-            self.direction_in_quarter_turns + rhs.rotation,
+            self.direction_in_quarter_turns() + rhs.rotation,
         )
     }
 }
@@ -1155,7 +1157,7 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
     fn sub(self, rhs: SquareWithOrthogonalDir) -> Self::Output {
         StepWithQuarterRotations::new(
             self.square - rhs.square,
-            self.direction_in_quarter_turns - rhs.direction_in_quarter_turns,
+            self.direction_in_quarter_turns() - rhs.direction_in_quarter_turns(),
         )
     }
 }
@@ -1236,7 +1238,6 @@ impl From<SquareWithOrthogonalDir> for (WorldSquare, OrthogonalWorldStep) {
     }
 }
 
-#[deprecated(note = "use (WorldSquare, KingWorldStep) instead")]
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
 pub struct SquareWithKingDir {
@@ -1470,6 +1471,34 @@ impl<const SIZE: usize> SquareBoolArray2D<SIZE> {
         }
         the_clone
     }
+}
+
+pub fn first_inside_square_face_hit_by_ray(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    inside_faces: &HashSet<SquareWithOrthogonalDir>,
+) -> Option<SquareWithOrthogonalDir> {
+    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
+    let inside_faces_facing_ray: HashSet<&SquareWithOrthogonalDir> = inside_faces
+        .iter()
+        .filter(|&&face| {
+            let vector_into_face = face.direction();
+            ray_direction.dot(vector_into_face.step().to_f32()) >= 0.0
+        })
+        .collect();
+
+    let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
+    let squares_on_naive_line: HashSet<WorldSquare> = Bresenham::new(
+        start.to_i32().to_tuple(),
+        naive_end_point.to_i32().to_tuple(),
+    )
+    .map(|(x, y)| WorldSquare::new(x, y))
+    .collect();
+
+    todo!();
+
+    inside_faces_facing_ray.get(0).copied().copied()
 }
 
 #[cfg(test)]
@@ -1936,5 +1965,55 @@ mod tests {
         assert_about_eq!(looping_clamp(0.0, 5.0, -0.1), 4.9); // below
         assert_about_eq!(looping_clamp(-1.0, 5.0, 11.1), -0.9); // multiple periods above
         assert_about_eq!(looping_clamp(-1.5, 1.5, 2.0), -1.0); // fraction above
+    }
+
+    #[test]
+    fn test_raycast_for_inside_square_faces__simple() {
+        let start_point = point2(5.0, 5.0);
+        let degrees = 90;
+        let range = 5.0;
+        let faces = vec![(point2(5, 6), STEP_UP.into()).into()];
+
+        let result = first_inside_square_face_hit_by_ray(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            &faces,
+        );
+
+        assert_eq!(result, Some(faces[0]));
+    }
+
+    #[test]
+    fn test_raycast_for_inside_square_faces__face_must_face_ray() {
+        let start_point = point2(5.0, 5.0);
+        let degrees = 90;
+        let range = 5.0;
+        let faces = vec![(point2(5, 6), STEP_DOWN.into()).into()];
+
+        let result = first_inside_square_face_hit_by_ray(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            &faces,
+        );
+
+        assert_eq!(result, None);
+    }
+    #[test]
+    fn test_raycast_for_inside_square_faces__miss() {
+        let start_point = point2(5.0, 5.0);
+        let degrees = 90;
+        let range = 5.0;
+        let faces = vec![(point2(6, 6), STEP_UP.into()).into()];
+
+        let result = first_inside_square_face_hit_by_ray(
+            start_point,
+            Angle::degrees(degrees as f32),
+            range,
+            &faces,
+        );
+
+        assert_eq!(result, None);
     }
 }

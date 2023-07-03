@@ -578,14 +578,14 @@ impl Game {
         self.death_cubes
             .iter()
             .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
-        self.floating_hunter_drones.iter().for_each(|thing| {
-            let sight_line_segments = self.portal_geometry.ray_to_naive_lines(
-                thing.position,
+        self.floating_hunter_drones.iter().for_each(|drone| {
+            let sight_line_segments = self.portal_geometry.ray_to_naive_line_segments(
+                drone.position,
                 drone.sight_direction,
                 HUNTER_DRONE_SIGHT_RANGE,
             );
             self.graphics
-                .draw_floating_hunter_drone(thing, &sight_line_segments);
+                .draw_floating_hunter_drone(drone, &sight_line_segments);
         });
         self.widgets.iter().for_each(|(&square, pushable)| {
             self.graphics

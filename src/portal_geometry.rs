@@ -9,15 +9,17 @@ use itertools::Itertools;
 use ntest::assert_false;
 
 use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldPoint, WorldSquare, WorldStep};
+use crate::utility::coordinate_frame_conversions::{
+    StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
+};
 use crate::utility::{
-    is_orthogonal, ith_projection_of_step, revolve_square,
-    rotated_n_quarter_turns_counter_clockwise, Octant, QuarterTurnsAnticlockwise,
-    SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT,
-    STEP_ZERO,
+    first_inside_square_face_hit_by_ray, is_orthogonal, ith_projection_of_step, revolve_square,
+    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
+    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir,
+    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
 
-#[derive(Hash, Neg, Clone, Copy, Debug)]
+#[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
     end_pose: SquareWithOrthogonalDir,
@@ -291,7 +293,9 @@ impl PortalGeometry {
         angle: Angle<f32>,
         range: f32,
     ) -> Option<SquareWithOrthogonalDir> {
-        todo!()
+        let all_entrances: Vec<SquareWithOrthogonalDir> =
+            self.portal_exits_by_entrance.keys().cloned().collect_vec();
+        first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
     }
 }
 
@@ -301,7 +305,6 @@ mod tests {
 
     use super::*;
 
-    // NO TESTS HERE YET
     #[test]
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
