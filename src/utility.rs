@@ -331,11 +331,14 @@ impl<U: Copy> Line<f32, U> {
         let line_point_a = self.p1;
         let line_point_b = self.p2;
         let is_same_point = line_point_a == line_point_b;
-        let is_vertical_line = line_point_a.x == line_point_b.x;
-        let is_horizontal_line = line_point_a.y == line_point_b.y;
         if is_same_point {
             panic!("gave same point {}", point_to_string(line_point_a));
-        } else if is_vertical_line {
+        }
+
+        let is_vertical_line = line_point_a.x == line_point_b.x;
+        let is_horizontal_line = line_point_a.y == line_point_b.y;
+
+        if is_vertical_line {
             let x = line_point_a.x;
             if x.abs() <= 0.5 {
                 self.points_in_line_order(vec![point2(x, 0.5), point2(x, -0.5)])
@@ -412,6 +415,10 @@ impl<U: Copy> Line<f32, U> {
 
     pub fn random_point_near_line(&self, radius: f32) -> Point2D<f32, U> {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
+    }
+
+    pub fn intersection_point_with_other_line(&self, other: &Self) -> Option<Point2D<f32, U>> {
+        todo!()
     }
 }
 
@@ -1518,20 +1525,28 @@ pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldS
         face_center + p2_direction.to_f32() * 0.5,
     )
 }
+pub fn ray_intersection_point_with_oriented_square_face(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    face: SquareWithOrthogonalDir,
+) -> Option<WorldPoint> {
+    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
+    let face_is_facing_ray = ray_direction.dot(face.step().step().to_f32()) > 0.0;
+    if !face_is_facing_ray {
+        return None;
+    }
+    let face_line_segment = square_face_as_line(face.square, face.step);
+    let ray_line_segment = WorldLine::from_ray(start, angle, range);
+    ray_line_segment.intersection_point_with_other_line(&face_line_segment)
+}
 pub fn does_ray_hit_oriented_square_face(
     start: WorldPoint,
     angle: Angle<f32>,
     range: f32,
     face: SquareWithOrthogonalDir,
 ) -> bool {
-    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
-    let face_is_facing_ray = ray_direction.dot(face.step().step().to_f32()) > 0.0;
-    if !face_is_facing_ray {
-        return false;
-    }
-    let face_line_segment = square_face_as_line(face.square, face.step);
-    let ray_line_segment = WorldLine::from_ray(start, angle, range);
-    todo!()
+    ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
 
 #[cfg(test)]
@@ -2150,11 +2165,143 @@ mod tests {
     }
     #[test]
     fn test_ray_hit_face__angled_hit() {
-        assert_false!(does_ray_hit_oriented_square_face(
+        assert!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.49),
             Angle::degrees(45.0),
             5.0,
             (point2(5, 6), STEP_RIGHT).into(),
         ));
+    }
+    #[test]
+    fn test_ray_hit_face__just_barely_touching_still_counts() {
+        assert!(does_ray_hit_oriented_square_face(
+            point2(5.5, 5.0),
+            Angle::degrees(90.0),
+            5.5,
+            (point2(5, 10), STEP_UP).into(),
+        ));
+    }
+    #[test]
+    fn test_ray_hit_face__parallel_hit_does_not_count() {
+        assert_false!(does_ray_hit_oriented_square_face(
+            point2(5.0, 5.5),
+            Angle::degrees(0.0),
+            5.0,
+            (point2(7, 5), STEP_UP).into(),
+        ));
+    }
+    fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
+        let tolerance = 0.001;
+        assert!(
+            (p1 - p2).length().abs() < tolerance,
+            "Points too far apart: p1: {:?}, p2: {:?}",
+            p1,
+            p2
+        );
+    }
+    #[test]
+    fn test_line_line_intersection__easy_orthogonal_hit() {
+        assert_about_eq_2d(
+            WorldLine::new(point2(0.0, 0.0), point2(0.0, 4.0))
+                .intersection_point_with_other_line(&WorldLine::new(
+                    point2(-1.0, 1.0),
+                    point2(1.0, 1.0),
+                ))
+                .unwrap(),
+            point2(0.0, 1.0),
+        )
+    }
+    #[test]
+    fn test_line_line_intersection__diagonal_intersection() {
+        assert_about_eq_2d(
+            WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
+                .intersection_point_with_other_line(&WorldLine::new(
+                    point2(1.0, 0.0),
+                    point2(0.0, 1.0),
+                ))
+                .unwrap(),
+            point2(0.5, 0.5),
+        )
+    }
+    #[test]
+    fn test_line_line_intersection__miss() {
+        assert!(WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
+            .intersection_point_with_other_line(&WorldLine::new(
+                point2(100.0, 1000.0),
+                point2(10.0, 10.0),
+            ))
+            .is_none())
+    }
+    #[test]
+    fn test_line_line_intersection__endpoint_touch_mid_counts() {
+        assert_about_eq_2d(
+            WorldLine::new(point2(5.0, 5.0), point2(7.0, 5.0))
+                .intersection_point_with_other_line(&WorldLine::new(
+                    point2(5.5, 5.0),
+                    point2(10.0, 10.0),
+                ))
+                .unwrap(),
+            point2(5.5, 5.0),
+        )
+    }
+    #[test]
+    fn test_line_line_intersection__perpendicular_endpoints_touch() {
+        assert_about_eq_2d(
+            WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+                .intersection_point_with_other_line(&WorldLine::new(
+                    point2(10.0, 5.0),
+                    point2(10.0, 10.0),
+                ))
+                .unwrap(),
+            point2(10.0, 5.0),
+        )
+    }
+    #[test]
+    fn test_line_line_intersection__parallel_endpoints_touch() {
+        assert_about_eq_2d(
+            WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+                .intersection_point_with_other_line(&WorldLine::new(
+                    point2(10.0, 5.0),
+                    point2(20.0, 5.0),
+                ))
+                .unwrap(),
+            point2(10.0, 5.0),
+        )
+    }
+    #[test]
+    fn test_line_line_intersection__parallel_miss() {
+        assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+            .intersection_point_with_other_line(&WorldLine::new(
+                point2(11.0, 5.0),
+                point2(20.0, 5.0),
+            ))
+            .is_none(),)
+    }
+    #[test]
+    fn test_line_line_intersection__parallel_overlap_does_not_count() {
+        assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+            .intersection_point_with_other_line(&WorldLine::new(
+                point2(9.0, 5.0),
+                point2(20.0, 5.0),
+            ))
+            .is_none(),)
+    }
+    #[test]
+    fn test_line_line_intersection__parallel_full_overlap_does_not_count() {
+        assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+            .intersection_point_with_other_line(&WorldLine::new(
+                point2(0.0, 5.0),
+                point2(20.0, 5.0),
+            ))
+            .is_none(),)
+    }
+    #[test]
+    fn test_line_line_intersection__parallel_exact_overlap_does_not_count() {
+        assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
+            .intersection_point_with_other_line(&WorldLine::new(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0),
+            ))
+            .is_none(),)
     }
 }
