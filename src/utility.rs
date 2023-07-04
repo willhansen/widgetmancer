@@ -218,7 +218,7 @@ where
 
 impl<U: Copy> Line<f32, U> {
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
-        in_line(self.p1, self.p2, point)
+        on_line(self.p1, self.p2, point)
     }
     pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
@@ -416,9 +416,49 @@ impl<U: Copy> Line<f32, U> {
     pub fn random_point_near_line(&self, radius: f32) -> Point2D<f32, U> {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
+    pub fn intersection_point_with_other_extended_line(
+        &self,
+        other: &Self,
+    ) -> Option<Point2D<f32, U>> {
+        // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+        let (x1, y1) = self.p1.to_tuple();
+        let (x2, y2) = self.p2.to_tuple();
+        let (x3, y3) = other.p1.to_tuple();
+        let (x4, y4) = other.p2.to_tuple();
+
+        let a = x1 * y2 - y1 * x2;
+        let b = x3 * y4 - y3 * x4;
+        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if denominator == 0.0 {
+            return None;
+        }
+        let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
+        let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
+        return Some(point2(final_x, final_y));
+    }
 
     pub fn intersection_point_with_other_line(&self, other: &Self) -> Option<Point2D<f32, U>> {
-        todo!()
+        if self.same_side_of_line(other.p1, other.p2) || other.same_side_of_line(self.p1, self.p2) {
+            let on_same_line = self.point_is_on_line(other.p1);
+            if !on_same_line {
+                return None;
+            }
+            return if self.p2 == other.p1 && on_line_in_this_order(self.p1, self.p2, other.p2) {
+                Some(self.p2)
+            } else if self.p2 == other.p2 && on_line_in_this_order(self.p1, self.p2, other.p1) {
+                Some(self.p2)
+            } else if self.p1 == other.p1 && on_line_in_this_order(self.p2, self.p1, other.p2) {
+                Some(self.p1)
+            } else if self.p1 == other.p2 && on_line_in_this_order(self.p2, self.p1, other.p1) {
+                Some(self.p1)
+            } else {
+                None
+            };
+        }
+        // from here, we know the line segments are overlapping, including the case of exactly touching
+        // A simple line intersection check is all that's left
+
+        self.intersection_point_with_other_extended_line(&other)
     }
 }
 
@@ -880,10 +920,17 @@ pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U
     ab.cross(ac) < 0.0
 }
 
-pub fn in_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == 0.0
+}
+pub fn on_line_in_this_order<U>(
+    a: Point2D<f32, U>,
+    b: Point2D<f32, U>,
+    c: Point2D<f32, U>,
+) -> bool {
+    on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
 #[deprecated(note = "Invalidated by screen rotation")]
@@ -2258,15 +2305,32 @@ mod tests {
     }
     #[test]
     fn test_line_line_intersection__parallel_endpoints_touch() {
+        let line1 = WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0));
+        let line2 = WorldLine::new(point2(10.0, 5.0), point2(20.0, 5.0));
         assert_about_eq_2d(
-            WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line(&WorldLine::new(
-                    point2(10.0, 5.0),
-                    point2(20.0, 5.0),
-                ))
+            line1.intersection_point_with_other_line(&line2).unwrap(),
+            point2(10.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1
+                .reversed()
+                .intersection_point_with_other_line(&line2)
                 .unwrap(),
             point2(10.0, 5.0),
-        )
+        );
+        assert_about_eq_2d(
+            line1
+                .intersection_point_with_other_line(&line2.reversed())
+                .unwrap(),
+            point2(10.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1
+                .reversed()
+                .intersection_point_with_other_line(&line2.reversed())
+                .unwrap(),
+            point2(10.0, 5.0),
+        );
     }
     #[test]
     fn test_line_line_intersection__parallel_miss() {
