@@ -13,10 +13,10 @@ use crate::utility::coordinate_frame_conversions::{
     StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
-    first_inside_square_face_hit_by_ray, is_orthogonal, ith_projection_of_step, revolve_square,
-    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
-    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir,
-    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
+    ith_projection_of_step, revolve_square, rotated_n_quarter_turns_counter_clockwise,
+    unit_vector_from_angle, Octant, QuarterTurnsAnticlockwise, SquareWithKingDir,
+    SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -63,6 +63,36 @@ impl RigidTransform {
             .iter()
             .map(|&step: &WorldStep| self.rotation().rotate_vector(step))
             .collect()
+    }
+    pub fn transform_ray(
+        &self,
+        ray_start: WorldPoint,
+        ray_direction: Angle<f32>,
+    ) -> (WorldPoint, Angle<f32>) {
+        let ray_start_relative_to_tf_start = ray_start - self.start_pose.square().to_f32();
+        let dist_from_tf_start = ray_start_relative_to_tf_start.length();
+        let start_tf_angle = better_angle_from_x_axis(self.start_pose.direction().step().to_f32());
+
+        let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
+        let end_tf_angle = better_angle_from_x_axis(self.end_pose.direction().step().to_f32());
+
+        let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
+
+        let new_ray_start = if dist_from_tf_start == 0.0 {
+            self.end_pose.square().to_f32()
+        } else {
+            let tf_start_point = self.start_pose.direction().step().to_f32();
+            let position_angle_from_tf_start =
+                tf_start_point.angle_to(ray_start_relative_to_tf_start);
+
+            let position_angle_from_tf_end = end_tf_angle + position_angle_from_tf_start;
+
+            self.end_pose.square().to_f32()
+                + unit_vector_from_angle(position_angle_from_tf_end).cast_unit()
+                    * dist_from_tf_start
+        };
+
+        (new_ray_start, new_ray_direction)
     }
 }
 
@@ -280,19 +310,40 @@ impl PortalGeometry {
     }
     pub fn ray_to_naive_line_segments(
         &self,
-        start: WorldPoint,
-        angle: Angle<f32>,
-        range: f32,
+        mut start: WorldPoint,
+        mut angle: Angle<f32>,
+        mut range: f32,
     ) -> Vec<WorldLine> {
-        let portal_entrance = self.first_portal_entrance_hit_by_ray(start, angle, range);
-        todo!()
+        assert!(range > 0.0);
+        let mut naive_line_segments = vec![];
+        while range > 0.0 {
+            // TODO: Watch out for a ray hitting the back of the portal it just came out of
+            if let Some((portal_entrance, intersection_point)) =
+                self.first_portal_entrance_hit_by_ray(start, angle, range)
+            {
+                let new_line = WorldLine::new(start, intersection_point);
+                naive_line_segments.push(new_line);
+                range -= new_line.length();
+
+                let portal = self.get_portal_by_entrance(portal_entrance).unwrap();
+
+                let new_start_beore_transform = intersection_point;
+                (start, angle) = portal.get_transform().transform_ray(start, angle);
+
+                todo!()
+            } else {
+                naive_line_segments.push(WorldLine::from_ray(start, angle, range));
+                range = 0.0;
+            }
+        }
+        naive_line_segments
     }
     fn first_portal_entrance_hit_by_ray(
         &self,
         start: WorldPoint,
         angle: Angle<f32>,
         range: f32,
-    ) -> Option<SquareWithOrthogonalDir> {
+    ) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
         let all_entrances: HashSet<SquareWithOrthogonalDir> =
             self.portal_exits_by_entrance.keys().cloned().collect();
         first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
@@ -301,7 +352,9 @@ impl PortalGeometry {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT};
+    use crate::utility::{
+        assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT,
+    };
     use ntest::assert_about_eq;
 
     use super::*;
@@ -345,5 +398,35 @@ mod tests {
                 actual_points[i]
             );
         }
+    }
+    #[test]
+    fn test_transform_ray__simple_translation() {
+        let tf = RigidTransform::from_start_and_end_poses(
+            (point2(3, 4), STEP_RIGHT).into(),
+            (point2(4, 4), STEP_RIGHT).into(),
+        );
+        let (new_start, new_direction) = tf.transform_ray(point2(3.0, 4.0), Angle::degrees(90.0));
+        assert_about_eq_2d(new_start, point2(4.0, 4.0));
+        assert_about_eq!(new_direction.to_degrees(), 90.0);
+    }
+    #[test]
+    fn test_transform_ray__simple_rotation() {
+        let tf = RigidTransform::from_start_and_end_poses(
+            (point2(3, 4), STEP_RIGHT).into(),
+            (point2(3, 4), STEP_DOWN).into(),
+        );
+        let (new_start, new_direction) = tf.transform_ray(point2(3.0, 4.0), Angle::degrees(45.0));
+        assert_about_eq_2d(new_start, point2(3.0, 4.0));
+        assert_about_eq!(new_direction.to_degrees(), -45.0);
+    }
+    #[test]
+    fn test_transform_ray__move_and_rotate() {
+        let tf = RigidTransform::from_start_and_end_poses(
+            (point2(5, 5), STEP_LEFT).into(),
+            (point2(-10, 20), STEP_UP).into(),
+        );
+        let (new_start, new_direction) = tf.transform_ray(point2(5.0, 4.3), Angle::degrees(170.0));
+        assert_about_eq_2d(new_start, point2(-10.7, 20.0));
+        assert_about_eq!(new_direction.to_degrees(), 80.0, 0.001);
     }
 }

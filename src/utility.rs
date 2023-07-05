@@ -214,9 +214,15 @@ where
         });
         Self::new(new_points[0].clone(), new_points[1].clone())
     }
+    pub fn square_length(&self) -> T {
+        (self.p1 - self.p2).square_length()
+    }
 }
 
 impl<U: Copy> Line<f32, U> {
+    pub fn length(&self) -> f32 {
+        (self.p1 - self.p2).length()
+    }
     pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
         on_line(self.p1, self.p2, point)
     }
@@ -1532,7 +1538,7 @@ pub fn first_inside_square_face_hit_by_ray(
     angle: Angle<f32>,
     range: f32,
     inside_faces: &HashSet<SquareWithOrthogonalDir>,
-) -> Option<SquareWithOrthogonalDir> {
+) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
     let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
 
     let inside_faces_facing_ray: HashSet<SquareWithOrthogonalDir> = inside_faces
@@ -1560,7 +1566,17 @@ pub fn first_inside_square_face_hit_by_ray(
             .cloned()
             .collect();
 
-    inside_faces_of_squares_touching_line.iter().next().cloned()
+    inside_faces_of_squares_touching_line
+        .iter()
+        .map(|&face| {
+            (
+                face,
+                ray_intersection_point_with_oriented_square_face(start, angle, range, face),
+            )
+        })
+        .filter(|(face, point)| point.is_some())
+        .map(|(face, point)| (face, point.unwrap()))
+        .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
 }
 pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
     let square_center = square.to_f32();
@@ -1594,6 +1610,16 @@ pub fn does_ray_hit_oriented_square_face(
     face: SquareWithOrthogonalDir,
 ) -> bool {
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
+}
+
+pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
+    let tolerance = 0.001;
+    assert!(
+        (p1 - p2).length().abs() < tolerance,
+        "Points too far apart: p1: {:?}, p2: {:?}",
+        p1,
+        p2
+    );
 }
 
 #[cfg(test)]
@@ -2237,15 +2263,6 @@ mod tests {
             (point2(7, 5), STEP_UP).into(),
         ));
     }
-    fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
-        let tolerance = 0.001;
-        assert!(
-            (p1 - p2).length().abs() < tolerance,
-            "Points too far apart: p1: {:?}, p2: {:?}",
-            p1,
-            p2
-        );
-    }
     #[test]
     fn test_line_line_intersection__easy_orthogonal_hit() {
         assert_about_eq_2d(
@@ -2367,5 +2384,21 @@ mod tests {
                 point2(10.0, 5.0),
             ))
             .is_none(),)
+    }
+    #[test]
+    fn test_first_inside_square_face_hit_by_ray__simple_case() {
+        let inside_faces = HashSet::from([
+            (point2(5, 6), STEP_UP).into(),
+            (point2(5, 7), STEP_DOWN).into(),
+            (point2(5, 7), STEP_UP).into(),
+        ]);
+        let result = first_inside_square_face_hit_by_ray(
+            point2(5.0, 5.0),
+            Angle::degrees(90.0),
+            20.0,
+            &inside_faces,
+        );
+        assert_eq!(result.unwrap().0, (point2(5, 6), STEP_UP).into());
+        assert_about_eq_2d(result.unwrap().1, point2(5.0, 6.5));
     }
 }
