@@ -101,10 +101,12 @@ pub struct IncubatingPawn {
     pub faction: Faction,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 struct RaycastResult {
     grid_entities: Vec<(WorldStep, GridEntity)>,
     //floating_entities: Vec<FloatingEntity>,
+    endpoint: WorldPoint,
+    //end_direction: Angle<f32>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy, CopyGetters)]
@@ -730,50 +732,49 @@ impl Game {
     }
 
     fn raycast(&self, start_point: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
+        let naive_line = WorldLine::from_ray(start_point, direction, range);
+
+        let line_segments_after_portal_awareness: Vec<WorldLine> = self
+            .portal_geometry
+            .ray_to_naive_line_segments(start_point, direction, range);
+
         let mut result = RaycastResult {
             grid_entities: vec![],
+            endpoint: line_segments_after_portal_awareness.last().unwrap().p2,
         };
-        let end_point = start_point + unit_vector_from_angle(direction).cast_unit() * range;
+
+        let squares_on_ray_path = line_segments_after_portal_awareness
+            .iter()
+            .flat_map(|line| line.touched_squares())
+            .collect_vec();
+
         let start_square = world_point_to_world_square(start_point);
-        let end_square = world_point_to_world_square(end_point);
 
-        let squares_on_line: Vec<WorldSquare> =
-            line_drawing::Bresenham::new(start_square.to_tuple(), end_square.to_tuple())
-                .map(|(x, y)| point2(x, y))
-                .collect_vec();
-        let squares_on_line_relative_to_start = squares_on_line
-            .iter()
-            .map(|&square| square - start_square)
-            .collect_vec();
-        let single_steps = (0..squares_on_line.len())
-            .tuple_windows()
-            .map(|(i, j)| squares_on_line[j] - squares_on_line[i])
+        let relative_squares_on_naive_line = naive_line
+            .touched_squares()
+            .into_iter()
+            .map(|square| square - start_square)
             .collect_vec();
 
-        let mut squares_on_portal_aware_line = vec![start_square];
-        let mut square_before_step = start_square;
-        let mut cumulative_rotation_from_portals = QuarterTurnsAnticlockwise::default();
-        for step in single_steps {
-            let pose_before_step: (WorldSquare, KingWorldStep) = (
-                square_before_step,
-                cumulative_rotation_from_portals.rotate_vector(step).into(),
-            );
-            if let Ok(pose_after_step) = self.portal_aware_single_step(pose_before_step.into()) {
-                let turn_from_step = QuarterTurnsAnticlockwise::from_start_and_end_directions(
-                    pose_before_step.1.into(),
-                    pose_after_step.direction().into(),
-                );
-                cumulative_rotation_from_portals += turn_from_step;
-                square_before_step = pose_after_step.square();
-                squares_on_portal_aware_line.push(pose_after_step.square());
-            } else {
-                break;
-            }
-        }
+        assert_eq!(
+            squares_on_ray_path.len(),
+            relative_squares_on_naive_line.len(),
+            "real path: {:?}\nnaive_path: {:?}",
+            squares_on_ray_path
+                .iter()
+                .cloned()
+                .map(point_to_string)
+                .collect_vec(),
+            relative_squares_on_naive_line
+                .iter()
+                .cloned()
+                .map(vector2_to_string)
+                .collect_vec()
+        );
 
-        result.grid_entities = squares_on_portal_aware_line
+        result.grid_entities = squares_on_ray_path
             .iter()
-            .zip(squares_on_line_relative_to_start.iter())
+            .zip(relative_squares_on_naive_line.iter())
             .filter_map(|(&square, &rel_square)| {
                 self.get_grid_entity_at_square(square)
                     .map(|entity| (rel_square, entity))
@@ -1796,13 +1797,9 @@ impl Game {
                 )
                 .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
+            let line = WorldLine::new(line_start.to_f32(), line_end);
 
-            // Orthogonal steps only
-            for (x, y) in line_drawing::WalkGrid::new(
-                line_start.to_tuple(),
-                line_end.round().to_i32().to_tuple(),
-            ) {
-                let square = WorldSquare::new(x, y);
+            for square in line.touched_squares() {
                 if self.is_non_player_piece_at(square) {
                     self.capture_piece_at(square);
                 }

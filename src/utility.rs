@@ -314,10 +314,7 @@ impl<U: Copy> Line<f32, U> {
     }
     pub fn from_ray(start: Point2D<f32, U>, angle: Angle<f32>, length: f32) -> Self {
         assert!(length > 0.0);
-        Self::new(
-            start,
-            start + unit_vector_from_angle(angle).cast_unit() * length,
-        )
+        Self::new(start, naive_ray_endpoint(start, angle, length))
     }
     pub fn same_side_of_line(&self, point_c: Point2D<f32, U>, point_d: Point2D<f32, U>) -> bool {
         let point_a = self.p1;
@@ -465,6 +462,17 @@ impl<U: Copy> Line<f32, U> {
         // A simple line intersection check is all that's left
 
         self.intersection_point_with_other_extended_line(&other)
+    }
+}
+
+impl WorldLine {
+    pub fn touched_squares(&self) -> Vec<WorldSquare> {
+        let start_square = world_point_to_world_square(self.p1);
+        let end_square = world_point_to_world_square(self.p2);
+        // TODO: use better line algorithm.  Account for floating point start and ends
+        line_drawing::WalkGrid::new(start_square.to_tuple(), end_square.to_tuple())
+            .map(|(x, y)| point2(x, y))
+            .collect_vec()
     }
 }
 
@@ -1620,6 +1628,14 @@ pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
         p1,
         p2
     );
+}
+
+pub fn naive_ray_endpoint<U>(
+    start: Point2D<f32, U>,
+    angle: Angle<f32>,
+    length: f32,
+) -> Point2D<f32, U> {
+    start + unit_vector_from_angle(angle).cast_unit() * length
 }
 
 #[cfg(test)]

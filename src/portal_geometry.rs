@@ -14,9 +14,10 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
-    ith_projection_of_step, revolve_square, rotated_n_quarter_turns_counter_clockwise,
-    unit_vector_from_angle, Octant, QuarterTurnsAnticlockwise, SquareWithKingDir,
-    SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    ith_projection_of_step, naive_ray_endpoint, revolve_square,
+    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
+    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir,
+    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -316,21 +317,26 @@ impl PortalGeometry {
     ) -> Vec<WorldLine> {
         assert!(range > 0.0);
         let mut naive_line_segments = vec![];
+        let STEP_BACK_DISTANCE = 0.001;
         while range > 0.0 {
-            // TODO: Watch out for a ray hitting the back of the portal it just came out of
             if let Some((portal_entrance, intersection_point)) =
                 self.first_portal_entrance_hit_by_ray(start, angle, range)
             {
-                let new_line = WorldLine::new(start, intersection_point);
+                // Step back so the line doesn't end exactly on the border between squares
+                let stepped_back_intersection_point =
+                    naive_ray_endpoint(intersection_point, angle, -STEP_BACK_DISTANCE);
+
+                let new_line = WorldLine::new(start, stepped_back_intersection_point);
                 naive_line_segments.push(new_line);
                 range -= new_line.length();
 
                 let portal = self.get_portal_by_entrance(portal_entrance).unwrap();
 
-                let new_start_beore_transform = intersection_point;
+                start = intersection_point;
                 (start, angle) = portal.get_transform().transform_ray(start, angle);
-
-                todo!()
+                // Step forward so the line doesn't start exactly on the border between squares
+                let stepped_forward_start = naive_ray_endpoint(start, angle, STEP_BACK_DISTANCE);
+                start = stepped_forward_start;
             } else {
                 naive_line_segments.push(WorldLine::from_ray(start, angle, range));
                 range = 0.0;
@@ -391,8 +397,9 @@ mod tests {
             ray_segments[1].p2,
         ];
         for i in 0..correct_points.len() {
+            // Note that the line segments don't end exactly on the portal, they are stepped back slightly
             assert!(
-                (correct_points[i] - actual_points[i]).length() < 0.001,
+                (correct_points[i] - actual_points[i]).length() < 0.01,
                 "correct: {:?}, actual {:?}",
                 correct_points[i],
                 actual_points[i]
@@ -428,5 +435,21 @@ mod tests {
         let (new_start, new_direction) = tf.transform_ray(point2(5.0, 4.3), Angle::degrees(170.0));
         assert_about_eq_2d(new_start, point2(-10.7, 20.0));
         assert_about_eq!(new_direction.to_degrees(), 80.0, 0.001);
+    }
+    #[test]
+    fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            (WorldSquare::new(3, 3), STEP_UP).into(),
+            (WorldSquare::new(6, 5), STEP_RIGHT).into(),
+        );
+        let segments =
+            portal_geometry.ray_to_naive_line_segments(point2(3.0, 3.0), Angle::degrees(90.0), 1.0);
+        let squares = segments
+            .iter()
+            .flat_map(WorldLine::touched_squares)
+            .collect_vec();
+        dbg!("asdf", &squares);
+        assert_eq!(squares.len(), 2);
     }
 }
