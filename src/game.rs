@@ -5,9 +5,10 @@ use std::ops::Mul;
 use std::time::{Duration, Instant};
 
 use ::num::clamp;
-use derive_more::Constructor;
+use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
+use derive_more::{Constructor, From};
 use euclid::*;
-use getset::CopyGetters;
+use getset::{CopyGetters, Setters};
 use itertools::Itertools;
 use line_drawing::Point;
 use ntest::assert_false;
@@ -42,7 +43,24 @@ use crate::{
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[delegatable_trait]
+pub trait FloatingEntityTrait {
+    fn position(&self) -> WorldPoint;
+    fn set_position(&mut self, position: WorldPoint);
+    fn velocity(&self) -> WorldMove;
+    fn set_velocity(&mut self, velocity: WorldMove);
+}
+
+#[derive(Clone, PartialEq, Debug, Copy, Delegate, From)]
+#[delegate(FloatingEntityTrait)]
+enum FloatingEntityEnum {
+    DeathCube(DeathCube),
+    FloatingHunterDrone(FloatingHunterDrone),
+}
+
+#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters, Delegate)]
+#[get_copy = "pub"]
+#[delegate(FloatingEntityTrait, target = "self")]
 pub struct DeathCube {
     pub position: WorldPoint,
     pub velocity: WorldMove,
@@ -50,7 +68,9 @@ pub struct DeathCube {
 
 pub const HUNTER_DRONE_SIGHT_RANGE: f32 = 5.0;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters, Delegate)]
+#[get_copy = "pub"]
+#[delegate(FloatingEntityTrait, target = "self")]
 pub struct FloatingHunterDrone {
     pub position: WorldPoint,
     pub velocity: WorldMove,
@@ -75,12 +95,6 @@ enum GridEntity {
     Player,
     Widget(Widget),
     Block,
-}
-
-#[derive(Clone, PartialEq, Debug, Copy)]
-enum FloatingEntity {
-    DeathCube(DeathCube),
-    FloatingHunterDrone(FloatingHunterDrone),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
@@ -350,33 +364,53 @@ impl Game {
         self.widgets.insert(end, widget);
     }
 
-    fn push_floating_entities_in_square(
+    fn push_floating_entities_that_are_in_square_in_king_direction(
         &mut self,
         start_square: WorldSquare,
         push_direction: KingWorldStep,
         push_length: f32,
     ) {
-        let floating_entities_at_start: Vec<FloatingHunterDrone> =
+        let floating_entities_at_start: Vec<FloatingEntityEnum> =
             self.take_floating_entities_from_square(start_square);
         let mut moved_drones = floating_entities_at_start
             .iter()
             .map(|e| {
-                self.slide_hunter_drone_with_portal_awareness(
-                    &e,
+                self.slide_floating_entity_with_portal_awareness(
+                    e,
                     push_direction.step().to_f32() * push_length,
                 )
             })
             .collect_vec();
-        self.floating_hunter_drones.append(&mut moved_drones);
+        moved_drones
+            .into_iter()
+            .for_each(
+                |floating_entity: FloatingEntityEnum| match floating_entity {
+                    FloatingEntityEnum::DeathCube(e) => self.death_cubes.push(e),
+                    FloatingEntityEnum::FloatingHunterDrone(e) => {
+                        self.floating_hunter_drones.push(e)
+                    }
+                },
+            );
     }
 
     fn take_floating_entities_from_square(
         &mut self,
         square: WorldSquare,
-    ) -> Vec<FloatingHunterDrone> {
-        self.floating_hunter_drones
+    ) -> Vec<FloatingEntityEnum> {
+        let hunter_drones_from_square = self
+            .floating_hunter_drones
             .drain_filter(|drone| world_point_to_world_square(drone.position) == square)
-            .collect_vec()
+            .map(|drone| FloatingEntityEnum::FloatingHunterDrone(drone))
+            .collect_vec();
+        let death_cubes_from_square = self
+            .death_cubes
+            .drain_filter(|cube: &mut DeathCube| {
+                world_point_to_world_square(cube.position) == square
+            })
+            .map(|cube| FloatingEntityEnum::DeathCube(cube))
+            .collect_vec();
+
+        [hunter_drones_from_square, death_cubes_from_square].concat()
     }
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
@@ -811,7 +845,7 @@ impl Game {
                         vec_to_player_center.normalize() * clone_drone.velocity.length();
                 }
 
-                clone_drone = self.slide_hunter_drone_with_portal_awareness(
+                clone_drone = self.slide_floating_entity_with_portal_awareness(
                     &clone_drone,
                     drone.velocity * duration.as_secs_f32(),
                 );
@@ -824,14 +858,14 @@ impl Game {
             .collect();
     }
 
-    fn slide_hunter_drone_with_portal_awareness(
+    fn slide_floating_entity_with_portal_awareness<T: FloatingEntityTrait + Clone>(
         &self,
-        hunter_drone: &FloatingHunterDrone,
+        floating_entity: &T,
         movement: WorldMove,
-    ) -> FloatingHunterDrone {
+    ) -> T {
         // TODO: portal awareness
-        let mut clone_drone = hunter_drone.clone();
-        clone_drone.position += movement;
+        let mut clone_drone = floating_entity.clone();
+        clone_drone.set_position(clone_drone.position() + movement);
         clone_drone
     }
 
@@ -949,7 +983,7 @@ impl Game {
                         push_direction.into(),
                     ));
                     if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
-                        self.push_floating_entities_in_square(
+                        self.push_floating_entities_that_are_in_square_in_king_direction(
                             start_square,
                             push_direction.into(),
                             push_distance,
