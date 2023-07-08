@@ -36,7 +36,8 @@ use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
 use crate::game::{
-    DeathCube, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD, HUNTER_DRONE_SIGHT_RANGE,
+    DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD,
+    HUNTER_DRONE_SIGHT_RANGE,
 };
 use crate::glyph::braille::count_braille_dots;
 use crate::glyph::floating_square::character_map_for_full_square_at_point;
@@ -428,7 +429,7 @@ impl Graphics {
 
     pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
         let color = self.technicolor_at_time(Instant::now());
-        self.draw_floating_square(death_cube.position, color);
+        self.draw_floating_square(death_cube.position(), color);
     }
     pub fn draw_floating_hunter_drone(
         &mut self,
@@ -438,7 +439,7 @@ impl Graphics {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
         }
-        self.draw_floating_square(drone.position, HUNTER_DRONE_COLOR);
+        self.draw_floating_square(drone.position(), HUNTER_DRONE_COLOR);
     }
 
     fn draw_floating_square(&mut self, pos: WorldPoint, color: RGB8) {

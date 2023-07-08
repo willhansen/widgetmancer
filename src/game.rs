@@ -51,30 +51,56 @@ pub trait FloatingEntityTrait {
     fn set_velocity(&mut self, velocity: WorldMove);
 }
 
-#[derive(Clone, PartialEq, Debug, Copy, Delegate, From)]
+#[derive(Clone, PartialEq, Debug, Copy, From, Delegate)]
 #[delegate(FloatingEntityTrait)]
 enum FloatingEntityEnum {
     DeathCube(DeathCube),
     FloatingHunterDrone(FloatingHunterDrone),
 }
 
-#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters, Delegate)]
-#[get_copy = "pub"]
-#[delegate(FloatingEntityTrait, target = "self")]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct DeathCube {
-    pub position: WorldPoint,
-    pub velocity: WorldMove,
+    position: WorldPoint,
+    velocity: WorldMove,
+}
+impl FloatingEntityTrait for DeathCube {
+    fn position(&self) -> WorldPoint {
+        self.position
+    }
+    fn set_position(&mut self, position: WorldPoint) {
+        self.position = position;
+    }
+    fn velocity(&self) -> WorldMove {
+        self.velocity
+    }
+    fn set_velocity(&mut self, velocity: WorldMove) {
+        self.velocity = velocity;
+    }
 }
 
 pub const HUNTER_DRONE_SIGHT_RANGE: f32 = 5.0;
 
-#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters, Delegate)]
-#[get_copy = "pub"]
-#[delegate(FloatingEntityTrait, target = "self")]
+#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters)]
 pub struct FloatingHunterDrone {
-    pub position: WorldPoint,
-    pub velocity: WorldMove,
-    pub sight_direction: Angle<f32>,
+    position: WorldPoint,
+    velocity: WorldMove,
+    #[getset(get_copy = "pub", set = "pub")]
+    sight_direction: Angle<f32>,
+}
+
+impl FloatingEntityTrait for FloatingHunterDrone {
+    fn position(&self) -> WorldPoint {
+        self.position
+    }
+    fn set_position(&mut self, position: WorldPoint) {
+        self.position = position;
+    }
+    fn velocity(&self) -> WorldMove {
+        self.velocity
+    }
+    fn set_velocity(&mut self, velocity: WorldMove) {
+        self.velocity = velocity;
+    }
 }
 
 impl FloatingHunterDrone {
