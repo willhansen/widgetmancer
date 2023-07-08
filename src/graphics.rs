@@ -34,7 +34,7 @@ use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::{FieldOfView, PositionedSquareVisibilityInFov, SquareVisibility};
+use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
 use crate::game::{
     DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD,
     HUNTER_DRONE_SIGHT_RANGE,
@@ -248,7 +248,7 @@ impl Graphics {
 
     pub fn maybe_drawable_for_rel_square_of_fov(
         &self,
-        fov: &FieldOfView,
+        fov: &FieldOfViewResult,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
         fov.drawable_at_relative_square(
@@ -259,7 +259,7 @@ impl Graphics {
         )
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
+    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfViewResult) {
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
                 .screen

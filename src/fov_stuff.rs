@@ -1,6 +1,7 @@
 use std::backtrace::Backtrace;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
+use std::fmt::{Debug, Formatter};
 
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
@@ -30,7 +31,7 @@ type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-#[derive(Clone, Debug, Copy, Constructor)]
+#[derive(Clone, Copy, Constructor)]
 pub struct SquareVisibility {
     visible_portion: Option<LocalSquareHalfPlane>,
 }
@@ -132,13 +133,29 @@ impl SquareVisibility {
         }
     }
     pub fn as_string(&self) -> String {
-        let fg_color = GREY;
-        PartialVisibilityDrawable::from_partially_visible_drawable(
-            &SolidColorDrawable::new(fg_color),
-            *self,
+        if self.is_fully_visible() {
+            "  ".to_string()
+        } else {
+            let fg_color = GREY;
+            PartialVisibilityDrawable::from_partially_visible_drawable(
+                &SolidColorDrawable::new(fg_color),
+                *self,
+            )
+            .to_glyphs()
+            .to_clean_string()
+        }
+    }
+}
+
+impl Debug for SquareVisibility {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:#?}\n\
+             chars: {}",
+            self.visible_portion,
+            self.as_string()
         )
-        .to_glyphs()
-        .to_clean_string()
     }
 }
 
@@ -205,15 +222,15 @@ type CharacterShadow = HalfPlane<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(Debug, Clone)]
-pub struct FieldOfView {
+pub struct FieldOfViewResult {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_relative_squares_in_main_view_only: StepVisibilityMap,
-    transformed_sub_fovs: Vec<FieldOfView>,
+    transformed_sub_fovs: Vec<FieldOfViewResult>,
 }
 
-impl FieldOfView {
+impl FieldOfViewResult {
     pub fn new_empty_fov_with_root(root: SquareWithOrthogonalDir) -> Self {
-        FieldOfView {
+        FieldOfViewResult {
             root_square_with_direction: root,
             visible_relative_squares_in_main_view_only: Default::default(),
             transformed_sub_fovs: vec![],
@@ -228,12 +245,12 @@ impl FieldOfView {
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
     }
-    pub fn view_transform_to(&self, other: &FieldOfView) -> RigidTransform {
+    pub fn view_transform_to(&self, other: &FieldOfViewResult) -> RigidTransform {
         let start = self.root_square_with_direction;
         let end = other.root_square_with_direction;
         RigidTransform::from_start_and_end_poses(start, end)
     }
-    pub fn sub_fovs(&self) -> &Vec<FieldOfView> {
+    pub fn sub_fovs(&self) -> &Vec<FieldOfViewResult> {
         &self.transformed_sub_fovs
     }
     pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
@@ -248,7 +265,7 @@ impl FieldOfView {
 
         self.transformed_sub_fovs
             .iter()
-            .for_each(|subview: &FieldOfView| {
+            .for_each(|subview: &FieldOfViewResult| {
                 let transform_from_subview = subview.view_transform_to(&self);
                 let relative_squares_in_sub_frame =
                     subview.fully_visible_relative_squares_in_main_view_only();
@@ -278,7 +295,7 @@ impl FieldOfView {
         the_clone.transformed_sub_fovs = the_clone
             .transformed_sub_fovs
             .into_iter()
-            .map(|sub_fov: FieldOfView| sub_fov.rounded_towards_full_visibility(tolerance))
+            .map(|sub_fov: FieldOfViewResult| sub_fov.rounded_towards_full_visibility(tolerance))
             .collect();
         the_clone
     }
@@ -381,7 +398,7 @@ impl FieldOfView {
         all_visibilities.extend(visibility_of_squares_only_visible_in_other);
         all_visibilities.extend(visibility_of_squares_visible_in_both_views);
 
-        FieldOfView {
+        FieldOfViewResult {
             root_square_with_direction: self.root_square_with_direction,
             visible_relative_squares_in_main_view_only: all_visibilities,
             transformed_sub_fovs: vec![],
@@ -389,9 +406,9 @@ impl FieldOfView {
     }
 
     fn combined_sub_fovs(
-        sub_fovs_1: &Vec<FieldOfView>,
-        sub_fovs_2: &Vec<FieldOfView>,
-    ) -> Vec<FieldOfView> {
+        sub_fovs_1: &Vec<FieldOfViewResult>,
+        sub_fovs_2: &Vec<FieldOfViewResult>,
+    ) -> Vec<FieldOfViewResult> {
         let mut clone1 = sub_fovs_1.clone();
         let mut clone2 = sub_fovs_2.clone();
         clone1.append(&mut clone2);
@@ -400,15 +417,17 @@ impl FieldOfView {
 
         let grouped_by_root = combined_sub_fovs
             .into_iter()
-            .into_group_map_by(|fov: &FieldOfView| fov.root_square_with_direction);
+            .into_group_map_by(|fov: &FieldOfViewResult| fov.root_square_with_direction);
 
-        let combined_by_root: Vec<FieldOfView> = grouped_by_root
+        let combined_by_root: Vec<FieldOfViewResult> = grouped_by_root
             .into_iter()
             .map(
-                |(root, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfView>)| {
+                |(root, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfViewResult>)| {
                     fov_list.iter().fold(
                         Self::new_empty_fov_with_root(root),
-                        |acc: FieldOfView, next_fov: &FieldOfView| acc.combined_with(next_fov),
+                        |acc: FieldOfViewResult, next_fov: &FieldOfViewResult| {
+                            acc.combined_with(next_fov)
+                        },
                     )
                 },
             )
@@ -431,7 +450,7 @@ impl FieldOfView {
         top_view_combined_fov
     }
     fn without_sub_views(&self) -> Self {
-        FieldOfView {
+        FieldOfViewResult {
             root_square_with_direction: self.root_square_with_direction,
             visible_relative_squares_in_main_view_only: self
                 .visible_relative_squares_in_main_view_only
@@ -473,7 +492,7 @@ impl FieldOfView {
 
         self.transformed_sub_fovs
             .iter()
-            .for_each(|sub_fov: &FieldOfView| {
+            .for_each(|sub_fov: &FieldOfViewResult| {
                 let forward_rotation = self.view_transform_to(sub_fov).rotation();
                 let mut sub_visibilities = sub_fov
                     .visibilities_of_absolute_square(world_square)
@@ -519,7 +538,7 @@ impl FieldOfView {
     fn visibilities_of_relative_square_in_one_sub_view(
         &self,
         relative_square: WorldStep,
-        sub_view: &FieldOfView,
+        sub_view: &FieldOfViewResult,
     ) -> Vec<PositionedSquareVisibilityInFov> {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
@@ -720,8 +739,8 @@ pub fn field_of_view_within_arc_in_single_octant(
     octant: Octant,
     view_arc: AngleInterval,
     starting_step_in_fov_sequence: u32,
-) -> FieldOfView {
-    let mut fov_result = FieldOfView::new_empty_fov_with_root(oriented_center_square);
+) -> FieldOfViewResult {
+    let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(oriented_center_square);
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
@@ -886,7 +905,7 @@ pub fn single_octant_field_of_view(
     octant: Octant,
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
-) -> FieldOfView {
+) -> FieldOfViewResult {
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
     let mut fov_result = field_of_view_within_arc_in_single_octant(
@@ -907,11 +926,11 @@ pub fn portal_aware_field_of_view_from_square(
     radius: u32,
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
-) -> FieldOfView {
+) -> FieldOfViewResult {
     (0..8)
         .fold(
-            FieldOfView::new_empty_fov_at(center_square),
-            |fov_result_accumulator: FieldOfView, octant_number: i32| {
+            FieldOfViewResult::new_empty_fov_at(center_square),
+            |fov_result_accumulator: FieldOfViewResult, octant_number: i32| {
                 let new_fov_result = single_octant_field_of_view(
                     center_square,
                     radius,
@@ -982,7 +1001,7 @@ fn square_visibility_from_one_view_arc(
     }
 }
 
-fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: bool) {
+fn print_fov(fov: &FieldOfViewResult, radius: u32, render_portals_with_line_of_sight: bool) {
     let center_drawable = TextDrawable::new("@@", WHITE, GREY, true);
     let r = radius as i32;
     (-r..=r).for_each(|neg_y| {
@@ -1016,11 +1035,11 @@ fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: 
     });
 }
 
-fn print_fov_as_relative(fov: &FieldOfView, radius: u32) {
+fn print_fov_as_relative(fov: &FieldOfViewResult, radius: u32) {
     print_fov(fov, radius, true)
 }
 
-fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
+fn print_fov_as_absolute(fov: &FieldOfViewResult, radius: u32) {
     print_fov(fov, radius, false)
 }
 
@@ -1492,7 +1511,7 @@ mod tests {
     #[test]
     fn test_get_mapping_from_fov_result() {
         let center: WorldSquare = point2(5, 5);
-        let mut fov_result = FieldOfView::new_empty_fov_at(center);
+        let mut fov_result = FieldOfViewResult::new_empty_fov_at(center);
         let relative_square = vec2(2, 2);
         fov_result.add_fully_visible_square(relative_square);
 
@@ -1660,12 +1679,12 @@ mod tests {
     fn test_sub_fov_view_transform() {
         let sub_center =
             SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT.into());
-        let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center.square());
+        let mut sub_fov = FieldOfViewResult::new_empty_fov_at(sub_center.square());
         sub_fov.root_square_with_direction = sub_center;
 
         let main_center =
             SquareWithOrthogonalDir::from_square_and_step(point2(50, 0), STEP_UP.into());
-        let mut main_fov = FieldOfView::new_empty_fov_at(main_center.square());
+        let mut main_fov = FieldOfViewResult::new_empty_fov_at(main_center.square());
         main_fov.root_square_with_direction = main_center;
 
         let target_square = point2(1, 4);
@@ -1779,8 +1798,8 @@ mod tests {
     #[test]
     fn test_simple_fov_combination() {
         let main_center = point2(5, 5);
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov_1 = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut fov_2 = FieldOfViewResult::new_empty_fov_at(main_center);
         fov_1.add_fully_visible_square(STEP_RIGHT);
         fov_2.add_fully_visible_square(STEP_UP);
 
@@ -1803,8 +1822,8 @@ mod tests {
     #[test]
     fn test_combined_fovs_combine_visibility() {
         let main_center = point2(5, 5);
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov_1 = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut fov_2 = FieldOfViewResult::new_empty_fov_at(main_center);
         let rel_square = STEP_RIGHT * 3;
         fov_1
             .visible_relative_squares_in_main_view_only
@@ -1831,10 +1850,10 @@ mod tests {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
 
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
-        let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
-        let mut sub_fov_2 = FieldOfView::new_empty_fov_at(other_center);
+        let mut fov_1 = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut fov_2 = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut sub_fov_1 = FieldOfViewResult::new_empty_fov_at(other_center);
+        let mut sub_fov_2 = FieldOfViewResult::new_empty_fov_at(other_center);
 
         let rel_square = STEP_RIGHT * 3;
         sub_fov_1
@@ -1869,7 +1888,7 @@ mod tests {
     fn test_fov_relative_to_absolute__top_level() {
         let main_center = point2(5, 5);
 
-        let mut fov = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov = FieldOfViewResult::new_empty_fov_at(main_center);
 
         let rel_square = STEP_DOWN_LEFT * 3;
         let correct_abs_square = main_center + rel_square;
@@ -1896,8 +1915,8 @@ mod tests {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
 
-        let mut fov = FieldOfView::new_empty_fov_at(main_center);
-        let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center);
+        let mut fov = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut sub_fov = FieldOfViewResult::new_empty_fov_at(sub_center);
 
         let rel_square = STEP_DOWN_LEFT * 3;
         let abs_square = sub_center + rel_square;
@@ -1921,7 +1940,7 @@ mod tests {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
 
-        let mut fov = FieldOfView::new_empty_fov_at(main_center);
+        let mut fov = FieldOfViewResult::new_empty_fov_at(main_center);
 
         let quarter_turns = 3;
 
@@ -1929,7 +1948,7 @@ mod tests {
             fov.root_square_with_direction.direction().step(),
             quarter_turns,
         );
-        let mut sub_fov = FieldOfView::new_empty_fov_with_root(
+        let mut sub_fov = FieldOfViewResult::new_empty_fov_with_root(
             SquareWithOrthogonalDir::from_square_and_worldstep(
                 sub_center,
                 sub_fov_direction.into(),
@@ -1967,8 +1986,8 @@ mod tests {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
 
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
+        let mut fov_1 = FieldOfViewResult::new_empty_fov_at(main_center);
+        let mut sub_fov_1 = FieldOfViewResult::new_empty_fov_at(other_center);
 
         let rel_square = STEP_RIGHT * 3;
         fov_1
@@ -1986,7 +2005,7 @@ mod tests {
 
     #[test]
     fn test_rounding_towards_full_visibility() {
-        let mut fov = FieldOfView::new_empty_fov_at(point2(0, 0));
+        let mut fov = FieldOfViewResult::new_empty_fov_at(point2(0, 0));
         fov.add_fully_visible_square(STEP_RIGHT);
 
         fov.add_visible_square(
