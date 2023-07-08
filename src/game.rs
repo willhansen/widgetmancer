@@ -2351,6 +2351,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::fov_stuff::PositionedSquareVisibilityInFov;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3847,8 +3848,8 @@ mod tests {
 
     #[test]
     fn test_horizontal_wide_portal_has_smooth_edge() {
-        let mut game = set_up_nxm_game(30, 30);
-        let player_square: WorldSquare = point2(3, 15);
+        let mut game = set_up_nxm_game(16, 10);
+        let player_square: WorldSquare = point2(3, game.board_size.height as i32 / 2);
         game.place_player(player_square);
 
         let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
@@ -3860,29 +3861,48 @@ mod tests {
 
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
-        let lower_relative_target = STEP_UP * 3 + STEP_RIGHT;
-        let upper_relative_target = lower_relative_target + STEP_UP;
-        let fov = game.player_field_of_view();
-        dbg!(
-            "asdf",
-            fov.visibilities_of_relative_square(lower_relative_target)[1],
-            fov.visibilities_of_relative_square(lower_relative_target)[0],
-            fov.visibilities_of_relative_square(upper_relative_target),
-        );
-
-        let test_squares_top_to_bottom = vec![
+        let test_relative_squares_on_screen_top_to_bottom = vec![
             ScreenBufferStep::new(1, -4),
             ScreenBufferStep::new(1, -3),
             ScreenBufferStep::new(1, 3),
             ScreenBufferStep::new(1, 4),
         ];
+        let test_steps_in_world_top_to_bottom = test_relative_squares_on_screen_top_to_bottom
+            .iter()
+            .map(|&screen_step| game.graphics.screen.screen_step_to_world_step(screen_step))
+            .collect_vec();
+
+        let fov = game.player_field_of_view();
+
+        dbg!(
+            "asdf",
+            test_steps_in_world_top_to_bottom
+                .iter()
+                .map(|&step| fov.visibilities_of_relative_square(step))
+                .collect_vec(),
+        );
+
+        test_steps_in_world_top_to_bottom
+            .iter()
+            .map(|&world_step| fov.visibilities_of_relative_square(world_step))
+            .for_each(
+                |visibilities_of_rel_square: Vec<PositionedSquareVisibilityInFov>| {
+                    let vis1 = visibilities_of_rel_square[0].unrotated_square_visibility();
+                    let vis2 = visibilities_of_rel_square[1].unrotated_square_visibility();
+                    assert!(vis1.is_about_complementary_to(vis2));
+                    assert!(vis1.is_visually_complementary_to(vis2));
+                },
+            );
+
         let correct_strings_top_to_bottom = vec!["🭋█", "🭅█", "🭖█", "🭦█"];
 
-        (0..test_squares_top_to_bottom.len()).for_each(|i| {
+        (0..test_relative_squares_on_screen_top_to_bottom.len()).for_each(|i| {
             assert_eq!(
                 game.graphics
                     .screen
-                    .get_screen_glyphs_at_visual_offset_from_center(test_squares_top_to_bottom[i])
+                    .get_screen_glyphs_at_visual_offset_from_center(
+                        test_relative_squares_on_screen_top_to_bottom[i]
+                    )
                     .to_clean_string(),
                 correct_strings_top_to_bottom[i]
             )

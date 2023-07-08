@@ -11,7 +11,9 @@ use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
 
-use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
+use crate::glyph::angled_blocks::{
+    angle_block_char_complement, half_plane_to_angled_block_character,
+};
 use crate::glyph::glyph_constants::{
     BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
 };
@@ -43,6 +45,11 @@ impl SquareVisibility {
     pub fn is_only_nearly_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion
             .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
+    }
+    pub fn is_at_least_partially_visible(&self) -> bool {
+        self.visible_portion.is_some_and(|visible_half_plane| {
+            visible_half_plane.at_least_partially_covers_unit_square()
+        })
     }
     pub fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
         self.is_fully_visible() || self.is_only_nearly_fully_visible(tolerance)
@@ -145,6 +152,24 @@ impl SquareVisibility {
             .to_clean_string()
         }
     }
+    pub fn is_about_complementary_to(&self, other: Self) -> bool {
+        return if self.is_fully_visible() {
+            !other.is_at_least_partially_visible()
+        } else if other.is_fully_visible() {
+            !self.is_at_least_partially_visible()
+        } else {
+            self.visible_portion
+                .unwrap()
+                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+        };
+    }
+
+    pub fn is_visually_complementary_to(&self, other: Self) -> bool {
+        self.as_string()
+            .chars()
+            .zip(other.as_string().chars())
+            .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
+    }
 }
 
 impl Debug for SquareVisibility {
@@ -152,7 +177,7 @@ impl Debug for SquareVisibility {
         write!(
             f,
             "{:#?}\n\
-             chars: {}",
+             \tchars: {}",
             self.visible_portion,
             self.as_string()
         )
