@@ -1060,11 +1060,11 @@ fn print_fov(fov: &FieldOfViewResult, radius: u32, render_portals_with_line_of_s
     });
 }
 
-fn print_fov_as_relative(fov: &FieldOfViewResult, radius: u32) {
+pub fn print_fov_as_relative(fov: &FieldOfViewResult, radius: u32) {
     print_fov(fov, radius, true)
 }
 
-fn print_fov_as_absolute(fov: &FieldOfViewResult, radius: u32) {
+pub fn print_fov_as_absolute(fov: &FieldOfViewResult, radius: u32) {
     print_fov(fov, radius, false)
 }
 

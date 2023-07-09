@@ -821,7 +821,9 @@ impl Game {
         assert_eq!(
             squares_on_ray_path.len(),
             relative_squares_on_naive_line.len(),
-            "real path: {:?}\nnaive_path: {:?}",
+            "RAYCAST SQUARE MISCOUNT\n\
+            real path: {:?}\n\
+            naive_path: {:?}",
             squares_on_ray_path
                 .iter()
                 .cloned()
@@ -2210,7 +2212,8 @@ impl Game {
             self.place_double_sided_two_way_portal(entrance, exit);
         });
 
-        self.place_block(left_entrance.square() + STEP_RIGHT * 2 + STEP_DOWN_RIGHT * 3);
+        let block_square = left_entrance.square() + STEP_RIGHT * 2 + STEP_DOWN_RIGHT * 3;
+        self.place_block(block_square);
 
         self.place_dense_horizontal_portals(base_square + STEP_RIGHT * 20, 1, 10);
 
@@ -2220,6 +2223,50 @@ impl Game {
         );
         let exit = entrance.stepped_n(5).strafed_right();
         self.place_wide_portal(entrance, exit, 5);
+
+        let bars_root_square = base_square + STEP_LEFT * 20 + STEP_UP * 5;
+
+        self.place_line_of_portals_to_one_exit(
+            (bars_root_square, STEP_UP).into(),
+            STEP_RIGHT * 2,
+            5,
+            (block_square, STEP_DOWN).into(),
+        );
+        self.place_line_of_portals_to_one_exit(
+            (bars_root_square + STEP_DOWN * 8, STEP_RIGHT).into(),
+            STEP_RIGHT,
+            10,
+            (block_square, STEP_DOWN).into(),
+        );
+        self.place_line_of_portals_to_one_exit(
+            (bars_root_square + STEP_LEFT * 5, STEP_LEFT).into(),
+            STEP_DOWN * 2,
+            5,
+            (block_square, STEP_DOWN).into(),
+        );
+        self.place_line_of_portals_to_one_exit(
+            (bars_root_square + STEP_LEFT * 13, STEP_DOWN).into(),
+            STEP_DOWN,
+            10,
+            (block_square, STEP_DOWN).into(),
+        );
+    }
+    fn place_line_of_portals_to_one_exit(
+        &mut self,
+        first_entrance: SquareWithOrthogonalDir,
+        step: WorldStep,
+        num_portals: u32,
+        common_exit: SquareWithOrthogonalDir,
+    ) {
+        (0..num_portals).for_each(|i| {
+            let entrance = (
+                first_entrance.square() + step * i as i32,
+                first_entrance.direction(),
+            )
+                .into();
+            self.place_single_sided_one_way_portal(entrance, common_exit);
+            self.place_single_sided_one_way_portal(entrance.stepped().turned_back(), common_exit);
+        });
     }
 
     // TODO: fix
@@ -2351,7 +2398,9 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::PositionedSquareVisibilityInFov;
+    use crate::fov_stuff::{
+        print_fov_as_absolute, print_fov_as_relative, PositionedSquareVisibilityInFov,
+    };
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3856,7 +3905,7 @@ mod tests {
             player_square + STEP_RIGHT * 0 + STEP_UP * 2,
             STEP_RIGHT.into(),
         );
-        let exit = entrance.stepped_n(5);
+        let exit = entrance.stepped_n(2);
         game.place_wide_portal(entrance, exit, 5);
 
         game.draw_headless_now();
@@ -3874,6 +3923,7 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
+        print_fov_as_absolute(&fov, 5);
         dbg!(
             "asdf",
             test_steps_in_world_top_to_bottom
