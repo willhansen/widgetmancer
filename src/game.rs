@@ -2224,33 +2224,40 @@ impl Game {
         let exit = entrance.stepped_n(5).strafed_right();
         self.place_wide_portal(entrance, exit, 5);
 
-        let bars_root_square = base_square + STEP_LEFT * 20 + STEP_UP * 5;
+        let bars_top_right_root_square = base_square + STEP_LEFT * 20 + STEP_UP * 5;
+        self.place_dotted_thin_walls(bars_top_right_root_square);
+    }
+
+    fn place_dotted_thin_walls(&mut self, bars_top_left_root_square: WorldSquare) {
+        let block_square = bars_top_left_root_square + STEP_DOWN_LEFT * 3;
+        self.place_block(block_square);
 
         self.place_line_of_portals_to_one_exit(
-            (bars_root_square, STEP_UP).into(),
+            (bars_top_left_root_square, STEP_UP).into(),
             STEP_RIGHT * 2,
             5,
             (block_square, STEP_DOWN).into(),
         );
         self.place_line_of_portals_to_one_exit(
-            (bars_root_square + STEP_DOWN * 8, STEP_RIGHT).into(),
+            (bars_top_left_root_square + STEP_DOWN * 8, STEP_RIGHT).into(),
             STEP_RIGHT,
             10,
             (block_square, STEP_DOWN).into(),
         );
         self.place_line_of_portals_to_one_exit(
-            (bars_root_square + STEP_LEFT * 5, STEP_LEFT).into(),
+            (bars_top_left_root_square + STEP_LEFT * 5, STEP_LEFT).into(),
             STEP_DOWN * 2,
             5,
             (block_square, STEP_DOWN).into(),
         );
         self.place_line_of_portals_to_one_exit(
-            (bars_root_square + STEP_LEFT * 13, STEP_DOWN).into(),
+            (bars_top_left_root_square + STEP_LEFT * 13, STEP_DOWN).into(),
             STEP_DOWN,
             10,
             (block_square, STEP_DOWN).into(),
         );
     }
+
     fn place_line_of_portals_to_one_exit(
         &mut self,
         first_entrance: SquareWithOrthogonalDir,
