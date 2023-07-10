@@ -22,9 +22,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square, FieldOfViewResult, SquareVisibility,
-};
+use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfView, SquareVisibility};
 use crate::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
 };
@@ -2368,7 +2366,7 @@ impl Game {
             .visibilities_of_relative_square(target_square_relative_to_player)
             .is_empty()
     }
-    fn player_field_of_view(&self) -> FieldOfViewResult {
+    fn player_field_of_view(&self) -> FieldOfView {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,
