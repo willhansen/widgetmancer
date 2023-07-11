@@ -247,13 +247,30 @@ impl PositionedSquareVisibilityInFov {
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(Debug, Clone)]
-pub struct RelativeOrthogonalWorldSquareLine(WorldStep, OrthogonalWorldStep);
-
-#[derive(Debug, Clone)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: AngleInterval,
-    relative_start_line: Option<RelativeOrthogonalWorldSquareLine>,
-    relative_end_line: RelativeOrthogonalWorldSquareLine,
+    start_line_relative_to_center: Option<WorldLine>,
+    last_visible_squares: StepSet,
+}
+impl AngleBasedVisibleSegment {
+    pub fn validate(&self) {
+        if !self.start_line_spans_angle_interval() || !self.end_squares_cover_angle_interval() {
+            panic!("INVALID VISIBLE AREA SEGMENT");
+        }
+    }
+    fn start_line_spans_angle_interval(&self) -> bool {
+        todo!()
+    }
+    fn end_squares_cover_angle_interval(&self) -> bool {
+        todo!()
+    }
+    pub fn from_relative_square(relative_square: WorldStep) -> Self {
+        Self {
+            visible_angle_interval: AngleInterval::from_square(relative_square),
+            start_line_relative_to_center: None,
+            last_visible_squares: HashSet::from([relative_square]),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -789,6 +806,12 @@ pub fn field_of_view_within_arc_in_single_octant(
         if out_of_range {
             break;
         }
+
+        // in an octant, every square has two possible view-blocking sides (on the far side of the square)
+        // If the square if view blocking, both fully block sight
+        // If there is one or two portals, they block sight, and fill in the gap with portal
+
+        // Maybe pass a copy of the iterator for next square, rather than passing the integer value
 
         let absolute_square = oriented_center_square.square() + relative_square;
 

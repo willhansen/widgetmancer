@@ -217,6 +217,9 @@ where
     pub fn square_length(&self) -> T {
         (self.p1 - self.p2).square_length()
     }
+    pub fn is_orthogonal(&self) -> bool {
+        self.p1.x == self.p2.x || self.p1.y == self.p2.y
+    }
 }
 
 impl<U: Copy> Line<f32, U> {
@@ -236,17 +239,17 @@ impl<U: Copy> Line<f32, U> {
         let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
         perpendicular_part_of_p1_to_point.length()
     }
-    pub fn point_clockwise_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
-    pub fn point_anticlockwise_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_anticlockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
     }
-    pub fn point_right_of_line(&self) -> Point2D<f32, U> {
-        self.point_clockwise_of_line()
+    pub fn a_point_right_of_line(&self) -> Point2D<f32, U> {
+        self.a_point_clockwise_of_line()
     }
-    pub fn point_left_of_line(&self) -> Point2D<f32, U> {
-        self.point_anticlockwise_of_line()
+    pub fn a_point_left_of_line(&self) -> Point2D<f32, U> {
+        self.a_point_anticlockwise_of_line()
     }
     pub fn lerp(&self, t: f32) -> Point2D<f32, U> {
         lerp2d(self.p1, self.p2, t)
@@ -541,7 +544,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
 
     pub fn point_on_half_plane(&self) -> Point2D<f32, U> {
-        self.dividing_line.point_right_of_line()
+        self.dividing_line.a_point_right_of_line()
     }
 
     pub fn point_off_half_plane(&self) -> Point2D<f32, U> {
