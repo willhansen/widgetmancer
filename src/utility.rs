@@ -159,9 +159,9 @@ impl Octant {
     ) -> Self {
         Self::new(self.0 + quarter_turns.quarter_turns() * 2)
     }
-    pub fn outward_and_across_directions(&self) -> (WorldStep, WorldStep) {
+    pub fn outward_and_across_directions(&self) -> (OrthogonalWorldStep, OrthogonalWorldStep) {
         // TODO: probably make this an actual equation
-        match self.0 {
+        let world_step = match self.0 {
             0 => (STEP_RIGHT, STEP_UP),
             1 => (STEP_UP, STEP_RIGHT),
             2 => (STEP_UP, STEP_LEFT),
@@ -171,7 +171,8 @@ impl Octant {
             6 => (STEP_DOWN, STEP_RIGHT),
             7 => (STEP_RIGHT, STEP_DOWN),
             _ => panic!("bad octant: {}", self.0),
-        }
+        };
+        (world_step.0.into(), world_step.1.into())
     }
     pub fn number(&self) -> i32 {
         self.0
@@ -1464,6 +1465,10 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     }
 }
 
+pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
+    step.project_onto_vector(axis.step).dot(axis.step)
+}
+
 pub fn snap_to_nths(x: f32, denominator: u32) -> f32 {
     (x * denominator as f32).round() / denominator as f32
 }
@@ -2420,5 +2425,12 @@ mod tests {
         );
         assert_eq!(result.unwrap().0, (point2(5, 6), STEP_UP).into());
         assert_about_eq_2d(result.unwrap().1, point2(5.0, 6.5));
+    }
+    #[test]
+    fn test_project_step_onto_axis() {
+        assert_eq!(
+            distance_of_step_along_axis(STEP_UP_LEFT * 8, STEP_RIGHT.into()),
+            -8
+        );
     }
 }

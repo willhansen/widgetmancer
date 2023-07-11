@@ -739,24 +739,56 @@ impl FieldOfView {
 }
 
 struct OctantFOVSquareSequenceIter {
-    outward_dir: WorldStep,
-    across_dir: WorldStep,
-    next_step_number: u32,
+    outward_dir: OrthogonalWorldStep,
+    across_dir: OrthogonalWorldStep,
+    outward_steps: u32,
+    across_steps: u32,
 }
 
 impl OctantFOVSquareSequenceIter {
     // one_before_starting_square is useful for skipping the vec2(0, 0) square.
-    pub fn new(octant: Octant, next_step_number: u32) -> Self {
+    #[deprecated(note = "use new_from_center and new_starting_after_square instead")]
+    pub fn new_starting_at_step_number(octant: Octant, next_step_number: u32) -> Self {
+        let (outward_dir, across_dir) = octant.outward_and_across_directions();
+        let (outward_steps, across_steps) =
+            Self::out_and_across_steps_for_square_number(next_step_number);
+
+        OctantFOVSquareSequenceIter {
+            outward_dir,
+            across_dir,
+            outward_steps,
+            across_steps,
+        }
+    }
+    pub fn new_starting_after_square(octant: Octant, prev_square: WorldStep) -> Self {
+        let (outward_dir, across_dir) = octant.outward_and_across_directions();
+        let outward_steps = distance_of_step_along_axis(prev_square, outward_dir);
+        let across_steps = distance_of_step_along_axis(prev_square, across_dir);
+        assert!(outward_steps >= 0);
+        assert!(across_steps >= 0);
+
+        let mut iter = OctantFOVSquareSequenceIter {
+            outward_dir,
+            across_dir,
+            outward_steps: outward_steps as u32,
+            across_steps: across_steps as u32,
+        };
+        iter.next();
+        iter
+    }
+    pub fn new_from_center(octant: Octant) -> Self {
         let (outward_dir, across_dir) = octant.outward_and_across_directions();
 
         OctantFOVSquareSequenceIter {
             outward_dir,
             across_dir,
-            next_step_number,
+            outward_steps: 0,
+            across_steps: 0,
         }
     }
 
-    fn next_out_and_across_steps(next_step_number: u32) -> (u32, u32) {
+    #[deprecated(note = "use new_from_center and new_starting_after_square instead")]
+    fn out_and_across_steps_for_square_number(next_step_number: u32) -> (u32, u32) {
         // area = y + (x-1)/2 * x
         // dx = x-1, dy = y-1, i = area-2
 
@@ -773,11 +805,14 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (outward_steps, across_steps) = Self::next_out_and_across_steps(self.next_step_number);
-        let relative_square =
-            self.outward_dir * outward_steps as i32 + self.across_dir * across_steps as i32;
+        let relative_square = self.outward_dir.step() * self.outward_steps as i32
+            + self.across_dir.step() * self.across_steps as i32;
 
-        self.next_step_number += 1;
+        self.across_steps += 1;
+        if self.across_steps > self.outward_steps {
+            self.outward_steps += 1;
+            self.across_steps = 0;
+        }
 
         Some(relative_square)
     }
@@ -794,9 +829,10 @@ pub fn field_of_view_within_arc_in_single_octant(
 ) -> FieldOfView {
     let mut fov_result = FieldOfView::new_empty_fov_with_root(oriented_center_square);
 
-    // TODO: Stop being an iterator, just be a function
-    let rel_squares_in_fov_sequence =
-        OctantFOVSquareSequenceIter::new(octant, starting_step_in_fov_sequence);
+    let rel_squares_in_fov_sequence = OctantFOVSquareSequenceIter::new_starting_at_step_number(
+        octant,
+        starting_step_in_fov_sequence,
+    );
 
     let mut next_step_in_fov_sequence = starting_step_in_fov_sequence;
     for relative_square in rel_squares_in_fov_sequence {
@@ -1336,7 +1372,8 @@ mod tests {
 
     #[test]
     fn test_fov_square_sequence__detailed() {
-        let mut sequence = OctantFOVSquareSequenceIter::new(Octant::new(1), 0);
+        let mut sequence =
+            OctantFOVSquareSequenceIter::new_starting_at_step_number(Octant::new(1), 0);
         let correct_sequence = [
             vec2(0, 0),
             vec2(0, 1),
@@ -1807,7 +1844,7 @@ mod tests {
         ];
         i_x_y.into_iter().for_each(|(i, x, y)| {
             assert_eq!(
-                OctantFOVSquareSequenceIter::next_out_and_across_steps(i),
+                OctantFOVSquareSequenceIter::out_and_across_steps_for_square_number(i),
                 (x, y)
             )
         });
