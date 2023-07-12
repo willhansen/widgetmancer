@@ -255,7 +255,7 @@ pub struct AngleBasedVisibleSegment {
 impl AngleBasedVisibleSegment {
     pub fn validate(&self) {
         if !self.start_line_spans_angle_interval() || !self.end_squares_cover_angle_interval() {
-            panic!("INVALID VISIBLE AREA SEGMENT");
+            panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
         }
     }
     fn start_line_spans_angle_interval(&self) -> bool {
@@ -270,6 +270,14 @@ impl AngleBasedVisibleSegment {
             start_line_relative_to_center: None,
             last_visible_squares: HashSet::from([relative_square]),
         }
+    }
+    pub fn with_start_line(&self, line: WorldLine) -> Self {
+        let thing = Self {
+            start_line_relative_to_center: Some(line),
+            ..self.clone()
+        };
+        assert!(thing.start_line_spans_angle_interval());
+        thing
     }
 }
 
