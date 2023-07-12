@@ -747,36 +747,6 @@ pub struct OctantFOVSquareSequenceIter {
 }
 
 impl OctantFOVSquareSequenceIter {
-    // one_before_starting_square is useful for skipping the vec2(0, 0) square.
-    #[deprecated(note = "use new_from_center and new_starting_after_square instead")]
-    pub fn new_starting_at_step_number(octant: Octant, next_step_number: u32) -> Self {
-        let (outward_dir, across_dir) = octant.outward_and_across_directions();
-        let (outward_steps, across_steps) =
-            Self::out_and_across_steps_for_square_number(next_step_number);
-
-        OctantFOVSquareSequenceIter {
-            outward_dir,
-            across_dir,
-            outward_steps,
-            across_steps,
-        }
-    }
-    pub fn new_starting_after_square(octant: Octant, prev_square: WorldStep) -> Self {
-        let (outward_dir, across_dir) = octant.outward_and_across_directions();
-        let outward_steps = distance_of_step_along_axis(prev_square, outward_dir);
-        let across_steps = distance_of_step_along_axis(prev_square, across_dir);
-        assert!(outward_steps >= 0);
-        assert!(across_steps >= 0);
-
-        let mut iter = OctantFOVSquareSequenceIter {
-            outward_dir,
-            across_dir,
-            outward_steps: outward_steps as u32,
-            across_steps: across_steps as u32,
-        };
-        iter.next();
-        iter
-    }
     pub fn new_from_center(octant: Octant) -> Self {
         let (outward_dir, across_dir) = octant.outward_and_across_directions();
 
@@ -792,18 +762,6 @@ impl OctantFOVSquareSequenceIter {
         Octant::from_outward_and_across_directions(self.outward_dir, self.across_dir)
     }
 
-    #[deprecated(note = "use new_from_center and new_starting_after_square instead")]
-    fn out_and_across_steps_for_square_number(next_step_number: u32) -> (u32, u32) {
-        // area = y + (x-1)/2 * x
-        // dx = x-1, dy = y-1, i = area-2
-
-        let area: i32 = next_step_number as i32 + 1;
-        let x: i32 = (0.5 + (0.25 + 2.0 * area as f32).sqrt()).ceil() as i32 - 1;
-        let y: i32 = area - ((x - 1) as f32 / 2.0 * x as f32).round() as i32;
-        let dx: u32 = x as u32 - 1;
-        let dy: u32 = y as u32 - 1;
-        (dx, dy)
-    }
     pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
         Self {
             outward_dir: self.outward_dir.rotated(quarter_turns),
@@ -1373,8 +1331,7 @@ mod tests {
 
     #[test]
     fn test_fov_square_sequence__detailed() {
-        let mut sequence =
-            OctantFOVSquareSequenceIter::new_starting_at_step_number(Octant::new(1), 0);
+        let mut sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
         let correct_sequence = [
             vec2(0, 0),
             vec2(0, 1),
@@ -1824,30 +1781,6 @@ mod tests {
         assert!(visibility_of_square(arc, square)
             .unwrap()
             .is_fully_visible());
-    }
-
-    #[test]
-    fn test_octant_step_sequence() {
-        let i_x_y = vec![
-            (0, 0, 0),
-            (1, 1, 0),
-            (2, 1, 1),
-            (3, 2, 0),
-            (4, 2, 1),
-            (5, 2, 2),
-            (6, 3, 0),
-            (7, 3, 1),
-            (8, 3, 2),
-            (9, 3, 3),
-            (10, 4, 0),
-            (11, 4, 1),
-        ];
-        i_x_y.into_iter().for_each(|(i, x, y)| {
-            assert_eq!(
-                OctantFOVSquareSequenceIter::out_and_across_steps_for_square_number(i),
-                (x, y)
-            )
-        });
     }
 
     #[test]
