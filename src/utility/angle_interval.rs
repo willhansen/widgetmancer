@@ -101,8 +101,8 @@ impl AngleInterval {
         let face_corners = [1, -1].map(|sign| {
             face_center
                 + rotated_n_quarter_turns_counter_clockwise(
-                face_direction.step().to_f32() / 2.0,
-                sign,
+                    face_direction.step().to_f32() / 2.0,
+                    sign,
                 )
         });
 

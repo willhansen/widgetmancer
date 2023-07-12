@@ -177,6 +177,36 @@ impl Octant {
     pub fn number(&self) -> i32 {
         self.0
     }
+    pub fn from_outward_and_across_directions(
+        outward_direction: OrthogonalWorldStep,
+        across_direction: OrthogonalWorldStep,
+    ) -> Self {
+        // TODO: probably make this an actual equation
+        let step_pair = (outward_direction.step, across_direction.step);
+        let octant_number = if step_pair == (STEP_RIGHT, STEP_UP) {
+            0
+        } else if step_pair == (STEP_UP, STEP_RIGHT) {
+            1
+        } else if step_pair == (STEP_UP, STEP_LEFT) {
+            2
+        } else if step_pair == (STEP_LEFT, STEP_UP) {
+            3
+        } else if step_pair == (STEP_LEFT, STEP_DOWN) {
+            4
+        } else if step_pair == (STEP_DOWN, STEP_LEFT) {
+            5
+        } else if step_pair == (STEP_DOWN, STEP_RIGHT) {
+            6
+        } else if step_pair == (STEP_RIGHT, STEP_DOWN) {
+            7
+        } else {
+            panic!(
+                "bad octant: outward: {:?}, across: {:?}",
+                outward_direction, across_direction
+            )
+        };
+        Self::new(octant_number)
+    }
 }
 
 #[derive(Clone, PartialEq, Copy)]
@@ -1275,6 +1305,12 @@ impl OrthogonalWorldStep {
     }
     pub fn step(&self) -> WorldStep {
         self.step
+    }
+    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+        Self::new(rotated_n_quarter_turns_counter_clockwise(
+            self.step,
+            quarter_turns.quarter_turns,
+        ))
     }
 }
 
