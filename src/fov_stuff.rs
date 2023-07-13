@@ -249,34 +249,37 @@ pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 #[derive(Debug, Clone)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: AngleInterval,
-    start_line_relative_to_center: Option<WorldLine>,
-    last_visible_squares: StepSet,
+    start_internal_relative_face: Option<SquareWithOrthogonalDir>,
+    end_internal_relative_faces: HashSet<SquareWithOrthogonalDir>,
 }
 impl AngleBasedVisibleSegment {
     pub fn validate(&self) {
-        if !self.start_line_spans_angle_interval() || !self.end_squares_cover_angle_interval() {
+        if !self.start_face_spans_angle_interval() || !self.end_faces_span_angle_interval() {
             panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
         }
     }
-    fn start_line_spans_angle_interval(&self) -> bool {
+    fn start_face_spans_angle_interval(&self) -> bool {
         todo!()
     }
-    fn end_squares_cover_angle_interval(&self) -> bool {
+    fn end_faces_span_angle_interval(&self) -> bool {
         todo!()
     }
-    pub fn from_relative_square(relative_square: WorldStep) -> Self {
+    pub fn from_relative_square_face(relative_face: SquareWithOrthogonalDir) -> Self {
         Self {
-            visible_angle_interval: AngleInterval::from_square(relative_square),
-            start_line_relative_to_center: None,
-            last_visible_squares: HashSet::from([relative_square]),
+            visible_angle_interval: AngleInterval::from_relative_square_face2(relative_face),
+            start_internal_relative_face: None,
+            end_internal_relative_faces: HashSet::from([relative_face]),
         }
     }
-    pub fn with_start_line(&self, line: WorldLine) -> Self {
+    pub fn with_start_internal_relative_face(
+        &self,
+        relative_face: SquareWithOrthogonalDir,
+    ) -> Self {
         let thing = Self {
-            start_line_relative_to_center: Some(line),
+            start_internal_relative_face: Some(relative_face),
             ..self.clone()
         };
-        assert!(thing.start_line_spans_angle_interval());
+        assert!(thing.start_face_spans_angle_interval());
         thing
     }
 }
@@ -816,12 +819,22 @@ pub fn field_of_view_within_arc_in_single_octant(
         }
 
         // in an octant, every square has two possible view-blocking sides (on the far side of the square)
+        let face_directions = [
+            steps_in_octant_iter.outward_dir,
+            steps_in_octant_iter.across_dir,
+        ];
+        let absolute_square = oriented_center_square.square() + relative_square;
+
+        let relative_faces: [SquareWithOrthogonalDir; 2] =
+            face_directions.map(|dir| (relative_square.to_point(), dir));
+        let absolute_faces: [SquareWithOrthogonalDir; 2] = face_directions
+            .map(|dir| (oriented_center_square.square() + relative_square, dir).into());
+
         // If the square if view blocking, both fully block sight
+
         // If there is one or two portals, they block sight, and fill in the gap with portal
 
         // Maybe pass a copy of the iterator for next square, rather than passing the integer value
-
-        let absolute_square = oriented_center_square.square() + relative_square;
 
         let view_arc_of_this_square = if relative_square == STEP_ZERO {
             AngleInterval::from_octant(octant)
@@ -878,7 +891,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .map(|&portal: &Portal| {
                     (
                         portal.clone(),
-                        AngleInterval::from_square_face(
+                        AngleInterval::from_relative_square_face(
                             relative_square,
                             portal.entrance().direction(),
                         ),
@@ -1766,7 +1779,8 @@ mod tests {
 
     #[test]
     fn test_square_fully_covered_by_face() {
-        let view_arc_of_face = AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT.into());
+        let view_arc_of_face =
+            AngleInterval::from_relative_square_face(STEP_RIGHT, STEP_RIGHT.into());
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
@@ -1775,7 +1789,8 @@ mod tests {
 
     #[test]
     fn test_square_fully_not_covered_by_adjacent() {
-        let view_arc_of_face = AngleInterval::from_square_face(STEP_UP_RIGHT, STEP_RIGHT.into());
+        let view_arc_of_face =
+            AngleInterval::from_relative_square_face(STEP_UP_RIGHT, STEP_RIGHT.into());
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
