@@ -2018,9 +2018,8 @@ impl Game {
         offset: WorldStep,
     ) {
         let exit_square = start_square + STEP_RIGHT + offset;
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(start_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(start_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
         self.place_double_sided_two_way_portal(entrance, exit);
     }
 
@@ -2122,9 +2121,8 @@ impl Game {
         self.place_block(entrance_square + STEP_DOWN_RIGHT);
         self.place_block(exit_square + STEP_UP_LEFT);
         self.place_block(exit_square + STEP_DOWN_LEFT);
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
@@ -2132,9 +2130,8 @@ impl Game {
         let entrance_square = self.player_square() + STEP_RIGHT * 8;
         let exit_square = entrance_square + STEP_RIGHT * 3 + STEP_UP * 5;
 
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
@@ -2150,22 +2147,21 @@ impl Game {
                 )
             });
         });
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
 
         self.place_double_sided_two_way_portal(entrance, exit);
     }
     pub fn set_up_simple_test_map(&mut self) {
         let width = 2;
         let spacing = width * 2 + 1;
-        let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let left_entrance = SquareWithOrthogonalDir::from_square_and_step(
             self.player_square() + STEP_RIGHT * 5,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
-        let left_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let left_exit = SquareWithOrthogonalDir::from_square_and_step(
             left_entrance.square() + STEP_UP + STEP_RIGHT * 3,
-            STEP_UP.into(),
+            STEP_UP,
         );
         (0..width).for_each(|i| {
             self.place_double_sided_two_way_portal(
@@ -2196,13 +2192,13 @@ impl Game {
             );
         }
 
-        let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let left_entrance = SquareWithOrthogonalDir::from_square_and_step(
             base_square + STEP_RIGHT * 3 + STEP_UP * 3,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
-        let left_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let left_exit = SquareWithOrthogonalDir::from_square_and_step(
             left_entrance.square() + STEP_UP * 2 + STEP_RIGHT * 2,
-            STEP_UP.into(),
+            STEP_UP,
         );
         (0..6).for_each(|i| {
             let entrance = left_entrance.strafed_right_n(i);
@@ -2215,9 +2211,9 @@ impl Game {
 
         self.place_dense_horizontal_portals(base_square + STEP_RIGHT * 20, 1, 10);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             base_square + STEP_LEFT * 7 + STEP_UP * 3,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
         let exit = entrance.stepped_n(5).strafed_right();
         self.place_wide_portal(entrance, exit, 5);
@@ -2277,14 +2273,10 @@ impl Game {
     // TODO: fix
 
     fn place_rotation_portal_square(&mut self, top_left: WorldSquare, side_length: u32) {
-        let mut entrance_step = SquareWithOrthogonalDir::from_square_and_worldstep(
-            top_left + STEP_LEFT,
-            STEP_RIGHT.into(),
-        );
-        let mut exit_step = SquareWithOrthogonalDir::from_square_and_worldstep(
-            top_left + STEP_DOWN,
-            STEP_DOWN.into(),
-        );
+        let mut entrance_step =
+            SquareWithOrthogonalDir::from_square_and_step(top_left + STEP_LEFT, STEP_RIGHT);
+        let mut exit_step =
+            SquareWithOrthogonalDir::from_square_and_step(top_left + STEP_DOWN, STEP_DOWN);
 
         (0..4).for_each(|_| {
             (0..side_length).for_each(|i| {
@@ -2313,13 +2305,10 @@ impl Game {
             vec2(0.1, 0.3),
         );
         self.place_double_sided_two_way_portal(
-            SquareWithOrthogonalDir::from_square_and_step(
-                block_square + STEP_UP_RIGHT,
-                STEP_DOWN.into(),
-            ),
+            SquareWithOrthogonalDir::from_square_and_step(block_square + STEP_UP_RIGHT, STEP_DOWN),
             SquareWithOrthogonalDir::from_square_and_step(
                 block_square + STEP_DOWN_RIGHT * 4,
-                STEP_LEFT.into(),
+                STEP_LEFT,
             ),
         );
         //self.place_death_turret(self.player_square() + STEP_LEFT * 14);
@@ -3072,8 +3061,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
         game.place_single_sided_one_way_portal(
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 5), STEP_RIGHT.into()),
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 7), STEP_LEFT.into()),
+            SquareWithOrthogonalDir::from_square_and_step(point2(5, 5), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(point2(5, 7), STEP_LEFT),
         );
         game.try_slide_player(STEP_RIGHT).expect("move player");
 
@@ -3084,10 +3073,8 @@ mod tests {
     #[test]
     fn test_portal_steps() {
         let mut game = set_up_10x10_game();
-        let entrance_step =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(2, 6), STEP_UP.into());
-        let exit_step =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 2), STEP_RIGHT.into());
+        let entrance_step = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_UP);
+        let exit_step = SquareWithOrthogonalDir::from_square_and_step(point2(5, 2), STEP_RIGHT);
         game.place_single_sided_one_way_portal(entrance_step, exit_step);
         assert_eq!(
             game.portal_aware_single_step(entrance_step.into()).unwrap(),
@@ -3098,12 +3085,9 @@ mod tests {
     #[test]
     fn test_move_through_multiple_portals() {
         let mut game = set_up_10x10_game();
-        let start =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(2, 6), STEP_RIGHT.into());
-        let mid =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 5), STEP_DOWN.into());
-        let end =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 2), STEP_LEFT.into());
+        let start = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_RIGHT);
+        let mid = SquareWithOrthogonalDir::from_square_and_step(point2(5, 5), STEP_DOWN);
+        let end = SquareWithOrthogonalDir::from_square_and_step(point2(5, 2), STEP_LEFT);
         game.place_single_sided_one_way_portal(start, mid);
         game.place_single_sided_one_way_portal(mid, end);
         assert_eq!(
@@ -3115,10 +3099,8 @@ mod tests {
     #[test]
     fn test_arrow_through_portal() {
         let mut game = set_up_10x10_game();
-        let start =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(2, 6), STEP_RIGHT.into());
-        let end =
-            SquareWithOrthogonalDir::from_square_and_worldstep(point2(5, 2), STEP_DOWN.into());
+        let start = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_RIGHT);
+        let end = SquareWithOrthogonalDir::from_square_and_step(point2(5, 2), STEP_DOWN);
         game.place_single_sided_one_way_portal(start, end);
         game.place_arrow(start.square(), start.direction().into());
         game.tick_projectile_arrows();
@@ -3130,10 +3112,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         let enemy_square = point2(5, 5);
         let player_square = point2(2, 2);
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_worldstep(enemy_square, STEP_RIGHT.into());
-        let exit =
-            SquareWithOrthogonalDir::from_square_and_worldstep(player_square, STEP_DOWN.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(enemy_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(player_square, STEP_DOWN);
         game.place_single_sided_one_way_portal(entrance, exit);
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
         game.place_player(player_square);
@@ -3148,10 +3128,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         let enemy_square = point2(5, 5);
         let player_square = point2(2, 2);
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_worldstep(player_square, STEP_RIGHT.into());
-        let exit =
-            SquareWithOrthogonalDir::from_square_and_worldstep(enemy_square, STEP_DOWN.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(player_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(enemy_square, STEP_DOWN);
 
         game.place_single_sided_one_way_portal(entrance, exit);
 
@@ -3189,14 +3167,9 @@ mod tests {
         let enemy_square = player_square + STEP_UP * 2;
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            player_square + STEP_RIGHT,
-            STEP_RIGHT.into(),
-        );
-        let exit = SquareWithOrthogonalDir::from_square_and_worldstep(
-            enemy_square + STEP_DOWN,
-            STEP_UP.into(),
-        );
+        let entrance =
+            SquareWithOrthogonalDir::from_square_and_step(player_square + STEP_RIGHT, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(enemy_square + STEP_DOWN, STEP_UP);
         game.place_single_sided_one_way_portal(entrance, exit);
 
         game.draw_headless_now();
@@ -3298,8 +3271,8 @@ mod tests {
         let entrance_square = block_square + STEP_UP_RIGHT;
         let exit_square = block_square + STEP_DOWN_RIGHT * 4;
         game.place_single_sided_one_way_portal(
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_DOWN.into()),
-            SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_LEFT.into()),
+            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_DOWN),
+            SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_LEFT),
         );
         game.draw_headless_now();
     }
@@ -3311,11 +3284,11 @@ mod tests {
         game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::from_square_and_step(
                 game.player_square() + STEP_DOWN_RIGHT,
-                STEP_DOWN.into(),
+                STEP_DOWN,
             ),
             SquareWithOrthogonalDir::from_square_and_step(
                 game.player_square() + STEP_DOWN_LEFT * 3,
-                STEP_RIGHT.into(),
+                STEP_RIGHT,
             ),
         );
         game.draw_headless_now();
@@ -3328,11 +3301,11 @@ mod tests {
         game.place_single_sided_one_way_portal(
             SquareWithOrthogonalDir::from_square_and_step(
                 game.player_square() + STEP_DOWN_LEFT,
-                STEP_DOWN.into(),
+                STEP_DOWN,
             ),
             SquareWithOrthogonalDir::from_square_and_step(
                 game.player_square() + STEP_DOWN_LEFT * 3,
-                STEP_RIGHT.into(),
+                STEP_RIGHT,
             ),
         );
         game.draw_headless_now();
@@ -3348,10 +3321,8 @@ mod tests {
         let enemy_square = player_square + STEP_RIGHT * 2;
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_worldstep(player_square, STEP_RIGHT.into());
-        let exit =
-            SquareWithOrthogonalDir::from_square_and_worldstep(enemy_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(player_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(enemy_square, STEP_RIGHT);
         game.place_single_sided_one_way_portal(entrance, exit);
 
         game.draw_headless_now();
@@ -3392,9 +3363,9 @@ mod tests {
         let player_square = point2(10, 10);
         game.place_player(player_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_DOWN_RIGHT * 3,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
         let exit = entrance.with_offset(STEP_RIGHT * 2);
         game.place_single_sided_one_way_portal(entrance, exit);
@@ -3510,10 +3481,10 @@ mod tests {
         let player_square = point2(5, 5);
         game.place_player(player_square);
         let entrance_step =
-            SquareWithOrthogonalDir::from_square_and_worldstep(player_square, STEP_RIGHT.into());
-        let exit_step = SquareWithOrthogonalDir::from_square_and_worldstep(
+            SquareWithOrthogonalDir::from_square_and_step(player_square, STEP_RIGHT);
+        let exit_step = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_DOWN_RIGHT * 3,
-            STEP_UP.into(),
+            STEP_UP,
         );
         game.place_single_sided_two_way_portal(entrance_step, exit_step);
 
@@ -3647,9 +3618,8 @@ mod tests {
 
         let entrance_square = player_square;
         let exit_square = entrance_square + STEP_RIGHT * 2;
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
         game.place_double_sided_two_way_portal(entrance, exit);
 
         let r = 2;
@@ -3684,9 +3654,8 @@ mod tests {
 
         let entrance_square = game.player_square();
         let exit_square = entrance_square + STEP_RIGHT * 3;
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_RIGHT);
         game.place_double_sided_two_way_portal(entrance, exit);
 
         game.draw_headless_now();
@@ -3875,9 +3844,9 @@ mod tests {
         let player_square: WorldSquare = point2(3, 15);
         game.place_player(player_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_RIGHT * 2 + STEP_UP * 2,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
         let exit = entrance.stepped_n(5);
         game.place_wide_portal(entrance, exit, 5);
@@ -3906,9 +3875,9 @@ mod tests {
         let player_square: WorldSquare = point2(3, game.board_size.height as i32 / 2);
         game.place_player(player_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_RIGHT * 0 + STEP_UP * 2,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
         let exit = entrance.stepped_n(2);
         game.place_wide_portal(entrance, exit, 5);
@@ -3970,9 +3939,9 @@ mod tests {
         let player_square: WorldSquare = point2(15, 5);
         game.place_player(player_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_UP * 2 + STEP_LEFT * 2,
-            STEP_UP.into(),
+            STEP_UP,
         );
         let exit = entrance.stepped_n(3);
         game.place_wide_portal(entrance, exit, 5);
@@ -4000,9 +3969,9 @@ mod tests {
         let player_square: WorldSquare = point2(15, 5);
         game.place_player(player_square);
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_UP * 0 + STEP_LEFT * 2,
-            STEP_UP.into(),
+            STEP_UP,
         );
         let exit = entrance.stepped_n(3);
         game.place_wide_portal(entrance, exit, 5);
@@ -4037,13 +4006,13 @@ mod tests {
         game.place_player(player_square);
 
         let width = 5;
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             player_square + STEP_RIGHT * 2 + STEP_UP * 2,
-            STEP_RIGHT.into(),
+            STEP_RIGHT,
         );
-        let exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let exit = SquareWithOrthogonalDir::from_square_and_step(
             entrance.square() + STEP_UP + STEP_RIGHT * 3,
-            STEP_UP.into(),
+            STEP_UP,
         );
         (0..width).for_each(|i| {
             game.place_double_sided_two_way_portal(
@@ -4077,14 +4046,14 @@ mod tests {
 
         let width = 3;
         (0..width).for_each(|i| {
-            let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            let entrance = SquareWithOrthogonalDir::from_square_and_step(
                 player_square + STEP_RIGHT * 2 + STEP_UP,
-                STEP_RIGHT.into(),
+                STEP_RIGHT,
             )
             .strafed_right_n(i);
-            let exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            let exit = SquareWithOrthogonalDir::from_square_and_step(
                 game.player_square() + STEP_UP * 8 + STEP_RIGHT,
-                STEP_UP.into(),
+                STEP_UP,
             )
             .strafed_right_n(i);
             game.place_double_sided_two_way_portal(entrance, exit);
@@ -4417,11 +4386,11 @@ mod tests {
         game.place_widget(Widget::new(4), widget_square);
         for i in 0..2 {
             game.place_single_sided_one_way_portal(
-                SquareWithOrthogonalDir::from_square_and_worldstep(
+                SquareWithOrthogonalDir::from_square_and_step(
                     widget_square + STEP_DOWN * i,
                     STEP_RIGHT,
                 ),
-                SquareWithOrthogonalDir::from_square_and_worldstep(
+                SquareWithOrthogonalDir::from_square_and_step(
                     widget_square + STEP_RIGHT * (3 + i) + STEP_UP * 3,
                     STEP_UP,
                 ),

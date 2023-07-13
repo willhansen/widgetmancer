@@ -1125,50 +1125,41 @@ impl Add for StepWithQuarterRotations {
 
 #[derive(Clone, Hash, Eq, PartialEq, Copy, CopyGetters)]
 #[get_copy = "pub"]
-pub struct SquareWithOrthogonalDir {
-    square: WorldSquare,
-    step: OrthogonalWorldStep,
+pub struct AbsOrRelSquareWithOrthogonalDir<T: Copy> {
+    square: T,
+    dir: OrthogonalWorldStep,
 }
 
-impl SquareWithOrthogonalDir {
+pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
+pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
+
+impl<T> AbsOrRelSquareWithOrthogonalDir<T>
+where
+    T: Copy + Add<WorldStep, Output = T> + Sub<WorldStep, Output = T>,
+{
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
-        QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.step.into())
+        QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
     }
-    pub fn from_square_and_step(square: WorldSquare, direction: WorldStep) -> Self {
-        SquareWithOrthogonalDir {
+    pub fn from_square_and_step<S: Into<OrthogonalWorldStep>>(square: T, direction: S) -> Self {
+        Self {
             square,
-            step: direction.into(),
+            dir: direction.into(),
         }
     }
-    pub fn from_square_and_worldstep(square: WorldSquare, direction: WorldStep) -> Self {
-        Self::from_square_and_step(square, direction.into())
-    }
-    pub fn from_square_and_turns(
-        square: WorldSquare,
-        quarter_turns: QuarterTurnsAnticlockwise,
-    ) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(square, quarter_turns.to_vector().into())
+    pub fn from_square_and_turns(square: T, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+        Self::from_square_and_step(square, quarter_turns.to_vector())
     }
     pub fn direction(&self) -> OrthogonalWorldStep {
-        self.step()
+        self.dir()
     }
     pub fn stepped(&self) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
-            self.square + self.direction().step(),
-            self.direction().into(),
-        )
+        Self::from_square_and_step(self.square + self.direction().step(), self.direction())
     }
     pub fn stepped_n(&self, n: i32) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
-            self.square + self.direction().step() * n,
-            self.direction().into(),
-        )
+        Self::from_square_and_step(self.square + self.direction().step() * n, self.direction())
     }
     pub fn stepped_back(&self) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
-            self.square - self.direction().step(),
-            self.direction().into(),
-        )
+        Self::from_square_and_step(self.square - self.direction().step(), self.direction())
     }
     pub fn strafed_left(&self) -> Self {
         self.strafed_right_n(-1)
@@ -1177,9 +1168,9 @@ impl SquareWithOrthogonalDir {
         self.strafed_right_n(1)
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
+        Self::from_square_and_step(
             self.square + rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3) * n,
-            self.direction().into(),
+            self.direction(),
         )
     }
     pub fn strafed_left_n(&self, n: i32) -> Self {
@@ -1187,39 +1178,34 @@ impl SquareWithOrthogonalDir {
     }
 
     pub fn turned_left(&self) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
+        Self::from_square_and_step(
             self.square,
-            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1).into(),
+            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1),
         )
     }
     pub fn turned_right(&self) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(
+        Self::from_square_and_step(
             self.square,
-            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3).into(),
+            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3),
         )
     }
     pub fn turned_back(&self) -> Self {
-        SquareWithOrthogonalDir::from_square_and_worldstep(self.square, -self.direction().step())
+        Self::from_square_and_step(self.square, -self.direction().step())
     }
     pub fn with_offset(&self, offset: WorldStep) -> Self {
-        Self::from_square_and_step(self.square + offset, self.step().into())
+        Self::from_square_and_step(self.square + offset, self.dir())
     }
     pub fn with_direction(&self, dir: WorldStep) -> Self {
-        Self::from_square_and_worldstep(self.square, dir)
+        Self::from_square_and_step(self.square, dir)
     }
     pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction().step())
     }
 }
 
-impl Debug for SquareWithOrthogonalDir {
+impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Pos: {}, Dir: {}",
-            point_to_string(self.square),
-            vector2_to_string(self.direction().step())
-        )
+        write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
     }
 }
 
@@ -1228,9 +1214,9 @@ impl TryFrom<SquareWithKingDir> for SquareWithOrthogonalDir {
 
     fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
         if is_orthogonal(value.direction().into()) {
-            Ok(SquareWithOrthogonalDir::from_square_and_worldstep(
+            Ok(SquareWithOrthogonalDir::from_square_and_step(
                 value.square(),
-                value.direction().into(),
+                value.direction(),
             ))
         } else {
             Err(())
@@ -1257,6 +1243,28 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
             self.square - rhs.square,
             self.direction_in_quarter_turns() - rhs.direction_in_quarter_turns(),
         )
+    }
+}
+
+impl<SquareType, DirectionType> From<(SquareType, DirectionType)>
+    for AbsOrRelSquareWithOrthogonalDir<SquareType>
+where
+    SquareType: Copy + Add<WorldStep, Output = SquareType> + Sub<WorldStep, Output = SquareType>,
+    DirectionType: Into<OrthogonalWorldStep>,
+{
+    fn from(value: (SquareType, DirectionType)) -> Self {
+        Self::from_square_and_step(value.0, value.1)
+    }
+}
+impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
+    for (SquareType, OrthogonalWorldStep)
+where
+    SquareType: Copy + Add<WorldStep, Output = SquareType> + Sub<WorldStep, Output = SquareType>,
+{
+    fn from(
+        value: AbsOrRelSquareWithOrthogonalDir<SquareType>,
+    ) -> (SquareType, OrthogonalWorldStep) {
+        (value.square, value.direction())
     }
 }
 
@@ -1329,21 +1337,6 @@ impl From<OrthogonalWorldStep> for WorldStep {
 impl From<KingWorldStep> for OrthogonalWorldStep {
     fn from(value: KingWorldStep) -> Self {
         OrthogonalWorldStep::new(value.step)
-    }
-}
-impl From<(WorldSquare, OrthogonalWorldStep)> for SquareWithOrthogonalDir {
-    fn from(value: (WorldSquare, OrthogonalWorldStep)) -> Self {
-        Self::from_square_and_step(value.0, value.1.into())
-    }
-}
-impl From<(WorldSquare, WorldStep)> for SquareWithOrthogonalDir {
-    fn from(value: (WorldSquare, WorldStep)) -> Self {
-        Self::from_square_and_step(value.0, value.1)
-    }
-}
-impl From<SquareWithOrthogonalDir> for (WorldSquare, OrthogonalWorldStep) {
-    fn from(value: SquareWithOrthogonalDir) -> (WorldSquare, OrthogonalWorldStep) {
-        (value.square, value.direction())
     }
 }
 
@@ -1648,11 +1641,11 @@ pub fn ray_intersection_point_with_oriented_square_face(
     face: SquareWithOrthogonalDir,
 ) -> Option<WorldPoint> {
     let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
-    let face_is_facing_ray = ray_direction.dot(face.step().step().to_f32()) > 0.0;
+    let face_is_facing_ray = ray_direction.dot(face.dir().step().to_f32()) > 0.0;
     if !face_is_facing_ray {
         return None;
     }
-    let face_line_segment = square_face_as_line(face.square, face.step);
+    let face_line_segment = square_face_as_line(face.square, face.dir);
     let ray_line_segment = WorldLine::from_ray(start, angle, range);
     ray_line_segment.intersection_point_with_other_line(&face_line_segment)
 }
@@ -1986,8 +1979,8 @@ mod tests {
 
     #[test]
     fn test_step_back_pose() {
-        let pose = SquareWithOrthogonalDir::from_square_and_step(point2(4, 6), STEP_RIGHT.into());
-        let back = SquareWithOrthogonalDir::from_square_and_step(point2(3, 6), STEP_RIGHT.into());
+        let pose = SquareWithOrthogonalDir::from_square_and_step(point2(4, 6), STEP_RIGHT);
+        let back = SquareWithOrthogonalDir::from_square_and_step(point2(3, 6), STEP_RIGHT);
         assert_eq!(pose.stepped_back(), back);
     }
 
@@ -1995,28 +1988,13 @@ mod tests {
     fn test_step_or_turn_pose() {
         let p = SquareWithOrthogonalDir::from_square_and_step;
         let s = point2(5, 5);
-        assert_eq!(
-            p(s, STEP_RIGHT.into()).stepped(),
-            p(s + STEP_RIGHT, STEP_RIGHT.into())
-        );
-        assert_eq!(
-            p(s, STEP_UP.into()).stepped(),
-            p(s + STEP_UP, STEP_UP.into())
-        );
-        assert_eq!(
-            p(s, STEP_DOWN.into()).strafed_left(),
-            p(s + STEP_RIGHT, STEP_DOWN.into())
-        );
-        assert_eq!(
-            p(s, STEP_LEFT.into()).strafed_right(),
-            p(s + STEP_UP, STEP_LEFT.into())
-        );
-        assert_eq!(p(s, STEP_LEFT.into()).turned_left(), p(s, STEP_DOWN.into()));
-        assert_eq!(p(s, STEP_LEFT.into()).turned_right(), p(s, STEP_UP.into()));
-        assert_eq!(
-            p(s, STEP_LEFT.into()).turned_back(),
-            p(s, STEP_RIGHT.into())
-        );
+        assert_eq!(p(s, STEP_RIGHT).stepped(), p(s + STEP_RIGHT, STEP_RIGHT));
+        assert_eq!(p(s, STEP_UP).stepped(), p(s + STEP_UP, STEP_UP));
+        assert_eq!(p(s, STEP_DOWN).strafed_left(), p(s + STEP_RIGHT, STEP_DOWN));
+        assert_eq!(p(s, STEP_LEFT).strafed_right(), p(s + STEP_UP, STEP_LEFT));
+        assert_eq!(p(s, STEP_LEFT).turned_left(), p(s, STEP_DOWN));
+        assert_eq!(p(s, STEP_LEFT).turned_right(), p(s, STEP_UP));
+        assert_eq!(p(s, STEP_LEFT).turned_back(), p(s, STEP_RIGHT));
     }
 
     #[test]

@@ -11,13 +11,13 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::{RelativeSquareWithOrthogonalDir, SquareVisibility};
+use crate::fov_stuff::SquareVisibility;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
-    SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
-    STEP_UP_RIGHT,
+    RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, CopyGetters)]
@@ -93,10 +93,11 @@ impl AngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_relative_square_face(
-        relative_square: WorldStep,
-        face_direction: OrthogonalWorldStep,
+    pub fn from_relative_square_face<T: Into<RelativeSquareWithOrthogonalDir>>(
+        rel_face: T,
     ) -> Self {
+        let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
+            rel_face.into().into();
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.step().to_f32() / 2.0;
         let face_corners = [1, -1].map(|sign| {
@@ -118,10 +119,6 @@ impl AngleInterval {
         } else {
             AngleInterval::new(face_corner_angles[1], face_corner_angles[0])
         }
-    }
-
-    pub fn from_relative_square_face2(rel_face: RelativeSquareWithOrthogonalDir) -> Self {
-        Self::from_relative_square_face(rel_face.0, rel_face.1)
     }
 
     pub fn intersection(&self, other: Self) -> Self {
@@ -1024,7 +1021,7 @@ mod tests {
     fn test_arc_from_square_face_is_smallish() {
         ORTHOGONAL_STEPS.into_iter().for_each(|step| {
             assert!(
-                AngleInterval::from_relative_square_face(vec2(3, 6), step.into())
+                AngleInterval::from_relative_square_face((vec2(3, 6), step))
                     .width()
                     .to_degrees()
                     < 45.0
@@ -1035,7 +1032,7 @@ mod tests {
     #[test]
     fn test_arc_from_square_face__observed_failure_at_right_face_of_one_block_right() {
         assert_about_eq!(
-            AngleInterval::from_relative_square_face(STEP_RIGHT, STEP_RIGHT.into())
+            AngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT))
                 .anticlockwise_end
                 .to_degrees(),
             AngleInterval::from_square(STEP_RIGHT * 2)

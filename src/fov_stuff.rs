@@ -249,8 +249,8 @@ pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 #[derive(Debug, Clone)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: AngleInterval,
-    start_internal_relative_face: Option<SquareWithOrthogonalDir>,
-    end_internal_relative_faces: HashSet<SquareWithOrthogonalDir>,
+    start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
+    end_internal_relative_faces: HashSet<RelativeSquareWithOrthogonalDir>,
 }
 impl AngleBasedVisibleSegment {
     pub fn validate(&self) {
@@ -264,16 +264,16 @@ impl AngleBasedVisibleSegment {
     fn end_faces_span_angle_interval(&self) -> bool {
         todo!()
     }
-    pub fn from_relative_square_face(relative_face: SquareWithOrthogonalDir) -> Self {
+    pub fn from_relative_square_face(relative_face: RelativeSquareWithOrthogonalDir) -> Self {
         Self {
-            visible_angle_interval: AngleInterval::from_relative_square_face2(relative_face),
+            visible_angle_interval: AngleInterval::from_relative_square_face(relative_face),
             start_internal_relative_face: None,
             end_internal_relative_faces: HashSet::from([relative_face]),
         }
     }
     pub fn with_start_internal_relative_face(
         &self,
-        relative_face: SquareWithOrthogonalDir,
+        relative_face: RelativeSquareWithOrthogonalDir,
     ) -> Self {
         let thing = Self {
             start_internal_relative_face: Some(relative_face),
@@ -303,8 +303,7 @@ impl FieldOfView {
     }
     pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
         Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
-            new_center,
-            STEP_UP.into(),
+            new_center, STEP_UP,
         ))
     }
     pub fn root_square(&self) -> WorldSquare {
@@ -825,8 +824,8 @@ pub fn field_of_view_within_arc_in_single_octant(
         ];
         let absolute_square = oriented_center_square.square() + relative_square;
 
-        let relative_faces: [SquareWithOrthogonalDir; 2] =
-            face_directions.map(|dir| (relative_square.to_point(), dir));
+        let relative_faces: [RelativeSquareWithOrthogonalDir; 2] =
+            face_directions.map(|dir| (relative_square, dir).into());
         let absolute_faces: [SquareWithOrthogonalDir; 2] = face_directions
             .map(|dir| (oriented_center_square.square() + relative_square, dir).into());
 
@@ -891,10 +890,10 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .map(|&portal: &Portal| {
                     (
                         portal.clone(),
-                        AngleInterval::from_relative_square_face(
+                        AngleInterval::from_relative_square_face((
                             relative_square,
                             portal.entrance().direction(),
-                        ),
+                        )),
                     )
                 })
                 .collect();
@@ -986,7 +985,7 @@ pub fn single_octant_field_of_view(
     let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP.into()),
+        SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP),
         radius,
         AngleInterval::from_octant(octant),
         OctantFOVSquareSequenceIter::new_from_center(octant),
@@ -1612,8 +1611,8 @@ mod tests {
         let exit_square = center + STEP_LEFT * 5;
 
         portal_geometry.create_portal(
-            SquareWithOrthogonalDir::from_square_and_worldstep(entrance_square, STEP_RIGHT.into()),
-            SquareWithOrthogonalDir::from_square_and_worldstep(exit_square, STEP_DOWN.into()),
+            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_DOWN),
         );
 
         let clockwise_end_in_degrees = 0.1;
@@ -1626,7 +1625,7 @@ mod tests {
         let fov_result = field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portal_geometry,
-            SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP.into()),
+            SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP),
             radius,
             view_arc,
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
@@ -1685,14 +1684,10 @@ mod tests {
     fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
-        let portal_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            center + STEP_RIGHT,
-            STEP_RIGHT.into(),
-        );
-        let portal_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
-            center + STEP_DOWN_LEFT * 15,
-            STEP_DOWN.into(),
-        );
+        let portal_entrance =
+            SquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit =
+            SquareWithOrthogonalDir::from_square_and_step(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1720,14 +1715,10 @@ mod tests {
     fn test_one_octant_with_one_portal() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
-        let portal_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
-            center + STEP_RIGHT,
-            STEP_RIGHT.into(),
-        );
-        let portal_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
-            center + STEP_DOWN_LEFT * 15,
-            STEP_DOWN.into(),
-        );
+        let portal_entrance =
+            SquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit =
+            SquareWithOrthogonalDir::from_square_and_step(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1750,13 +1741,11 @@ mod tests {
 
     #[test]
     fn test_sub_fov_view_transform() {
-        let sub_center =
-            SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT.into());
+        let sub_center = SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT);
         let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center.square());
         sub_fov.root_square_with_direction = sub_center;
 
-        let main_center =
-            SquareWithOrthogonalDir::from_square_and_step(point2(50, 0), STEP_UP.into());
+        let main_center = SquareWithOrthogonalDir::from_square_and_step(point2(50, 0), STEP_UP);
         let mut main_fov = FieldOfView::new_empty_fov_at(main_center.square());
         main_fov.root_square_with_direction = main_center;
 
@@ -1779,8 +1768,7 @@ mod tests {
 
     #[test]
     fn test_square_fully_covered_by_face() {
-        let view_arc_of_face =
-            AngleInterval::from_relative_square_face(STEP_RIGHT, STEP_RIGHT.into());
+        let view_arc_of_face = AngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT));
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
@@ -1790,7 +1778,7 @@ mod tests {
     #[test]
     fn test_square_fully_not_covered_by_adjacent() {
         let view_arc_of_face =
-            AngleInterval::from_relative_square_face(STEP_UP_RIGHT, STEP_RIGHT.into());
+            AngleInterval::from_relative_square_face((STEP_UP_RIGHT, STEP_RIGHT));
         let square = STEP_RIGHT * 2;
 
         let visibility = visibility_of_square(view_arc_of_face, square);
@@ -1808,9 +1796,8 @@ mod tests {
 
     #[test]
     fn test_portal_pose_transform() {
-        let entrance =
-            SquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT.into());
-        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN.into());
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT);
+        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN);
         let portal = Portal::new(entrance, exit);
 
         let transform = portal.get_transform();
@@ -2000,10 +1987,7 @@ mod tests {
             quarter_turns,
         );
         let mut sub_fov = FieldOfView::new_empty_fov_with_root(
-            SquareWithOrthogonalDir::from_square_and_worldstep(
-                sub_center,
-                sub_fov_direction.into(),
-            ),
+            SquareWithOrthogonalDir::from_square_and_step(sub_center, sub_fov_direction),
         );
 
         let rel_square = STEP_DOWN_LEFT * 3;
@@ -2188,10 +2172,9 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance_left_end =
-            SquareWithOrthogonalDir::from_square_and_worldstep(center, STEP_RIGHT.into());
+        let entrance_left_end = SquareWithOrthogonalDir::from_square_and_step(center, STEP_RIGHT);
         let portal_step = STEP_RIGHT * 2;
-        let exit_left_end = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let exit_left_end = SquareWithOrthogonalDir::from_square_and_step(
             entrance_left_end.square() + STEP_RIGHT + portal_step,
             STEP_RIGHT,
         );
@@ -2239,11 +2222,11 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let entrance = SquareWithOrthogonalDir::from_square_and_step(
             center + STEP_RIGHT * 2 + STEP_UP,
             STEP_RIGHT,
         );
-        let exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+        let exit = SquareWithOrthogonalDir::from_square_and_step(
             entrance.square() + STEP_UP_LEFT * 50,
             STEP_UP,
         );
