@@ -271,10 +271,11 @@ impl AngleBasedVisibleSegment {
             end_internal_relative_faces: HashSet::from([relative_face]),
         }
     }
-    pub fn with_start_internal_relative_face(
-        &self,
-        relative_face: RelativeSquareWithOrthogonalDir,
-    ) -> Self {
+    pub fn weakly_apply_start_face(&self, relative_face: RelativeSquareWithOrthogonalDir) -> Self {
+        if self.start_internal_relative_face.is_some() {
+            return self.clone();
+        }
+
         let thing = Self {
             start_internal_relative_face: Some(relative_face),
             ..self.clone()
@@ -288,6 +289,7 @@ impl AngleBasedVisibleSegment {
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
+    #[deprecated(note = "use visible_segments_in_main_view_only instead")]
     visible_relative_squares_in_main_view_only: StepVisibilityMap,
     transformed_sub_fovs: Vec<FieldOfView>,
 }
@@ -830,41 +832,56 @@ pub fn field_of_view_within_arc_in_single_octant(
             .map(|dir| (oriented_center_square.square() + relative_square, dir).into());
 
         // If the square if view blocking, both fully block sight
+        let visible_segments_up_to_relative_faces =
+            relative_faces.map(AngleBasedVisibleSegment::from_relative_square_face);
 
         // If there is one or two portals, they block sight, and fill in the gap with portal
 
-        // Maybe pass a copy of the iterator for next square, rather than passing the integer value
-
-        let view_arc_of_this_square = if relative_square == STEP_ZERO {
-            AngleInterval::from_octant(octant)
-        } else {
-            AngleInterval::from_square(relative_square)
-        };
-
-        if !view_arc_of_this_square.overlaps_other_by_at_least_this_much(
-            view_arc,
-            Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-        ) {
-            continue;
-        }
-
-        let maybe_visibility_of_this_square: Option<SquareVisibility> =
-            if relative_square == STEP_ZERO {
-                Some(SquareVisibility::new_fully_visible())
-            } else {
-                visibility_of_square(view_arc, relative_square)
-            };
-
-        if let Some(visibility_of_this_square) = maybe_visibility_of_this_square {
-            fov_result.add_visible_square(relative_square, visibility_of_this_square);
-        } else {
-            continue;
-        }
+        let portals_on_faces =
+            absolute_faces.map(|face| portal_geometry.get_portal_by_entrance(face));
 
         let square_blocks_sight = sight_blockers.contains(&absolute_square);
-        let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
 
-        let maybe_view_blocking_arc: Option<AngleInterval>;
+        let face_blocks_sight =
+            portals_on_faces.map(|maybe_portal| maybe_portal.is_some() || square_blocks_sight);
+
+        //
+        // let view_arc_of_this_square = if relative_square == STEP_ZERO {
+        //     AngleInterval::from_octant(octant)
+        // } else {
+        //     AngleInterval::from_square(relative_square)
+        // };
+        //
+
+        // is this face even visible?
+        let face_is_visible = relative_faces.map(|rel_face| {
+            AngleInterval::from_relative_square_face(rel_face).overlaps_other_by_at_least_this_much(
+                view_arc,
+                Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+            )
+        });
+
+        let neither_face_is_visible = face_is_visible.iter().all(|&x| x);
+        if neither_face_is_visible {
+            continue;
+        }
+
+        // let maybe_visibility_of_this_square: Option<SquareVisibility> =
+        //     if relative_square == STEP_ZERO {
+        //         Some(SquareVisibility::new_fully_visible())
+        //     } else {
+        //         visibility_of_square(view_arc, relative_square)
+        //     };
+
+        // if let Some(visibility_of_this_square) = maybe_visibility_of_this_square {
+        //     fov_result.add_visible_square(relative_square, visibility_of_this_square);
+        // } else {
+        //     continue;
+        // }
+
+        // let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
+
+        // let maybe_view_blocking_arc: Option<AngleInterval>;
 
         // portals are on inside faces of squares, while stepping out of a square, so if a block has a sight blocker and a portal, the sight blocker takes priority
         if square_blocks_sight {
