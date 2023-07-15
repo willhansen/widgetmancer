@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Neg, Sub};
 
 use euclid::{default, vec2, Angle};
 use getset::CopyGetters;
@@ -23,6 +23,8 @@ use crate::utility::{
 #[derive(Default, Debug, Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct AngleInterval {
+    // I think that this type might need to explicitly exclude both the zero degree and 360 degree cases,
+    // just to remove any ambiguity, if nothing else.
     clockwise_end: Angle<f32>,
     anticlockwise_end: Angle<f32>,
 }
@@ -373,6 +375,30 @@ impl AngleInterval {
             self.clockwise_end + d_angle,
             self.anticlockwise_end + d_angle,
         )
+    }
+}
+
+impl Add for AngleInterval {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.union(rhs)
+    }
+}
+
+impl Sub for AngleInterval {
+    type Output = Vec<Self>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.subtract(rhs)
+    }
+}
+
+impl Neg for AngleInterval {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self.complement()
     }
 }
 

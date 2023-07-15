@@ -16,8 +16,8 @@ use crate::utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
     ith_projection_of_step, naive_ray_endpoint, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
-    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir,
-    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    QuarterTurnsAnticlockwise, RelativeSquareWithOrthogonalDir, SquareWithKingDir,
+    SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -42,13 +42,30 @@ impl RigidTransform {
     pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
         (self.end_pose - self.start_pose).rotation()
     }
-    pub fn transform_pose(&self, pose: SquareWithOrthogonalDir) -> SquareWithOrthogonalDir {
+    pub fn transform_absolute_pose(
+        &self,
+        pose: SquareWithOrthogonalDir,
+    ) -> SquareWithOrthogonalDir {
         let end_square = revolve_square(pose.square(), self.start_pose.square(), self.rotation())
             + self.translation();
 
         let end_direction = self.rotation().rotate_vector(pose.direction().step());
 
         SquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
+    }
+    // TODO: maybe test this if sus
+    pub fn transform_relative_pose(
+        &self,
+        pose: RelativeSquareWithOrthogonalDir,
+    ) -> RelativeSquareWithOrthogonalDir {
+        let end_square = rotated_n_quarter_turns_counter_clockwise(
+            pose.square(),
+            self.rotation().quarter_turns(),
+        );
+
+        let end_direction = self.rotation().rotate_vector(pose.direction().step());
+
+        RelativeSquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
     }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
@@ -99,7 +116,7 @@ impl RigidTransform {
 
 impl PartialEq for RigidTransform {
     fn eq(&self, other: &Self) -> bool {
-        self.transform_pose(other.start_pose) == other.end_pose
+        self.transform_absolute_pose(other.start_pose) == other.end_pose
     }
 }
 
@@ -373,7 +390,7 @@ mod tests {
         );
         let pose1 = SquareWithOrthogonalDir::from_square_and_step(point2(3, 3), STEP_RIGHT);
         let pose2 = SquareWithOrthogonalDir::from_square_and_step(point2(6, 3), STEP_DOWN);
-        assert_eq!(transform.transform_pose(pose1), pose2);
+        assert_eq!(transform.transform_absolute_pose(pose1), pose2);
     }
     #[test]
     fn test_ray_through_portal() {

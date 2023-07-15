@@ -283,6 +283,12 @@ impl AngleBasedVisibleSegment {
         assert!(thing.start_face_spans_angle_interval());
         thing
     }
+    pub fn with_visible_angle_interval(&self, angle_interval: AngleInterval) -> Self {
+        Self {
+            visible_angle_interval: angle_interval,
+            ..self.clone()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -813,9 +819,9 @@ pub fn field_of_view_within_arc_in_single_octant(
 
     loop {
         let relative_square = steps_in_octant_iter.next().unwrap();
-        let out_of_range =
+        let square_is_out_of_range =
             relative_square.x.abs() > radius as i32 || relative_square.y.abs() > radius as i32;
-        if out_of_range {
+        if square_is_out_of_range {
             break;
         }
 
@@ -826,24 +832,89 @@ pub fn field_of_view_within_arc_in_single_octant(
         ];
         let absolute_square = oriented_center_square.square() + relative_square;
 
-        let relative_faces: [RelativeSquareWithOrthogonalDir; 2] =
-            face_directions.map(|dir| (relative_square, dir).into());
-        let absolute_faces: [SquareWithOrthogonalDir; 2] = face_directions
-            .map(|dir| (oriented_center_square.square() + relative_square, dir).into());
+        let mut view_blocking_arc_for_this_square: Option<AngleInterval> = None;
 
-        // If the square if view blocking, both fully block sight
-        let visible_segments_up_to_relative_faces =
-            relative_faces.map(AngleBasedVisibleSegment::from_relative_square_face);
+        for face_direction in face_directions {
+            let relative_face: RelativeSquareWithOrthogonalDir =
+                (relative_square, face_direction).into();
+            let absolute_face: SquareWithOrthogonalDir = (
+                oriented_center_square.square() + relative_square,
+                face_direction,
+            )
+                .into();
 
-        // If there is one or two portals, they block sight, and fill in the gap with portal
+            let face_has_portal = portal_geometry
+                .get_portal_by_entrance(absolute_face)
+                .is_some();
 
-        let portals_on_faces =
-            absolute_faces.map(|face| portal_geometry.get_portal_by_entrance(face));
+            let square_blocks_sight = sight_blockers.contains(&absolute_square);
 
-        let square_blocks_sight = sight_blockers.contains(&absolute_square);
+            let face_blocks_sight = face_has_portal || square_blocks_sight;
 
-        let face_blocks_sight =
-            portals_on_faces.map(|maybe_portal| maybe_portal.is_some() || square_blocks_sight);
+            let view_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
+
+            let face_is_at_least_partially_visible = view_arc_of_face
+                .overlaps_other_by_at_least_this_much(
+                    view_arc,
+                    Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+                );
+
+            if !face_is_at_least_partially_visible {
+                continue;
+            }
+
+            let visible_arc_of_face = view_arc.intersection(view_arc_of_face);
+
+            if !face_blocks_sight {
+                continue;
+            }
+
+            view_blocking_arc_for_this_square = Some(
+                view_blocking_arc_for_this_square
+                    .map_or(view_arc_of_face, |old_val| old_val + view_arc_of_face),
+            );
+
+            // create a segment ending at this face
+            let visible_segment_up_to_relative_face =
+                AngleBasedVisibleSegment::from_relative_square_face(relative_face)
+                    .with_visible_angle_interval(visible_arc_of_face);
+
+            fov_result
+                .visible_segments_in_main_view_only
+                .push(visible_segment_up_to_relative_face);
+
+            if !face_has_portal {
+                continue;
+            }
+
+            // go into applicable portals
+            let portal = portal_geometry
+                .get_portal_by_entrance(absolute_face)
+                .unwrap();
+
+            let transform = portal.get_transform();
+            let transformed_center = transform.transform_absolute_pose(oriented_center_square);
+            let relative_portal_exit_in_sub_fov = transform
+                .transform_relative_pose(relative_face)
+                .stepped()
+                .turned_back();
+            let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+                sight_blockers,
+                portal_geometry,
+                transformed_center,
+                radius,
+                visible_arc_of_face.rotated_quarter_turns(transform.rotation()),
+                steps_in_octant_iter.rotated(transform.rotation()),
+            )
+            .with_weakly_applied_start_line(relative_portal_exit_in_sub_fov);
+            fov_result.transformed_sub_fovs.push(sub_arc_fov);
+        }
+        if view_blocking_arc_for_this_square.is_none() {
+            continue;
+        }
+        // split arc around the blocked faces
+        let arcs_on_either_side_of_blocked_faces =
+            view_arc - view_blocking_arc_for_this_square.unwrap();
 
         //
         // let view_arc_of_this_square = if relative_square == STEP_ZERO {
@@ -852,19 +923,6 @@ pub fn field_of_view_within_arc_in_single_octant(
         //     AngleInterval::from_square(relative_square)
         // };
         //
-
-        // is this face even visible?
-        let face_is_visible = relative_faces.map(|rel_face| {
-            AngleInterval::from_relative_square_face(rel_face).overlaps_other_by_at_least_this_much(
-                view_arc,
-                Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-            )
-        });
-
-        let neither_face_is_visible = face_is_visible.iter().all(|&x| x);
-        if neither_face_is_visible {
-            continue;
-        }
 
         // let maybe_visibility_of_this_square: Option<SquareVisibility> =
         //     if relative_square == STEP_ZERO {
@@ -930,7 +988,8 @@ pub fn field_of_view_within_arc_in_single_octant(
             significantly_visible_portals_in_sight.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
-                    let transformed_center = transform.transform_pose(oriented_center_square);
+                    let transformed_center =
+                        transform.transform_absolute_pose(oriented_center_square);
                     let visible_arc_of_portal = view_arc.intersection(portal_view_arc);
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
@@ -1842,7 +1901,9 @@ mod tests {
             let actual_center = entrance
                 .with_offset(offset_from_entrance)
                 .with_direction(direction_near_entrance);
-            let virtual_center_at_exit = portal.get_transform().transform_pose(actual_center);
+            let virtual_center_at_exit = portal
+                .get_transform()
+                .transform_absolute_pose(actual_center);
             let correct_center_at_exit = exit
                 .with_offset(offset_from_exit)
                 .with_direction(direction_near_exit);
