@@ -11,6 +11,7 @@ use std::ops::{Add, AddAssign, Neg, Sub};
 use approx::AbsDiffEq;
 use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
+use euclid::num::Zero;
 use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
@@ -1125,28 +1126,41 @@ impl Add for StepWithQuarterRotations {
 
 #[derive(Clone, Hash, Eq, PartialEq, Copy, CopyGetters)]
 #[get_copy = "pub"]
-pub struct AbsOrRelSquareWithOrthogonalDir<T: Copy> {
-    square: T,
+pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy + Debug> {
+    square: SquareType,
     dir: OrthogonalWorldStep,
 }
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
 
-impl<T> AbsOrRelSquareWithOrthogonalDir<T>
+pub trait AbsOrRelSquare<T> = Copy
+    + Add<WorldStep, Output = T>
+    + Sub<WorldStep, Output = T>
+    + Sub<T, Output = WorldStep>
+    + Zero
+    + Debug;
+
+impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    T: Copy + Add<WorldStep, Output = T> + Sub<WorldStep, Output = T>,
+    SquareType: AbsOrRelSquare<SquareType>,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
         QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
     }
-    pub fn from_square_and_step<S: Into<OrthogonalWorldStep>>(square: T, direction: S) -> Self {
+    pub fn from_square_and_step<S: Into<OrthogonalWorldStep>>(
+        square: SquareType,
+        direction: S,
+    ) -> Self {
         Self {
             square,
             dir: direction.into(),
         }
     }
-    pub fn from_square_and_turns(square: T, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+    pub fn from_square_and_turns(
+        square: SquareType,
+        quarter_turns: QuarterTurnsAnticlockwise,
+    ) -> Self {
         Self::from_square_and_step(square, quarter_turns.to_vector())
     }
     pub fn direction(&self) -> OrthogonalWorldStep {
@@ -1201,6 +1215,34 @@ where
     pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction().step())
     }
+    fn as_relative_face(&self) -> RelativeSquareWithOrthogonalDir {
+        RelativeSquareWithOrthogonalDir::from_square_and_step(
+            self.square() - SquareType::zero(),
+            self.dir(),
+        )
+    }
+    pub fn face_is_on_same_line<OtherType: Into<Self>>(&self, other: OtherType) -> bool {
+        let other_face: Self = other.into();
+        let directions_are_parallel = self.dir.step().dot(other_face.dir.step()) != 0;
+        if !directions_are_parallel {
+            return false;
+        }
+
+        let pos_on_dir_axis = self.dir().pos_on_axis(self.as_relative_face().square());
+        let stepped_pos_on_dir_axis = self
+            .dir()
+            .pos_on_axis(self.stepped().as_relative_face().square().into());
+        let other_pos_on_dir_axis = self
+            .dir()
+            .pos_on_axis(other_face.as_relative_face().square().into());
+
+        let same_direction = self.dir() == other_face.dir();
+        if same_direction {
+            other_pos_on_dir_axis == pos_on_dir_axis
+        } else {
+            other_pos_on_dir_axis == stepped_pos_on_dir_axis
+        }
+    }
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
@@ -1249,7 +1291,7 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
 impl<SquareType, DirectionType> From<(SquareType, DirectionType)>
     for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: Copy + Add<WorldStep, Output = SquareType> + Sub<WorldStep, Output = SquareType>,
+    SquareType: AbsOrRelSquare<SquareType>,
     DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (SquareType, DirectionType)) -> Self {
@@ -1259,7 +1301,7 @@ where
 impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
     for (SquareType, OrthogonalWorldStep)
 where
-    SquareType: Copy + Add<WorldStep, Output = SquareType> + Sub<WorldStep, Output = SquareType>,
+    SquareType: AbsOrRelSquare<SquareType>,
 {
     fn from(
         value: AbsOrRelSquareWithOrthogonalDir<SquareType>,
@@ -1319,6 +1361,9 @@ impl OrthogonalWorldStep {
             self.step,
             quarter_turns.quarter_turns,
         ))
+    }
+    pub fn pos_on_axis(&self, pos: WorldStep) -> i32 {
+        self.step().dot(pos)
     }
 }
 
@@ -2456,5 +2501,23 @@ mod tests {
             distance_of_step_along_axis(STEP_UP_LEFT * 8, STEP_RIGHT.into()),
             -8
         );
+    }
+    #[test]
+    fn test_face_is_on_same_line() {
+        let f = |a, b| SquareWithOrthogonalDir::from(a).face_is_on_same_line(b);
+        // facing each other left-right
+        assert!(f((point2(3, 5), STEP_RIGHT), (point2(4, 5), STEP_LEFT)));
+        // facing each other left-right, with vertical offset
+        assert!(f((point2(3, 5), STEP_RIGHT), (point2(4, 25), STEP_LEFT)));
+        //facing each other left-right, too far apart
+        assert_false!(f((point2(2, 5), STEP_RIGHT), (point2(4, 5), STEP_LEFT)));
+
+        // facing each other up-down
+        assert!(f((point2(3, 5), STEP_UP), (point2(3, 6), STEP_DOWN)));
+
+        // Same face
+        assert!(f((point2(3, 5), STEP_RIGHT), (point2(3, 5), STEP_RIGHT)));
+        // Same face, vertical offset
+        assert!(f((point2(3, 5), STEP_RIGHT), (point2(3, 45), STEP_RIGHT)));
     }
 }
