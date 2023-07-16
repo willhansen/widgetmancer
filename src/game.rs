@@ -36,8 +36,7 @@ use crate::portal_geometry::PortalGeometry;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{
-    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint,
-    IVector, LEFT_I,
+    lerp, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector, LEFT_I,
 };
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
@@ -441,7 +440,7 @@ impl Game {
 
     pub fn move_player_to(&mut self, square: WorldSquare) {
         self.try_set_player_position(square)
-            .expect(&("failed move player to ".to_owned() + &point_to_string(square)));
+            .expect(&("failed move player to ".to_owned() + &square.to_string()));
     }
 
     fn floor_color_at_square(&self, square: WorldSquare) -> RGB8 {
@@ -825,12 +824,12 @@ impl Game {
             squares_on_ray_path
                 .iter()
                 .cloned()
-                .map(point_to_string)
+                .map(|x| x.to_string())
                 .collect_vec(),
             relative_squares_on_naive_line
                 .iter()
                 .cloned()
-                .map(vector2_to_string)
+                .map(|x| x.to_string())
                 .collect_vec()
         );
 
@@ -1076,13 +1075,10 @@ impl Game {
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
         if !self.square_is_on_board(square) {
-            panic!(
-                "Tried to place piece off board at {}",
-                point_to_string(square)
-            );
+            panic!("Tried to place piece off board at {}", square.to_string());
         }
         if !self.square_is_empty(square) {
-            panic!("Tried to overwrite piece at {}", point_to_string(square));
+            panic!("Tried to overwrite piece at {}", square.to_string());
         }
         self.pieces.insert(square, piece);
     }
@@ -1359,7 +1355,7 @@ impl Game {
     fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
         // capture player
         if !self.is_non_player_piece_at(start) {
-            panic!("No piece to move at {}", point_to_string(start));
+            panic!("No piece to move at {}", start.to_string());
         }
         if self.is_player_at(end) {
             self.kill_player();
@@ -1368,7 +1364,7 @@ impl Game {
             let target_piece = self.pieces.get(&end).unwrap();
             let this_piece = self.pieces.get(&start).unwrap();
             if this_piece.faction == target_piece.faction {
-                panic!("Tried to capture allied piece at {}", point_to_string(end));
+                panic!("Tried to capture allied piece at {}", end.to_string());
             }
             self.capture_piece_at(end);
         }
@@ -1924,7 +1920,7 @@ impl Game {
         if !self.square_is_on_board(square) {
             return Err(format!(
                 "Tried to capture piece off board at {}",
-                point_to_string(square)
+                square.to_string()
             ));
         }
         if self.try_get_player_square() == Some(square) {
@@ -1941,7 +1937,7 @@ impl Game {
         } else {
             Err(format!(
                 "Tried to capture an empty square at {}",
-                point_to_string(square)
+                square.to_string()
             ))
         }
     }
@@ -2464,7 +2460,7 @@ mod tests {
             assert!(
                 game.square_is_fully_visible_to_player(square),
                 "should be fully visible.  square: {}",
-                point_to_string(square)
+                square.to_string()
             );
         }
         for step in relative_squares_that_should_be_fully_blocked {
@@ -2472,7 +2468,7 @@ mod tests {
             assert!(
                 game.square_is_not_visible_to_player(square),
                 "should be fully blocked.  square: {}",
-                point_to_string(square)
+                square.to_string()
             );
         }
     }

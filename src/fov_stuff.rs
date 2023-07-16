@@ -259,7 +259,16 @@ impl AngleBasedVisibleSegment {
         }
     }
     fn start_face_spans_angle_interval(&self) -> bool {
-        todo!()
+        self.start_internal_relative_face.is_none()
+            || self.start_internal_relative_face.is_some_and(
+                |face: RelativeSquareWithOrthogonalDir| {
+                    !face.line().parallel_directions().iter().any(|&line_angle| {
+                        !self
+                            .visible_angle_interval
+                            .contains_or_touches_angle(line_angle)
+                    })
+                },
+            )
     }
     fn end_faces_span_angle_interval(&self) -> bool {
         todo!()
@@ -1678,14 +1687,14 @@ mod tests {
             assert!(
                 fov_result.can_see_absolute_square(*square),
                 "square: {}",
-                point_to_string(*square)
+                square.to_string()
             );
         });
         should_be_visible_after_portal.iter().for_each(|square| {
             assert!(
                 fov_result.can_see_absolute_square(*square),
                 "square: {}",
-                point_to_string(*square)
+                square.to_string()
             );
         });
     }

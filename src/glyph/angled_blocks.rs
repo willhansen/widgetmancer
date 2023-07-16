@@ -13,7 +13,7 @@ use crate::glyph::glyph_constants::{
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
+    is_clockwise, snap_angle_to_diagonal, unit_vector_from_angle, CoordToString, HalfPlane, Line,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -208,8 +208,8 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
             if pointA == pointB {
                 panic!(
                     "Can't be same points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    pointA.to_string(),
+                    pointB.to_string()
                 );
             }
 
@@ -217,15 +217,15 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
             if !valid_points.contains(&pointA) || !valid_points.contains(&pointB) {
                 panic!(
                     "gave non-valid points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    pointA.to_string(),
+                    pointB.to_string()
                 );
             }
 
             panic!(
                 "Missed case for points: A: {}, B: {}",
-                point_to_string(pointA),
-                point_to_string(pointB)
+                pointA.to_string(),
+                pointB.to_string()
             );
         }
     }

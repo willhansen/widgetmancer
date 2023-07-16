@@ -7,6 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, AddAssign, Neg, Sub};
+use std::string::ToString;
 
 use approx::AbsDiffEq;
 use derive_more::{AddAssign, Constructor, Display, Neg};
@@ -347,6 +348,12 @@ impl<U: Copy> Line<f32, U> {
     pub fn direction(&self) -> Angle<f32> {
         better_angle_from_x_axis(self.p2 - self.p1)
     }
+    pub fn parallel_directions(&self) -> [Angle<f32>; 2] {
+        [
+            better_angle_from_x_axis(self.p2 - self.p1),
+            better_angle_from_x_axis(self.p1 - self.p2),
+        ]
+    }
     pub fn from_ray(start: Point2D<f32, U>, angle: Angle<f32>, length: f32) -> Self {
         assert!(length > 0.0);
         Self::new(start, naive_ray_endpoint(start, angle, length))
@@ -370,7 +377,7 @@ impl<U: Copy> Line<f32, U> {
         let line_point_b = self.p2;
         let is_same_point = line_point_a == line_point_b;
         if is_same_point {
-            panic!("gave same point {}", point_to_string(line_point_a));
+            panic!("gave same point {}", line_point_a.to_string());
         }
 
         let is_vertical_line = line_point_a.x == line_point_b.x;
@@ -519,8 +526,8 @@ where
         write!(
             f,
             "p1: {}, p2: {}",
-            point_to_string(self.p1),
-            point_to_string(self.p2),
+            self.p1.to_string(),
+            self.p2.to_string(),
         )
     }
 }
@@ -766,12 +773,18 @@ pub fn get_8_octants_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<
         .collect()
 }
 
-pub fn point_to_string<T: Display, U>(point: Point2D<T, U>) -> String {
-    format!("(x: {}, y: {})", point.x, point.y)
+pub trait CoordToString {
+    fn to_string(&self) -> String;
 }
-
-pub fn vector2_to_string<T: Display, U>(vec: Vector2D<T, U>) -> String {
-    format!("(dx: {}, dy: {})", vec.x, vec.y)
+impl<T: Display, U> CoordToString for Point2D<T, U> {
+    fn to_string(&self) -> String {
+        format!("(x: {}, y: {})", self.x, self.y)
+    }
+}
+impl<T: Display, U> CoordToString for Vector2D<T, U> {
+    fn to_string(&self) -> String {
+        format!("(dx: {}, dy: {})", self.x, self.y)
+    }
 }
 
 pub fn king_distance(step: WorldStep) -> u32 {
@@ -1126,7 +1139,7 @@ impl Add for StepWithQuarterRotations {
 
 #[derive(Clone, Hash, Eq, PartialEq, Copy, CopyGetters)]
 #[get_copy = "pub"]
-pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy + Debug> {
+pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy> {
     square: SquareType,
     dir: OrthogonalWorldStep,
 }
@@ -1134,12 +1147,12 @@ pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy + Debug> {
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
 
-pub trait AbsOrRelSquare<T> = Copy
-    + Add<WorldStep, Output = T>
-    + Sub<WorldStep, Output = T>
-    + Sub<T, Output = WorldStep>
-    + Zero
-    + Debug;
+// trait alias
+pub trait AbsOrRelSquare<AbsOrRelWorldSquare> = Copy
+    + Add<WorldStep, Output = AbsOrRelWorldSquare>
+    + Sub<WorldStep, Output = AbsOrRelWorldSquare>
+    + Sub<AbsOrRelWorldSquare, Output = WorldStep>
+    + Zero;
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -1221,6 +1234,12 @@ where
             self.dir(),
         )
     }
+    fn as_absolute_face(&self) -> SquareWithOrthogonalDir {
+        SquareWithOrthogonalDir::from_square_and_step(
+            WorldSquare::zero() + self.as_relative_face().square(),
+            self.dir(),
+        )
+    }
     pub fn face_is_on_same_line<OtherType: Into<Self>>(&self, other: OtherType) -> bool {
         let other_face: Self = other.into();
         let directions_are_parallel = self.dir.step().dot(other_face.dir.step()) != 0;
@@ -1242,6 +1261,10 @@ where
         } else {
             other_pos_on_dir_axis == stepped_pos_on_dir_axis
         }
+    }
+    pub fn line(&self) -> WorldLine {
+        let abs_face = self.as_absolute_face();
+        square_face_as_line(abs_face.square, abs_face.dir)
     }
 }
 

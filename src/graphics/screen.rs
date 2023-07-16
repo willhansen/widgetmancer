@@ -12,8 +12,9 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
+use crate::utility::CoordToString;
 use crate::utility::{
-    flip_y, get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
+    flip_y, get_by_point, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -418,7 +419,7 @@ impl Screen {
         if !self.buffer_character_square_is_on_screen(buffer_square) {
             panic!(
                 "Tried to draw character off screen: {}",
-                point_to_string(buffer_square)
+                buffer_square.to_string()
             );
         }
 

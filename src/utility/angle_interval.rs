@@ -308,7 +308,7 @@ impl AngleInterval {
 
         self.center_angle().angle_to(angle).radians.abs() < self.width().radians / 2.0
     }
-    fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
+    pub(crate) fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
         // both edges count
         if self.exactly_touches_angle(angle) {
             return true;

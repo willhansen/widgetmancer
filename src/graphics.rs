@@ -58,8 +58,8 @@ use crate::utility::{
     OrthogonalWorldStep, WorldLine, STEP_RIGHT,
 };
 use crate::{
-    get_by_point, glyph, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
-    IPoint, PieceType, RIGHT_I,
+    get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,
+    PieceType, RIGHT_I,
 };
 
 pub(crate) mod drawable;

@@ -16,13 +16,16 @@ pub struct CharacterGridInLocalCharacterFrame;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInLocalSquareFrame;
 
-pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
-pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
+pub type RelativeWorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
+pub type AbsoluteWorldCoordinate<DataType> = Point2D<DataType, SquareGridInWorldFrame>;
+
+pub type WorldSquare = AbsoluteWorldCoordinate<i32>;
+pub type WorldPoint = AbsoluteWorldCoordinate<f32>;
 pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
 pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
 
-pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
-pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
+pub type WorldStep = RelativeWorldCoordinate<i32>;
+pub type WorldMove = RelativeWorldCoordinate<f32>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
