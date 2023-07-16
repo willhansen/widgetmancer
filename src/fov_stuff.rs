@@ -187,7 +187,7 @@ impl Debug for SquareVisibility {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedSquareVisibilityInFov {
-    unrotated_square_visibility: SquareVisibility,
+    absolute_square_visibility: SquareVisibility,
     relative_square: WorldStep,
     absolute_square: WorldSquare,
     //step_in_fov_sequence: u32,
@@ -211,7 +211,7 @@ impl PositionedSquareVisibilityInFov {
         }
     }
     pub fn unrotated_square_visibility(&self) -> SquareVisibility {
-        self.unrotated_square_visibility
+        self.absolute_square_visibility
     }
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
@@ -231,7 +231,7 @@ impl PositionedSquareVisibilityInFov {
         relative_square: WorldStep,
     ) -> Self {
         PositionedSquareVisibilityInFov {
-            unrotated_square_visibility: square_visibility,
+            absolute_square_visibility: square_visibility,
             relative_square,
             absolute_square,
             portal_depth: 0,
@@ -239,7 +239,7 @@ impl PositionedSquareVisibilityInFov {
         }
     }
     pub fn rotated_square_visibility(&self) -> SquareVisibility {
-        self.unrotated_square_visibility
+        self.absolute_square_visibility
             .rotated(-self.portal_rotation.quarter_turns())
     }
 }
@@ -271,7 +271,10 @@ impl AngleBasedVisibleSegment {
             end_internal_relative_faces: HashSet::from([relative_face]),
         }
     }
-    pub fn weakly_apply_start_face(&self, relative_face: RelativeSquareWithOrthogonalDir) -> Self {
+    pub fn with_weakly_applied_start_face(
+        &self,
+        relative_face: RelativeSquareWithOrthogonalDir,
+    ) -> Self {
         if self.start_internal_relative_face.is_some() {
             return self.clone();
         }
@@ -477,6 +480,30 @@ impl FieldOfView {
             visible_segments_in_main_view_only: vec![],
             visible_relative_squares_in_main_view_only: all_visibilities,
             transformed_sub_fovs: vec![],
+        }
+    }
+
+    pub fn with_weakly_applied_start_line(
+        &self,
+        start_face: RelativeSquareWithOrthogonalDir,
+    ) -> Self {
+        Self {
+            visible_segments_in_main_view_only: self
+                .visible_segments_in_main_view_only
+                .iter()
+                .map(|segment| segment.with_weakly_applied_start_face(start_face))
+                .collect(),
+            transformed_sub_fovs: self
+                .transformed_sub_fovs
+                .iter()
+                .map(|sub_fov| {
+                    let tf_to_sub_fov = self.view_transform_to(sub_fov);
+                    // This transform needs to be done because a start line facing up in the main view may need to be represented as facing right(for example) in a sub-view that has gone through a portal.
+                    let start_face_in_sub_fov = tf_to_sub_fov.transform_relative_pose(start_face);
+                    sub_fov.with_weakly_applied_start_line(start_face_in_sub_fov)
+                })
+                .collect(),
+            ..self.clone()
         }
     }
 
@@ -819,8 +846,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
     loop {
         let relative_square = steps_in_octant_iter.next().unwrap();
-        let square_is_out_of_range =
-            relative_square.x.abs() > radius as i32 || relative_square.y.abs() > radius as i32;
+        let square_is_out_of_range = king_distance(relative_square) > radius;
         if square_is_out_of_range {
             break;
         }
@@ -849,7 +875,11 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             let square_blocks_sight = sight_blockers.contains(&absolute_square);
 
-            let face_blocks_sight = face_has_portal || square_blocks_sight;
+            let face_is_on_edge_of_sight_radius =
+                king_distance(relative_face.stepped().square()) > radius;
+
+            let face_blocks_sight =
+                face_has_portal || square_blocks_sight || face_is_on_edge_of_sight_radius;
 
             let view_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
 
@@ -883,7 +913,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .visible_segments_in_main_view_only
                 .push(visible_segment_up_to_relative_face);
 
-            if !face_has_portal {
+            // portals are on inside faces of squares, while stepping out of a square, so if a block has a sight blocker and a portal, the sight blocker takes priority
+            let face_has_visible_portal = face_has_portal && !square_blocks_sight;
+            if !face_has_visible_portal {
                 continue;
             }
 
@@ -894,10 +926,11 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             let transform = portal.get_transform();
             let transformed_center = transform.transform_absolute_pose(oriented_center_square);
-            let relative_portal_exit_in_sub_fov = transform
-                .transform_relative_pose(relative_face)
-                .stepped()
-                .turned_back();
+            // in a relative view, the portal exit is the same line as the portal entrance
+            let relative_portal_exit: RelativeSquareWithOrthogonalDir =
+                relative_face.stepped().turned_back();
+            let relative_portal_exit_in_sub_fov =
+                transform.transform_relative_pose(relative_portal_exit);
             let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                 sight_blockers,
                 portal_geometry,
@@ -913,16 +946,26 @@ pub fn field_of_view_within_arc_in_single_octant(
             continue;
         }
         // split arc around the blocked faces
-        let arcs_on_either_side_of_blocked_faces =
+        let view_arcs_on_either_side_of_blocked_faces =
             view_arc - view_blocking_arc_for_this_square.unwrap();
 
-        //
-        // let view_arc_of_this_square = if relative_square == STEP_ZERO {
-        //     AngleInterval::from_octant(octant)
-        // } else {
-        //     AngleInterval::from_square(relative_square)
-        // };
-        //
+        view_arcs_on_either_side_of_blocked_faces
+            .into_iter()
+            .filter(|new_sub_arc| {
+                new_sub_arc.width().to_degrees() > NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES
+            })
+            .for_each(|new_sub_arc| {
+                let sub_arc_fov = field_of_view_within_arc_in_single_octant(
+                    sight_blockers,
+                    portal_geometry,
+                    oriented_center_square,
+                    radius,
+                    new_sub_arc,
+                    steps_in_octant_iter,
+                );
+                fov_result = fov_result.combined_with(&sub_arc_fov);
+            });
+        break;
 
         // let maybe_visibility_of_this_square: Option<SquareVisibility> =
         //     if relative_square == STEP_ZERO {
@@ -936,115 +979,6 @@ pub fn field_of_view_within_arc_in_single_octant(
         // } else {
         //     continue;
         // }
-
-        // let square_has_portal = portal_geometry.square_has_portal_entrance(absolute_square);
-
-        // let maybe_view_blocking_arc: Option<AngleInterval>;
-
-        // portals are on inside faces of squares, while stepping out of a square, so if a block has a sight blocker and a portal, the sight blocker takes priority
-        if square_blocks_sight {
-            maybe_view_blocking_arc = Some(view_arc_of_this_square);
-        } else if square_has_portal {
-            let portals_for_square: Vec<Portal> =
-                portal_geometry.portals_entering_from_square(absolute_square);
-
-            // portals are only visible if you see the entrance from the correct side
-            let portals_at_square_facing_viewer: Vec<Portal> = portals_for_square
-                .into_iter()
-                .filter(|portal| {
-                    unit_vector_from_angle(view_arc.center_angle())
-                        .cast_unit()
-                        .dot(portal.entrance().direction().step().to_f32())
-                        > 0.0
-                })
-                .collect();
-
-            // Break the view arc around the (up to 2) portals and recurse
-            let portal_view_arcs: HashMap<Portal, AngleInterval> = portals_at_square_facing_viewer
-                .iter()
-                .map(|&portal: &Portal| {
-                    (
-                        portal.clone(),
-                        AngleInterval::from_relative_square_face((
-                            relative_square,
-                            portal.entrance().direction(),
-                        )),
-                    )
-                })
-                .collect();
-
-            let significantly_visible_portals_in_sight: HashMap<Portal, AngleInterval> =
-                portal_view_arcs
-                    .clone()
-                    .into_iter()
-                    .filter(|(_portal, portal_arc): &(Portal, AngleInterval)| {
-                        portal_arc.overlaps_other_by_at_least_this_much(
-                            view_arc,
-                            Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-                        )
-                    })
-                    .collect();
-
-            significantly_visible_portals_in_sight.iter().for_each(
-                |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
-                    let transform = portal.get_transform();
-                    let transformed_center =
-                        transform.transform_absolute_pose(oriented_center_square);
-                    let visible_arc_of_portal = view_arc.intersection(portal_view_arc);
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
-                        sight_blockers,
-                        portal_geometry,
-                        transformed_center,
-                        radius,
-                        visible_arc_of_portal.rotated_quarter_turns(transform.rotation()),
-                        steps_in_octant_iter.rotated(transform.rotation()),
-                    );
-                    fov_result.transformed_sub_fovs.push(sub_arc_fov);
-                },
-            );
-
-            // a max of two portals are visible in one square, touching each other at a corner
-            if portals_at_square_facing_viewer.len() > 0 {
-                // TODO: turn this into a constructor for angleintervals
-                let combined_view_arc_of_portals: AngleInterval = if portal_view_arcs.len() == 1 {
-                    *portal_view_arcs.values().next().unwrap()
-                } else if portal_view_arcs.len() == 2 {
-                    let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
-                    arcs[0].union(*arcs[1])
-                } else {
-                    panic!(
-                        "There should be exactly one or two portals here.  found {}: {:?}",
-                        portal_view_arcs.len(),
-                        portal_view_arcs
-                    );
-                };
-                maybe_view_blocking_arc = Some(combined_view_arc_of_portals);
-            } else {
-                maybe_view_blocking_arc = None;
-            };
-        } else {
-            maybe_view_blocking_arc = None;
-        }
-
-        if let Some(view_blocking_arc) = maybe_view_blocking_arc {
-            // split arc and recurse
-            let view_arcs_around_blocker: Vec<AngleInterval> = view_arc.subtract(view_blocking_arc);
-            view_arcs_around_blocker
-                .into_iter()
-                .filter(|new_sub_arc| new_sub_arc.width().to_degrees() > 0.01)
-                .for_each(|new_sub_arc| {
-                    let sub_arc_fov = field_of_view_within_arc_in_single_octant(
-                        sight_blockers,
-                        portal_geometry,
-                        oriented_center_square,
-                        radius,
-                        new_sub_arc,
-                        steps_in_octant_iter,
-                    );
-                    fov_result = fov_result.combined_with(&sub_arc_fov);
-                });
-            break;
-        }
     }
     fov_result
 }
@@ -2226,7 +2160,7 @@ mod tests {
             the_positioned_visibility.portal_rotation,
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.unrotated_square_visibility;
+        let the_square_visibility = the_positioned_visibility.absolute_square_visibility;
         assert_about_eq!(
             the_square_visibility
                 .visible_portion

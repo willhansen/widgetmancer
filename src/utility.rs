@@ -1301,7 +1301,7 @@ impl From<KingWorldStep> for WorldStep {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+#[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy)]
 pub struct OrthogonalWorldStep {
     step: WorldStep,
 }
@@ -1669,10 +1669,12 @@ pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
 }
 
 pub fn left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
+    assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
     if faces[0] == faces[1].rotated(QuarterTurnsAnticlockwise::new(1)) {
         faces
     } else {
+        [faces[1], faces[0]]
     }
 }
 
