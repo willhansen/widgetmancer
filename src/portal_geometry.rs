@@ -8,7 +8,7 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use crate::utility::angle_interval::AngleInterval;
+use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::{
     StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
@@ -70,7 +70,7 @@ impl RigidTransform {
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
     }
-    pub fn transform_arc(&self, arc: AngleInterval) -> AngleInterval {
+    pub fn transform_arc(&self, arc: PartialAngleInterval) -> PartialAngleInterval {
         arc.rotated_quarter_turns(self.rotation())
     }
     pub fn rotate_step(&self, step: WorldStep) -> WorldStep {

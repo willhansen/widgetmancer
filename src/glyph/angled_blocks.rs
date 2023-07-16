@@ -10,7 +10,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
-use crate::utility::angle_interval::AngleInterval;
+use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     is_clockwise, snap_angle_to_diagonal, unit_vector_from_angle, CoordToString, HalfPlane, Line,
