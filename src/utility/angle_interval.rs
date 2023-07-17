@@ -25,7 +25,8 @@ pub enum AngleInterval {
     FULL_CIRCLE,
     PARTIAL(PartialAngleInterval),
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, CopyGetters)]
+#[get_copy = "pub"]
 pub struct PartialAngleInterval {
     clockwise_end: Angle<f32>,
     anticlockwise_end: Angle<f32>,
