@@ -1077,21 +1077,28 @@ fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
 fn visibility_of_square(
     view_arc: PartialAngleInterval,
     rel_square: WorldStep,
-) -> Option<SquareVisibilityFromOneLargeShadow> {
+) -> Option<SquareVisibility> {
     let square_arc = PartialAngleInterval::from_square(rel_square);
     if view_arc.at_least_fully_overlaps(square_arc) {
-        Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
+        Some(SquareVisibility::new_fully_visible())
     } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
-        square_visibility_from_one_view_arc(view_arc, rel_square)
+        single_shadow_square_visibility_from_one_view_arc(view_arc, rel_square)
     } else {
         None
     }
 }
 
-fn square_visibility_from_one_view_arc(
+fn point_source_shadow_square_visibility_from_one_view_arc(
+    vis_arc: PartialAngleInterval,
+    rel_square: WorldStep,
+) -> Option<SquareVisibility> {
+    todo!()
+}
+
+fn single_shadow_square_visibility_from_one_view_arc(
     visibility_arc: PartialAngleInterval,
     square_relative_to_center: WorldStep,
-) -> Option<SquareVisibility> {
+) -> Option<SquareVisibilityFromOneLargeShadow> {
     let square_arc = PartialAngleInterval::from_square(square_relative_to_center);
     assert!(visibility_arc.touches_or_overlaps(square_arc));
 
@@ -1348,7 +1355,8 @@ mod tests {
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
-        let visibility = square_visibility_from_one_view_arc(interval, square_relative_to_center);
+        let visibility =
+            single_shadow_square_visibility_from_one_view_arc(interval, square_relative_to_center);
         let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
             .to_glyphs()
             .to_clean_string();
@@ -1423,7 +1431,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__one_step_up() {
         let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
-        let partial = square_visibility_from_one_view_arc(arc, square);
+        let partial = single_shadow_square_visibility_from_one_view_arc(arc, square);
         assert!(!partial.unwrap().is_fully_visible());
         assert_eq!(
             PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
@@ -1503,7 +1511,7 @@ mod tests {
         block_square: WorldStep,
         shadowed_square: WorldStep,
     ) -> Option<SquareVisibilityFromOneLargeShadow> {
-        square_visibility_from_one_view_arc(
+        single_shadow_square_visibility_from_one_view_arc(
             PartialAngleInterval::from_square(block_square).complement(),
             shadowed_square,
         )
@@ -2082,7 +2090,7 @@ mod tests {
             Angle::radians(0.7853978),
             Angle::radians(0.7853982),
         );
-        let visibility = square_visibility_from_one_view_arc(arc, rel_square);
+        let visibility = single_shadow_square_visibility_from_one_view_arc(arc, rel_square);
     }
 
     #[test]

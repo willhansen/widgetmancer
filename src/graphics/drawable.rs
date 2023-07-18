@@ -279,11 +279,13 @@ impl SolidColorDrawable {
     }
 }
 
-impl Drawable for SolidColorDrawable {
-    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for SolidColorDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         self.clone().into()
     }
+}
 
+impl Drawable for SolidColorDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         DoubleGlyph::solid_color(self.color)
     }
@@ -334,20 +336,18 @@ impl ArrowDrawable {
     }
 }
 
-impl Drawable for ArrowDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for ArrowDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         ArrowDrawable {
-            direction: rotated_n_quarter_turns_counter_clockwise(
-                self.direction.into(),
-                quarter_rotations_anticlockwise,
-            )
-            .into(),
+            direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
         }
         .with_updated_text_drawable()
         .into()
     }
+}
 
+impl Drawable for ArrowDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         self.text_drawable.to_glyphs()
     }
@@ -400,19 +400,16 @@ impl ConveyorBeltDrawable {
     }
 }
 
-impl Drawable for ConveyorBeltDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for ConveyorBeltDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         ConveyorBeltDrawable {
-            direction: rotated_n_quarter_turns_counter_clockwise(
-                self.direction.into(),
-                quarter_rotations_anticlockwise,
-            )
-            .into(),
+            direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
         }
-        .to_enum()
     }
+}
 
+impl Drawable for ConveyorBeltDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         let chars = characters_for_full_square_with_looping_1d_offset(
             self.direction,
@@ -489,18 +486,16 @@ impl OffsetSquareDrawable {
     }
 }
 
-impl Drawable for OffsetSquareDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for OffsetSquareDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         OffsetSquareDrawable {
-            offset: rotated_n_quarter_turns_counter_clockwise(
-                self.offset,
-                quarter_rotations_anticlockwise,
-            ),
+            offset: self.offset.rotated(quarter_turns_anticlockwise),
             ..self.clone()
         }
-        .into()
     }
+}
 
+impl Drawable for OffsetSquareDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         characters_for_full_square_with_2d_offset(self.offset)
             .map(|c| Glyph::new(c, self.fg_color(), self.bg_color()))

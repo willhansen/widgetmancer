@@ -1360,6 +1360,12 @@ impl KingWorldStep {
     }
 }
 
+impl QuarterTurnRotatable for KingWorldStep {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        self.into().rotated(quarter_turns_anticlockwise).into()
+    }
+}
+
 impl From<WorldStep> for KingWorldStep {
     fn from(value: WorldStep) -> Self {
         KingWorldStep::new(value)
@@ -1391,14 +1397,14 @@ impl OrthogonalWorldStep {
     pub fn step(&self) -> WorldStep {
         self.step
     }
-    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
-        Self::new(rotated_n_quarter_turns_counter_clockwise(
-            self.step,
-            quarter_turns.quarter_turns,
-        ))
-    }
     pub fn pos_on_axis(&self, pos: WorldStep) -> i32 {
         self.step().dot(pos)
+    }
+}
+
+impl QuarterTurnRotatable for OrthogonalWorldStep {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        self.into().rotated(quarter_turns_anticlockwise).into()
     }
 }
 
