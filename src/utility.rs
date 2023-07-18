@@ -148,6 +148,18 @@ impl Sub for QuarterTurnsAnticlockwise {
     }
 }
 
+pub trait QuarterTurnRotatable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self;
+}
+
+impl QuarterTurnRotatable for Angle<f32> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        standardize_angle(Angle::radians(
+            self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
+        ))
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
 
@@ -1010,7 +1022,7 @@ pub fn rotate_point_around_point<U>(
     moving_point: Point2D<f32, U>,
     angle: Angle<f32>,
 ) -> Point2D<f32, U> {
-    axis_point + rotate_vect((moving_point - axis_point), angle)
+    axis_point + rotate_vect(moving_point - axis_point, angle)
 }
 
 pub fn cross_correlate_squares_with_steps(

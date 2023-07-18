@@ -29,17 +29,17 @@ use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+type StepVisibilityMap = HashMap<WorldStep, SquareVisibilityFromPointSource>;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 #[derive(Clone, Copy, Constructor)]
-pub struct SquareVisibility {
+pub struct SquareVisibilityFromOneLargeShadow {
     // TODO: have more than one half plane (two?)
     visible_portion: Option<LocalSquareHalfPlane>,
 }
 
-impl SquareVisibility {
+impl SquareVisibilityFromOneLargeShadow {
     pub fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
@@ -61,7 +61,7 @@ impl SquareVisibility {
     }
 
     pub fn new_fully_visible() -> Self {
-        SquareVisibility {
+        SquareVisibilityFromOneLargeShadow {
             visible_portion: None,
         }
     }
@@ -69,7 +69,7 @@ impl SquareVisibility {
     pub fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
         assert!(visible_portion.at_least_partially_covers_unit_square());
         assert!(!visible_portion.fully_covers_unit_square());
-        SquareVisibility {
+        SquareVisibilityFromOneLargeShadow {
             visible_portion: Some(visible_portion),
         }
     }
@@ -145,7 +145,7 @@ impl SquareVisibility {
             "  ".to_string()
         } else {
             let fg_color = GREY;
-            PartialVisibilityDrawable::from_partially_visible_drawable(
+            PartialVisibilityDrawable::from_shadowed_drawable(
                 &SolidColorDrawable::new(fg_color),
                 *self,
             )
@@ -173,7 +173,7 @@ impl SquareVisibility {
     }
 }
 
-impl Debug for SquareVisibility {
+impl Debug for SquareVisibilityFromOneLargeShadow {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -185,7 +185,33 @@ impl Debug for SquareVisibility {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+pub type SquareVisibility = SquareVisibilityFromPointSource;
+
+#[derive(Clone, Constructor, Debug)]
+pub struct SquareVisibilityFromPointSource {
+    visible_before_first_angle: bool,
+    visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
+}
+
+impl SquareVisibilityFromPointSource {
+    pub fn is_fully_visible(&self) -> bool {
+        todo!()
+    }
+}
+
+impl QuarterTurnRotatable for SquareVisibilityFromPointSource {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        let mut the_clone = self.clone();
+        the_clone.visibility_switch_angles_going_ccw = the_clone
+            .visibility_switch_angles_going_ccw
+            .iter()
+            .map(|angle: &Angle<f32>| angle.rotated(quarter_turns_anticlockwise))
+            .collect_vec();
+        the_clone
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct PositionedSquareVisibilityInFov {
     square_visibility_in_absolute_frame: SquareVisibility,
     relative_square: WorldStep,
@@ -207,11 +233,11 @@ impl PositionedSquareVisibilityInFov {
                 self.relative_square,
                 -forward_rotation_through_portal.quarter_turns(),
             ),
-            ..*self
+            ..self.clone()
         }
     }
-    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
+    pub fn square_visibility_in_absolute_frame(&self) -> &SquareVisibility {
+        &self.square_visibility_in_absolute_frame
     }
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
@@ -226,7 +252,7 @@ impl PositionedSquareVisibilityInFov {
         self.relative_square
     }
     pub fn new_in_top_view(
-        square_visibility: SquareVisibility,
+        square_visibility: SquareVisibilityFromPointSource,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
     ) -> Self {
@@ -240,7 +266,7 @@ impl PositionedSquareVisibilityInFov {
     }
     pub fn square_visibility_in_relative_frame(&self) -> SquareVisibility {
         self.square_visibility_in_absolute_frame
-            .rotated(-self.portal_rotation.quarter_turns())
+            .rotated(-self.portal_rotation)
     }
 }
 
@@ -342,6 +368,12 @@ impl FieldOfView {
         //     .map(|(&square, vis): (&WorldStep, &SquareVisibility)| square)
         //     .collect()
     }
+    pub fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
+        todo!()
+    }
+    pub fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
+        todo!()
+    }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
         let mut all_visible = self.fully_visible_relative_squares_in_main_view_only();
 
@@ -422,7 +454,7 @@ impl FieldOfView {
     }
     pub fn visibilities_of_partially_visible_squares_in_main_view_only(
         &self,
-    ) -> HashMap<WorldStep, SquareVisibility> {
+    ) -> HashMap<WorldStep, SquareVisibilityFromOneLargeShadow> {
         todo!();
         // self.visible_relative_squares_in_main_view_only
         //     .iter()
@@ -647,10 +679,10 @@ impl FieldOfView {
     fn visibility_of_relative_square_in_main_view(
         &self,
         relative_square: WorldStep,
-    ) -> Option<SquareVisibility> {
+    ) -> Option<SquareVisibilityFromPointSource> {
         self.visible_relative_squares_in_main_view_only()
             .get(&relative_square)
-            .copied()
+            .cloned()
     }
 
     fn visibilities_of_relative_square_in_one_sub_view(
@@ -770,7 +802,7 @@ impl FieldOfView {
                     .is_fully_visible()
                 {
                     drawable = DrawableEnum::PartialVisibility(
-                        PartialVisibilityDrawable::from_partially_visible_drawable(
+                        PartialVisibilityDrawable::from_shadowed_drawable(
                             &drawable,
                             if render_portals_with_line_of_sight {
                                 positioned_visibility.square_visibility_in_relative_frame()
@@ -1045,10 +1077,10 @@ fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
 fn visibility_of_square(
     view_arc: PartialAngleInterval,
     rel_square: WorldStep,
-) -> Option<SquareVisibility> {
+) -> Option<SquareVisibilityFromOneLargeShadow> {
     let square_arc = PartialAngleInterval::from_square(rel_square);
     if view_arc.at_least_fully_overlaps(square_arc) {
-        Some(SquareVisibility::new_fully_visible())
+        Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
     } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
         square_visibility_from_one_view_arc(view_arc, rel_square)
     } else {
@@ -1086,11 +1118,11 @@ fn square_visibility_from_one_view_arc(
     if square_shadow.fully_covers_unit_square() {
         None
     } else if square_shadow.at_least_partially_covers_unit_square() {
-        Some(SquareVisibility::new_partially_visible(
+        Some(SquareVisibilityFromOneLargeShadow::new_partially_visible(
             square_shadow.complement(),
         ))
     } else {
-        Some(SquareVisibility::new_fully_visible())
+        Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
     }
 }
 
@@ -1241,7 +1273,7 @@ mod tests {
 
     #[test]
     fn test_square_visibility_knows_if_its_fully_visible() {
-        let partial = SquareVisibility::from_visible_half_plane(
+        let partial = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(
             HalfPlane::from_line_and_point_on_half_plane(
                 Line {
                     p1: point2(-5.0, 2.0),
@@ -1303,8 +1335,9 @@ mod tests {
             let square_visibility = fov_result
                 .visible_relative_squares_in_main_view_only()
                 .get(&step)
-                .unwrap();
-            let string = PartialVisibilityDrawable::from_square_visibility(*square_visibility)
+                .unwrap()
+                .clone();
+            let string = PartialVisibilityDrawable::from_square_visibility(square_visibility)
                 .to_glyphs()
                 .to_clean_string();
             assert_eq!(&string, "🭞🭚");
@@ -1362,8 +1395,10 @@ mod tests {
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
-        let partial_1 = SquareVisibility::from_visible_half_plane(half_plane_1).unwrap();
-        let partial_2 = SquareVisibility::from_visible_half_plane(half_plane_2).unwrap();
+        let partial_1 =
+            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1).unwrap();
+        let partial_2 =
+            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2).unwrap();
 
         let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
         assert!(combined_partial.is_fully_visible());
@@ -1432,14 +1467,16 @@ mod tests {
             .visible_relative_squares_in_main_view_only()
             .iter()
             .filter(|(step, vis)| !vis.is_fully_visible())
-            .map(|(step, square_vis): (&WorldStep, &SquareVisibility)| {
-                (
-                    step,
-                    PartialVisibilityDrawable::from_square_visibility(*square_vis)
-                        .to_glyphs()
-                        .to_clean_string(),
-                )
-            })
+            .map(
+                |(step, square_vis): (&WorldStep, &SquareVisibilityFromOneLargeShadow)| {
+                    (
+                        step,
+                        PartialVisibilityDrawable::from_square_visibility(*square_vis)
+                            .to_glyphs()
+                            .to_clean_string(),
+                    )
+                },
+            )
             .for_each(|(step, char_string): (&WorldStep, String)| {
                 let chars: Vec<char> = char_string.chars().collect();
                 assert_eq!(chars.len(), 2);
@@ -1465,7 +1502,7 @@ mod tests {
     fn square_visibility_from_block_and_square(
         block_square: WorldStep,
         shadowed_square: WorldStep,
-    ) -> Option<SquareVisibility> {
+    ) -> Option<SquareVisibilityFromOneLargeShadow> {
         square_visibility_from_one_view_arc(
             PartialAngleInterval::from_square(block_square).complement(),
             shadowed_square,
@@ -1770,9 +1807,10 @@ mod tests {
         let mut main_fov = FieldOfView::new_empty_fov_at(main_center.square());
         main_fov.root_square_with_direction = main_center;
 
-        let target_square = point2(1, 4);
+        let target_square: WorldSquare = point2(1, 4);
 
-        sub_fov.add_fully_visible_square(target_square - sub_fov.root_square());
+        todo!();
+        //sub_fov.add_fully_visible_square(target_square - sub_fov.root_square());
 
         main_fov.transformed_sub_fovs.push(sub_fov);
 
@@ -1862,8 +1900,8 @@ mod tests {
         let main_center = point2(5, 5);
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
-        fov_1.add_fully_visible_square(STEP_RIGHT);
-        fov_2.add_fully_visible_square(STEP_UP);
+        fov_1.add_fully_visible_relative_square(STEP_RIGHT);
+        fov_2.add_fully_visible_relative_square(STEP_UP);
 
         let combined = fov_1.combined_with(&fov_2);
 
@@ -1957,7 +1995,7 @@ mod tests {
         let rel_square = STEP_DOWN_LEFT * 3;
         let correct_abs_square = main_center + rel_square;
 
-        fov.add_fully_visible_square(rel_square);
+        fov.add_fully_visible_relative_square(rel_square);
 
         let visibility: PositionedSquareVisibilityInFov = *fov
             .visibilities_of_relative_square(rel_square)
@@ -1987,7 +2025,7 @@ mod tests {
         let rel_square = STEP_DOWN_LEFT * 3;
         let abs_square = sub_center + rel_square;
 
-        sub_fov.add_fully_visible_square(rel_square);
+        sub_fov.add_fully_visible_relative_square(rel_square);
 
         fov.transformed_sub_fovs.push(sub_fov);
 
@@ -2023,7 +2061,7 @@ mod tests {
             rotated_n_quarter_turns_counter_clockwise(rel_square, quarter_turns);
         let abs_square = sub_center + rotated_rel_square;
 
-        sub_fov.add_fully_visible_square(rotated_rel_square);
+        sub_fov.add_fully_visible_relative_square(rotated_rel_square);
         fov.transformed_sub_fovs.push(sub_fov);
 
         assert_eq!(
@@ -2055,13 +2093,14 @@ mod tests {
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
 
+        todo!();
         let rel_square = STEP_RIGHT * 3;
-        fov_1
-            .visible_relative_squares_in_main_view_only
-            .insert(rel_square, SquareVisibility::bottom_half_visible());
-        sub_fov_1
-            .visible_relative_squares_in_main_view_only
-            .insert(rel_square, SquareVisibility::top_half_visible());
+        // fov_1
+        //     .visible_relative_squares_in_main_view_only
+        //     .insert(rel_square, SquareVisibility::bottom_half_visible());
+        // sub_fov_1
+        //     .visible_relative_squares_in_main_view_only
+        //     .insert(rel_square, SquareVisibility::top_half_visible());
 
         fov_1.transformed_sub_fovs.push(sub_fov_1);
 
@@ -2072,21 +2111,22 @@ mod tests {
     #[test]
     fn test_rounding_towards_full_visibility() {
         let mut fov = FieldOfView::new_empty_fov_at(point2(0, 0));
-        fov.add_fully_visible_square(STEP_RIGHT);
+        fov.add_fully_visible_relative_square(STEP_RIGHT);
 
-        fov.add_visible_square(
-            STEP_UP,
-            SquareVisibility::new_partially_visible(
-                LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
-            ),
-        );
-        fov.add_visible_square(
-            STEP_DOWN,
-            SquareVisibility::new_partially_visible(
-                LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
-            ),
-        );
-        assert_eq!(fov.visible_relative_squares_in_main_view_only.len(), 3);
+        todo!();
+        // fov.add_visible_square(
+        //     STEP_UP,
+        //     SquareVisibility::new_partially_visible(
+        //         LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
+        //     ),
+        // );
+        // fov.add_visible_square(
+        //     STEP_DOWN,
+        //     SquareVisibility::new_partially_visible(
+        //         LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
+        //     ),
+        // );
+        assert_eq!(fov.visible_relative_squares_in_main_view_only().len(), 3);
         assert_eq!(
             fov.fully_visible_relative_squares_in_main_view_only().len(),
             1
@@ -2099,7 +2139,9 @@ mod tests {
 
         let rounded_fov = fov.with_all_squares_rounded_towards_full_visibility(1e-3);
         assert_eq!(
-            rounded_fov.visible_relative_squares_in_main_view_only.len(),
+            rounded_fov
+                .visible_relative_squares_in_main_view_only()
+                .len(),
             3
         );
         assert_eq!(
@@ -2131,9 +2173,9 @@ mod tests {
             &Default::default(),
             &Default::default(),
         );
-        assert_eq!(fov.visible_relative_squares_in_main_view_only.len(), 1);
+        assert_eq!(fov.visible_relative_squares_in_main_view_only().len(), 1);
         assert!(fov
-            .visible_relative_squares_in_main_view_only
+            .visible_relative_squares_in_main_view_only()
             .get(&STEP_ZERO)
             .unwrap()
             .is_fully_visible());
@@ -2189,7 +2231,7 @@ mod tests {
                 .to_degrees(),
             0.0
         );
-        let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
+        let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),
             the_square_visibility,
         );
@@ -2301,7 +2343,7 @@ mod tests {
         );
         let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
         assert_false!(the_square_visibility.is_fully_visible());
-        let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
+        let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),
             the_square_visibility,
         );

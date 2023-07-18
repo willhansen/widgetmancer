@@ -11,7 +11,7 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::SquareVisibility;
+use crate::fov_stuff::SquareVisibilityFromOneLargeShadow;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
@@ -21,9 +21,9 @@ use crate::utility::{
 };
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AngleInterval {
-    EMPTY,
-    FULL_CIRCLE,
-    PARTIAL(PartialAngleInterval),
+    Empty,
+    FullCircle,
+    Partial(PartialAngleInterval),
 }
 #[derive(Debug, Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
@@ -576,9 +576,9 @@ impl Display for AngleIntervalSet {
 impl AngleInterval {
     pub fn complement(&self) -> Self {
         match self {
-            AngleInterval::EMPTY => Self::FULL_CIRCLE,
-            AngleInterval::FULL_CIRCLE => Self::EMPTY,
-            AngleInterval::PARTIAL(partial) => Self::PARTIAL(PartialAngleInterval::new_interval(
+            AngleInterval::Empty => Self::FullCircle,
+            AngleInterval::FullCircle => Self::Empty,
+            AngleInterval::Partial(partial) => Self::Partial(PartialAngleInterval::new_interval(
                 partial.anticlockwise_end,
                 partial.clockwise_end,
             )),

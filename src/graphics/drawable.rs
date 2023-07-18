@@ -10,7 +10,9 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
 
-use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
+use crate::fov_stuff::{
+    LocalSquareHalfPlane, SquareVisibility, SquareVisibilityFromOneLargeShadow,
+};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{
     get_braille_arrays_for_braille_line, BrailleArray, DoubleBrailleArray,
@@ -26,12 +28,11 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::{
     rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
-    OrthogonalWorldStep, QuarterTurnsAnticlockwise,
+    OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsAnticlockwise,
 };
 
 #[delegatable_trait]
-pub trait Drawable: Clone + Debug {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum;
+pub trait Drawable: Clone + Debug + QuarterTurnRotatable {
     fn to_glyphs(&self) -> DoubleGlyph;
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum;
     fn color_if_backgroundified(&self) -> RGB8;
@@ -71,12 +72,14 @@ impl TextDrawable {
     }
 }
 
-impl Drawable for TextDrawable {
-    fn rotated(&self, _quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for TextDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         // lmao no
         self.clone().into()
     }
+}
 
+impl Drawable for TextDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         self.glyphs
     }
@@ -101,7 +104,6 @@ impl Drawable for TextDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct PartialVisibilityDrawable {
-    // TODO: more shadows
     visibility: SquareVisibility,
     fg_color: RGB8,
     bg_color: RGB8,
@@ -119,7 +121,7 @@ impl PartialVisibilityDrawable {
             bg_color: OUT_OF_SIGHT_COLOR, // TODO: no default color
         }
     }
-    pub fn from_partially_visible_drawable<T: Drawable>(
+    pub fn from_shadowed_drawable<T: Drawable>(
         original_drawable: &T,
         square_viz: SquareVisibility,
     ) -> Self {
@@ -132,13 +134,15 @@ impl PartialVisibilityDrawable {
     }
 }
 
-impl Drawable for PartialVisibilityDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
+impl QuarterTurnRotatable for PartialVisibilityDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         let mut the_clone = self.clone();
-        the_clone.visibility = self.visibility.rotated(quarter_rotations_anticlockwise);
+        the_clone.visibility = self.visibility.rotated(quarter_turns_anticlockwise);
         the_clone.into()
     }
+}
 
+impl Drawable for PartialVisibilityDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         let character_visible_portions = [0, 1].map(|i| {
             local_square_half_plane_to_local_character_half_plane(
@@ -220,18 +224,20 @@ impl BrailleDrawable {
     }
 }
 
-impl Drawable for BrailleDrawable {
-    fn rotated(&self, quarter_rotations_anticlockwise: i32) -> DrawableEnum {
-        let r = self.braille_array.rotated(QuarterTurnsAnticlockwise::new(
-            quarter_rotations_anticlockwise,
-        ));
+impl QuarterTurnRotatable for BrailleDrawable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        let r = self
+            .braille_array
+            .rotated(QuarterTurnsAnticlockwise::new(quarter_turns_anticlockwise));
         Self {
             braille_array: r,
             ..self.clone()
         }
         .into()
     }
+}
 
+impl Drawable for BrailleDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         self.braille_array
             .to_two_braille_arrays()
@@ -537,7 +543,7 @@ mod tests {
     #[test]
     fn test_shadow_over_text() {
         let shadow = PartialVisibilityDrawable::from_square_visibility(
-            SquareVisibility::bottom_half_visible(),
+            SquareVisibilityFromOneLargeShadow::bottom_half_visible(),
         );
         let text = TextDrawable::new("a ", RED, GREEN, false);
 
@@ -571,15 +577,14 @@ mod tests {
     #[test]
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
-        let visibility = SquareVisibility::new_partially_visible(
+        let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
             LocalSquareHalfPlane::from_line_and_point_on_half_plane(
                 Line::new(point2(0.0, 0.0), point2(-1.0, 0.0)),
                 point2(0.0, 25.0),
             ),
         );
         dbg!(visibility);
-        let top_half =
-            PartialVisibilityDrawable::from_partially_visible_drawable(&base, visibility);
+        let top_half = PartialVisibilityDrawable::from_shadowed_drawable(&base, visibility);
         assert_eq!(top_half.to_glyphs().to_clean_string(), "🬎🬎");
     }
 

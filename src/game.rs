@@ -22,7 +22,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::{portal_aware_field_of_view_from_square, FieldOfView, SquareVisibility};
+use crate::fov_stuff::{
+    portal_aware_field_of_view_from_square, FieldOfView, SquareVisibilityFromOneLargeShadow,
+};
 use crate::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
 };
