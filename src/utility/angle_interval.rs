@@ -711,13 +711,9 @@ mod tests {
                 .contains_or_touches_angle(Angle::degrees(180.0)),
             "inside a large arc"
         );
-        assert!(
-            !PartialAngleInterval::from_degrees(0.0, 0.0)
-                .contains_or_touches_angle(Angle::degrees(180.0)),
-            "directly across from zero width interval"
-        );
     }
 
+    #[ignore = "zero width partial arc no longer valid"]
     #[test]
     fn test_width_of_zero_width_arc() {
         assert_eq!(
