@@ -52,6 +52,10 @@ pub enum DrawableEnum {
     OffsetSquare(OffsetSquareDrawable),
 }
 
+impl QuarterTurnRotatable for DrawableEnum {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {}
+}
+
 #[derive(Debug, Clone, CopyGetters)]
 pub struct TextDrawable {
     glyphs: DoubleGlyph,

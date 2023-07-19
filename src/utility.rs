@@ -9,6 +9,8 @@ use std::mem;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::string::ToString;
 
+use ambassador::delegatable_trait;
+
 use approx::AbsDiffEq;
 use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
@@ -250,20 +252,20 @@ where
             _ => panic!("only two points defining the line"),
         }
     }
-    pub fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
-        let new_points = [0, 1].map(|i| {
-            point_rotated_n_quarter_turns_counter_clockwise(
-                self.get(i),
-                quarter_rotations_anticlockwise,
-            )
-        });
-        Self::new(new_points[0].clone(), new_points[1].clone())
-    }
     pub fn square_length(&self) -> T {
         (self.p1 - self.p2).square_length()
     }
     pub fn is_orthogonal(&self) -> bool {
         self.p1.x == self.p2.x || self.p1.y == self.p2.y
+    }
+}
+impl<T, U> QuarterTurnRotatable for Line<T, U>
+where
+    T: Clone + Debug + PartialEq + Signed + Copy,
+{
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_anticlockwise));
+        Self::new(new_points[0].clone(), new_points[1].clone())
     }
 }
 
@@ -673,14 +675,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             point_transform_function(self.point_on_half_plane()),
         )
     }
-    pub fn rotated(&self, quarter_rotations_anticlockwise: i32) -> Self {
-        let line = self.dividing_line();
-        let point = self.point_on_half_plane();
-        let new_point =
-            point_rotated_n_quarter_turns_counter_clockwise(point, quarter_rotations_anticlockwise);
-        let new_line = line.rotated(quarter_rotations_anticlockwise);
-        Self::from_line_and_point_on_half_plane(new_line, new_point)
-    }
     pub fn top_half_plane() -> Self {
         Self::from_line_and_point_on_half_plane(
             Line::<f32, U> {
@@ -697,6 +691,16 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         } else {
             -dist
         }
+    }
+}
+
+impl<U: Copy + Debug> QuarterTurnRotatable for HalfPlane<f32, U> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        let line = self.dividing_line();
+        let point = self.point_on_half_plane();
+        let new_point = point.rotated(quarter_turns_anticlockwise);
+        let new_line = line.rotated(quarter_turns_anticlockwise);
+        Self::from_line_and_point_on_half_plane(new_line, new_point)
     }
 }
 
@@ -796,6 +800,21 @@ impl<T: Display, U> CoordToString for Point2D<T, U> {
 impl<T: Display, U> CoordToString for Vector2D<T, U> {
     fn to_string(&self) -> String {
         format!("(dx: {}, dy: {})", self.x, self.y)
+    }
+}
+
+impl<T: Signed + Copy, U> QuarterTurnRotatable for Point2D<T, U> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        point_rotated_n_quarter_turns_counter_clockwise(
+            *self,
+            quarter_turns_anticlockwise.quarter_turns,
+        )
+    }
+}
+
+impl<T: Signed + Copy, U> QuarterTurnRotatable for Vector2D<T, U> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise.quarter_turns)
     }
 }
 

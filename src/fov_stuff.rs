@@ -33,6 +33,20 @@ type StepVisibilityMap = HashMap<WorldStep, SquareVisibilityFromPointSource>;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
+pub trait SquareVisibilityTrait: QuarterTurnRotatable {
+    fn is_fully_visible(&self) -> bool;
+    fn is_at_least_partially_visible(&self) -> bool;
+    fn new_fully_visible() -> Self;
+    fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
+    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Box<Self>>;
+    fn top_half_visible() -> Self;
+    fn bottom_half_visible() -> Self;
+    fn combined_increasing_visibility(&self, other: &Self) -> Self;
+    fn as_string(&self) -> String;
+    fn is_about_complementary_to(&self, other: Self) -> bool;
+    fn is_visually_complementary_to(&self, other: Self) -> bool;
+}
+
 #[derive(Clone, Copy, Constructor)]
 pub struct SquareVisibilityFromOneLargeShadow {
     // TODO: have more than one half plane (two?)
@@ -43,7 +57,7 @@ impl SquareVisibilityFromOneLargeShadow {
     pub fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
-    pub fn is_only_nearly_fully_visible(&self, tolerance: f32) -> bool {
+    pub fn is_nearly_but_not_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion
             .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
     }
@@ -53,7 +67,7 @@ impl SquareVisibilityFromOneLargeShadow {
         })
     }
     pub fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
-        self.is_fully_visible() || self.is_only_nearly_fully_visible(tolerance)
+        self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
     }
 
     pub fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
@@ -83,13 +97,6 @@ impl SquareVisibilityFromOneLargeShadow {
         }
     }
 
-    pub fn rotated(&self, quarter_turns_anticlockwise: i32) -> Self {
-        let mut cloned = self.clone();
-        cloned.visible_portion = cloned
-            .visible_portion
-            .map(|vis: LocalSquareHalfPlane| vis.rotated(quarter_turns_anticlockwise));
-        cloned
-    }
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
@@ -172,6 +179,15 @@ impl SquareVisibilityFromOneLargeShadow {
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
     }
 }
+impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        Self {
+            visible_portion: self
+                .visible_portion
+                .map(|half_plane| half_plane.rotated(quarter_turns_anticlockwise)),
+        }
+    }
+}
 
 impl Debug for SquareVisibilityFromOneLargeShadow {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -185,7 +201,7 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
     }
 }
 
-pub type SquareVisibility = SquareVisibilityFromPointSource;
+pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
 
 #[derive(Clone, Constructor, Debug)]
 pub struct SquareVisibilityFromPointSource {
