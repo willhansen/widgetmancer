@@ -57,7 +57,7 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
     flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
     reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
-    OrthogonalWorldStep, WorldLine, STEP_RIGHT,
+    OrthogonalWorldStep, QuarterTurnRotatable, WorldLine, STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,
@@ -272,8 +272,7 @@ impl Graphics {
                 self.maybe_drawable_for_rel_square_of_fov(&field_of_view, relative_world_square);
 
             if let Some(unrotated) = maybe_unrotated {
-                let rotated: DrawableEnum =
-                    unrotated.rotated(-self.screen.rotation().quarter_turns());
+                let rotated: DrawableEnum = unrotated.rotated(-self.screen.rotation());
                 self.screen.draw_drawable(&rotated, screen_square);
             }
         }

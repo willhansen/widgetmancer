@@ -29,7 +29,7 @@ use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-type StepVisibilityMap = HashMap<WorldStep, SquareVisibilityFromPointSource>;
+type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
@@ -252,8 +252,8 @@ impl PositionedSquareVisibilityInFov {
             ..self.clone()
         }
     }
-    pub fn square_visibility_in_absolute_frame(&self) -> &SquareVisibility {
-        &self.square_visibility_in_absolute_frame
+    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
+        self.square_visibility_in_absolute_frame
     }
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
@@ -268,7 +268,7 @@ impl PositionedSquareVisibilityInFov {
         self.relative_square
     }
     pub fn new_in_top_view(
-        square_visibility: SquareVisibilityFromPointSource,
+        square_visibility: SquareVisibility,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
     ) -> Self {
@@ -695,7 +695,7 @@ impl FieldOfView {
     fn visibility_of_relative_square_in_main_view(
         &self,
         relative_square: WorldStep,
-    ) -> Option<SquareVisibilityFromPointSource> {
+    ) -> Option<SquareVisibility> {
         self.visible_relative_squares_in_main_view_only()
             .get(&relative_square)
             .cloned()
@@ -790,12 +790,12 @@ impl FieldOfView {
                     true
                 }
             })
-            .map(|&positioned_visibility: &PositionedSquareVisibilityInFov| {
+            .map(|positioned_visibility: &PositionedSquareVisibilityInFov| {
                 let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map
                         .get(&positioned_visibility.absolute_square())
                         .unwrap()
-                        .rotated(-positioned_visibility.portal_rotation.quarter_turns())
+                        .rotated(-positioned_visibility.portal_rotation)
                 } else {
                     // SolidColorDrawable::new(GREY).to_enum()
                     // SolidColorDrawable::new(number_to_hue_rotation(
@@ -2021,11 +2021,12 @@ mod tests {
 
         fov.add_fully_visible_relative_square(rel_square);
 
-        let visibility: PositionedSquareVisibilityInFov = *fov
+        let visibility = fov
             .visibilities_of_relative_square(rel_square)
             .iter()
             .next()
-            .unwrap();
+            .unwrap()
+            .clone();
         let abs_square = visibility.absolute_square;
         assert_eq!(abs_square, correct_abs_square);
         assert_eq!(
@@ -2239,7 +2240,7 @@ mod tests {
         print_fov_as_relative(&new_fov_result, 2);
         let visibilities_of_one_right = new_fov_result.visibilities_of_relative_square(STEP_RIGHT);
         assert_eq!(visibilities_of_one_right.len(), 1);
-        let the_positioned_visibility = visibilities_of_one_right[0];
+        let the_positioned_visibility = visibilities_of_one_right[0].clone();
         assert_eq!(the_positioned_visibility.portal_depth, 0);
         assert_eq!(
             the_positioned_visibility.portal_rotation,
@@ -2304,7 +2305,7 @@ mod tests {
             new_fov_result.visibilities_of_relative_square(test_square);
         assert_eq!(visibilities_of_test_square.len(), 1);
         assert!(new_fov_result.can_fully_and_seamlessly_see_relative_square(test_square));
-        let the_positioned_visibility = visibilities_of_test_square[0];
+        let the_positioned_visibility = visibilities_of_test_square[0].clone();
         assert_eq!(the_positioned_visibility.portal_depth, 1);
         assert_eq!(
             the_positioned_visibility.portal_rotation,
@@ -2359,7 +2360,7 @@ mod tests {
         let visibilities_of_test_square =
             new_fov_result.visibilities_of_relative_square(test_square);
         assert_eq!(visibilities_of_test_square.len(), 1);
-        let the_positioned_visibility = visibilities_of_test_square[0];
+        let the_positioned_visibility = visibilities_of_test_square[0].clone();
         assert_eq!(the_positioned_visibility.portal_depth, 1);
         assert_eq!(
             the_positioned_visibility.portal_rotation,

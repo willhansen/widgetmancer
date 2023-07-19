@@ -1187,7 +1187,7 @@ pub trait AbsOrRelSquare<AbsOrRelWorldSquare> = Copy
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: AbsOrRelSquare<SquareType>,
+    SquareType: AbsOrRelSquare<SquareType> + Copy,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
         QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
@@ -1381,7 +1381,7 @@ impl KingWorldStep {
 
 impl QuarterTurnRotatable for KingWorldStep {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        self.into().rotated(quarter_turns_anticlockwise).into()
+        self.step().rotated(quarter_turns_anticlockwise).into()
     }
 }
 
@@ -1423,7 +1423,7 @@ impl OrthogonalWorldStep {
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        self.into().rotated(quarter_turns_anticlockwise).into()
+        self.step().rotated(quarter_turns_anticlockwise).into()
     }
 }
 

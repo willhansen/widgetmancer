@@ -52,8 +52,19 @@ pub enum DrawableEnum {
     OffsetSquare(OffsetSquareDrawable),
 }
 
+// TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {}
+    fn rotated(&self, b: QuarterTurnsAnticlockwise) -> Self {
+        match self {
+            Self::Text(a) => a.rotated(b).into(),
+            Self::PartialVisibility(a) => a.rotated(b).into(),
+            Self::SolidColor(a) => a.rotated(b).into(),
+            Self::Braille(a) => a.rotated(b).into(),
+            Self::Arrow(a) => a.rotated(b).into(),
+            Self::ConveyorBelt(a) => a.rotated(b).into(),
+            Self::OffsetSquare(a) => a.rotated(b).into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, CopyGetters)]
@@ -230,9 +241,7 @@ impl BrailleDrawable {
 
 impl QuarterTurnRotatable for BrailleDrawable {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        let r = self
-            .braille_array
-            .rotated(QuarterTurnsAnticlockwise::new(quarter_turns_anticlockwise));
+        let r = self.braille_array.rotated(quarter_turns_anticlockwise);
         Self {
             braille_array: r,
             ..self.clone()
@@ -590,7 +599,7 @@ mod tests {
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
-        let character = d.rotated(1).to_glyphs()[0].character;
+        let character = d.rotated(QuarterTurnsAnticlockwise::new(1)).to_glyphs()[0].character;
         assert_eq!(
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
@@ -624,7 +633,12 @@ mod tests {
     fn test_braille_drawable_rotation() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
         drawable.braille_array.print();
-        let f = |i| drawable.rotated(i).to_glyphs().chars();
+        let f = |i| {
+            drawable
+                .rotated(QuarterTurnsAnticlockwise::new(i))
+                .to_glyphs()
+                .chars()
+        };
         assert_eq!(f(-1), ['⠓', '⠃']);
         assert_eq!(f(1), ['⢠', '⢤']);
         assert_eq!(f(2), [' ', '⠯']);
