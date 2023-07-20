@@ -73,7 +73,7 @@ impl PartialAngleInterval {
         Self::from_radians(n as f32 * step_length, (n + 1) as f32 * step_length)
     }
 
-    pub fn from_square(relative_square: WorldStep) -> Self {
+    pub fn from_relative_square(relative_square: WorldStep) -> Self {
         assert_ne!(relative_square, vec2(0, 0));
         let rel_square_center = relative_square.to_f32();
         let rel_square_corners: Vec<WorldMove> = vec![
@@ -1006,19 +1006,19 @@ mod tests {
 
     #[test]
     fn test_angle_interval_from_square() {
-        let arc = PartialAngleInterval::from_square(vec2(1, 0));
+        let arc = PartialAngleInterval::from_relative_square(vec2(1, 0));
         assert_about_eq!(arc.clockwise_end.to_degrees(), -45.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), 45.0);
 
-        let arc = PartialAngleInterval::from_square(vec2(0, 1));
+        let arc = PartialAngleInterval::from_relative_square(vec2(0, 1));
         assert_about_eq!(arc.clockwise_end.to_degrees(), 45.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), 135.0);
 
-        let arc = PartialAngleInterval::from_square(vec2(-1, 0));
+        let arc = PartialAngleInterval::from_relative_square(vec2(-1, 0));
         assert_about_eq!(arc.clockwise_end.to_degrees(), 135.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), -135.0);
 
-        let arc = PartialAngleInterval::from_square(vec2(0, -1));
+        let arc = PartialAngleInterval::from_relative_square(vec2(0, -1));
         assert_about_eq!(arc.clockwise_end.to_degrees(), -135.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), -45.0);
     }
@@ -1109,7 +1109,7 @@ mod tests {
             PartialAngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT))
                 .anticlockwise_end
                 .to_degrees(),
-            PartialAngleInterval::from_square(STEP_RIGHT * 2)
+            PartialAngleInterval::from_relative_square(STEP_RIGHT * 2)
                 .anticlockwise_end
                 .to_degrees()
         );

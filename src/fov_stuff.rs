@@ -29,8 +29,6 @@ use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
-
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 pub trait SquareVisibilityTrait: QuarterTurnRotatable {
@@ -207,6 +205,7 @@ pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
 pub struct SquareVisibilityFromPointSource {
     visible_before_first_angle: bool,
     visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
+    point_source_position: WorldPoint,
 }
 
 impl SquareVisibilityFromPointSource {
@@ -224,6 +223,57 @@ impl QuarterTurnRotatable for SquareVisibilityFromPointSource {
             .map(|angle: &Angle<f32>| angle.rotated(quarter_turns_anticlockwise))
             .collect_vec();
         the_clone
+    }
+}
+
+type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+
+pub trait StepVisibilityMapFunctions {
+    fn combined_increasing_visibility(&self, other: &Self) -> Self;
+    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
+
+    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
+    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
+}
+
+impl StepVisibilityMapFunctions for StepVisibilityMap {
+    fn combined_increasing_visibility(&self, other: &Self) -> Self {
+        todo!()
+    }
+
+    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
+        todo!();
+        // let mut the_clone = self.clone();
+        // the_clone.visible_relative_squares_in_main_view_only = the_clone
+        //     .visible_relative_squares_in_main_view_only
+        //     .into_iter()
+        //     .map(|(rel_square, visibility): (WorldStep, SquareVisibility)| {
+        //         (
+        //             rel_square,
+        //             if visibility.is_nearly_or_fully_visible(tolerance) {
+        //                 SquareVisibility::new_fully_visible()
+        //             } else {
+        //                 visibility
+        //             },
+        //         )
+        //     })
+        //     .collect();
+        // the_clone.transformed_sub_fovs = the_clone
+        //     .transformed_sub_fovs
+        //     .into_iter()
+        //     .map(|sub_fov: FieldOfView| {
+        //         sub_fov.with_all_squares_rounded_towards_full_visibility(tolerance)
+        //     })
+        //     .collect();
+        // the_clone
+    }
+
+    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
+        todo!()
+    }
+
+    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
+        todo!()
     }
 }
 
@@ -322,6 +372,14 @@ impl AngleBasedVisibleSegment {
             end_internal_relative_faces: HashSet::from([relative_face]),
         }
     }
+    pub fn from_relative_square(step: WorldStep) -> Self {
+        let faces = faces_away_from_center_at_rel_square(step);
+        Self {
+            visible_angle_interval: PartialAngleInterval::from_relative_square(step),
+            start_internal_relative_face: None,
+            end_internal_relative_faces: faces,
+        }
+    }
     pub fn with_weakly_applied_start_face(
         &self,
         relative_face: RelativeSquareWithOrthogonalDir,
@@ -376,6 +434,10 @@ impl FieldOfView {
     pub fn sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
+    pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
+        self.visible_segments_in_main_view_only
+            .push(AngleBasedVisibleSegment::from_relative_square(step))
+    }
     pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         todo!();
         // self.visible_relative_squares_in_main_view_only
@@ -383,12 +445,6 @@ impl FieldOfView {
         //     .filter(|(square, vis): &(&WorldStep, &SquareVisibility)| vis.is_fully_visible())
         //     .map(|(&square, vis): (&WorldStep, &SquareVisibility)| square)
         //     .collect()
-    }
-    pub fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
-        todo!()
-    }
-    pub fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
-        todo!()
     }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
         let mut all_visible = self.fully_visible_relative_squares_in_main_view_only();
@@ -404,34 +460,6 @@ impl FieldOfView {
                 all_visible = union(&all_visible, &visible_in_main_frame);
             });
         all_visible
-    }
-
-    #[deprecated(note = "Not really applicable with the new angle-based field of view model")]
-    pub fn with_all_squares_rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        todo!();
-        // let mut the_clone = self.clone();
-        // the_clone.visible_relative_squares_in_main_view_only = the_clone
-        //     .visible_relative_squares_in_main_view_only
-        //     .into_iter()
-        //     .map(|(rel_square, visibility): (WorldStep, SquareVisibility)| {
-        //         (
-        //             rel_square,
-        //             if visibility.is_nearly_or_fully_visible(tolerance) {
-        //                 SquareVisibility::new_fully_visible()
-        //             } else {
-        //                 visibility
-        //             },
-        //         )
-        //     })
-        //     .collect();
-        // the_clone.transformed_sub_fovs = the_clone
-        //     .transformed_sub_fovs
-        //     .into_iter()
-        //     .map(|sub_fov: FieldOfView| {
-        //         sub_fov.with_all_squares_rounded_towards_full_visibility(tolerance)
-        //     })
-        //     .collect();
-        // the_clone
     }
 
     pub fn visible_relative_squares_in_main_view_only(&self) -> StepVisibilityMap {
@@ -1068,22 +1096,20 @@ pub fn portal_aware_field_of_view_from_square(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfView {
-    (0..8)
-        .fold(
-            FieldOfView::new_empty_fov_at(center_square),
-            |fov_result_accumulator: FieldOfView, octant_number: i32| {
-                let new_fov_result = single_octant_field_of_view(
-                    center_square,
-                    radius,
-                    Octant::new(octant_number),
-                    sight_blockers,
-                    portal_geometry,
-                );
-                let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
-                combined_fov
-            },
-        )
-        .with_all_squares_rounded_towards_full_visibility(1e-3)
+    (0..8).fold(
+        FieldOfView::new_empty_fov_at(center_square),
+        |fov_result_accumulator: FieldOfView, octant_number: i32| {
+            let new_fov_result = single_octant_field_of_view(
+                center_square,
+                radius,
+                Octant::new(octant_number),
+                sight_blockers,
+                portal_geometry,
+            );
+            let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
+            combined_fov
+        },
+    )
 }
 
 fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
@@ -1094,7 +1120,7 @@ fn visibility_of_square(
     view_arc: PartialAngleInterval,
     rel_square: WorldStep,
 ) -> Option<SquareVisibility> {
-    let square_arc = PartialAngleInterval::from_square(rel_square);
+    let square_arc = PartialAngleInterval::from_relative_square(rel_square);
     if view_arc.at_least_fully_overlaps(square_arc) {
         Some(SquareVisibility::new_fully_visible())
     } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
@@ -1115,7 +1141,7 @@ fn single_shadow_square_visibility_from_one_view_arc(
     visibility_arc: PartialAngleInterval,
     square_relative_to_center: WorldStep,
 ) -> Option<SquareVisibilityFromOneLargeShadow> {
-    let square_arc = PartialAngleInterval::from_square(square_relative_to_center);
+    let square_arc = PartialAngleInterval::from_relative_square(square_relative_to_center);
     assert!(visibility_arc.touches_or_overlaps(square_arc));
 
     let shadow_arc = visibility_arc.complement();
@@ -1216,7 +1242,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__horizontal() {
-        let view_angle = PartialAngleInterval::from_square(vec2(3, 0));
+        let view_angle = PartialAngleInterval::from_relative_square(vec2(3, 0));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
 
@@ -1232,7 +1258,7 @@ mod tests {
 
     #[test]
     fn test_square_view_angle__diagonalish() {
-        let view_angle = PartialAngleInterval::from_square(vec2(5, 3));
+        let view_angle = PartialAngleInterval::from_relative_square(vec2(5, 3));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
 
@@ -1528,7 +1554,7 @@ mod tests {
         shadowed_square: WorldStep,
     ) -> Option<SquareVisibilityFromOneLargeShadow> {
         single_shadow_square_visibility_from_one_view_arc(
-            PartialAngleInterval::from_square(block_square).complement(),
+            PartialAngleInterval::from_relative_square(block_square).complement(),
             shadowed_square,
         )
     }
@@ -2162,7 +2188,9 @@ mod tests {
             2
         );
 
-        let rounded_fov = fov.with_all_squares_rounded_towards_full_visibility(1e-3);
+        let rounded_fov = fov
+            .rasterized()
+            .with_all_squares_rounded_towards_full_visibility(1e-3);
         assert_eq!(
             rounded_fov
                 .visible_relative_squares_in_main_view_only()

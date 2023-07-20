@@ -1791,6 +1791,16 @@ pub fn naive_ray_endpoint<U>(
     start + unit_vector_from_angle(angle).cast_unit() * length
 }
 
+pub fn faces_away_from_center_at_rel_square(
+    step: WorldStep,
+) -> HashSet<RelativeSquareWithOrthogonalDir> {
+    ORTHOGONAL_STEPS
+        .iter()
+        .filter(|&&face_step| step.dot(face_step) >= 0)
+        .map(|&face_step| (step, face_step).into())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -2579,5 +2589,22 @@ mod tests {
         assert!(f((point2(3, 5), STEP_RIGHT), (point2(3, 5), STEP_RIGHT)));
         // Same face, vertical offset
         assert!(f((point2(3, 5), STEP_RIGHT), (point2(3, 45), STEP_RIGHT)));
+    }
+    #[test]
+    fn test_faces_away_from_center_at_relative_square() {
+        let step = vec2(3, 4);
+        assert_eq!(
+            faces_away_from_center_at_rel_square(step),
+            HashSet::from([(step, STEP_UP).into(), (step, STEP_RIGHT).into()])
+        );
+        let step = vec2(0, -40);
+        assert_eq!(
+            faces_away_from_center_at_rel_square(step),
+            HashSet::from([
+                (step, STEP_LEFT).into(),
+                (step, STEP_DOWN).into(),
+                (step, STEP_RIGHT).into()
+            ])
+        );
     }
 }
