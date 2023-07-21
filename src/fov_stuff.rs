@@ -229,7 +229,7 @@ impl QuarterTurnRotatable for SquareVisibilityFromPointSource {
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 pub trait StepVisibilityMapFunctions {
-    fn combined_increasing_visibility(&self, other: &Self) -> Self;
+    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self;
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
 
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
@@ -237,7 +237,7 @@ pub trait StepVisibilityMapFunctions {
 }
 
 impl StepVisibilityMapFunctions for StepVisibilityMap {
-    fn combined_increasing_visibility(&self, other: &Self) -> Self {
+    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
         todo!()
     }
 
@@ -365,7 +365,7 @@ impl AngleBasedVisibleSegment {
     fn end_faces_span_angle_interval(&self) -> bool {
         todo!()
     }
-    pub fn from_relative_square_face(relative_face: RelativeSquareWithOrthogonalDir) -> Self {
+    pub fn from_relative_face(relative_face: RelativeSquareWithOrthogonalDir) -> Self {
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square_face(relative_face),
             start_internal_relative_face: None,
@@ -400,6 +400,9 @@ impl AngleBasedVisibleSegment {
             visible_angle_interval: angle_interval,
             ..self.clone()
         }
+    }
+    pub fn rasterized(&self) -> StepVisibilityMap {
+        todo!()
     }
 }
 
@@ -438,6 +441,10 @@ impl FieldOfView {
         self.visible_segments_in_main_view_only
             .push(AngleBasedVisibleSegment::from_relative_square(step))
     }
+    pub fn add_fully_visible_relative_face(&mut self, face: RelativeSquareWithOrthogonalDir) {
+        self.visible_segments_in_main_view_only
+            .push(AngleBasedVisibleSegment::from_relative_face(face))
+    }
     pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         todo!();
         // self.visible_relative_squares_in_main_view_only
@@ -463,7 +470,7 @@ impl FieldOfView {
     }
 
     pub fn visible_relative_squares_in_main_view_only(&self) -> StepVisibilityMap {
-        todo!()
+        self.without_sub_views().rasterized()
     }
 
     pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
@@ -868,6 +875,16 @@ impl FieldOfView {
             .reduce(|bottom, top| top.drawn_over(&bottom));
         maybe_drawable
     }
+    pub fn rasterized(&self) -> StepVisibilityMap {
+        self.with_all_view_segments_in_one_relative_frame()
+            .iter()
+            .map(|segment: &AngleBasedVisibleSegment| segment.rasterized())
+            .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
+            .unwrap()
+    }
+    fn with_all_view_segments_in_one_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
+        todo!()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
@@ -993,7 +1010,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             // create a segment ending at this face
             let visible_segment_up_to_relative_face =
-                AngleBasedVisibleSegment::from_relative_square_face(relative_face)
+                AngleBasedVisibleSegment::from_relative_face(relative_face)
                     .with_visible_angle_interval(visible_arc_of_face);
 
             fov_result
@@ -1968,32 +1985,71 @@ mod tests {
             2
         );
     }
+    #[test]
+    fn test_combined_fovs_combine_visibility__faces_on_one_square() {
+        (0..5).for_each(|dy| {
+            let main_step = STEP_LEFT * 7 + STEP_UP * dy;
+            let main_center = point2(5, 5);
+            let fovs = faces_away_from_center_at_rel_square(main_step)
+                .iter()
+                .map(|&rel_face| {
+                    let mut fov = FieldOfView::new_empty_fov_at(main_center);
+                    fov.add_fully_visible_relative_face(rel_face);
+                    fov
+                })
+                .collect_vec();
+
+            let test_step = main_step + STEP_RIGHT;
+            let test_square = main_center + test_step;
+
+            fovs.iter().for_each(|fov| {
+                assert_false!(fov.visibilities_of_absolute_square(test_square)[0]
+                    .square_visibility_in_absolute_frame
+                    .is_fully_visible())
+            });
+
+            let merged_fov = fovs
+                .iter()
+                .cloned()
+                .reduce(|a, b| a.combined_with(&b))
+                .unwrap();
+
+            assert!(merged_fov.visibilities_of_absolute_square(test_square)[0]
+                .square_visibility_in_absolute_frame
+                .is_fully_visible());
+        });
+    }
 
     #[test]
-    fn test_combined_fovs_combine_visibility() {
+    fn test_combined_fovs_combine_visibility__full_squares() {
         let main_center = point2(5, 5);
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
-        let rel_square = STEP_RIGHT * 3;
-        todo!();
-        // fov_1
-        //     .visible_relative_squares_in_main_view_only()
-        //     .insert(rel_square, SquareVisibility::top_half_visible());
-        // fov_2
-        //     .visible_relative_squares_in_main_view_only()
-        //     .insert(rel_square, SquareVisibility::bottom_half_visible());
+        let horizontal_offset = 12;
+        let fovs = (-1..=1)
+            .map(|dy| {
+                let mut fov = FieldOfView::new_empty_fov_at(main_center);
+                fov.add_fully_visible_relative_square(vec2(horizontal_offset, dy));
+                fov
+            })
+            .collect_vec();
 
-        let combined = fov_1.combined_with(&fov_2);
+        let test_step = STEP_RIGHT * (horizontal_offset - 1);
+        let test_square = main_center + test_step;
 
-        assert_eq!(
-            combined
-                .fully_visible_relative_squares_including_subviews()
-                .len(),
-            1
-        );
-        assert!(combined
-            .only_partially_visible_relative_squares_in_main_view_only()
-            .is_empty());
+        fovs.iter().for_each(|fov| {
+            assert_false!(fov.visibilities_of_absolute_square(test_square)[0]
+                .square_visibility_in_absolute_frame
+                .is_fully_visible())
+        });
+
+        let merged_fov = fovs
+            .iter()
+            .cloned()
+            .reduce(|a, b| a.combined_with(&b))
+            .unwrap();
+
+        assert!(merged_fov.visibilities_of_absolute_square(test_square)[0]
+            .square_visibility_in_absolute_frame
+            .is_fully_visible());
     }
 
     #[test]
@@ -2188,33 +2244,31 @@ mod tests {
             2
         );
 
-        let rounded_fov = fov
-            .rasterized()
-            .with_all_squares_rounded_towards_full_visibility(1e-3);
-        assert_eq!(
-            rounded_fov
-                .visible_relative_squares_in_main_view_only()
-                .len(),
-            3
-        );
-        assert_eq!(
-            rounded_fov
-                .fully_visible_relative_squares_in_main_view_only()
-                .len(),
-            2
-        );
-        assert_eq!(
-            rounded_fov
-                .only_partially_visible_relative_squares_in_main_view_only()
-                .len(),
-            1
-        );
-        assert!(rounded_fov
-            .fully_visible_relative_squares_in_main_view_only()
-            .contains(&STEP_DOWN));
-        assert!(rounded_fov
-            .only_partially_visible_relative_squares_in_main_view_only()
-            .contains(&STEP_UP));
+        // let rounded_fov = fov.rasterized().rounded_towards_full_visibility(1e-3);
+        // assert_eq!(
+        //     rounded_fov
+        //         .visible_relative_squares_in_main_view_only()
+        //         .len(),
+        //     3
+        // );
+        // assert_eq!(
+        //     rounded_fov
+        //         .fully_visible_relative_squares_in_main_view_only()
+        //         .len(),
+        //     2
+        // );
+        // assert_eq!(
+        //     rounded_fov
+        //         .only_partially_visible_relative_squares_in_main_view_only()
+        //         .len(),
+        //     1
+        // );
+        // assert!(rounded_fov
+        //     .fully_visible_relative_squares_in_main_view_only()
+        //     .contains(&STEP_DOWN));
+        // assert!(rounded_fov
+        //     .only_partially_visible_relative_squares_in_main_view_only()
+        //     .contains(&STEP_UP));
     }
 
     #[test]
