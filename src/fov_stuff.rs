@@ -24,7 +24,7 @@ use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
+use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform, RigidlyTransformable};
 use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -406,7 +406,12 @@ impl AngleBasedVisibleSegment {
     }
 }
 
-#[derive(Debug, Clone)]
+impl RigidlyTransformable for AngleBasedVisibleSegment {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {}
+}
+
+#[derive(Debug, Clone, Constructor, CopyGetters)]
+#[get_copy = "pub"]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
@@ -876,14 +881,43 @@ impl FieldOfView {
         maybe_drawable
     }
     pub fn rasterized(&self) -> StepVisibilityMap {
-        self.with_all_view_segments_in_one_relative_frame()
+        self.all_view_segments_in_relative_frame()
             .iter()
             .map(|segment: &AngleBasedVisibleSegment| segment.rasterized())
             .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
             .unwrap()
     }
-    fn with_all_view_segments_in_one_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
-        todo!()
+    fn all_view_segments_in_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
+        concat([
+            self.visible_segments_in_main_view_only.clone(),
+            self.transformed_sub_fovs
+                .iter()
+                .flat_map(|sub_fov| {
+                    self.other_converted_to_this_frame(sub_fov)
+                        .all_view_segments_in_relative_frame()
+                })
+                .collect_vec(),
+        ])
+    }
+
+    fn other_converted_to_this_frame(&self, other: &Self) -> Self {
+        other.apply_rigid_transform(other.view_transform_to(self))
+    }
+}
+
+impl RigidlyTransformable for FieldOfView {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        FieldOfView::new(
+            self.root_square_with_direction().apply_rigid_transform(tf),
+            self.visible_segments_in_main_view_only()
+                .iter()
+                .map(|seg| seg.apply_rigid_transform(tf))
+                .collect_vec(),
+            self.transformed_sub_fovs()
+                .iter()
+                .map(|seg| seg.apply_rigid_transform(tf))
+                .collect_vec(),
+        )
     }
 }
 

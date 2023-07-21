@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 
+use crate::fov_stuff::{AngleBasedVisibleSegment, FieldOfView};
 use derive_more::Constructor;
 use derive_more::Neg;
 use euclid::{point2, Angle};
@@ -128,6 +129,16 @@ impl Default for RigidTransform {
             SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
             SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
         )
+    }
+}
+
+pub trait RigidlyTransformable {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
+}
+
+impl RigidlyTransformable for SquareWithOrthogonalDir {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.transform_absolute_pose(*self)
     }
 }
 
