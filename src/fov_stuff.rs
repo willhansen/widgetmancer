@@ -24,7 +24,7 @@ use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform, RigidlyTransformable};
+use crate::portal_geometry::{Portal, PortalGeometry};
 use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -411,14 +411,19 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self {
             visible_angle_interval: self.visible_angle_interval.apply_rigid_transform(tf),
-            start_internal_relative_face: self.start_internal_relative_face.map(|face|face.apply_rigid_transform(tf)),
-            end_internal_relative_faces: self.end_internal_relative_faces.iter().map(|face| face.apply_rigid_transform(tf)).collect(),
+            start_internal_relative_face: self
+                .start_internal_relative_face
+                .map(|face| face.apply_rigid_transform(tf)),
+            end_internal_relative_faces: self
+                .end_internal_relative_faces
+                .iter()
+                .map(|face| face.apply_rigid_transform(tf))
+                .collect(),
         }
     }
 }
 
-#[derive(Debug, Clone, Constructor, CopyGetters)]
-#[get_copy = "pub"]
+#[derive(Debug, Clone, Constructor)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
@@ -441,12 +446,15 @@ impl FieldOfView {
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
     }
+    pub fn root_square_with_direction(&self) -> SquareWithOrthogonalDir {
+        self.root_square_with_direction
+    }
     pub fn view_transform_to(&self, other: &FieldOfView) -> RigidTransform {
         let start = self.root_square_with_direction;
         let end = other.root_square_with_direction;
         RigidTransform::from_start_and_end_poses(start, end)
     }
-    pub fn sub_fovs(&self) -> &Vec<FieldOfView> {
+    pub fn transformed_sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
     pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
@@ -483,6 +491,9 @@ impl FieldOfView {
 
     pub fn visible_relative_squares_in_main_view_only(&self) -> StepVisibilityMap {
         self.without_sub_views().rasterized()
+    }
+    pub fn visible_segments_in_main_view_only(&self) -> &Vec<AngleBasedVisibleSegment> {
+        &self.visible_segments_in_main_view_only
     }
 
     pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
@@ -1993,9 +2004,8 @@ mod tests {
             let actual_center = entrance
                 .with_offset(offset_from_entrance)
                 .with_direction(direction_near_entrance);
-            let virtual_center_at_exit = portal
-                .get_transform()
-                .transform_absolute_pose(actual_center);
+            let virtual_center_at_exit =
+                actual_center.apply_rigid_transform(portal.get_transform());
             let correct_center_at_exit = exit
                 .with_offset(offset_from_exit)
                 .with_direction(direction_near_exit);

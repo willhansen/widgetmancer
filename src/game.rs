@@ -3186,7 +3186,7 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
-        assert_eq!(fov.sub_fovs().len(), 1);
+        assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 2);
         assert_eq!(
             game.graphics
@@ -3339,7 +3339,7 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
-        assert_eq!(fov.sub_fovs().len(), 1);
+        assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 1);
         assert_eq!(
             game.graphics

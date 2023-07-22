@@ -29,6 +29,7 @@ use rgb::RGB8;
 
 use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
 use crate::piece::PieceType::King;
+use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
 
@@ -1799,6 +1800,152 @@ pub fn faces_away_from_center_at_rel_square(
         .filter(|&&face_step| step.dot(face_step) >= 0)
         .map(|&face_step| (step, face_step).into())
         .collect()
+}
+
+#[derive(Hash, Clone, Copy, Debug)]
+pub struct RigidTransform {
+    start_pose: SquareWithOrthogonalDir,
+    end_pose: SquareWithOrthogonalDir,
+}
+
+impl RigidTransform {
+    pub fn from_start_and_end_poses(
+        start: SquareWithOrthogonalDir,
+        end: SquareWithOrthogonalDir,
+    ) -> Self {
+        RigidTransform {
+            start_pose: start,
+            end_pose: end,
+        }
+    }
+    pub fn translation(&self) -> WorldStep {
+        (self.end_pose - self.start_pose).stepp()
+    }
+    pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
+        (self.end_pose - self.start_pose).rotation()
+    }
+    // TODO: maybe test this if sus
+    pub fn transform_relative_pose(
+        &self,
+        pose: RelativeSquareWithOrthogonalDir,
+    ) -> RelativeSquareWithOrthogonalDir {
+        let end_square = rotated_n_quarter_turns_counter_clockwise(
+            pose.square(),
+            self.rotation().quarter_turns(),
+        );
+
+        let end_direction = self.rotation().rotate_vector(pose.direction().step());
+
+        RelativeSquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
+    }
+    pub fn transform_octant(&self, octant: Octant) -> Octant {
+        octant.with_n_quarter_turns_anticlockwise(self.rotation())
+    }
+    pub fn rotate_step(&self, step: WorldStep) -> WorldStep {
+        self.rotation().rotate_vector(step)
+    }
+    pub fn rotate_steps(&self, steps: &StepSet) -> StepSet {
+        steps
+            .iter()
+            .map(|&step: &WorldStep| self.rotation().rotate_vector(step))
+            .collect()
+    }
+    pub fn transform_ray(
+        &self,
+        ray_start: WorldPoint,
+        ray_direction: Angle<f32>,
+    ) -> (WorldPoint, Angle<f32>) {
+        let ray_start_relative_to_tf_start = ray_start - self.start_pose.square().to_f32();
+        let dist_from_tf_start = ray_start_relative_to_tf_start.length();
+        let start_tf_angle = better_angle_from_x_axis(self.start_pose.direction().step().to_f32());
+
+        let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
+        let end_tf_angle = better_angle_from_x_axis(self.end_pose.direction().step().to_f32());
+
+        let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
+
+        let new_ray_start = if dist_from_tf_start == 0.0 {
+            self.end_pose.square().to_f32()
+        } else {
+            let tf_start_point = self.start_pose.direction().step().to_f32();
+            let position_angle_from_tf_start =
+                tf_start_point.angle_to(ray_start_relative_to_tf_start);
+
+            let position_angle_from_tf_end = end_tf_angle + position_angle_from_tf_start;
+
+            self.end_pose.square().to_f32()
+                + unit_vector_from_angle(position_angle_from_tf_end).cast_unit()
+                    * dist_from_tf_start
+        };
+
+        (new_ray_start, new_ray_direction)
+    }
+}
+
+impl PartialEq for RigidTransform {
+    fn eq(&self, other: &Self) -> bool {
+        other.start_pose.apply_rigid_transform(*self) == other.end_pose
+    }
+}
+
+impl Eq for RigidTransform {}
+
+impl Default for RigidTransform {
+    fn default() -> Self {
+        RigidTransform::from_start_and_end_poses(
+            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+        )
+    }
+}
+
+pub trait RigidlyTransformable {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
+}
+
+impl<SquareType> RigidlyTransformable for AbsOrRelSquareWithOrthogonalDir<SquareType>
+where
+    SquareType: Copy + RigidlyTransformable + AbsOrRelSquareTrait<SquareType>,
+{
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        Self::from_square_and_step(
+            self.square().apply_rigid_transform(tf),
+            self.dir().apply_rigid_transform(tf),
+        )
+    }
+}
+
+impl RigidlyTransformable for WorldSquare {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
+    }
+}
+impl RigidlyTransformable for WorldStep {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.rotation().rotate_vector(*self)
+    }
+}
+impl RigidlyTransformable for OrthogonalWorldStep {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.rotation().rotate_vector(self.step).into()
+    }
+}
+
+impl RigidlyTransformable for AngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        match self {
+            AngleInterval::Empty | AngleInterval::FullCircle => *self,
+            AngleInterval::Partial(partial_angle_interval) => {
+                AngleInterval::Partial(partial_angle_interval.apply_rigid_transform(tf))
+            }
+        }
+    }
+}
+
+impl RigidlyTransformable for PartialAngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        self.rotated_quarter_turns(tf.rotation())
+    }
 }
 
 #[cfg(test)]
