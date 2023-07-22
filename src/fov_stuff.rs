@@ -346,9 +346,14 @@ pub struct AngleBasedVisibleSegment {
 }
 impl AngleBasedVisibleSegment {
     pub fn validate(&self) {
-        if !self.start_face_spans_angle_interval() || !self.end_faces_span_angle_interval() {
+        if !self.start_face_spans_angle_interval()
+            || !self.end_faces_fully_cover_angle_interval_with_no_overlap()
+        {
             panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
         }
+    }
+    fn end_faces_fully_cover_angle_interval_with_no_overlap(&self) -> bool {
+        todo!()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
         self.start_internal_relative_face.is_none()
@@ -361,9 +366,6 @@ impl AngleBasedVisibleSegment {
                     })
                 },
             )
-    }
-    fn end_faces_span_angle_interval(&self) -> bool {
-        todo!()
     }
     pub fn from_relative_face(relative_face: RelativeSquareWithOrthogonalDir) -> Self {
         Self {
