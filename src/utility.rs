@@ -1179,7 +1179,7 @@ pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
 
 // trait alias
-pub trait AbsOrRelSquare<AbsOrRelWorldSquare> = Copy
+pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare> = Copy
     + Add<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<AbsOrRelWorldSquare, Output = WorldStep>
@@ -1187,7 +1187,7 @@ pub trait AbsOrRelSquare<AbsOrRelWorldSquare> = Copy
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: AbsOrRelSquare<SquareType> + Copy,
+    SquareType: AbsOrRelSquareTrait<SquareType> + Copy,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
         QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
@@ -1345,7 +1345,7 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
 impl<SquareType, DirectionType> From<(SquareType, DirectionType)>
     for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: AbsOrRelSquare<SquareType>,
+    SquareType: AbsOrRelSquareTrait<SquareType>,
     DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (SquareType, DirectionType)) -> Self {
@@ -1355,7 +1355,7 @@ where
 impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
     for (SquareType, OrthogonalWorldStep)
 where
-    SquareType: AbsOrRelSquare<SquareType>,
+    SquareType: AbsOrRelSquareTrait<SquareType>,
 {
     fn from(
         value: AbsOrRelSquareWithOrthogonalDir<SquareType>,

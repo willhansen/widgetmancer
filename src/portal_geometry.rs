@@ -9,16 +9,17 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use crate::utility::angle_interval::PartialAngleInterval;
+use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::{
-    StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    AbsoluteWorldCoordinate, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
     ith_projection_of_step, naive_ray_endpoint, revolve_square,
-    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
-    QuarterTurnsAnticlockwise, RelativeSquareWithOrthogonalDir, SquareWithKingDir,
-    SquareWithOrthogonalDir, StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle,
+    AbsOrRelSquareWithOrthogonalDir, Octant, QuarterTurnsAnticlockwise,
+    RelativeSquareWithOrthogonalDir, SquareWithKingDir, SquareWithOrthogonalDir,
+    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -47,9 +48,6 @@ impl RigidTransform {
         &self,
         pose: SquareWithOrthogonalDir,
     ) -> SquareWithOrthogonalDir {
-        let end_square = revolve_square(pose.square(), self.start_pose.square(), self.rotation())
-            + self.translation();
-
         let end_direction = self.rotation().rotate_vector(pose.direction().step());
 
         SquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
@@ -70,9 +68,6 @@ impl RigidTransform {
     }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
-    }
-    pub fn transform_arc(&self, arc: PartialAngleInterval) -> PartialAngleInterval {
-        arc.rotated_quarter_turns(self.rotation())
     }
     pub fn rotate_step(&self, step: WorldStep) -> WorldStep {
         self.rotation().rotate_vector(step)
@@ -136,9 +131,38 @@ pub trait RigidlyTransformable {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
 }
 
-impl RigidlyTransformable for SquareWithOrthogonalDir {
+impl<SquareType> RigidlyTransformable for AbsOrRelSquareWithOrthogonalDir<SquareType>
+where
+    SquareType: Copy + RigidlyTransformable + AbsOrRelSquareTrait<SquareType>,
+{
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        tf.transform_absolute_pose(*self)
+        Self::from_square_and_step(
+            self.square().apply_rigid_transform(tf),
+            self.dir().apply_rigid_transform(tf),
+        )
+    }
+}
+
+impl RigidlyTransformable for WorldSquare {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
+    }
+}
+
+impl RigidlyTransformable for AngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        match self {
+            AngleInterval::Empty | AngleInterval::FullCircle => *self,
+            AngleInterval::Partial(partial_angle_interval) => {
+                AngleInterval::Partial(partial_angle_interval.apply_rigid_transform(tf))
+            }
+        }
+    }
+}
+
+impl RigidlyTransformable for PartialAngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        self.rotated_quarter_turns(tf.rotation())
     }
 }
 

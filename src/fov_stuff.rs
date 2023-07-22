@@ -406,8 +406,15 @@ impl AngleBasedVisibleSegment {
     }
 }
 
+// TODO: Applying a trait by simply calling the functions on every component member of a struct should be automated.
 impl RigidlyTransformable for AngleBasedVisibleSegment {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {}
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        Self {
+            visible_angle_interval: self.visible_angle_interval.apply_rigid_transform(tf),
+            start_internal_relative_face: self.start_internal_relative_face.map(|face|face.apply_rigid_transform(tf)),
+            end_internal_relative_faces: self.end_internal_relative_faces.iter().map(|face| face.apply_rigid_transform(tf)).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Constructor, CopyGetters)]
@@ -1063,7 +1070,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .unwrap();
 
             let transform = portal.get_transform();
-            let transformed_center = transform.transform_absolute_pose(oriented_center_square);
+            let transformed_center = oriented_center_square.apply_rigid_transform(transform);
             // in a relative view, the portal exit is the same line as the portal entrance
             let relative_portal_exit: RelativeSquareWithOrthogonalDir =
                 relative_face.stepped().turned_back();
