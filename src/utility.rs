@@ -1294,6 +1294,7 @@ where
             other_pos_on_dir_axis == stepped_pos_on_dir_axis
         }
     }
+    // TODO: return AbsOrRelWorldLine
     pub fn line(&self) -> WorldLine {
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
@@ -1303,6 +1304,12 @@ where
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
+    }
+}
+
+impl RelativeSquareWithOrthogonalDir {
+    pub fn face_center_point(&self) -> WorldMove {
+        self.square().to_f32() + self.dir().step().to_f32() * 0.5
     }
 }
 

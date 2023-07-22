@@ -103,9 +103,7 @@ impl PartialAngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_relative_square_face<T: Into<RelativeSquareWithOrthogonalDir>>(
-        rel_face: T,
-    ) -> Self {
+    pub fn from_relative_square_face(rel_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();

@@ -199,13 +199,14 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
     }
 }
 
+// TODO: change to enum with for fully visible, not visible, and partially visible
 pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
 
 #[derive(Clone, Constructor, Debug)]
 pub struct SquareVisibilityFromPointSource {
     visible_before_first_angle: bool,
     visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
-    point_source_position: WorldPoint,
+    point_source_from_square_center: WorldMove,
 }
 
 impl SquareVisibilityFromPointSource {
@@ -353,6 +354,12 @@ impl AngleBasedVisibleSegment {
         }
     }
     fn end_faces_fully_cover_angle_interval_with_no_overlap(&self) -> bool {
+        let end_faces_going_clockwise =
+            self.end_internal_relative_faces
+                .iter()
+                .sorted_by_key(|face| {
+                    OrderedFloat(better_angle_from_x_axis(face.face_center_point()).radians)
+                });
         todo!()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
@@ -367,11 +374,12 @@ impl AngleBasedVisibleSegment {
                 },
             )
     }
-    pub fn from_relative_face(relative_face: RelativeSquareWithOrthogonalDir) -> Self {
+    pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
+        let actual_face = relative_face.into();
         Self {
-            visible_angle_interval: PartialAngleInterval::from_relative_square_face(relative_face),
+            visible_angle_interval: PartialAngleInterval::from_relative_square_face(actual_face),
             start_internal_relative_face: None,
-            end_internal_relative_faces: HashSet::from([relative_face]),
+            end_internal_relative_faces: HashSet::from([actual_face]),
         }
     }
     pub fn from_relative_square(step: WorldStep) -> Self {
@@ -403,7 +411,13 @@ impl AngleBasedVisibleSegment {
             ..self.clone()
         }
     }
-    pub fn rasterized(&self) -> StepVisibilityMap {
+    pub fn touched_squares(&self) -> StepSet {
+        todo!()
+    }
+    pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
+        todo!()
+    }
+    pub fn to_square_visibilities(&self) -> StepVisibilityMap {
         todo!()
     }
 }
@@ -903,7 +917,7 @@ impl FieldOfView {
     pub fn rasterized(&self) -> StepVisibilityMap {
         self.all_view_segments_in_relative_frame()
             .iter()
-            .map(|segment: &AngleBasedVisibleSegment| segment.rasterized())
+            .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())
             .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
             .unwrap()
     }
@@ -2510,5 +2524,13 @@ mod tests {
         let the_glyphs = the_drawable.to_glyphs();
         let the_clean_string = the_glyphs.to_clean_string();
         assert_eq!(the_clean_string, "🬎🬎");
+    }
+    #[test]
+    fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
+        let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));
+        assert_eq!(
+            seg.touched_squares(),
+            (0..=5).map(|i| STEP_RIGHT * i).collect()
+        )
     }
 }
