@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Neg, Sub};
@@ -11,7 +11,7 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::SquareVisibilityFromOneLargeShadow;
+use crate::fov_stuff::{OctantFOVSquareSequenceIter, SquareVisibilityFromOneLargeShadow};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
@@ -269,7 +269,7 @@ impl PartialAngleInterval {
         }
     }
     pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> DirectionalAngularEdge {
-        assert!(other.fully_contains_interval(*self));
+        assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
         let clockwise_dist =
             PartialAngleInterval::new_interval(other.clockwise_end, self.clockwise_end).width();
         let anticlockwise_dist =
@@ -359,7 +359,10 @@ impl PartialAngleInterval {
         mid_angle
     }
 
-    pub fn fully_contains_interval(&self, other: PartialAngleInterval) -> bool {
+    pub fn fully_contains_interval_excluding_edge_overlaps(
+        &self,
+        other: PartialAngleInterval,
+    ) -> bool {
         let contains_other_edges = self.contains_angle_not_including_edges(other.anticlockwise_end)
             && self.contains_angle_not_including_edges(other.clockwise_end);
         let other_does_not_contain_these_edges = !other
@@ -367,6 +370,11 @@ impl PartialAngleInterval {
             && !other.contains_angle_not_including_edges(self.anticlockwise_end);
 
         contains_other_edges && other_does_not_contain_these_edges
+    }
+    pub fn other_is_sub_interval_of_this(&self, other: Self) -> bool {
+        self.contains_or_touches_angle(other.anticlockwise_end)
+            && self.contains_or_touches_angle(other.clockwise_end)
+            && self.contains_or_touches_angle(other.center_angle())
     }
     pub fn most_overlapped_edge_of_self(
         &self,
@@ -388,6 +396,7 @@ impl PartialAngleInterval {
             clockwise_is_closer,
         )
     }
+    // TODO: replace with implementation of QuarterTurnRotatable trait
     pub fn rotated_quarter_turns(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
         PartialAngleInterval {
             clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
@@ -399,6 +408,44 @@ impl PartialAngleInterval {
             self.clockwise_end + d_angle,
             self.anticlockwise_end + d_angle,
         )
+    }
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator {
+        self.split_into_octants_in_ccw_order()
+            .into_iter()
+            .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant())
+            .collect_vec();
+
+        todo!();
+        0..4
+    }
+    fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
+        todo!()
+    }
+    fn touched_rel_squares_going_outwards_in_one_octant(&self) -> impl Iterator<Item = WorldStep> {
+        assert!(self.in_one_octant());
+        todo!();
+        ORTHOGONAL_STEPS.into_iter()
+    }
+    fn touched_rel_squares_going_outwards_in_one_octant_with_placeholders(
+        &self,
+    ) -> impl Iterator<Item = Option<WorldStep>> + '_ {
+        assert!(self.in_one_octant());
+        OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap()).map(|step| {
+            if self.partially_or_fully_overlaps_without_exactly_touching(
+                Self::from_relative_square(step),
+            ) {
+                Some(step)
+            } else {
+                None
+            }
+        })
+    }
+    fn in_one_octant(&self) -> bool {
+        self.octant().is_some()
+    }
+    fn octant(&self) -> Option<Octant> {
+        Octant::all_octants()
+            .find(|octant| Self::from_octant(*octant).other_is_sub_interval_of_this(*self))
     }
 }
 
@@ -517,7 +564,7 @@ impl AngleIntervalSet {
     pub fn fully_contains_interval(&self, interval: PartialAngleInterval) -> bool {
         self.intervals
             .iter()
-            .any(|i| i.fully_contains_interval(interval))
+            .any(|i| i.fully_contains_interval_excluding_edge_overlaps(interval))
     }
     pub fn partially_or_fully_overlaps_interval(&self, interval: PartialAngleInterval) -> bool {
         self.intervals.iter().any(|i: &PartialAngleInterval| {
@@ -537,7 +584,7 @@ impl AngleIntervalSet {
             .filter_map(|&arc_from_set: &PartialAngleInterval| {
                 if arc_from_set.partially_overlaps_other_while_including_edges(interval) {
                     Some(arc_from_set.edge_of_this_overlapped_by(interval))
-                } else if interval.fully_contains_interval(arc_from_set) {
+                } else if interval.fully_contains_interval_excluding_edge_overlaps(arc_from_set) {
                     Some(arc_from_set.edge_of_this_deeper_in(interval))
                 } else {
                     None
@@ -831,21 +878,32 @@ mod tests {
     fn test_interval_fully_contain_other_interval() {
         assert!(
             PartialAngleInterval::from_degrees(-10.0, 10.0)
-                .fully_contains_interval(PartialAngleInterval::from_degrees(-5.0, 5.0)),
+                .fully_contains_interval_excluding_edge_overlaps(
+                    PartialAngleInterval::from_degrees(-5.0, 5.0)
+                ),
             "simple positive"
         );
 
         assert!(
             !PartialAngleInterval::from_degrees(-10.0, 10.0)
-                .fully_contains_interval(PartialAngleInterval::from_degrees(5.0, -5.0)),
+                .fully_contains_interval_excluding_edge_overlaps(
+                    PartialAngleInterval::from_degrees(5.0, -5.0)
+                ),
             "contains endpoints, but not the middle"
         );
 
         assert!(
             PartialAngleInterval::from_degrees(5.0, -5.0)
-                .fully_contains_interval(PartialAngleInterval::from_degrees(10.0, -10.0)),
+                .fully_contains_interval_excluding_edge_overlaps(
+                    PartialAngleInterval::from_degrees(10.0, -10.0)
+                ),
             "big angle fully contained"
         );
+    }
+    #[test]
+    fn test_interval_fully_contain_other_interval__should_not_match_self() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 10.0);
+        assert_false!(arc.fully_contains_interval_excluding_edge_overlaps(arc));
     }
 
     #[test]
@@ -868,21 +926,27 @@ mod tests {
         let complementary_but_overlapping_top = PartialAngleInterval::from_degrees(aa, b);
         let complementary_but_overlapping_bottom = PartialAngleInterval::from_degrees(a, ab);
 
-        assert!(!base_interval.fully_contains_interval(base_interval)); // controversial
-        assert!(!base_interval.fully_contains_interval(touching_below));
-        assert!(!base_interval.fully_contains_interval(touching_above));
-        assert!(!base_interval.fully_contains_interval(overlapping_below));
-        assert!(!base_interval.fully_contains_interval(overlapping_above));
-        assert!(!base_interval.fully_contains_interval(inside_touching_start));
-        assert!(!base_interval.fully_contains_interval(inside_touching_end));
-        assert_eq!(
-            base_interval.fully_contains_interval(inside_touching_start),
-            base_interval.fully_contains_interval(inside_touching_end)
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(base_interval)); // controversial
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(touching_below));
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(touching_above));
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(overlapping_below));
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(overlapping_above));
+        assert!(
+            !base_interval.fully_contains_interval_excluding_edge_overlaps(inside_touching_start)
         );
-        assert!(!base_interval.fully_contains_interval(edges_in_but_wraparound));
-        assert!(!base_interval.fully_contains_interval(complementary));
-        assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_top));
-        assert!(!base_interval.fully_contains_interval(complementary_but_overlapping_bottom));
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(inside_touching_end));
+        assert_eq!(
+            base_interval.fully_contains_interval_excluding_edge_overlaps(inside_touching_start),
+            base_interval.fully_contains_interval_excluding_edge_overlaps(inside_touching_end)
+        );
+        assert!(
+            !base_interval.fully_contains_interval_excluding_edge_overlaps(edges_in_but_wraparound)
+        );
+        assert!(!base_interval.fully_contains_interval_excluding_edge_overlaps(complementary));
+        assert!(!base_interval
+            .fully_contains_interval_excluding_edge_overlaps(complementary_but_overlapping_top));
+        assert!(!base_interval
+            .fully_contains_interval_excluding_edge_overlaps(complementary_but_overlapping_bottom));
     }
 
     #[test]
@@ -1224,5 +1288,78 @@ mod tests {
             Angle::degrees(5.0)
         ));
         // TODO: more cases here
+    }
+    #[test]
+    fn test_split_into_octants__one_octant() {
+        let single_octant_degrees = vec![
+            (0.0, 5.0),
+            (0.0, 45.0),
+            (45.0, 90.0),
+            (89.0, 90.0),
+            (-30.0, 0.0),
+            (-30.0, -1.0),
+        ];
+
+        single_octant_degrees.iter().for_each(|p| {
+            let arc = PartialAngleInterval::from_degrees(p.0, p.1);
+            assert_eq!(arc.split_into_octants_in_ccw_order()[0], arc);
+        })
+    }
+    #[test]
+    fn test_split_into_octants__more_than_one() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 90.0);
+        todo!()
+    }
+    #[test]
+    fn test_get_containing_octant__exact_octant() {
+        assert_eq!(
+            PartialAngleInterval::from_degrees(0.0, 45.0)
+                .octant()
+                .unwrap()
+                .number(),
+            0
+        );
+    }
+    #[test]
+    fn test_get_containing_octant__in_one() {
+        assert_eq!(
+            PartialAngleInterval::from_degrees(100.0, 120.0)
+                .octant()
+                .unwrap()
+                .number(),
+            2
+        );
+    }
+    #[test]
+    fn test_get_containing_octant__not_in_an_octant() {
+        assert!(PartialAngleInterval::from_degrees(0.0, 120.0)
+            .octant()
+            .is_none());
+    }
+    #[test]
+    fn test_get_containing_octant__tricky_case() {
+        assert!(PartialAngleInterval::from_degrees(-10.0, -20.0)
+            .octant()
+            .is_none());
+    }
+    #[test]
+    fn test_sub_interval__fully_within() {
+        assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
+            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(5.0, 25.0)));
+    }
+    #[test]
+    fn test_sub_interval__touch_one_edge() {
+        assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
+            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(0.0, 25.0)));
+    }
+    #[test]
+    fn test_sub_interval__exact_match() {
+        assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
+            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(0.0, 30.0)));
+    }
+    #[test]
+    fn test_sub_interval__tricky_wraparound() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 30.0);
+        assert_false!(arc.other_is_sub_interval_of_this(arc.complement()));
     }
 }

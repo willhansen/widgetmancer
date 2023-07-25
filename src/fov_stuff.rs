@@ -411,7 +411,13 @@ impl AngleBasedVisibleSegment {
             ..self.clone()
         }
     }
-    pub fn touched_squares(&self) -> StepSet {
+    pub fn get_touching_relative_squares(&self) -> StepSet {
+        for step in self
+            .visible_angle_interval
+            .touched_squares_going_outwards_and_ccw()
+        {
+            todo!()
+        }
         todo!()
     }
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
@@ -979,6 +985,7 @@ impl OctantFOVSquareSequenceIter {
         Octant::from_outward_and_across_directions(self.outward_dir, self.across_dir)
     }
 
+    // todo: change to implementation of QuarterTurnRotatable trait
     pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
         Self {
             outward_dir: self.outward_dir.rotated(quarter_turns),
@@ -2529,7 +2536,7 @@ mod tests {
     fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
         let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));
         assert_eq!(
-            seg.touched_squares(),
+            seg.get_touching_relative_squares(),
             (0..=5).map(|i| STEP_RIGHT * i).collect()
         )
     }

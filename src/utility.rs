@@ -224,6 +224,9 @@ impl Octant {
         };
         Self::new(octant_number)
     }
+    pub fn all_octants() -> impl Iterator<Item = Self> {
+        (0..8).map(|i| Octant(i))
+    }
 }
 
 #[derive(Clone, PartialEq, Copy)]
