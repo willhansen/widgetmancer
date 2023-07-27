@@ -25,7 +25,7 @@ use crate::graphics::drawable::{
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry};
-use crate::utility::angle_interval::PartialAngleInterval;
+use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
@@ -199,23 +199,32 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
     }
 }
 
-// TODO: change to enum with for fully visible, not visible, and partially visible
-pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
-
-#[derive(Clone, Constructor, Debug)]
-pub struct SquareVisibilityFromPointSource {
-    visible_before_first_angle: bool,
-    visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
-    point_source_from_square_center: WorldMove,
+impl QuarterTurnRotatable for Option<SquareVisibilityFromOneLargeShadow> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        self.map(|x| x.rotated(quarter_turns_anticlockwise))
+    }
 }
 
-impl SquareVisibilityFromPointSource {
+// TODO: change to enum with for fully visible, not visible, and partially visible.  Is currently None for fully visible, and Some(_) for partially visible
+pub type SquareVisibility = Option<SquareVisibilityFromOneLargeShadow>;
+
+#[derive(Clone, Constructor, Debug)]
+pub struct PartialSquareVisibilityFromPointSource {
+    visible_at_cw_extreme: bool,
+    visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
+    this_square_from_view_center: WorldStep,
+}
+
+impl PartialSquareVisibilityFromPointSource {
     pub fn is_fully_visible(&self) -> bool {
+        todo!()
+    }
+    pub fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self {
         todo!()
     }
 }
 
-impl QuarterTurnRotatable for SquareVisibilityFromPointSource {
+impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
@@ -423,8 +432,28 @@ impl AngleBasedVisibleSegment {
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
         todo!()
     }
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
+        todo!();
+        vec![STEP_ZERO].into_iter()
+    }
     pub fn to_square_visibilities(&self) -> StepVisibilityMap {
-        todo!()
+        // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
+        // Watch out for the wraparound case.
+        self.touched_squares_going_outwards_and_ccw()
+            .map(|rel_square| {
+                (
+                    rel_square,
+                    single_shadow_square_visibility_from_one_view_arc(
+                        self.visible_angle_interval,
+                        rel_square,
+                    ), //TODO: change shadow type
+                       // SquareVisibilityFromPointSource::from_single_visible_arc(
+                       //     rel_square,
+                       //     self.visible_angle_interval,
+                       // ),
+                )
+            })
+            .collect()
     }
 }
 
