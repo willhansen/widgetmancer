@@ -239,14 +239,11 @@ impl Octant {
     }
     pub fn from_angle_with_tie_break_toward_ccw(angle: Angle<f32>) -> Self {
         let normalized = angle.to_degrees() / 45.0;
-        let is_edge_case = normalized == normalized.floor();
+        // Use floor instead of truncation because want round towards neg inf, not zero.
         let octant = Octant::new(normalized.floor() as i32);
-        if is_edge_case {
-            octant.next_ccw()
-        } else {
-            octant
-        }
+        octant
     }
+
     pub fn next_cw(&self) -> Self {
         Self::new(self.number() - 1)
     }
