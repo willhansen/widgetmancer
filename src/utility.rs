@@ -228,12 +228,29 @@ impl Octant {
         (0..8).map(|i| Octant(i))
     }
     pub fn from_angle_with_tie_break_toward_cw(angle: Angle<f32>) -> Self {
-        todo!()
+        let normalized = angle.to_degrees() / 45.0;
+        let is_edge_case = normalized == normalized.floor();
+        let octant = Octant::new(normalized.floor() as i32);
+        if is_edge_case {
+            octant.next_cw()
+        } else {
+            octant
+        }
     }
     pub fn from_angle_with_tie_break_toward_ccw(angle: Angle<f32>) -> Self {
-        todo!()
+        let normalized = angle.to_degrees() / 45.0;
+        let is_edge_case = normalized == normalized.floor();
+        let octant = Octant::new(normalized.floor() as i32);
+        if is_edge_case {
+            octant.next_ccw()
+        } else {
+            octant
+        }
     }
     pub fn next_cw(&self) -> Self {
+        Self::new(self.number() - 1)
+    }
+    pub fn next_ccw(&self) -> Self {
         Self::new(self.number() + 1)
     }
 }
@@ -2775,26 +2792,35 @@ mod tests {
     }
     #[test]
     fn test_angle_to_octant() {
-        let deg_octcw_octccw = vec![
-            (0.0, -1, 0),
-            (1.0, 0, 0),
-            (-1.0, -1, -1),
-            (45.0, 0, 1),
-            (50.0, 1, 1),
-            (180.0, 3, 4),
-            (360.0, -1, 0),
+        // in format of degrees, octanct biased cw, octant biased ccw
+        let deg_octcw_octccw: Vec<(f32, [i32; 2])> = (0..9)
+            .flat_map(|i| {
+                vec![
+                    (45.0 * i as f32, [-1 + i, 0 + i]),
+                    (45.0 * i as f32 - 5.0, [-1 + i, -1 + i]),
+                    (45.0 * i as f32 + 5.0, [0 + i, 0 + i]),
+                ]
+            })
+            .collect_vec();
+
+        let fs: [(fn(Angle<f32>) -> Octant, &str); 2] = [
+            (Octant::from_angle_with_tie_break_toward_cw, "cw"),
+            (Octant::from_angle_with_tie_break_toward_ccw, "ccw"),
         ];
+
         deg_octcw_octccw
             .iter()
-            .for_each(|(degrees, octant_cw, octant_ccw)| {
-                assert_eq!(
-                    Octant::from_angle_with_tie_break_toward_cw(Angle::degrees(*degrees)),
-                    Octant::new(*octant_cw)
-                );
-                assert_eq!(
-                    Octant::from_angle_with_tie_break_toward_ccw(Angle::degrees(*degrees)),
-                    Octant::new(*octant_ccw)
-                );
+            .for_each(|(degrees, biased_octants)| {
+                fs.iter().enumerate().for_each(|(fi, (f, bias))| {
+                    assert_eq!(
+                        f(Angle::degrees(*degrees)),
+                        Octant::new(biased_octants[fi]),
+                        "angle: {}, correct_octant: {}, bias_for_this_function: {}",
+                        degrees,
+                        biased_octants[fi],
+                        bias
+                    )
+                })
             });
     }
 }
