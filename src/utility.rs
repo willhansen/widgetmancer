@@ -227,6 +227,15 @@ impl Octant {
     pub fn all_octants() -> impl Iterator<Item = Self> {
         (0..8).map(|i| Octant(i))
     }
+    pub fn from_angle_with_tie_break_toward_cw(angle: Angle<f32>) -> Self {
+        todo!()
+    }
+    pub fn from_angle_with_tie_break_toward_ccw(angle: Angle<f32>) -> Self {
+        todo!()
+    }
+    pub fn next_cw(&self) -> Self {
+        Self::new(self.number() + 1)
+    }
 }
 
 #[derive(Clone, PartialEq, Copy)]
@@ -2763,5 +2772,29 @@ mod tests {
                 (step, STEP_RIGHT).into()
             ])
         );
+    }
+    #[test]
+    fn test_angle_to_octant() {
+        let deg_octcw_octccw = vec![
+            (0.0, -1, 0),
+            (1.0, 0, 0),
+            (-1.0, -1, -1),
+            (45.0, 0, 1),
+            (50.0, 1, 1),
+            (180.0, 3, 4),
+            (360.0, -1, 0),
+        ];
+        deg_octcw_octccw
+            .iter()
+            .for_each(|(degrees, octant_cw, octant_ccw)| {
+                assert_eq!(
+                    Octant::from_angle_with_tie_break_toward_cw(Angle::degrees(*degrees)),
+                    Octant::new(*octant_cw)
+                );
+                assert_eq!(
+                    Octant::from_angle_with_tie_break_toward_ccw(Angle::degrees(*degrees)),
+                    Octant::new(*octant_ccw)
+                );
+            });
     }
 }

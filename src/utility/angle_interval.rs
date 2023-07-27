@@ -371,7 +371,7 @@ impl PartialAngleInterval {
 
         contains_other_edges && other_does_not_contain_these_edges
     }
-    pub fn other_is_sub_interval_of_this(&self, other: Self) -> bool {
+    pub fn other_is_permissive_sub_interval_of_this(&self, other: Self) -> bool {
         self.contains_or_touches_angle(other.anticlockwise_end)
             && self.contains_or_touches_angle(other.clockwise_end)
             && self.contains_or_touches_angle(other.center_angle())
@@ -419,17 +419,44 @@ impl PartialAngleInterval {
         0..4
     }
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
-        todo!()
+        if self.is_in_one_octant() {
+            return vec![*self];
+        }
+
+        let start_octant: Octant = Octant::from_angle_with_tie_break_toward_ccw(self.clockwise_end);
+        let end_octant: Octant =
+            Octant::from_angle_with_tie_break_toward_cw(self.anticlockwise_end);
+
+        let segment_in_first_octant = Self::new_interval(
+            self.clockwise_end,
+            Self::from_octant(start_octant).anticlockwise_end,
+        );
+
+        let segment_in_last_octant = Self::new_interval(
+            Self::from_octant(end_octant).clockwise_end,
+            self.anticlockwise_end,
+        );
+
+        let mut segments_to_return = vec![segment_in_first_octant];
+
+        let mut oct = start_octant.next_cw();
+        while oct != end_octant {
+            segments_to_return.push(PartialAngleInterval::from_octant(oct));
+            oct = oct.next_cw();
+        }
+        segments_to_return.push(segment_in_last_octant);
+
+        segments_to_return
     }
     fn touched_rel_squares_going_outwards_in_one_octant(&self) -> impl Iterator<Item = WorldStep> {
-        assert!(self.in_one_octant());
+        assert!(self.is_in_one_octant());
         todo!();
         ORTHOGONAL_STEPS.into_iter()
     }
     fn touched_rel_squares_going_outwards_in_one_octant_with_placeholders(
         &self,
     ) -> impl Iterator<Item = Option<WorldStep>> + '_ {
-        assert!(self.in_one_octant());
+        assert!(self.is_in_one_octant());
         OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap()).map(|step| {
             if self.partially_or_fully_overlaps_without_exactly_touching(
                 Self::from_relative_square(step),
@@ -440,12 +467,13 @@ impl PartialAngleInterval {
             }
         })
     }
-    fn in_one_octant(&self) -> bool {
+    fn is_in_one_octant(&self) -> bool {
         self.octant().is_some()
     }
     fn octant(&self) -> Option<Octant> {
-        Octant::all_octants()
-            .find(|octant| Self::from_octant(*octant).other_is_sub_interval_of_this(*self))
+        Octant::all_octants().find(|octant| {
+            Self::from_octant(*octant).other_is_permissive_sub_interval_of_this(*self)
+        })
     }
 }
 
@@ -1307,8 +1335,25 @@ mod tests {
     }
     #[test]
     fn test_split_into_octants__more_than_one() {
-        let arc = PartialAngleInterval::from_degrees(0.0, 90.0);
-        todo!()
+        let arc = PartialAngleInterval::from_degrees(0.0, 91.0);
+        let parts = arc.split_into_octants_in_ccw_order();
+        assert_eq!(parts.len(), 3);
+        assert_about_eq!(parts[0].clockwise_end().to_degrees(), 0.0);
+        assert_about_eq!(parts[0].anticlockwise_end().to_degrees(), 45.0);
+        assert_about_eq!(parts[1].clockwise_end().to_degrees(), 45.0);
+        assert_about_eq!(parts[1].anticlockwise_end().to_degrees(), 90.0);
+        assert_about_eq!(parts[2].clockwise_end().to_degrees(), 90.0);
+        assert_about_eq!(parts[2].anticlockwise_end().to_degrees(), 91.0);
+    }
+    #[test]
+    fn test_split_into_octants__all_the_way_around_case() {
+        let arc = PartialAngleInterval::from_degrees(10.0, 5.0);
+        let parts = arc.split_into_octants_in_ccw_order();
+        assert_eq!(parts.len(), 9);
+        assert_about_eq!(parts[0].clockwise_end().to_degrees(), 10.0);
+        assert_about_eq!(parts[0].anticlockwise_end().to_degrees(), 45.0);
+        assert_about_eq!(parts[8].clockwise_end().to_degrees(), 0.0);
+        assert_about_eq!(parts[8].anticlockwise_end().to_degrees(), 5.0);
     }
     #[test]
     fn test_get_containing_octant__exact_octant() {
@@ -1345,21 +1390,27 @@ mod tests {
     #[test]
     fn test_sub_interval__fully_within() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(5.0, 25.0)));
+            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+                5.0, 25.0
+            )));
     }
     #[test]
     fn test_sub_interval__touch_one_edge() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(0.0, 25.0)));
+            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+                0.0, 25.0
+            )));
     }
     #[test]
     fn test_sub_interval__exact_match() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_sub_interval_of_this(PartialAngleInterval::from_degrees(0.0, 30.0)));
+            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+                0.0, 30.0
+            )));
     }
     #[test]
     fn test_sub_interval__tricky_wraparound() {
         let arc = PartialAngleInterval::from_degrees(0.0, 30.0);
-        assert_false!(arc.other_is_sub_interval_of_this(arc.complement()));
+        assert_false!(arc.other_is_permissive_sub_interval_of_this(arc.complement()));
     }
 }
