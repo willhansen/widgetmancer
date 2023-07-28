@@ -13,12 +13,14 @@ use termion::cursor::Left;
 
 use crate::fov_stuff::{OctantFOVSquareSequenceIter, SquareVisibilityFromOneLargeShadow};
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
+use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
     RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AngleInterval {
     Empty,
@@ -409,14 +411,18 @@ impl PartialAngleInterval {
             self.anticlockwise_end + d_angle,
         )
     }
-    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator {
-        self.split_into_octants_in_ccw_order()
-            .into_iter()
-            .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant())
-            .collect_vec();
-
-        todo!();
-        0..4
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
+        round_robin(
+            self.split_into_octants_in_ccw_order()
+                .into_iter()
+                .map(|arc| {
+                    arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders()
+                        .collect_vec()
+                        .into_iter()
+                })
+                .collect_vec(),
+        )
+        .filter_map(|maybe_step| maybe_step)
     }
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
         if self.is_in_one_octant() {

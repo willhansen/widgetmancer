@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::iter::zip;
 use std::mem;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::string::ToString;
@@ -35,6 +36,7 @@ use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
 pub mod coordinate_frame_conversions;
+pub mod round_robin_iterator;
 
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;

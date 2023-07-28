@@ -199,14 +199,13 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
     }
 }
 
-impl QuarterTurnRotatable for Option<SquareVisibilityFromOneLargeShadow> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        self.map(|x| x.rotated(quarter_turns_anticlockwise))
-    }
+pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
+    fn is_fully_visible(&self) -> bool;
+    fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self;
 }
 
-// TODO: change to enum with for fully visible, not visible, and partially visible.  Is currently None for fully visible, and Some(_) for partially visible
-pub type SquareVisibility = Option<SquareVisibilityFromOneLargeShadow>;
+// TODO: change to enum with for fully visible, not visible, and partially visible
+pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
 
 #[derive(Clone, Constructor, Debug)]
 pub struct PartialSquareVisibilityFromPointSource {
@@ -432,9 +431,23 @@ impl AngleBasedVisibleSegment {
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
         todo!()
     }
-    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
-        todo!();
-        vec![STEP_ZERO].into_iter()
+    fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
+        todo!()
+    }
+    fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
+        todo!()
+    }
+    fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
+        todo!()
+    }
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
+        self.visible_angle_interval
+            .touched_squares_going_outwards_and_ccw()
+            .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
+            .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
+            .take_while(|&rel_square| {
+                !self.rel_square_is_past_furthest_part_of_end_fence(rel_square)
+            })
     }
     pub fn to_square_visibilities(&self) -> StepVisibilityMap {
         // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
@@ -446,12 +459,14 @@ impl AngleBasedVisibleSegment {
                     single_shadow_square_visibility_from_one_view_arc(
                         self.visible_angle_interval,
                         rel_square,
-                    ), //TODO: change shadow type
-                       // SquareVisibilityFromPointSource::from_single_visible_arc(
-                       //     rel_square,
-                       //     self.visible_angle_interval,
-                       // ),
+                    )
+                    .unwrap(),
                 )
+                //TODO: change shadow type
+                // SquareVisibilityFromPointSource::from_single_visible_arc(
+                //     rel_square,
+                //     self.visible_angle_interval,
+                // ),
             })
             .collect()
     }
@@ -1262,8 +1277,9 @@ fn single_shadow_square_visibility_from_one_view_arc(
     visibility_arc: PartialAngleInterval,
     square_relative_to_center: WorldStep,
 ) -> Option<SquareVisibilityFromOneLargeShadow> {
+    // Returns None if not visible
     let square_arc = PartialAngleInterval::from_relative_square(square_relative_to_center);
-    assert!(visibility_arc.touches_or_overlaps(square_arc));
+    assert!(visibility_arc.touches_or_overlaps(square_arc)); // This invalidates the None return case
 
     let shadow_arc = visibility_arc.complement();
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
