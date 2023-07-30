@@ -1594,7 +1594,7 @@ mod tests {
     #[test]
     fn test_fov_square_sequence__detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
-        let correct_sequence = [
+        let correct_sequence = vec![
             vec2(0, 0),
             vec2(0, 1),
             vec2(1, 1),
@@ -1603,7 +1603,10 @@ mod tests {
             vec2(2, 2),
             vec2(0, 3),
         ];
-        assert_eq!(sequence.next_chunk::<7>().unwrap(), correct_sequence);
+        assert_eq!(
+            sequence.take(correct_sequence.len()).collect_vec(),
+            correct_sequence
+        );
     }
 
     #[test]

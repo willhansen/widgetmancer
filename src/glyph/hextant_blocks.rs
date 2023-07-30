@@ -56,11 +56,16 @@ pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     let before_half_right = '🬧';
     let after_half_right = '🬨';
 
+    const BYTE_FOR_SPACE: u8 = hextant_character_to_byte(SPACE);
+    const BYTE_FOR_LEFT_HALF_BLOCK: u8 = hextant_character_to_byte(LEFT_HALF_BLOCK);
+    const BYTE_FOR_RIGHT_HALF_BLOCK: u8 = hextant_character_to_byte(RIGHT_HALF_BLOCK);
+    const BYTE_FOR_FULL_BLOCK: u8 = hextant_character_to_byte(FULL_BLOCK);
+
     match as_binary {
-        const { hextant_character_to_binary(SPACE) } => SPACE,
-        const { hextant_character_to_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
-        const { hextant_character_to_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
-        const { hextant_character_to_binary(FULL_BLOCK) } => FULL_BLOCK,
+        BYTE_FOR_SPACE => SPACE,
+        BYTE_FOR_LEFT_HALF_BLOCK => LEFT_HALF_BLOCK,
+        BYTE_FOR_RIGHT_HALF_BLOCK => RIGHT_HALF_BLOCK,
+        BYTE_FOR_FULL_BLOCK => FULL_BLOCK,
         _ => {
             let unadjusted_value = FIRST_HEXTANT as u32 + as_binary as u32;
             let offset = if unadjusted_value
@@ -79,7 +84,7 @@ pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     }
 }
 
-fn binary_to_hextant_char(binary: u8) -> char {
+fn byte_to_hextant_char(binary: u8) -> char {
     hextant_array_to_char(binary_to_hextant_array(binary))
 }
 
@@ -139,7 +144,7 @@ fn binary_to_hextant_array(mut binary: u8) -> HextantArray {
     out
 }
 
-const fn hextant_character_to_binary(hextant_character: char) -> u8 {
+const fn hextant_character_to_byte(hextant_character: char) -> u8 {
     assert!(char_is_hextant(hextant_character));
     let before_half_left = '🬓';
     let before_half_right = '🬧';
@@ -165,13 +170,13 @@ const fn hextant_character_to_binary(hextant_character: char) -> u8 {
 pub fn combine_hextant_characters(a: char, b: char) -> char {
     assert!(char_is_hextant(a));
     assert!(char_is_hextant(b));
-    binary_to_hextant_char(hextant_character_to_binary(a) | hextant_character_to_binary(b))
+    byte_to_hextant_char(hextant_character_to_byte(a) | hextant_character_to_byte(b))
 }
 
 fn hextant_character_to_value_it_damn_well_should_have(character: char) -> u32 {
     // If its empty, full, and horizontal halfblocks weren't already taken
     assert!(char_is_hextant(character));
-    FIRST_HEXTANT as u32 + hextant_character_to_binary(character) as u32
+    FIRST_HEXTANT as u32 + hextant_character_to_byte(character) as u32
 }
 
 fn local_hextant_squares_to_char(local_hextant_squares: HashSet<LocalHextantSquare>) -> char {

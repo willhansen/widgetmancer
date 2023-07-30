@@ -1208,11 +1208,24 @@ pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
 
 // trait alias
-pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare> = Copy
+pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
+    Copy
     + Add<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<AbsOrRelWorldSquare, Output = WorldStep>
-    + Zero;
+    + Zero
+{
+}
+
+// TODO: not have this huge type bound exist twice
+impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
+    T: Copy
+        + Add<WorldStep, Output = AbsOrRelWorldSquare>
+        + Sub<WorldStep, Output = AbsOrRelWorldSquare>
+        + Sub<AbsOrRelWorldSquare, Output = WorldStep>
+        + Zero
+{
+}
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where

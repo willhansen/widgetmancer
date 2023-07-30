@@ -791,7 +791,8 @@ impl Game {
             kill_squares.insert(point2(x, y));
         }
         kill_squares.into_iter().for_each(|square| {
-            if let Some(piece) = self.get_piece_at(square) && piece.faction != self.death_cube_faction {
+            let maybe_piece = self.get_piece_at(square);
+            if maybe_piece.is_some() && maybe_piece.unwrap().faction != self.death_cube_faction {
                 self.capture_piece_at(square);
             } else if self.is_player_at(square) {
                 self.capture_piece_at(square);
@@ -1127,7 +1128,11 @@ impl Game {
 
         for square in found_incubation_squares {
             let faction = self.get_piece_at(square + STEP_UP).unwrap().faction;
-            if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
+            let maybe_incubation = self.incubating_pawns.get_mut(&square);
+            if maybe_incubation
+                .is_some_and(|existing_incubation| existing_incubation.faction == faction)
+            {
+                let existing_incubation = maybe_incubation.unwrap();
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
                     self.place_piece(Piece::new(OmniDirectionalPawn, faction), square);
