@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 approx = "0.5.1"
 derive_more = "0.99.17"
-device_query = "1.1.1"
 dyn-clone = "1.0.9"
 enum-as-inner = "0.6.0"
 euclid = "0.22.7"
@@ -23,10 +22,8 @@ strum_macros = "0.25.1"
 termion = "2.0.1"
 priority-queue = "1.2.3"
 itertools = "0.11.0"
-unordered-pair = "0.2.4"
 shrinkwraprs = "0.3.0"
 getset = "0.1.2"
-backtrace-on-stack-overflow = "0.3.0"
 ambassador = "0.3.5"
 
 [dev-dependencies]
