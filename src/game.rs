@@ -117,8 +117,8 @@ impl FloatingHunterDrone {
     }
 }
 
-pub const CONVEYOR_BELT_MOVEMENT_PERIOD: Duration = Duration::from_secs_f32(2.0);
-pub const CONVEYOR_BELT_VISUAL_PERIOD: Duration = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(2.0);
+pub const CONVEYOR_BELT_MOVEMENT_PERIOD_S: f32 = 2.0;
+pub const CONVEYOR_BELT_VISUAL_PERIOD_S: f32 = CONVEYOR_BELT_MOVEMENT_PERIOD_S * 2.0;
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum GridEntity {
@@ -617,7 +617,7 @@ impl Game {
             .draw_floor_push_arrows(&self.floor_push_arrows);
 
         let global_phase_offset: f32 =
-            self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_VISUAL_PERIOD.as_secs_f32();
+            self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_VISUAL_PERIOD_S;
         self.graphics
             .draw_conveyor_belts(&self.conveyor_belts, global_phase_offset);
 
@@ -956,10 +956,10 @@ impl Game {
     }
 
     fn tick_conveyor_belts(&mut self, delta: Duration) {
-        let prev_conveyor_periods_since_start = self.world_time_since_start().as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32();
+        let prev_conveyor_periods_since_start =
+            self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_MOVEMENT_PERIOD_S;
         let new_conveyor_periods_since_start = delta.as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
+            / CONVEYOR_BELT_MOVEMENT_PERIOD_S
             + prev_conveyor_periods_since_start;
 
         let just_finished_full_movement_period =
@@ -1130,6 +1130,7 @@ impl Game {
             let faction = self.get_piece_at(square + STEP_UP).unwrap().faction;
             let maybe_incubation = self.incubating_pawns.get_mut(&square);
             if maybe_incubation
+                .as_ref()
                 .is_some_and(|existing_incubation| existing_incubation.faction == faction)
             {
                 let existing_incubation = maybe_incubation.unwrap();
@@ -2043,7 +2044,7 @@ impl Game {
         self.conveyor_belts.insert(square, dir.into());
     }
     pub fn conveyor_belt_speed() -> f32 {
-        1.0 / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
+        1.0 / CONVEYOR_BELT_MOVEMENT_PERIOD_S
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
@@ -4596,16 +4597,25 @@ mod tests {
 
         assert!(glyphs1.get_solid_color().is_some());
 
-        let glyphs2 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(8.0));
+        let glyphs2 = advance_and_get_glyphs(
+            &mut game,
+            Duration::from_secs_f32(CONVEYOR_BELT_VISUAL_PERIOD_S / 8.0),
+        );
 
         assert_ne!(glyphs1, glyphs2);
         assert_eq!(glyphs2.chars(), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
 
-        let glyphs2_5 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
+        let glyphs2_5 = advance_and_get_glyphs(
+            &mut game,
+            Duration::from_secs_f32(CONVEYOR_BELT_VISUAL_PERIOD_S / 2.0),
+        );
 
         assert_eq!(glyphs2_5.chars(), [LEFT_HALF_BLOCK, SPACE]);
 
-        let glyphs3 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
+        let glyphs3 = advance_and_get_glyphs(
+            &mut game,
+            Duration::from_secs_f32(CONVEYOR_BELT_VISUAL_PERIOD_S / 2.0),
+        );
 
         assert_eq!(glyphs2, glyphs3);
     }
@@ -4619,7 +4629,9 @@ mod tests {
         game.place_conveyor_belt(square, dir.into());
 
         assert_eq!(game.player_square(), square);
-        game.tick_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
+        game.tick_realtime_effects(Duration::from_secs_f32(
+            CONVEYOR_BELT_MOVEMENT_PERIOD_S * 1.1,
+        ));
         assert_eq!(game.player_square(), square + dir);
     }
     #[test]
@@ -4631,7 +4643,9 @@ mod tests {
         game.place_conveyor_belt(square, dir.into());
 
         assert!(game.widgets.contains_key(&square));
-        game.tick_realtime_effects(CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(1.1));
+        game.tick_realtime_effects(Duration::from_secs_f32(
+            CONVEYOR_BELT_MOVEMENT_PERIOD_S * 1.1,
+        ));
         assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
@@ -4646,7 +4660,7 @@ mod tests {
         let pos = game.floating_hunter_drones.iter().next().unwrap().position;
         assert!((pos - square.to_f32()).length() < 0.001);
 
-        let dt = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(0.4635);
+        let dt = Duration::from_secs_f32(CONVEYOR_BELT_MOVEMENT_PERIOD_S * 0.4635);
         game.tick_realtime_effects(dt);
 
         let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
@@ -4666,7 +4680,7 @@ mod tests {
         let pos = game.death_cubes.get(0).unwrap().position;
         assert!((pos - square.to_f32()).length() < 0.001);
 
-        let dt = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(0.4635);
+        let dt = Duration::from_secs_f32(CONVEYOR_BELT_MOVEMENT_PERIOD_S * 0.4635);
         game.tick_realtime_effects(dt);
 
         let new_pos = game.death_cubes.get(0).unwrap().position;

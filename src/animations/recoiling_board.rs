@@ -26,13 +26,11 @@ pub struct RecoilingBoardAnimation {
 }
 
 impl RecoilingBoardAnimation {
-    pub(crate) const TIME_TO_PEAK: Duration = Duration::from_secs_f32(0.1);
-    const RECOIL_RELAX_DURATION: Duration =
-        Duration::from_secs_f32(RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32() * 3.0);
-    pub(crate) const RECOIL_DURATION: Duration = Duration::from_secs_f32(
-        RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
-            + RecoilingBoardAnimation::RECOIL_RELAX_DURATION.as_secs_f32(),
-    );
+    pub(crate) const TIME_TO_PEAK_S: f32 = 0.1;
+    const RECOIL_RELAX_DURATION_S: f32 = RecoilingBoardAnimation::TIME_TO_PEAK_S * 3.0;
+    pub(crate) const RECOIL_DURATION_S: f32 =
+        RecoilingBoardAnimation::TIME_TO_PEAK_S + RecoilingBoardAnimation::RECOIL_RELAX_DURATION_S;
+
     pub(crate) const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(1.0);
 
     pub fn new(
@@ -81,19 +79,19 @@ impl RecoilingBoardAnimation {
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32();
-        if age < RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32() {
+        let fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION_S;
+        if age < RecoilingBoardAnimation::TIME_TO_PEAK_S {
             RecoilingBoardAnimation::recoil_start(
                 age,
                 RecoilingBoardAnimation::RECOIL_DISTANCE.0,
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
+                RecoilingBoardAnimation::TIME_TO_PEAK_S,
             )
         } else {
             RecoilingBoardAnimation::recoil_end(
                 age,
                 RecoilingBoardAnimation::RECOIL_DISTANCE.0,
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
-                RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+                RecoilingBoardAnimation::TIME_TO_PEAK_S,
+                RecoilingBoardAnimation::RECOIL_DURATION_S,
             )
         }
     }
@@ -104,7 +102,7 @@ impl Animation for RecoilingBoardAnimation {
         self.start_time
     }
     fn duration(&self) -> Duration {
-        RecoilingBoardAnimation::RECOIL_DURATION
+        Duration::from_secs_f32(RecoilingBoardAnimation::RECOIL_DURATION_S)
     }
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {

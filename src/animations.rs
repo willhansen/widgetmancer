@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
-        let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32();
+        let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK_S;
         let mut prev_d = 0.0;
         let mut t = 0.0;
         loop {
@@ -235,7 +235,7 @@ mod tests {
     fn test_recoil_function__hit_peak() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
-                RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
+                RecoilingBoardAnimation::TIME_TO_PEAK_S
             ),
             RecoilingBoardAnimation::RECOIL_DISTANCE.0
         );
@@ -245,7 +245,7 @@ mod tests {
     fn test_recoil_function__flat_peak() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
-            RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
+            RecoilingBoardAnimation::TIME_TO_PEAK_S,
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {slope}");
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn test_recoil_function__fully_relax() {
         let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
-            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+            RecoilingBoardAnimation::RECOIL_DURATION_S,
         );
         assert!(height.abs() < 0.01, "height: {}", height);
     }
@@ -263,7 +263,7 @@ mod tests {
     fn test_recoil_function__relax_flat() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
-            RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
+            RecoilingBoardAnimation::RECOIL_DURATION_S,
             0.0001,
         );
         assert!(slope.abs() < 0.01, "slope: {}", slope);

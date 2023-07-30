@@ -38,7 +38,7 @@ use crate::fov_stuff::{
     FieldOfView, PositionedSquareVisibilityInFov, SquareVisibilityFromOneLargeShadow,
 };
 use crate::game::{
-    DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD,
+    DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD_S,
     HUNTER_DRONE_SIGHT_RANGE,
 };
 use crate::glyph::braille::count_braille_dots;
