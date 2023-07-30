@@ -1,6 +1,4 @@
 //#![allow(non_snake_case)]
-#![feature(is_sorted)]
-#![feature(drain_filter)]
 //#![allow(warnings)]
 #![feature(trait_upcasting)]
 #![feature(duration_consts_float)]

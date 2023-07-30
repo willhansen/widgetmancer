@@ -576,7 +576,13 @@ impl AngleIntervalSet {
     }
 
     fn is_valid(&self) -> bool {
-        let sorted = self.intervals.is_sorted_by_key(|i| i.clockwise_end);
+        let sorted_version = self
+            .intervals
+            .clone()
+            .into_iter()
+            .sorted_by_key(|i| OrderedFloat(i.clockwise_end.radians))
+            .collect_vec();
+        let sorted = (self.intervals == sorted_version);
         if !sorted {
             return false;
         }

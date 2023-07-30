@@ -610,9 +610,8 @@ impl Graphics {
                 self.board_animation = None;
             }
         }
-        self.active_animations
-            .drain_filter(|x| x.finished_at_time(time));
-        self.selectors.drain_filter(|x| x.finished_at_time(time));
+        self.active_animations.retain(|x| !x.finished_at_time(time));
+        self.selectors.retain(|x| !x.finished_at_time(time));
     }
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {

@@ -50,6 +50,9 @@ pub trait FloatingEntityTrait {
     fn set_position(&mut self, position: WorldPoint);
     fn velocity(&self) -> WorldMove;
     fn set_velocity(&mut self, velocity: WorldMove);
+    fn in_square(&self, square: WorldSquare) -> bool {
+        world_point_to_world_square(self.position()) == square
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Copy, From, Delegate)]
@@ -426,16 +429,20 @@ impl Game {
     ) -> Vec<FloatingEntityEnum> {
         let hunter_drones_from_square = self
             .floating_hunter_drones
-            .drain_filter(|drone| world_point_to_world_square(drone.position) == square)
-            .map(|drone| FloatingEntityEnum::FloatingHunterDrone(drone))
+            .iter()
+            .filter(|drone| drone.in_square(square))
+            .map(|drone| FloatingEntityEnum::FloatingHunterDrone(*drone))
             .collect_vec();
         let death_cubes_from_square = self
             .death_cubes
-            .drain_filter(|cube: &mut DeathCube| {
-                world_point_to_world_square(cube.position) == square
-            })
-            .map(|cube| FloatingEntityEnum::DeathCube(cube))
+            .iter()
+            .filter(|cube| world_point_to_world_square(cube.position) == square)
+            .map(|cube| FloatingEntityEnum::DeathCube(*cube))
             .collect_vec();
+
+        // and delete
+        self.floating_hunter_drones.retain(|f| !f.in_square(square));
+        self.death_cubes.retain(|f| !f.in_square(square));
 
         [hunter_drones_from_square, death_cubes_from_square].concat()
     }
