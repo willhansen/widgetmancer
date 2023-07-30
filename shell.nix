@@ -1,7 +1,11 @@
-{ pkgs ? import <nixpkgs> {} }:
+let 
+  pkgs = import <nixpkgs> {};
+  unstable = import <nixos-unstable> {};
+in
+{}:
   pkgs.mkShell rec {
-    buildInputs = with pkgs; [
-      cargo
-      rustc
+    buildInputs = [
+      unstable.pkgs.cargo
+      unstable.pkgs.rustc
     ];
   }
