@@ -4,8 +4,9 @@ let
 in
 {}:
   pkgs.mkShell rec {
-    buildInputs = [
-      unstable.pkgs.cargo
-      unstable.pkgs.rustc
+    buildInputs = with unstable.pkgs; [
+      cargo
+      rustc
+      rust-analyzer
     ];
   }
