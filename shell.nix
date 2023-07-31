@@ -8,5 +8,7 @@ in
       cargo
       rustc
       rust-analyzer
+      clippy
+      lldb
     ];
   }
