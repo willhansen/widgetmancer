@@ -22,7 +22,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::rasterized_field_of_view::PositionedVisibilityOfSquare;
+use crate::fov_stuff::rasterized_field_of_view::{
+    PositionedVisibilityOfSquare, RasterizedFieldOfView,
+};
 use crate::fov_stuff::square_visibility::SquareVisibilityFunctions;
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
 use crate::glyph::glyph_constants::{
@@ -680,7 +682,7 @@ impl Game {
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
             self.graphics
-                .load_screen_buffer_from_fov(self.rasterized_player_field_of_view());
+                .load_screen_buffer_from_fov(&self.rasterized_player_field_of_view());
         } else {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
@@ -2366,7 +2368,7 @@ impl Game {
             .visibilities_of_relative_square(target_square_relative_to_player)
             .is_empty()
     }
-    fn rasterized_player_field_of_view(&self) -> square_visibility::RelativeSquareVisibilityMap {
+    fn rasterized_player_field_of_view(&self) -> RasterizedFieldOfView {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,

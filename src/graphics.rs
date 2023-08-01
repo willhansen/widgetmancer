@@ -34,6 +34,9 @@ use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
+use crate::fov_stuff::rasterized_field_of_view::{
+    PositionedVisibilityOfSquare, RasterizedFieldOfView,
+};
 use crate::fov_stuff::FieldOfView;
 use crate::game::{
     DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD_S,
@@ -53,9 +56,10 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
-    reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
-    OrthogonalWorldStep, QuarterTurnRotatable, WorldLine, STEP_RIGHT,
+    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, king_distance,
+    number_to_color, number_to_hue_rotation, reversed, square_is_odd, squares_on_board,
+    unit_vector_from_angle, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, WorldLine,
+    STEP_RIGHT,
 };
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,
@@ -248,10 +252,11 @@ impl Graphics {
 
     pub fn maybe_drawable_for_rel_square_of_fov(
         &self,
-        fov: &FieldOfView,
+        rasterized_fov: &RasterizedFieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
-        fov.drawable_at_relative_square(
+        Self::drawable_at_relative_square(
+            rasterized_fov,
             rel_square,
             Some(&self.draw_buffer),
             self.tint_portals,
@@ -259,15 +264,20 @@ impl Graphics {
         )
     }
 
-    pub fn load_screen_buffer_from_fov(&mut self, field_of_view: FieldOfView) {
+    pub fn load_screen_buffer_from_fov(
+        &mut self,
+        rasterized_field_of_view: &RasterizedFieldOfView,
+    ) {
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
                 .screen
                 .screen_buffer_square_to_world_square(screen_square);
 
-            let relative_world_square = world_square - field_of_view.root_square();
-            let maybe_unrotated =
-                self.maybe_drawable_for_rel_square_of_fov(&field_of_view, relative_world_square);
+            let relative_world_square = world_square - rasterized_field_of_view.root_square();
+            let maybe_unrotated = self.maybe_drawable_for_rel_square_of_fov(
+                &rasterized_field_of_view,
+                relative_world_square,
+            );
 
             if let Some(unrotated) = maybe_unrotated {
                 let rotated: DrawableEnum = unrotated.rotated(-self.screen.rotation());
@@ -636,6 +646,91 @@ impl Graphics {
             .into_iter()
             .map(|square| SelectorAnimation::new(square))
             .collect();
+    }
+
+    fn sorted_by_draw_order(
+        visibilities: Vec<PositionedVisibilityOfSquare>,
+    ) -> Vec<PositionedVisibilityOfSquare> {
+        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
+        visibilities
+            .into_iter()
+            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
+            .collect_vec()
+    }
+
+    pub(crate) fn drawable_at_relative_square(
+        rasterized_fov: &RasterizedFieldOfView,
+        relative_square: WorldStep,
+        maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
+        tint_portals: bool,
+        render_portals_with_line_of_sight: bool,
+    ) -> Option<DrawableEnum> {
+        let visibilities: Vec<PositionedVisibilityOfSquare> =
+            Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
+                rasterized_fov.visibilities_of_relative_square(relative_square)
+            } else {
+                rasterized_fov
+                    .visibilities_of_absolute_square(rasterized_fov.root_square() + relative_square)
+            });
+        let maybe_drawable: Option<DrawableEnum> = visibilities
+            .iter()
+            .filter(|&vis: &&PositionedVisibilityOfSquare| {
+                if let Some(drawable_map) = maybe_drawable_map {
+                    drawable_map.contains_key(&vis.absolute_square())
+                } else {
+                    true
+                }
+            })
+            .map(|positioned_visibility: &PositionedVisibilityOfSquare| {
+                let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
+                    drawable_map
+                        .get(&positioned_visibility.absolute_square())
+                        .unwrap()
+                        .rotated(-positioned_visibility.portal_rotation())
+                } else {
+                    // SolidColorDrawable::new(GREY).to_enum()
+                    // SolidColorDrawable::new(number_to_hue_rotation(
+                    //     better_angle_from_x_axis(
+                    //         (positioned_visibility.absolute_square - rasterized_fov.root_square()).to_f32(),
+                    //     )
+                    //     .to_degrees(),
+                    //     360.0,
+                    // ))
+                    // .to_enum()
+                    SolidColorDrawable::new(number_to_hue_rotation(
+                        king_distance(
+                            positioned_visibility.absolute_square() - rasterized_fov.root_square(),
+                        ) as f32,
+                        10.0,
+                    ))
+                    .to_enum()
+                };
+                if !positioned_visibility
+                    .square_visibility_in_absolute_frame()
+                    .is_fully_visible()
+                {
+                    drawable = DrawableEnum::PartialVisibility(
+                        PartialVisibilityDrawable::from_shadowed_drawable(
+                            &drawable,
+                            if render_portals_with_line_of_sight {
+                                positioned_visibility.square_visibility_in_relative_frame()
+                            } else {
+                                positioned_visibility.square_visibility_in_absolute_frame()
+                            },
+                        ),
+                    )
+                };
+                if tint_portals {
+                    drawable = drawable.tinted(
+                        RED,
+                        //number_to_color(positioned_visibility.portal_depth()),
+                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
+                    );
+                }
+                drawable
+            })
+            .reduce(|bottom, top| top.drawn_over(&bottom));
+        maybe_drawable
     }
 }
 
