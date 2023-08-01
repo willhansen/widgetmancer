@@ -1,8 +1,16 @@
+pub mod angle_based_visible_segment;
+pub mod square_visibility;
+
 use std::backtrace::Backtrace;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
+use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
+use crate::fov_stuff::square_visibility::{
+    PositionedSquareVisibilityInFov, SquareVisibility, SquareVisibilityFromOneLargeShadow,
+    SquareVisibilityFunctions, SquareVisibilityMap,
+};
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
 use getset::CopyGetters;
@@ -30,464 +38,6 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
-
-pub trait SquareVisibilityTrait: QuarterTurnRotatable {
-    fn is_fully_visible(&self) -> bool;
-    fn is_at_least_partially_visible(&self) -> bool;
-    fn new_fully_visible() -> Self;
-    fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
-    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Box<Self>>;
-    fn top_half_visible() -> Self;
-    fn bottom_half_visible() -> Self;
-    fn combined_increasing_visibility(&self, other: &Self) -> Self;
-    fn as_string(&self) -> String;
-    fn is_about_complementary_to(&self, other: Self) -> bool;
-    fn is_visually_complementary_to(&self, other: Self) -> bool;
-}
-
-#[derive(Clone, Copy, Constructor)]
-pub struct SquareVisibilityFromOneLargeShadow {
-    // TODO: have more than one half plane (two?)
-    visible_portion: Option<LocalSquareHalfPlane>,
-}
-
-impl SquareVisibilityFromOneLargeShadow {
-    pub fn is_fully_visible(&self) -> bool {
-        self.visible_portion.is_none()
-    }
-    pub fn is_nearly_but_not_fully_visible(&self, tolerance: f32) -> bool {
-        self.visible_portion
-            .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
-    }
-    pub fn is_at_least_partially_visible(&self) -> bool {
-        self.visible_portion.is_some_and(|visible_half_plane| {
-            visible_half_plane.at_least_partially_covers_unit_square()
-        })
-    }
-    pub fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
-        self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
-    }
-
-    pub fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
-        self.visible_portion
-    }
-
-    pub fn new_fully_visible() -> Self {
-        SquareVisibilityFromOneLargeShadow {
-            visible_portion: None,
-        }
-    }
-
-    pub fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
-        assert!(visible_portion.at_least_partially_covers_unit_square());
-        assert!(!visible_portion.fully_covers_unit_square());
-        SquareVisibilityFromOneLargeShadow {
-            visible_portion: Some(visible_portion),
-        }
-    }
-    pub fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Self> {
-        if visible_portion.fully_covers_unit_square() {
-            Some(Self::new_fully_visible())
-        } else if visible_portion.at_least_partially_covers_unit_square() {
-            Some(Self::new_partially_visible(visible_portion))
-        } else {
-            None
-        }
-    }
-
-    fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
-        // todo: may be backwards
-        shadow_direction = standardize_angle(shadow_direction);
-        Self::new_partially_visible(HalfPlane::from_line_and_point_on_half_plane(
-            Line::new(
-                point2(0.0, 0.0),
-                rotated_n_quarter_turns_counter_clockwise(
-                    unit_vector_from_angle(shadow_direction),
-                    1,
-                )
-                .to_point()
-                .cast_unit(),
-            ),
-            unit_vector_from_angle(shadow_direction)
-                .to_point()
-                .cast_unit(),
-        ))
-    }
-    pub fn top_half_visible() -> Self {
-        Self::half_visible(Angle::degrees(270.0))
-    }
-    pub fn bottom_half_visible() -> Self {
-        Self::half_visible(Angle::degrees(90.0))
-    }
-    pub fn combined_increasing_visibility(&self, other: &Self) -> Self {
-        if self.is_fully_visible() || other.is_fully_visible() {
-            Self::new_fully_visible()
-        } else if self
-            .visible_portion
-            .unwrap()
-            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
-        {
-            Self::new_fully_visible()
-        } else {
-            let depth_a = self
-                .visible_portion
-                .unwrap()
-                .depth_of_point_in_half_plane(point2(0.0, 0.0));
-            let depth_b = other
-                .visible_portion
-                .unwrap()
-                .depth_of_point_in_half_plane(point2(0.0, 0.0));
-
-            if depth_a > depth_b {
-                self.clone()
-            } else {
-                other.clone()
-            }
-        }
-    }
-    pub fn as_string(&self) -> String {
-        if self.is_fully_visible() {
-            "  ".to_string()
-        } else {
-            let fg_color = GREY;
-            PartialVisibilityDrawable::from_shadowed_drawable(
-                &SolidColorDrawable::new(fg_color),
-                *self,
-            )
-            .to_glyphs()
-            .to_clean_string()
-        }
-    }
-    pub fn is_about_complementary_to(&self, other: Self) -> bool {
-        return if self.is_fully_visible() {
-            !other.is_at_least_partially_visible()
-        } else if other.is_fully_visible() {
-            !self.is_at_least_partially_visible()
-        } else {
-            self.visible_portion
-                .unwrap()
-                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
-        };
-    }
-
-    pub fn is_visually_complementary_to(&self, other: Self) -> bool {
-        self.as_string()
-            .chars()
-            .zip(other.as_string().chars())
-            .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
-    }
-}
-impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        Self {
-            visible_portion: self
-                .visible_portion
-                .map(|half_plane| half_plane.rotated(quarter_turns_anticlockwise)),
-        }
-    }
-}
-
-impl Debug for SquareVisibilityFromOneLargeShadow {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:#?}\n\
-             \tchars: {}",
-            self.visible_portion,
-            self.as_string()
-        )
-    }
-}
-
-pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
-    fn is_fully_visible(&self) -> bool;
-    fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self;
-}
-
-// TODO: change to enum with for fully visible, not visible, and partially visible
-pub type SquareVisibility = SquareVisibilityFromOneLargeShadow;
-
-#[derive(Clone, Constructor, Debug)]
-pub struct PartialSquareVisibilityFromPointSource {
-    visible_at_cw_extreme: bool,
-    visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
-    this_square_from_view_center: WorldStep,
-}
-
-impl PartialSquareVisibilityFromPointSource {
-    pub fn is_fully_visible(&self) -> bool {
-        todo!()
-    }
-    pub fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self {
-        todo!()
-    }
-}
-
-impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        let mut the_clone = self.clone();
-        the_clone.visibility_switch_angles_going_ccw = the_clone
-            .visibility_switch_angles_going_ccw
-            .iter()
-            .map(|angle: &Angle<f32>| angle.rotated(quarter_turns_anticlockwise))
-            .collect_vec();
-        the_clone
-    }
-}
-
-type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
-
-pub trait StepVisibilityMapFunctions {
-    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self;
-    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
-
-    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
-    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
-}
-
-impl StepVisibilityMapFunctions for StepVisibilityMap {
-    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
-        todo!()
-    }
-
-    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        todo!();
-        // let mut the_clone = self.clone();
-        // the_clone.visible_relative_squares_in_main_view_only = the_clone
-        //     .visible_relative_squares_in_main_view_only
-        //     .into_iter()
-        //     .map(|(rel_square, visibility): (WorldStep, SquareVisibility)| {
-        //         (
-        //             rel_square,
-        //             if visibility.is_nearly_or_fully_visible(tolerance) {
-        //                 SquareVisibility::new_fully_visible()
-        //             } else {
-        //                 visibility
-        //             },
-        //         )
-        //     })
-        //     .collect();
-        // the_clone.transformed_sub_fovs = the_clone
-        //     .transformed_sub_fovs
-        //     .into_iter()
-        //     .map(|sub_fov: FieldOfView| {
-        //         sub_fov.with_all_squares_rounded_towards_full_visibility(tolerance)
-        //     })
-        //     .collect();
-        // the_clone
-    }
-
-    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
-        todo!()
-    }
-
-    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PositionedSquareVisibilityInFov {
-    square_visibility_in_absolute_frame: SquareVisibility,
-    relative_square: WorldStep,
-    absolute_square: WorldSquare,
-    //step_in_fov_sequence: u32,
-    portal_depth: u32,
-    portal_rotation: QuarterTurnsAnticlockwise,
-}
-
-impl PositionedSquareVisibilityInFov {
-    pub fn one_portal_deeper(
-        &self,
-        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
-    ) -> Self {
-        PositionedSquareVisibilityInFov {
-            portal_depth: self.portal_depth + 1,
-            portal_rotation: self.portal_rotation + forward_rotation_through_portal,
-            relative_square: rotated_n_quarter_turns_counter_clockwise(
-                self.relative_square,
-                -forward_rotation_through_portal.quarter_turns(),
-            ),
-            ..self.clone()
-        }
-    }
-    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
-    }
-    pub fn portal_depth(&self) -> u32 {
-        self.portal_depth
-    }
-    pub fn portal_rotation(&self) -> QuarterTurnsAnticlockwise {
-        self.portal_rotation
-    }
-    pub fn absolute_square(&self) -> WorldSquare {
-        self.absolute_square
-    }
-    pub fn relative_square(&self) -> WorldStep {
-        self.relative_square
-    }
-    pub fn new_in_top_view(
-        square_visibility: SquareVisibility,
-        absolute_square: WorldSquare,
-        relative_square: WorldStep,
-    ) -> Self {
-        PositionedSquareVisibilityInFov {
-            square_visibility_in_absolute_frame: square_visibility,
-            relative_square,
-            absolute_square,
-            portal_depth: 0,
-            portal_rotation: Default::default(),
-        }
-    }
-    pub fn square_visibility_in_relative_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
-            .rotated(-self.portal_rotation)
-    }
-}
-
-pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AngleBasedVisibleSegment {
-    visible_angle_interval: PartialAngleInterval,
-    start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
-    end_internal_relative_faces: HashSet<RelativeSquareWithOrthogonalDir>,
-}
-impl AngleBasedVisibleSegment {
-    pub fn validate(&self) {
-        if !self.start_face_spans_angle_interval()
-            || !self.end_faces_fully_cover_angle_interval_with_no_overlap()
-        {
-            panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
-        }
-    }
-    fn end_faces_fully_cover_angle_interval_with_no_overlap(&self) -> bool {
-        let end_faces_going_clockwise =
-            self.end_internal_relative_faces
-                .iter()
-                .sorted_by_key(|face| {
-                    OrderedFloat(better_angle_from_x_axis(face.face_center_point()).radians)
-                });
-        todo!()
-    }
-    fn start_face_spans_angle_interval(&self) -> bool {
-        self.start_internal_relative_face.is_none()
-            || self.start_internal_relative_face.is_some_and(
-                |face: RelativeSquareWithOrthogonalDir| {
-                    !face.line().parallel_directions().iter().any(|&line_angle| {
-                        !self
-                            .visible_angle_interval
-                            .contains_or_touches_angle(line_angle)
-                    })
-                },
-            )
-    }
-    pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
-        let actual_face = relative_face.into();
-        Self {
-            visible_angle_interval: PartialAngleInterval::from_relative_square_face(actual_face),
-            start_internal_relative_face: None,
-            end_internal_relative_faces: HashSet::from([actual_face]),
-        }
-    }
-    pub fn from_relative_square(step: WorldStep) -> Self {
-        let faces = faces_away_from_center_at_rel_square(step);
-        Self {
-            visible_angle_interval: PartialAngleInterval::from_relative_square(step),
-            start_internal_relative_face: None,
-            end_internal_relative_faces: faces,
-        }
-    }
-    pub fn with_weakly_applied_start_face(
-        &self,
-        relative_face: RelativeSquareWithOrthogonalDir,
-    ) -> Self {
-        if self.start_internal_relative_face.is_some() {
-            return self.clone();
-        }
-
-        let thing = Self {
-            start_internal_relative_face: Some(relative_face),
-            ..self.clone()
-        };
-        assert!(thing.start_face_spans_angle_interval());
-        thing
-    }
-    pub fn with_visible_angle_interval(&self, angle_interval: PartialAngleInterval) -> Self {
-        Self {
-            visible_angle_interval: angle_interval,
-            ..self.clone()
-        }
-    }
-    pub fn get_touching_relative_squares(&self) -> StepSet {
-        for step in self
-            .visible_angle_interval
-            .touched_squares_going_outwards_and_ccw()
-        {
-            todo!()
-        }
-        todo!()
-    }
-    pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
-        todo!()
-    }
-    fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
-        todo!()
-    }
-    fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
-        todo!()
-    }
-    fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
-        todo!()
-    }
-    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
-        self.visible_angle_interval
-            .touched_squares_going_outwards_and_ccw()
-            .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
-            .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
-            .take_while(|&rel_square| {
-                !self.rel_square_is_past_furthest_part_of_end_fence(rel_square)
-            })
-    }
-    pub fn to_square_visibilities(&self) -> StepVisibilityMap {
-        // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
-        // Watch out for the wraparound case.
-        self.touched_squares_going_outwards_and_ccw()
-            .map(|rel_square| {
-                (
-                    rel_square,
-                    single_shadow_square_visibility_from_one_view_arc(
-                        self.visible_angle_interval,
-                        rel_square,
-                    )
-                    .unwrap(),
-                )
-                //TODO: change shadow type
-                // SquareVisibilityFromPointSource::from_single_visible_arc(
-                //     rel_square,
-                //     self.visible_angle_interval,
-                // ),
-            })
-            .collect()
-    }
-}
-
-// TODO: Applying a trait by simply calling the functions on every component member of a struct should be automated.
-impl RigidlyTransformable for AngleBasedVisibleSegment {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        Self {
-            visible_angle_interval: self.visible_angle_interval.apply_rigid_transform(tf),
-            start_internal_relative_face: self
-                .start_internal_relative_face
-                .map(|face| face.apply_rigid_transform(tf)),
-            end_internal_relative_faces: self
-                .end_internal_relative_faces
-                .iter()
-                .map(|face| face.apply_rigid_transform(tf))
-                .collect(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Constructor)]
 pub struct FieldOfView {
@@ -555,7 +105,7 @@ impl FieldOfView {
         all_visible
     }
 
-    pub fn visible_relative_squares_in_main_view_only(&self) -> StepVisibilityMap {
+    pub fn visible_relative_squares_in_main_view_only(&self) -> SquareVisibilityMap {
         self.without_sub_views().rasterized()
     }
     pub fn visible_segments_in_main_view_only(&self) -> &Vec<AngleBasedVisibleSegment> {
@@ -763,38 +313,6 @@ impl FieldOfView {
         !self.visibilities_of_relative_square(step).is_empty()
     }
 
-    pub fn visibilities_of_absolute_square(
-        &self,
-        world_square: WorldSquare,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        let rel_square: WorldStep = world_square - self.root_square();
-        // Due to portals, this may see the same square multiple times
-        let mut visibilities = vec![];
-        if let Some(visibility_in_untransformed_view) =
-            self.visibility_of_relative_square_in_main_view(rel_square)
-        {
-            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
-                visibility_in_untransformed_view,
-                world_square,
-                rel_square,
-            ));
-        }
-
-        self.transformed_sub_fovs
-            .iter()
-            .for_each(|sub_fov: &FieldOfView| {
-                let forward_rotation = self.view_transform_to(sub_fov).rotation();
-                let mut sub_visibilities = sub_fov
-                    .visibilities_of_absolute_square(world_square)
-                    .into_iter()
-                    .map(|pos_vis: PositionedSquareVisibilityInFov| {
-                        pos_vis.one_portal_deeper(forward_rotation)
-                    })
-                    .collect_vec();
-                visibilities.append(&mut sub_visibilities);
-            });
-        visibilities
-    }
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
         !self
             .visibilities_of_absolute_square(world_square)
@@ -825,6 +343,16 @@ impl FieldOfView {
             .cloned()
     }
 
+    fn sorted_by_draw_order(
+        visibilities: Vec<PositionedSquareVisibilityInFov>,
+    ) -> Vec<PositionedSquareVisibilityInFov> {
+        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
+        visibilities
+            .into_iter()
+            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
+            .collect_vec()
+    }
+
     fn visibilities_of_relative_square_in_one_sub_view(
         &self,
         relative_square: WorldStep,
@@ -853,132 +381,21 @@ impl FieldOfView {
         visibilities_in_frame_of_main_view
     }
 
-    pub fn visibilities_of_relative_square(
-        &self,
-        relative_square: WorldStep,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        let mut visibilities: Vec<PositionedSquareVisibilityInFov> = vec![];
-
-        if let Some(top_level_visibility) =
-            self.visibility_of_relative_square_in_main_view(relative_square)
-        {
-            let absolute_square = self.root_square() + relative_square;
-            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
-                top_level_visibility,
-                absolute_square,
-                relative_square,
-            ));
-        }
-        let mut sub_view_visibilities: Vec<PositionedSquareVisibilityInFov> = self
-            .transformed_sub_fovs
-            .iter()
-            .map(|sub_fov| {
-                self.visibilities_of_relative_square_in_one_sub_view(relative_square, sub_fov)
-            })
-            .flatten()
-            .collect_vec();
-        visibilities.append(&mut sub_view_visibilities);
-
-        visibilities
-    }
-
-    fn sorted_by_draw_order(
-        visibilities: Vec<PositionedSquareVisibilityInFov>,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
-        visibilities
-            .into_iter()
-            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
-            .collect_vec()
-    }
-
-    pub fn drawable_at_relative_square(
-        &self,
-        relative_square: WorldStep,
-        maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
-        tint_portals: bool,
-        render_portals_with_line_of_sight: bool,
-    ) -> Option<DrawableEnum> {
-        let visibilities: Vec<PositionedSquareVisibilityInFov> =
-            Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
-                self.visibilities_of_relative_square(relative_square)
-            } else {
-                self.visibilities_of_absolute_square(self.root_square() + relative_square)
-            });
-        let maybe_drawable: Option<DrawableEnum> = visibilities
-            .iter()
-            .filter(|&vis: &&PositionedSquareVisibilityInFov| {
-                if let Some(drawable_map) = maybe_drawable_map {
-                    drawable_map.contains_key(&vis.absolute_square())
-                } else {
-                    true
-                }
-            })
-            .map(|positioned_visibility: &PositionedSquareVisibilityInFov| {
-                let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
-                    drawable_map
-                        .get(&positioned_visibility.absolute_square())
-                        .unwrap()
-                        .rotated(-positioned_visibility.portal_rotation)
-                } else {
-                    // SolidColorDrawable::new(GREY).to_enum()
-                    // SolidColorDrawable::new(number_to_hue_rotation(
-                    //     better_angle_from_x_axis(
-                    //         (positioned_visibility.absolute_square - self.root_square()).to_f32(),
-                    //     )
-                    //     .to_degrees(),
-                    //     360.0,
-                    // ))
-                    // .to_enum()
-                    SolidColorDrawable::new(number_to_hue_rotation(
-                        king_distance(positioned_visibility.absolute_square - self.root_square())
-                            as f32,
-                        10.0,
-                    ))
-                    .to_enum()
-                };
-                if !positioned_visibility
-                    .square_visibility_in_absolute_frame()
-                    .is_fully_visible()
-                {
-                    drawable = DrawableEnum::PartialVisibility(
-                        PartialVisibilityDrawable::from_shadowed_drawable(
-                            &drawable,
-                            if render_portals_with_line_of_sight {
-                                positioned_visibility.square_visibility_in_relative_frame()
-                            } else {
-                                positioned_visibility.square_visibility_in_absolute_frame()
-                            },
-                        ),
-                    )
-                };
-                if tint_portals {
-                    drawable = drawable.tinted(
-                        RED,
-                        //number_to_color(positioned_visibility.portal_depth()),
-                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
-                    );
-                }
-                drawable
-            })
-            .reduce(|bottom, top| top.drawn_over(&bottom));
-        maybe_drawable
-    }
-    pub fn rasterized(&self) -> StepVisibilityMap {
-        self.all_view_segments_in_relative_frame()
+    pub fn rasterized(&self) -> SquareVisibilityMap {
+        self.all_view_segments_converted_to_relative_frame()
             .iter()
             .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())
             .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
             .unwrap()
     }
-    fn all_view_segments_in_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
+    fn all_view_segments_converted_to_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
         concat([
             self.visible_segments_in_main_view_only.clone(),
             self.transformed_sub_fovs
                 .iter()
                 .flat_map(|sub_fov| {
                     self.other_converted_to_this_frame(sub_fov)
-                        .all_view_segments_in_relative_frame()
+                        .all_view_segments_converted_to_relative_frame()
                 })
                 .collect_vec(),
         ])
@@ -1056,6 +473,7 @@ impl Iterator for OctantFOVSquareSequenceIter {
     }
 }
 
+// TODO: Break this function into more pieces
 pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
@@ -1082,7 +500,6 @@ pub fn field_of_view_within_arc_in_single_octant(
         let absolute_square = oriented_center_square.square() + relative_square;
 
         let mut view_blocking_arc_for_this_square: Option<PartialAngleInterval> = None;
-
         for face_direction in face_directions {
             let relative_face: RelativeSquareWithOrthogonalDir =
                 (relative_square, face_direction).into();
@@ -1171,7 +588,6 @@ pub fn field_of_view_within_arc_in_single_octant(
         // split arc around the blocked faces
         let view_arcs_on_either_side_of_blocked_faces =
             view_arc - view_blocking_arc_for_this_square.unwrap();
-
         view_arcs_on_either_side_of_blocked_faces
             .into_iter()
             .filter(|new_sub_arc| {
@@ -1458,21 +874,6 @@ mod tests {
     }
 
     #[test]
-    fn test_square_visibility_knows_if_its_fully_visible() {
-        let partial = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(
-            HalfPlane::from_line_and_point_on_half_plane(
-                Line {
-                    p1: point2(-5.0, 2.0),
-                    p2: point2(5.0, 2.2928933),
-                },
-                point2(-12.061038, -1.3054879),
-            ),
-        )
-        .unwrap();
-        assert!(partial.is_fully_visible());
-    }
-
-    #[test]
     fn test_field_of_view_includes_blocks() {
         let start_square = point2(5, 5);
         let block_step = STEP_UP * 2;
@@ -1531,18 +932,6 @@ mod tests {
     }
 
     #[test]
-    fn test_single_square_is_shadowed_correctly_on_diagonal() {
-        let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
-        let square_relative_to_center = vec2(1, 1);
-        let visibility =
-            single_shadow_square_visibility_from_one_view_arc(interval, square_relative_to_center);
-        let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
-            .to_glyphs()
-            .to_clean_string();
-        assert_eq!(&string, "🭞🭚");
-    }
-
-    #[test]
     fn test_observed_bright_spot_in_shadow() {
         let player_square = point2(3, 3);
         let block_square = player_square + STEP_UP_RIGHT * 2;
@@ -1573,25 +962,6 @@ mod tests {
     }
 
     #[test]
-    fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
-
-        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
-
-        let partial_1 =
-            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1).unwrap();
-        let partial_2 =
-            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2).unwrap();
-
-        let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
-        assert!(combined_partial.is_fully_visible());
-    }
-
-    #[test]
     fn test_fov_square_sequence__detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
         let correct_sequence = vec![
@@ -1606,20 +976,6 @@ mod tests {
         assert_eq!(
             sequence.take(correct_sequence.len()).collect_vec(),
             correct_sequence
-        );
-    }
-
-    #[test]
-    fn test_partial_visibility_of_one_square__one_step_up() {
-        let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
-        let square = WorldStep::new(0, 1);
-        let partial = single_shadow_square_visibility_from_one_view_arc(arc, square);
-        assert!(!partial.unwrap().is_fully_visible());
-        assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
-                .to_glyphs()
-                .to_clean_string(),
-            [FULL_BLOCK, SPACE].into_iter().collect::<String>()
         );
     }
 
@@ -1831,23 +1187,16 @@ mod tests {
     #[test]
     fn test_get_mapping_from_fov_result() {
         let center: WorldSquare = point2(5, 5);
-        let mut fov_result = FieldOfView::new_empty_fov_at(center);
+        let mut fov = FieldOfView::new_empty_fov_at(center);
         let relative_square = vec2(2, 2);
-        todo!();
-        //fov_result.add_fully_visible_square(relative_square);
+        fov.add_fully_visible_relative_square(relative_square);
 
-        let square_visibility = fov_result.visibilities_of_relative_square(relative_square);
+        let square_visibility = fov.visibilities_of_relative_square(relative_square);
         assert!(square_visibility
             .get(0)
             .unwrap()
             .square_visibility_in_absolute_frame()
             .is_fully_visible());
-        assert!(square_visibility
-            .get(0)
-            .unwrap()
-            .square_visibility_in_absolute_frame()
-            .visible_portion
-            .is_none());
     }
 
     #[test]

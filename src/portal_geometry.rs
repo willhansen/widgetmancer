@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 
-use crate::fov_stuff::{AngleBasedVisibleSegment, FieldOfView};
 use derive_more::Constructor;
 use derive_more::Neg;
 use euclid::{point2, Angle};

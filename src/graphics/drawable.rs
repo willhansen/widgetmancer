@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use crate::fov_stuff::square_visibility::SquareVisibility;
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;
@@ -10,9 +11,6 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
 
-use crate::fov_stuff::{
-    LocalSquareHalfPlane, SquareVisibility, SquareVisibilityFromOneLargeShadow,
-};
 use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
 use crate::glyph::braille::{
     get_braille_arrays_for_braille_line, BrailleArray, DoubleBrailleArray,
@@ -539,6 +537,9 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
+    use crate::fov_stuff::square_visibility::{
+        LocalSquareHalfPlane, SquareVisibilityFromOneLargeShadow,
+    };
     use crate::glyph::braille::EMPTY_BRAILLE;
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};

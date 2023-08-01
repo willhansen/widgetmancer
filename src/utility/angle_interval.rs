@@ -11,14 +11,14 @@ use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
-use crate::fov_stuff::{OctantFOVSquareSequenceIter, SquareVisibilityFromOneLargeShadow};
+use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
     RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -445,10 +445,11 @@ impl PartialAngleInterval {
 
         let mut segments_to_return = vec![segment_in_first_octant];
 
-        let mut oct = start_octant.next_cw();
+        let mut oct = start_octant.next_ccw();
         while oct != end_octant {
+            dbg!("asdfasdf", oct);
             segments_to_return.push(PartialAngleInterval::from_octant(oct));
-            oct = oct.next_cw();
+            oct = oct.next_ccw();
         }
         segments_to_return.push(segment_in_last_octant);
 
@@ -464,6 +465,9 @@ impl PartialAngleInterval {
     ) -> impl Iterator<Item = Option<WorldStep>> + '_ {
         assert!(self.is_in_one_octant());
         OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap()).map(|step| {
+            if step == STEP_ZERO {
+                return Some(step);
+            }
             if self.partially_or_fully_overlaps_without_exactly_touching(
                 Self::from_relative_square(step),
             ) {

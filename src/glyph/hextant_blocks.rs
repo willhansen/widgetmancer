@@ -6,7 +6,6 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::IVector;
 use euclid::{point2, Point2D};
-use ordered_float::OrderedFloat;
 use std::collections::{HashMap, HashSet};
 
 pub const FIRST_HEXTANT: char = '🬀';

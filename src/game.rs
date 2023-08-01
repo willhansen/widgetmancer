@@ -22,9 +22,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square, FieldOfView, SquareVisibilityFromOneLargeShadow,
-};
+use crate::fov_stuff::square_visibility::SquareVisibilityFunctions;
+use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
 use crate::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
 };
@@ -680,7 +679,7 @@ impl Game {
                 .screen
                 .set_screen_center_by_world_square(self.player_square());
             self.graphics
-                .load_screen_buffer_from_fov(self.player_field_of_view());
+                .load_screen_buffer_from_fov(self.rasterized_player_field_of_view());
         } else {
             self.graphics
                 .load_screen_buffer_from_absolute_positions_in_draw_buffer();
@@ -2351,7 +2350,7 @@ impl Game {
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         let visibilities = self
-            .player_field_of_view()
+            .rasterized_player_field_of_view()
             .visibilities_of_relative_square(target_square_relative_to_player);
         visibilities.len() == 1
             && visibilities
@@ -2362,11 +2361,11 @@ impl Game {
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
-        self.player_field_of_view()
+        self.rasterized_player_field_of_view()
             .visibilities_of_relative_square(target_square_relative_to_player)
             .is_empty()
     }
-    fn player_field_of_view(&self) -> FieldOfView {
+    fn rasterized_player_field_of_view(&self) -> square_visibility::SquareVisibilityMap {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,
@@ -2374,6 +2373,7 @@ impl Game {
             &self.blocks,
             &self.portal_geometry,
         )
+        .rasterized()
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
@@ -2403,9 +2403,8 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::{
-        print_fov_as_absolute, print_fov_as_relative, PositionedSquareVisibilityInFov,
-    };
+    use crate::fov_stuff::print_fov_as_absolute;
+    use crate::fov_stuff::square_visibility::PositionedSquareVisibilityInFov;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3197,7 +3196,7 @@ mod tests {
         // );
         // game.graphics.print_screen_buffer();
 
-        let fov = game.player_field_of_view();
+        let fov = game.rasterized_player_field_of_view();
 
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 2);
@@ -3350,7 +3349,7 @@ mod tests {
         // );
         // game.graphics.print_screen_buffer();
 
-        let fov = game.player_field_of_view();
+        let fov = game.rasterized_player_field_of_view();
 
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 1);
@@ -3395,7 +3394,7 @@ mod tests {
         // );
         // game.graphics.screen.print_screen_buffer();
 
-        let fov = game.player_field_of_view();
+        let fov = game.rasterized_player_field_of_view();
 
         assert_eq!(
             fov.visibilities_of_absolute_square(square_that_should_be_visible)
@@ -3906,7 +3905,7 @@ mod tests {
             .map(|&screen_step| game.graphics.screen.screen_step_to_world_step(screen_step))
             .collect_vec();
 
-        let fov = game.player_field_of_view();
+        let fov = game.rasterized_player_field_of_view();
 
         print_fov_as_absolute(&fov, 5);
         dbg!(
@@ -4073,7 +4072,7 @@ mod tests {
         game.populate_draw_buffer(Instant::now());
 
         let rel_square = STEP_RIGHT * 3 + STEP_UP;
-        let player_fov = game.player_field_of_view();
+        let player_fov = game.rasterized_player_field_of_view();
         let visibilities_at_rel_square = player_fov.visibilities_of_relative_square(rel_square);
         assert_eq!(visibilities_at_rel_square.len(), 1);
         let maybe_drawable: Option<DrawableEnum> = game
@@ -4409,7 +4408,7 @@ mod tests {
         }
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
-        let fov = game.player_field_of_view();
+        let fov = game.rasterized_player_field_of_view();
 
         let glyphs = game
             .graphics

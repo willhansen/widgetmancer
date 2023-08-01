@@ -34,9 +34,7 @@ use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::{
-    FieldOfView, PositionedSquareVisibilityInFov, SquareVisibilityFromOneLargeShadow,
-};
+use crate::fov_stuff::FieldOfView;
 use crate::game::{
     DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD_S,
     HUNTER_DRONE_SIGHT_RANGE,
