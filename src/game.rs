@@ -22,6 +22,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
+use crate::fov_stuff::rasterized_field_of_view::PositionedVisibilityOfSquare;
 use crate::fov_stuff::square_visibility::SquareVisibilityFunctions;
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
 use crate::glyph::glyph_constants::{
@@ -2365,7 +2366,7 @@ impl Game {
             .visibilities_of_relative_square(target_square_relative_to_player)
             .is_empty()
     }
-    fn rasterized_player_field_of_view(&self) -> square_visibility::SquareVisibilityMap {
+    fn rasterized_player_field_of_view(&self) -> square_visibility::RelativeSquareVisibilityMap {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,
@@ -2404,7 +2405,6 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use crate::fov_stuff::print_fov_as_absolute;
-    use crate::fov_stuff::square_visibility::PositionedSquareVisibilityInFov;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3920,7 +3920,7 @@ mod tests {
             .iter()
             .map(|&world_step| fov.visibilities_of_relative_square(world_step))
             .for_each(
-                |visibilities_of_rel_square: Vec<PositionedSquareVisibilityInFov>| {
+                |visibilities_of_rel_square: Vec<PositionedVisibilityOfSquare>| {
                     let vis1 = visibilities_of_rel_square[0].square_visibility_in_absolute_frame();
                     let vis2 = visibilities_of_rel_square[1].square_visibility_in_absolute_frame();
                     assert!(vis1.is_about_complementary_to(vis2));

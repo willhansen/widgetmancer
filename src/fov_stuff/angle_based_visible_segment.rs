@@ -1,5 +1,6 @@
 use crate::fov_stuff::{
-    single_shadow_square_visibility_from_one_view_arc, SquareVisibility, SquareVisibilityMap,
+    single_shadow_square_visibility_from_one_view_arc, RelativeSquareVisibilityMap,
+    SquareVisibility,
 };
 use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
@@ -113,7 +114,7 @@ impl AngleBasedVisibleSegment {
                 !self.rel_square_is_past_furthest_part_of_end_fence(rel_square)
             })
     }
-    pub fn to_square_visibilities(&self) -> SquareVisibilityMap {
+    pub fn to_square_visibilities(&self) -> RelativeSquareVisibilityMap {
         // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
         // Watch out for the wraparound case.
         self.touched_squares_going_outwards_and_ccw()

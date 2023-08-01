@@ -1,4 +1,5 @@
 pub mod angle_based_visible_segment;
+pub mod rasterized_field_of_view;
 pub mod square_visibility;
 
 use std::backtrace::Backtrace;
@@ -7,9 +8,10 @@ use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
+use crate::fov_stuff::rasterized_field_of_view::PositionedVisibilityOfSquare;
 use crate::fov_stuff::square_visibility::{
-    PositionedSquareVisibilityInFov, SquareVisibility, SquareVisibilityFromOneLargeShadow,
-    SquareVisibilityFunctions, SquareVisibilityMap,
+    RelativeSquareVisibilityMap, SquareVisibility, SquareVisibilityFromOneLargeShadow,
+    SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
@@ -105,52 +107,11 @@ impl FieldOfView {
         all_visible
     }
 
-    pub fn visible_relative_squares_in_main_view_only(&self) -> SquareVisibilityMap {
+    pub fn visible_relative_squares_in_main_view_only(&self) -> RelativeSquareVisibilityMap {
         self.without_sub_views().rasterized()
     }
     pub fn visible_segments_in_main_view_only(&self) -> &Vec<AngleBasedVisibleSegment> {
         &self.visible_segments_in_main_view_only
-    }
-
-    pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
-        let top_view_visible = self.at_least_partially_visible_relative_squares_in_main_view_only();
-
-        let mut all_visible = top_view_visible;
-
-        for sub_view in &self.transformed_sub_fovs {
-            let transform_from_sub_view = sub_view.view_transform_to(&self);
-            let relative_squares_in_sub_frame =
-                sub_view.at_least_partially_visible_relative_squares_in_main_view_only();
-            let visible_in_main_frame =
-                transform_from_sub_view.rotate_steps(&relative_squares_in_sub_frame);
-            visible_in_main_frame.iter().for_each(|&step| {
-                all_visible.insert(step);
-            });
-        }
-        all_visible
-    }
-    pub fn at_least_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        todo!();
-        //set_of_keys(&self.visible_relative_squares_in_main_view_only)
-    }
-
-    pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        todo!();
-        // self.visible_relative_squares_in_main_view_only
-        //     .iter()
-        //     .filter(|(square, vis)| !vis.is_fully_visible())
-        //     .map(|(&square, vis)| square)
-        //     .collect()
-    }
-    pub fn visibilities_of_partially_visible_squares_in_main_view_only(
-        &self,
-    ) -> HashMap<WorldStep, SquareVisibilityFromOneLargeShadow> {
-        todo!();
-        // self.visible_relative_squares_in_main_view_only
-        //     .iter()
-        //     .filter(|(square, vis)| !vis.is_fully_visible())
-        //     .map(|(square, vis)| (square.clone(), vis.clone()))
-        //     .collect()
     }
 
     fn combined_main_view_only(&self, other: &Self) -> Self {
@@ -343,21 +304,11 @@ impl FieldOfView {
             .cloned()
     }
 
-    fn sorted_by_draw_order(
-        visibilities: Vec<PositionedSquareVisibilityInFov>,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
-        visibilities
-            .into_iter()
-            .sorted_by_key(|pos_vis| pos_vis.portal_depth())
-            .collect_vec()
-    }
-
     fn visibilities_of_relative_square_in_one_sub_view(
         &self,
         relative_square: WorldStep,
         sub_view: &FieldOfView,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
+    ) -> Vec<PositionedVisibilityOfSquare> {
         let view_transform_to_sub_view = self.view_transform_to(sub_view);
 
         let rotation_moving_forward_through_portal: QuarterTurnsAnticlockwise =
@@ -373,7 +324,7 @@ impl FieldOfView {
 
         let visibilities_in_frame_of_main_view = visibilities_in_frame_of_sub_view
             .iter()
-            .map(|pos_vis: &PositionedSquareVisibilityInFov| {
+            .map(|pos_vis: &PositionedVisibilityOfSquare| {
                 pos_vis.one_portal_deeper(rotation_moving_forward_through_portal)
             })
             .collect_vec();
@@ -381,7 +332,7 @@ impl FieldOfView {
         visibilities_in_frame_of_main_view
     }
 
-    pub fn rasterized(&self) -> SquareVisibilityMap {
+    pub fn rasterized(&self) -> RelativeSquareVisibilityMap {
         self.all_view_segments_converted_to_relative_frame()
             .iter()
             .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())

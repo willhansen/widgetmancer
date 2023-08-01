@@ -19,7 +19,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
-pub trait SquareVisibilityTrait: QuarterTurnRotatable {
+pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable {
     fn is_fully_visible(&self) -> bool;
     fn is_at_least_partially_visible(&self) -> bool;
     fn new_fully_visible() -> Self;
@@ -225,32 +225,17 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     }
 }
 
-pub type SquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+pub type RelativeSquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
-pub trait SquareVisibilityFunctions {
+pub trait SquareVisibilityMapFunctions {
     fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self;
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
 
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
-    fn visibilities_of_absolute_square(
-        &self,
-        world_square: WorldSquare,
-    ) -> Vec<PositionedSquareVisibilityInFov>;
-    fn visibilities_of_relative_square(
-        &self,
-        relative_square: WorldStep,
-    ) -> Vec<PositionedSquareVisibilityInFov>;
-    fn drawable_at_relative_square(
-        &self,
-        relative_square: WorldStep,
-        maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
-        tint_portals: bool,
-        render_portals_with_line_of_sight: bool,
-    ) -> Option<DrawableEnum>;
 }
 
-impl SquareVisibilityFunctions for SquareVisibilityMap {
+impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
     fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
         todo!()
     }
@@ -289,199 +274,8 @@ impl SquareVisibilityFunctions for SquareVisibilityMap {
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
         todo!()
     }
-    fn visibilities_of_absolute_square(
-        &self,
-        world_square: WorldSquare,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        let rel_square: WorldStep = world_square - self.root_square();
-        // Due to portals, this may see the same square multiple times
-        let mut visibilities = vec![];
-        todo!();
-        if let Some(visibility_in_untransformed_view) =
-            self.visibility_of_relative_square_in_main_view(rel_square)
-        {
-            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
-                visibility_in_untransformed_view,
-                world_square,
-                rel_square,
-            ));
-        }
-
-        self.transformed_sub_fovs.iter().for_each(|sub_fov| {
-            let forward_rotation = self.view_transform_to(sub_fov).rotation();
-            let mut sub_visibilities = sub_fov
-                .visibilities_of_absolute_square(world_square)
-                .into_iter()
-                .map(|pos_vis: PositionedSquareVisibilityInFov| {
-                    pos_vis.one_portal_deeper(forward_rotation)
-                })
-                .collect_vec();
-            visibilities.append(&mut sub_visibilities);
-        });
-        visibilities
-    }
-    fn visibilities_of_relative_square(
-        &self,
-        relative_square: WorldStep,
-    ) -> Vec<PositionedSquareVisibilityInFov> {
-        let mut visibilities: Vec<PositionedSquareVisibilityInFov> = vec![];
-
-        if let Some(top_level_visibility) =
-            self.visibility_of_relative_square_in_main_view(relative_square)
-        {
-            panic!("asdfasdf");
-            let absolute_square = self.root_square() + relative_square;
-            panic!("asdfasdf");
-            visibilities.push(PositionedSquareVisibilityInFov::new_in_top_view(
-                top_level_visibility,
-                absolute_square,
-                relative_square,
-            ));
-        }
-        panic!("asdfasdf");
-        let mut sub_view_visibilities: Vec<PositionedSquareVisibilityInFov> = self
-            .transformed_sub_fovs
-            .iter()
-            .map(|sub_fov| {
-                self.visibilities_of_relative_square_in_one_sub_view(relative_square, sub_fov)
-            })
-            .flatten()
-            .collect_vec();
-        visibilities.append(&mut sub_view_visibilities);
-
-        visibilities
-    }
-    fn drawable_at_relative_square(
-        &self,
-        relative_square: WorldStep,
-        maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
-        tint_portals: bool,
-        render_portals_with_line_of_sight: bool,
-    ) -> Option<DrawableEnum> {
-        let visibilities: Vec<PositionedSquareVisibilityInFov> =
-            Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
-                self.visibilities_of_relative_square(relative_square)
-            } else {
-                self.visibilities_of_absolute_square(self.root_square() + relative_square)
-            });
-        let maybe_drawable: Option<DrawableEnum> = visibilities
-            .iter()
-            .filter(|&vis: &&PositionedSquareVisibilityInFov| {
-                if let Some(drawable_map) = maybe_drawable_map {
-                    drawable_map.contains_key(&vis.absolute_square())
-                } else {
-                    true
-                }
-            })
-            .map(|positioned_visibility: &PositionedSquareVisibilityInFov| {
-                let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
-                    drawable_map
-                        .get(&positioned_visibility.absolute_square())
-                        .unwrap()
-                        .rotated(-positioned_visibility.portal_rotation)
-                } else {
-                    // SolidColorDrawable::new(GREY).to_enum()
-                    // SolidColorDrawable::new(number_to_hue_rotation(
-                    //     better_angle_from_x_axis(
-                    //         (positioned_visibility.absolute_square - self.root_square()).to_f32(),
-                    //     )
-                    //     .to_degrees(),
-                    //     360.0,
-                    // ))
-                    // .to_enum()
-                    SolidColorDrawable::new(number_to_hue_rotation(
-                        king_distance(positioned_visibility.absolute_square - self.root_square())
-                            as f32,
-                        10.0,
-                    ))
-                    .to_enum()
-                };
-                if !positioned_visibility
-                    .square_visibility_in_absolute_frame()
-                    .is_fully_visible()
-                {
-                    drawable = DrawableEnum::PartialVisibility(
-                        PartialVisibilityDrawable::from_shadowed_drawable(
-                            &drawable,
-                            if render_portals_with_line_of_sight {
-                                positioned_visibility.square_visibility_in_relative_frame()
-                            } else {
-                                positioned_visibility.square_visibility_in_absolute_frame()
-                            },
-                        ),
-                    )
-                };
-                if tint_portals {
-                    drawable = drawable.tinted(
-                        RED,
-                        //number_to_color(positioned_visibility.portal_depth()),
-                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
-                    );
-                }
-                drawable
-            })
-            .reduce(|bottom, top| top.drawn_over(&bottom));
-        maybe_drawable
-    }
-}
-#[derive(Debug, Clone)]
-pub struct PositionedSquareVisibilityInFov {
-    square_visibility_in_absolute_frame: SquareVisibility,
-    relative_square: WorldStep,
-    absolute_square: WorldSquare,
-    //step_in_fov_sequence: u32,
-    portal_depth: u32,
-    portal_rotation: QuarterTurnsAnticlockwise,
 }
 
-impl PositionedSquareVisibilityInFov {
-    pub fn one_portal_deeper(
-        &self,
-        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
-    ) -> Self {
-        PositionedSquareVisibilityInFov {
-            portal_depth: self.portal_depth + 1,
-            portal_rotation: self.portal_rotation + forward_rotation_through_portal,
-            relative_square: rotated_n_quarter_turns_counter_clockwise(
-                self.relative_square,
-                -forward_rotation_through_portal.quarter_turns(),
-            ),
-            ..self.clone()
-        }
-    }
-    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
-    }
-    pub fn portal_depth(&self) -> u32 {
-        self.portal_depth
-    }
-    pub fn portal_rotation(&self) -> QuarterTurnsAnticlockwise {
-        self.portal_rotation
-    }
-    pub fn absolute_square(&self) -> WorldSquare {
-        self.absolute_square
-    }
-    pub fn relative_square(&self) -> WorldStep {
-        self.relative_square
-    }
-    pub fn new_in_top_view(
-        square_visibility: SquareVisibility,
-        absolute_square: WorldSquare,
-        relative_square: WorldStep,
-    ) -> Self {
-        PositionedSquareVisibilityInFov {
-            square_visibility_in_absolute_frame: square_visibility,
-            relative_square,
-            absolute_square,
-            portal_depth: 0,
-            portal_rotation: Default::default(),
-        }
-    }
-    pub fn square_visibility_in_relative_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
-            .rotated(-self.portal_rotation)
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
