@@ -106,6 +106,7 @@ pub const DOTS_IN_SELECTOR: u32 = 3;
 
 #[cfg(test)]
 mod tests {
+    use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::animations::floaty_laser::FloatyLaserAnimation;
@@ -117,6 +118,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_distance_function_increasing_for_first_half() {
         let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK_S;
         let mut prev_d = 0.0;
@@ -138,6 +140,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
         let board_length = 5;
         let animation = RecoilingBoardAnimation::new(
@@ -171,6 +174,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     #[ignore = "More for visual debugging than an actual test"]
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
@@ -197,6 +201,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_simple_laser_transparent_background() {
         let animation =
             SimpleLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
@@ -205,6 +210,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_floaty_laser_transparent_background() {
         let animation =
             FloatyLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
@@ -213,6 +219,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__start_at_zero() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(0.0),
@@ -221,6 +228,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__start_fast() {
         assert!(
             derivative(
@@ -232,6 +240,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__hit_peak() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
@@ -242,6 +251,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__flat_peak() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
@@ -252,6 +262,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__fully_relax() {
         let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
             RecoilingBoardAnimation::RECOIL_DURATION_S,
@@ -260,6 +271,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_recoil_function__relax_flat() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,

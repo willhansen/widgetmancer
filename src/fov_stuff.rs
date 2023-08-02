@@ -633,7 +633,7 @@ mod tests {
     use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
     use euclid::point2;
     use itertools::Itertools;
-    use ntest::{assert_about_eq, assert_false, assert_true};
+    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
@@ -653,6 +653,7 @@ mod tests {
     const SIGHT_RADIUS: u32 = 16;
 
     #[test]
+    #[timeout(100)]
     fn test_square_view_angle__horizontal() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(3, 0));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
@@ -669,6 +670,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_square_view_angle__diagonalish() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(5, 3));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
@@ -685,6 +687,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
         let fov_radius = 10;
@@ -709,6 +712,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_small_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
         let radius = 2;
@@ -735,6 +739,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_field_of_view_includes_blocks() {
         let start_square = point2(5, 5);
         let block_step = STEP_UP * 2;
@@ -753,6 +758,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_squares_look_partial() {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_DOWN * 2;
@@ -770,6 +776,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_diagonal_shadow_looks_diagonal() {
         let start_square = point2(5, 5);
         let block_square = start_square + STEP_RIGHT;
@@ -796,6 +803,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_observed_bright_spot_in_shadow() {
         let player_square = point2(3, 3);
         let block_square = player_square + STEP_UP_RIGHT * 2;
@@ -827,6 +835,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_fov_square_sequence__detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
         let correct_sequence = vec![
@@ -845,6 +854,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_visibility_near_two_blocks() {
         let mid_square = point2(5, 5);
         let sight_blockers =
@@ -864,6 +874,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_no_sharp_corners_in_shadows__mid_square() {
         let player_square = point2(5, 5);
         let block_square = player_square + STEP_DOWN_LEFT;
@@ -923,6 +934,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_of_one_square__observed_discontinuity_1() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
@@ -933,6 +945,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_of_one_square__observed_discontinuity_2() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
@@ -943,6 +956,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_of_one_square__observed_discontinuity_3() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
@@ -953,6 +967,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_of_one_square__observed_discontinuity_4() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
@@ -969,6 +984,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_of_one_square__observed_random_discontinuity() {
         // highest i observed before failure: 9
         for i in 0..30 {
@@ -982,6 +998,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_vertical_shadow_symmetry() {
         let block_square = STEP_RIGHT * 3;
         let above_glyphs = PartialVisibilityDrawable::from_square_visibility(
@@ -1009,6 +1026,7 @@ mod tests {
     // "🭣🭕"
 
     #[test]
+    #[timeout(100)]
     fn test_shadows_have_concave_bias_for_angled_blocks() {
         let block_shadow_string_tuples = vec![
             (STEP_LEFT, STEP_UP_LEFT, "🭏🬽"),
@@ -1052,6 +1070,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_get_mapping_from_fov_result() {
         let center: WorldSquare = point2(5, 5);
         let mut fov = FieldOfView::new_empty_fov_at(center);
@@ -1069,6 +1088,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_really_narrow_fov_through_a_portal() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(10, 20);
@@ -1148,6 +1168,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_sub_view_through_portal_has_correct_transform() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
@@ -1179,6 +1200,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_one_octant_with_one_portal() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
@@ -1209,6 +1231,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_sub_fov_view_transform() {
         let sub_center = SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT);
         let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center.square());
@@ -1238,6 +1261,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_square_fully_covered_by_face() {
         let view_arc_of_face =
             PartialAngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT));
@@ -1248,6 +1272,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_square_fully_not_covered_by_adjacent() {
         let view_arc_of_face =
             PartialAngleInterval::from_relative_square_face((STEP_UP_RIGHT, STEP_RIGHT));
@@ -1258,6 +1283,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_square_fully_inside_view_arc__near_edge() {
         let square = vec2(1, -2);
         let arc = PartialAngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
@@ -1267,6 +1293,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_portal_pose_transform() {
         let entrance = SquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT);
         let exit = SquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN);
@@ -1307,6 +1334,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_simple_fov_combination() {
         let main_center = point2(5, 5);
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
@@ -1330,6 +1358,7 @@ mod tests {
         );
     }
     #[test]
+    #[timeout(100)]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
         (0..5).for_each(|dy| {
             let main_step = STEP_LEFT * 7 + STEP_UP * dy;
@@ -1368,6 +1397,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_combined_fovs_combine_visibility__full_squares() {
         let main_center = point2(5, 5);
         let horizontal_offset = 12;
@@ -1404,6 +1434,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_sub_fovs_in_combining_fovs_might_also_combine() {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
@@ -1439,6 +1470,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_fov_relative_to_absolute__top_level() {
         let main_center = point2(5, 5);
 
@@ -1464,6 +1496,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_fov_relative_to_absolute__sub_view_no_rotation() {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
@@ -1485,6 +1518,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_fov_relative_to_absolute__sub_view_with_rotation() {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
@@ -1516,6 +1550,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_partial_visibility_in_blindspot_of_nearly_full_arc() {
         let rel_square = vec2(4, 4);
         // These values are from an observed failure.  NOT ARBITRARY
@@ -1527,6 +1562,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_visibility_of_multiple_squares_in_one_square() {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
@@ -1560,6 +1596,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_center_of_fov_is_visible() {
         let square = point2(4, 5);
         let fov = portal_aware_field_of_view_from_square(
@@ -1583,6 +1620,7 @@ mod tests {
 
     #[ignore = "not a priority for the time being"]
     #[test]
+    #[timeout(100)]
     fn test_adjacent_wall_all_fully_visible() {
         let player_square = point2(5, 5);
         let rel_blocks = (0..10).map(|i| STEP_RIGHT + STEP_UP * i).collect_vec();
@@ -1603,6 +1641,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_octant_edge_has_correct_rotation() {
         // let new_fov_result = get_fov_for_first_quadrant_going_through_wide_turning_portal();
         let center = point2(5, 5);
@@ -1644,6 +1683,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_one_square_seen_through_seam_of_wide_portal_is_fully_visible() {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
@@ -1697,6 +1737,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_no_seam_for_wide_rotated_portal() {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
@@ -1759,6 +1800,7 @@ mod tests {
         assert_eq!(the_clean_string, "🬎🬎");
     }
     #[test]
+    #[timeout(100)]
     fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
         let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));
         assert_eq!(

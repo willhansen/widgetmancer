@@ -452,7 +452,7 @@ impl Screen {
 
 #[cfg(test)]
 mod tests {
-    use ntest::assert_false;
+    use ntest::{assert_false, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::utility::{STEP_DOWN, STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
@@ -474,6 +474,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_world_to_screen_buffer() {
         let g = set_up_10x10_character_screen();
 
@@ -494,6 +495,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_world_to_screen__should_bias_up_left() {
         let s0 = set_up_nxn_square_screen(5);
         assert_eq!(s0.screen_origin_as_world_square(), point2(0, 4));
@@ -527,6 +529,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_screen_origin_set_get_consistency() {
         let mut s = set_up_nxn_square_screen(23);
         let new_center = point2(24, 89);
@@ -535,6 +538,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_screen_max_position() {
         let mut s = set_up_nxn_square_screen(5);
 
@@ -544,6 +548,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_screen_max_position__with_rotation() {
         let mut s = set_up_nxn_square_screen(5);
         s.set_rotation(QuarterTurnsAnticlockwise::new(3));
@@ -553,6 +558,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_world_to_screen__with_screen_motion() {
         let mut g = set_up_10x10_character_screen();
 
@@ -568,6 +574,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_world_square_is_on_screen() {
         let mut g = Screen::new(41, 20);
         let xmax = 20;
@@ -605,6 +612,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_screen_rotation__square_to_square() {
         let mut s = Screen::new(20, 20);
         let center = point2(3, 5);
@@ -652,6 +660,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_world_square_is_on_screen__with_screen_rotation() {
         let mut s = Screen::new_by_square_dimensions(100, 5);
         s.set_screen_center_by_world_square(point2(300, 20));
@@ -670,6 +679,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_screen_rotation_pivots_around_center_square() {
         let mut s = Screen::new(20, 20);
         let center = point2(3, 5);

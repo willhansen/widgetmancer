@@ -27,8 +27,10 @@ where
 mod tests {
     use super::*;
     use itertools::Itertools;
+    use ntest::timeout;
 
     #[test]
+    #[timeout(100)]
     fn test_round_robin() {
         let iter = round_robin(vec![0..10, 100..110]);
         assert_eq!(iter.clone().take(4).collect_vec(), vec![0, 100, 1, 101]);
@@ -37,6 +39,7 @@ mod tests {
         assert_eq!(round_robin(vec![0..10, 100..102]).count(), 5);
     }
     #[test]
+    #[timeout(100)]
     fn test_one_sided_ranges() {
         let iter = round_robin(vec![0.., 100..]);
         assert_eq!(iter.take(4).collect_vec(), vec![0, 100, 1, 101]);

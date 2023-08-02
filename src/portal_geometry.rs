@@ -300,11 +300,12 @@ mod tests {
         assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
         STEP_UP_RIGHT,
     };
-    use ntest::assert_about_eq;
+    use ntest::{assert_about_eq, timeout};
 
     use super::*;
 
     #[test]
+    #[timeout(100)]
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
             SquareWithOrthogonalDir::from_square_and_step(point2(1, 2), STEP_UP),
@@ -315,6 +316,7 @@ mod tests {
         assert_eq!(pose1.apply_rigid_transform(transform), pose2);
     }
     #[test]
+    #[timeout(100)]
     fn test_ray_through_portal() {
         let mut portal_geometry = PortalGeometry::default();
         portal_geometry.create_portal(
@@ -346,6 +348,7 @@ mod tests {
         }
     }
     #[test]
+    #[timeout(100)]
     fn test_transform_ray__simple_translation() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(3, 4), STEP_RIGHT).into(),
@@ -356,6 +359,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), 90.0);
     }
     #[test]
+    #[timeout(100)]
     fn test_transform_ray__simple_rotation() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(3, 4), STEP_RIGHT).into(),
@@ -366,6 +370,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), -45.0);
     }
     #[test]
+    #[timeout(100)]
     fn test_transform_ray__move_and_rotate() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(5, 5), STEP_LEFT).into(),
@@ -376,6 +381,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), 80.0, 0.001);
     }
     #[test]
+    #[timeout(100)]
     fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
         let mut portal_geometry = PortalGeometry::default();
         portal_geometry.create_portal(

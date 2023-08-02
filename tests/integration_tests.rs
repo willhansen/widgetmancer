@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use euclid::*;
-use ntest::assert_false;
+use ntest::{assert_false, timeout};
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;
 
@@ -19,6 +19,7 @@ use rust_roguelike::utility::{
 use rust_roguelike::utils_for_tests::*;
 
 #[test]
+#[timeout(100)]
 fn test_walk_in_circle() {
     let mut game = set_up_game_with_player();
     let start_pos = game.try_get_player_square();
@@ -30,6 +31,7 @@ fn test_walk_in_circle() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_player_drawn_to_screen() {
     let mut game = set_up_game_with_player();
     let start_pos = game.player_square();
@@ -41,6 +43,7 @@ fn test_player_drawn_to_screen() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_player_can_not_move_off_low_edge() {
     let mut game = set_up_game_with_player();
     let start_pos = point2(0, 0);
@@ -52,6 +55,7 @@ fn test_player_can_not_move_off_low_edge() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_player_can_not_move_off_high_edge() {
     let mut game = set_up_game_with_player();
 
@@ -73,6 +77,7 @@ fn test_player_can_not_move_off_high_edge() {
 
 #[ignore]
 #[test]
+#[timeout(100)]
 fn test_checkerboard_background() {
     let mut game = set_up_game_with_player();
     game.try_set_player_position(point2(1, 2))
@@ -108,6 +113,7 @@ fn test_checkerboard_background() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_draw_placed_pawn() {
     let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
@@ -121,6 +127,7 @@ fn test_draw_placed_pawn() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_capture_pawn() {
     let mut game = set_up_game_with_player();
     let one_left = game.player_square() + LEFT_I.cast_unit();
@@ -143,6 +150,7 @@ fn test_capture_pawn() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_pawn_capture_player() {
     let mut game = set_up_game_with_player();
     let player_start_square = game.player_square();
@@ -157,6 +165,7 @@ fn test_pawn_capture_player() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_pawn_move_towards_player() {
     let mut game = set_up_game_with_player();
     let two_left = game.player_square() + (LEFT_I * 2).cast_unit();
@@ -167,6 +176,7 @@ fn test_pawn_move_towards_player() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_shoot_pawn() {
     let mut game = set_up_player_facing_pawn_on_left();
 
@@ -176,6 +186,7 @@ fn test_shoot_pawn() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_move_to_turn() {
     let mut game = set_up_game_with_player();
     game.try_slide_player(UP_I.cast_unit()).expect("step");
@@ -198,6 +209,7 @@ fn test_move_to_turn() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_visible_laser() {
     let mut game = set_up_game_with_player();
     let inspection_square: WorldSquare =
@@ -214,6 +226,7 @@ fn test_visible_laser() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_player_background_is_transparent() {
     let mut game = set_up_game_with_player();
 
@@ -242,6 +255,7 @@ fn test_player_background_is_transparent() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_laser_background_is_transparent() {
     let mut game = set_up_10x10_game();
     let left_point: WorldPoint = point2(2.0, 2.0);
@@ -268,6 +282,7 @@ fn test_laser_background_is_transparent() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_pawn_background_is_transparent() {
     let mut game = set_up_10x10_game();
     let square1 = point2(2, 3);
@@ -286,6 +301,7 @@ fn test_pawn_background_is_transparent() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_shotgun_spread() {
     let start_pawns = 5;
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(start_pawns, 5);
@@ -296,6 +312,7 @@ fn test_shotgun_spread() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_particles_on_piece_death() {
     let mut game = set_up_10x10_game();
     let pawn_square = point2(5, 5);
@@ -312,6 +329,7 @@ fn test_particles_on_piece_death() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_piece_death_animation_finishes() {
     let mut game = set_up_10x10_game();
     let pawn_square = point2(5, 5);
@@ -330,6 +348,7 @@ fn test_piece_death_animation_finishes() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_sniper_one_shot_one_kill() {
     let mut game = set_up_player_facing_n_pawns_m_blocks_up(3, 20);
     game.select_closest_piece();
@@ -342,6 +361,7 @@ fn test_sniper_one_shot_one_kill() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_selector() {
     let mut game = set_up_10x10_game();
     let test_square = point2(5, 5);
@@ -363,6 +383,7 @@ fn test_selector() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_game_over_on_capture_player() {
     let mut game = set_up_pawn_threatening_player();
     assert!(game.running());
@@ -371,6 +392,7 @@ fn test_game_over_on_capture_player() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_rook_move() {
     let mut game = set_up_game_with_player();
     game.place_piece(
@@ -386,6 +408,7 @@ fn test_rook_move() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_rook_capture() {
     let mut game = set_up_game_with_player();
     game.place_piece(
@@ -399,6 +422,7 @@ fn test_rook_capture() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_king_move() {
     let mut game = set_up_game_with_player();
     let diag_up_right: WorldStep = RIGHT_I.cast_unit() + UP_I.cast_unit();
@@ -415,6 +439,7 @@ fn test_king_move() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_knight_move() {
     let mut game = set_up_game_with_player();
     game.place_piece(
@@ -430,6 +455,7 @@ fn test_knight_move() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_correct_amount_of_braille_in_selector() {
     let mut game = set_up_10x10_game();
     let test_square = point2(5, 5);
@@ -452,6 +478,7 @@ fn test_correct_amount_of_braille_in_selector() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_no_move_into_check() {
     let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
@@ -461,6 +488,7 @@ fn test_no_move_into_check() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_draw_danger_squares() {
     let mut game = set_up_game_with_player();
     let rook_square = game.player_square() + LEFT_I.cast_unit() + UP_I.cast_unit() * 3;
@@ -477,6 +505,7 @@ fn test_draw_danger_squares() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_no_step_on_block() {
     let mut game = set_up_game_with_player();
     let block_square = game.player_square() + RIGHT_I.cast_unit();
@@ -487,6 +516,7 @@ fn test_no_step_on_block() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_rook_stopped_by_block() {
     let mut game = set_up_game_with_player();
     let rook_start_square = game.player_square() + RIGHT_I.cast_unit() * 4;
@@ -501,6 +531,7 @@ fn test_rook_stopped_by_block() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediately_before_that_rook_moves(
 ) {
     let mut game = set_up_game_with_player();
@@ -525,6 +556,7 @@ fn test_some_indicator_that_a_pawn_might_step_out_of_the_path_of_a_rook_immediat
 }
 
 #[test]
+#[timeout(100)]
 fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
     let mut game = set_up_10x10_game();
     let pawn_square = game.mid_square();
@@ -549,6 +581,7 @@ fn test_pawn_move_and_capture_squares_both_visible_and_look_different() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_king_pathfind() {
     let mut game = set_up_nxn_game(20);
     let player_square = WorldSquare::new(3, 10);
@@ -570,6 +603,7 @@ fn test_king_pathfind() {
 }
 
 #[test]
+#[timeout(100)]
 #[ignore] // for now
 fn test_draw_pathfind_paths() {
     let mut game = set_up_nxn_game(20);
@@ -589,6 +623,7 @@ fn test_draw_pathfind_paths() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_turn_if_move_into_wall() {
     let mut game = set_up_game_with_player();
     game.raw_set_player_faced_direction(STEP_UP.into());
@@ -602,6 +637,7 @@ fn test_turn_if_move_into_wall() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_one_move_per_faction_per_turn() {
     let mut game = set_up_10x10_game();
     game.place_player(point2(0, 0));
@@ -619,6 +655,7 @@ fn test_one_move_per_faction_per_turn() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_blocks_visibly_block_view() {
     let mut game = set_up_10x10_game();
     let player_pos = point2(5, 5);
@@ -637,6 +674,7 @@ fn test_blocks_visibly_block_view() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_mystery_labyrinth_death() {
     let (width, height) = (50, 50);
     let mut game = Game::new(width, height, Instant::now());
@@ -648,6 +686,7 @@ fn test_mystery_labyrinth_death() {
 }
 
 #[test]
+#[timeout(100)]
 fn test_factions_attack_each_other() {
     let mut game = set_up_nxn_game(10);
     let square = point2(3, 3);

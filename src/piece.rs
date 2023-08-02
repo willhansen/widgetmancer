@@ -265,6 +265,7 @@ impl Piece {
 
 #[cfg(test)]
 mod tests {
+    use ntest::timeout;
     use std::collections::HashSet;
 
     use pretty_assertions::{assert_eq, assert_ne};
@@ -272,6 +273,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[timeout(100)]
     fn test_turning_vs_omnidirectional_pawn() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_moves()),
@@ -287,6 +289,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_moves()),

@@ -291,9 +291,10 @@ mod tests {
     use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
     use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
     use euclid::point2;
-    use ntest::assert_true;
+    use ntest::{assert_true, timeout};
 
     #[test]
+    #[timeout(100)]
     fn test_rounding_towards_full_visibility() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         assert_eq!(

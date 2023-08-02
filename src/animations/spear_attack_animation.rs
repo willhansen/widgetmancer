@@ -95,12 +95,14 @@ impl Animation for SpearAttackAnimation {
 #[cfg(test)]
 mod tests {
     use euclid::point2;
+    use ntest::timeout;
 
     use crate::utility::STEP_RIGHT;
 
     use super::*;
 
     #[test]
+    #[timeout(100)]
     fn test_spear_attack_does_any_drawing() {
         let square = point2(3, 3);
         let dir = STEP_RIGHT;

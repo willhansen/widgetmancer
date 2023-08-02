@@ -122,7 +122,7 @@ impl Animation for RadialShockwave {
 #[cfg(test)]
 mod tests {
     use euclid::point2;
-    use ntest::assert_about_eq;
+    use ntest::{assert_about_eq, timeout};
 
     use crate::animations::recoiling_board::RecoilingBoardAnimation;
     use crate::glyph::glyph_constants::RED;
@@ -130,6 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[timeout(100)]
     fn test_triangle_wave() {
         assert_about_eq!(
             RadialShockwave::normalized_single_period_triangle_sine_wave(0.0),
@@ -171,6 +172,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_has_some_glyphs() {
         let anim = RadialShockwave::new(point2(5, 5), FloorColorEnum::Solid(RED));
         assert!(anim.glyphs_at_duration(Duration::from_secs_f32(0.0)).len() < 5);
@@ -178,6 +180,7 @@ mod tests {
     }
 
     #[test]
+    #[timeout(100)]
     fn test_shockwave_heights() {
         // past edge of shockwave is zero
         assert_about_eq!(RadialShockwave::shockwave_height(1.0, 0.0, 1.0), 0.0);
