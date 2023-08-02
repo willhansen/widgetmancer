@@ -1521,4 +1521,25 @@ mod tests {
         .collect_vec();
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }
+    #[test]
+    #[timeout(100)]
+    fn test_outward_and_ccw_squares_in_one_octant_with_placeholders() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
+        let iter = arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders();
+        let expected = vec![
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (3, 0),
+            (4, 0),
+            (5, 0),
+            (6, 0),
+            (7, 0),
+            (8, 0),
+        ]
+        .into_iter()
+        .map(|t| Some(t.into()))
+        .collect_vec();
+        assert_eq!(iter.take(expected.len()).collect_vec(), expected);
+    }
 }
