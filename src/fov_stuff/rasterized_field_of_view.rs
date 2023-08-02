@@ -188,6 +188,16 @@ impl RasterizedFieldOfView {
             .is_empty()
     }
 
+    pub fn visibility_of_relative_square_in_main_view(
+        &self,
+        rel_square: WorldStep,
+    ) -> Option<PositionedVisibilityOfSquare> {
+        self.0
+            .iter()
+            .find(|vis| vis.relative_square == rel_square)
+            .cloned()
+    }
+
     pub fn relative_to_absolute_from_main_view_only(
         &self,
         rel_square: WorldStep,
@@ -200,7 +210,7 @@ impl RasterizedFieldOfView {
             .next()
     }
 
-    pub fn relativee_square_visibility_map_of_main_view_only(&self) -> RelativeSquareVisibilityMap {
+    pub fn relative_square_visibility_map_of_main_view_only(&self) -> RelativeSquareVisibilityMap {
         todo!();
     }
 

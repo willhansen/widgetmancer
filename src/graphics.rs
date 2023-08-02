@@ -879,7 +879,7 @@ mod tests {
         );
         g.screen
             .set_screen_center_by_world_square(fov.root_square());
-        g.load_screen_buffer_from_fov(fov);
+        g.load_screen_buffer_from_fov(&fov.rasterized());
         let screen_buffer_square = g.screen.world_square_to_screen_buffer_square(world_square);
         // g.print_draw_buffer(point2(0, 0), 3);
         // g.screen.print_screen_buffer();

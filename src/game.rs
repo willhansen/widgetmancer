@@ -2370,7 +2370,7 @@ impl Game {
             .visibilities_of_relative_square(target_square_relative_to_player)
             .is_empty()
     }
-    fn rasterized_player_field_of_view(&self) -> RasterizedFieldOfView {
+    fn player_field_of_view(&self) -> FieldOfView {
         let start_square = self.player_square();
         portal_aware_field_of_view_from_square(
             start_square,
@@ -2378,7 +2378,9 @@ impl Game {
             &self.blocks,
             &self.portal_geometry,
         )
-        .rasterized()
+    }
+    fn rasterized_player_field_of_view(&self) -> RasterizedFieldOfView {
+        self.player_field_of_view().rasterized()
     }
 
     pub fn get_color_for_faction(&self, faction: Faction) -> RGB8 {
@@ -3200,10 +3202,15 @@ mod tests {
         // );
         // game.graphics.print_screen_buffer();
 
-        let fov = game.rasterized_player_field_of_view();
+        let fov = game.player_field_of_view();
 
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
-        assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 2);
+        assert_eq!(
+            fov.rasterized()
+                .visibilities_of_absolute_square(enemy_square)
+                .len(),
+            2
+        );
         assert_eq!(
             game.graphics
                 .screen
@@ -3353,10 +3360,15 @@ mod tests {
         // );
         // game.graphics.print_screen_buffer();
 
-        let fov = game.rasterized_player_field_of_view();
+        let fov = game.player_field_of_view();
 
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
-        assert_eq!(fov.visibilities_of_absolute_square(enemy_square).len(), 1);
+        assert_eq!(
+            fov.rasterized()
+                .visibilities_of_absolute_square(enemy_square)
+                .len(),
+            1
+        );
         assert_eq!(
             game.graphics
                 .screen
@@ -3909,20 +3921,20 @@ mod tests {
             .map(|&screen_step| game.graphics.screen.screen_step_to_world_step(screen_step))
             .collect_vec();
 
-        let fov = game.rasterized_player_field_of_view();
+        let fov = game.player_field_of_view();
 
         print_fov_as_absolute(&fov, 5);
         dbg!(
             "asdf",
             test_steps_in_world_top_to_bottom
                 .iter()
-                .map(|&step| fov.visibilities_of_relative_square(step))
+                .map(|&step| fov.rasterized().visibilities_of_relative_square(step))
                 .collect_vec(),
         );
 
         test_steps_in_world_top_to_bottom
             .iter()
-            .map(|&world_step| fov.visibilities_of_relative_square(world_step))
+            .map(|&world_step| fov.rasterized().visibilities_of_relative_square(world_step))
             .for_each(
                 |visibilities_of_rel_square: Vec<PositionedVisibilityOfSquare>| {
                     let vis1 = visibilities_of_rel_square[0].square_visibility_in_absolute_frame();

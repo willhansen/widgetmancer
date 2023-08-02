@@ -784,7 +784,7 @@ mod tests {
         for i in 1..=5 {
             let step = STEP_UP_RIGHT * i;
             let square_visibility = fov_result
-                .relativee_square_visibility_map_of_main_view_only()
+                .relative_square_visibility_map_of_main_view_only()
                 .get(&step)
                 .unwrap()
                 .clone();
@@ -877,7 +877,7 @@ mod tests {
         .rasterized();
 
         fov_result
-            .relativee_square_visibility_map_of_main_view_only()
+            .relative_square_visibility_map_of_main_view_only()
             .iter()
             .filter(|(step, vis)| !vis.is_fully_visible())
             .map(
@@ -1541,7 +1541,7 @@ mod tests {
         fov_1.add_fully_visible_relative_face(faces[0]);
         sub_fov_1.add_fully_visible_relative_face(faces[1]);
 
-        fov_1.transformed_sub_fovs.push(sub_fov_1);
+        fov_1.transformed_sub_fovs.push(sub_fov_1.clone());
 
         assert_eq!(
             fov_1
@@ -1569,11 +1569,15 @@ mod tests {
             &Default::default(),
         )
         .rasterized();
-        assert_eq!(fov.visible_relative_squares_in_main_view_only().len(), 1);
+        assert_eq!(
+            fov.at_least_partially_visible_relative_squares_in_main_view_only()
+                .len(),
+            1
+        );
         assert!(fov
-            .visible_relative_squares_in_main_view_only()
-            .get(&STEP_ZERO)
+            .visibility_of_relative_square_in_main_view(STEP_ZERO)
             .unwrap()
+            .square_visibility_in_absolute_frame()
             .is_fully_visible());
     }
 
@@ -1590,7 +1594,8 @@ mod tests {
         print_fov_as_relative(&fov, 5);
         rel_blocks.iter().for_each(|rel_block| {
             assert!(
-                fov.can_fully_and_seamlessly_see_relative_square(*rel_block),
+                fov.rasterized()
+                    .can_fully_and_seamlessly_see_relative_square(*rel_block),
                 "rel_block: {:?}",
                 rel_block
             )
@@ -1609,18 +1614,20 @@ mod tests {
             &Default::default(),
         );
         print_fov_as_relative(&new_fov_result, 2);
-        let visibilities_of_one_right = new_fov_result.visibilities_of_relative_square(STEP_RIGHT);
+        let visibilities_of_one_right = new_fov_result
+            .rasterized()
+            .visibilities_of_relative_square(STEP_RIGHT);
         assert_eq!(visibilities_of_one_right.len(), 1);
         let the_positioned_visibility = visibilities_of_one_right[0].clone();
-        assert_eq!(the_positioned_visibility.portal_depth, 0);
+        assert_eq!(the_positioned_visibility.portal_depth(), 0);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation(),
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.square_visibility_in_absolute_frame;
+        let the_square_visibility = the_positioned_visibility.square_visibility_in_absolute_frame();
         assert_about_eq!(
             the_square_visibility
-                .visible_portion
+                .visible_portion()
                 .unwrap()
                 .dividing_line()
                 .angle_with_positive_x_axis()
@@ -1672,14 +1679,17 @@ mod tests {
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
         let test_square = STEP_UP_RIGHT;
-        let visibilities_of_test_square =
-            new_fov_result.visibilities_of_relative_square(test_square);
+        let visibilities_of_test_square = new_fov_result
+            .rasterized()
+            .visibilities_of_relative_square(test_square);
         assert_eq!(visibilities_of_test_square.len(), 1);
-        assert!(new_fov_result.can_fully_and_seamlessly_see_relative_square(test_square));
+        assert!(new_fov_result
+            .rasterized()
+            .can_fully_and_seamlessly_see_relative_square(test_square));
         let the_positioned_visibility = visibilities_of_test_square[0].clone();
-        assert_eq!(the_positioned_visibility.portal_depth, 1);
+        assert_eq!(the_positioned_visibility.portal_depth(), 1);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation(),
             QuarterTurnsAnticlockwise::new(0)
         );
         let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
@@ -1728,13 +1738,14 @@ mod tests {
 
         let test_square = STEP_RIGHT * 3;
 
-        let visibilities_of_test_square =
-            new_fov_result.visibilities_of_relative_square(test_square);
+        let visibilities_of_test_square = new_fov_result
+            .rasterized()
+            .visibilities_of_relative_square(test_square);
         assert_eq!(visibilities_of_test_square.len(), 1);
         let the_positioned_visibility = visibilities_of_test_square[0].clone();
-        assert_eq!(the_positioned_visibility.portal_depth, 1);
+        assert_eq!(the_positioned_visibility.portal_depth(), 1);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation(),
             QuarterTurnsAnticlockwise::new(1)
         );
         let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
