@@ -19,12 +19,18 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
-pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable {
+pub trait ViewRoundable {
+    fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
+}
+
+pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable + ViewRoundable {
     fn is_fully_visible(&self) -> bool;
     fn is_at_least_partially_visible(&self) -> bool;
+    fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
+    fn is_nearly_but_not_fully_visible(&self, tolerance_length: f32) -> bool;
     fn new_fully_visible() -> Self;
     fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
-    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Box<Self>>;
+    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
     fn top_half_visible() -> Self;
     fn bottom_half_visible() -> Self;
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
@@ -35,56 +41,16 @@ pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable {
 
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
-#[derive(Clone, Copy, Constructor)]
+#[derive(PartialEq, Clone, Copy, Constructor)]
 pub struct SquareVisibilityFromOneLargeShadow {
     // TODO: have more than one half plane (two?)
     visible_portion: Option<LocalSquareHalfPlane>,
 }
 
 impl SquareVisibilityFromOneLargeShadow {
-    pub fn is_fully_visible(&self) -> bool {
-        self.visible_portion.is_none()
-    }
-    pub fn is_nearly_but_not_fully_visible(&self, tolerance: f32) -> bool {
-        self.visible_portion
-            .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
-    }
-    pub fn is_at_least_partially_visible(&self) -> bool {
-        self.visible_portion.is_some_and(|visible_half_plane| {
-            visible_half_plane.at_least_partially_covers_unit_square()
-        })
-    }
-    pub fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
-        self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
-    }
-
-    pub fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
+    pub(crate) fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
         self.visible_portion
     }
-
-    pub fn new_fully_visible() -> Self {
-        SquareVisibilityFromOneLargeShadow {
-            visible_portion: None,
-        }
-    }
-
-    pub fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
-        assert!(visible_portion.at_least_partially_covers_unit_square());
-        assert!(!visible_portion.fully_covers_unit_square());
-        SquareVisibilityFromOneLargeShadow {
-            visible_portion: Some(visible_portion),
-        }
-    }
-    pub fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Option<Self> {
-        if visible_portion.fully_covers_unit_square() {
-            Some(Self::new_fully_visible())
-        } else if visible_portion.at_least_partially_covers_unit_square() {
-            Some(Self::new_partially_visible(visible_portion))
-        } else {
-            None
-        }
-    }
-
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
@@ -103,13 +69,61 @@ impl SquareVisibilityFromOneLargeShadow {
                 .cast_unit(),
         ))
     }
-    pub fn top_half_visible() -> Self {
+}
+
+impl ViewRoundable for SquareVisibilityFromOneLargeShadow {
+    fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self {
+        todo!()
+    }
+}
+
+impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
+    fn is_fully_visible(&self) -> bool {
+        self.visible_portion.is_none()
+    }
+    fn is_nearly_but_not_fully_visible(&self, tolerance: f32) -> bool {
+        self.visible_portion
+            .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
+    }
+    fn is_at_least_partially_visible(&self) -> bool {
+        self.visible_portion.is_some_and(|visible_half_plane| {
+            visible_half_plane.at_least_partially_covers_unit_square()
+        })
+    }
+    fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
+        self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
+    }
+
+    fn new_fully_visible() -> Self {
+        SquareVisibilityFromOneLargeShadow {
+            visible_portion: None,
+        }
+    }
+
+    fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
+        assert!(visible_portion.at_least_partially_covers_unit_square());
+        assert!(!visible_portion.fully_covers_unit_square());
+        SquareVisibilityFromOneLargeShadow {
+            visible_portion: Some(visible_portion),
+        }
+    }
+    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
+        if visible_portion.fully_covers_unit_square() {
+            Self::new_fully_visible()
+        } else if visible_portion.at_least_partially_covers_unit_square() {
+            Self::new_partially_visible(visible_portion)
+        } else {
+            panic!("half plane does not even partially cover the unit square at (0,0)")
+        }
+    }
+
+    fn top_half_visible() -> Self {
         Self::half_visible(Angle::degrees(270.0))
     }
-    pub fn bottom_half_visible() -> Self {
+    fn bottom_half_visible() -> Self {
         Self::half_visible(Angle::degrees(90.0))
     }
-    pub fn combined_increasing_visibility(&self, other: &Self) -> Self {
+    fn combined_increasing_visibility(&self, other: &Self) -> Self {
         if self.is_fully_visible() || other.is_fully_visible() {
             Self::new_fully_visible()
         } else if self
@@ -135,7 +149,7 @@ impl SquareVisibilityFromOneLargeShadow {
             }
         }
     }
-    pub fn as_string(&self) -> String {
+    fn as_string(&self) -> String {
         if self.is_fully_visible() {
             "  ".to_string()
         } else {
@@ -148,7 +162,7 @@ impl SquareVisibilityFromOneLargeShadow {
             .to_clean_string()
         }
     }
-    pub fn is_about_complementary_to(&self, other: Self) -> bool {
+    fn is_about_complementary_to(&self, other: Self) -> bool {
         return if self.is_fully_visible() {
             !other.is_at_least_partially_visible()
         } else if other.is_fully_visible() {
@@ -160,7 +174,7 @@ impl SquareVisibilityFromOneLargeShadow {
         };
     }
 
-    pub fn is_visually_complementary_to(&self, other: Self) -> bool {
+    fn is_visually_complementary_to(&self, other: Self) -> bool {
         self.as_string()
             .chars()
             .zip(other.as_string().chars())
@@ -192,6 +206,7 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
 pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
     fn is_fully_visible(&self) -> bool;
     fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self;
+    fn rounded_toward_full_visibility(&self, tolerance: f32) -> Self;
 }
 
 // TODO: change to enum with for fully visible, not visible, and partially visible
@@ -227,19 +242,13 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
 
 pub type RelativeSquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
-pub trait SquareVisibilityMapFunctions {
+pub trait SquareVisibilityMapFunctions: ViewRoundable {
     fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self;
-    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
-
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
 }
 
-impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
-    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
-        todo!()
-    }
-
+impl ViewRoundable for RelativeSquareVisibilityMap {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         todo!();
         // let mut the_clone = self.clone();
@@ -265,6 +274,12 @@ impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
         //     })
         //     .collect();
         // the_clone
+    }
+}
+
+impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
+    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
+        todo!()
     }
 
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
@@ -294,8 +309,7 @@ mod tests {
                 },
                 point2(-12.061038, -1.3054879),
             ),
-        )
-        .unwrap();
+        );
         assert!(partial.is_fully_visible());
     }
     #[test]
@@ -319,10 +333,8 @@ mod tests {
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
-        let partial_1 =
-            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1).unwrap();
-        let partial_2 =
-            SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2).unwrap();
+        let partial_1 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1);
+        let partial_2 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2);
 
         let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
         assert!(combined_partial.is_fully_visible());

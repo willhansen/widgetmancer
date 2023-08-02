@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::fov_stuff::square_visibility::SquareVisibility;
+use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityTrait, SquareVisibility};
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;

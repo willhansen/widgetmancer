@@ -591,7 +591,7 @@ pub struct Ray<U> {
     pub angle: Angle<f32>,
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T, U>
 where
     T: Display + Copy,
