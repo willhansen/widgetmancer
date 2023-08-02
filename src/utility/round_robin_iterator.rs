@@ -36,4 +36,9 @@ mod tests {
 
         assert_eq!(round_robin(vec![0..10, 100..102]).count(), 5);
     }
+    #[test]
+    fn test_one_sided_ranges() {
+        let iter = round_robin(vec![0.., 100..]);
+        assert_eq!(iter.take(4).collect_vec(), vec![0, 100, 1, 101]);
+    }
 }

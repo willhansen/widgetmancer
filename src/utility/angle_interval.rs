@@ -1429,4 +1429,44 @@ mod tests {
         let arc = PartialAngleInterval::from_degrees(0.0, 30.0);
         assert_false!(arc.other_is_permissive_sub_interval_of_this(arc.complement()));
     }
+    #[test]
+    fn test_square_going_outwards_and_ccw__one_quadrant() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 90.0);
+        let iter = arc.touched_squares_going_outwards_and_ccw();
+        let expected: Vec<WorldStep> = vec![
+            (0, 0),
+            (1, 0),
+            (0, 1),
+            (1, 1),
+            (2, 0),
+            (0, 2),
+            (2, 1),
+            (1, 2),
+            (2, 2),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect_vec();
+        assert_eq!(iter.take(expected.len()).collect_vec(), expected);
+    }
+    #[test]
+    fn test_square_going_outwards_and_ccw__very_small_angle() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
+        let iter = arc.touched_squares_going_outwards_and_ccw();
+        let expected: Vec<WorldStep> = vec![
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (3, 0),
+            (4, 0),
+            (5, 0),
+            (6, 0),
+            (7, 0),
+            (8, 0),
+        ]
+        .into_iter()
+        .map(|t| t.into())
+        .collect_vec();
+        assert_eq!(iter.take(expected.len()).collect_vec(), expected);
+    }
 }
