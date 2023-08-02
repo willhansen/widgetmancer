@@ -1527,18 +1527,19 @@ mod tests {
         let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
         let iter = arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders();
         let expected = vec![
-            (0, 0),
-            (1, 0),
-            (2, 0),
-            (3, 0),
-            (4, 0),
-            (5, 0),
-            (6, 0),
-            (7, 0),
-            (8, 0),
+            Some((0, 0)),
+            Some((1, 0)),
+            None, // 1,1
+            Some((2, 0)),
+            None, // 2,1
+            None, // 2,2
+            Some((3, 0)),
+            None, // 3,1
+            None, // 3,2
+            
         ]
         .into_iter()
-        .map(|t| Some(t.into()))
+        .map(|t| t.map(|x|x.into()))
         .collect_vec();
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }
