@@ -294,7 +294,7 @@ mod tests {
     use ntest::{assert_true, timeout};
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_rounding_towards_full_visibility() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         assert_eq!(

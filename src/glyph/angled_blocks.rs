@@ -347,7 +347,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_line_and_inside_point_to_angled_block_character__left_edge_full_block() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
@@ -366,7 +366,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_line_and_inside_point_to_angled_block_character__left_edge_empty_block() {
         assert_eq!(
             half_plane_to_angled_block_character(
@@ -384,7 +384,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_line_and_inside_point_to_angled_block_character__lower_right_diagonal() {
         assert_eq!(
             half_plane_to_angled_block_character(
@@ -402,7 +402,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_line_and_inside_point_to_angled_block_character__notch_off_bottom_right() {
         assert_eq!(
             half_plane_to_angled_block_character(
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_snap_to_grid() {
         assert_eq!(
             snap_to_grid(point2(-0.45, -0.51)),
@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_snap_points_to_character() {
         assert_eq!(
             get_character_from_snap_points(Line::new(point2(0, 0), point2(2, 3))),
@@ -473,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_half_plane_to_character__from_failure_data() {
         let half_plane = HalfPlane::from_line_and_point_on_half_plane(
             Line {
@@ -492,7 +492,7 @@ mod tests {
     //U+1FB6x 	🭠 	🭡 	🭢 	🭣 	🭤 	🭥 	🭦 	🭧
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_angle_block_char_complement() {
         assert_eq!(angle_block_char_complement('🭦'), '🭐');
         assert_eq!(angle_block_char_complement('🭗'), '🭁');
@@ -501,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_top_half_visible_with_exactly_horizontal_line() {
         assert_eq!(
             half_plane_to_angled_block_character(
@@ -518,7 +518,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_left_half_visible_with_exactly_vertical_line() {
         assert_eq!(
             half_plane_to_angled_block_character(

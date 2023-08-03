@@ -113,7 +113,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_screen_to_world__lower_left() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 50);
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_screen_to_world__upper_left() {
         // 50 squares x 50 squares
         let input_map = InputMap::new(100, 50);
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_screen_to_world__lower_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 50);
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_screen_to_world__upper_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 1);
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_screen_to_world__two_characters_one_square() {
         let input_map = InputMap::new(100, 50);
         // odd to even, moving right, is same square

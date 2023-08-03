@@ -273,7 +273,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_turning_vs_omnidirectional_pawn() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_moves()),
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_moves()),

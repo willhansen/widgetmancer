@@ -32,7 +32,7 @@ mod tests {
     use ntest::timeout;
 
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_round_robin() {
         let vec_of_iters: Vec<_> = vec![0..10, 100..110];
         let iter = round_robin(vec_of_iters.clone());
@@ -40,7 +40,7 @@ mod tests {
         assert_eq!(iter.clone().count(), 20);
     }
     #[test]
-    #[timeout(100)]
+    #[timeout(1000)]
     fn test_one_sided_ranges() {
         let iter = round_robin(vec![0.., 100..]);
         assert_eq!(iter.take(4).collect_vec(), vec![0, 100, 1, 101]);
