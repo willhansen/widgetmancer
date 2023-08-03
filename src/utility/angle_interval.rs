@@ -418,7 +418,7 @@ impl PartialAngleInterval {
             .into_iter()
             .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
             .collect_vec();
-        round_robin(iters).filter_map(|maybe_step| maybe_step)
+        round_robin(iters).filter_map(|maybe_step| maybe_step).unique()
     }
 
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
