@@ -411,19 +411,21 @@ impl PartialAngleInterval {
             self.anticlockwise_end + d_angle,
         )
     }
+
+    // asdfasdf
     pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
-        round_robin(
-            self.split_into_octants_in_ccw_order()
+        let iters:  Vec<&_> = self.split_into_octants_in_ccw_order()
                 .into_iter()
                 .map(|arc| {
-                    arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders()
-                        .collect_vec()
-                        .into_iter()
+                    &arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders()
                 })
-                .collect_vec(),
+                .collect_vec();
+        round_robin(iters,
         )
-        .filter_map(|maybe_step| maybe_step)
+        .filter_map(|maybe_step| maybe_step) // TODO: is this the infiniloop source?
     }
+
+
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
         if self.is_in_one_octant() {
             return vec![*self];

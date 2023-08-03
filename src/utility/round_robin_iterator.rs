@@ -1,17 +1,17 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct RoundRobinIterator<IteratorType> {
-    iters: Vec<IteratorType>,
+pub struct RoundRobinIterator<'a, IteratorType> {
+    iters: Vec<&'a IteratorType>,
     index_of_next_iterator: usize,
 }
 
-pub fn round_robin<IteratorType>(iters: Vec<IteratorType>) -> RoundRobinIterator<IteratorType> {
+pub fn round_robin<IteratorType>(iters: Vec<&IteratorType>) -> RoundRobinIterator<IteratorType> {
     RoundRobinIterator {
         iters,
         index_of_next_iterator: 0,
     }
 }
 
-impl<IteratorType, ItemType> Iterator for RoundRobinIterator<IteratorType>
+impl<IteratorType, ItemType> Iterator for RoundRobinIterator<'_, IteratorType>
 where
     IteratorType: Iterator<Item = ItemType>,
 {
