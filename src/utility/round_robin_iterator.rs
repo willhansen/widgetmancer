@@ -34,12 +34,10 @@ mod tests {
     #[test]
     #[timeout(100)]
     fn test_round_robin() {
-        let vec_of_ref_iters: Vec<_> = vec![0..10, 100..110];
-        let iter = round_robin(vec_of_ref_iters.clone());
+        let vec_of_iters: Vec<_> = vec![0..10, 100..110];
+        let iter = round_robin(vec_of_iters.clone());
         assert_eq!(iter.clone().take(4).collect_vec(), vec![0, 100, 1, 101]);
         assert_eq!(iter.clone().count(), 20);
-
-        assert_eq!(round_robin(vec_of_ref_iters).count(), 5);
     }
     #[test]
     #[timeout(100)]
