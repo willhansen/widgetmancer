@@ -412,19 +412,14 @@ impl PartialAngleInterval {
         )
     }
 
-    // asdfasdf
-    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
-        let iters:  Vec<&_> = self.split_into_octants_in_ccw_order()
-                .into_iter()
-                .map(|arc| {
-                    &arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders()
-                })
-                .collect_vec();
-        round_robin(iters,
-        )
-        .filter_map(|maybe_step| maybe_step) // TODO: is this the infiniloop source?
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
+        let iters: Vec<_> = self
+            .split_into_octants_in_ccw_order()
+            .into_iter()
+            .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
+            .collect_vec();
+        round_robin(iters).filter_map(|maybe_step| maybe_step)
     }
-
 
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
         if self.is_in_one_octant() {
@@ -449,7 +444,6 @@ impl PartialAngleInterval {
 
         let mut oct = start_octant.next_ccw();
         while oct != end_octant {
-            dbg!("asdfasdf", oct);
             segments_to_return.push(PartialAngleInterval::from_octant(oct));
             oct = oct.next_ccw();
         }
@@ -464,20 +458,24 @@ impl PartialAngleInterval {
     }
     fn touched_rel_squares_going_outwards_in_one_octant_with_placeholders(
         &self,
-    ) -> impl Iterator<Item = Option<WorldStep>> + '_ {
+    ) -> impl Iterator<Item = Option<WorldStep>> {
         assert!(self.is_in_one_octant());
-        OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap()).map(|step| {
+        let squares_in_octant_iter =
+            OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap());
+        let cloned_arc = self.clone();
+        let squares_in_arc_iter = squares_in_octant_iter.map(move |step| {
             if step == STEP_ZERO {
                 return Some(step);
             }
-            if self.partially_or_fully_overlaps_without_exactly_touching(
+            if cloned_arc.partially_or_fully_overlaps_without_exactly_touching(
                 Self::from_relative_square(step),
             ) {
                 Some(step)
             } else {
                 None
             }
-        })
+        });
+        squares_in_arc_iter
     }
     fn is_in_one_octant(&self) -> bool {
         self.octant().is_some()
@@ -1538,10 +1536,9 @@ mod tests {
             Some((3, 0)),
             None, // 3,1
             None, // 3,2
-            
         ]
         .into_iter()
-        .map(|t| t.map(|x|x.into()))
+        .map(|t| t.map(|x| x.into()))
         .collect_vec();
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }

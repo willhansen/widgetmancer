@@ -1,17 +1,19 @@
+use std::iter::Take;
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct RoundRobinIterator<'a, IteratorType> {
-    iters: Vec<&'a IteratorType>,
+pub struct RoundRobinIterator<IteratorType> {
+    iters: Vec<IteratorType>,
     index_of_next_iterator: usize,
 }
 
-pub fn round_robin<IteratorType>(iters: Vec<&IteratorType>) -> RoundRobinIterator<IteratorType> {
+pub fn round_robin<IteratorType>(iters: Vec<IteratorType>) -> RoundRobinIterator<IteratorType> {
     RoundRobinIterator {
         iters,
         index_of_next_iterator: 0,
     }
 }
 
-impl<IteratorType, ItemType> Iterator for RoundRobinIterator<'_, IteratorType>
+impl<IteratorType, ItemType> Iterator for RoundRobinIterator<IteratorType>
 where
     IteratorType: Iterator<Item = ItemType>,
 {
@@ -32,11 +34,12 @@ mod tests {
     #[test]
     #[timeout(100)]
     fn test_round_robin() {
-        let iter = round_robin(vec![0..10, 100..110]);
+        let vec_of_ref_iters: Vec<_> = vec![0..10, 100..110];
+        let iter = round_robin(vec_of_ref_iters.clone());
         assert_eq!(iter.clone().take(4).collect_vec(), vec![0, 100, 1, 101]);
         assert_eq!(iter.clone().count(), 20);
 
-        assert_eq!(round_robin(vec![0..10, 100..102]).count(), 5);
+        assert_eq!(round_robin(vec_of_ref_iters).count(), 5);
     }
     #[test]
     #[timeout(100)]
