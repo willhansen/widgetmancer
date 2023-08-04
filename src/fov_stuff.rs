@@ -238,13 +238,16 @@ impl FieldOfView {
     }
 
     pub fn rasterized(&self) -> RasterizedFieldOfView {
+        // rasterize top level
+        // rasterize each sub-level
+        let relativeVisibilityMap: RelativeSquareVisibilityMap = self.all_view_segments_converted_to_relative_frame()
+            .iter()
+            .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())
+            .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
+            .unwrap();
         todo!();
-        // self.all_view_segments_converted_to_relative_frame()
-        //     .iter()
-        //     .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())
-        //     .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
-        //     .unwrap()
     }
+
     fn all_view_segments_converted_to_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
         concat([
             self.visible_segments_in_main_view_only.clone(),
@@ -1808,4 +1811,17 @@ mod tests {
             (0..=5).map(|i| STEP_RIGHT * i).collect()
         )
     }
+    #[test]
+    #[timeout(1000)]
+    fn test_rasterize__main_view_only() {
+        let mut narrow_fov = FieldOfView::new_empty_fov_with_root(point2(5,10));
+        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT*5);
+
+        let rasterized_fov = narrow_fov.rasterized();
+
+        // asdfasdf
+        assert_eq!(rasterized_fov)
+
+    }
+
 }

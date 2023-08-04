@@ -625,7 +625,7 @@ impl AngleIntervalSet {
         // TODO: don't just get the first one
         self.intervals
             .iter()
-            .filter_map(|&arc_from_set: &PartialAngleInterval| {
+            .find_map(|&arc_from_set: &PartialAngleInterval| {
                 if arc_from_set.partially_overlaps_other_while_including_edges(interval) {
                     Some(arc_from_set.edge_of_this_overlapped_by(interval))
                 } else if interval.fully_contains_interval_excluding_edge_overlaps(arc_from_set) {
@@ -634,7 +634,6 @@ impl AngleIntervalSet {
                     None
                 }
             })
-            .next()
     }
 }
 
