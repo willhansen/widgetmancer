@@ -1,6 +1,7 @@
 pub mod angle_based_visible_segment;
 pub mod rasterized_field_of_view;
 pub mod square_visibility;
+pub mod fence;
 
 use std::backtrace::Backtrace;
 use std::collections::{HashMap, HashSet};
@@ -52,9 +53,9 @@ pub struct FieldOfView {
 }
 
 impl FieldOfView {
-    pub fn new_empty_fov_with_root(root: SquareWithOrthogonalDir) -> Self {
+    pub fn new_empty_fov_with_root(root: impl Into<SquareWithOrthogonalDir>) -> Self {
         FieldOfView {
-            root_square_with_direction: root,
+            root_square_with_direction: root.into(),
             visible_segments_in_main_view_only: Vec::new(),
             transformed_sub_fovs: Vec::new(),
         }
@@ -1814,13 +1815,15 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_rasterize__main_view_only() {
-        let mut narrow_fov = FieldOfView::new_empty_fov_with_root(point2(5,10));
-        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT*5);
+        let root_square = point2(5,10);
+        let mut narrow_fov = FieldOfView::new_empty_fov_with_root((root_square, STEP_UP));
+        let dx = 5;
+        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT*dx);
 
         let rasterized_fov = narrow_fov.rasterized();
 
+        assert_eq!(rasterized_fov.positioned_visibilities().len(), dx as usize);
         // asdfasdf
-        assert_eq!(rasterized_fov)
 
     }
 

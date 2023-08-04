@@ -94,6 +94,10 @@ impl RasterizedFieldOfView {
             STEP_ZERO,
         )]))
     }
+    pub fn positioned_visibilities(&self) -> &Vec<PositionedVisibilityOfSquare> {
+        &self.0
+    }
+
     pub(crate) fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,

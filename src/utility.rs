@@ -1983,8 +1983,8 @@ impl RigidlyTransformable for AngleInterval {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         match self {
             AngleInterval::Empty | AngleInterval::FullCircle => *self,
-            AngleInterval::Partial(partial_angle_interval) => {
-                AngleInterval::Partial(partial_angle_interval.apply_rigid_transform(tf))
+            AngleInterval::PartialArc(partial_angle_interval) => {
+                AngleInterval::PartialArc(partial_angle_interval.apply_rigid_transform(tf))
             }
         }
     }

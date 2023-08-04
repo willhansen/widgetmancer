@@ -2,38 +2,43 @@ use crate::fov_stuff::{
     single_shadow_square_visibility_from_one_view_arc, RelativeSquareVisibilityMap,
     SquareVisibility,
 };
-use crate::utility::angle_interval::PartialAngleInterval;
+use crate::utility::angle_interval::{PartialAngleInterval, AngleInterval};
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square,
-    RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable,
+    RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
 };
+use euclid::point2;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
+
+use super::fence::RelativeFenceFullyVisibleFromOrigin;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: PartialAngleInterval,
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
-    end_internal_relative_faces: HashSet<RelativeSquareWithOrthogonalDir>,
+    end_fence: RelativeFenceFullyVisibleFromOrigin,
 }
 impl AngleBasedVisibleSegment {
     pub fn validate(&self) {
         if !self.start_face_spans_angle_interval()
-            || !self.end_faces_fully_cover_angle_interval_with_no_overlap()
+            || !self.end_fence_fully_covers_angle_interval_with_no_overlap()
         {
             panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
         }
     }
-    fn end_faces_fully_cover_angle_interval_with_no_overlap(&self) -> bool {
-        let end_faces_going_clockwise =
-            self.end_internal_relative_faces
-                .iter()
-                .sorted_by_key(|face| {
-                    OrderedFloat(better_angle_from_x_axis(face.face_center_point()).radians)
-                });
-        todo!()
+    pub fn end_fence(&self) -> &RelativeFenceFullyVisibleFromOrigin {
+        &self.end_fence
+    }
+
+    fn end_fence_fully_covers_angle_interval_with_no_overlap(&self) -> bool {
+        match self.end_fence.spanned_angle_from_origin(){
+            AngleInterval::Empty => false,
+            AngleInterval::FullCircle => true,
+            AngleInterval::PartialArc(arc) => arc.fully_contains_interval_including_edge_overlaps(self.visible_angle_interval) ,
+        }
     }
     fn start_face_spans_angle_interval(&self) -> bool {
         self.start_internal_relative_face.is_none()
@@ -52,7 +57,7 @@ impl AngleBasedVisibleSegment {
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square_face(actual_face),
             start_internal_relative_face: None,
-            end_internal_relative_faces: HashSet::from([actual_face]),
+            end_fence: RelativeFenceFullyVisibleFromOrigin::from_relative_edges(vec![actual_face]),
         }
     }
     pub fn from_relative_square(step: WorldStep) -> Self {
@@ -60,7 +65,7 @@ impl AngleBasedVisibleSegment {
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square(step),
             start_internal_relative_face: None,
-            end_internal_relative_faces: faces,
+            end_fence: RelativeFenceFullyVisibleFromOrigin::from_unsorted_relative_edges(faces),
         }
     }
     pub fn with_weakly_applied_start_face(
@@ -97,10 +102,14 @@ impl AngleBasedVisibleSegment {
         todo!()
     }
     fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
-        todo!()
+        if let Some(line) = self.start_internal_relative_face.map(|face| face.line()) {
+            // TODO: generalize to allow passing in the relative squares, not needing absolute points
+            line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0,0.0) )
+        }
+        else {true}
     }
     fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
-        todo!()
+        self.end_fence().same_side_of_fence(rel_square, STEP_ZERO)
     }
     fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
         todo!()
@@ -144,11 +153,8 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
             start_internal_relative_face: self
                 .start_internal_relative_face
                 .map(|face| face.apply_rigid_transform(tf)),
-            end_internal_relative_faces: self
-                .end_internal_relative_faces
-                .iter()
-                .map(|face| face.apply_rigid_transform(tf))
-                .collect(),
+            end_fence: self
+                .end_fence.apply_rigid_transform(tf)
         }
     }
 }

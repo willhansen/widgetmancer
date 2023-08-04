@@ -25,7 +25,7 @@ use crate::utility::{
 pub enum AngleInterval {
     Empty,
     FullCircle,
-    Partial(PartialAngleInterval),
+    PartialArc(PartialAngleInterval),
 }
 #[derive(Debug, Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
@@ -373,7 +373,8 @@ impl PartialAngleInterval {
 
         contains_other_edges && other_does_not_contain_these_edges
     }
-    pub fn other_is_permissive_sub_interval_of_this(&self, other: Self) -> bool {
+
+    pub fn fully_contains_interval_including_edge_overlaps(&self, other: Self) -> bool {
         self.contains_or_touches_angle(other.anticlockwise_end)
             && self.contains_or_touches_angle(other.clockwise_end)
             && self.contains_or_touches_angle(other.center_angle())
@@ -482,7 +483,7 @@ impl PartialAngleInterval {
     }
     fn octant(&self) -> Option<Octant> {
         Octant::all_octants().find(|octant| {
-            Self::from_octant(*octant).other_is_permissive_sub_interval_of_this(*self)
+            Self::from_octant(*octant).fully_contains_interval_including_edge_overlaps(*self)
         })
     }
 }
@@ -666,7 +667,7 @@ impl AngleInterval {
         match self {
             AngleInterval::Empty => Self::FullCircle,
             AngleInterval::FullCircle => Self::Empty,
-            AngleInterval::Partial(partial) => Self::Partial(PartialAngleInterval::new_interval(
+            AngleInterval::PartialArc(partial) => Self::PartialArc(PartialAngleInterval::new_interval(
                 partial.anticlockwise_end,
                 partial.clockwise_end,
             )),
@@ -1452,7 +1453,7 @@ mod tests {
     #[timeout(1000)]
     fn test_sub_interval__fully_within() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+            .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
                 5.0, 25.0
             )));
     }
@@ -1460,7 +1461,7 @@ mod tests {
     #[timeout(1000)]
     fn test_sub_interval__touch_one_edge() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+            .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
                 0.0, 25.0
             )));
     }
@@ -1468,7 +1469,7 @@ mod tests {
     #[timeout(1000)]
     fn test_sub_interval__exact_match() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
-            .other_is_permissive_sub_interval_of_this(PartialAngleInterval::from_degrees(
+            .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
                 0.0, 30.0
             )));
     }
@@ -1476,7 +1477,7 @@ mod tests {
     #[timeout(1000)]
     fn test_sub_interval__tricky_wraparound() {
         let arc = PartialAngleInterval::from_degrees(0.0, 30.0);
-        assert_false!(arc.other_is_permissive_sub_interval_of_this(arc.complement()));
+        assert_false!(arc.fully_contains_interval_including_edge_overlaps(arc.complement()));
     }
     #[test]
     #[timeout(1000)]
