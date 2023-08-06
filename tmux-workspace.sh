@@ -20,10 +20,10 @@ tmux new-session -d -s $SESSION -x "$(tput cols)" -y "$(tput lines)" -c "$WORK_D
 tmux split-window -v -t $SESSION:0 -l 30% -c "$WORK_DIR" # initial vertical split
 tmux split-window -h -t $SESSION:0.1 -l 20% -c "$WORK_DIR" # horizontally split bottom pane
 
-tmux send-keys -t $SESSION:0.0 "nix-shell --command 'zsh'" Enter
+tmux send-keys -t $SESSION:0.0 "nix-shell --run $SHELL" Enter
 #tmux send-keys -t $SESSION:0.0 "hx" Enter
 
-tmux send-keys -t $SESSION:0.1 "nix-shell --command 'zsh'" Enter
+tmux send-keys -t $SESSION:0.1 "nix-shell --run $SHELL" Enter
 
 tmux send-keys -t $SESSION:0.2 "cpugraph" Enter
 
