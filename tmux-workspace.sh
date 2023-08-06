@@ -3,13 +3,13 @@
 set -o errexit # exit if a command exits
 set -o pipefail # a pipe fails if any part fails
 set -o noglob
-set -o nounset # no use of unset variables allowed
+#set -o nounset # no use of unset variables allowed
 
 
 WORK_DIR=$(dirname "$0")
 SESSION="rust-roguelike"
 
-#tmux kill-session -t $SESSION || true # cleanup old session
+tmux kill-session -t $SESSION 2> /dev/null || true # cleanup old session
 
 # create new detached session, with the terminals actual size know before attaching
 # (for correct pane size percentages later)
@@ -30,4 +30,11 @@ tmux send-keys -t $SESSION:0.2 "cpugraph" Enter
 # tmux resize-pane -t $SESSION:0.1 -y 30%
 # tmux resize-pane -t $SESSION:0.2 -x 20%
 
-tmux attach-session -t $SESSION:0.0
+# if already in tmux
+if [ -n "${TMUX}" ]; then
+  tmux switch-client -t $SESSION:0.0
+else
+  tmux attach-session -t $SESSION:0.0
+fi
+
+
