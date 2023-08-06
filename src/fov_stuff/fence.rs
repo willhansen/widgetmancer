@@ -7,15 +7,38 @@ pub struct RelativeFenceFullyVisibleFromOrigin {
     edges: Vec<RelativeSquareWithOrthogonalDir>
 }
 
+pub type Fence = RelativeFenceFullyVisibleFromOrigin;
+
+type Face = RelativeSquareWithOrthogonalDir;
+
 impl RelativeFenceFullyVisibleFromOrigin {
     pub fn from_relative_edges(edges: Vec<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
+        
 
         todo!();
 
     }
-    fn add_edge(&mut self, edge: RelativeSquareWithOrthogonalDir){
-        todo!()
+    fn add_edge(&mut self, edge: Face){
+        if self.edges.is_empty() {
+            self.edges.push(edge);
+            return;
+        } 
+        if self.overlaps_edge(edge) {
+            panic!("Tried to add overlapping edge to fence: {}", edge)
+        }
+
+        if self.can_connect_to_end(edge) {
+            self.edges.push(edge)
+        } else if self.can_connect_to_start(edge) {
+            self.edges.insert(0, edge)
+        }
+        else {
+            panic!("Tried to add edge that can't connect to either end: {}", edge)
+        }
         
+    }
+    fn overlaps_edge(&self, edge: RelativeSquareWithOrthogonalDir) {
+        todo!()
     }
     pub fn from_unsorted_relative_edges(edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
 
@@ -40,12 +63,14 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOrigin {
 mod tests {
     use ntest::timeout;
 
+    use crate::utility::{STEP_UP, STEP_LEFT};
+
     use super::*;
 
     #[test]
     #[timeout(1000)]
     fn test_make_a_fence_from_square_faces() {
-        todo!()
+        Fence::from_relative_edges(vec![((5,5), STEP_UP), ((6,4), STEP_LEFT)]);
     }
 
     #[test]

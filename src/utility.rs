@@ -1348,6 +1348,15 @@ impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
     }
 }
 
+// TODO: Redundant definition with debug?  Can be derived?
+impl<T> Display for AbsOrRelSquareWithOrthogonalDir<T> 
+where T: Copy 
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
+    }
+}
+
 impl RelativeSquareWithOrthogonalDir {
     pub fn face_center_point(&self) -> WorldMove {
         self.square().to_f32() + self.dir().step().to_f32() * 0.5
@@ -1391,14 +1400,15 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
     }
 }
 
-impl<SquareType, DirectionType> From<(SquareType, DirectionType)>
+impl<ConvertableToSquareType, SquareType, DirectionType> From<(ConvertableToSquareType, DirectionType)>
     for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
+    ConvertableToSquareType: Into<SquareType>,
     SquareType: AbsOrRelSquareTrait<SquareType>,
     DirectionType: Into<OrthogonalWorldStep>,
 {
-    fn from(value: (SquareType, DirectionType)) -> Self {
-        Self::from_square_and_step(value.0, value.1)
+    fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
+        Self::from_square_and_step(value.0.into(), value.1)
     }
 }
 impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
