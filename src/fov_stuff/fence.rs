@@ -9,16 +9,19 @@ pub struct RelativeFenceFullyVisibleFromOrigin {
 
 pub type Fence = RelativeFenceFullyVisibleFromOrigin;
 
-type Face = RelativeSquareWithOrthogonalDir;
+type Edge = RelativeSquareWithOrthogonalDir;
 
 impl RelativeFenceFullyVisibleFromOrigin {
-    pub fn from_relative_edges(edges: Vec<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
-        
-
-        todo!();
-
+    pub fn edges(&self) -> &Vec<Edge> {
+        &self.edges()
     }
-    fn add_edge(&mut self, edge: Face){
+    pub fn from_relative_edges(edges: Vec<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
+        let mut fence = Self::default();
+        edges.into_iter().for_each(|edge| fence.add_edge(edge));
+        fence
+    }
+    fn add_edge(&mut self, can_be_edge: impl Into<Edge>){
+        let edge = can_be_edge.into();
         if self.edges.is_empty() {
             self.edges.push(edge);
             return;
@@ -37,7 +40,14 @@ impl RelativeFenceFullyVisibleFromOrigin {
         }
         
     }
-    fn overlaps_edge(&self, edge: RelativeSquareWithOrthogonalDir) {
+    fn overlaps_edge(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
+        self.edges.iter().any(|own_edge| own_edge.faces_overlap(edge))
+        todo!()
+    }
+    fn can_connect_to_end(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
+        todo!()
+    }
+    fn can_connect_to_start(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
         todo!()
     }
     pub fn from_unsorted_relative_edges(edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
@@ -61,48 +71,103 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOrigin {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use ntest::timeout;
 
-    use crate::utility::{STEP_UP, STEP_LEFT};
+    use crate::utility::*;
 
     use super::*;
 
     #[test]
     #[timeout(1000)]
     fn test_make_a_fence_from_square_faces() {
-        Fence::from_relative_edges(vec![((5,5), STEP_UP), ((6,4), STEP_LEFT)]);
+        let input = vec![((5,5), STEP_RIGHT), ((6,4), STEP_LEFT)];
+        let fence = Fence::from_relative_edges(input.clone());
+        assert_eq!(fence.edges().len(), input.len());
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_add_to_end_of_fence() {
+        let input = vec![((5,5), STEP_RIGHT), ((6,4), STEP_LEFT)];
+        let mut fence = Fence::from_relative_edges(input.clone());
+        fence.add_edge(((6,4), STEP_DOWN));
+
+        assert_eq!(fence.edges().len(), input.len()+1);
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_add_to_start_of_fence() {
+        let input = vec![((5,5), STEP_RIGHT), ((6,4), STEP_LEFT)];
+        let mut fence = Fence::from_relative_edges(input.clone());
+        fence.add_edge(((5,6), STEP_RIGHT));
+
+        assert_eq!(fence.edges().len(), input.len()+1);
     }
 
     #[test]
     #[timeout(1000)]
+    #[should_panic]
     fn test_fail_to_make_a_fence__disconnected() {
-        todo!()
+        Fence::from_relative_edges(vec![((5,5), STEP_UP), ((6,40), STEP_LEFT)]);
     }
 
     #[test]
     #[timeout(1000)]
+    #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_square_edge() {
-        todo!()
+        Fence::from_relative_edges(vec![((5,5), STEP_UP),((5,5), STEP_UP) ]);
     }
     #[test]
     #[timeout(1000)]
+    #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_edge_from_other_square() {
-        todo!()
+        Fence::from_relative_edges(vec![((5,5), STEP_UP),((5,6), STEP_DOWN) ]);
     }
     #[test]
     #[timeout(1000)]
+    #[should_panic]
     fn test_fail_to_make_a_fence__forking_path() {
-        todo!()
+        let edges = (0..20).map(|y| ((5,y), STEP_RIGHT)).collect();
+        let mut fence = Fence::from_relative_edges(edges);
+
+        fence.add_edge(((5,5), STEP_UP));
     }
     
     #[test]
     #[timeout(1000)]
-    fn test_fence_fully_visible_from_origin() {
-        todo!()
+    #[should_panic]
+    fn test_fail_to_make_a_fence__not_fully_visible_from_origin() {
+        Fence::from_relative_edges(vec![
+            ((10,0), STEP_LEFT),
+            ((10,0), STEP_UP),
+            ((10,0), STEP_RIGHT),
+        ]);
+
     }
     #[test]
     #[timeout(1000)]
-    fn test_fence_not_fully_visible_from_origin() {
-        todo!()
+    fn test_full_circle_fence() {
+        let r = 5;
+        let d = 2*r + 1;
+        let mut edges = vec![];
+        let mut edge: Edge = ((-r, r), STEP_UP).into();
+        (0..4).for_each(|i| {
+            (0..d).for_each(|j| {
+                edges.push(edge);
+                edge = edge.strafed_right();
+            });
+            edge = edge.strafed_left().turned_right();
+        });
+        Fence::from_relative_edges(edges);
+    }
+    #[test]
+    #[timeout(1000)]
+    #[should_panic]
+    fn test_full_circle_fence__fail_because_not_surrounding_origin() {
+    }
+    #[test]
+    #[timeout(1000)]
+    #[should_panic]
+    fn test_almost_full_circle_fence__fail_because_ends_block_view_of_origin() {
     }
 }

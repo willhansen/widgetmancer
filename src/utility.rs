@@ -1340,6 +1340,10 @@ where
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
     }
+
+    pub fn faces_overlap(&self, other_face: Self) -> bool {
+        *self == other_face || *self == other_face.stepped().turned_back()
+    }
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
@@ -1349,8 +1353,7 @@ impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
 }
 
 // TODO: Redundant definition with debug?  Can be derived?
-impl<T> Display for AbsOrRelSquareWithOrthogonalDir<T> 
-where T: Copy 
+impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> 
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
