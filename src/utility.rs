@@ -1218,6 +1218,7 @@ pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
 {
 }
 
+
 // TODO: not have this huge type bound exist twice
 impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
     T: Copy
@@ -1228,6 +1229,18 @@ impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T wher
         + Zero
 {
 }
+
+pub trait AbsOrRelPointTrait<AbsOrRelPoint>: 
+    Copy
+    + PartialEq
+    + Sub<AbsOrRelPoint, Output = WorldMove>
+{}
+
+impl <T, AbsOrRelPoint> AbsOrRelPointTrait<AbsOrRelPoint> for T where
+    T: Copy
+    + PartialEq
+    + Sub<AbsOrRelPoint, Output = WorldMove>
+{}    
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -1271,7 +1284,7 @@ where
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
         Self::from_square_and_step(
-            self.square + rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3) * n,
+            self.square + self.right().step() * n,
             self.direction(),
         )
     }
@@ -1282,14 +1295,20 @@ where
     pub fn turned_left(&self) -> Self {
         Self::from_square_and_step(
             self.square,
-            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1),
+            self.left(),
         )
     }
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(
             self.square,
-            rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3),
+            self.right(),
         )
+    }
+    fn left(&self) -> OrthogonalWorldStep {
+        rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1).into()
+    }
+    fn right(&self) -> OrthogonalWorldStep {
+        rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3).into()
     }
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_step(self.square, -self.direction().step())
@@ -1363,8 +1382,18 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T>
 }
 
 impl RelativeSquareWithOrthogonalDir {
+    // TODO: generalize for absolute squares too
     pub fn face_center_point(&self) -> WorldMove {
         self.square().to_f32() + self.dir().step().to_f32() * 0.5
+    }
+    // TODO: generalize for absolute squares too
+    pub fn face_end_points(&self) -> [WorldMove;2] {
+        [self.left(), self.right()].map(|dir| self.face_center_point() + dir.step().to_f32() * 0.5)
+    }
+    // TODO: generalize for absolute squares too
+    pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
+        let tolerance = 1e-6;
+        self.face_end_points().into_iter().any(|end_point| about_eq_2d(end_point,point ,tolerance ) )
     }
 }
 
@@ -1827,10 +1856,14 @@ pub fn does_ray_hit_oriented_square_face(
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
 
+pub fn about_eq_2d<P: AbsOrRelPointTrait<P>>(p1: P, p2: P, tolerance: f32) -> bool {
+    (p1 - p2).length().abs() < tolerance
+}
+
 pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
     let tolerance = 0.001;
     assert!(
-        (p1 - p2).length().abs() < tolerance,
+        about_eq_2d(p1, p2, tolerance),
         "Points too far apart: p1: {:?}, p2: {:?}",
         p1,
         p2

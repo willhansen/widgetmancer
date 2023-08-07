@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::utility::{RelativeSquareWithOrthogonalDir, angle_interval::AngleInterval, RigidlyTransformable, coordinate_frame_conversions::WorldStep};
+use crate::utility::{RelativeSquareWithOrthogonalDir, angle_interval::AngleInterval, RigidlyTransformable, coordinate_frame_conversions::{WorldStep, WorldPoint, WorldMove}};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeFenceFullyVisibleFromOrigin {
@@ -40,17 +40,26 @@ impl RelativeFenceFullyVisibleFromOrigin {
         }
         
     }
-    fn overlaps_edge(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
+    fn overlaps_edge(&self, edge: Edge) -> bool {
         self.edges.iter().any(|own_edge| own_edge.faces_overlap(edge))
     }
-    fn can_connect_to_end(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
-        todo!()
+    fn can_connect_to_end(&self, edge: Edge) -> bool {
+        !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.end_point())
     }
-    fn can_connect_to_start(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
-        todo!()
+    fn can_connect_to_start(&self, edge: Edge) -> bool {
+        !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.start_point())
     }
-    pub fn from_unsorted_relative_edges(edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
 
+    fn end_point(&self) -> WorldMove {
+        todo!()
+    }
+    fn start_point(&self) -> WorldMove {
+        todo!()
+    }
+
+
+    
+    pub fn from_unsorted_relative_edges(edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
         todo!();
     }
 
