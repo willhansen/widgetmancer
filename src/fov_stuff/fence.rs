@@ -42,7 +42,6 @@ impl RelativeFenceFullyVisibleFromOrigin {
     }
     fn overlaps_edge(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
         self.edges.iter().any(|own_edge| own_edge.faces_overlap(edge))
-        todo!()
     }
     fn can_connect_to_end(&self, edge: RelativeSquareWithOrthogonalDir) -> bool {
         todo!()

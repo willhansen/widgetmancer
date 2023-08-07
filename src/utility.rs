@@ -1210,6 +1210,7 @@ pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<World
 // trait alias
 pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
     Copy
+    + PartialEq
     + Add<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<WorldStep, Output = AbsOrRelWorldSquare>
     + Sub<AbsOrRelWorldSquare, Output = WorldStep>
@@ -1220,6 +1221,7 @@ pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
 // TODO: not have this huge type bound exist twice
 impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
     T: Copy
+        + PartialEq
         + Add<WorldStep, Output = AbsOrRelWorldSquare>
         + Sub<WorldStep, Output = AbsOrRelWorldSquare>
         + Sub<AbsOrRelWorldSquare, Output = WorldStep>
@@ -1229,7 +1231,7 @@ impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T wher
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: AbsOrRelSquareTrait<SquareType> + Copy,
+    SquareType: AbsOrRelSquareTrait<SquareType> + Copy + PartialEq,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
         QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
@@ -1335,15 +1337,15 @@ where
             other_pos_on_dir_axis == stepped_pos_on_dir_axis
         }
     }
+    pub fn faces_overlap<OtherType: Into<Self> + std::marker::Copy>(&self, other_face: OtherType) -> bool {
+        *self == other_face.into() || *self == other_face.into().stepped().turned_back()
+    }
     // TODO: return AbsOrRelWorldLine
     pub fn line(&self) -> WorldLine {
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
     }
 
-    pub fn faces_overlap(&self, other_face: Self) -> bool {
-        *self == other_face || *self == other_face.stepped().turned_back()
-    }
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
