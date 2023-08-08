@@ -17,12 +17,15 @@ type Edge = RelativeSquareWithOrthogonalDir;
 
 impl RelativeFenceFullyVisibleFromOrigin {
     pub fn edges(&self) -> &Vec<Edge> {
-        &self.edges()
+        &self.edges
     }
     pub fn from_relative_edges(edges: Vec<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
         let mut fence = Self::default();
         edges.into_iter().for_each(|edge| fence.add_edge(edge));
         fence
+    }
+    pub fn from_one_edge(edge: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
+        Self::from_relative_edges(vec![edge])
     }
     fn add_edge(&mut self, can_be_edge: impl Into<Edge>) {
         let edge = can_be_edge.into();
@@ -58,10 +61,38 @@ impl RelativeFenceFullyVisibleFromOrigin {
     }
 
     fn end_point(&self) -> WorldMove {
-        todo!()
+        if self.edges.is_empty() {
+            panic!("no points on an empty fence");
+        } else if self.edges.len() == 1 {
+            // the choice of which edge is the end is arbitrary, as long as it's different from the start point
+            self.edges[0].face_end_points()[0]
+        } else {
+            let points_from_last_edge = self.edges.last().unwrap().face_end_points();
+            let second_last_edge = self.edges.get(self.edges.len() - 2).unwrap();
+            points_from_last_edge
+                .into_iter()
+                .find(|&candidate_endpoint| {
+                    !second_last_edge.face_end_point_approx_touches_point(candidate_endpoint)
+                })
+                .unwrap()
+        }
     }
     fn start_point(&self) -> WorldMove {
-        todo!()
+        if self.edges.is_empty() {
+            panic!("no points on an empty fence");
+        } else if self.edges.len() == 1 {
+            // the choice of which edge is the end is arbitrary, as long as it's different from the start point
+            self.edges[0].face_end_points()[1]
+        } else {
+            let points_from_first_edge = self.edges.first().unwrap().face_end_points();
+            let second_edge = self.edges.get(1).unwrap();
+            points_from_first_edge
+                .into_iter()
+                .find(|&candidate_endpoint| {
+                    !second_edge.face_end_point_approx_touches_point(candidate_endpoint)
+                })
+                .unwrap()
+        }
     }
 
     pub fn from_unsorted_relative_edges(
@@ -88,6 +119,7 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOrigin {
 mod tests {
     use itertools::Itertools;
     use ntest::timeout;
+    use pretty_assertions::assert_ne;
 
     use crate::utility::*;
 
@@ -158,13 +190,13 @@ mod tests {
             ((10, 0), STEP_RIGHT),
         ]);
     }
-    #[test]
-    #[timeout(1000)]
-    fn test_full_circle_fence() {
-        let r = 5;
+    fn full_circle_fence(center_square: impl Into<WorldStep>, radius: u32) -> Fence {
+        let r = radius as i32;
+        let s = center_square.into();
         let d = 2 * r + 1;
         let mut edges = vec![];
-        let mut edge: Edge = ((-r, r), STEP_UP).into();
+        let start_square: WorldStep = s + Into::<WorldStep>::into((-r, r));
+        let mut edge: Edge = (start_square, STEP_UP).into();
         (0..4).for_each(|i| {
             (0..d).for_each(|j| {
                 edges.push(edge);
@@ -172,14 +204,34 @@ mod tests {
             });
             edge = edge.strafed_left().turned_right();
         });
-        Fence::from_relative_edges(edges);
+        Fence::from_relative_edges(edges)
     }
+
+    #[test]
+    #[timeout(1000)]
+    fn test_full_circle_fence() {
+        full_circle_fence((0, 2), 5);
+    }
+
     #[test]
     #[timeout(1000)]
     #[should_panic]
-    fn test_full_circle_fence__fail_because_not_surrounding_origin() {}
+    fn test_full_circle_fence__fail_because_origin_is_outside() {}
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_almost_full_circle_fence__fail_because_ends_block_view_of_origin() {}
+
+    #[test]
+    #[timeout(1000)]
+    fn test_end_and_start_points_of_single_edge_fence_are_different() {
+        let fence = Fence::from_one_edge(((5, 5), STEP_RIGHT));
+        assert_ne!(fence.start_point(), fence.end_point());
+    }
+
+    #[test]
+    #[timeout(1000)]
+    fn test_fence_from_unordered_edges() {
+        Fence::from_unsorted_relative_edges((0..20).map(|y| ((5, y), STEP_RIGHT)).collect());
+    }
 }
