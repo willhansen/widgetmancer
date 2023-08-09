@@ -36,6 +36,9 @@ impl RelativeFenceFullyVisibleFromOrigin {
         if self.overlaps_edge(edge) {
             panic!("Tried to add overlapping edge to fence: {}", edge)
         }
+        if self.has_view_from_origin_overlap_with(edge) {
+            panic!("View overlap");
+        }
 
         if self.can_connect_to_end(edge) {
             self.edges.push(edge)
@@ -59,7 +62,10 @@ impl RelativeFenceFullyVisibleFromOrigin {
     fn can_connect_to_start(&self, edge: Edge) -> bool {
         !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.start_point())
     }
-
+    fn has_view_from_origin_overlap_with(&self, edge: Edge) -> bool {
+        //self.spanned_angle_from_origin().overlapping
+        todo!()
+    }
     fn end_point(&self) -> WorldMove {
         if self.edges.is_empty() {
             panic!("no points on an empty fence");

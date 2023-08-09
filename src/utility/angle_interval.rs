@@ -174,10 +174,7 @@ impl PartialAngleInterval {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
 
-    fn partially_or_fully_overlaps_without_exactly_touching(
-        &self,
-        other: PartialAngleInterval,
-    ) -> bool {
+    pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
         // self overlap
         if other == *self {
             return true;
@@ -297,12 +294,7 @@ impl PartialAngleInterval {
         edges_touch && !contains_other_edge
     }
     pub fn overlaps_or_touches(&self, other: PartialAngleInterval) -> bool {
-        self.partially_or_fully_overlaps_without_exactly_touching(other)
-            || self.exactly_touches_arc(other)
-    }
-    pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
-        self.partially_or_fully_overlaps_without_exactly_touching(other)
-            && !self.exactly_touches_arc(other)
+        self.overlapping_but_not_exactly_touching(other) || self.exactly_touches_arc(other)
     }
     pub fn overlaps_other_by_at_least_this_much(
         &self,
@@ -419,7 +411,9 @@ impl PartialAngleInterval {
             .into_iter()
             .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
             .collect_vec();
-        round_robin(iters).filter_map(|maybe_step| maybe_step).unique()
+        round_robin(iters)
+            .filter_map(|maybe_step| maybe_step)
+            .unique()
     }
 
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
@@ -468,9 +462,7 @@ impl PartialAngleInterval {
             if step == STEP_ZERO {
                 return Some(step);
             }
-            if cloned_arc.partially_or_fully_overlaps_without_exactly_touching(
-                Self::from_relative_square(step),
-            ) {
+            if cloned_arc.overlapping_but_not_exactly_touching(Self::from_relative_square(step)) {
                 Some(step)
             } else {
                 None
@@ -612,9 +604,9 @@ impl AngleIntervalSet {
             .any(|i| i.fully_contains_interval_excluding_edge_overlaps(interval))
     }
     pub fn partially_or_fully_overlaps_interval(&self, interval: PartialAngleInterval) -> bool {
-        self.intervals.iter().any(|i: &PartialAngleInterval| {
-            i.partially_or_fully_overlaps_without_exactly_touching(interval)
-        })
+        self.intervals
+            .iter()
+            .any(|i: &PartialAngleInterval| i.overlapping_but_not_exactly_touching(interval))
     }
     pub fn partially_overlaps_interval(&self, interval: PartialAngleInterval) -> bool {
         self.most_overlapped_edge_of_set(interval).is_some()
@@ -667,10 +659,12 @@ impl AngleInterval {
         match self {
             AngleInterval::Empty => Self::FullCircle,
             AngleInterval::FullCircle => Self::Empty,
-            AngleInterval::PartialArc(partial) => Self::PartialArc(PartialAngleInterval::new_interval(
-                partial.anticlockwise_end,
-                partial.clockwise_end,
-            )),
+            AngleInterval::PartialArc(partial) => {
+                Self::PartialArc(PartialAngleInterval::new_interval(
+                    partial.anticlockwise_end,
+                    partial.clockwise_end,
+                ))
+            }
         }
     }
 }
@@ -692,19 +686,19 @@ mod tests {
         let interval_a = PartialAngleInterval::from_degrees(0.0, 10.0);
 
         assert!(
-            interval_a.partially_or_fully_overlaps_without_exactly_touching(interval_a),
+            interval_a.overlapping_but_not_exactly_touching(interval_a),
             "self overlap"
         );
         assert!(
-            interval_b.partially_or_fully_overlaps_without_exactly_touching(interval_b),
+            interval_b.overlapping_but_not_exactly_touching(interval_b),
             "other self overlap"
         );
         assert!(
-            interval_a.partially_or_fully_overlaps_without_exactly_touching(interval_b),
+            interval_a.overlapping_but_not_exactly_touching(interval_b),
             "basic overlap"
         );
         assert!(
-            interval_b.partially_or_fully_overlaps_without_exactly_touching(interval_a),
+            interval_b.overlapping_but_not_exactly_touching(interval_a),
             "commutative"
         );
     }
@@ -770,7 +764,7 @@ mod tests {
         let interval_a = PartialAngleInterval::from_degrees(0.0, 10.0);
         let interval_c = PartialAngleInterval::from_degrees(10.0, 50.0);
         assert!(
-            !interval_a.partially_or_fully_overlaps_without_exactly_touching(interval_c),
+            !interval_a.overlapping_but_not_exactly_touching(interval_c),
             "touching edges should not count as overlap"
         );
     }
