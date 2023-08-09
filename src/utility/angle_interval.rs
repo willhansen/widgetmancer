@@ -667,6 +667,36 @@ impl AngleInterval {
             }
         }
     }
+    pub fn union(&self, other: &(impl Into<Self> + Copy)) -> Self {
+        let other_interval = Into::<Self>::into(*other);
+        match self {
+            AngleInterval::Empty => other_interval,
+            AngleInterval::FullCircle => AngleInterval::FullCircle,
+            AngleInterval::PartialArc(self_arc) => match other_interval {
+                AngleInterval::Empty => *self,
+                AngleInterval::FullCircle => AngleInterval::FullCircle,
+                AngleInterval::PartialArc(other_arc) => self_arc.union(other_arc).into(),
+            },
+        }
+    }
+}
+
+impl From<PartialAngleInterval> for AngleInterval {
+    fn from(value: PartialAngleInterval) -> Self {
+        AngleInterval::PartialArc(value)
+    }
+}
+
+impl TryFrom<AngleInterval> for PartialAngleInterval {
+    type Error = ();
+
+    fn try_from(value: AngleInterval) -> Result<Self, Self::Error> {
+        match value {
+            AngleInterval::Empty => Err(()),
+            AngleInterval::FullCircle => Err(()),
+            AngleInterval::PartialArc(arc) => Ok(arc),
+        }
+    }
 }
 
 #[cfg(test)]

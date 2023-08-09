@@ -1,21 +1,25 @@
 use std::collections::HashSet;
 
+use itertools::Itertools;
+use ordered_float::OrderedFloat;
+
 use crate::utility::{
-    angle_interval::AngleInterval,
+    angle_interval::{AngleInterval, PartialAngleInterval},
+    better_angle_from_x_axis,
     coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct RelativeFenceFullyVisibleFromOrigin {
+pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,
 }
 
-pub type Fence = RelativeFenceFullyVisibleFromOrigin;
+pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 type Edge = RelativeSquareWithOrthogonalDir;
 
-impl RelativeFenceFullyVisibleFromOrigin {
+impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<Edge> {
         &self.edges
     }
@@ -36,8 +40,8 @@ impl RelativeFenceFullyVisibleFromOrigin {
         if self.overlaps_edge(edge) {
             panic!("Tried to add overlapping edge to fence: {}", edge)
         }
-        if self.has_view_from_origin_overlap_with(edge) {
-            panic!("View overlap");
+        if self.has_angle_overlap_with(edge) {
+            panic!("Angle overlap");
         }
 
         if self.can_connect_to_end(edge) {
@@ -62,9 +66,14 @@ impl RelativeFenceFullyVisibleFromOrigin {
     fn can_connect_to_start(&self, edge: Edge) -> bool {
         !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.start_point())
     }
-    fn has_view_from_origin_overlap_with(&self, edge: Edge) -> bool {
-        //self.spanned_angle_from_origin().overlapping
-        todo!()
+    fn has_angle_overlap_with(&self, edge: Edge) -> bool {
+        match self.spanned_angle_from_origin() {
+            AngleInterval::Empty => false,
+            AngleInterval::FullCircle => true,
+            AngleInterval::PartialArc(arc) => arc.overlapping_but_not_exactly_touching(
+                PartialAngleInterval::from_relative_square_face(edge),
+            ),
+        }
     }
     fn end_point(&self) -> WorldMove {
         if self.edges.is_empty() {
@@ -104,18 +113,35 @@ impl RelativeFenceFullyVisibleFromOrigin {
     pub fn from_unsorted_relative_edges(
         edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
     ) -> Self {
-        todo!();
+        let edges_sorted_by_angle = edges
+            .into_iter()
+            .map(Into::<RelativeSquareWithOrthogonalDir>::into)
+            .sorted_by_key(|edge| {
+                OrderedFloat(better_angle_from_x_axis(edge.face_center_point()).radians)
+            })
+            .collect_vec();
+
+        Self::from_relative_edges(rotated_to_have_split_at_max(
+            edges_sorted_by_angle,
+            |&a: &Edge, &b: &Edge| a.face_center_point().angle_to(b.face_center_point()),
+        ))
     }
 
+    // TODO: probably make faster
     pub fn spanned_angle_from_origin(&self) -> AngleInterval {
-        todo!()
+        self.edges
+            .iter()
+            .map(|x| PartialAngleInterval::from_relative_square_face(*x))
+            .fold(AngleInterval::Empty, |acc, x| {
+                AngleInterval::union(&acc, &x)
+            })
     }
 
     pub fn same_side_of_fence(&self, rel_square_a: WorldStep, rel_square_b: WorldStep) -> bool {
         todo!()
     }
 }
-impl RigidlyTransformable for RelativeFenceFullyVisibleFromOrigin {
+impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn apply_rigid_transform(&self, tf: crate::utility::RigidTransform) -> Self {
         todo!()
     }
@@ -185,30 +211,32 @@ mod tests {
 
         fence.add_edge(((5, 5), STEP_UP));
     }
+    #[test]
+    #[timeout(1000)]
+    #[should_panic]
+    fn test_fail_to_make_a_fence__not_ccw() {
+        Fence::from_relative_edges(vec![((5, 0), STEP_RIGHT), ((5, -1), STEP_RIGHT)]);
+    }
 
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__not_fully_visible_from_origin() {
-        Fence::from_relative_edges(vec![
-            ((10, 0), STEP_LEFT),
-            ((10, 0), STEP_UP),
-            ((10, 0), STEP_RIGHT),
-        ]);
+        Fence::from_relative_edges(vec![((10, 1), STEP_RIGHT), ((10, 1), STEP_DOWN)]);
     }
-    fn full_circle_fence(center_square: impl Into<WorldStep>, radius: u32) -> Fence {
+    fn full_circle_ccw_fence(center_square: impl Into<WorldStep>, radius: u32) -> Fence {
         let r = radius as i32;
-        let s = center_square.into();
+        let c = center_square.into();
         let d = 2 * r + 1;
         let mut edges = vec![];
-        let start_square: WorldStep = s + Into::<WorldStep>::into((-r, r));
+        let start_square: WorldStep = c + Into::<WorldStep>::into((r, r));
         let mut edge: Edge = (start_square, STEP_UP).into();
         (0..4).for_each(|i| {
             (0..d).for_each(|j| {
                 edges.push(edge);
-                edge = edge.strafed_right();
+                edge = edge.strafed_left();
             });
-            edge = edge.strafed_left().turned_right();
+            edge = edge.strafed_right().turned_left();
         });
         Fence::from_relative_edges(edges)
     }
@@ -216,17 +244,19 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_full_circle_fence() {
-        full_circle_fence((0, 2), 5);
+        full_circle_ccw_fence((0, 2), 5);
     }
 
     #[test]
     #[timeout(1000)]
     #[should_panic]
-    fn test_full_circle_fence__fail_because_origin_is_outside() {}
+    fn test_full_circle_fence__fail_because_origin_is_outside() {
+        full_circle_ccw_fence((10, 30), 3);
+    }
     #[test]
     #[timeout(1000)]
     #[should_panic]
-    fn test_almost_full_circle_fence__fail_because_ends_block_view_of_origin() {}
+    fn test_almost_full_circle_fence__fail_because_ends_have_angle_overlap() {}
 
     #[test]
     #[timeout(1000)]

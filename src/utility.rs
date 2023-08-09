@@ -1218,7 +1218,6 @@ pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
 {
 }
 
-
 // TODO: not have this huge type bound exist twice
 impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
     T: Copy
@@ -1230,17 +1229,15 @@ impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T wher
 {
 }
 
-pub trait AbsOrRelPointTrait<AbsOrRelPoint>: 
-    Copy
-    + PartialEq
-    + Sub<AbsOrRelPoint, Output = WorldMove>
-{}
+pub trait AbsOrRelPointTrait<AbsOrRelPoint>:
+    Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
+{
+}
 
-impl <T, AbsOrRelPoint> AbsOrRelPointTrait<AbsOrRelPoint> for T where
-    T: Copy
-    + PartialEq
-    + Sub<AbsOrRelPoint, Output = WorldMove>
-{}    
+impl<T, AbsOrRelPoint> AbsOrRelPointTrait<AbsOrRelPoint> for T where
+    T: Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
+{
+}
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -1283,26 +1280,17 @@ where
         self.strafed_right_n(1)
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
-        Self::from_square_and_step(
-            self.square + self.right().step() * n,
-            self.direction(),
-        )
+        Self::from_square_and_step(self.square + self.right().step() * n, self.direction())
     }
     pub fn strafed_left_n(&self, n: i32) -> Self {
         self.strafed_right_n(-n)
     }
 
     pub fn turned_left(&self) -> Self {
-        Self::from_square_and_step(
-            self.square,
-            self.left(),
-        )
+        Self::from_square_and_step(self.square, self.left())
     }
     pub fn turned_right(&self) -> Self {
-        Self::from_square_and_step(
-            self.square,
-            self.right(),
-        )
+        Self::from_square_and_step(self.square, self.right())
     }
     fn left(&self) -> OrthogonalWorldStep {
         rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1).into()
@@ -1356,7 +1344,10 @@ where
             other_pos_on_dir_axis == stepped_pos_on_dir_axis
         }
     }
-    pub fn faces_overlap<OtherType: Into<Self> + std::marker::Copy>(&self, other_face: OtherType) -> bool {
+    pub fn faces_overlap<OtherType: Into<Self> + std::marker::Copy>(
+        &self,
+        other_face: OtherType,
+    ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
     // TODO: return AbsOrRelWorldLine
@@ -1364,7 +1355,6 @@ where
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
     }
-
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
@@ -1374,8 +1364,7 @@ impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
 }
 
 // TODO: Redundant definition with debug?  Can be derived?
-impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> 
-{
+impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
     }
@@ -1387,13 +1376,15 @@ impl RelativeSquareWithOrthogonalDir {
         self.square().to_f32() + self.dir().step().to_f32() * 0.5
     }
     // TODO: generalize for absolute squares too
-    pub fn face_end_points(&self) -> [WorldMove;2] {
+    pub fn face_end_points(&self) -> [WorldMove; 2] {
         [self.left(), self.right()].map(|dir| self.face_center_point() + dir.step().to_f32() * 0.5)
     }
     // TODO: generalize for absolute squares too
     pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
         let tolerance = 1e-6;
-        self.face_end_points().into_iter().any(|end_point| about_eq_2d(end_point,point ,tolerance ) )
+        self.face_end_points()
+            .into_iter()
+            .any(|end_point| about_eq_2d(end_point, point, tolerance))
     }
 }
 
@@ -1434,8 +1425,8 @@ impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
     }
 }
 
-impl<ConvertableToSquareType, SquareType, DirectionType> From<(ConvertableToSquareType, DirectionType)>
-    for AbsOrRelSquareWithOrthogonalDir<SquareType>
+impl<ConvertableToSquareType, SquareType, DirectionType>
+    From<(ConvertableToSquareType, DirectionType)> for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
     ConvertableToSquareType: Into<SquareType>,
     SquareType: AbsOrRelSquareTrait<SquareType>,
@@ -2042,6 +2033,10 @@ impl RigidlyTransformable for PartialAngleInterval {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         self.rotated_quarter_turns(tf.rotation())
     }
+}
+
+pub fn rotated_to_have_split_at_max<T>(vec: &Vec<T>, f: impl Fn(&T, &T) -> f32) -> Vec<T> {
+    todo!();
 }
 
 #[cfg(test)]
