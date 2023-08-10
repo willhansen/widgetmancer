@@ -52,8 +52,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             self.edges.insert(0, edge)
         } else {
             panic!(
-                "Tried to add edge that can't connect to either end: {}",
-                edge
+                "Tried to add edge that can't connect to either end:
+                edge: {}
+                existing: {:#?}",
+                edge,
+                self.edges()
             )
         }
     }
@@ -112,9 +115,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
     }
 
-    pub fn from_unordered_relative_edges(
+    fn edges_sorted_going_ccw(
         edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
-    ) -> Self {
+    ) -> Vec<RelativeSquareWithOrthogonalDir> {
         let edges_sorted_by_angle = edges
             .into_iter()
             .map(Into::<RelativeSquareWithOrthogonalDir>::into)
@@ -130,10 +133,13 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 .abs()
         };
 
-        Self::from_relative_edges(rotated_to_have_split_at_max(
-            &edges_sorted_by_angle,
-            edge_angle_gap_function,
-        ))
+        rotated_to_have_split_at_max(&edges_sorted_by_angle, edge_angle_gap_function)
+    }
+
+    pub fn from_unordered_relative_edges(
+        edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
+    ) -> Self {
+        Self::from_relative_edges(Self::edges_sorted_going_ccw(edges))
     }
 
     // TODO: probably make faster
@@ -298,5 +304,14 @@ mod tests {
             (0..20).map(|y| ((5, y), STEP_RIGHT).into()).collect();
         let fence = Fence::from_unordered_relative_edges(edges.iter().cloned().collect());
         assert_eq!(*fence.edges(), edges);
+    }
+
+    #[test]
+    #[timeout(1000)]
+    fn test_sort_edges_by_ccwness() {
+        let edges: Vec<RelativeSquareWithOrthogonalDir> =
+            (0..20).map(|y| ((5, y), STEP_RIGHT).into()).collect();
+        let resorted_edges = Fence::edges_sorted_going_ccw(edges.iter().cloned().collect());
+        assert_eq!(resorted_edges, edges);
     }
 }
