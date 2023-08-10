@@ -69,7 +69,7 @@ impl AngleBasedVisibleSegment {
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square(step),
             start_internal_relative_face: None,
-            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_unsorted_relative_edges(
+            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_unordered_relative_edges(
                 faces,
             ),
         }

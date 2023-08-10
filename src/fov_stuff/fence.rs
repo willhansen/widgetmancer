@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 
+use crate::rotated_to_have_split_at_max;
+
 use crate::utility::{
     angle_interval::{AngleInterval, PartialAngleInterval},
     better_angle_from_x_axis,
@@ -110,7 +112,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
     }
 
-    pub fn from_unsorted_relative_edges(
+    pub fn from_unordered_relative_edges(
         edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
     ) -> Self {
         let edges_sorted_by_angle = edges
@@ -121,9 +123,16 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             })
             .collect_vec();
 
+        let edge_angle_gap_function = |a: Edge, b: Edge| {
+            a.face_center_point()
+                .angle_to(b.face_center_point())
+                .radians
+                .abs()
+        };
+
         Self::from_relative_edges(rotated_to_have_split_at_max(
-            edges_sorted_by_angle,
-            |&a: &Edge, &b: &Edge| a.face_center_point().angle_to(b.face_center_point()),
+            &edges_sorted_by_angle,
+            edge_angle_gap_function,
         ))
     }
 
@@ -256,7 +265,24 @@ mod tests {
     #[test]
     #[timeout(1000)]
     #[should_panic]
-    fn test_almost_full_circle_fence__fail_because_ends_have_angle_overlap() {}
+    fn test_almost_full_circle_fence__fail_because_ends_have_angle_overlap() {
+        Fence::from_relative_edges(vec![
+            ((0, 1), STEP_UP),
+            ((-1, 1), STEP_UP),
+            ((-1, 1), STEP_LEFT),
+            ((-1, 0), STEP_LEFT),
+            ((-1, -1), STEP_LEFT),
+            ((-1, -1), STEP_DOWN),
+            ((0, -1), STEP_DOWN),
+            ((1, -1), STEP_DOWN),
+            ((1, -1), STEP_RIGHT),
+            ((1, 0), STEP_RIGHT),
+            ((1, 1), STEP_RIGHT),
+            ((1, 2), STEP_RIGHT),
+            ((1, 2), STEP_UP),
+            ((0, 2), STEP_UP),
+        ]);
+    }
 
     #[test]
     #[timeout(1000)]
@@ -268,6 +294,9 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_fence_from_unordered_edges() {
-        Fence::from_unsorted_relative_edges((0..20).map(|y| ((5, y), STEP_RIGHT)).collect());
+        let edges: Vec<RelativeSquareWithOrthogonalDir> =
+            (0..20).map(|y| ((5, y), STEP_RIGHT).into()).collect();
+        let fence = Fence::from_unordered_relative_edges(edges.iter().cloned().collect());
+        assert_eq!(*fence.edges(), edges);
     }
 }

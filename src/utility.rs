@@ -2035,8 +2035,17 @@ impl RigidlyTransformable for PartialAngleInterval {
     }
 }
 
-pub fn rotated_to_have_split_at_max<T>(vec: &Vec<T>, f: impl Fn(&T, &T) -> f32) -> Vec<T> {
-    todo!();
+pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f32) -> Vec<T> {
+    let index_of_max: usize = vec
+        .iter()
+        .cloned()
+        .circular_tuple_windows()
+        .position_max_by_key(|pair: &(T, T)| OrderedFloat(f(pair.0, pair.1)))
+        .unwrap();
+
+    let mut the_clone = vec.clone();
+    the_clone.rotate_left(index_of_max);
+    the_clone
 }
 
 #[cfg(test)]
@@ -2936,5 +2945,14 @@ mod tests {
                     )
                 })
             });
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_vec_rotated_to_max() {
+        assert_eq!(
+            rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 6, 7], |a, b| (a % 7 - b % 7).abs()
+                as f32),
+            vec![6, 7, 0, 1, 2, 3]
+        )
     }
 }
