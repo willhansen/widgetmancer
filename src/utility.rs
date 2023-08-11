@@ -413,7 +413,8 @@ impl<U: Copy> Line<f32, U> {
             return false;
         }
 
-        is_clockwise(point_a, point_b, point_c) == is_clockwise(point_a, point_b, point_d)
+        three_points_are_clockwise(point_a, point_b, point_c)
+            == three_points_are_clockwise(point_a, point_b, point_d)
     }
     pub fn line_intersections_with_centered_unit_square(&self) -> Vec<Point2D<f32, U>> {
         let line_point_a = self.p1;
@@ -606,8 +607,11 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         point_on_half_plane: Point2D<f32, U>,
     ) -> Self {
         HalfPlane {
-            dividing_line: if is_clockwise(dividing_line.p1, dividing_line.p2, point_on_half_plane)
-            {
+            dividing_line: if three_points_are_clockwise(
+                dividing_line.p1,
+                dividing_line.p2,
+                point_on_half_plane,
+            ) {
                 dividing_line
             } else {
                 dividing_line.reversed()
@@ -1037,10 +1041,18 @@ fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2
     furthest_values.try_into().unwrap()
 }
 
-pub fn is_clockwise<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+pub fn three_points_are_clockwise<U>(
+    a: Point2D<f32, U>,
+    b: Point2D<f32, U>,
+    c: Point2D<f32, U>,
+) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < 0.0
+}
+
+pub fn in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
+    a.cross(b) > 0.0
 }
 
 pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
@@ -2036,21 +2048,22 @@ impl RigidlyTransformable for PartialAngleInterval {
 }
 
 pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f32) -> Vec<T> {
-    let index_of_max: usize = vec
+    let index_of_new_end: usize = vec
         .iter()
         .cloned()
         .circular_tuple_windows()
         .position_max_by_key(|pair: &(T, T)| OrderedFloat(f(pair.0, pair.1)))
-        .unwrap();
+        .unwrap()
+        + 1;
 
     let mut the_clone = vec.clone();
-    the_clone.rotate_left(index_of_max);
+    the_clone.rotate_left(index_of_new_end);
     the_clone
 }
 
 #[cfg(test)]
 mod tests {
-    use ntest::{assert_about_eq, assert_false, timeout};
+    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
@@ -2129,12 +2142,12 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_clockwise() {
-        assert!(is_clockwise::<WorldPoint>(
+        assert!(three_points_are_clockwise::<WorldPoint>(
             point2(0.0, 0.0),
             point2(0.0, 1.0),
             point2(1.0, 0.0),
         ));
-        assert_false!(is_clockwise::<WorldPoint>(
+        assert_false!(three_points_are_clockwise::<WorldPoint>(
             point2(0.0, 0.0),
             point2(0.0, 1.0),
             point2(-0.1, -10.0)
@@ -2949,10 +2962,43 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_vec_rotated_to_max() {
+        // up and down
         assert_eq!(
-            rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 6, 7], |a, b| (a % 7 - b % 7).abs()
-                as f32),
-            vec![6, 7, 0, 1, 2, 3]
-        )
+            rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 1, 1], |a, b| (a - b).abs() as f32),
+            vec![1, 1, 0, 1, 2, 3]
+        );
+
+        // find max
+        assert_eq!(
+            rotated_to_have_split_at_max(&vec![0, 1, 2, 7, 6, 3], |a, b| (a - b).abs() as f32),
+            vec![7, 6, 3, 0, 1, 2]
+        );
+
+        // no change
+        assert_eq!(
+            rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 4, 5], |a, b| (a - b).abs() as f32),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_relative_points_in_ccw_order() {
+        assert_true!(in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
+        assert_true!(in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
+        // slight diff
+        assert_true!(in_ccw_order(
+            STEP_UP.to_f32(),
+            STEP_UP.to_f32() + WorldMove::new(-0.001, 0.0)
+        ));
+        assert_true!(in_ccw_order(
+            STEP_UP.to_f32(),
+            STEP_DOWN.to_f32() + WorldMove::new(-0.001, 0.0)
+        ));
+
+        // across
+        assert_false!(in_ccw_order(STEP_UP.to_f32(), STEP_DOWN.to_f32()));
+
+        assert_false!(in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
+        assert_false!(in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
     }
 }

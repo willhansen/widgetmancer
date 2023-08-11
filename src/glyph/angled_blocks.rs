@@ -13,7 +13,8 @@ use crate::glyph::glyph_constants::{
 use crate::utility::angle_interval::PartialAngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    is_clockwise, snap_angle_to_diagonal, unit_vector_from_angle, CoordToString, HalfPlane, Line,
+    snap_angle_to_diagonal, three_points_are_clockwise, unit_vector_from_angle, CoordToString,
+    HalfPlane, Line,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -193,7 +194,7 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
         let same_y = pointA.y == pointB.y;
         let both_on_same_edge =
             (same_x && [0, 2].contains(&pointA.x)) || (same_y && [0, 3].contains(&pointA.y));
-        let center_is_clockwise = is_clockwise(
+        let center_is_clockwise = three_points_are_clockwise(
             local_snap_grid_to_local_character_frame(pointA),
             local_snap_grid_to_local_character_frame(pointB),
             point2(0.0, 0.0),
@@ -290,7 +291,7 @@ pub fn half_plane_to_angled_block_character(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
-        if !is_clockwise(
+        if !three_points_are_clockwise(
             half_plane.dividing_line().p1,
             half_plane.dividing_line().p2,
             half_plane.point_on_half_plane(),

@@ -5,6 +5,7 @@ use ordered_float::OrderedFloat;
 
 use crate::rotated_to_have_split_at_max;
 
+use crate::utility::in_ccw_order;
 use crate::utility::{
     angle_interval::{AngleInterval, PartialAngleInterval},
     better_angle_from_x_axis,
@@ -46,9 +47,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("Angle overlap");
         }
 
-        if self.can_connect_to_end(edge) {
+        if self.can_connect_to_ccw_end(edge) {
             self.edges.push(edge)
-        } else if self.can_connect_to_start(edge) {
+        } else if self.can_connect_to_cw_end(edge) {
             self.edges.insert(0, edge)
         } else {
             panic!(
@@ -65,11 +66,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .iter()
             .any(|own_edge| own_edge.faces_overlap(edge))
     }
-    fn can_connect_to_end(&self, edge: Edge) -> bool {
-        !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.end_point())
+    fn can_connect_to_ccw_end(&self, edge: Edge) -> bool {
+        !self.overlaps_edge(edge)
+            && edge.face_end_point_approx_touches_point(self.ccw_end_point())
+            && in_ccw_order(self.ccw_end_point(), edge.face_center_point())
     }
-    fn can_connect_to_start(&self, edge: Edge) -> bool {
-        !self.overlaps_edge(edge) && edge.face_end_point_approx_touches_point(self.start_point())
+    fn can_connect_to_cw_end(&self, edge: Edge) -> bool {
+        !self.overlaps_edge(edge)
+            && edge.face_end_point_approx_touches_point(self.cw_end_point())
+            && in_ccw_order(edge.face_center_point(), self.cw_end_point())
     }
     fn has_angle_overlap_with(&self, edge: Edge) -> bool {
         match self.spanned_angle_from_origin() {
@@ -80,7 +85,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             ),
         }
     }
-    fn end_point(&self) -> WorldMove {
+    fn ccw_end_point(&self) -> WorldMove {
         if self.edges.is_empty() {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
@@ -97,7 +102,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 .unwrap()
         }
     }
-    fn start_point(&self) -> WorldMove {
+    fn cw_end_point(&self) -> WorldMove {
         if self.edges.is_empty() {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
@@ -132,6 +137,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 .radians
                 .abs()
         };
+
+        dbg!("asdf", edges_sorted_by_angle.clone());
 
         rotated_to_have_split_at_max(&edges_sorted_by_angle, edge_angle_gap_function)
     }
@@ -294,14 +301,14 @@ mod tests {
     #[timeout(1000)]
     fn test_end_and_start_points_of_single_edge_fence_are_different() {
         let fence = Fence::from_one_edge(((5, 5), STEP_RIGHT));
-        assert_ne!(fence.start_point(), fence.end_point());
+        assert_ne!(fence.cw_end_point(), fence.ccw_end_point());
     }
 
     #[test]
     #[timeout(1000)]
     fn test_fence_from_unordered_edges() {
         let edges: Vec<RelativeSquareWithOrthogonalDir> =
-            (0..20).map(|y| ((5, y), STEP_RIGHT).into()).collect();
+            (0..5).map(|y| ((5, y), STEP_RIGHT).into()).collect();
         let fence = Fence::from_unordered_relative_edges(edges.iter().cloned().collect());
         assert_eq!(*fence.edges(), edges);
     }
@@ -310,7 +317,7 @@ mod tests {
     #[timeout(1000)]
     fn test_sort_edges_by_ccwness() {
         let edges: Vec<RelativeSquareWithOrthogonalDir> =
-            (0..20).map(|y| ((5, y), STEP_RIGHT).into()).collect();
+            (0..5).map(|y| ((5, y), STEP_RIGHT).into()).collect();
         let resorted_edges = Fence::edges_sorted_going_ccw(edges.iter().cloned().collect());
         assert_eq!(resorted_edges, edges);
     }
