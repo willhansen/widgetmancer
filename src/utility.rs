@@ -38,6 +38,8 @@ pub mod angle_interval;
 pub mod coordinate_frame_conversions;
 pub mod round_robin_iterator;
 
+pub type SimpleResult = Result<(), ()>;
+
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;
@@ -1051,8 +1053,14 @@ pub fn three_points_are_clockwise<U>(
     ab.cross(ac) < 0.0
 }
 
-pub fn in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
+pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
     a.cross(b) > 0.0
+}
+
+pub fn in_ccw_order(v: &Vec<WorldMove>) -> bool {
+    v.iter()
+        .tuple_windows()
+        .all(|(&a, &b)| two_in_ccw_order(a, b))
 }
 
 pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
@@ -1390,6 +1398,13 @@ impl RelativeSquareWithOrthogonalDir {
     // TODO: generalize for absolute squares too
     pub fn face_end_points(&self) -> [WorldMove; 2] {
         [self.left(), self.right()].map(|dir| self.face_center_point() + dir.step().to_f32() * 0.5)
+    }
+    pub fn face_end_points_in_ccw_order(&self) -> [WorldMove; 2] {
+        let mut ps = self.face_end_points();
+        if !two_in_ccw_order(ps[0], ps[1]) {
+            ps.reverse();
+        }
+        ps
     }
     // TODO: generalize for absolute squares too
     pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
@@ -2983,22 +2998,22 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_relative_points_in_ccw_order() {
-        assert_true!(in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
-        assert_true!(in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
+        assert_true!(two_in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
+        assert_true!(two_in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
         // slight diff
-        assert_true!(in_ccw_order(
+        assert_true!(two_in_ccw_order(
             STEP_UP.to_f32(),
             STEP_UP.to_f32() + WorldMove::new(-0.001, 0.0)
         ));
-        assert_true!(in_ccw_order(
+        assert_true!(two_in_ccw_order(
             STEP_UP.to_f32(),
             STEP_DOWN.to_f32() + WorldMove::new(-0.001, 0.0)
         ));
 
         // across
-        assert_false!(in_ccw_order(STEP_UP.to_f32(), STEP_DOWN.to_f32()));
+        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_DOWN.to_f32()));
 
-        assert_false!(in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
-        assert_false!(in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
+        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
+        assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
     }
 }

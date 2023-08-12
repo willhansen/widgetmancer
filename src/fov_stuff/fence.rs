@@ -5,13 +5,13 @@ use ordered_float::OrderedFloat;
 
 use crate::rotated_to_have_split_at_max;
 
-use crate::utility::in_ccw_order;
 use crate::utility::{
     angle_interval::{AngleInterval, PartialAngleInterval},
     better_angle_from_x_axis,
     coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
+use crate::utility::{in_ccw_order, two_in_ccw_order, SimpleResult};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
@@ -26,13 +26,41 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<Edge> {
         &self.edges
     }
-    pub fn from_relative_edges(edges: Vec<impl Into<RelativeSquareWithOrthogonalDir>>) -> Self {
+    pub fn from_relative_edges(edges: Vec<impl Into<Edge> + Copy>) -> Self {
+        assert!(in_ccw_order(
+            &edges
+                .iter()
+                .map(|&e| Into::<Edge>::into(e).face_center_point())
+                .collect_vec()
+        ));
         let mut fence = Self::default();
         edges.into_iter().for_each(|edge| fence.add_edge(edge));
         fence
     }
-    pub fn from_one_edge(edge: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
+    pub fn from_one_edge(edge: impl Into<RelativeSquareWithOrthogonalDir> + Copy) -> Self {
         Self::from_relative_edges(vec![edge])
+    }
+    fn try_add_to_ccw_end(&mut self, edge: Edge) -> SimpleResult {
+        if self.can_connect_to_ccw_end(edge) {
+            self.add_to_ccw_end(edge);
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    fn try_add_to_cw_end(&mut self, edge: Edge) -> SimpleResult {
+        if self.can_connect_to_cw_end(edge) {
+            self.add_to_cw_end(edge);
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    fn add_to_ccw_end(&mut self, edge: Edge) {
+        self.edges.push(edge)
+    }
+    fn add_to_cw_end(&mut self, edge: Edge) {
+        self.edges.insert(0, edge)
     }
     fn add_edge(&mut self, can_be_edge: impl Into<Edge>) {
         let edge = can_be_edge.into();
@@ -47,11 +75,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("Angle overlap");
         }
 
-        if self.can_connect_to_ccw_end(edge) {
-            self.edges.push(edge)
-        } else if self.can_connect_to_cw_end(edge) {
-            self.edges.insert(0, edge)
-        } else {
+        if self.try_add_to_ccw_end(edge).is_err() && self.try_add_to_cw_end(edge).is_err() {
             panic!(
                 "Tried to add edge that can't connect to either end:
                 edge: {}
@@ -67,14 +91,38 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .any(|own_edge| own_edge.faces_overlap(edge))
     }
     fn can_connect_to_ccw_end(&self, edge: Edge) -> bool {
-        !self.overlaps_edge(edge)
-            && edge.face_end_point_approx_touches_point(self.ccw_end_point())
-            && in_ccw_order(self.ccw_end_point(), edge.face_center_point())
+        let overlapping = self.overlaps_edge(edge);
+        let ends_touch = edge.face_end_point_approx_touches_point(self.ccw_end_point());
+        let edge_is_ccw_of_self = two_in_ccw_order(self.ccw_end_point(), edge.face_center_point());
+        dbg!(
+            "asdf",
+            &self,
+            &edge,
+            overlapping,
+            ends_touch,
+            edge_is_ccw_of_self,
+            edge.face_center_point(),
+            self.ccw_end_point()
+        );
+
+        !overlapping && ends_touch && edge_is_ccw_of_self
     }
     fn can_connect_to_cw_end(&self, edge: Edge) -> bool {
-        !self.overlaps_edge(edge)
-            && edge.face_end_point_approx_touches_point(self.cw_end_point())
-            && in_ccw_order(edge.face_center_point(), self.cw_end_point())
+        let overlapping = self.overlaps_edge(edge);
+        let ends_touch = edge.face_end_point_approx_touches_point(self.cw_end_point());
+        let edge_is_cw_of_self = two_in_ccw_order(edge.face_center_point(), self.cw_end_point());
+        dbg!(
+            "asdf",
+            &self,
+            &edge,
+            overlapping,
+            ends_touch,
+            edge_is_cw_of_self,
+            edge.face_center_point(),
+            self.cw_end_point()
+        );
+
+        !overlapping && ends_touch && edge_is_cw_of_self
     }
     fn has_angle_overlap_with(&self, edge: Edge) -> bool {
         match self.spanned_angle_from_origin() {
@@ -90,7 +138,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
             // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].face_end_points()[0]
+            self.edges[0].face_end_points_in_ccw_order()[1]
         } else {
             let points_from_last_edge = self.edges.last().unwrap().face_end_points();
             let second_last_edge = self.edges.get(self.edges.len() - 2).unwrap();
@@ -107,7 +155,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
             // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].face_end_points()[1]
+            self.edges[0].face_end_points_in_ccw_order()[0]
         } else {
             let points_from_first_edge = self.edges.first().unwrap().face_end_points();
             let second_edge = self.edges.get(1).unwrap();
@@ -172,7 +220,7 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use ntest::timeout;
+    use ntest::{assert_true, timeout};
     use pretty_assertions::assert_ne;
 
     use crate::utility::*;
@@ -182,14 +230,14 @@ mod tests {
     #[test]
     #[timeout(1000)]
     fn test_make_a_fence_from_square_faces() {
-        let input = vec![((5, 5), STEP_RIGHT), ((6, 4), STEP_LEFT)];
+        let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let fence = Fence::from_relative_edges(input.clone());
         assert_eq!(fence.edges().len(), input.len());
     }
     #[test]
     #[timeout(1000)]
-    fn test_add_to_end_of_fence() {
-        let input = vec![((5, 5), STEP_RIGHT), ((6, 4), STEP_LEFT)];
+    fn test_add_to_cw_end_of_fence() {
+        let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let mut fence = Fence::from_relative_edges(input.clone());
         fence.add_edge(((6, 4), STEP_DOWN));
 
@@ -197,8 +245,8 @@ mod tests {
     }
     #[test]
     #[timeout(1000)]
-    fn test_add_to_start_of_fence() {
-        let input = vec![((5, 5), STEP_RIGHT), ((6, 4), STEP_LEFT)];
+    fn test_add_to_ccw_end_of_fence() {
+        let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let mut fence = Fence::from_relative_edges(input.clone());
         fence.add_edge(((5, 6), STEP_RIGHT));
 
@@ -238,6 +286,17 @@ mod tests {
     #[should_panic]
     fn test_fail_to_make_a_fence__not_ccw() {
         Fence::from_relative_edges(vec![((5, 0), STEP_RIGHT), ((5, -1), STEP_RIGHT)]);
+    }
+
+    #[test]
+    #[timeout(1000)]
+    #[should_panic]
+    fn test_fail_to_make_a_fence__edges_not_sequential() {
+        Fence::from_relative_edges(vec![
+            ((5, 0), STEP_RIGHT),
+            ((5, 2), STEP_RIGHT),
+            ((5, 1), STEP_RIGHT),
+        ]);
     }
 
     #[test]
@@ -299,9 +358,15 @@ mod tests {
 
     #[test]
     #[timeout(1000)]
-    fn test_end_and_start_points_of_single_edge_fence_are_different() {
-        let fence = Fence::from_one_edge(((5, 5), STEP_RIGHT));
-        assert_ne!(fence.cw_end_point(), fence.ccw_end_point());
+    fn test_end_points_of_single_edge_fence_are_in_ccw_order() {
+        let edges = ORTHOGONAL_STEPS.map(|step| ((5, 5), step));
+        for edge in edges {
+            let fence = Fence::from_one_edge(edge);
+            assert!(two_in_ccw_order(
+                fence.cw_end_point(),
+                fence.ccw_end_point()
+            ));
+        }
     }
 
     #[test]
