@@ -7,6 +7,7 @@ in
     buildInputs = with unstable.pkgs; [
       cargo
       rustc
+      cargo-watch
       rustfmt
       rust-analyzer
       clippy
