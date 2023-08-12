@@ -59,7 +59,7 @@ impl AngleBasedVisibleSegment {
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square_face(actual_face),
             start_internal_relative_face: None,
-            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_relative_edges(vec![
+            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_ccw_relative_edges(vec![
                 actual_face,
             ]),
         }
@@ -116,7 +116,8 @@ impl AngleBasedVisibleSegment {
         }
     }
     fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
-        self.end_fence().same_side_of_fence(rel_square, STEP_ZERO)
+        self.end_fence()
+            .on_same_side_of_fence(rel_square, STEP_ZERO)
     }
     fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
         todo!()

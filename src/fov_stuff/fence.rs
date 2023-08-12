@@ -26,7 +26,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<Edge> {
         &self.edges
     }
-    pub fn from_relative_edges(edges: Vec<impl Into<Edge> + Copy>) -> Self {
+    pub fn from_ccw_relative_edges(edges: Vec<impl Into<Edge> + Copy>) -> Self {
         assert!(in_ccw_order(
             &edges
                 .iter()
@@ -38,7 +38,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         fence
     }
     pub fn from_one_edge(edge: impl Into<RelativeSquareWithOrthogonalDir> + Copy) -> Self {
-        Self::from_relative_edges(vec![edge])
+        Self::from_ccw_relative_edges(vec![edge])
     }
     fn try_add_to_ccw_end(&mut self, edge: Edge) -> SimpleResult {
         if self.can_connect_to_ccw_end(edge) {
@@ -94,16 +94,6 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.ccw_end_point());
         let edge_is_ccw_of_self = two_in_ccw_order(self.ccw_end_point(), edge.face_center_point());
-        dbg!(
-            "asdf",
-            &self,
-            &edge,
-            overlapping,
-            ends_touch,
-            edge_is_ccw_of_self,
-            edge.face_center_point(),
-            self.ccw_end_point()
-        );
 
         !overlapping && ends_touch && edge_is_ccw_of_self
     }
@@ -111,16 +101,6 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.cw_end_point());
         let edge_is_cw_of_self = two_in_ccw_order(edge.face_center_point(), self.cw_end_point());
-        dbg!(
-            "asdf",
-            &self,
-            &edge,
-            overlapping,
-            ends_touch,
-            edge_is_cw_of_self,
-            edge.face_center_point(),
-            self.cw_end_point()
-        );
 
         !overlapping && ends_touch && edge_is_cw_of_self
     }
@@ -186,15 +166,13 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 .abs()
         };
 
-        dbg!("asdf", edges_sorted_by_angle.clone());
-
         rotated_to_have_split_at_max(&edges_sorted_by_angle, edge_angle_gap_function)
     }
 
     pub fn from_unordered_relative_edges(
         edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
     ) -> Self {
-        Self::from_relative_edges(Self::edges_sorted_going_ccw(edges))
+        Self::from_ccw_relative_edges(Self::edges_sorted_going_ccw(edges))
     }
 
     // TODO: probably make faster
@@ -207,7 +185,14 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             })
     }
 
-    pub fn same_side_of_fence(&self, rel_square_a: WorldStep, rel_square_b: WorldStep) -> bool {
+    pub fn on_same_side_of_fence(
+        &self,
+        rel_square_a: impl Into<WorldStep>,
+        rel_square_b: impl Into<WorldStep>,
+    ) -> bool {
+        self.is_inside_fence(rel_square_a) == self.is_inside_fence(rel_square_b)
+    }
+    fn is_inside_fence(&self, can_be_rel_square: impl Into<WorldStep>) -> bool {
         todo!()
     }
 }
@@ -220,7 +205,7 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use ntest::{assert_true, timeout};
+    use ntest::{assert_false, assert_true, timeout};
     use pretty_assertions::assert_ne;
 
     use crate::utility::*;
@@ -231,14 +216,14 @@ mod tests {
     #[timeout(1000)]
     fn test_make_a_fence_from_square_faces() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
-        let fence = Fence::from_relative_edges(input.clone());
+        let fence = Fence::from_ccw_relative_edges(input.clone());
         assert_eq!(fence.edges().len(), input.len());
     }
     #[test]
     #[timeout(1000)]
     fn test_add_to_cw_end_of_fence() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
-        let mut fence = Fence::from_relative_edges(input.clone());
+        let mut fence = Fence::from_ccw_relative_edges(input.clone());
         fence.add_edge(((6, 4), STEP_DOWN));
 
         assert_eq!(fence.edges().len(), input.len() + 1);
@@ -247,7 +232,7 @@ mod tests {
     #[timeout(1000)]
     fn test_add_to_ccw_end_of_fence() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
-        let mut fence = Fence::from_relative_edges(input.clone());
+        let mut fence = Fence::from_ccw_relative_edges(input.clone());
         fence.add_edge(((5, 6), STEP_RIGHT));
 
         assert_eq!(fence.edges().len(), input.len() + 1);
@@ -257,27 +242,27 @@ mod tests {
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__disconnected() {
-        Fence::from_relative_edges(vec![((5, 5), STEP_UP), ((6, 40), STEP_LEFT)]);
+        Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((6, 40), STEP_LEFT)]);
     }
 
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_square_edge() {
-        Fence::from_relative_edges(vec![((5, 5), STEP_UP), ((5, 5), STEP_UP)]);
+        Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((5, 5), STEP_UP)]);
     }
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_edge_from_other_square() {
-        Fence::from_relative_edges(vec![((5, 5), STEP_UP), ((5, 6), STEP_DOWN)]);
+        Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((5, 6), STEP_DOWN)]);
     }
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__forking_path() {
         let edges = (0..20).map(|y| ((5, y), STEP_RIGHT)).collect();
-        let mut fence = Fence::from_relative_edges(edges);
+        let mut fence = Fence::from_ccw_relative_edges(edges);
 
         fence.add_edge(((5, 5), STEP_UP));
     }
@@ -285,14 +270,14 @@ mod tests {
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__not_ccw() {
-        Fence::from_relative_edges(vec![((5, 0), STEP_RIGHT), ((5, -1), STEP_RIGHT)]);
+        Fence::from_ccw_relative_edges(vec![((5, 0), STEP_RIGHT), ((5, -1), STEP_RIGHT)]);
     }
 
     #[test]
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__edges_not_sequential() {
-        Fence::from_relative_edges(vec![
+        Fence::from_ccw_relative_edges(vec![
             ((5, 0), STEP_RIGHT),
             ((5, 2), STEP_RIGHT),
             ((5, 1), STEP_RIGHT),
@@ -303,7 +288,7 @@ mod tests {
     #[timeout(1000)]
     #[should_panic]
     fn test_fail_to_make_a_fence__not_fully_visible_from_origin() {
-        Fence::from_relative_edges(vec![((10, 1), STEP_RIGHT), ((10, 1), STEP_DOWN)]);
+        Fence::from_ccw_relative_edges(vec![((10, 1), STEP_RIGHT), ((10, 1), STEP_DOWN)]);
     }
     fn full_circle_ccw_fence(center_square: impl Into<WorldStep>, radius: u32) -> Fence {
         let r = radius as i32;
@@ -319,7 +304,7 @@ mod tests {
             });
             edge = edge.strafed_right().turned_left();
         });
-        Fence::from_relative_edges(edges)
+        Fence::from_ccw_relative_edges(edges)
     }
 
     #[test]
@@ -338,7 +323,7 @@ mod tests {
     #[timeout(1000)]
     #[should_panic]
     fn test_almost_full_circle_fence__fail_because_ends_have_angle_overlap() {
-        Fence::from_relative_edges(vec![
+        Fence::from_ccw_relative_edges(vec![
             ((0, 1), STEP_UP),
             ((-1, 1), STEP_UP),
             ((-1, 1), STEP_LEFT),
@@ -385,5 +370,42 @@ mod tests {
             (0..5).map(|y| ((5, y), STEP_RIGHT).into()).collect();
         let resorted_edges = Fence::edges_sorted_going_ccw(edges.iter().cloned().collect());
         assert_eq!(resorted_edges, edges);
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_same_side_of_fence() {
+        let fence = Fence::from_ccw_relative_edges(vec![
+            ((8, 0), STEP_RIGHT),
+            ((8, 1), STEP_RIGHT),
+            ((8, 2), STEP_RIGHT),
+            ((8, 2), STEP_UP),
+            ((7, 2), STEP_UP),
+            ((6, 3), STEP_RIGHT),
+        ]);
+
+        // basic case
+        assert_false!(fence.on_same_side_of_fence((0, 0), (200, 200)));
+        assert_true!(fence.on_same_side_of_fence((0, 0), (-200, 200)));
+
+        // close to the line
+        assert_false!(fence.on_same_side_of_fence((8, 0), (9, 1)));
+        assert_false!(fence.on_same_side_of_fence((7, 1), (7, 4)));
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_inside_fence() {
+        let fence = Fence::from_ccw_relative_edges(vec![
+            ((8, 0), STEP_RIGHT),
+            ((8, 1), STEP_RIGHT),
+            ((8, 2), STEP_RIGHT),
+            ((8, 2), STEP_UP),
+            ((7, 2), STEP_UP),
+            ((6, 3), STEP_RIGHT),
+        ]);
+        let inside_rel_squares = [(8, 0), (0, 0), (6, 3), (0, 3), (0, 1), (3, 3)];
+        let outside_rel_squares = [(9, 0), (-9, 0), (-1, 0), (0, -1)];
+        assert_true!(fence.is_inside_fence((8, 0)));
+        assert_true!(fence.is_inside_fence((0, 0)));
+        assert_true!(fence.is_inside_fence((0, 0)));
     }
 }
