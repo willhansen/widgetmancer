@@ -105,7 +105,9 @@ impl PartialAngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_relative_square_face(rel_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
+    pub fn from_relative_square_face(
+        rel_face: impl Into<RelativeSquareWithOrthogonalDir> + Copy,
+    ) -> Self {
         let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
@@ -641,6 +643,16 @@ impl Display for PartialAngleInterval {
     }
 }
 
+impl Display for AngleInterval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AngleInterval::Empty => write!(f, "Empty"),
+            AngleInterval::FullCircle => write!(f, "FullCircle"),
+            AngleInterval::PartialArc(arc) => arc.fmt(f),
+        }
+    }
+}
+
 impl Display for AngleIntervalSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "contained_intervals:")?;
@@ -677,6 +689,27 @@ impl AngleInterval {
                 AngleInterval::FullCircle => AngleInterval::FullCircle,
                 AngleInterval::PartialArc(other_arc) => self_arc.union(other_arc).into(),
             },
+        }
+    }
+
+    pub fn from_degrees(ccw: f32, cw: f32) -> PartialAngleInterval {
+        PartialAngleInterval::from_degrees(ccw, cw)
+    }
+
+    pub fn overlapping_but_not_exactly_touching(
+        &self,
+        can_be_partial: impl TryInto<PartialAngleInterval>,
+    ) -> bool {
+        match self {
+            AngleInterval::Empty => false,
+            AngleInterval::FullCircle => true,
+            AngleInterval::PartialArc(self_arc) => {
+                if let Ok(other_partial) = can_be_partial.try_into() {
+                    self_arc.overlapping_but_not_exactly_touching(other_partial)
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -1565,5 +1598,25 @@ mod tests {
         .map(|t| t.map(|x| x.into()))
         .collect_vec();
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_overlapping_but_not_exactly_touching() {
+        assert!(AngleInterval::from_degrees(0.0, 20.0)
+            .overlapping_but_not_exactly_touching(AngleInterval::from_degrees(-10.0, 10.0)));
+        assert!(!AngleInterval::from_degrees(0.0, 20.0)
+            .overlapping_but_not_exactly_touching(AngleInterval::from_degrees(-10.0, -1.0)));
+
+        assert!(AngleInterval::from_degrees(0.0, 20.0)
+            .overlapping_but_not_exactly_touching(PartialAngleInterval::from_degrees(-10.0, 10.0)));
+
+        assert!(AngleInterval::FullCircle
+            .overlapping_but_not_exactly_touching(AngleInterval::from_degrees(0.0, 30.0)));
+        assert!(AngleInterval::FullCircle
+            .overlapping_but_not_exactly_touching(AngleInterval::FullCircle));
+        // assert!(AngleInterval::from_degrees(20.0, 30.0)
+        //     .overlapping_but_not_exactly_touching(AngleInterval::FullCircle));
+        // assert!(!AngleInterval::from_degrees(20.0, 30.0)
+        //     .overlapping_but_not_exactly_touching(AngleInterval::Empty));
     }
 }
