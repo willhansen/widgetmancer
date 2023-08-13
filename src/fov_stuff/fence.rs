@@ -444,7 +444,7 @@ mod tests {
     }
     #[test]
     #[timeout(1000)]
-    fn test_inside_fence() {
+    fn test_inside_fence__simple_case() {
         let fence = Fence::from_ccw_relative_edges(vec![
             ((8, 0), STEP_RIGHT),
             ((8, 1), STEP_RIGHT),
@@ -452,9 +452,16 @@ mod tests {
             ((8, 2), STEP_UP),
             ((7, 2), STEP_UP),
             ((6, 3), STEP_RIGHT),
+            // ((6, 3), STEP_UP),
+            // ((5, 3), STEP_UP),
+            // ((4, 3), STEP_UP),
+            // ((3, 3), STEP_UP),
+            // ((2, 3), STEP_UP),
+            // ((1, 3), STEP_UP),
+            // ((0, 3), STEP_UP),
         ]);
         let inside_rel_squares = [(8, 0), (0, 0), (6, 3), (0, 3), (0, 1), (3, 3)];
-        let outside_rel_squares = [(9, 0), (-9, 0), (-1, 0), (0, -1)];
+        let outside_rel_squares = [(9, 0), (-9, 0), (-1, 0), (0, -1), (5, 4)];
         inside_rel_squares
             .into_iter()
             .for_each(|s| assert_true!(fence.is_inside_fence(s)));
