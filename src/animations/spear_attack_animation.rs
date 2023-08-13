@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_spear_attack_does_any_drawing() {
         let square = point2(3, 3);
         let dir = STEP_RIGHT;

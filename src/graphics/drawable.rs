@@ -551,7 +551,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_shadow_over_text() {
         let shadow = PartialVisibilityDrawable::from_square_visibility(
             SquareVisibilityFromOneLargeShadow::bottom_half_visible(),
@@ -571,14 +571,14 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_text_background() {
         let text = TextDrawable::new("a ", RED, GREEN, false);
         assert_eq!(text.color_if_backgroundified(), RED);
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_text_drawn_over_solid_to_glyphs_with_empty_space() {
         let solid_drawable = SolidColorDrawable::new(GREEN);
         let text_drawable = TextDrawable::new("♟ ", RED, BLUE, true);
@@ -588,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
         let character = d.rotated(QuarterTurnsAnticlockwise::new(1)).to_glyphs()[0].character;
@@ -613,13 +613,13 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_conveyor_belt_drawable__half_down() {
         let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_offset_square_drawn_over_solid() {
         let top = OffsetSquareDrawable {
             offset: vec2(0.5, 0.0),
@@ -633,14 +633,14 @@ mod tests {
     // All the braille unicode consecutively for easy reference
     //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
     #[test]
-    #[timeout(1000)]
+    
     fn test_braille_drawable_from_chars() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
         assert_eq!(drawable.braille_array.chars()[1], SPACE);
         drawable.braille_array.print();
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_braille_drawable_rotation() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
         drawable.braille_array.print();

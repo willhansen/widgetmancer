@@ -756,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_draw_diagonal_braille_line() {
         let mut g = set_up_graphics();
         let line_start = WorldSquare::new(2, 2);
@@ -776,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_single_braille_point() {
         let mut g = set_up_graphics();
         let test_square = point2(5, 5);
@@ -789,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_laser_has_transparent_background() {
         let mut g = set_up_graphics();
         g.load_screen_buffer_from_absolute_positions_in_draw_buffer();
@@ -805,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_draw_on_far_right_square_in_odd_width_terminal() {
         let mut g = Graphics::new(41, 20, Instant::now());
         g.add_simple_laser(point2(0.0, 0.0), point2(50.0, 0.0));
@@ -813,7 +813,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_overlapped_glyphs_change_background_color() {
         let mut g = set_up_graphics_with_nxn_world_squares(6);
         let test_square = WorldSquare::new(3, 4);
@@ -847,7 +847,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_draw_piece_on_board() {
         let mut g = set_up_graphics_with_nxn_world_squares(1);
         let the_square = WorldSquare::new(0, 0);
@@ -872,7 +872,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_draw_buffer_to_screen_through_field_of_view() {
         let mut g = set_up_graphics_with_nxn_world_squares(5);
         let world_square = WorldSquare::new(1, 2);

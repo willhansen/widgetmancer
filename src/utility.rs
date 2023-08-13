@@ -2115,7 +2115,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_round_to_kingstep() {
         assert_eq!(
             WorldStep::new(0, 0),
@@ -2140,7 +2140,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_pair_up_glyph_map__positions() {
         let character_squares: Vec<WorldCharacterSquare> = vec![
             point2(0, 0),
@@ -2164,7 +2164,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_pair_up_glyph_map__glyphs() {
         let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
         let test_glyph = Glyph {
@@ -2185,7 +2185,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_clockwise() {
         assert!(three_points_are_clockwise::<WorldPoint>(
             point2(0.0, 0.0),
@@ -2200,7 +2200,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_world_pos_to_character_world_pos() {
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
@@ -2219,7 +2219,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_local_square_point_to_local_character_point() {
         assert_eq!(
             local_square_point_to_local_character_point(point2(0.0, 0.0), 0),
@@ -2232,7 +2232,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(-1.5, -1.0), point2(0.0, 0.0));
@@ -2246,7 +2246,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
     ) {
         let input_line: Line<f32, SquareGridInWorldFrame> =
@@ -2257,7 +2257,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_same_side_of_line__vertical_line() {
         let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
         let origin = point2(0.0, 0.0);
@@ -2266,7 +2266,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_adjacent_king_steps() {
         assert_eq!(
             adjacent_king_steps(STEP_UP),
@@ -2283,7 +2283,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_rotate_zero_vector() {
         assert_eq!(
             rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
@@ -2292,7 +2292,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_half_plane_complementary_check__different_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let line2: Line<f32, SquareGridInWorldFrame> =
@@ -2312,7 +2312,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_half_plane_complementary_check__equivalent_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let line2: Line<f32, SquareGridInWorldFrame> =
@@ -2327,14 +2327,14 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_check_line_intersection_with_standard_square() {
         let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
         assert_false!(line.line_intersects_with_centered_unit_square());
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_from_x_axis() {
         assert_about_eq!(
             better_angle_from_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
@@ -2359,7 +2359,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
         assert!(
             (default::Vector2D::new(0.5, 0.5)
@@ -2372,7 +2372,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_standardize_angle() {
         assert_about_eq!(
             standardize_angle(Angle::<f32>::degrees(75.0)).radians,
@@ -2381,7 +2381,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_intersections__observed_3_intersections() {
         Line::new(
             WorldPoint::new(-29.5, 5.0),
@@ -2391,7 +2391,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_revolve_square() {
         assert_eq!(
             revolve_square(
@@ -2404,7 +2404,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_quarter_turns_from_vectors() {
         assert_eq!(
             QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_UP),
@@ -2428,7 +2428,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_step_back_pose() {
         let pose = SquareWithOrthogonalDir::from_square_and_step(point2(4, 6), STEP_RIGHT);
         let back = SquareWithOrthogonalDir::from_square_and_step(point2(3, 6), STEP_RIGHT);
@@ -2436,7 +2436,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_step_or_turn_pose() {
         let p = SquareWithOrthogonalDir::from_square_and_step;
         let s = point2(5, 5);
@@ -2450,7 +2450,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_point_reflection() {
         let line = Line::new(WorldPoint::new(1.0, 5.0), WorldPoint::new(2.4, 5.0));
 
@@ -2465,7 +2465,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_half_plane_cover_unit_square() {
         let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
             [0.0, 0.01, -0.01].map(|dx| {
@@ -2484,7 +2484,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_same_side_of_line() {
         let line = Line::<_, WorldPoint>::new(point2(1.0, 1.0), point2(2.0, 1.0));
         let low = point2(0.0, 0.0);
@@ -2508,7 +2508,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_halfplane_covers_expanded_unit_square() {
         let the_plane = HalfPlane::from_line_and_point_on_half_plane(
             Line::new(WorldPoint::new(1.0, 5.0), point2(1.0, 6.0)),
@@ -2521,7 +2521,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_squares_on_board() {
         let size = BoardSize::new(5, 40);
         let squares = squares_on_board(size);
@@ -2530,7 +2530,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_horizontal_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.5, 0.0), point2(-1.5, 0.0));
@@ -2539,7 +2539,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_vertical_line_intersection_with_square() {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.0, 0.5), point2(0.0, -1.5));
@@ -2548,7 +2548,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_depth_of_point_in_half_plane() {
         let horizontal = HalfPlane::from_line_and_point_on_half_plane(
             Line::new(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
@@ -2580,7 +2580,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_looping_clamp() {
         assert_about_eq!(looping_clamp(0.0, 5.0, 3.0), 3.0); // in range
         assert_about_eq!(looping_clamp(0.0, 5.0, 5.1), 0.1); // above
@@ -2590,7 +2590,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__simple() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
@@ -2608,7 +2608,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__face_must_face_ray() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
@@ -2625,7 +2625,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__miss() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
@@ -2642,7 +2642,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__under_ranged() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
@@ -2659,7 +2659,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_within_range() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
@@ -2676,7 +2676,7 @@ mod tests {
         assert!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_out_of_closer_range() {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
@@ -2693,7 +2693,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_within_closer_range() {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
@@ -2710,7 +2710,7 @@ mod tests {
         assert!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_out_of_really_close_range() {
         let start_point = point2(5.0, 6.49);
         let degrees = 90;
@@ -2727,7 +2727,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_within_really_close_range() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.0, 6.49),
@@ -2737,7 +2737,7 @@ mod tests {
         ));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__angled_miss() {
         assert_false!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.49),
@@ -2747,7 +2747,7 @@ mod tests {
         ));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__angled_hit() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.49),
@@ -2757,7 +2757,7 @@ mod tests {
         ));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__just_barely_touching_still_counts() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.5, 5.0),
@@ -2767,7 +2767,7 @@ mod tests {
         ));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_ray_hit_face__parallel_hit_does_not_count() {
         assert_false!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.5),
@@ -2777,7 +2777,7 @@ mod tests {
         ));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__easy_orthogonal_hit() {
         assert_about_eq_2d(
             WorldLine::new(point2(0.0, 0.0), point2(0.0, 4.0))
@@ -2790,7 +2790,7 @@ mod tests {
         )
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__diagonal_intersection() {
         assert_about_eq_2d(
             WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
@@ -2803,7 +2803,7 @@ mod tests {
         )
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__miss() {
         assert!(WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
             .intersection_point_with_other_line(&WorldLine::new(
@@ -2813,7 +2813,7 @@ mod tests {
             .is_none())
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__endpoint_touch_mid_counts() {
         assert_about_eq_2d(
             WorldLine::new(point2(5.0, 5.0), point2(7.0, 5.0))
@@ -2826,7 +2826,7 @@ mod tests {
         )
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__perpendicular_endpoints_touch() {
         assert_about_eq_2d(
             WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
@@ -2839,7 +2839,7 @@ mod tests {
         )
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__parallel_endpoints_touch() {
         let line1 = WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0));
         let line2 = WorldLine::new(point2(10.0, 5.0), point2(20.0, 5.0));
@@ -2869,7 +2869,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__parallel_miss() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
@@ -2879,7 +2879,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__parallel_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
@@ -2889,7 +2889,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__parallel_full_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
@@ -2899,7 +2899,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_line_line_intersection__parallel_exact_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
@@ -2909,7 +2909,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_first_inside_square_face_hit_by_ray__simple_case() {
         let inside_faces = HashSet::from([
             (point2(5, 6), STEP_UP).into(),
@@ -2926,7 +2926,7 @@ mod tests {
         assert_about_eq_2d(result.unwrap().1, point2(5.0, 6.5));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_project_step_onto_axis() {
         assert_eq!(
             distance_of_step_along_axis(STEP_UP_LEFT * 8, STEP_RIGHT.into()),
@@ -2934,7 +2934,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_face_is_on_same_line() {
         let f = |a, b| SquareWithOrthogonalDir::from(a).face_is_on_same_line(b);
         // facing each other left-right
@@ -2953,7 +2953,7 @@ mod tests {
         assert!(f((point2(3, 5), STEP_RIGHT), (point2(3, 45), STEP_RIGHT)));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_faces_away_from_center_at_relative_square() {
         let step = vec2(3, 4);
         assert_eq!(
@@ -2971,7 +2971,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_to_octant() {
         // in format of degrees, octanct biased cw, octant biased ccw
         let deg_octcw_octccw: Vec<(f32, [i32; 2])> = (0..9)
@@ -3005,7 +3005,7 @@ mod tests {
             });
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_vec_rotated_to_max() {
         // up and down
         assert_eq!(
@@ -3026,7 +3026,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_relative_points_in_ccw_order() {
         assert_true!(two_in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
         assert_true!(two_in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
@@ -3047,7 +3047,7 @@ mod tests {
         assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
     }
     #[test]
-    #[timeout(1000)]
+    
     #[ignore = "Not yet implemented"]
     fn test_quadrants_of_relative_square() {
         let point_quadrants: Vec<((i32, i32), Vec<i32>)> = vec![

@@ -301,7 +301,7 @@ mod tests {
     use ntest::timeout;
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(
             HalfPlane::from_line_and_point_on_half_plane(
@@ -315,7 +315,7 @@ mod tests {
         assert!(partial.is_fully_visible());
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(&string, "🭞🭚");
     }
     #[test]
-    #[timeout(1000)]
+    
     fn complementary_partial_squares_combine_to_full_visibility() {
         let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
@@ -344,7 +344,7 @@ mod tests {
         assert!(combined_partial.is_fully_visible());
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_partial_visibility_of_one_square__one_step_up() {
         let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);

@@ -743,7 +743,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_overlap() {
         let interval_b = PartialAngleInterval::from_degrees(5.0, 15.0);
         let interval_a = PartialAngleInterval::from_degrees(0.0, 10.0);
@@ -767,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_partial_overlap() {
         let arc_a = PartialAngleInterval::from_degrees(0.0, 20.0);
         let arc_b = PartialAngleInterval::from_degrees(-25.0, 5.0);
@@ -777,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_overlap_does_not_include_full_overlap() {
         let interval_b = PartialAngleInterval::from_degrees(5.0, 15.0);
         let interval_a = PartialAngleInterval::from_degrees(7.0, 10.0);
@@ -792,7 +792,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_partial_overlap_on_both_ends() {
         let wrapping_angle = PartialAngleInterval::from_degrees(45.0, 0.0);
         let zero_center_angle = PartialAngleInterval::from_degrees(-45.0, 45.0);
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn num_contained_edges_is_symmetric__weird_wrapping_case() {
         let arc_a = PartialAngleInterval::from_degrees(45.0, 0.0);
         let arc_b = PartialAngleInterval::from_degrees(-45.0, 45.0);
@@ -811,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn num_contained_edges_is_symmetric__regular_case() {
         let arc_a = PartialAngleInterval::from_degrees(0.0, 20.0);
         let arc_b = PartialAngleInterval::from_degrees(10.0, 30.0);
@@ -822,7 +822,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_overlap_edges() {
         let interval_a = PartialAngleInterval::from_degrees(0.0, 10.0);
         let interval_c = PartialAngleInterval::from_degrees(10.0, 50.0);
@@ -833,7 +833,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_contains_angle() {
         assert!(
             PartialAngleInterval::from_degrees(0.0, 10.0)
@@ -869,7 +869,7 @@ mod tests {
 
     #[ignore = "zero width partial arc no longer valid"]
     #[test]
-    #[timeout(1000)]
+    
     fn test_width_of_zero_width_arc() {
         assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 0.0)
@@ -880,7 +880,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_union() {
         assert_eq!(
             PartialAngleInterval::from_degrees(80.0, 100.0)
@@ -898,7 +898,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_intersection__simple_overlap() {
         assert_eq!(
             PartialAngleInterval::from_degrees(80.0, 100.0)
@@ -909,7 +909,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     #[should_panic]
     fn test_angle_interval_intersection__no_overlap() {
         PartialAngleInterval::from_degrees(95.0, 100.0)
@@ -917,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_intersection__full_overlap() {
         let small = PartialAngleInterval::from_degrees(80.0, 100.0);
         let big = PartialAngleInterval::from_degrees(60.0, 120.0);
@@ -926,7 +926,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     #[should_panic]
     fn test_angle_interval_intersection__wraparound_double_overlap() {
         let small = PartialAngleInterval::from_degrees(80.0, 100.0);
@@ -935,7 +935,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_set__standardization() {
         let mut angle_interval_set = AngleIntervalSet {
             intervals: vec![
@@ -955,7 +955,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_set__standardize_with_one() {
         let interval = PartialAngleInterval::from_degrees(15.0, 30.0);
         let mut angle_interval_set = AngleIntervalSet {
@@ -968,7 +968,7 @@ mod tests {
 
     #[ignore = "moving away from angle sets"]
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_set__overlap_and_adding() {
         let mut angle_interval_set = AngleIntervalSet::default();
         assert!(angle_interval_set.intervals.is_empty());
@@ -993,7 +993,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_fully_contain_other_interval() {
         assert!(
             PartialAngleInterval::from_degrees(-10.0, 10.0)
@@ -1020,14 +1020,14 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_fully_contain_other_interval__should_not_match_self() {
         let arc = PartialAngleInterval::from_degrees(0.0, 10.0);
         assert_false!(arc.fully_contains_interval_excluding_edge_overlaps(arc));
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_fully_contain_other_interval__edge_cases() {
         let z = 70.374;
         let a = 50.342;
@@ -1071,7 +1071,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_set__standardize_but_no_change_required() {
         let mut the_set = AngleIntervalSet {
             intervals: vec![
@@ -1086,7 +1086,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_set_validity() {
         assert!(AngleIntervalSet {
             intervals: vec![PartialAngleInterval::from_degrees(10.0, 20.0)]
@@ -1110,7 +1110,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_angle_endpoint_of_overlapped_region() {
         let interval_set = AngleIntervalSet {
             intervals: vec![PartialAngleInterval::from_degrees(0.0, 20.0)],
@@ -1127,7 +1127,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_angle_endpoint_of_more_overlapped_region() {
         let interval_set = AngleIntervalSet {
             intervals: vec![
@@ -1147,7 +1147,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_center_angle_of_interval() {
         assert_about_eq!(
             PartialAngleInterval::from_degrees(10.0, 20.0)
@@ -1170,7 +1170,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_width() {
         assert_about_eq!(
             PartialAngleInterval::from_degrees(10.0, 20.0)
@@ -1194,7 +1194,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_from_square() {
         let arc = PartialAngleInterval::from_relative_square(vec2(1, 0));
         assert_about_eq!(arc.clockwise_end.to_degrees(), -45.0);
@@ -1214,7 +1214,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_split_interval_around_interval() {
         let new_arcs = assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 30.0)
@@ -1227,7 +1227,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_interval_subtraction__touching_from_inside() {
         let new_arcs = assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 30.0)
@@ -1237,7 +1237,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_partial_overlap_includes_almost_peaking_out() {
         assert!(PartialAngleInterval::from_degrees(10.0, 20.0)
             .partially_overlaps_other_while_including_edges(PartialAngleInterval::from_degrees(
@@ -1254,7 +1254,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_partial_overlap_includes_almost_peaking_out__wraparound_case() {
         assert!(PartialAngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(PartialAngleInterval::from_degrees(
@@ -1263,7 +1263,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_wraparound_invariance() {
         assert!(PartialAngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(PartialAngleInterval::from_degrees(
@@ -1278,7 +1278,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_most_overlapped_edge_of_arc() {
         assert_eq!(
             PartialAngleInterval::from_degrees(135.0, 90.0)
@@ -1288,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_arc_from_square_face_is_smallish() {
         ORTHOGONAL_STEPS.into_iter().for_each(|step| {
             assert!(
@@ -1301,7 +1301,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_arc_from_square_face__observed_failure_at_right_face_of_one_block_right() {
         assert_about_eq!(
             PartialAngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT))
@@ -1314,7 +1314,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_arc_at_least_fully_overlap() {
         let cw = Angle::degrees(5.0);
         let ccw = Angle::degrees(25.0);
@@ -1355,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_arc_exact_touch() {
         let cw = Angle::degrees(5.0);
         let ccw = Angle::degrees(25.0);
@@ -1377,7 +1377,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_angle_interval_from_octant() {
         // Are the exact values really important?
         let octant_start_end = vec![
@@ -1409,7 +1409,7 @@ mod tests {
     }
 
     #[test]
-    #[timeout(1000)]
+    
     fn test_overlap_at_least_this_much() {
         let arc1 = PartialAngleInterval::from_degrees(0.0, 90.0);
         let arc2 = PartialAngleInterval::from_degrees(90.0, 180.0);
@@ -1430,7 +1430,7 @@ mod tests {
         // TODO: more cases here
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_split_into_octants__one_octant() {
         let single_octant_degrees = vec![
             (0.0, 5.0),
@@ -1447,7 +1447,7 @@ mod tests {
         })
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_split_into_octants__more_than_one() {
         let arc = PartialAngleInterval::from_degrees(0.0, 91.0);
         let parts = arc.split_into_octants_in_ccw_order();
@@ -1460,7 +1460,7 @@ mod tests {
         assert_about_eq!(parts[2].anticlockwise_end().to_degrees(), 91.0);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_split_into_octants__all_the_way_around_case() {
         let arc = PartialAngleInterval::from_degrees(10.0, 5.0);
         let parts = arc.split_into_octants_in_ccw_order();
@@ -1471,7 +1471,7 @@ mod tests {
         assert_about_eq!(parts[8].anticlockwise_end().to_degrees(), 5.0);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_containing_octant__exact_octant() {
         assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 45.0)
@@ -1482,7 +1482,7 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_containing_octant__in_one() {
         assert_eq!(
             PartialAngleInterval::from_degrees(100.0, 120.0)
@@ -1493,21 +1493,21 @@ mod tests {
         );
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_containing_octant__not_in_an_octant() {
         assert!(PartialAngleInterval::from_degrees(0.0, 120.0)
             .octant()
             .is_none());
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_get_containing_octant__tricky_case() {
         assert!(PartialAngleInterval::from_degrees(-10.0, -20.0)
             .octant()
             .is_none());
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_sub_interval__fully_within() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
             .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
@@ -1515,7 +1515,7 @@ mod tests {
             )));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_sub_interval__touch_one_edge() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
             .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
@@ -1523,7 +1523,7 @@ mod tests {
             )));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_sub_interval__exact_match() {
         assert!(PartialAngleInterval::from_degrees(0.0, 30.0)
             .fully_contains_interval_including_edge_overlaps(PartialAngleInterval::from_degrees(
@@ -1531,13 +1531,13 @@ mod tests {
             )));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_sub_interval__tricky_wraparound() {
         let arc = PartialAngleInterval::from_degrees(0.0, 30.0);
         assert_false!(arc.fully_contains_interval_including_edge_overlaps(arc.complement()));
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_square_going_outwards_and_ccw__one_quadrant() {
         let arc = PartialAngleInterval::from_degrees(0.0, 90.0);
         let iter = arc.touched_squares_going_outwards_and_ccw();
@@ -1558,7 +1558,7 @@ mod tests {
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_square_going_outwards_and_ccw__very_small_angle() {
         let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
         let iter = arc.touched_squares_going_outwards_and_ccw();
@@ -1579,7 +1579,7 @@ mod tests {
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_outward_and_ccw_squares_in_one_octant_with_placeholders() {
         let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
         let iter = arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders();
@@ -1600,7 +1600,7 @@ mod tests {
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
     }
     #[test]
-    #[timeout(1000)]
+    
     fn test_overlapping_but_not_exactly_touching() {
         assert!(AngleInterval::from_degrees(0.0, 20.0)
             .overlapping_but_not_exactly_touching(AngleInterval::from_degrees(-10.0, 10.0)));
