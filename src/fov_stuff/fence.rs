@@ -11,7 +11,9 @@ use crate::utility::{
     coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
-use crate::utility::{in_ccw_order, two_in_ccw_order, SimpleResult};
+use crate::utility::{
+    in_ccw_order, quadrants_of_rel_square, two_in_ccw_order, Quadrant, SimpleResult,
+};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
@@ -193,6 +195,55 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         self.is_inside_fence(rel_square_a) == self.is_inside_fence(rel_square_b)
     }
     fn is_inside_fence(&self, can_be_rel_square: impl Into<WorldStep>) -> bool {
+        let rel_square: WorldStep = can_be_rel_square.into();
+
+        !(0..2).any(|i| {
+            let potentially_blocking_edges_in_this_dimension = self
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.square().to_array()[i] == rel_square.to_array()[i]
+                        && edge.dir().step().to_array()[i].abs() > 0
+                })
+                .collect_vec();
+
+            potentially_blocking_edges_in_this_dimension
+                .into_iter()
+                .any(|edge| {
+                    let face_pos = edge.face_center_point().to_array()[i];
+                    let square_pos = rel_square.to_array()[i] as f32;
+                    let face_is_between_square_and_zero =
+                        (face_pos * square_pos) > 0.0 && face_pos.abs() < square_pos.abs();
+                    face_is_between_square_and_zero
+                })
+        })
+
+        // TODO: remove these comments if the function works
+
+        // Extrapolate the fence to cover the full quadrant the square is in.
+        // Do this by drawing from fence endpoint straight to axis
+        // let common_quadrants: HashSet<Quadrant> = self
+        //     .touched_quadrants()
+        //     .intersection(&quadrants_of_rel_square(rel_square))
+        //     .cloned()
+        //     .collect();
+
+        // if common_quadrants.is_empty() {
+        //     return false;
+        // }
+
+        // // if the square is on an axis, either common quadrant will do. Same for the origin.
+        // let test_quadrant = common_quadrants.into_iter().next().unwrap();
+
+        // let fence_covering_quadrant =
+        //     self.isolated_and_extrapolated_to_cover_quadrant(test_quadrant);
+
+        // check if there are any fence segments between the square and both axes
+    }
+    pub fn touched_quadrants(&self) -> HashSet<Quadrant> {
+        todo!()
+    }
+    fn isolated_and_extrapolated_to_cover_quadrant(&self, quadrant: Quadrant) -> Fence {
         todo!()
     }
 }
@@ -404,8 +455,11 @@ mod tests {
         ]);
         let inside_rel_squares = [(8, 0), (0, 0), (6, 3), (0, 3), (0, 1), (3, 3)];
         let outside_rel_squares = [(9, 0), (-9, 0), (-1, 0), (0, -1)];
-        assert_true!(fence.is_inside_fence((8, 0)));
-        assert_true!(fence.is_inside_fence((0, 0)));
-        assert_true!(fence.is_inside_fence((0, 0)));
+        inside_rel_squares
+            .into_iter()
+            .for_each(|s| assert_true!(fence.is_inside_fence(s)));
+        outside_rel_squares
+            .into_iter()
+            .for_each(|s| assert_false!(fence.is_inside_fence(s)));
     }
 }

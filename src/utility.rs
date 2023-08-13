@@ -22,7 +22,7 @@ use itertools::Itertools;
 use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;
-use num::traits::Signed;
+use num::traits::{Euclid, Signed};
 use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -164,6 +164,14 @@ impl QuarterTurnRotatable for Angle<f32> {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
         ))
+    }
+}
+#[derive(Clone, Hash, Debug, Eq, Copy)]
+pub struct Quadrant(pub i32);
+
+impl PartialEq for Quadrant {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.rem_euclid(4) == other.0.rem_euclid(4)
     }
 }
 
@@ -1390,12 +1398,11 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     }
 }
 
+// TODO: generalize for absolute squares too
 impl RelativeSquareWithOrthogonalDir {
-    // TODO: generalize for absolute squares too
     pub fn face_center_point(&self) -> WorldMove {
         self.square().to_f32() + self.dir().step().to_f32() * 0.5
     }
-    // TODO: generalize for absolute squares too
     pub fn face_end_points(&self) -> [WorldMove; 2] {
         [self.left(), self.right()].map(|dir| self.face_center_point() + dir.step().to_f32() * 0.5)
     }
@@ -1406,7 +1413,6 @@ impl RelativeSquareWithOrthogonalDir {
         }
         ps
     }
-    // TODO: generalize for absolute squares too
     pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
         let tolerance = 1e-6;
         self.face_end_points()
@@ -1702,6 +1708,7 @@ pub fn number_to_hue_rotation(x: f32, period: f32) -> RGB8 {
     hue_to_rgb(x * 360.0 / period)
 }
 
+#[deprecated(note = "use Vector2D's to_array function instead")]
 pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     match i {
         0 => WorldStep::new(step.x, 0),
@@ -2074,6 +2081,29 @@ pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f
     let mut the_clone = vec.clone();
     the_clone.rotate_left(index_of_new_end);
     the_clone
+}
+
+pub fn quadrants_of_rel_square(
+    can_be_rel_square: impl Into<WorldStep> + Copy,
+) -> HashSet<Quadrant> {
+    // A square on an axis is in two quadrants
+    // The origin is in all 4
+    (0..4)
+        .map(|i| Quadrant(i))
+        .filter(|&q| rel_square_is_in_quadrant_or_on_adjacent_axis(can_be_rel_square, q))
+        .collect()
+}
+pub fn rel_square_is_in_quadrant_or_on_adjacent_axis(
+    can_be_rel_square: impl Into<WorldStep>,
+    quadrant: Quadrant,
+) -> bool {
+    let rel_square: WorldStep = can_be_rel_square.into();
+    let dir = direction_of_quadrant(quadrant);
+
+    todo!()
+}
+pub fn direction_of_quadrant(quadrant: Quadrant) -> WorldStep {
+    STEP_UP_RIGHT.rotated(QuarterTurnsAnticlockwise::new(quadrant.0))
 }
 
 #[cfg(test)]
@@ -3015,5 +3045,22 @@ mod tests {
 
         assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
         assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
+    }
+    #[test]
+    #[timeout(1000)]
+    fn test_quadrants_of_relative_square() {
+        let point_quadrants: Vec<((i32, i32), Vec<i32>)> = vec![
+            ((0, 0), vec![0, 1, 2, 3]),
+            ((1, 0), vec![0, 3]),
+            ((1, 1), vec![0]),
+            ((0, 1), vec![0, 1]),
+            ((0, -100), vec![3, 2]),
+        ];
+        point_quadrants.into_iter().for_each(|(p, v)| {
+            assert_eq!(
+                quadrants_of_rel_square(p),
+                v.iter().map(|&q| Quadrant(q)).collect()
+            );
+        });
     }
 }
