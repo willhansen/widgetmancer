@@ -75,7 +75,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("Tried to add overlapping edge to fence: {}", edge)
         }
         if self.has_angle_overlap_with_edge(edge) {
-            panic!("Angle overlap");
+            panic!(
+                "Angle overlap: \nfence: {:?}\nedge: {}",
+                self,
+                edge.to_string()
+            );
         }
 
         if self.try_add_to_ccw_end(edge).is_err() && self.try_add_to_cw_end(edge).is_err() {
@@ -113,7 +117,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 edge,
             ))
     }
-    fn has_angle_overlap_with_rel_square(&self, rel_square: WorldStep) -> bool {
+    // TODO: add tolerance?
+    fn has_non_zero_angle_overlap_with_rel_square(&self, rel_square: WorldStep) -> bool {
+        if rel_square == STEP_ZERO {
+            return !self.edges.is_empty();
+        }
         self.spanned_angle_from_origin()
             .overlapping_but_not_exactly_touching(PartialAngleInterval::from_relative_square(
                 rel_square,
@@ -203,90 +211,29 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         if rel_square == STEP_ZERO {
             return !self.edges.is_empty();
         }
-        assert!(
-            self.has_angle_overlap_with_rel_square(rel_square),
-            "square {} has no angle overlap with self.  self:{} vs square:{}",
-            rel_square.to_string(),
-            self.spanned_angle_from_origin(),
-            PartialAngleInterval::from_relative_square(rel_square)
-        );
-
-        let angle_of_square_center = better_angle_from_x_axis(rel_square.to_f32());
-
-        // TODO: need to account for edge case where square center is in line with endpoint of fence edge?
-        if let Some(&edge_in_line_with_square_center) = self.edges.iter().find(|&&fence_edge| {
-            PartialAngleInterval::from_relative_square_face(fence_edge)
-                .contains_or_touches_angle(angle_of_square_center)
-        }) {
+        if let Some(fence_edge_with_angle_overlap) = self
+            .edges
+            .iter()
+            .filter(|&&fence_edge| {
+                PartialAngleInterval::from_relative_square_face(fence_edge)
+                    .overlapping_but_not_exactly_touching(
+                        PartialAngleInterval::from_relative_square(rel_square),
+                    )
+            })
+            .next()
+        {
             (rel_square.square_length() as f32)
-                < edge_in_line_with_square_center
+                < fence_edge_with_angle_overlap
                     .face_center_point()
                     .square_length()
         } else {
-            false
+            panic!(
+                "square {} has no angle overlap with self.  self:{} vs square:{}",
+                rel_square.to_string(),
+                self.spanned_angle_from_origin(),
+                PartialAngleInterval::from_relative_square(rel_square)
+            );
         }
-        // TODO: remove these comments if the function works
-
-        // !(0..2).any(|i| {
-        //     let potentially_blocking_edges_in_this_dimension = self
-        //         .edges
-        //         .iter()
-        //         .filter(|edge| {
-        //             edge.square().to_array()[1 - i] == rel_square.to_array()[1 - i]
-        //                 && edge.dir().step().to_array()[i].abs() > 0
-        //         })
-        //         .collect_vec();
-
-        //     if potentially_blocking_edges_in_this_dimension.is_empty() {
-        //         return false;
-        //     }
-
-        //     dbg!(
-        //         "asdf",
-        //         &potentially_blocking_edges_in_this_dimension,
-        //         rel_square
-        //     );
-        //     let is_outside_fence_along_this_dimension =
-        //         potentially_blocking_edges_in_this_dimension
-        //             .into_iter()
-        //             .any(|edge| {
-        //                 let face_pos = edge.face_center_point().to_array()[i];
-        //                 let square_pos = rel_square.to_array()[i] as f32;
-        //                 let face_is_between_square_and_zero =
-        //                     (face_pos * square_pos) > 0.0 && face_pos.abs() < square_pos.abs();
-        //                 let face_is_between_square_and_infinity =
-        //                     (face_pos * square_pos) > 0.0 && face_pos.abs() > square_pos.abs();
-        //                 dbg!(
-        //                     "asdf",
-        //                     face_pos,
-        //                     square_pos,
-        //                     face_is_between_square_and_zero,
-        //                     face_is_between_square_and_infinity,
-        //                 );
-        //                 face_is_between_square_and_zero
-        //             });
-        //     is_outside_fence_along_this_dimension
-        // })
-
-        // Extrapolate the fence to cover the full quadrant the square is in.
-        // Do this by drawing from fence endpoint straight to axis
-        // let common_quadrants: HashSet<Quadrant> = self
-        //     .touched_quadrants()
-        //     .intersection(&quadrants_of_rel_square(rel_square))
-        //     .cloned()
-        //     .collect();
-
-        // if common_quadrants.is_empty() {
-        //     return false;
-        // }
-
-        // // if the square is on an axis, either common quadrant will do. Same for the origin.
-        // let test_quadrant = common_quadrants.into_iter().next().unwrap();
-
-        // let fence_covering_quadrant =
-        //     self.isolated_and_extrapolated_to_cover_quadrant(test_quadrant);
-
-        // check if there are any fence segments between the square and both axes
     }
     pub fn touched_quadrants(&self) -> HashSet<Quadrant> {
         todo!()
@@ -304,7 +251,7 @@ impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use ntest::{assert_false, assert_true, timeout};
+    use ntest::{assert_false, assert_true};
     use pretty_assertions::assert_ne;
 
     use crate::utility::*;
@@ -312,14 +259,12 @@ mod tests {
     use super::*;
 
     #[test]
-    
     fn test_make_a_fence_from_square_faces() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let fence = Fence::from_ccw_relative_edges(input.clone());
         assert_eq!(fence.edges().len(), input.len());
     }
     #[test]
-    
     fn test_add_to_cw_end_of_fence() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let mut fence = Fence::from_ccw_relative_edges(input.clone());
@@ -328,7 +273,6 @@ mod tests {
         assert_eq!(fence.edges().len(), input.len() + 1);
     }
     #[test]
-    
     fn test_add_to_ccw_end_of_fence() {
         let input = vec![((6, 4), STEP_LEFT), ((5, 5), STEP_RIGHT)];
         let mut fence = Fence::from_ccw_relative_edges(input.clone());
@@ -338,26 +282,22 @@ mod tests {
     }
 
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__disconnected() {
         Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((6, 40), STEP_LEFT)]);
     }
 
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_square_edge() {
         Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((5, 5), STEP_UP)]);
     }
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__duplicate_edge_from_other_square() {
         Fence::from_ccw_relative_edges(vec![((5, 5), STEP_UP), ((5, 6), STEP_DOWN)]);
     }
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__forking_path() {
         let edges = (0..20).map(|y| ((5, y), STEP_RIGHT)).collect();
@@ -366,14 +306,12 @@ mod tests {
         fence.add_edge(((5, 5), STEP_UP));
     }
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__not_ccw() {
         Fence::from_ccw_relative_edges(vec![((5, 0), STEP_RIGHT), ((5, -1), STEP_RIGHT)]);
     }
 
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__edges_not_sequential() {
         Fence::from_ccw_relative_edges(vec![
@@ -384,7 +322,6 @@ mod tests {
     }
 
     #[test]
-    
     #[should_panic]
     fn test_fail_to_make_a_fence__not_fully_visible_from_origin() {
         Fence::from_ccw_relative_edges(vec![((10, 1), STEP_RIGHT), ((10, 1), STEP_DOWN)]);
@@ -407,19 +344,16 @@ mod tests {
     }
 
     #[test]
-    
     fn test_full_circle_fence() {
         full_circle_ccw_fence((0, 2), 5);
     }
 
     #[test]
-    
     #[should_panic]
     fn test_full_circle_fence__fail_because_origin_is_outside() {
         full_circle_ccw_fence((10, 30), 3);
     }
     #[test]
-    
     #[should_panic]
     fn test_almost_full_circle_fence__fail_because_ends_have_angle_overlap() {
         Fence::from_ccw_relative_edges(vec![
@@ -441,7 +375,6 @@ mod tests {
     }
 
     #[test]
-    
     fn test_end_points_of_single_edge_fence_are_in_ccw_order() {
         let edges = ORTHOGONAL_STEPS.map(|step| ((5, 5), step));
         for edge in edges {
@@ -454,7 +387,6 @@ mod tests {
     }
 
     #[test]
-    
     fn test_fence_from_unordered_edges() {
         let edges: Vec<RelativeSquareWithOrthogonalDir> =
             (0..5).map(|y| ((5, y), STEP_RIGHT).into()).collect();
@@ -463,7 +395,6 @@ mod tests {
     }
 
     #[test]
-    
     fn test_sort_edges_by_ccwness() {
         let edges: Vec<RelativeSquareWithOrthogonalDir> =
             (0..5).map(|y| ((5, y), STEP_RIGHT).into()).collect();
@@ -471,7 +402,6 @@ mod tests {
         assert_eq!(resorted_edges, edges);
     }
     #[test]
-    
     fn test_same_side_of_fence() {
         let fence = Fence::from_ccw_relative_edges(vec![
             ((8, 0), STEP_RIGHT),
@@ -491,7 +421,6 @@ mod tests {
         assert_false!(fence.on_same_side_of_fence((7, 1), (7, 4)));
     }
     #[test]
-    
     fn test_radially_inside_fence__simple_case() {
         let fence = Fence::from_ccw_relative_edges(vec![
             ((8, 0), STEP_RIGHT),
@@ -513,11 +442,10 @@ mod tests {
         check_points_inside_outside(&fence, &inside_rel_squares, &outside_rel_squares);
     }
     #[test]
-    
     fn test_radially_inside_fence__short_fence_case() {
-        let fence = Fence::from_ccw_relative_edges(vec![((3, 3), STEP_UP), ((4, 3), STEP_UP)]);
+        let fence = Fence::from_ccw_relative_edges(vec![((4, 3), STEP_UP), ((3, 3), STEP_UP)]);
         let inside_rel_squares = vec![(3, 3), (4, 3), (2, 3)];
-        let outside_rel_squares = vec![(5, 3), (3, 4), (4, 4)];
+        let outside_rel_squares = vec![(3, 4), (4, 4)];
         check_points_inside_outside(&fence, &inside_rel_squares, &outside_rel_squares);
     }
     fn check_points_inside_outside(
@@ -541,13 +469,12 @@ mod tests {
         });
     }
     #[test]
-    
     fn test_radially_inside_fence__wraparound_case() {
         let fence = Fence::from_ccw_relative_edges(vec![
-            ((5, 1), STEP_LEFT),
-            ((4, 1), STEP_LEFT),
-            ((3, 1), STEP_LEFT),
-            ((2, 1), STEP_LEFT),
+            ((5, 1), STEP_UP),
+            ((4, 1), STEP_UP),
+            ((3, 1), STEP_UP),
+            ((2, 1), STEP_UP),
             ((1, 1), STEP_UP),
             ((0, 1), STEP_UP),
             ((0, 1), STEP_LEFT),
@@ -574,7 +501,6 @@ mod tests {
         check_points_inside_outside(&fence, &inside_rel_squares, &outside_rel_squares);
     }
     #[test]
-    
     fn test_radially_inside_fence__minimal_case() {
         let fence = Fence::from_ccw_relative_edges(vec![((0, 0), STEP_RIGHT), ((0, 0), STEP_UP)]);
         let inside_rel_squares = vec![(0, 0)];

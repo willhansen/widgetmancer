@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use euclid::*;
-use ntest::{assert_false, timeout};
+use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;
 
@@ -603,7 +603,6 @@ fn test_king_pathfind() {
 }
 
 #[test]
-
 #[ignore] // for now
 fn test_draw_pathfind_paths() {
     let mut game = set_up_nxn_game(20);
