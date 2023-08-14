@@ -211,7 +211,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         if rel_square == STEP_ZERO {
             return !self.edges.is_empty();
         }
-        if let Some(fence_edge_with_angle_overlap) = self
+        let fence_edges_with_angle_overlap = self
             .edges
             .iter()
             .filter(|&&fence_edge| {
@@ -220,13 +220,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                         PartialAngleInterval::from_relative_square(rel_square),
                     )
             })
-            .next()
-        {
-            (rel_square.square_length() as f32)
-                < fence_edge_with_angle_overlap
-                    .face_center_point()
-                    .square_length()
-        } else {
+            .collect_vec();
+        if fence_edges_with_angle_overlap.is_empty() {
             panic!(
                 "square {} has no angle overlap with self.  self:{} vs square:{}",
                 rel_square.to_string(),
@@ -234,6 +229,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 PartialAngleInterval::from_relative_square(rel_square)
             );
         }
+        fence_edges_with_angle_overlap.iter().any(|&edge| {
+            (rel_square.square_length() as f32) < edge.face_center_point().square_length()
+        })
     }
     pub fn touched_quadrants(&self) -> HashSet<Quadrant> {
         todo!()
@@ -471,10 +469,10 @@ mod tests {
     #[test]
     fn test_radially_inside_fence__wraparound_case() {
         let fence = Fence::from_ccw_relative_edges(vec![
-            ((5, 1), STEP_UP),
-            ((4, 1), STEP_UP),
-            ((3, 1), STEP_UP),
-            ((2, 1), STEP_UP),
+            // ((5, 1), STEP_UP),
+            // ((4, 1), STEP_UP),
+            // ((3, 1), STEP_UP),
+            // ((2, 1), STEP_UP),
             ((1, 1), STEP_UP),
             ((0, 1), STEP_UP),
             ((0, 1), STEP_LEFT),
@@ -496,8 +494,19 @@ mod tests {
             ((6, 3), STEP_RIGHT),
             ((6, 3), STEP_UP),
         ]);
-        let inside_rel_squares = vec![(0, 0), (3, 1), (6, 3)];
-        let outside_rel_squares = vec![(-1, 0), (3, 4), (3, 2), (6, 4)];
+
+        //  5|
+        //   |
+        //   |     🭾
+        //   |      ▔🭾
+        //   🭽▔      ▕
+        //  0🭼▁▁▁▁▁▁▁🭿-------------
+        //   0    5  89
+
+        // 🭽 🭾 🭼 🭿 ▏▔▁▕
+
+        let inside_rel_squares = vec![(0, 0), (3, 1), (3, 2), (6, 3)];
+        let outside_rel_squares = vec![(-1, 0), (3, 4), (6, 4)];
         check_points_inside_outside(&fence, &inside_rel_squares, &outside_rel_squares);
     }
     #[test]
