@@ -223,7 +223,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .collect_vec();
         if fence_edges_with_angle_overlap.is_empty() {
             panic!(
-                "square {} has no angle overlap with self.  self:{} vs square:{}",
+                "Square {} has no angle overlap with self.\n\
+                \tSelf:   {}\n\
+                \tSquare: {}",
                 rel_square.to_string(),
                 self.spanned_angle_from_origin(),
                 PartialAngleInterval::from_relative_square(rel_square)
@@ -412,7 +414,7 @@ mod tests {
 
         // basic case
         assert_false!(fence.on_same_side_of_fence((0, 0), (200, 100)));
-        assert_true!(fence.on_same_side_of_fence((0, 0), (-200, 200)));
+        assert_true!(fence.on_same_side_of_fence((0, 0), (5, 2)));
 
         // close to the line
         assert_false!(fence.on_same_side_of_fence((8, 0), (9, 1)));
