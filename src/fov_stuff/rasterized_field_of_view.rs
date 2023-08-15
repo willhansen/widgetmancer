@@ -83,7 +83,7 @@ impl ViewRoundable for PositionedVisibilityOfSquare {
         }
     }
 }
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct RasterizedFieldOfView(Vec<PositionedVisibilityOfSquare>);
 
 impl RasterizedFieldOfView {
@@ -141,35 +141,43 @@ impl RasterizedFieldOfView {
     }
 
     pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
+        let tolerance_length = 0.0;
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
+            tolerance_length,
+        )
+        .iter()
+        .map(|positioned_visibility| positioned_visibility.relative_square)
+        .collect()
+    }
+    fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
+        &self,
+        tolerance_length: f32,
+    ) -> Vec<&PositionedVisibilityOfSquare> {
         self.0
             .iter()
             .filter(|positioned_visibility| positioned_visibility.portal_depth == 0)
             .filter(|positioned_visibility| {
                 positioned_visibility
                     .square_visibility_in_absolute_frame
-                    .is_nearly_but_not_fully_visible(0.0) // TODO: parameterize this tolerance
+                    .is_nearly_but_not_fully_visible(tolerance_length)
             })
-            .map(|positioned_visibility| positioned_visibility.relative_square)
             .collect()
     }
     pub fn visibilities_of_partially_visible_squares_in_main_view_only(
         &self,
     ) -> RelativeSquareVisibilityMap {
-        self.0
-            .iter()
-            .filter(|positioned_visibility| positioned_visibility.portal_depth == 0)
-            .filter(|positioned_visibility| {
-                positioned_visibility
-                    .square_visibility_in_absolute_frame
-                    .is_nearly_but_not_fully_visible(0.0) // TODO: parameterize this tolerance
-            })
-            .map(|positioned_visibility| {
-                (
-                    positioned_visibility.relative_square(),
-                    positioned_visibility.square_visibility_in_relative_frame(),
-                )
-            })
-            .collect()
+        let tolerance_length = 0.0;
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
+            tolerance_length,
+        )
+        .iter()
+        .map(|positioned_visibility| {
+            (
+                positioned_visibility.relative_square(),
+                positioned_visibility.square_visibility_in_relative_frame(),
+            )
+        })
+        .collect()
     }
 
     pub fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
@@ -298,9 +306,9 @@ mod tests {
     use ntest::{assert_true, timeout};
 
     #[test]
-    
-    fn test_rounding_towards_full_visibility() {
+    fn test_center_square_is_always_visible() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+        assert_eq!(rasterized_fov.positioned_visibilities().len(), 1);
         assert_eq!(
             rasterized_fov
                 .visibilities_of_relative_square(STEP_ZERO)
@@ -310,6 +318,11 @@ mod tests {
         assert_true!(rasterized_fov.visibilities_of_relative_square(STEP_ZERO)[0]
             .square_visibility_in_relative_frame()
             .is_fully_visible());
+    }
+
+    #[test]
+    fn test_rounding_towards_full_visibility() {
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_fully_visible_relative_square(STEP_RIGHT);
 
@@ -329,13 +342,13 @@ mod tests {
             rasterized_fov
                 .at_least_partially_visible_relative_squares_in_main_view_only()
                 .len(),
-            3
+            4
         );
         assert_eq!(
             rasterized_fov
                 .fully_visible_relative_squares_in_main_view_only()
                 .len(),
-            1
+            2
         );
         assert_eq!(
             rasterized_fov
@@ -349,13 +362,13 @@ mod tests {
             rounded_fov
                 .at_least_partially_visible_relative_squares_in_main_view_only()
                 .len(),
-            3
+            4
         );
         assert_eq!(
             rounded_fov
                 .fully_visible_relative_squares_in_main_view_only()
                 .len(),
-            2
+            3
         );
         assert_eq!(
             rounded_fov
