@@ -26,6 +26,7 @@ pub trait ViewRoundable {
 pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable + ViewRoundable {
     fn is_fully_visible(&self) -> bool;
     fn is_at_least_partially_visible(&self) -> bool;
+    fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_nearly_but_not_fully_visible(&self, tolerance_length: f32) -> bool;
     fn new_fully_visible() -> Self;
@@ -82,9 +83,10 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
         self.visible_portion.is_none()
     }
     fn is_at_least_partially_visible(&self) -> bool {
-        self.visible_portion.is_some_and(|visible_half_plane| {
-            visible_half_plane.at_least_partially_covers_unit_square()
-        })
+        self.is_fully_visible() || self.is_only_partially_visible()
+    }
+    fn is_only_partially_visible(&self) -> bool {
+        self.visible_portion.is_some()
     }
     fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
         self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
@@ -301,7 +303,6 @@ mod tests {
     use ntest::timeout;
 
     #[test]
-
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(
             HalfPlane::from_line_and_point_on_half_plane(
@@ -315,7 +316,6 @@ mod tests {
         assert!(partial.is_fully_visible());
     }
     #[test]
-
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
@@ -327,7 +327,6 @@ mod tests {
         assert_eq!(&string, "🭞🭚");
     }
     #[test]
-
     fn complementary_partial_squares_combine_to_full_visibility() {
         let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
@@ -344,7 +343,6 @@ mod tests {
         assert!(combined_partial.is_fully_visible());
     }
     #[test]
-
     fn test_partial_visibility_of_one_square__one_step_up() {
         let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
@@ -357,14 +355,38 @@ mod tests {
             [FULL_BLOCK, SPACE].into_iter().collect::<String>()
         );
     }
+    #[test]
+    #[should_panic]
+    fn test_one_shadow__should_fail_to_make_not_visible() {
+        let non_vis = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::top_half_plane().extended(-0.6),
+        );
+    }
+    #[test]
+    fn test_one_shadow__fully_visible() {
+        let vis = SquareVisibility::new_fully_visible();
+
+        assert!(!vis.is_only_partially_visible());
+        assert!(vis.is_at_least_partially_visible());
+        assert!(vis.is_fully_visible());
+    }
 
     #[test]
     fn test_one_shadow__only_partially_visible() {
         let vis = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
+            LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-3),
+        );
+        assert!(vis.is_only_partially_visible());
+        assert!(vis.is_at_least_partially_visible());
+    }
+    #[test]
+    fn test_one_shadow__almost_fully_visible() {
+        let vis = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-3),
         );
 
-        assert!(vis.is_only_partially_visible(0.0));
         assert!(!vis.is_nearly_but_not_fully_visible(0.0));
+        assert!(!vis.is_nearly_but_not_fully_visible(1e-4));
+        assert!(vis.is_nearly_but_not_fully_visible(1e-2));
     }
 }
