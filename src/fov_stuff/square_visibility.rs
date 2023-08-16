@@ -74,7 +74,11 @@ impl SquareVisibilityFromOneLargeShadow {
 
 impl ViewRoundable for SquareVisibilityFromOneLargeShadow {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self {
-        todo!()
+        if self.is_nearly_or_fully_visible(tolerance_length) {
+            Self::new_fully_visible()
+        } else {
+            self.clone()
+        }
     }
 }
 

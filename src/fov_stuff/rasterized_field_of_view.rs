@@ -141,17 +141,13 @@ impl RasterizedFieldOfView {
     }
 
     pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        let tolerance_length = 0.0;
-        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
-            tolerance_length,
-        )
-        .iter()
-        .map(|positioned_visibility| positioned_visibility.relative_square)
-        .collect()
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
+            .iter()
+            .map(|positioned_visibility| positioned_visibility.relative_square)
+            .collect()
     }
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
-        tolerance_length: f32,
     ) -> Vec<&PositionedVisibilityOfSquare> {
         self.0
             .iter()
@@ -159,25 +155,22 @@ impl RasterizedFieldOfView {
             .filter(|positioned_visibility| {
                 positioned_visibility
                     .square_visibility_in_absolute_frame
-                    .is_nearly_but_not_fully_visible(tolerance_length)
+                    .is_only_partially_visible()
             })
             .collect()
     }
     pub fn visibilities_of_partially_visible_squares_in_main_view_only(
         &self,
     ) -> RelativeSquareVisibilityMap {
-        let tolerance_length = 0.0;
-        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
-            tolerance_length,
-        )
-        .iter()
-        .map(|positioned_visibility| {
-            (
-                positioned_visibility.relative_square(),
-                positioned_visibility.square_visibility_in_relative_frame(),
-            )
-        })
-        .collect()
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
+            .iter()
+            .map(|positioned_visibility| {
+                (
+                    positioned_visibility.relative_square(),
+                    positioned_visibility.square_visibility_in_relative_frame(),
+                )
+            })
+            .collect()
     }
 
     pub fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
