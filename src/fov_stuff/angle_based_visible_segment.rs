@@ -121,15 +121,12 @@ impl AngleBasedVisibleSegment {
     }
     /// This iterator ends when squares in the segment run out
     pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
-        let max_square_length = dbg!(self.furthest_overlapping_square().square_length());
+        let max_square_length = self.furthest_overlapping_square().square_length();
         self.visible_angle_interval
             .touched_squares_going_outwards_and_ccw()
+            .take_while(move |&rel_square| dbg!(rel_square.square_length()) <= max_square_length)
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
             .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
-            .inspect(|x| println!("asdf: {}", x.to_string()))
-            .take_while(move |&rel_square| dbg!(rel_square.square_length()) <= max_square_length)
-        //asdfasdfasdf todo resume here
-        // todo!()
     }
     pub fn to_square_visibilities(&self) -> RelativeSquareVisibilityMap {
         // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
