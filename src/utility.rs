@@ -2109,6 +2109,12 @@ pub fn direction_of_quadrant(quadrant: Quadrant) -> WorldStep {
     STEP_UP_RIGHT.rotated(QuarterTurnsAnticlockwise::new(quadrant.0))
 }
 
+pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
+    face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
+) -> [SquareType; 2] {
+    [face.square, face.stepped().square]
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};

@@ -5,7 +5,7 @@ use crate::fov_stuff::{
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::{
-    better_angle_from_x_axis, faces_away_from_center_at_rel_square,
+    better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
     RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
 };
 use euclid::point2;
@@ -96,13 +96,7 @@ impl AngleBasedVisibleSegment {
         }
     }
     pub fn get_touching_relative_squares(&self) -> StepSet {
-        for step in self
-            .visible_angle_interval
-            .touched_squares_going_outwards_and_ccw()
-        {
-            todo!()
-        }
-        todo!()
+        self.touched_squares_going_outwards_and_ccw().collect()
     }
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
         todo!()
@@ -116,20 +110,26 @@ impl AngleBasedVisibleSegment {
         }
     }
     fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
-        self.end_fence()
-            .on_same_side_of_fence(rel_square, STEP_ZERO)
+        self.end_fence().is_radially_inside_fence(rel_square)
     }
     fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
         todo!()
     }
+    // if there are several equally distant, selects one somehow
+    fn furthest_overlapping_square(&self) -> WorldStep {
+        self.end_fence.furthest_inside_square()
+    }
+    /// This iterator ends when squares in the segment run out
     pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
+        let max_square_length = dbg!(self.furthest_overlapping_square().square_length());
         self.visible_angle_interval
             .touched_squares_going_outwards_and_ccw()
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
             .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
-            .take_while(|&rel_square| {
-                !self.rel_square_is_past_furthest_part_of_end_fence(rel_square)
-            })
+            .inspect(|x| println!("asdf: {}", x.to_string()))
+            .take_while(move |&rel_square| dbg!(rel_square.square_length()) <= max_square_length)
+        //asdfasdfasdf todo resume here
+        // todo!()
     }
     pub fn to_square_visibilities(&self) -> RelativeSquareVisibilityMap {
         // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
@@ -163,5 +163,19 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
                 .map(|face| face.apply_rigid_transform(tf)),
             end_fence: self.end_fence.apply_rigid_transform(tf),
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::utility::STEP_RIGHT;
+
+    use super::*;
+    #[test]
+    fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
+        let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));
+        assert_eq!(
+            seg.get_touching_relative_squares(),
+            (0..=5).map(|i| STEP_RIGHT * i).collect()
+        )
     }
 }

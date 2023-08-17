@@ -12,8 +12,8 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
 use crate::utility::{
-    in_ccw_order, quadrants_of_rel_square, two_in_ccw_order, CoordToString, Quadrant, SimpleResult,
-    STEP_ZERO,
+    in_ccw_order, quadrants_of_rel_square, squares_sharing_face, two_in_ccw_order, CoordToString,
+    Quadrant, SimpleResult, STEP_ZERO,
 };
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -64,6 +64,18 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     }
     fn add_to_cw_end(&mut self, edge: Edge) {
         self.edges.insert(0, edge)
+    }
+    pub fn furthest_inside_square(&self) -> WorldStep {
+        self.squares_adjacent_to_fence_edges()
+            .unique()
+            .max_by_key(|step| step.square_length())
+            .unwrap()
+    }
+    fn squares_adjacent_to_fence_edges(&self) -> impl Iterator<Item = WorldStep> + '_ {
+        self.edges
+            .iter()
+            .cloned()
+            .flat_map(|edge| squares_sharing_face(edge))
     }
     fn add_edge(&mut self, can_be_edge: impl Into<Edge>) {
         let edge = can_be_edge.into();
@@ -206,7 +218,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     ) -> bool {
         self.is_radially_inside_fence(rel_square_a) == self.is_radially_inside_fence(rel_square_b)
     }
-    fn is_radially_inside_fence(&self, can_be_rel_square: impl Into<WorldStep>) -> bool {
+    pub fn is_radially_inside_fence(&self, can_be_rel_square: impl Into<WorldStep>) -> bool {
         let rel_square: WorldStep = can_be_rel_square.into();
         if rel_square == STEP_ZERO {
             return !self.edges.is_empty();

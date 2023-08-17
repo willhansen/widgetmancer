@@ -1764,14 +1764,6 @@ mod tests {
         assert_eq!(the_clean_string, "🬎🬎");
     }
     #[test]
-    fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
-        let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));
-        assert_eq!(
-            seg.get_touching_relative_squares(),
-            (0..=5).map(|i| STEP_RIGHT * i).collect()
-        )
-    }
-    #[test]
     fn test_rasterize__main_view_only() {
         let root_square = point2(5, 10);
         let mut narrow_fov = FieldOfView::new_empty_fov_with_root((root_square, STEP_UP));
