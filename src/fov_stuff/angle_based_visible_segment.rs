@@ -14,6 +14,7 @@ use ordered_float::OrderedFloat;
 use std::collections::HashSet;
 
 use super::fence::RelativeFenceFullyVisibleFromOriginGoingCcw;
+use super::square_visibility::RelativeSquareVisibilityTrait;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {

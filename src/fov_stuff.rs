@@ -556,6 +556,9 @@ fn single_shadow_square_visibility_from_one_view_arc(
     square_relative_to_center: WorldStep,
 ) -> Option<SquareVisibilityFromOneLargeShadow> {
     // Returns None if not visible
+    if square_relative_to_center == STEP_ZERO {
+        return Some(SquareVisibilityFromOneLargeShadow::new_fully_visible());
+    }
     let square_arc = PartialAngleInterval::from_relative_square(square_relative_to_center);
     assert!(visibility_arc.touches_or_overlaps(square_arc)); // This invalidates the None return case
 
@@ -1774,5 +1777,13 @@ mod tests {
 
         assert_eq!(rasterized_fov.positioned_visibilities().len(), dx as usize);
         // asdfasdf
+    }
+    #[test]
+    fn test_square_is_fully_visible_if_view_arc_starts_in_that_square() {
+        assert!(single_shadow_square_visibility_from_one_view_arc(
+            PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
+            STEP_ZERO
+        )
+        .is_some_and(|vis| vis.is_fully_visible()))
     }
 }
