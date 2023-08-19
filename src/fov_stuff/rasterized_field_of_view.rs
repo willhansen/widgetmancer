@@ -54,13 +54,13 @@ impl PositionedVisibilityOfSquare {
     pub fn relative_square(&self) -> WorldStep {
         self.relative_square
     }
-    pub fn new_in_top_view(
-        square_visibility: SquareVisibility,
+    pub fn new_in_main_view(
+        square_visibility: &SquareVisibility,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
     ) -> Self {
         PositionedVisibilityOfSquare {
-            square_visibility_in_absolute_frame: square_visibility,
+            square_visibility_in_absolute_frame: square_visibility.clone(),
             relative_square,
             absolute_square,
             portal_depth: 0,
@@ -88,14 +88,42 @@ pub struct RasterizedFieldOfView(Vec<PositionedVisibilityOfSquare>);
 
 impl RasterizedFieldOfView {
     fn new_centered_at(new_root: WorldSquare) -> Self {
-        RasterizedFieldOfView(Vec::from([PositionedVisibilityOfSquare::new_in_top_view(
-            SquareVisibility::new_fully_visible(),
-            new_root,
-            STEP_ZERO,
-        )]))
+        let mut new_thing = RasterizedFieldOfView(vec![]);
+        new_thing
+            .add_visible_square_in_main_view(STEP_ZERO, &SquareVisibility::new_fully_visible());
+        new_thing
+    }
+    fn has_visibility_for_position_in_main_view(&self, rel_square: WorldStep) -> bool {
+        self.0.iter().any(|positioned_vis| {
+            positioned_vis.portal_depth == 0 && positioned_vis.relative_square == rel_square
+        })
+    }
+    pub fn add_visible_square_in_main_view(
+        &mut self,
+        relative_square: WorldStep,
+        visibility: &SquareVisibility,
+    ) {
+        // make sure there isn't a positioned visibility in the main view in the same relative square already
+        assert!(!self.has_visibility_for_position_in_main_view(relative_square));
+
+        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
+            visibility,
+            self.root_square() + relative_square,
+            relative_square,
+        ));
     }
     pub fn positioned_visibilities(&self) -> &Vec<PositionedVisibilityOfSquare> {
         &self.0
+    }
+    pub fn from_visibility_map_of_main_view(
+        root: WorldSquare,
+        vis_map: &RelativeSquareVisibilityMap,
+    ) -> Self {
+        let mut new_thing = Self::new_centered_at(root);
+        vis_map.iter().for_each(|(rel_square, visibility)| {
+            new_thing.add_visible_square_in_main_view(*rel_square, visibility);
+        });
+        new_thing
     }
 
     pub(crate) fn visibilities_of_absolute_square(
@@ -111,7 +139,7 @@ impl RasterizedFieldOfView {
 
     pub fn root_square(&self) -> WorldSquare {
         // Will panic if no visible square at relative origin
-        self.relative_to_absolute_from_main_view_only(STEP_ZERO)
+        self.absolute_square_from_relative_square_in_main_view(STEP_ZERO)
             .unwrap()
     }
 
@@ -146,6 +174,7 @@ impl RasterizedFieldOfView {
             .map(|positioned_visibility| positioned_visibility.relative_square)
             .collect()
     }
+    // TODO: these names are getting long.  parameterize the logic.
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
     ) -> Vec<&PositionedVisibilityOfSquare> {
@@ -203,7 +232,7 @@ impl RasterizedFieldOfView {
             .cloned()
     }
 
-    pub fn relative_to_absolute_from_main_view_only(
+    pub fn absolute_square_from_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
     ) -> Option<WorldSquare> {
@@ -263,8 +292,8 @@ impl RasterizedFieldOfView {
             .collect()
     }
     pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
-        self.0.push(PositionedVisibilityOfSquare::new_in_top_view(
-            SquareVisibility::new_fully_visible(),
+        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
+            &SquareVisibility::new_fully_visible(),
             self.root_square() + step,
             step,
         ));
@@ -272,9 +301,9 @@ impl RasterizedFieldOfView {
     pub fn add_partially_visible_relative_square(
         &mut self,
         step: WorldStep,
-        vis: SquareVisibility,
+        vis: &SquareVisibility,
     ) {
-        self.0.push(PositionedVisibilityOfSquare::new_in_top_view(
+        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
             vis,
             self.root_square() + step,
             step,
@@ -288,6 +317,12 @@ impl RasterizedFieldOfView {
                 .map(|x| x.rounded_towards_full_visibility(tolerance))
                 .collect_vec(),
         )
+    }
+    pub fn combined_with(&self, other: &Self) -> Self {
+        todo!()
+    }
+    pub fn as_seen_through_portal_by(&self, other: &Self) -> Self {
+        todo!()
     }
 }
 #[cfg(test)]
@@ -321,13 +356,13 @@ mod tests {
 
         rasterized_fov.add_partially_visible_relative_square(
             STEP_UP,
-            SquareVisibility::new_partially_visible(
+            &SquareVisibility::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
             ),
         );
         rasterized_fov.add_partially_visible_relative_square(
             STEP_DOWN,
-            SquareVisibility::new_partially_visible(
+            &SquareVisibility::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
             ),
         );

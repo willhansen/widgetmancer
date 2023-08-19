@@ -249,7 +249,7 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
 pub type RelativeSquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 pub trait SquareVisibilityMapFunctions: ViewRoundable {
-    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self;
+    fn combined_while_increasing_visibility(&self, other: &Self) -> Self;
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
 }
@@ -284,8 +284,21 @@ impl ViewRoundable for RelativeSquareVisibilityMap {
 }
 
 impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
-    fn combined_with_while_increasing_visibility(&self, other: &Self) -> Self {
-        todo!()
+    fn combined_while_increasing_visibility(&self, other: &Self) -> Self {
+        let mut combined_vis_map = self.clone();
+        other.iter().for_each(|entry_to_add| {
+            let (key, value_to_add) = entry_to_add;
+            let mut existing_entry = combined_vis_map.entry(*key);
+            match existing_entry {
+                std::collections::hash_map::Entry::Occupied(mut e) => {
+                    e.insert(e.get().combined_increasing_visibility(value_to_add));
+                }
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(*value_to_add);
+                }
+            }
+        });
+        combined_vis_map
     }
 
     fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {

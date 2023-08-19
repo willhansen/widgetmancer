@@ -125,7 +125,7 @@ impl AngleBasedVisibleSegment {
         let max_square_length = self.furthest_overlapping_square().square_length();
         self.visible_angle_interval
             .touched_squares_going_outwards_and_ccw()
-            .take_while(move |&rel_square| dbg!(rel_square.square_length()) <= max_square_length)
+            .take_while(move |&rel_square| rel_square.square_length() <= max_square_length)
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
             .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
     }

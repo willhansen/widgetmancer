@@ -241,26 +241,25 @@ impl FieldOfView {
     pub fn rasterized(&self) -> RasterizedFieldOfView {
         // rasterize top level
         // rasterize each sub-level
-        let relativeVisibilityMap: RelativeSquareVisibilityMap = self
-            .all_view_segments_converted_to_relative_frame()
-            .iter()
-            .map(|segment: &AngleBasedVisibleSegment| segment.to_square_visibilities())
-            .reduce(|a, b| a.combined_with_while_increasing_visibility(&b))
-            .unwrap();
-        todo!();
+        let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
+        self.transformed_sub_fovs.iter().for_each(|sub_fov| {
+            let rasterized_and_relocalized_sub_fov =
+                sub_fov.rasterized().as_seen_through_portal_by(&combined);
+            combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
+        });
+        combined
     }
 
-    fn all_view_segments_converted_to_relative_frame(&self) -> Vec<AngleBasedVisibleSegment> {
-        concat([
-            self.visible_segments_in_main_view_only.clone(),
-            self.transformed_sub_fovs
+    fn rasterized_main_view_only(&self) -> RasterizedFieldOfView {
+        RasterizedFieldOfView::from_visibility_map_of_main_view(
+            self.root_square(),
+            &self
+                .visible_segments_in_main_view_only
                 .iter()
-                .flat_map(|sub_fov| {
-                    self.other_converted_to_this_frame(sub_fov)
-                        .all_view_segments_converted_to_relative_frame()
-                })
-                .collect_vec(),
-        ])
+                .map(AngleBasedVisibleSegment::to_square_visibilities)
+                .reduce(|a, b| a.combined_while_increasing_visibility(&b))
+                .unwrap(),
+        )
     }
 
     fn other_converted_to_this_frame(&self, other: &Self) -> Self {
