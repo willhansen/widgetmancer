@@ -2359,7 +2359,7 @@ impl Game {
             && visibilities
                 .get(0)
                 .unwrap()
-                .square_visibility_in_absolute_frame()
+                .lone_square_visibility_in_absolute_frame_or_panic()
                 .is_fully_visible()
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
@@ -4008,8 +4008,10 @@ mod tests {
             .map(|&world_step| fov.rasterized().visibilities_of_relative_square(world_step))
             .for_each(
                 |visibilities_of_rel_square: Vec<PositionedVisibilityOfSquare>| {
-                    let vis1 = visibilities_of_rel_square[0].square_visibility_in_absolute_frame();
-                    let vis2 = visibilities_of_rel_square[1].square_visibility_in_absolute_frame();
+                    let vis1 = visibilities_of_rel_square[0]
+                        .lone_square_visibility_in_absolute_frame_or_panic();
+                    let vis2 = visibilities_of_rel_square[1]
+                        .lone_square_visibility_in_absolute_frame_or_panic();
                     assert!(vis1.is_about_complementary_to(vis2));
                     assert!(vis1.is_visually_complementary_to(vis2));
                 },

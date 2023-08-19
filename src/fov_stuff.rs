@@ -820,7 +820,7 @@ mod tests {
             .clone();
         assert_eq!(
             PartialVisibilityDrawable::from_square_visibility(
-                visibility_of_test_square.square_visibility_in_absolute_frame()
+                visibility_of_test_square.lone_square_visibility_in_absolute_frame_or_panic()
             )
             .to_glyphs()
             .to_clean_string()
@@ -1069,7 +1069,7 @@ mod tests {
         assert!(square_visibility
             .get(0)
             .unwrap()
-            .square_visibility_in_absolute_frame()
+            .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());
     }
 
@@ -1355,7 +1355,7 @@ mod tests {
                 assert_false!(fov
                     .rasterized()
                     .visibilities_of_absolute_square(test_square)[0]
-                    .square_visibility_in_absolute_frame()
+                    .lone_square_visibility_in_absolute_frame_or_panic()
                     .is_fully_visible())
             });
 
@@ -1367,7 +1367,7 @@ mod tests {
                 .rasterized();
 
             assert!(merged_fov.visibilities_of_absolute_square(test_square)[0]
-                .square_visibility_in_absolute_frame()
+                .lone_square_visibility_in_absolute_frame_or_panic()
                 .is_fully_visible());
         });
     }
@@ -1391,7 +1391,7 @@ mod tests {
             assert_false!(fov
                 .rasterized()
                 .visibilities_of_absolute_square(test_square)[0]
-                .square_visibility_in_absolute_frame()
+                .lone_square_visibility_in_absolute_frame_or_panic()
                 .is_fully_visible())
         });
 
@@ -1404,7 +1404,7 @@ mod tests {
         assert!(merged_fov
             .rasterized()
             .visibilities_of_absolute_square(test_square)[0]
-            .square_visibility_in_absolute_frame()
+            .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());
     }
 
@@ -1464,7 +1464,7 @@ mod tests {
             1
         );
         assert!(visibility
-            .square_visibility_in_absolute_frame()
+            .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());
     }
 
@@ -1582,7 +1582,7 @@ mod tests {
         assert!(fov
             .visibility_of_relative_square_in_main_view(STEP_ZERO)
             .unwrap()
-            .square_visibility_in_absolute_frame()
+            .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());
     }
 
@@ -1629,7 +1629,8 @@ mod tests {
             the_positioned_visibility.portal_rotation(),
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.square_visibility_in_absolute_frame();
+        let the_square_visibility =
+            the_positioned_visibility.lone_square_visibility_in_absolute_frame_or_panic();
         assert_about_eq!(
             the_square_visibility
                 .visible_portion()

@@ -15,29 +15,71 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Debug, Clone)]
-struct PositionedVisibilityOfSquare {
-    non_overlapping_draw_targets: NonOverlappingDrawTargetsForOneRelativeSquare,
-    relative_square: WorldStep,
+struct LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
+    local_relative_square: WorldStep,
+    non_overlapping_draw_targets_from_one_square: NonOverlappingDrawTargetsFromOneSquare,
 }
 
-impl PositionedVisibilityOfSquare {
+impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
     pub fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
-        PositionedVisibilityOfSquare {
-            non_overlapping_draw_targets: self
-                .non_overlapping_draw_targets
+        LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
+            non_overlapping_draw_targets_from_one_square: self
+                .non_overlapping_draw_targets_from_one_square
                 .one_portal_deeper(forward_rotation_through_portal),
-            relative_square: rotated_n_quarter_turns_counter_clockwise(
-                self.relative_square,
+            local_relative_square: rotated_n_quarter_turns_counter_clockwise(
+                self.local_relative_square,
                 -forward_rotation_through_portal.quarter_turns(),
             ),
             ..self.clone()
         }
     }
-    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
-        self.square_visibility_in_absolute_frame
+    fn lone_positioned_draw_target_or_panic(&self) -> PositionedDrawTarget {
+        todo!();
+        let draw_target_count = self.non_overlapping_draw_targets_from_one_square.0.iter().count();
+        if draw_target_count == 1 {
+            self.non_overlapping_draw_targets_from_one_square
+                .0
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .clone() // TODO: make this more readable
+        } else if draw_target_count > 1 {
+            panic!(
+                "More than one visibility found.  ambiguous call.  self: {:?}",
+                self
+            )
+        } else {
+            panic!(
+                "No visibilities.  this shouldn't be possible. self: {:?}",
+                self
+            )
+        }
+    }
+    pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> SquareVisibility {
+        let visibility_count = self.non_overlapping_draw_targets_from_one_square.0.iter().count();
+        if visibility_count == 1 {
+            self.non_overlapping_draw_targets_from_one_square
+                .0
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .clone() // TODO: make this more readable
+        } else if visibility_count > 1 {
+            panic!(
+                "More than one visibility found.  ambiguous call.  self: {:?}",
+                self
+            )
+        } else {
+            panic!(
+                "No visibilities.  this shouldn't be possible. self: {:?}",
+                self
+            )
+        }
     }
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
@@ -49,16 +91,19 @@ impl PositionedVisibilityOfSquare {
         self.absolute_square
     }
     pub fn relative_square(&self) -> WorldStep {
-        self.relative_square
+        self.local_relative_square
     }
     pub fn new_in_main_view(
         square_visibility: &SquareVisibility,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
     ) -> Self {
-        PositionedVisibilityOfSquare {
+        Self {
+
+            local_relative_square: relative_square,
+            non_overlapping_draw_targets_from_one_square: NonOverlappingDrawTargetsFromOneSquare::new_local_target()
+
             square_visibility_in_absolute_frame: square_visibility.clone(),
-            relative_square,
             absolute_square,
             portal_depth: 0,
             portal_rotation: Default::default(),
@@ -70,7 +115,7 @@ impl PositionedVisibilityOfSquare {
     }
 }
 
-impl ViewRoundable for PositionedVisibilityOfSquare {
+impl ViewRoundable for LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         Self {
             square_visibility_in_absolute_frame: self
@@ -82,31 +127,36 @@ impl ViewRoundable for PositionedVisibilityOfSquare {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-struct NonOverlappingDrawTargetsForOneRelativeSquare(
-    HashMap<DrawTargetIdentifier, SquareVisibility>,
-);
+struct NonOverlappingDrawTargetsFromOneSquare(HashMap<DrawTargetCoordinates, SquareVisibility>);
 
+// TODO: rename?  Should it be "target" as in "target a thing to draw", or "source" as in "the source of what to draw"?
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-struct DrawTargetIdentifier {
+struct DrawTargetCoordinates {
     absolute_square: WorldSquare,
     portal_depth: u32,
     portal_rotation_to_target: QuarterTurnsAnticlockwise,
 }
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-struct PositionedDrawTargetIdentifier {
-    local_relative_position: WorldStep,
-    draw_target_identifier: DrawTargetIdentifier,
+struct LocallyPositionedDrawTargetIdentifier {
+    local_relative_square: WorldStep,
+    draw_target_coordinates: DrawTargetCoordinates,
 }
 
 #[derive(Clone, Debug)]
 struct DrawTarget {
     square_visibility_in_absolute_frame: SquareVisibility,
-    draw_coordinates: DrawTargetIdentifier,
+    draw_target_coordinates: DrawTargetCoordinates,
+}
+
+#[derive(Clone, Debug)]
+struct PositionedDrawTarget {
+    local_relative_square: WorldStep,
+    draw_target: DrawTarget,
 }
 
 #[derive(Clone, Constructor, Debug)]
-pub struct RasterizedFieldOfView(HashMap<PositionedDrawTargetIdentifier, SquareVisibility>);
+pub struct RasterizedFieldOfView(HashMap<LocallyPositionedDrawTargetIdentifier, SquareVisibility>);
 
 impl RasterizedFieldOfView {
     fn new_centered_at(new_root: WorldSquare) -> Self {
@@ -120,7 +170,10 @@ impl RasterizedFieldOfView {
             positioned_vis.portal_depth == 0 && positioned_vis.relative_square == rel_square
         })
     }
-    fn add_visible_square(&mut self, visibility: &PositionedVisibilityOfSquare) {
+    fn add_visible_square(
+        &mut self,
+        visibility: &LocallyPositionedNonOverlappingDrawTargetsFromOneSquare,
+    ) {
         todo!()
     }
     pub fn add_visible_square_in_main_view(
@@ -131,13 +184,17 @@ impl RasterizedFieldOfView {
         // make sure there isn't a positioned visibility in the main view in the same relative square already
         assert!(!self.has_visibility_for_position_in_main_view(relative_square));
 
-        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
-            visibility,
-            self.root_square() + relative_square,
-            relative_square,
-        ));
+        self.0.push(
+            LocallyPositionedNonOverlappingDrawTargetsFromOneSquare::new_in_main_view(
+                visibility,
+                self.root_square() + relative_square,
+                relative_square,
+            ),
+        );
     }
-    pub fn positioned_visibilities(&self) -> &Vec<PositionedVisibilityOfSquare> {
+    pub fn positioned_visibilities(
+        &self,
+    ) -> &Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         &self.0
     }
     pub fn from_visibility_map_of_main_view(
@@ -154,7 +211,7 @@ impl RasterizedFieldOfView {
     pub(crate) fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,
-    ) -> Vec<PositionedVisibilityOfSquare> {
+    ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         self.0
             .iter()
             .filter(|vis| vis.absolute_square == world_square)
@@ -171,7 +228,7 @@ impl RasterizedFieldOfView {
     pub(crate) fn visibilities_of_relative_square(
         &self,
         relative_square: WorldStep,
-    ) -> Vec<PositionedVisibilityOfSquare> {
+    ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         self.0
             .iter()
             .filter(|vis| vis.relative_square == relative_square)
@@ -196,13 +253,13 @@ impl RasterizedFieldOfView {
     pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
             .iter()
-            .map(|positioned_visibility| positioned_visibility.relative_square)
+            .map(|positioned_visibility| positioned_visibility.local_relative_square)
             .collect()
     }
     // TODO: these names are getting long.  parameterize the logic.
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
-    ) -> Vec<&PositionedVisibilityOfSquare> {
+    ) -> Vec<&LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         self.0
             .iter()
             .filter(|positioned_visibility| positioned_visibility.portal_depth == 0)
@@ -233,7 +290,7 @@ impl RasterizedFieldOfView {
             && visibility
                 .get(0)
                 .unwrap()
-                .square_visibility_in_absolute_frame()
+                .lone_square_visibility_in_absolute_frame_or_panic()
                 .is_fully_visible();
     }
 
@@ -250,7 +307,7 @@ impl RasterizedFieldOfView {
     pub fn visibility_of_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
-    ) -> Option<PositionedVisibilityOfSquare> {
+    ) -> Option<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         self.0
             .iter()
             .find(|vis| vis.relative_square == rel_square)
@@ -317,22 +374,26 @@ impl RasterizedFieldOfView {
             .collect()
     }
     pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
-        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
-            &SquareVisibility::new_fully_visible(),
-            self.root_square() + step,
-            step,
-        ));
+        self.0.push(
+            LocallyPositionedNonOverlappingDrawTargetsFromOneSquare::new_in_main_view(
+                &SquareVisibility::new_fully_visible(),
+                self.root_square() + step,
+                step,
+            ),
+        );
     }
     pub fn add_partially_visible_relative_square(
         &mut self,
         step: WorldStep,
         vis: &SquareVisibility,
     ) {
-        self.0.push(PositionedVisibilityOfSquare::new_in_main_view(
-            vis,
-            self.root_square() + step,
-            step,
-        ));
+        self.0.push(
+            LocallyPositionedNonOverlappingDrawTargetsFromOneSquare::new_in_main_view(
+                vis,
+                self.root_square() + step,
+                step,
+            ),
+        );
     }
 
     pub fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
@@ -365,7 +426,7 @@ impl DrawTarget {
     }
 }
 
-impl NonOverlappingDrawTargetsForOneRelativeSquare {
+impl NonOverlappingDrawTargetsFromOneSquare {
     // simple delegation
     pub fn one_portal_deeper(
         &self,
@@ -377,6 +438,17 @@ impl NonOverlappingDrawTargetsForOneRelativeSquare {
                 .map(|x| x.one_portal_deeper(forward_rotation_through_portal))
                 .collect_vec(),
         )
+    }
+    fn new_local_target(absolute_square: WorldSquare, visibility: SquareVisibility) -> Self {
+        Self(HashMap::from([(DrawTargetCoordinates::new_local(absolute_square) , visibility)])
+            
+        )
+    }
+}
+
+impl DrawTargetCoordinates {
+    fn new_local(absolute_square: WorldSquare) -> Self {
+        Self { absolute_square , portal_depth: 0, portal_rotation_to_target: QuarterTurnsAnticlockwise::default()  }
     }
 }
 
@@ -470,13 +542,15 @@ mod tests {
     fn test_add_a_view_of_a_square() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_visible_square(&PositionedVisibilityOfSquare {
-            contents: todo!(),
-            square_visibility_in_absolute_frame: SquareVisibility::new_fully_visible(),
-            relative_square: (4, 5).into(),
-            absolute_square: (10, 10).into(),
-            portal_depth: 1,
-            portal_rotation: QuarterTurnsAnticlockwise::default(),
-        })
+        rasterized_fov.add_visible_square(
+            &LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
+                contents: todo!(),
+                square_visibility_in_absolute_frame: SquareVisibility::new_fully_visible(),
+                local_relative_square: (4, 5).into(),
+                absolute_square: (10, 10).into(),
+                portal_depth: 1,
+                portal_rotation: QuarterTurnsAnticlockwise::default(),
+            },
+        )
     }
 }
