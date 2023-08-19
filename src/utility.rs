@@ -1927,6 +1927,12 @@ pub fn faces_away_from_center_at_rel_square(
 }
 
 #[derive(Hash, Clone, Copy, Debug)]
+pub struct ViewTransform {
+    transform: RigidTransform,
+    portal_depth: u32,
+}
+
+#[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
     end_pose: SquareWithOrthogonalDir,
@@ -1934,12 +1940,12 @@ pub struct RigidTransform {
 
 impl RigidTransform {
     pub fn from_start_and_end_poses(
-        start: SquareWithOrthogonalDir,
-        end: SquareWithOrthogonalDir,
+        start: impl Into<SquareWithOrthogonalDir>,
+        end: impl Into<SquareWithOrthogonalDir>,
     ) -> Self {
         RigidTransform {
-            start_pose: start,
-            end_pose: end,
+            start_pose: start.into(),
+            end_pose: end.into(),
         }
     }
     pub fn translation(&self) -> WorldStep {

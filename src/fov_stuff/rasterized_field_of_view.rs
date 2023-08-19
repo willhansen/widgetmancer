@@ -8,14 +8,15 @@ use crate::graphics::drawable::{
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    QuarterTurnRotatable, QuarterTurnsAnticlockwise, STEP_ZERO,
+    QuarterTurnRotatable, QuarterTurnsAnticlockwise, ViewTransform, STEP_ZERO,
 };
 use derive_more::Constructor;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct PositionedVisibilityOfSquare {
+struct PositionedVisibilityOfSquare {
+    views: HashMap<(WorldStep, ViewTransform), SquareVisibility>,
     square_visibility_in_absolute_frame: SquareVisibility,
     relative_square: WorldStep,
     absolute_square: WorldSquare,
@@ -97,6 +98,13 @@ impl RasterizedFieldOfView {
         self.0.iter().any(|positioned_vis| {
             positioned_vis.portal_depth == 0 && positioned_vis.relative_square == rel_square
         })
+    }
+    pub fn add_visible_square(
+        &mut self,
+        rel_square: impl Into<WorldStep>,
+        portal_view_transform: ViewTransform,
+    ) {
+        todo!()
     }
     pub fn add_visible_square_in_main_view(
         &mut self,
@@ -329,7 +337,7 @@ impl RasterizedFieldOfView {
 mod tests {
     use super::*;
     use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
-    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use crate::utility::{RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP};
     use euclid::point2;
     use ntest::{assert_true, timeout};
 
@@ -410,5 +418,20 @@ mod tests {
         assert!(rounded_fov
             .only_partially_visible_relative_squares_in_main_view_only()
             .contains(&STEP_UP));
+    }
+    #[test]
+    fn test_add_a_view_of_a_square() {
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+
+        rasterized_fov.add_visible_square(
+            (4, 5),
+            ViewTransform {
+                transform: RigidTransform::from_start_and_end_poses(
+                    ((0, 0), STEP_RIGHT),
+                    ((5, 10), STEP_UP),
+                ),
+                portal_depth: 1,
+            },
+        )
     }
 }

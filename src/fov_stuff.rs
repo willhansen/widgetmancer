@@ -9,9 +9,7 @@ use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
-use crate::fov_stuff::rasterized_field_of_view::{
-    PositionedVisibilityOfSquare, RasterizedFieldOfView,
-};
+use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
