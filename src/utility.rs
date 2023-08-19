@@ -1927,12 +1927,6 @@ pub fn faces_away_from_center_at_rel_square(
 }
 
 #[derive(Hash, Clone, Copy, Debug)]
-pub struct ViewTransform {
-    transform: RigidTransform,
-    portal_depth: u32,
-}
-
-#[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
     end_pose: SquareWithOrthogonalDir,

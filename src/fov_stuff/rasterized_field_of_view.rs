@@ -8,7 +8,7 @@ use crate::graphics::drawable::{
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    QuarterTurnRotatable, QuarterTurnsAnticlockwise, ViewTransform, STEP_ZERO,
+    QuarterTurnRotatable, QuarterTurnsAnticlockwise, STEP_ZERO,
 };
 use derive_more::Constructor;
 use itertools::Itertools;
@@ -16,13 +16,8 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Debug, Clone)]
 struct PositionedVisibilityOfSquare {
-    views: HashMap<(WorldStep, ViewTransform), SquareVisibility>,
-    square_visibility_in_absolute_frame: SquareVisibility,
+    non_overlapping_draw_targets: NonOverlappingDrawTargetsForOneRelativeSquare,
     relative_square: WorldStep,
-    absolute_square: WorldSquare,
-    //step_in_fov_sequence: u32,
-    portal_depth: u32,
-    portal_rotation: QuarterTurnsAnticlockwise,
 }
 
 impl PositionedVisibilityOfSquare {
@@ -31,8 +26,9 @@ impl PositionedVisibilityOfSquare {
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
         PositionedVisibilityOfSquare {
-            portal_depth: self.portal_depth + 1,
-            portal_rotation: self.portal_rotation + forward_rotation_through_portal,
+            non_overlapping_draw_targets: self
+                .non_overlapping_draw_targets
+                .one_portal_deeper(forward_rotation_through_portal),
             relative_square: rotated_n_quarter_turns_counter_clockwise(
                 self.relative_square,
                 -forward_rotation_through_portal.quarter_turns(),
@@ -84,8 +80,33 @@ impl ViewRoundable for PositionedVisibilityOfSquare {
         }
     }
 }
+
+#[derive(Clone, PartialEq, Debug)]
+struct NonOverlappingDrawTargetsForOneRelativeSquare(
+    HashMap<DrawTargetIdentifier, SquareVisibility>,
+);
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+struct DrawTargetIdentifier {
+    absolute_square: WorldSquare,
+    portal_depth: u32,
+    portal_rotation_to_target: QuarterTurnsAnticlockwise,
+}
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+struct PositionedDrawTargetIdentifier {
+    local_relative_position: WorldStep,
+    draw_target_identifier: DrawTargetIdentifier,
+}
+
+#[derive(Clone, Debug)]
+struct DrawTarget {
+    square_visibility_in_absolute_frame: SquareVisibility,
+    draw_coordinates: DrawTargetIdentifier,
+}
+
 #[derive(Clone, Constructor, Debug)]
-pub struct RasterizedFieldOfView(Vec<PositionedVisibilityOfSquare>);
+pub struct RasterizedFieldOfView(HashMap<PositionedDrawTargetIdentifier, SquareVisibility>);
 
 impl RasterizedFieldOfView {
     fn new_centered_at(new_root: WorldSquare) -> Self {
@@ -99,11 +120,7 @@ impl RasterizedFieldOfView {
             positioned_vis.portal_depth == 0 && positioned_vis.relative_square == rel_square
         })
     }
-    pub fn add_visible_square(
-        &mut self,
-        rel_square: impl Into<WorldStep>,
-        portal_view_transform: ViewTransform,
-    ) {
+    fn add_visible_square(&mut self, visibility: &PositionedVisibilityOfSquare) {
         todo!()
     }
     pub fn add_visible_square_in_main_view(
@@ -333,6 +350,36 @@ impl RasterizedFieldOfView {
         todo!()
     }
 }
+
+impl DrawTarget {
+    pub fn one_portal_deeper(
+        &self,
+        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
+    ) -> Self {
+        Self {
+            portal_depth: self.portal_depth + 1,
+            portal_rotation_to_target: self.portal_rotation_to_target
+                + forward_rotation_through_portal,
+            ..self.clone()
+        }
+    }
+}
+
+impl NonOverlappingDrawTargetsForOneRelativeSquare {
+    // simple delegation
+    pub fn one_portal_deeper(
+        &self,
+        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
+    ) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|x| x.one_portal_deeper(forward_rotation_through_portal))
+                .collect_vec(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,15 +470,13 @@ mod tests {
     fn test_add_a_view_of_a_square() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_visible_square(
-            (4, 5),
-            ViewTransform {
-                transform: RigidTransform::from_start_and_end_poses(
-                    ((0, 0), STEP_RIGHT),
-                    ((5, 10), STEP_UP),
-                ),
-                portal_depth: 1,
-            },
-        )
+        rasterized_fov.add_visible_square(&PositionedVisibilityOfSquare {
+            contents: todo!(),
+            square_visibility_in_absolute_frame: SquareVisibility::new_fully_visible(),
+            relative_square: (4, 5).into(),
+            absolute_square: (10, 10).into(),
+            portal_depth: 1,
+            portal_rotation: QuarterTurnsAnticlockwise::default(),
+        })
     }
 }

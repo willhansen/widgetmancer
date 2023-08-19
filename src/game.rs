@@ -22,9 +22,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::rasterized_field_of_view::{
-    PositionedVisibilityOfSquare, RasterizedFieldOfView,
-};
+use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityTrait, SquareVisibilityFunctions,
 };
@@ -2438,7 +2436,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_try_set_player_on_block_is_fail() {
         let mut game = Game::new(20, 10, Instant::now());
         game.place_player(point2(5, 5));
@@ -2447,7 +2445,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_blocks_block_view() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -2457,7 +2455,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_fov_mask_non_partials() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -2497,7 +2495,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_faction_moves_closest_piece_to_player() {
         let mut game = set_up_game_with_player();
         let king_square = game.player_square() + STEP_UP_RIGHT * 3;
@@ -2509,7 +2507,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_pawn_reproduction_in_surrounded_squares() {
         let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
@@ -2525,7 +2523,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_pawn_reproduction_does_not_apply_to_filled_squares() {
         let mut game = set_up_10x10_game();
 
@@ -2545,7 +2543,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_faction_with_only_pawns_becomes_red_pawns() {
         let mut game = set_up_10x10_game();
 
@@ -2572,7 +2570,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawn_looks_red() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -2586,7 +2584,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawns_dont_move_if_stable() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(0, 0));
@@ -2604,7 +2602,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawn_will_move_into_protection() {
         let mut game = set_up_10x10_game();
         let moving_pawn_square = point2(5, 5);
@@ -2616,7 +2614,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawns_dont_try_to_capture_each_other() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -2633,7 +2631,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawns_try_to_not_pack_tightly() {
         let mut game = set_up_10x10_game();
         let pawn_squares = (4..=6).flat_map(|x| (4..=5).map(move |y| point2(x, y)));
@@ -2648,7 +2646,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_red_pawns_slightly_prefer_movement_over_non_movement() {
         let mut game = set_up_10x10_game();
         let pawn_square = point2(5, 5);
@@ -2659,7 +2657,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_kills_player() {
         let mut game = set_up_game_with_player();
         let death_cube_start_pos = (game.player_square() + STEP_LEFT).to_f32();
@@ -2671,7 +2669,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_kills_rook() {
         let mut game = set_up_10x10_game();
         let rook_square = point2(5, 5);
@@ -2685,7 +2683,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_can_be_seen() {
         let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
@@ -2709,7 +2707,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_moves() {
         let mut game = set_up_10x10_game();
         game.place_linear_death_cube(point2(3.0, 4.5), vec2(1.0, 0.0));
@@ -2718,7 +2716,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_visually_moves() {
         let mut game = set_up_10x10_game();
         let test_square = point2(5, 5);
@@ -2753,7 +2751,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cubes_change_color_over_time() {
         let mut game = set_up_10x10_game();
         let test_square = point2(3, 3);
@@ -2776,7 +2774,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cube_turret_shoots_death_cubes() {
         let mut game = set_up_10x10_game();
         let turret_square = point2(5, 5);
@@ -2790,7 +2788,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_death_cubes_vanish_when_off_board() {
         let mut game = set_up_nxn_game(5);
         game.place_linear_death_cube(point2(4.9, 4.9), vec2(20.0, 0.0));
@@ -2800,7 +2798,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_blink() {
         let mut game = set_up_game_with_player();
         let start_pos = game.player_square();
@@ -2810,7 +2808,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_blink_is_also_strafe() {
         let mut game = set_up_game_with_player();
         let start_pos = game.player_square();
@@ -2820,7 +2818,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_no_blink_through_block() {
         let mut game = set_up_game_with_player();
         let start_pos = game.player_square();
@@ -2831,7 +2829,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_blink_leaves_blue_trail() {
         let mut game = set_up_game_with_player();
         let start_pos = game.player_square();
@@ -2857,7 +2855,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_overlapping_blink_trails_have_uniform_color() {
         let mut game = set_up_game_with_player();
         let start_pos = game.player_square();
@@ -2890,7 +2888,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_try_to_blink_but_blocked() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(0, 0));
@@ -2898,7 +2896,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_protected_piece_has_fully_colored_background() {
         let mut game = set_up_10x10_game();
         let square1 = point2(5, 5);
@@ -2915,7 +2913,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_blink_range_upgrade() {
         let mut game = set_up_nxn_game(20);
         let start = point2(5, 5);
@@ -2944,7 +2942,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_kings_drop_upgrades() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -2955,7 +2953,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_soldier() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -2971,7 +2969,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_turning_soldier_turns_toward_player() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -2996,7 +2994,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_turning_pawn_turns_toward_player() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -3021,7 +3019,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_radial_attack() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3036,7 +3034,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_spear_attack() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3050,7 +3048,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_arrow_travels() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3063,7 +3061,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_draw_arrows() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3077,7 +3075,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_shoot_arrow() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3089,7 +3087,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_shoot_arrow_diagonal() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3101,7 +3099,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_can_capture_arrow() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -3113,7 +3111,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_can_step_through_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -3128,7 +3126,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portal_steps() {
         let mut game = set_up_10x10_game();
         let entrance_step = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_UP);
@@ -3141,7 +3139,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_move_through_multiple_portals() {
         let mut game = set_up_10x10_game();
         let start = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_RIGHT);
@@ -3156,7 +3154,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_arrow_through_portal() {
         let mut game = set_up_10x10_game();
         let start = SquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_RIGHT);
@@ -3168,7 +3166,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_piece_capture_through_portal() {
         let mut game = set_up_10x10_game();
         let enemy_square = point2(5, 5);
@@ -3185,7 +3183,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_spear_stab_through_portal() {
         let mut game = set_up_10x10_game();
         let enemy_square = point2(5, 5);
@@ -3206,7 +3204,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_arrow_does_not_turn_toward_player() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -3221,7 +3219,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_see_through_portal() {
         let mut game = set_up_10x10_game();
 
@@ -3274,7 +3272,7 @@ mod tests {
 
     #[ignore = "Turns out not a great feature"]
     #[test]
-    
+
     fn test_screen_jumps_to_player_if_far_from_screen_center() {
         let mut game = set_up_nxn_game(20);
         let start_square = point2(5, 5);
@@ -3323,7 +3321,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_observed_crash_from_one_pillar_shadow() {
         let mut game = set_up_nxn_game(20);
         let player_square = point2(0, 0);
@@ -3335,7 +3333,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_observed_crash_from_seeing_back_of_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -3350,7 +3348,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_observed_crash_from_being_near_portal() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -3368,7 +3366,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_observed_crash_from_being_near_portal__2() {
         let mut game = set_up_nxn_game(20);
         game.place_player(point2(5, 5));
@@ -3386,7 +3384,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_see_through_portal_while_next_to_it() {
         let mut game = set_up_10x10_game();
 
@@ -3437,7 +3435,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portals_causing_shadows_at_certain_angles() {
         let mut game = set_up_nxn_game(20);
 
@@ -3484,7 +3482,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_rotate_screen() {
         let mut game = set_up_nxn_game(20);
 
@@ -3558,7 +3556,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_rotates_when_stepping_through_portal() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -3592,7 +3590,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_move_relative_to_screen() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -3606,7 +3604,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_blink_relative_to_screen() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -3620,7 +3618,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_rotated_shadows() {
         let player_square = point2(5, 5);
 
@@ -3662,7 +3660,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_can_fail_to_walk_into_block_without_crashing() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -3672,7 +3670,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_partial_shadows_are_drawn() {
         let player_square = point2(5, 5);
         let mut game = set_up_10x10_game();
@@ -3719,7 +3717,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_do_not_see_block_through_portal() {
         let mut game = set_up_player_just_left_of_portal_through_wall();
 
@@ -3735,7 +3733,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_freestanding_portals_can_be_seamless() {
         let player_square = point2(5, 5);
         let mut game = set_up_10x10_game();
@@ -3784,7 +3782,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portal_edges_are_stable__dense_horizontal() {
         let player_square = point2(0, 5);
         let mut game = set_up_nxm_game(10, 30);
@@ -3795,7 +3793,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portal_edges_are_stable__simple_case() {
         let player_square = point2(0, 2);
         let mut game = set_up_nxm_game(5, 5);
@@ -3807,7 +3805,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portal_edges_are_stable__two_deep() {
         let player_square = point2(0, 2);
         let mut game = set_up_nxm_game(5, 10);
@@ -3829,7 +3827,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portal_drawn_in_correct_order_over_partially_visible_block() {
         let player_square = point2(5, 5);
         let test_square = SCREEN_STEP_DOWN_RIGHT + SCREEN_STEP_RIGHT * 2;
@@ -3852,7 +3850,7 @@ mod tests {
 
     #[ignore = "May or may not want this"]
     #[test]
-    
+
     fn test_shadow_arc_squashed_by_portal_still_looks_connected() {
         let player_square = point2(5, 5);
         let test_square = SCREEN_STEP_DOWN_RIGHT + SCREEN_STEP_RIGHT * 3;
@@ -3882,7 +3880,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_set_floor_color() {
         let mut game = set_up_nxm_game(10, 10);
         game.draw_headless_now();
@@ -3906,7 +3904,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_portals_tint_views() {
         let test_square: ScreenBufferStep = SCREEN_STEP_RIGHT * 3;
         let player_square: WorldSquare = point2(3, 3);
@@ -3936,7 +3934,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_horizontal_wide_portal_has_no_internal_defects() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(3, 15);
@@ -3968,7 +3966,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_horizontal_wide_portal_has_smooth_edge() {
         let mut game = set_up_nxm_game(16, 10);
         let player_square: WorldSquare = point2(3, game.board_size.height as i32 / 2);
@@ -4033,7 +4031,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_vertical_wide_portals_have_no_internal_defects() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(15, 5);
@@ -4064,7 +4062,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_vertical_wide_portals_have_smooth_edges() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(15, 5);
@@ -4101,7 +4099,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_rotated_wide_portals_have_no_internal_defects() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(5, 5);
@@ -4141,7 +4139,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_turning_wide_portal_specific_defect() {
         let mut game = set_up_nxm_game(30, 30);
         let player_square: WorldSquare = point2(5, 15);
@@ -4181,7 +4179,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_rotates_with_portal() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -4211,7 +4209,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_move_vertical_looks_correct() {
         let mut game = set_up_10x10_game();
         game.place_player_with_direction(point2(5, 5), STEP_UP);
@@ -4237,7 +4235,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_seen_through_portal_is_rotated_correctly() {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
@@ -4265,7 +4263,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_around_adjacent_portal() {
         for orthodir in ORTHOGONAL_STEPS {
             [-1, 1].into_iter().for_each(|i| {
@@ -4289,7 +4287,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_into_off_adjacent_portal() {
         for orthodir in ORTHOGONAL_STEPS {
             for i in [-1, 1] {
@@ -4314,7 +4312,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_into_matching_convex_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
             let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
@@ -4344,7 +4342,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_into_mismatched_convex_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
             let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
@@ -4375,7 +4373,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_into_matching_concave_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
             let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
@@ -4401,7 +4399,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_player_diagonal_step_into_mismatched_concave_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
             let right_orthodir = rotated_n_quarter_turns_counter_clockwise(left_orthodir, -1);
@@ -4428,7 +4426,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_push_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -4446,7 +4444,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_draw_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -4462,7 +4460,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_draw_floor_arrows() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -4479,7 +4477,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floor_arrows_push_widget() {
         let mut game = set_up_10x10_game();
         let start_square = point2(5, 5);
@@ -4494,7 +4492,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_widget_visible_next_to_turning_portal() {
         let mut game = set_up_10x10_game();
         let start_square = point2(2, 2);
@@ -4525,7 +4523,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floating_hunter_drone__place_and_draw() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(4, 5));
@@ -4553,7 +4551,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floating_hunter_drone__rotate_over_time() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
@@ -4572,7 +4570,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floating_hunter_drone__move_over_time() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
@@ -4591,7 +4589,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floating_hunter_drone__bounce_off_board_edge() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
@@ -4611,7 +4609,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_reflect_off_board_edges() {
         let game = set_up_nxm_game(10, 20);
 
@@ -4658,7 +4656,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_hunter_drone_rotates_with_screen_rotation() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -4689,7 +4687,7 @@ mod tests {
         assert_eq!(lower_glyphs.chars(), [SPACE, '⡇']); // Might need to flip horizontally at some point
     }
     #[test]
-    
+
     fn test_conveyor_belt__place_and_draw() {
         let mut game = set_up_10x10_game();
         let player_square = point2(4, 5);
@@ -4734,7 +4732,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_conveyor_belt__push_player() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4749,7 +4747,7 @@ mod tests {
         assert_eq!(game.player_square(), square + dir);
     }
     #[test]
-    
+
     fn test_conveyor_belt__push_widget() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4764,7 +4762,7 @@ mod tests {
         assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
-    
+
     fn test_conveyor_belt__push_hunter_drone() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4786,7 +4784,7 @@ mod tests {
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
     #[test]
-    
+
     fn test_conveyor_belt__pushes_death_cube() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4807,7 +4805,7 @@ mod tests {
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
     #[test]
-    
+
     fn test_floor_arrows_push_hunter_drone() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4831,7 +4829,7 @@ mod tests {
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
     #[test]
-    
+
     fn test_floor_arrows_push_player() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4843,7 +4841,7 @@ mod tests {
         assert_eq!(game.player_square(), square + STEP_RIGHT);
     }
     #[test]
-    
+
     fn test_floor_arrow_does_not_push_too_far() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4855,7 +4853,7 @@ mod tests {
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
     }
     #[test]
-    
+
     fn test_player_tries_to_walk_against_push_arrows() {
         let mut game = set_up_10x10_game();
         let square = point2(8, 5);
@@ -4874,7 +4872,7 @@ mod tests {
         assert_eq!(game.player_square(), square);
     }
     #[test]
-    
+
     fn test_hunter_drone_turns_towards_player_upon_detection() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
@@ -4897,14 +4895,14 @@ mod tests {
         assert_about_eq!(start_vel.length(), end_vel.length());
     }
     #[test]
-    
+
     fn test_raycast__hit_nothing() {
         let game = set_up_10x10_game();
         let result = game.raycast(point2(5.0, 5.0), Angle::degrees(0.0), 3.0);
         assert!(result.grid_entities.is_empty());
     }
     #[test]
-    
+
     fn test_raycast__hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
@@ -4917,7 +4915,7 @@ mod tests {
         assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
     }
     #[test]
-    
+
     fn test_raycast__not_enough_range_to_hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
@@ -4930,7 +4928,7 @@ mod tests {
         assert!(result.grid_entities.is_empty());
     }
     #[test]
-    
+
     fn test_raycast__barely_hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
@@ -4943,7 +4941,7 @@ mod tests {
         assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
     }
     #[test]
-    
+
     fn test_raycast__barely_out_of_range() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
@@ -4956,7 +4954,7 @@ mod tests {
         assert!(result.grid_entities.is_empty());
     }
     #[test]
-    
+
     fn test_raycast_goes_through_portal() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
@@ -4987,7 +4985,7 @@ mod tests {
         );
     }
     #[test]
-    
+
     fn test_raycast_goes_through_turned_portal() {
         let mut game = set_up_10x10_game();
         let block_square = point2(5, 5);
@@ -5005,7 +5003,7 @@ mod tests {
         assert_eq!(result.grid_entities[0], (STEP_UP, GridEntity::Block));
     }
     #[test]
-    
+
     fn test_hunter_drone_raycasts_visually_go_through_portal() {
         let mut game = set_up_10x10_game();
         let drone_square = point2(2, 2);
@@ -5032,7 +5030,7 @@ mod tests {
         assert!(char_is_braille(chars[0]) || char_is_braille(chars[1]));
     }
     #[test]
-    
+
     fn test_hunter_drone_moves_through_portal() {
         let mut game = set_up_10x10_game();
         let drone_square = point2(2, 2);
@@ -5051,7 +5049,7 @@ mod tests {
         assert!(drone.position.x > drone_square.x as f32 + 2.0);
     }
     #[test]
-    
+
     fn test_hunter_drone_visually_pokes_through_a_portal_a_little_bit() {
         let mut game = set_up_10x10_game();
         let drone_square = point2(2, 2);
