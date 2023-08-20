@@ -14,11 +14,43 @@ use derive_more::Constructor;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
-#[derive(PartialEq, Debug, Clone)]
-struct LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
-    local_relative_square: WorldStep,
-    non_overlapping_draw_targets_from_one_square: NonOverlappingDrawTargetsFromOneSquare,
+// TODO: rename?  Should it be "target" as in "target a thing to draw", or "source" as in "the source of what to draw"?
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+struct DrawTargetCoordinates {
+    absolute_square: WorldSquare,
+    portal_depth: u32,
+    portal_rotation_to_target: QuarterTurnsAnticlockwise,
 }
+
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+struct LocallyPositioned<T> {
+    local_relative_square: WorldStep,
+    contents: T
+}
+
+trait PositionedLocally {
+    fn local_relative_square(&self) -> WorldStep;
+    fn set_local_relative_square(&mut self, rel_square: WorldStep);
+    fn position_locally<T>(rel_square: WorldStep, contents: &T) -> LocallyPositioned<T>;
+}
+
+type LocallyPositionedDrawTargetCoordinates = LocallyPositioned<DrawTargetCoordinates>;
+
+#[derive(Clone, Debug)]
+struct DrawTarget {
+    draw_target_coordinates: DrawTargetCoordinates,
+    square_visibility_in_absolute_frame: SquareVisibility,
+}
+
+type LocallyPositionedDrawTarget = LocallyPositioned<DrawTarget>;
+
+#[derive(Clone, Constructor, Debug)]
+pub struct RasterizedFieldOfView(HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility>);
+
+#[derive(Clone, PartialEq, Debug)]
+struct NonOverlappingDrawTargetsFromOneSquare(HashMap<DrawTargetCoordinates, SquareVisibility>);
+
+type  LocallyPositionedNonOverlappingDrawTargetsFromOneSquare = LocallyPositioned<NonOverlappingDrawTargetsFromOneSquare>;
 
 impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
     pub fn one_portal_deeper(
@@ -26,8 +58,8 @@ impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
         LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
-            non_overlapping_draw_targets_from_one_square: self
-                .non_overlapping_draw_targets_from_one_square
+            contents: self
+                .contents
                 .one_portal_deeper(forward_rotation_through_portal),
             local_relative_square: rotated_n_quarter_turns_counter_clockwise(
                 self.local_relative_square,
@@ -36,59 +68,20 @@ impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
             ..self.clone()
         }
     }
-    fn lone_positioned_draw_target_or_panic(&self) -> PositionedDrawTarget {
-        todo!();
-        let draw_target_count = self.non_overlapping_draw_targets_from_one_square.0.iter().count();
-        if draw_target_count == 1 {
-            self.non_overlapping_draw_targets_from_one_square
-                .0
-                .iter()
-                .next()
-                .unwrap()
-                .1
-                .clone() // TODO: make this more readable
-        } else if draw_target_count > 1 {
-            panic!(
-                "More than one visibility found.  ambiguous call.  self: {:?}",
-                self
-            )
-        } else {
-            panic!(
-                "No visibilities.  this shouldn't be possible. self: {:?}",
-                self
-            )
-        }
+    fn lone_positioned_draw_target_or_panic(&self) -> LocallyPositionedDrawTarget {
+        LocallyPositioned::<DrawTarget>::position_locally(self.local_relative_square, self.contents.lone_draw_target_or_panic() )
     }
     pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> SquareVisibility {
-        let visibility_count = self.non_overlapping_draw_targets_from_one_square.0.iter().count();
-        if visibility_count == 1 {
-            self.non_overlapping_draw_targets_from_one_square
-                .0
-                .iter()
-                .next()
-                .unwrap()
-                .1
-                .clone() // TODO: make this more readable
-        } else if visibility_count > 1 {
-            panic!(
-                "More than one visibility found.  ambiguous call.  self: {:?}",
-                self
-            )
-        } else {
-            panic!(
-                "No visibilities.  this shouldn't be possible. self: {:?}",
-                self
-            )
-        }
+        self.contents.lone_draw_target_or_panic().square_visibility_in_absolute_frame
     }
-    pub fn portal_depth(&self) -> u32 {
-        self.portal_depth
+    pub fn lone_portal_depth_or_panic(&self) -> u32 {
+        self.contents.lone_draw_target_or_panic().draw_target_coordinates.portal_depth
     }
-    pub fn portal_rotation(&self) -> QuarterTurnsAnticlockwise {
-        self.portal_rotation
+    pub fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
+        self.contents.lone_draw_target_or_panic().draw_target_coordinates.portal_rotation_to_target
     }
-    pub fn absolute_square(&self) -> WorldSquare {
-        self.absolute_square
+    pub fn lone_absolute_square_or_panic(&self) -> WorldSquare {
+        self.contents.lone_draw_target_or_panic().draw_target_coordinates.absolute_square
     }
     pub fn relative_square(&self) -> WorldStep {
         self.local_relative_square
@@ -126,37 +119,6 @@ impl ViewRoundable for LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-struct NonOverlappingDrawTargetsFromOneSquare(HashMap<DrawTargetCoordinates, SquareVisibility>);
-
-// TODO: rename?  Should it be "target" as in "target a thing to draw", or "source" as in "the source of what to draw"?
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-struct DrawTargetCoordinates {
-    absolute_square: WorldSquare,
-    portal_depth: u32,
-    portal_rotation_to_target: QuarterTurnsAnticlockwise,
-}
-
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-struct LocallyPositionedDrawTargetIdentifier {
-    local_relative_square: WorldStep,
-    draw_target_coordinates: DrawTargetCoordinates,
-}
-
-#[derive(Clone, Debug)]
-struct DrawTarget {
-    square_visibility_in_absolute_frame: SquareVisibility,
-    draw_target_coordinates: DrawTargetCoordinates,
-}
-
-#[derive(Clone, Debug)]
-struct PositionedDrawTarget {
-    local_relative_square: WorldStep,
-    draw_target: DrawTarget,
-}
-
-#[derive(Clone, Constructor, Debug)]
-pub struct RasterizedFieldOfView(HashMap<LocallyPositionedDrawTargetIdentifier, SquareVisibility>);
 
 impl RasterizedFieldOfView {
     fn new_centered_at(new_root: WorldSquare) -> Self {
@@ -444,11 +406,54 @@ impl NonOverlappingDrawTargetsFromOneSquare {
             
         )
     }
+    fn lone_draw_target_or_panic(&self) -> &DrawTarget {
+        
+        let draw_target_count = self.0.iter().count();
+        if draw_target_count == 1 {
+                 self.0
+                .iter()
+                .next()
+                .unwrap().into()
+        } else if draw_target_count > 1 {
+            panic!(
+                "More than one visibility found.  ambiguous call.  self: {:?}",
+                self
+            )
+        } else {
+            panic!(
+                "No visibilities.  this shouldn't be possible. self: {:?}",
+                self
+            )
+        }
+    
+    }
 }
 
 impl DrawTargetCoordinates {
     fn new_local(absolute_square: WorldSquare) -> Self {
         Self { absolute_square , portal_depth: 0, portal_rotation_to_target: QuarterTurnsAnticlockwise::default()  }
+    }
+}
+
+impl<T: Clone> PositionedLocally for LocallyPositioned<T> {
+    fn local_relative_square(&self) -> WorldStep {
+        self.local_relative_square    
+    }
+
+    fn set_local_relative_square(&mut self, rel_square: WorldStep) {
+        self.local_relative_square = rel_square;
+    }
+    fn position_locally(rel_square: WorldStep, contents: &T) -> LocallyPositioned<T> {
+        LocallyPositioned { local_relative_square: rel_square, contents: contents.clone()  }
+    }
+}
+
+impl From<(DrawTargetCoordinates, SquareVisibility)> for DrawTarget {
+    fn from(value: (DrawTargetCoordinates, SquareVisibility)) -> Self {
+        Self {
+            draw_target_coordinates: value.0,
+            square_visibility_in_absolute_frame: value.1,
+        }
     }
 }
 
