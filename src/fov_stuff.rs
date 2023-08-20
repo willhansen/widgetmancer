@@ -1700,7 +1700,8 @@ mod tests {
             the_positioned_visibility.lone_portal_rotation_or_panic(),
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
+        let the_square_visibility =
+            the_positioned_visibility.lone_square_visibility_in_relative_frame_or_panic();
         assert!(the_square_visibility.is_fully_visible());
     }
 
@@ -1756,7 +1757,8 @@ mod tests {
             the_positioned_visibility.lone_portal_rotation_or_panic(),
             QuarterTurnsAnticlockwise::new(1)
         );
-        let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
+        let the_square_visibility =
+            the_positioned_visibility.lone_square_visibility_in_relative_frame_or_panic();
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),

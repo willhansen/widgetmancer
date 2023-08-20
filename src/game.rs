@@ -4007,7 +4007,9 @@ mod tests {
             .iter()
             .map(|&world_step| fov.rasterized().visibilities_of_relative_square(world_step))
             .for_each(
-                |visibilities_of_rel_square: Vec<PositionedVisibilityOfSquare>| {
+                |visibilities_of_rel_square: Vec<
+                    LocallyPositionedNonOverlappingDrawTargetsFromOneSquare,
+                >| {
                     let vis1 = visibilities_of_rel_square[0]
                         .lone_square_visibility_in_absolute_frame_or_panic();
                     let vis2 = visibilities_of_rel_square[1]

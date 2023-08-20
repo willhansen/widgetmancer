@@ -648,8 +648,8 @@ impl Graphics {
     }
 
     fn sorted_by_draw_order(
-        visibilities: Vec<PositionedVisibilityOfSquare>,
-    ) -> Vec<PositionedVisibilityOfSquare> {
+        visibilities: Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare>,
+    ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
         visibilities
             .into_iter()
@@ -664,7 +664,7 @@ impl Graphics {
         tint_portals: bool,
         render_portals_with_line_of_sight: bool,
     ) -> Option<DrawableEnum> {
-        let visibilities: Vec<PositionedVisibilityOfSquare> =
+        let visibilities: Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> =
             Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
                 rasterized_fov.visibilities_of_relative_square(relative_square)
             } else {
@@ -673,14 +673,14 @@ impl Graphics {
             });
         let maybe_drawable: Option<DrawableEnum> = visibilities
             .iter()
-            .filter(|&vis: &&PositionedVisibilityOfSquare| {
+            .filter(|&vis: &&LocallyPositionedNonOverlappingDrawTargetsFromOneSquare| {
                 if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map.contains_key(&vis.absolute_square())
                 } else {
                     true
                 }
             })
-            .map(|positioned_visibility: &PositionedVisibilityOfSquare| {
+            .map(|positioned_visibility: &LocallyPositionedNonOverlappingDrawTargetsFromOneSquare| {
                 let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map
                         .get(&positioned_visibility.absolute_square())
