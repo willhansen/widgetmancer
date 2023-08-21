@@ -327,7 +327,7 @@ impl RasterizedFieldOfView {
     pub fn visibility_of_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
-    ) -> LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
+    ) -> Option<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
         NonOverlappingDrawTargetsFromOneSquare(
             self.main_view_only()
                 .0
@@ -339,11 +339,13 @@ impl RasterizedFieldOfView {
         .at(rel_square)
     }
 
+    // in main view, so no portals involved, so one-to-one assumption is valid
     pub fn absolute_square_from_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
     ) -> Option<WorldSquare> {
-        self.0
+        self.visibility_of_relative_square_in_main_view(rel_square)
+            .0
             .iter()
             .filter(|vis| vis.relative_square() == rel_square)
             .filter(|vis| vis.portal_depth == 0)
