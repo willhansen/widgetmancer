@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
-use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
+use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
@@ -236,10 +236,10 @@ impl FieldOfView {
         }
     }
 
-    pub fn rasterized(&self) -> RasterizedFieldOfView {
+    pub fn rasterized(&self) -> TopDownifiedFieldOfView {
         // rasterize top level
         // rasterize each sub-level
-        let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
+        let mut combined: TopDownifiedFieldOfView = self.rasterized_main_view_only();
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let rasterized_and_relocalized_sub_fov =
                 sub_fov.rasterized().as_seen_through_portal_by(&combined);
@@ -248,8 +248,8 @@ impl FieldOfView {
         combined
     }
 
-    fn rasterized_main_view_only(&self) -> RasterizedFieldOfView {
-        RasterizedFieldOfView::from_visibility_map_of_main_view(
+    fn rasterized_main_view_only(&self) -> TopDownifiedFieldOfView {
+        TopDownifiedFieldOfView::from_visibility_map_of_main_view(
             self.root_square(),
             &self
                 .visible_segments_in_main_view_only

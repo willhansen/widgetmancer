@@ -34,7 +34,7 @@ use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
+use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
 use crate::fov_stuff::square_visibility::RelativeSquareVisibilityTrait;
 use crate::fov_stuff::FieldOfView;
 use crate::game::{
@@ -251,7 +251,7 @@ impl Graphics {
 
     pub fn maybe_drawable_for_rel_square_of_fov(
         &self,
-        rasterized_fov: &RasterizedFieldOfView,
+        rasterized_fov: &TopDownifiedFieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
         Self::drawable_at_relative_square(
@@ -265,7 +265,7 @@ impl Graphics {
 
     pub fn load_screen_buffer_from_fov(
         &mut self,
-        rasterized_field_of_view: &RasterizedFieldOfView,
+        rasterized_field_of_view: &TopDownifiedFieldOfView,
     ) {
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
@@ -658,7 +658,7 @@ impl Graphics {
     }
 
     pub(crate) fn drawable_at_relative_square(
-        rasterized_fov: &RasterizedFieldOfView,
+        rasterized_fov: &TopDownifiedFieldOfView,
         relative_square: WorldStep,
         maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
         tint_portals: bool,

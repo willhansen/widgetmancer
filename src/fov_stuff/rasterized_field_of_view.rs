@@ -1,5 +1,5 @@
 use crate::fov_stuff::square_visibility::{
-    RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, SquareVisibility, ViewRoundable,
+    RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, TopDownPortalShape, ViewRoundable,
 };
 use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
@@ -48,17 +48,20 @@ type LocallyPositionedDrawTargetCoordinates = LocallyPositioned<DrawTargetCoordi
 #[derive(Clone, Debug)]
 struct DrawTarget {
     draw_target_coordinates: DrawTargetCoordinates,
-    square_visibility_in_absolute_frame: SquareVisibility,
+    square_visibility_in_absolute_frame: TopDownPortalShape,
 }
 
 type LocallyPositionedDrawTarget = LocallyPositioned<DrawTarget>;
 
+// Key metaphor is that the portal is no longer from player to square, it is now screen to square, so it can be rendered correctly.
 #[derive(Clone, Default, Constructor, Debug)]
-pub struct RasterizedFieldOfView(VisibilitiesByPositionedCoords);
+pub struct TopDownifiedFieldOfView(VisibilitiesByPositionedCoords);
+
+type TopDownPortalShape = SquareVisibility;
 
 type VisibilitiesByPositionedCoords =
-    HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility>;
-type VisibilitiesByCoords = HashMap<DrawTargetCoordinates, SquareVisibility>;
+    HashMap<LocallyPositionedDrawTargetCoordinates, TopDownPortalShape>;
+type VisibilitiesByCoords = HashMap<DrawTargetCoordinates, TopDownPortalShape>;
 
 #[derive(Clone, PartialEq, Debug, Default)]
 struct NonOverlappingDrawTargetsFromOneSquare(VisibilitiesByCoords);
@@ -87,7 +90,7 @@ impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
             .lone_draw_target_or_panic()
             .at(self.local_relative_square)
     }
-    pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> SquareVisibility {
+    pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
         self.contents
             .lone_draw_target_or_panic()
             .square_visibility_in_absolute_frame
@@ -114,7 +117,7 @@ impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
         self.local_relative_square
     }
     pub fn new_in_main_view(
-        square_visibility: &SquareVisibility,
+        square_visibility: &TopDownPortalShape,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
     ) -> Self {
@@ -126,13 +129,13 @@ impl LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
             ),
         }
     }
-    pub fn lone_square_visibility_in_relative_frame_or_panic(&self) -> SquareVisibility {
+    pub fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape {
         self.lone_square_visibility_in_absolute_frame_or_panic()
             .rotated(-self.lone_portal_rotation_or_panic())
     }
     fn split_into_draw_target_coordinates_and_visibilities(
         &self,
-    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility> {
+    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, TopDownPortalShape> {
         self.contents
             .0
             .iter()
@@ -168,11 +171,11 @@ impl ViewRoundable for NonOverlappingDrawTargetsFromOneSquare {
     }
 }
 
-impl RasterizedFieldOfView {
+impl TopDownifiedFieldOfView {
     fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_thing = RasterizedFieldOfView::default();
+        let mut new_thing = TopDownifiedFieldOfView::default();
         new_thing
-            .add_visible_square_in_main_view(STEP_ZERO, &SquareVisibility::new_fully_visible());
+            .add_visible_square_in_main_view(STEP_ZERO, &TopDownPortalShape::new_fully_visible());
         new_thing
     }
     fn has_visibility_for_position_in_main_view(&self, rel_square: WorldStep) -> bool {
@@ -189,7 +192,7 @@ impl RasterizedFieldOfView {
     pub fn add_visible_square_in_main_view(
         &mut self,
         relative_square: WorldStep,
-        visibility: &SquareVisibility,
+        visibility: &TopDownPortalShape,
     ) {
         // make sure there isn't a positioned visibility in the main view in the same relative square already
         assert!(!self.has_visibility_for_position_in_main_view(relative_square));
@@ -205,7 +208,7 @@ impl RasterizedFieldOfView {
     }
     pub fn positioned_visibilities(
         &self,
-    ) -> &HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility> {
+    ) -> &HashMap<LocallyPositionedDrawTargetCoordinates, TopDownPortalShape> {
         &self.0
     }
     pub fn from_visibility_map_of_main_view(
@@ -289,7 +292,7 @@ impl RasterizedFieldOfView {
     // TODO: these names are getting long.  parameterize the logic.
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
-    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility> {
+    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, TopDownPortalShape> {
         self.main_view_only()
             .0
             .iter()
@@ -324,10 +327,11 @@ impl RasterizedFieldOfView {
             .is_empty()
     }
 
+    // main view, so one-to-one
     pub fn visibility_of_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
-    ) -> Option<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
+    ) -> LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
         NonOverlappingDrawTargetsFromOneSquare(
             self.main_view_only()
                 .0
@@ -347,8 +351,6 @@ impl RasterizedFieldOfView {
         self.visibility_of_relative_square_in_main_view(rel_square)
             .0
             .iter()
-            .filter(|vis| vis.relative_square() == rel_square)
-            .filter(|vis| vis.portal_depth == 0)
             .map(|vis| vis.absolute_square())
             .next()
     }
@@ -403,7 +405,7 @@ impl RasterizedFieldOfView {
     pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
         self.0.push(
             LocallyPositionedNonOverlappingDrawTargetsFromOneSquare::new_in_main_view(
-                &SquareVisibility::new_fully_visible(),
+                &TopDownPortalShape::new_fully_visible(),
                 self.root_square() + step,
                 step,
             ),
@@ -412,7 +414,7 @@ impl RasterizedFieldOfView {
     pub fn add_partially_visible_relative_square(
         &mut self,
         step: WorldStep,
-        vis: &SquareVisibility,
+        vis: &TopDownPortalShape,
     ) {
         self.0.push(
             LocallyPositionedNonOverlappingDrawTargetsFromOneSquare::new_in_main_view(
@@ -467,7 +469,7 @@ impl NonOverlappingDrawTargetsFromOneSquare {
         )
     }
     pub fn from_local_draw_target(
-        visibility: &SquareVisibility,
+        visibility: &TopDownPortalShape,
         absolute_square: WorldSquare,
     ) -> Self {
         Self(HashMap::from([(
@@ -543,16 +545,16 @@ impl<T: Clone> HasLocalPosition for LocallyPositioned<T> {
     }
 }
 
-impl From<(DrawTargetCoordinates, SquareVisibility)> for DrawTarget {
-    fn from(value: (DrawTargetCoordinates, SquareVisibility)) -> Self {
+impl From<(DrawTargetCoordinates, TopDownPortalShape)> for DrawTarget {
+    fn from(value: (DrawTargetCoordinates, TopDownPortalShape)) -> Self {
         Self {
             draw_target_coordinates: value.0,
             square_visibility_in_absolute_frame: value.1,
         }
     }
 }
-impl From<(DrawTargetCoordinates, &SquareVisibility)> for DrawTarget {
-    fn from(value: (DrawTargetCoordinates, &SquareVisibility)) -> Self {
+impl From<(DrawTargetCoordinates, &TopDownPortalShape)> for DrawTarget {
+    fn from(value: (DrawTargetCoordinates, &TopDownPortalShape)) -> Self {
         (value.0, value.1.clone()).into()
     }
 }
@@ -572,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_center_square_is_always_visible() {
-        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
         assert_eq!(rasterized_fov.positioned_visibilities().len(), 1);
         assert_eq!(
             rasterized_fov
@@ -587,19 +589,19 @@ mod tests {
 
     #[test]
     fn test_rounding_towards_full_visibility() {
-        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_fully_visible_relative_square(STEP_RIGHT);
 
         rasterized_fov.add_partially_visible_relative_square(
             STEP_UP,
-            &SquareVisibility::new_partially_visible(
+            &TopDownPortalShape::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
             ),
         );
         rasterized_fov.add_partially_visible_relative_square(
             STEP_DOWN,
-            &SquareVisibility::new_partially_visible(
+            &TopDownPortalShape::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
             ),
         );
@@ -650,7 +652,7 @@ mod tests {
     }
     #[test]
     fn test_add_a_view_of_a_square() {
-        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_visible_square(
             &LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
@@ -661,7 +663,7 @@ mod tests {
                         portal_depth: 1,
                         portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
                     },
-                    square_visibility_in_absolute_frame: SquareVisibility::new_fully_visible(),
+                    square_visibility_in_absolute_frame: TopDownPortalShape::new_fully_visible(),
                 }),
             },
         )
