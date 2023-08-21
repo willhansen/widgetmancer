@@ -54,10 +54,14 @@ struct DrawTarget {
 type LocallyPositionedDrawTarget = LocallyPositioned<DrawTarget>;
 
 #[derive(Clone, Default, Constructor, Debug)]
-pub struct RasterizedFieldOfView(HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility>);
+pub struct RasterizedFieldOfView(VisibilitiesByPositionedCoords);
+
+type VisibilitiesByPositionedCoords =
+    HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility>;
+type VisibilitiesByCoords = HashMap<DrawTargetCoordinates, SquareVisibility>;
 
 #[derive(Clone, PartialEq, Debug, Default)]
-struct NonOverlappingDrawTargetsFromOneSquare(HashMap<DrawTargetCoordinates, SquareVisibility>);
+struct NonOverlappingDrawTargetsFromOneSquare(VisibilitiesByCoords);
 
 type LocallyPositionedNonOverlappingDrawTargetsFromOneSquare =
     LocallyPositioned<NonOverlappingDrawTargetsFromOneSquare>;
@@ -218,7 +222,7 @@ impl RasterizedFieldOfView {
     pub(crate) fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,
-    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility> {
+    ) -> VisibilitiesByPositionedCoords {
         self.0
             .iter()
             .filter(|(coords, vis)| coords.contents.absolute_square == world_square)
@@ -235,46 +239,63 @@ impl RasterizedFieldOfView {
     pub(crate) fn visibilities_of_relative_square(
         &self,
         relative_square: WorldStep,
-    ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
-        self.0
+    ) -> Option<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
+        let visibilities_by_draw_coordinates: HashMap<_, _> = self
+            .0
             .iter()
-            .filter(|vis| vis.relative_square == relative_square)
-            .cloned()
-            .collect()
+            .filter(|(coord, vis)| coord.local_relative_square == relative_square)
+            .map(|(&coord, &vis)| (coord.contents, vis))
+            .collect();
+        if visibilities_by_draw_coordinates.is_empty() {
+            None
+        } else {
+            Some(
+                NonOverlappingDrawTargetsFromOneSquare(visibilities_by_draw_coordinates)
+                    .at(relative_square),
+            )
+        }
     }
 
     pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
         self.0
             .iter()
-            .map(|positioned_visibility| positioned_visibility.relative_square)
+            .map(|(coord, vis)| coord.local_relative_square)
             .collect()
     }
-    pub fn at_least_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        self.0
+
+    fn main_view_only(&self) -> Self {
+        let filtered_map = self
+            .0
             .iter()
-            .filter(|positioned_visibility| positioned_visibility.portal_depth == 0)
-            .map(|positioned_visibility| positioned_visibility.relative_square)
+            .filter(|(coord, vis)| coord.contents.portal_depth == 0)
+            .map(|(&a, &b)| (a, b))
+            .collect();
+        Self(filtered_map)
+    }
+    pub fn at_least_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
+        self.main_view_only()
+            .0
+            .iter()
+            .map(|(coord, vis)| coord.local_relative_square)
             .collect()
     }
 
     pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
             .iter()
-            .map(|positioned_visibility| positioned_visibility.local_relative_square)
+            .map(|(coord, vis)| coord.local_relative_square)
             .collect()
     }
     // TODO: these names are getting long.  parameterize the logic.
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
-    ) -> Vec<&LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
-        self.0
+    ) -> HashMap<LocallyPositionedDrawTargetCoordinates, SquareVisibility> {
+        self.main_view_only()
+            .0
             .iter()
-            .filter(|positioned_visibility| positioned_visibility.portal_depth == 0)
-            .filter(|positioned_visibility| {
-                positioned_visibility
-                    .square_visibility_in_absolute_frame
-                    .is_only_partially_visible()
-            })
+            .filter(|(coord, vis)| coord.contents.portal_depth == 0)
+            .filter(|(coord, vis)| vis.is_only_partially_visible())
+            .map(|(&a, &b)| (a, b))
             .collect()
     }
     pub fn visibilities_of_partially_visible_squares_in_main_view_only(
@@ -282,27 +303,19 @@ impl RasterizedFieldOfView {
     ) -> RelativeSquareVisibilityMap {
         self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
             .iter()
-            .map(|positioned_visibility| {
-                (
-                    positioned_visibility.relative_square(),
-                    positioned_visibility.lone_square_visibility_in_relative_frame_or_panic(),
-                )
-            })
+            .map(|(coord, &vis)| (coord.local_relative_square, vis))
             .collect()
     }
 
     pub fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
-        let visibility = self.visibilities_of_relative_square(step);
-        return visibility.len() == 1
-            && visibility
-                .get(0)
-                .unwrap()
-                .lone_square_visibility_in_absolute_frame_or_panic()
-                .is_fully_visible();
+        let visibilities_of_rel_square = self.visibilities_of_relative_square(step);
+        return visibilities_of_rel_square.is_some_and(|v| {
+            v.contents.0.len() == 1 && v.contents.0.iter().next().unwrap().1.is_fully_visible()
+        });
     }
 
     pub fn can_see_relative_square(&self, step: WorldStep) -> bool {
-        !self.visibilities_of_relative_square(step).is_empty()
+        !self.visibilities_of_relative_square(step).is_some()
     }
 
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
@@ -314,11 +327,16 @@ impl RasterizedFieldOfView {
     pub fn visibility_of_relative_square_in_main_view(
         &self,
         rel_square: WorldStep,
-    ) -> Option<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
-        self.0
-            .iter()
-            .find(|vis| vis.relative_square == rel_square)
-            .cloned()
+    ) -> LocallyPositionedNonOverlappingDrawTargetsFromOneSquare {
+        NonOverlappingDrawTargetsFromOneSquare(
+            self.main_view_only()
+                .0
+                .iter()
+                .filter(|(coord, vis)| coord.local_relative_square == rel_square)
+                .map(|(&a, &b)| (a.contents, b))
+                .collect(),
+        )
+        .at(rel_square)
     }
 
     pub fn absolute_square_from_relative_square_in_main_view(
