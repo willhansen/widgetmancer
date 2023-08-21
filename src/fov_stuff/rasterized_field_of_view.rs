@@ -44,9 +44,9 @@ trait CanBeLocallyPositioned {
 }
 
 #[derive(Clone, Debug)]
-struct DrawTarget {
-    draw_target_coordinates: TopDownPortalTarget,
-    square_visibility_in_absolute_frame: TopDownPortalShape,
+struct TopDownPortal {
+    target: TopDownPortalTarget,
+    shape: TopDownPortalShape,
 }
 
 // Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
@@ -58,6 +58,9 @@ type TopDownPortalShape = SquareVisibility;
 type ShapesForTopDownPortals = HashMap<LocallyPositioned<TopDownPortalTarget>, TopDownPortalShape>;
 type ShapesForTopDownPortalsSharingOneRelativeSquare =
     HashMap<TopDownPortalTarget, TopDownPortalShape>;
+
+#[derive(Clone, Debug)]
+struct DirectConnectionToLocalSquare(TopDownPortal);
 
 #[derive(Clone, PartialEq, Debug, Default)]
 struct NonOverlappingShapesForTopDownPortalsSharingOneRelativeSquare(
@@ -83,32 +86,30 @@ impl OneRelativeSquareOfTopDownPortals {
             ..self.clone()
         }
     }
-    fn lone_positioned_draw_target_or_panic(&self) -> LocallyPositioned<DrawTarget> {
+    fn lone_positioned_draw_target_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
         self.contents
             .lone_draw_target_or_panic()
             .at(self.local_relative_square)
     }
     pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
-        self.contents
-            .lone_draw_target_or_panic()
-            .square_visibility_in_absolute_frame
+        self.contents.lone_draw_target_or_panic().shape
     }
     pub fn lone_portal_depth_or_panic(&self) -> u32 {
         self.contents
             .lone_draw_target_or_panic()
-            .draw_target_coordinates
+            .target
             .portal_depth
     }
     pub fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
         self.contents
             .lone_draw_target_or_panic()
-            .draw_target_coordinates
+            .target
             .portal_rotation_to_target
     }
     pub fn lone_absolute_square_or_panic(&self) -> WorldSquare {
         self.contents
             .lone_draw_target_or_panic()
-            .draw_target_coordinates
+            .target
             .absolute_square
     }
     pub fn relative_square(&self) -> WorldStep {
@@ -324,28 +325,24 @@ impl TopDownifiedFieldOfView {
     }
 
     // main view, so one-to-one
-    pub fn visibility_of_relative_square_in_main_view(
+    fn direct_connection_to_local_square(
         &self,
-        rel_square: WorldStep,
-    ) -> OneRelativeSquareOfTopDownPortals {
-        NonOverlappingShapesForTopDownPortalsSharingOneRelativeSquare(
-            self.main_view_only()
-                .0
-                .iter()
-                .filter(|(coord, vis)| coord.local_relative_square == rel_square)
-                .map(|(&a, &b)| (a.contents, b))
-                .collect(),
-        )
-        .at(rel_square)
+        relative_square: WorldStep,
+    ) -> Option<LocallyPositioned<DirectConnectionToLocalSquare>> {
+        self.main_view_only()
+            .0
+            .iter()
+            .find(|(target, shape)| target.local_relative_square == relative_square)
+            .map(|(target, shape)| {
+                DirectConnectionToLocalSquare::new(target.contents.absolute_square, shape)
+                    .at(relative_square)
+            })
     }
 
     // in main view, so no portals involved, so one-to-one assumption is valid
     pub fn local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
-        self.visibility_of_relative_square_in_main_view(rel_square)
-            .0
-            .iter()
-            .map(|vis| vis.absolute_square())
-            .next()
+        self.direct_connection_to_local_square(rel_square)
+            .map(|direct_connection| direct_connection.contents.target_square())
     }
 
     pub fn relative_square_visibility_map_of_main_view_only(&self) -> RelativeSquareVisibilityMap {
@@ -381,19 +378,22 @@ impl TopDownifiedFieldOfView {
     //     visibilities_in_frame_of_main_view
     // }
     pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        self.0
-            .iter()
-            .filter(|vis| vis.portal_depth() == 0)
-            .filter(|vis| vis.square_visibility_in_absolute_frame.is_fully_visible())
-            .map(|vis| vis.relative_square())
-            .collect()
+        self.fully_visible_relative_squares(true)
     }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
-        self.0
-            .iter()
-            .filter(|vis| vis.square_visibility_in_absolute_frame.is_fully_visible())
-            .map(|vis| vis.relative_square())
-            .collect()
+        self.fully_visible_relative_squares(false)
+    }
+    fn fully_visible_relative_squares(&self, local_space_only: bool) -> StepSet {
+        if local_space_only {
+            self.main_view_only()
+        } else {
+            *self
+        }
+        .0
+        .iter()
+        .filter(|(target, shape)| shape.is_fully_visible())
+        .map(|(target, shape)| target.local_relative_square())
+        .collect()
     }
     pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
         self.0
@@ -432,14 +432,14 @@ impl TopDownifiedFieldOfView {
     }
 }
 
-impl DrawTarget {
+impl TopDownPortal {
     pub fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
         Self {
-            draw_target_coordinates: self
-                .draw_target_coordinates
+            target: self
+                .target
                 .one_portal_deeper(forward_rotation_through_portal),
             ..self.clone()
         }
@@ -468,7 +468,7 @@ impl NonOverlappingShapesForTopDownPortalsSharingOneRelativeSquare {
             visibility,
         )]))
     }
-    fn lone_draw_target_or_panic(&self) -> &DrawTarget {
+    fn lone_draw_target_or_panic(&self) -> &TopDownPortal {
         let draw_target_count = self.0.iter().count();
         if draw_target_count == 1 {
             self.0.iter().next().unwrap().into()
@@ -536,15 +536,15 @@ impl<T: Clone> HasLocalPosition for LocallyPositioned<T> {
     }
 }
 
-impl From<(TopDownPortalTarget, TopDownPortalShape)> for DrawTarget {
+impl From<(TopDownPortalTarget, TopDownPortalShape)> for TopDownPortal {
     fn from(value: (TopDownPortalTarget, TopDownPortalShape)) -> Self {
         Self {
-            draw_target_coordinates: value.0,
-            square_visibility_in_absolute_frame: value.1,
+            target: value.0,
+            shape: value.1,
         }
     }
 }
-impl From<(TopDownPortalTarget, &TopDownPortalShape)> for DrawTarget {
+impl From<(TopDownPortalTarget, &TopDownPortalShape)> for TopDownPortal {
     fn from(value: (TopDownPortalTarget, &TopDownPortalShape)) -> Self {
         (value.0, value.1.clone()).into()
     }
@@ -552,6 +552,21 @@ impl From<(TopDownPortalTarget, &TopDownPortalShape)> for DrawTarget {
 impl LocallyPositioned<TopDownPortalTarget> {
     pub fn portal_depth(&self) -> u32 {
         self.contents.portal_depth
+    }
+}
+
+impl DirectConnectionToLocalSquare {
+    fn new(absolute_square: WorldSquare, visibility: &SquareVisibility) -> Self {
+        Self(TopDownPortal {
+            target: TopDownPortalTarget::new_local(absolute_square),
+            shape: visibility.clone(),
+        })
+    }
+    fn target_square(&self) -> WorldSquare {
+        self.0.target.absolute_square
+    }
+    fn as_top_down_portal(&self) -> TopDownPortal {
+        self.0
     }
 }
 
@@ -649,14 +664,13 @@ mod tests {
             local_relative_square: (4, 5).into(),
             contents:
                 NonOverlappingShapesForTopDownPortalsSharingOneRelativeSquare::from_draw_target(
-                    DrawTarget {
-                        draw_target_coordinates: TopDownPortalTarget {
+                    TopDownPortal {
+                        target: TopDownPortalTarget {
                             absolute_square: (10, 10).into(),
                             portal_depth: 1,
                             portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
                         },
-                        square_visibility_in_absolute_frame: TopDownPortalShape::new_fully_visible(
-                        ),
+                        shape: TopDownPortalShape::new_fully_visible(),
                     },
                 ),
         })
