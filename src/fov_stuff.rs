@@ -1582,7 +1582,7 @@ mod tests {
             1
         );
         assert!(fov
-            .visibility_of_relative_square_in_main_view(STEP_ZERO)
+            .direct_connection_to_local_square(STEP_ZERO)
             .unwrap()
             .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());

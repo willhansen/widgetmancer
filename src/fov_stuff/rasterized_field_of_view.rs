@@ -231,7 +231,7 @@ impl TopDownifiedFieldOfView {
 
     pub fn root_square(&self) -> WorldSquare {
         // Will panic if no visible square at relative origin
-        self.local_absolute_square(STEP_ZERO).unwrap()
+        self.visible_local_absolute_square(STEP_ZERO).unwrap()
     }
 
     pub(crate) fn visibilities_of_relative_square(
@@ -350,9 +350,9 @@ impl TopDownifiedFieldOfView {
     }
 
     // in main view, so no portals involved, so one-to-one assumption is valid
-    pub fn local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
+    pub fn visible_local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
         self.existing_direct_connection_to_local_square(rel_square)
-            .map(|direct_connection| direct_connection.contents.target_square())
+            .map(|direct_connection| direct_connection.0.target.absolute_square)
     }
 
     pub fn relative_square_visibility_map_of_main_view_only(&self) -> RelativeSquareVisibilityMap {
@@ -433,6 +433,9 @@ impl TopDownifiedFieldOfView {
                 .new_direct_connection_to_local_square(step, vis)
                 .as_top_down_portal(),
         );
+    }
+    fn top_down_portals(&self) -> impl Iterator<Item = &LocallyPositioned<TopDownPortal>> {
+        self.0.iter().map(|x| x.into())
     }
 
     pub fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
@@ -568,6 +571,16 @@ impl From<(TopDownPortalTarget, &TopDownPortalShape)> for TopDownPortal {
         (value.0, value.1.clone()).into()
     }
 }
+impl<A, B, C> From<(LocallyPositioned<A>, B)> for LocallyPositioned<C>
+where
+    C: From<(A, B)> + CanBeLocallyPositioned,
+{
+    fn from(value: (LocallyPositioned<A>, B)) -> Self {
+        let c: C = (value.0.contents, value.1).into();
+        c.at(value.0.local_relative_square)
+    }
+}
+
 impl LocallyPositioned<TopDownPortalTarget> {
     pub fn portal_depth(&self) -> u32 {
         self.contents.portal_depth
