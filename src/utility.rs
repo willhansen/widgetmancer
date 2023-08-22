@@ -2115,6 +2115,21 @@ pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
     [face.square, face.stepped().square]
 }
 
+pub trait TupleClone {
+    type TupleType;
+    fn tuple_clone(&self) -> Self::TupleType;
+}
+impl<A: Clone, B: Clone> TupleClone for (&A, &B) {
+    type TupleType = (A, B);
+
+    fn tuple_clone(&self) -> Self::TupleType {
+        {
+            let x = *self;
+            (x.0.clone(), x.1.clone())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
