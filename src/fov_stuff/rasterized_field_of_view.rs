@@ -325,23 +325,33 @@ impl TopDownifiedFieldOfView {
     }
 
     // main view, so one-to-one
-    fn direct_connection_to_local_square(
+    fn existing_direct_connection_to_local_square(
         &self,
         relative_square: WorldStep,
-    ) -> Option<LocallyPositioned<DirectConnectionToLocalSquare>> {
+    ) -> Option<DirectConnectionToLocalSquare> {
         self.main_view_only()
             .0
             .iter()
             .find(|(target, shape)| target.local_relative_square == relative_square)
             .map(|(target, shape)| {
                 DirectConnectionToLocalSquare::new(target.contents.absolute_square, shape)
-                    .at(relative_square)
             })
+    }
+
+    fn new_direct_connection_to_local_square(
+        &self,
+        relative_square: WorldStep,
+        top_down_portal_shape: &TopDownPortalShape,
+    ) -> DirectConnectionToLocalSquare {
+        DirectConnectionToLocalSquare::new(
+            self.root_square() + relative_square,
+            top_down_portal_shape,
+        )
     }
 
     // in main view, so no portals involved, so one-to-one assumption is valid
     pub fn local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
-        self.direct_connection_to_local_square(rel_square)
+        self.existing_direct_connection_to_local_square(rel_square)
             .map(|direct_connection| direct_connection.contents.target_square())
     }
 
@@ -395,25 +405,34 @@ impl TopDownifiedFieldOfView {
         .map(|(target, shape)| target.local_relative_square())
         .collect()
     }
-    pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
-        self.0
-            .push(OneRelativeSquareOfTopDownPortals::new_in_main_view(
-                &TopDownPortalShape::new_fully_visible(),
-                self.root_square() + step,
-                step,
-            ));
+    fn add_top_down_portal(&mut self, relative_position: WorldStep, portal: &TopDownPortal) {
+        let positioned_portal_target: LocallyPositioned<TopDownPortalTarget> =
+            portal.target.at(relative_position);
+        let portal_shape: TopDownPortalShape = portal.shape;
+        self.0.insert(positioned_portal_target, portal_shape);
     }
-    pub fn add_partially_visible_relative_square(
+    pub fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep) {
+        self.add_top_down_portal(
+            relative_square,
+            &self
+                .new_direct_connection_to_local_square(
+                    relative_square,
+                    &TopDownPortalShape::new_fully_visible(),
+                )
+                .as_top_down_portal(),
+        );
+    }
+    pub fn add_partially_visible_local_relative_square(
         &mut self,
         step: WorldStep,
         vis: &TopDownPortalShape,
     ) {
-        self.0
-            .push(OneRelativeSquareOfTopDownPortals::new_in_main_view(
-                vis,
-                self.root_square() + step,
-                step,
-            ));
+        self.add_top_down_portal(
+            step,
+            &self
+                .new_direct_connection_to_local_square(step, vis)
+                .as_top_down_portal(),
+        );
     }
 
     pub fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
@@ -597,15 +616,15 @@ mod tests {
     fn test_rounding_towards_full_visibility() {
         let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_fully_visible_relative_square(STEP_RIGHT);
+        rasterized_fov.add_fully_visible_local_relative_square(STEP_RIGHT);
 
-        rasterized_fov.add_partially_visible_relative_square(
+        rasterized_fov.add_partially_visible_local_relative_square(
             STEP_UP,
             &TopDownPortalShape::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
             ),
         );
-        rasterized_fov.add_partially_visible_relative_square(
+        rasterized_fov.add_partially_visible_local_relative_square(
             STEP_DOWN,
             &TopDownPortalShape::new_partially_visible(
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
