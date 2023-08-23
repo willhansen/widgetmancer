@@ -43,25 +43,25 @@ struct TopDownPortal {
 
 // Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
 #[derive(Clone, Default, Constructor, Debug)]
-pub struct TopDownifiedFieldOfView(ShapesByTopDownPortalTargets);
+pub struct TopDownifiedFieldOfView(TopDownPortalShapesByPositionedTopDownPortalTarget);
 
 type TopDownPortalShape = SquareVisibility;
 
-type ShapesByTopDownPortalTargets =
+type TopDownPortalShapesByPositionedTopDownPortalTarget =
     HashMap<LocallyPositioned<TopDownPortalTarget>, TopDownPortalShape>;
-type ShapesByTopDownPortalTargetsSharingOneRelativeSquare =
+type ShapesByTopDownPortalTargetSharingOneRelativeSquare =
     HashMap<TopDownPortalTarget, TopDownPortalShape>;
 
 #[derive(Clone, Debug)]
 struct DirectConnectionToLocalSquare(TopDownPortal);
 
 #[derive(Clone, PartialEq, Debug, Default)]
-struct NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare(
-    ShapesByTopDownPortalTargetsSharingOneRelativeSquare,
+struct NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare(
+    ShapesByTopDownPortalTargetSharingOneRelativeSquare,
 );
 
 type OneRelativeSquareOfTopDownPortals =
-    LocallyPositioned<NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare>;
+    LocallyPositioned<NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare>;
 
 impl OneRelativeSquareOfTopDownPortals {
     pub fn one_portal_deeper(
@@ -116,7 +116,7 @@ impl OneRelativeSquareOfTopDownPortals {
         Self {
             local_relative_square: relative_square,
             contents:
-                NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare::from_local_draw_target(
+                NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare::from_local_draw_target(
                     square_visibility,
                     absolute_square,
                 ),
@@ -145,7 +145,7 @@ impl ViewRoundable for OneRelativeSquareOfTopDownPortals {
         }
     }
 }
-impl ViewRoundable for NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare {
+impl ViewRoundable for NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         Self(
             self.0
@@ -215,11 +215,15 @@ impl TopDownifiedFieldOfView {
     pub(crate) fn visibilities_of_absolute_square(
         &self,
         world_square: WorldSquare,
-    ) -> ShapesByTopDownPortalTargets {
+    ) -> Vec<LocallyPositioned<TopDownPortal>> {
         self.0
             .iter()
             .filter(|(coords, vis)| coords.contents.absolute_square == world_square)
-            .map(|(&coords, &vis)| (coords, vis))
+            .map(|(&positioned_coords, &vis)| {
+                let positioned_top_down_portal: LocallyPositioned<TopDownPortal> =
+                    (positioned_coords, vis).into();
+                positioned_top_down_portal
+            })
             .collect()
     }
 
@@ -242,7 +246,7 @@ impl TopDownifiedFieldOfView {
             None
         } else {
             Some(
-                NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare(
+                NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare(
                     visibilities_by_draw_coordinates,
                 )
                 .at(relative_square),
@@ -473,7 +477,7 @@ impl TopDownPortal {
     }
 }
 
-impl NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare {
+impl NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
     // simple delegation
     pub fn one_portal_deeper(
         &self,
@@ -512,7 +516,7 @@ impl NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare {
             )
         }
     }
-    fn new(portals: impl Into<ShapesByTopDownPortalTargetsSharingOneRelativeSquare>) -> Self {
+    fn new(portals: impl Into<ShapesByTopDownPortalTargetSharingOneRelativeSquare>) -> Self {
         todo!("assert shapes are non overlapping");
         Self(portals.into())
     }
@@ -631,18 +635,18 @@ impl DirectConnectionToLocalSquare {
 }
 
 impl From<DirectConnectionToLocalSquare>
-    for NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare
+    for NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare
 {
     fn from(value: DirectConnectionToLocalSquare) -> Self {
         Self::new(value)
     }
 }
-impl From<DirectConnectionToLocalSquare> for ShapesByTopDownPortalTargetsSharingOneRelativeSquare {
+impl From<DirectConnectionToLocalSquare> for ShapesByTopDownPortalTargetSharingOneRelativeSquare {
     fn from(value: DirectConnectionToLocalSquare) -> Self {
         Self::from(value.as_top_down_portal())
     }
 }
-impl From<TopDownPortal> for ShapesByTopDownPortalTargetsSharingOneRelativeSquare {
+impl From<TopDownPortal> for ShapesByTopDownPortalTargetSharingOneRelativeSquare {
     fn from(value: TopDownPortal) -> Self {
         Self::from([value.tuple()])
     }
@@ -741,7 +745,7 @@ mod tests {
 
         rasterized_fov.add_visible_square(&OneRelativeSquareOfTopDownPortals {
             local_relative_square: (4, 5).into(),
-            contents: NonOverlappingShapesByTopDownPortalTargetsSharingOneRelativeSquare::new(
+            contents: NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare::new(
                 TopDownPortal {
                     target: TopDownPortalTarget {
                         absolute_square: (10, 10).into(),

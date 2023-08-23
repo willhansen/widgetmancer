@@ -1349,11 +1349,16 @@ mod tests {
             let test_square = main_center + test_step;
 
             fovs.iter().for_each(|fov| {
-                assert_false!(fov
+                let visibilities_for_abs_square = fov
                     .rasterized()
-                    .visibilities_of_absolute_square(test_square)[0]
-                    .lone_square_visibility_in_absolute_frame_or_panic()
-                    .is_fully_visible())
+                    .visibilities_of_absolute_square(test_square);
+                assert_eq!(visibilities_for_abs_square.len(), 1);
+                assert_false!(visibilities_for_abs_square
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .1
+                    .is_fully_visible());
             });
 
             let merged_fov = fovs
