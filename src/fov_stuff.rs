@@ -815,9 +815,7 @@ mod tests {
         .rasterized();
         let visibility_of_test_square = fov_result
             .visibilities_of_relative_square(test_rel_square)
-            .get(0)
-            .unwrap()
-            .clone();
+            .unwrap();
         assert_eq!(
             PartialVisibilityDrawable::from_square_visibility(
                 visibility_of_test_square.lone_square_visibility_in_absolute_frame_or_panic()
@@ -1067,7 +1065,6 @@ mod tests {
             .rasterized()
             .visibilities_of_relative_square(relative_square);
         assert!(square_visibility
-            .get(0)
             .unwrap()
             .lone_square_visibility_in_absolute_frame_or_panic()
             .is_fully_visible());
