@@ -5,7 +5,7 @@ use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldSquare, WorldStep};
+use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     QuarterTurnRotatable, QuarterTurnsAnticlockwise, TupleClone, STEP_ZERO,
@@ -79,7 +79,7 @@ impl OneRelativeSquareOfTopDownPortals {
             ..self.clone()
         }
     }
-    fn lone_positioned_draw_target_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
+    fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
         self.contents
             .lone_top_down_portal_or_panic()
             .at(self.local_relative_square)
@@ -123,8 +123,9 @@ impl OneRelativeSquareOfTopDownPortals {
         }
     }
     pub fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape {
-        self.lone_square_visibility_in_absolute_frame_or_panic()
-            .rotated(-self.lone_portal_rotation_or_panic())
+        self.contents
+            .lone_top_down_portal_or_panic()
+            .visibility_in_local_frame()
     }
     fn split_into_draw_target_coordinates_and_visibilities(
         &self,
@@ -212,13 +213,13 @@ impl TopDownifiedFieldOfView {
         new_thing
     }
 
-    pub(crate) fn visibilities_of_absolute_square(
+    fn top_down_portals_for_absolute_square(
         &self,
-        world_square: WorldSquare,
+        absolute_square: WorldSquare,
     ) -> Vec<LocallyPositioned<TopDownPortal>> {
         self.0
             .iter()
-            .filter(|(coords, vis)| coords.contents.absolute_square == world_square)
+            .filter(|(coords, vis)| coords.contents.absolute_square == absolute_square)
             .map(|(&positioned_coords, &vis)| {
                 let positioned_top_down_portal: LocallyPositioned<TopDownPortal> =
                     (positioned_coords, vis).into();
@@ -227,12 +228,39 @@ impl TopDownifiedFieldOfView {
             .collect()
     }
 
+    pub fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize {
+        self.top_down_portals_for_absolute_square(absolute_square)
+            .len()
+    }
+    pub fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize {
+        self.top_down_portals_for_absolute_square(absolute_square)
+            .into_iter()
+            .filter(|positioned_top_down_portal| {
+                positioned_top_down_portal.contents.shape.is_fully_visible()
+            })
+            .count()
+    }
+
     pub fn root_square(&self) -> WorldSquare {
         // Will panic if no visible square at relative origin
         self.visible_local_absolute_square(STEP_ZERO).unwrap()
     }
+    pub fn absolute_squares_visible_at_relative_square(
+        &self,
+        relative_square: WorldStep,
+    ) -> SquareSet {
+        self.top_down_portals_for_relative_square(relative_square)
+            .map(|positioned_square_of_portals| {
+                positioned_square_of_portals
+                    .contents
+                    .portals()
+                    .map(|portal| portal.target.absolute_square)
+                    .collect()
+            })
+            .unwrap_or(SquareSet::default())
+    }
 
-    pub(crate) fn visibilities_of_relative_square(
+    fn top_down_portals_for_relative_square(
         &self,
         relative_square: WorldStep,
     ) -> Option<OneRelativeSquareOfTopDownPortals> {
@@ -252,6 +280,20 @@ impl TopDownifiedFieldOfView {
                 .at(relative_square),
             )
         }
+    }
+    pub fn visibilities_of_relative_square_in_local_frame(
+        &self,
+        relative_square: WorldStep,
+    ) -> Vec<TopDownPortalShape> {
+        self.top_down_portals_for_relative_square(relative_square)
+            .map(|square_of_portals| {
+                square_of_portals
+                    .contents
+                    .portals()
+                    .map(|x| x.visibility_in_local_frame())
+                    .collect()
+            })
+            .unwrap_or(vec![])
     }
 
     pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
@@ -306,19 +348,19 @@ impl TopDownifiedFieldOfView {
     }
 
     pub fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
-        let visibilities_of_rel_square = self.visibilities_of_relative_square(step);
+        let visibilities_of_rel_square = self.top_down_portals_for_relative_square(step);
         return visibilities_of_rel_square.is_some_and(|v| {
             v.contents.0.len() == 1 && v.contents.0.iter().next().unwrap().1.is_fully_visible()
         });
     }
 
     pub fn can_see_relative_square(&self, step: WorldStep) -> bool {
-        !self.visibilities_of_relative_square(step).is_some()
+        !self.top_down_portals_for_relative_square(step).is_some()
     }
 
     pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
         !self
-            .visibilities_of_absolute_square(world_square)
+            .top_down_portals_for_absolute_square(world_square)
             .is_empty()
     }
 
@@ -475,6 +517,9 @@ impl TopDownPortal {
     fn tuple(&self) -> (TopDownPortalTarget, TopDownPortalShape) {
         (self.target, self.shape)
     }
+    pub fn visibility_in_local_frame(&self) -> SquareVisibility {
+        self.shape.rotated(-self.target.portal_rotation_to_target)
+    }
 }
 
 impl NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
@@ -519,6 +564,9 @@ impl NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
     fn new(portals: impl Into<ShapesByTopDownPortalTargetSharingOneRelativeSquare>) -> Self {
         todo!("assert shapes are non overlapping");
         Self(portals.into())
+    }
+    fn portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
+        self.0.iter().map(|x| x.tuple_clone().into())
     }
 }
 
@@ -666,7 +714,7 @@ mod tests {
         assert_eq!(rasterized_fov.positioned_visibilities().len(), 1);
         assert_eq!(
             rasterized_fov
-                .visibilities_of_relative_square(STEP_ZERO)
+                .top_down_portals_for_relative_square(STEP_ZERO)
                 .unwrap()
                 .contents
                 .0
