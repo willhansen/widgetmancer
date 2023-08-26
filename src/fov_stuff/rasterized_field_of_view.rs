@@ -37,15 +37,54 @@ trait CanBeLocallyPositioned {
 }
 
 #[derive(Clone, Debug)]
-pub struct TopDownPortal {
+struct TopDownPortal {
     target: TopDownPortalTarget,
     shape: TopDownPortalShape,
 }
 
 // Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
+// This struct and trait are the only public things in this module
+// TODO: maybe precalculate indexes
 #[derive(Clone, Default, Constructor, Debug)]
 pub struct TopDownifiedFieldOfView(TopDownPortalShapesByPositionedTopDownPortalTarget);
 
+pub trait TopDownifiedFieldOfViewInterface {
+    fn absolute_square_is_visible(&self, world_square: WorldSquare) -> bool;
+    fn absolute_squares_visible_at_relative_square(&self, relative_square: WorldStep) -> SquareSet;
+    fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep);
+    fn add_visible_local_relative_square(
+        &mut self,
+        relative_square: WorldStep,
+        visibility: &TopDownPortalShape,
+    );
+    fn as_seen_through_portal_by(&self, other: &Self) -> Self;
+    fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool;
+    fn combined_with(&self, other: &Self) -> Self;
+    fn from_visibility_map_of_main_view(
+        root: WorldSquare,
+        vis_map: &RelativeSquareVisibilityMap,
+    ) -> Self;
+    fn fully_visible_local_relative_squares(&self) -> StepSet;
+    fn fully_visible_relative_squares(&self) -> StepSet;
+    fn only_partially_visible_local_relative_squares(&self) -> StepSet;
+    fn relative_square_is_visible(&self, step: WorldStep) -> bool;
+    fn root_square(&self) -> WorldSquare;
+    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
+    fn shapes_of_visibilities_of_relative_square_rotated_to_local_frame(
+        &self,
+        relative_square: WorldStep,
+    ) -> Vec<TopDownPortalShape>;
+    fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize;
+    fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize;
+
+    fn visibilities_of_partially_visible_squares_in_main_view_only(
+        &self,
+    ) -> RelativeSquareVisibilityMap;
+    fn visibility_map_of_local_relative_squares(&self) -> RelativeSquareVisibilityMap;
+    fn visible_local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare>;
+    fn visible_local_relative_squares(&self) -> StepSet;
+    fn visible_relative_squares(&self) -> StepSet;
+}
 type TopDownPortalShape = SquareVisibility;
 
 type TopDownPortalShapesByPositionedTopDownPortalTarget =
@@ -61,12 +100,12 @@ struct SquareOfTopDownPortals(ShapesByTopDownPortalTargetSharingOneRelativeSquar
 
 type PositionedSquareOfTopDownPortals = LocallyPositioned<SquareOfTopDownPortals>;
 
-#[delegatable_trait]
-pub trait SquareOfTopDownPortalsFunctions {
-    fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape;
+#[delegatable_trait] // TODO: make use of this
+trait SquareOfTopDownPortalsFunctions {
+    fn lone_absolute_square_or_panic(&self) -> WorldSquare;
     fn lone_portal_depth_or_panic(&self) -> u32;
     fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise;
-    fn lone_absolute_square_or_panic(&self) -> WorldSquare;
+    fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape;
     fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape;
     fn lone_top_down_portal_or_panic(&self) -> TopDownPortal;
     fn top_down_portals(&self) -> Vec<TopDownPortal>;
@@ -146,7 +185,7 @@ impl SquareOfTopDownPortalsFunctions for PositionedSquareOfTopDownPortals {
 }
 
 impl PositionedSquareOfTopDownPortals {
-    pub fn one_portal_deeper(
+    fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
@@ -165,10 +204,7 @@ impl PositionedSquareOfTopDownPortals {
         self.lone_top_down_portal_or_panic()
             .at(self.local_relative_square)
     }
-    pub fn relative_square(&self) -> WorldStep {
-        self.local_relative_square
-    }
-    pub fn new_in_main_view(
+    fn new_in_main_view(
         square_visibility: &TopDownPortalShape,
         absolute_square: WorldSquare,
         relative_square: WorldStep,
@@ -183,7 +219,7 @@ impl PositionedSquareOfTopDownPortals {
     }
     fn split_into_draw_target_coordinates_and_visibilities(
         &self,
-    ) -> HashMap<LocallyPositioned<TopDownPortalTarget>, TopDownPortalShape> {
+    ) -> TopDownPortalShapesByPositionedTopDownPortalTarget {
         self.contents
             .0
             .iter()
@@ -219,28 +255,14 @@ impl ViewRoundable for SquareOfTopDownPortals {
     }
 }
 
-impl TopDownifiedFieldOfView {
-    fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_thing = TopDownifiedFieldOfView::default();
-        new_thing
-            .add_visible_square_in_main_view(STEP_ZERO, &TopDownPortalShape::new_fully_visible());
-        new_thing
-    }
-    fn has_visibility_for_position_in_main_view(&self, rel_square: WorldStep) -> bool {
-        self.0.keys().any(|positioned_vis| {
-            positioned_vis.portal_depth() == 0 && positioned_vis.local_relative_square == rel_square
-        })
-    }
-    fn add_visible_square(&mut self, visibility: &PositionedSquareOfTopDownPortals) {
-        todo!()
-    }
-    pub fn add_visible_square_in_main_view(
+impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
+    fn add_visible_local_relative_square(
         &mut self,
         relative_square: WorldStep,
         visibility: &TopDownPortalShape,
     ) {
         // make sure there isn't a positioned visibility in the main view in the same relative square already
-        assert!(!self.has_visibility_for_position_in_main_view(relative_square));
+        assert!(!self.can_see_local_relative_square(relative_square));
 
         self.0.extend(
             PositionedSquareOfTopDownPortals::new_in_main_view(
@@ -251,20 +273,194 @@ impl TopDownifiedFieldOfView {
             .split_into_draw_target_coordinates_and_visibilities(),
         );
     }
-    pub fn positioned_visibilities(
-        &self,
-    ) -> &HashMap<LocallyPositioned<TopDownPortalTarget>, TopDownPortalShape> {
-        &self.0
-    }
-    pub fn from_visibility_map_of_main_view(
+
+    fn from_visibility_map_of_main_view(
         root: WorldSquare,
         vis_map: &RelativeSquareVisibilityMap,
     ) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
-            new_thing.add_visible_square_in_main_view(*rel_square, visibility);
+            new_thing.add_visible_local_relative_square(*rel_square, visibility);
         });
         new_thing
+    }
+
+    fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize {
+        self.top_down_portals_for_absolute_square(absolute_square)
+            .len()
+    }
+
+    fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize {
+        self.top_down_portals_for_absolute_square(absolute_square)
+            .into_iter()
+            .filter(|positioned_top_down_portal| {
+                positioned_top_down_portal.contents.shape.is_fully_visible()
+            })
+            .count()
+    }
+
+    fn root_square(&self) -> WorldSquare {
+        // Will panic if no visible square at relative origin
+        self.visible_local_absolute_square(STEP_ZERO).unwrap()
+    }
+    fn absolute_squares_visible_at_relative_square(&self, relative_square: WorldStep) -> SquareSet {
+        self.top_down_portals_for_relative_square(relative_square)
+            .iter()
+            .map(|portal| portal.target.absolute_square)
+            .collect()
+    }
+
+    fn shapes_of_visibilities_of_relative_square_rotated_to_local_frame(
+        &self,
+        relative_square: WorldStep,
+    ) -> Vec<TopDownPortalShape> {
+        self.top_down_portals_for_relative_square(relative_square)
+            .iter()
+            .map(|x| x.visibility_in_local_frame())
+            .collect()
+    }
+
+    fn visible_relative_squares(&self) -> StepSet {
+        self.0
+            .iter()
+            .map(|(coord, vis)| coord.local_relative_square)
+            .collect()
+    }
+
+    fn visible_local_relative_squares(&self) -> StepSet {
+        self.main_view_only()
+            .0
+            .iter()
+            .map(|(coord, vis)| coord.local_relative_square)
+            .collect()
+    }
+
+    fn only_partially_visible_local_relative_squares(&self) -> StepSet {
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
+            .iter()
+            .map(|(coord, vis)| coord.local_relative_square)
+            .collect()
+    }
+
+    fn visibilities_of_partially_visible_squares_in_main_view_only(
+        &self,
+    ) -> RelativeSquareVisibilityMap {
+        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
+            .iter()
+            .map(|(coord, &vis)| (coord.local_relative_square, vis))
+            .collect()
+    }
+
+    fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
+        let top_down_portals = self.top_down_portals_for_relative_square(step);
+        return top_down_portals.len() == 1 && top_down_portals[0].shape.is_fully_visible();
+    }
+
+    fn relative_square_is_visible(&self, step: WorldStep) -> bool {
+        self.visible_relative_squares().contains(&step)
+    }
+
+    fn absolute_square_is_visible(&self, world_square: WorldSquare) -> bool {
+        !self
+            .top_down_portals_for_absolute_square(world_square)
+            .is_empty()
+    }
+
+    // in main view, so no portals involved, so one-to-one assumption is valid
+    fn visible_local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
+        self.existing_direct_connection_to_local_square(rel_square)
+            .map(|direct_connection| direct_connection.0.target.absolute_square)
+    }
+
+    fn visibility_map_of_local_relative_squares(&self) -> RelativeSquareVisibilityMap {
+        todo!();
+    }
+
+    fn fully_visible_local_relative_squares(&self) -> StepSet {
+        self.fully_visible_relative_squares(true)
+    }
+    fn fully_visible_relative_squares(&self) -> StepSet {
+        self.fully_visible_relative_squares(false)
+    }
+
+    fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep) {
+        self.add_top_down_portal(
+            relative_square,
+            &self
+                .new_direct_connection_to_local_square(
+                    relative_square,
+                    &TopDownPortalShape::new_fully_visible(),
+                )
+                .as_top_down_portal(),
+        );
+    }
+
+    fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|x| {
+                    let positioned_top_down_portal: LocallyPositioned<TopDownPortal> =
+                        x.tuple_clone().into();
+                    let rounded: LocallyPositioned<TopDownPortal> =
+                        positioned_top_down_portal.rounded_towards_full_visibility(tolerance);
+                    // TODO: tidy this up
+                    let tuple = rounded.contents.tuple();
+                    (
+                        tuple.0.at(positioned_top_down_portal.local_relative_square),
+                        tuple.1,
+                    )
+                })
+                .collect(),
+        )
+    }
+    fn combined_with(&self, other: &Self) -> Self {
+        todo!()
+    }
+    fn as_seen_through_portal_by(&self, other: &Self) -> Self {
+        todo!()
+    }
+}
+
+impl TopDownifiedFieldOfView {
+    fn top_down_portals_for_relative_square(
+        &self,
+        relative_square: WorldStep,
+    ) -> Vec<TopDownPortal> {
+        self.0
+            .iter()
+            .filter(|(coord, vis)| coord.local_relative_square == relative_square)
+            .map(|(&coord, &vis)| (coord.contents, vis).into())
+            .collect()
+    }
+    fn new_centered_at(new_root: WorldSquare) -> Self {
+        let mut new_thing = TopDownifiedFieldOfView::default();
+        new_thing
+            .add_visible_local_relative_square(STEP_ZERO, &TopDownPortalShape::new_fully_visible());
+        new_thing
+    }
+    fn can_see_local_relative_square(&self, rel_square: WorldStep) -> bool {
+        self.0.keys().any(|positioned_vis| {
+            positioned_vis.portal_depth() == 0 && positioned_vis.local_relative_square == rel_square
+        })
+    }
+    fn add_visible_square(&mut self, visibility: &PositionedSquareOfTopDownPortals) {
+        todo!()
+    }
+    fn add_partially_visible_local_relative_square(
+        &mut self,
+        step: WorldStep,
+        vis: &TopDownPortalShape,
+    ) {
+        self.add_top_down_portal(
+            step,
+            &self
+                .new_direct_connection_to_local_square(step, vis)
+                .as_top_down_portal(),
+        );
+    }
+    fn positioned_visibilities(&self) -> &TopDownPortalShapesByPositionedTopDownPortalTarget {
+        &self.0
     }
 
     fn top_down_portals_for_absolute_square(
@@ -282,78 +478,6 @@ impl TopDownifiedFieldOfView {
             .collect()
     }
 
-    pub fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize {
-        self.top_down_portals_for_absolute_square(absolute_square)
-            .len()
-    }
-    pub fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize {
-        self.top_down_portals_for_absolute_square(absolute_square)
-            .into_iter()
-            .filter(|positioned_top_down_portal| {
-                positioned_top_down_portal.contents.shape.is_fully_visible()
-            })
-            .count()
-    }
-
-    pub fn root_square(&self) -> WorldSquare {
-        // Will panic if no visible square at relative origin
-        self.visible_local_absolute_square(STEP_ZERO).unwrap()
-    }
-    pub fn absolute_squares_visible_at_relative_square(
-        &self,
-        relative_square: WorldStep,
-    ) -> SquareSet {
-        self.top_down_portals_for_relative_square(relative_square)
-            .map(|positioned_square_of_portals| {
-                positioned_square_of_portals
-                    .contents
-                    .top_down_portals()
-                    .iter()
-                    .map(|portal| portal.target.absolute_square)
-                    .collect()
-            })
-            .unwrap_or(SquareSet::default())
-    }
-
-    fn top_down_portals_for_relative_square(
-        &self,
-        relative_square: WorldStep,
-    ) -> Option<PositionedSquareOfTopDownPortals> {
-        let visibilities_by_draw_coordinates: HashMap<_, _> = self
-            .0
-            .iter()
-            .filter(|(coord, vis)| coord.local_relative_square == relative_square)
-            .map(|(&coord, &vis)| (coord.contents, vis))
-            .collect();
-        if visibilities_by_draw_coordinates.is_empty() {
-            None
-        } else {
-            Some(SquareOfTopDownPortals(visibilities_by_draw_coordinates).at(relative_square))
-        }
-    }
-    pub fn visibilities_of_relative_square_in_local_frame(
-        &self,
-        relative_square: WorldStep,
-    ) -> Vec<TopDownPortalShape> {
-        self.top_down_portals_for_relative_square(relative_square)
-            .map(|square_of_portals| {
-                square_of_portals
-                    .contents
-                    .top_down_portals()
-                    .iter()
-                    .map(|x| x.visibility_in_local_frame())
-                    .collect()
-            })
-            .unwrap_or(vec![])
-    }
-
-    pub fn at_least_partially_visible_relative_squares_including_subviews(&self) -> StepSet {
-        self.0
-            .iter()
-            .map(|(coord, vis)| coord.local_relative_square)
-            .collect()
-    }
-
     fn main_view_only(&self) -> Self {
         let filtered_map = self
             .0
@@ -363,24 +487,10 @@ impl TopDownifiedFieldOfView {
             .collect();
         Self(filtered_map)
     }
-    pub fn at_least_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        self.main_view_only()
-            .0
-            .iter()
-            .map(|(coord, vis)| coord.local_relative_square)
-            .collect()
-    }
-
-    pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
-            .iter()
-            .map(|(coord, vis)| coord.local_relative_square)
-            .collect()
-    }
     // TODO: these names are getting long.  parameterize the logic.
     fn positioned_visibilities_of_only_partially_visible_squares_in_main_view_only(
         &self,
-    ) -> HashMap<LocallyPositioned<TopDownPortalTarget>, TopDownPortalShape> {
+    ) -> TopDownPortalShapesByPositionedTopDownPortalTarget {
         self.main_view_only()
             .0
             .iter()
@@ -388,31 +498,6 @@ impl TopDownifiedFieldOfView {
             .filter(|(coord, vis)| vis.is_only_partially_visible())
             .map(|(&a, &b)| (a, b))
             .collect()
-    }
-    pub fn visibilities_of_partially_visible_squares_in_main_view_only(
-        &self,
-    ) -> RelativeSquareVisibilityMap {
-        self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
-            .iter()
-            .map(|(coord, &vis)| (coord.local_relative_square, vis))
-            .collect()
-    }
-
-    pub fn can_fully_and_seamlessly_see_relative_square(&self, step: WorldStep) -> bool {
-        let visibilities_of_rel_square = self.top_down_portals_for_relative_square(step);
-        return visibilities_of_rel_square.is_some_and(|v| {
-            v.contents.0.len() == 1 && v.contents.0.iter().next().unwrap().1.is_fully_visible()
-        });
-    }
-
-    pub fn can_see_relative_square(&self, step: WorldStep) -> bool {
-        !self.top_down_portals_for_relative_square(step).is_some()
-    }
-
-    pub fn can_see_absolute_square(&self, world_square: WorldSquare) -> bool {
-        !self
-            .top_down_portals_for_absolute_square(world_square)
-            .is_empty()
     }
 
     // main view, so one-to-one
@@ -438,16 +523,6 @@ impl TopDownifiedFieldOfView {
             self.root_square() + relative_square,
             top_down_portal_shape,
         )
-    }
-
-    // in main view, so no portals involved, so one-to-one assumption is valid
-    pub fn visible_local_absolute_square(&self, rel_square: WorldStep) -> Option<WorldSquare> {
-        self.existing_direct_connection_to_local_square(rel_square)
-            .map(|direct_connection| direct_connection.0.target.absolute_square)
-    }
-
-    pub fn relative_square_visibility_map_of_main_view_only(&self) -> RelativeSquareVisibilityMap {
-        todo!();
     }
 
     // TODO: delete this after the refactor (currently keeping for reference)
@@ -478,12 +553,6 @@ impl TopDownifiedFieldOfView {
     //
     //     visibilities_in_frame_of_main_view
     // }
-    pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
-        self.fully_visible_relative_squares(true)
-    }
-    pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
-        self.fully_visible_relative_squares(false)
-    }
     fn fully_visible_relative_squares(&self, local_space_only: bool) -> StepSet {
         if local_space_only {
             self.main_view_only()
@@ -502,59 +571,10 @@ impl TopDownifiedFieldOfView {
         let portal_shape: TopDownPortalShape = portal.shape;
         self.0.insert(positioned_portal_target, portal_shape);
     }
-    pub fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep) {
-        self.add_top_down_portal(
-            relative_square,
-            &self
-                .new_direct_connection_to_local_square(
-                    relative_square,
-                    &TopDownPortalShape::new_fully_visible(),
-                )
-                .as_top_down_portal(),
-        );
-    }
-    pub fn add_partially_visible_local_relative_square(
-        &mut self,
-        step: WorldStep,
-        vis: &TopDownPortalShape,
-    ) {
-        self.add_top_down_portal(
-            step,
-            &self
-                .new_direct_connection_to_local_square(step, vis)
-                .as_top_down_portal(),
-        );
-    }
-
-    pub fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|x| {
-                    let positioned_top_down_portal: LocallyPositioned<TopDownPortal> =
-                        x.tuple_clone().into();
-                    let rounded: LocallyPositioned<TopDownPortal> =
-                        positioned_top_down_portal.rounded_towards_full_visibility(tolerance);
-                    // TODO: tidy this up
-                    let tuple = rounded.contents.tuple();
-                    (
-                        tuple.0.at(positioned_top_down_portal.local_relative_square),
-                        tuple.1,
-                    )
-                })
-                .collect(),
-        )
-    }
-    pub fn combined_with(&self, other: &Self) -> Self {
-        todo!()
-    }
-    pub fn as_seen_through_portal_by(&self, other: &Self) -> Self {
-        todo!()
-    }
 }
 
 impl TopDownPortal {
-    pub fn one_portal_deeper(
+    fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
@@ -568,14 +588,24 @@ impl TopDownPortal {
     fn tuple(&self) -> (TopDownPortalTarget, TopDownPortalShape) {
         (self.target, self.shape)
     }
-    pub fn visibility_in_local_frame(&self) -> SquareVisibility {
+    fn visibility_in_local_frame(&self) -> SquareVisibility {
         self.shape.rotated(-self.target.portal_rotation_to_target)
+    }
+    fn portal_depth(&self) -> u32 {
+        self.target.portal_depth
+    }
+    fn portal_rotation_to_target(&self) -> QuarterTurnsAnticlockwise {
+        self.target.portal_rotation_to_target
+    }
+
+    fn square_of_target(&self) -> WorldSquare {
+        self.target.absolute_square
     }
 }
 
 impl SquareOfTopDownPortals {
     // simple delegation
-    pub fn one_portal_deeper(
+    fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
@@ -590,7 +620,7 @@ impl SquareOfTopDownPortals {
                 .collect(),
         )
     }
-    pub fn from_local_draw_target(
+    fn from_local_draw_target(
         visibility: &TopDownPortalShape,
         absolute_square: WorldSquare,
     ) -> Self {
@@ -680,7 +710,7 @@ where
 }
 
 impl LocallyPositioned<TopDownPortalTarget> {
-    pub fn portal_depth(&self) -> u32 {
+    fn portal_depth(&self) -> u32 {
         self.contents.portal_depth
     }
 }
@@ -773,49 +803,32 @@ mod tests {
                 LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
             ),
         );
+        assert_eq!(rasterized_fov.visible_local_relative_squares().len(), 4);
         assert_eq!(
-            rasterized_fov
-                .at_least_partially_visible_relative_squares_in_main_view_only()
-                .len(),
-            4
-        );
-        assert_eq!(
-            rasterized_fov
-                .fully_visible_relative_squares_in_main_view_only()
-                .len(),
+            rasterized_fov.fully_visible_local_relative_squares().len(),
             2
         );
         assert_eq!(
             rasterized_fov
-                .only_partially_visible_relative_squares_in_main_view_only()
+                .only_partially_visible_local_relative_squares()
                 .len(),
             2
         );
 
         let rounded_fov = rasterized_fov.rounded_towards_full_visibility(1e-3);
+        assert_eq!(rounded_fov.visible_local_relative_squares().len(), 4);
+        assert_eq!(rounded_fov.fully_visible_local_relative_squares().len(), 3);
         assert_eq!(
             rounded_fov
-                .at_least_partially_visible_relative_squares_in_main_view_only()
-                .len(),
-            4
-        );
-        assert_eq!(
-            rounded_fov
-                .fully_visible_relative_squares_in_main_view_only()
-                .len(),
-            3
-        );
-        assert_eq!(
-            rounded_fov
-                .only_partially_visible_relative_squares_in_main_view_only()
+                .only_partially_visible_local_relative_squares()
                 .len(),
             1
         );
         assert!(rounded_fov
-            .fully_visible_relative_squares_in_main_view_only()
+            .fully_visible_local_relative_squares()
             .contains(&STEP_DOWN));
         assert!(rounded_fov
-            .only_partially_visible_relative_squares_in_main_view_only()
+            .only_partially_visible_local_relative_squares()
             .contains(&STEP_UP));
     }
     #[test]
