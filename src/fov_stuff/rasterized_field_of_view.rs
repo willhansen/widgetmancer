@@ -63,22 +63,16 @@ type PositionedSquareOfTopDownPortals = LocallyPositioned<SquareOfTopDownPortals
 
 #[delegatable_trait]
 pub trait SquareOfTopDownPortalsFunctions {
-    fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal>;
-
     fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape;
     fn lone_portal_depth_or_panic(&self) -> u32;
     fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise;
     fn lone_absolute_square_or_panic(&self) -> WorldSquare;
     fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape;
     fn lone_top_down_portal_or_panic(&self) -> TopDownPortal;
-    fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_;
+    fn top_down_portals(&self) -> Vec<TopDownPortal>;
 }
 
 impl SquareOfTopDownPortalsFunctions for SquareOfTopDownPortals {
-    fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
-        self.lone_top_down_portal_or_panic()
-            .at(self.local_relative_square)
-    }
     fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
         self.lone_top_down_portal_or_panic().shape
     }
@@ -113,10 +107,44 @@ impl SquareOfTopDownPortalsFunctions for SquareOfTopDownPortals {
             )
         }
     }
-    fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
-        self.0.iter().map(|x| x.tuple_clone().into())
+    fn top_down_portals(&self) -> Vec<TopDownPortal> {
+        self.0.iter().map(|x| x.tuple_clone().into()).collect()
     }
 }
+
+// TODO: there's gotta be a better way to delegate this
+impl SquareOfTopDownPortalsFunctions for PositionedSquareOfTopDownPortals {
+    fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
+        self.contents
+            .lone_square_visibility_in_absolute_frame_or_panic()
+    }
+
+    fn lone_portal_depth_or_panic(&self) -> u32 {
+        self.contents.lone_portal_depth_or_panic()
+    }
+
+    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
+        self.contents.lone_portal_rotation_or_panic()
+    }
+
+    fn lone_absolute_square_or_panic(&self) -> WorldSquare {
+        self.contents.lone_absolute_square_or_panic()
+    }
+
+    fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape {
+        self.contents
+            .lone_square_visibility_in_relative_frame_or_panic()
+    }
+
+    fn lone_top_down_portal_or_panic(&self) -> TopDownPortal {
+        self.contents.lone_top_down_portal_or_panic()
+    }
+
+    fn top_down_portals(&self) -> Vec<TopDownPortal> {
+        self.contents.top_down_portals()
+    }
+}
+
 impl PositionedSquareOfTopDownPortals {
     pub fn one_portal_deeper(
         &self,
@@ -280,6 +308,7 @@ impl TopDownifiedFieldOfView {
                 positioned_square_of_portals
                     .contents
                     .top_down_portals()
+                    .iter()
                     .map(|portal| portal.target.absolute_square)
                     .collect()
             })
@@ -311,6 +340,7 @@ impl TopDownifiedFieldOfView {
                 square_of_portals
                     .contents
                     .top_down_portals()
+                    .iter()
                     .map(|x| x.visibility_in_local_frame())
                     .collect()
             })
