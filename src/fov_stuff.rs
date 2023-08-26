@@ -1581,7 +1581,7 @@ mod tests {
     #[test]
     fn test_center_of_fov_is_visible() {
         let square = point2(4, 5);
-        let fov = portal_aware_field_of_view_from_square(
+        let rasterized_fov = portal_aware_field_of_view_from_square(
             square,
             0,
             &Default::default(),
@@ -1589,15 +1589,12 @@ mod tests {
         )
         .rasterized();
         assert_eq!(
-            fov.at_least_partially_visible_relative_squares_in_main_view_only()
+            rasterized_fov
+                .at_least_partially_visible_relative_squares_in_main_view_only()
                 .len(),
             1
         );
-        assert!(fov
-            .direct_connection_to_local_square(STEP_ZERO)
-            .unwrap()
-            .lone_square_visibility_in_absolute_frame_or_panic()
-            .is_fully_visible());
+        assert!(rasterized_fov.can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
     }
 
     #[ignore = "not a priority for the time being"]

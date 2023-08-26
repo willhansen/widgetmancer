@@ -10,6 +10,7 @@ use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     QuarterTurnRotatable, QuarterTurnsAnticlockwise, TupleClone, STEP_ZERO,
 };
+use ambassador::delegatable_trait;
 use derive_more::Constructor;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
@@ -36,7 +37,7 @@ trait CanBeLocallyPositioned {
 }
 
 #[derive(Clone, Debug)]
-struct TopDownPortal {
+pub struct TopDownPortal {
     target: TopDownPortalTarget,
     shape: TopDownPortalShape,
 }
@@ -56,19 +57,72 @@ type ShapesByTopDownPortalTargetSharingOneRelativeSquare =
 struct DirectConnectionToLocalSquare(TopDownPortal);
 
 #[derive(Clone, PartialEq, Debug, Default)]
-struct NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare(
-    ShapesByTopDownPortalTargetSharingOneRelativeSquare,
-);
+struct SquareOfTopDownPortals(ShapesByTopDownPortalTargetSharingOneRelativeSquare);
 
-type OneRelativeSquareOfTopDownPortals =
-    LocallyPositioned<NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare>;
+type PositionedSquareOfTopDownPortals = LocallyPositioned<SquareOfTopDownPortals>;
 
-impl OneRelativeSquareOfTopDownPortals {
+#[delegatable_trait]
+pub trait SquareOfTopDownPortalsFunctions {
+    fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal>;
+
+    fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape;
+    fn lone_portal_depth_or_panic(&self) -> u32;
+    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise;
+    fn lone_absolute_square_or_panic(&self) -> WorldSquare;
+    fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape;
+    fn lone_top_down_portal_or_panic(&self) -> TopDownPortal;
+    fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_;
+}
+
+impl SquareOfTopDownPortalsFunctions for SquareOfTopDownPortals {
+    fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
+        self.lone_top_down_portal_or_panic()
+            .at(self.local_relative_square)
+    }
+    fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
+        self.lone_top_down_portal_or_panic().shape
+    }
+    fn lone_portal_depth_or_panic(&self) -> u32 {
+        self.lone_top_down_portal_or_panic().target.portal_depth
+    }
+    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
+        self.lone_top_down_portal_or_panic()
+            .target
+            .portal_rotation_to_target
+    }
+    fn lone_absolute_square_or_panic(&self) -> WorldSquare {
+        self.lone_top_down_portal_or_panic().target.absolute_square
+    }
+    fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape {
+        self.lone_top_down_portal_or_panic()
+            .visibility_in_local_frame()
+    }
+    fn lone_top_down_portal_or_panic(&self) -> TopDownPortal {
+        let draw_target_count = self.0.iter().count();
+        if draw_target_count == 1 {
+            self.0.iter().next().unwrap().tuple_clone().into()
+        } else if draw_target_count > 1 {
+            panic!(
+                "More than one visibility found.  ambiguous call.  self: {:?}",
+                self
+            )
+        } else {
+            panic!(
+                "No visibilities.  this shouldn't be possible. self: {:?}",
+                self
+            )
+        }
+    }
+    fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
+        self.0.iter().map(|x| x.tuple_clone().into())
+    }
+}
+impl PositionedSquareOfTopDownPortals {
     pub fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
-        OneRelativeSquareOfTopDownPortals {
+        PositionedSquareOfTopDownPortals {
             contents: self
                 .contents
                 .one_portal_deeper(forward_rotation_through_portal),
@@ -80,30 +134,8 @@ impl OneRelativeSquareOfTopDownPortals {
         }
     }
     fn lone_positioned_top_down_portal_or_panic(&self) -> LocallyPositioned<TopDownPortal> {
-        self.contents
-            .lone_top_down_portal_or_panic()
+        self.lone_top_down_portal_or_panic()
             .at(self.local_relative_square)
-    }
-    pub fn lone_square_visibility_in_absolute_frame_or_panic(&self) -> TopDownPortalShape {
-        self.contents.lone_top_down_portal_or_panic().shape
-    }
-    pub fn lone_portal_depth_or_panic(&self) -> u32 {
-        self.contents
-            .lone_top_down_portal_or_panic()
-            .target
-            .portal_depth
-    }
-    pub fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
-        self.contents
-            .lone_top_down_portal_or_panic()
-            .target
-            .portal_rotation_to_target
-    }
-    pub fn lone_absolute_square_or_panic(&self) -> WorldSquare {
-        self.contents
-            .lone_top_down_portal_or_panic()
-            .target
-            .absolute_square
     }
     pub fn relative_square(&self) -> WorldStep {
         self.local_relative_square
@@ -115,17 +147,11 @@ impl OneRelativeSquareOfTopDownPortals {
     ) -> Self {
         Self {
             local_relative_square: relative_square,
-            contents:
-                NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare::from_local_draw_target(
-                    square_visibility,
-                    absolute_square,
-                ),
+            contents: SquareOfTopDownPortals::from_local_draw_target(
+                square_visibility,
+                absolute_square,
+            ),
         }
-    }
-    pub fn lone_square_visibility_in_relative_frame_or_panic(&self) -> TopDownPortalShape {
-        self.contents
-            .lone_top_down_portal_or_panic()
-            .visibility_in_local_frame()
     }
     fn split_into_draw_target_coordinates_and_visibilities(
         &self,
@@ -138,7 +164,7 @@ impl OneRelativeSquareOfTopDownPortals {
     }
 }
 
-impl ViewRoundable for OneRelativeSquareOfTopDownPortals {
+impl ViewRoundable for PositionedSquareOfTopDownPortals {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         Self {
             contents: self.contents.rounded_towards_full_visibility(tolerance),
@@ -146,7 +172,7 @@ impl ViewRoundable for OneRelativeSquareOfTopDownPortals {
         }
     }
 }
-impl ViewRoundable for NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
+impl ViewRoundable for SquareOfTopDownPortals {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         Self(
             self.0
@@ -177,7 +203,7 @@ impl TopDownifiedFieldOfView {
             positioned_vis.portal_depth() == 0 && positioned_vis.local_relative_square == rel_square
         })
     }
-    fn add_visible_square(&mut self, visibility: &OneRelativeSquareOfTopDownPortals) {
+    fn add_visible_square(&mut self, visibility: &PositionedSquareOfTopDownPortals) {
         todo!()
     }
     pub fn add_visible_square_in_main_view(
@@ -189,7 +215,7 @@ impl TopDownifiedFieldOfView {
         assert!(!self.has_visibility_for_position_in_main_view(relative_square));
 
         self.0.extend(
-            OneRelativeSquareOfTopDownPortals::new_in_main_view(
+            PositionedSquareOfTopDownPortals::new_in_main_view(
                 visibility,
                 self.root_square() + relative_square,
                 relative_square,
@@ -253,7 +279,7 @@ impl TopDownifiedFieldOfView {
             .map(|positioned_square_of_portals| {
                 positioned_square_of_portals
                     .contents
-                    .portals()
+                    .top_down_portals()
                     .map(|portal| portal.target.absolute_square)
                     .collect()
             })
@@ -263,7 +289,7 @@ impl TopDownifiedFieldOfView {
     fn top_down_portals_for_relative_square(
         &self,
         relative_square: WorldStep,
-    ) -> Option<OneRelativeSquareOfTopDownPortals> {
+    ) -> Option<PositionedSquareOfTopDownPortals> {
         let visibilities_by_draw_coordinates: HashMap<_, _> = self
             .0
             .iter()
@@ -273,12 +299,7 @@ impl TopDownifiedFieldOfView {
         if visibilities_by_draw_coordinates.is_empty() {
             None
         } else {
-            Some(
-                NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare(
-                    visibilities_by_draw_coordinates,
-                )
-                .at(relative_square),
-            )
+            Some(SquareOfTopDownPortals(visibilities_by_draw_coordinates).at(relative_square))
         }
     }
     pub fn visibilities_of_relative_square_in_local_frame(
@@ -289,7 +310,7 @@ impl TopDownifiedFieldOfView {
             .map(|square_of_portals| {
                 square_of_portals
                     .contents
-                    .portals()
+                    .top_down_portals()
                     .map(|x| x.visibility_in_local_frame())
                     .collect()
             })
@@ -522,7 +543,7 @@ impl TopDownPortal {
     }
 }
 
-impl NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
+impl SquareOfTopDownPortals {
     // simple delegation
     pub fn one_portal_deeper(
         &self,
@@ -545,28 +566,10 @@ impl NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare {
     ) -> Self {
         DirectConnectionToLocalSquare::new(absolute_square, visibility).into()
     }
-    fn lone_top_down_portal_or_panic(&self) -> TopDownPortal {
-        let draw_target_count = self.0.iter().count();
-        if draw_target_count == 1 {
-            self.0.iter().next().unwrap().tuple_clone().into()
-        } else if draw_target_count > 1 {
-            panic!(
-                "More than one visibility found.  ambiguous call.  self: {:?}",
-                self
-            )
-        } else {
-            panic!(
-                "No visibilities.  this shouldn't be possible. self: {:?}",
-                self
-            )
-        }
-    }
+
     fn new(portals: impl Into<ShapesByTopDownPortalTargetSharingOneRelativeSquare>) -> Self {
         todo!("assert shapes are non overlapping");
         Self(portals.into())
-    }
-    fn portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
-        self.0.iter().map(|x| x.tuple_clone().into())
     }
 }
 
@@ -682,9 +685,7 @@ impl DirectConnectionToLocalSquare {
     }
 }
 
-impl From<DirectConnectionToLocalSquare>
-    for NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare
-{
+impl From<DirectConnectionToLocalSquare> for SquareOfTopDownPortals {
     fn from(value: DirectConnectionToLocalSquare) -> Self {
         Self::new(value)
     }
@@ -791,18 +792,16 @@ mod tests {
     fn test_add_a_view_of_a_square() {
         let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_visible_square(&OneRelativeSquareOfTopDownPortals {
+        rasterized_fov.add_visible_square(&PositionedSquareOfTopDownPortals {
             local_relative_square: (4, 5).into(),
-            contents: NonOverlappingShapesByTopDownPortalTargetSharingOneRelativeSquare::new(
-                TopDownPortal {
-                    target: TopDownPortalTarget {
-                        absolute_square: (10, 10).into(),
-                        portal_depth: 1,
-                        portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
-                    },
-                    shape: TopDownPortalShape::new_fully_visible(),
+            contents: SquareOfTopDownPortals::new(TopDownPortal {
+                target: TopDownPortalTarget {
+                    absolute_square: (10, 10).into(),
+                    portal_depth: 1,
+                    portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
                 },
-            ),
+                shape: TopDownPortalShape::new_fully_visible(),
+            }),
         })
     }
 }
