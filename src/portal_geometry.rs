@@ -305,7 +305,6 @@ mod tests {
     use super::*;
 
     #[test]
-    
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
             SquareWithOrthogonalDir::from_square_and_step(point2(1, 2), STEP_UP),
@@ -316,7 +315,6 @@ mod tests {
         assert_eq!(pose1.apply_rigid_transform(transform), pose2);
     }
     #[test]
-    
     fn test_ray_through_portal() {
         let mut portal_geometry = PortalGeometry::default();
         portal_geometry.create_portal(
@@ -348,40 +346,30 @@ mod tests {
         }
     }
     #[test]
-    
     fn test_transform_ray__simple_translation() {
-        let tf = RigidTransform::from_start_and_end_poses(
-            (point2(3, 4), STEP_RIGHT).into(),
-            (point2(4, 4), STEP_RIGHT).into(),
-        );
+        let tf =
+            RigidTransform::from_start_and_end_poses(((3, 4), STEP_RIGHT), ((4, 4), STEP_RIGHT));
         let (new_start, new_direction) = tf.transform_ray(point2(3.0, 4.0), Angle::degrees(90.0));
         assert_about_eq_2d(new_start, point2(4.0, 4.0));
         assert_about_eq!(new_direction.to_degrees(), 90.0);
     }
     #[test]
-    
     fn test_transform_ray__simple_rotation() {
-        let tf = RigidTransform::from_start_and_end_poses(
-            (point2(3, 4), STEP_RIGHT).into(),
-            (point2(3, 4), STEP_DOWN).into(),
-        );
+        let tf =
+            RigidTransform::from_start_and_end_poses(((3, 4), STEP_RIGHT), ((3, 4), STEP_DOWN));
         let (new_start, new_direction) = tf.transform_ray(point2(3.0, 4.0), Angle::degrees(45.0));
         assert_about_eq_2d(new_start, point2(3.0, 4.0));
         assert_about_eq!(new_direction.to_degrees(), -45.0);
     }
     #[test]
-    
     fn test_transform_ray__move_and_rotate() {
-        let tf = RigidTransform::from_start_and_end_poses(
-            (point2(5, 5), STEP_LEFT).into(),
-            (point2(-10, 20), STEP_UP).into(),
-        );
+        let tf =
+            RigidTransform::from_start_and_end_poses(((5, 5), STEP_LEFT), ((-10, 20), STEP_UP));
         let (new_start, new_direction) = tf.transform_ray(point2(5.0, 4.3), Angle::degrees(170.0));
         assert_about_eq_2d(new_start, point2(-10.7, 20.0));
         assert_about_eq!(new_direction.to_degrees(), 80.0, 0.001);
     }
     #[test]
-    
     fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
         let mut portal_geometry = PortalGeometry::default();
         portal_geometry.create_portal(

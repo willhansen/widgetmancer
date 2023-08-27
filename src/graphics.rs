@@ -674,19 +674,20 @@ impl Graphics {
             });
         let maybe_drawable: Option<DrawableEnum> = visual_top_down_portals
             .iter()
-            .filter(|&vis: &&SquareOfTopDownPortals| {
+            // filter for visible squares
+            .filter(|&top_down_portal: &&TopDownPortal| {
                 if let Some(drawable_map) = maybe_drawable_map {
-                    drawable_map.contains_key(&vis.absolute_square())
+                    drawable_map.contains_key(&top_down_portal.target_square())
                 } else {
                     true
                 }
             })
-            .map(|positioned_visibility: &SquareOfTopDownPortals| {
+            .map(|top_down_portal: &TopDownPortal| {
                 let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map
-                        .get(&positioned_visibility.absolute_square())
+                        .get(&top_down_portal.target_square())
                         .unwrap()
-                        .rotated(-positioned_visibility.portal_rotation())
+                        .rotated(-top_down_portal.portal_rotation_to_target())
                 } else {
                     // SolidColorDrawable::new(GREY).to_enum()
                     // SolidColorDrawable::new(number_to_hue_rotation(
@@ -699,23 +700,23 @@ impl Graphics {
                     // .to_enum()
                     SolidColorDrawable::new(number_to_hue_rotation(
                         king_distance(
-                            positioned_visibility.absolute_square() - rasterized_fov.root_square(),
+                            top_down_portal.target_square() - rasterized_fov.root_square(),
                         ) as f32,
                         10.0,
                     ))
                     .to_enum()
                 };
-                if !positioned_visibility
-                    .square_visibility_in_absolute_frame()
+                if !top_down_portal
+                    .shape_rotated_to_absolute_frame()
                     .is_fully_visible()
                 {
                     drawable = DrawableEnum::PartialVisibility(
                         PartialVisibilityDrawable::from_shadowed_drawable(
                             &drawable,
                             if render_portals_with_line_of_sight {
-                                positioned_visibility.square_visibility_in_relative_frame()
+                                top_down_portal.shape_rotated_to_relative_frame()
                             } else {
-                                positioned_visibility.square_visibility_in_absolute_frame()
+                                top_down_portal.shape_rotated_to_absolute_frame()
                             },
                         ),
                     )
@@ -724,7 +725,7 @@ impl Graphics {
                     drawable = drawable.tinted(
                         RED,
                         //number_to_color(positioned_visibility.portal_depth()),
-                        (0.1 * positioned_visibility.portal_depth() as f32).min(1.0),
+                        (0.1 * top_down_portal.portal_depth() as f32).min(1.0),
                     );
                 }
                 drawable

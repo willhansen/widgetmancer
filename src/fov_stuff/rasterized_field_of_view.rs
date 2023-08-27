@@ -34,7 +34,7 @@ pub struct TopDownPortal {
 // Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
 // This struct and trait are the only public things in this module
 // TODO: maybe precalculate indexes
-#[derive(Clone, Default, Constructor, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct TopDownifiedFieldOfView {
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
 }
@@ -530,7 +530,7 @@ impl TopDownifiedFieldOfView {
         if local_space_only {
             self.local_view_only()
         } else {
-            *self
+            self.clone()
         }
         .map_of_top_down_portal_shapes_by_coordinates
         .iter()
@@ -729,7 +729,7 @@ impl DirectConnectionToLocalSquare {
         self.0.target.absolute_square
     }
     fn top_down_portal(&self) -> TopDownPortal {
-        self.0
+        self.0.clone()
     }
 }
 
