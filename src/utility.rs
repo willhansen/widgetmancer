@@ -2129,6 +2129,17 @@ impl<A: Clone, B: Clone> TupleClone for (&A, &B) {
         }
     }
 }
+// TODO: learn macros
+impl<A: Clone, B: Clone, C: Clone> TupleClone for (&A, &B, &C) {
+    type TupleType = (A, B, C);
+
+    fn tuple_clone(&self) -> Self::TupleType {
+        {
+            let x = *self;
+            (x.0.clone(), x.1.clone(), x.2.clone())
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
