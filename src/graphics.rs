@@ -664,7 +664,7 @@ impl Graphics {
         tint_portals: bool,
         render_portals_with_line_of_sight: bool,
     ) -> Option<DrawableEnum> {
-        let visibilities: Vec<TopDownPortal> =
+        let visual_top_down_portals: Vec<TopDownPortal> =
             Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
                 rasterized_fov.top_down_portals_for_relative_square(relative_square)
             } else {
@@ -672,16 +672,16 @@ impl Graphics {
                     rasterized_fov.root_square() + relative_square,
                 )
             });
-        let maybe_drawable: Option<DrawableEnum> = visibilities
+        let maybe_drawable: Option<DrawableEnum> = visual_top_down_portals
             .iter()
-            .filter(|&vis: &&LocallyPositionedNonOverlappingDrawTargetsFromOneSquare| {
+            .filter(|&vis: &&SquareOfTopDownPortals| {
                 if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map.contains_key(&vis.absolute_square())
                 } else {
                     true
                 }
             })
-            .map(|positioned_visibility: &LocallyPositionedNonOverlappingDrawTargetsFromOneSquare| {
+            .map(|positioned_visibility: &SquareOfTopDownPortals| {
                 let mut drawable: DrawableEnum = if let Some(drawable_map) = maybe_drawable_map {
                     drawable_map
                         .get(&positioned_visibility.absolute_square())
