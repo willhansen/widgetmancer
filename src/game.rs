@@ -22,7 +22,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
-use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
+use crate::fov_stuff::rasterized_field_of_view::{
+    TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
+};
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityTrait, SquareVisibilityFunctions,
 };
@@ -2352,21 +2354,13 @@ impl Game {
     }
     pub fn square_is_fully_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
-        let visibilities = self
-            .rasterized_player_field_of_view()
-            .visibilities_of_relative_square(target_square_relative_to_player);
-        visibilities.len() == 1
-            && visibilities
-                .get(0)
-                .unwrap()
-                .lone_square_visibility_in_absolute_frame_or_panic()
-                .is_fully_visible()
+        self.rasterized_player_field_of_view()
+            .relative_square_is_fully_visible(target_square_relative_to_player)
     }
     pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         self.rasterized_player_field_of_view()
-            .visibilities_of_relative_square(target_square_relative_to_player)
-            .is_empty()
+            .relative_square_is_visible(target_square_relative_to_player)
     }
     fn player_field_of_view(&self) -> FieldOfView {
         let start_square = self.player_square();
@@ -2409,6 +2403,8 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use crate::fov_stuff::print_fov_as_absolute;
+    use crate::fov_stuff::rasterized_field_of_view::TopDownPortal;
+    use crate::fov_stuff::square_visibility::SquareVisibility;
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3253,8 +3249,7 @@ mod tests {
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(
             fov.rasterized()
-                .visibilities_of_absolute_square(enemy_square)
-                .len(),
+                .times_absolute_square_is_visible(enemy_square),
             2
         );
         assert_eq!(
@@ -3417,8 +3412,7 @@ mod tests {
         assert_eq!(fov.transformed_sub_fovs().len(), 1);
         assert_eq!(
             fov.rasterized()
-                .visibilities_of_absolute_square(enemy_square)
-                .len(),
+                .times_absolute_square_is_visible(enemy_square),
             1
         );
         assert_eq!(
@@ -3466,8 +3460,7 @@ mod tests {
         let fov = game.rasterized_player_field_of_view();
 
         assert_eq!(
-            fov.visibilities_of_absolute_square(square_that_should_be_visible)
-                .len(),
+            fov.times_absolute_square_is_visible(square_that_should_be_visible),
             1
         );
         assert_ne!(
@@ -3995,29 +3988,19 @@ mod tests {
         let fov = game.player_field_of_view();
 
         print_fov_as_absolute(&fov, 5);
-        dbg!(
-            "asdf",
-            test_steps_in_world_top_to_bottom
-                .iter()
-                .map(|&step| fov.rasterized().visibilities_of_relative_square(step))
-                .collect_vec(),
-        );
 
         test_steps_in_world_top_to_bottom
             .iter()
-            .map(|&world_step| fov.rasterized().visibilities_of_relative_square(world_step))
-            .for_each(
-                |visibilities_of_rel_square: Vec<
-                    LocallyPositionedNonOverlappingDrawTargetsFromOneSquare,
-                >| {
-                    let vis1 = visibilities_of_rel_square[0]
-                        .lone_square_visibility_in_absolute_frame_or_panic();
-                    let vis2 = visibilities_of_rel_square[1]
-                        .lone_square_visibility_in_absolute_frame_or_panic();
-                    assert!(vis1.is_about_complementary_to(vis2));
-                    assert!(vis1.is_visually_complementary_to(vis2));
-                },
-            );
+            .map(|&world_step| {
+                fov.rasterized()
+                    .shapes_of_visibilities_of_relative_square_rotated_to_local_frame(world_step)
+            })
+            .for_each(|visibilities_of_rel_square: Vec<SquareVisibility>| {
+                let vis1: SquareVisibility = visibilities_of_rel_square[0];
+                let vis2: SquareVisibility = visibilities_of_rel_square[1];
+                assert!(vis1.is_about_complementary_to(vis2));
+                assert!(vis1.is_visually_complementary_to(vis2));
+            });
 
         let correct_strings_top_to_bottom = vec!["🭋█", "🭅█", "🭖█", "🭦█"];
 
@@ -4168,7 +4151,8 @@ mod tests {
 
         let rel_square = STEP_RIGHT * 3 + STEP_UP;
         let player_fov = game.rasterized_player_field_of_view();
-        let visibilities_at_rel_square = player_fov.visibilities_of_relative_square(rel_square);
+        let visibilities_at_rel_square =
+            player_fov.top_down_portals_for_relative_square(rel_square);
         assert_eq!(visibilities_at_rel_square.len(), 1);
         let maybe_drawable: Option<DrawableEnum> = game
             .graphics

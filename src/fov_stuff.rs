@@ -705,7 +705,7 @@ mod tests {
         assert!(fov_result
             .only_partially_visible_local_relative_squares()
             .is_empty());
-        assert!(fov_result.can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
+        assert!(fov_result.relative_square_is_fully_visible(STEP_ZERO));
         let square_area = (fov_radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result.fully_visible_local_relative_squares().len(),
@@ -729,7 +729,7 @@ mod tests {
         assert!(fov_result
             .only_partially_visible_local_relative_squares()
             .is_empty());
-        assert!(fov_result.can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
+        assert!(fov_result.relative_square_is_fully_visible(STEP_ZERO));
         let square_area = (radius * 2 + 1).pow(2);
         assert_eq!(
             fov_result.fully_visible_local_relative_squares().len(),
@@ -750,9 +750,9 @@ mod tests {
             &PortalGeometry::default(),
         )
         .rasterized();
-        assert!(fov_result.can_fully_and_seamlessly_see_relative_square(block_step));
-        assert!(fov_result.can_fully_and_seamlessly_see_relative_square(block_step + STEP_DOWN));
-        assert_false!(fov_result.can_fully_and_seamlessly_see_relative_square(block_step + STEP_UP));
+        assert!(fov_result.relative_square_is_fully_visible(block_step));
+        assert!(fov_result.relative_square_is_fully_visible(block_step + STEP_DOWN));
+        assert_false!(fov_result.relative_square_is_fully_visible(block_step + STEP_UP));
     }
 
     #[test]
@@ -857,9 +857,8 @@ mod tests {
         )
         .rasterized();
         let visible_rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
-        assert!(fov_result
-            .can_fully_and_seamlessly_see_relative_square((visible_rel_square + STEP_LEFT)));
-        assert!(fov_result.can_fully_and_seamlessly_see_relative_square(visible_rel_square));
+        assert!(fov_result.relative_square_is_fully_visible((visible_rel_square + STEP_LEFT)));
+        assert!(fov_result.relative_square_is_fully_visible(visible_rel_square));
     }
 
     #[test]
@@ -1059,7 +1058,7 @@ mod tests {
 
         assert!(fov
             .rasterized()
-            .can_fully_and_seamlessly_see_relative_square(relative_square));
+            .relative_square_is_fully_visible(relative_square));
     }
 
     #[test]
@@ -1187,7 +1186,7 @@ mod tests {
 
         assert_false!(angle_based_fov_result.transformed_sub_fovs[0]
             .rasterized()
-            .can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
+            .relative_square_is_fully_visible(STEP_ZERO));
     }
 
     #[test]
@@ -1210,7 +1209,7 @@ mod tests {
 
         let rasterized_fov = main_fov.rasterized();
 
-        assert!(rasterized_fov.can_fully_and_seamlessly_see_relative_square(rel_from_main));
+        assert!(rasterized_fov.relative_square_is_fully_visible(rel_from_main));
         assert!(rasterized_fov.absolute_square_is_visible(point2(1, 4)));
 
         assert_eq!(
@@ -1415,8 +1414,8 @@ mod tests {
             combined_rasterized.fully_visible_relative_squares().len(),
             2
         );
-        assert!(combined_rasterized.can_fully_and_seamlessly_see_relative_square(rel_square));
-        assert!(combined_rasterized.can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
+        assert!(combined_rasterized.relative_square_is_fully_visible(rel_square));
+        assert!(combined_rasterized.relative_square_is_fully_visible(STEP_ZERO));
     }
 
     #[test]
@@ -1559,7 +1558,7 @@ mod tests {
         )
         .rasterized();
         assert_eq!(rasterized_fov.visible_local_relative_squares().len(), 1);
-        assert!(rasterized_fov.can_fully_and_seamlessly_see_relative_square(STEP_ZERO));
+        assert!(rasterized_fov.relative_square_is_fully_visible(STEP_ZERO));
     }
 
     #[ignore = "not a priority for the time being"]
@@ -1576,7 +1575,7 @@ mod tests {
         rel_blocks.iter().for_each(|rel_block| {
             assert!(
                 fov.rasterized()
-                    .can_fully_and_seamlessly_see_relative_square(*rel_block),
+                    .relative_square_is_fully_visible(*rel_block),
                 "rel_block: {:?}",
                 rel_block
             )
@@ -1597,8 +1596,7 @@ mod tests {
         print_fov_as_relative(&new_fov_result, 2);
         let rasterized_fov = new_fov_result.rasterized();
         let test_step = STEP_RIGHT;
-        let visibilities_of_one_right = new_fov_result
-            .rasterized()
+        let visibilities_of_one_right = rasterized_fov
             .shapes_of_visibilities_of_relative_square_rotated_to_local_frame(test_step);
 
         // check that the relative square corresponds to exactly one absolute square
@@ -1610,14 +1608,12 @@ mod tests {
         );
         let the_positioned_visibility = visibilities_of_one_right[0].clone();
         // check that the relative square is not reached through any portals
-        assert_eq!(the_positioned_visibility.lone_portal_depth_or_panic(), 0);
-        // redundant with portal check.  test elsewhere
-        assert_eq!(
-            the_positioned_visibility.lone_portal_rotation_or_panic(),
-            QuarterTurnsAnticlockwise::new(0)
-        );
-        let the_square_visibility =
-            the_positioned_visibility.lone_square_visibility_in_absolute_frame_or_panic();
+        assert!(rasterized_fov.relative_square_is_only_locally_visible(test_step));
+
+        let the_square_visibility = rasterized_fov
+            .lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
+                test_step,
+            );
         // check the visibility of the relative square
         assert_about_eq!(
             the_square_visibility
@@ -1673,22 +1669,16 @@ mod tests {
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
         let test_square = STEP_UP_RIGHT;
-        let visibilities_of_test_square = new_fov_result
-            .rasterized()
-            .shapes_of_visibilities_of_relative_square_rotated_to_local_frame(test_square);
-        assert_eq!(visibilities_of_test_square.len(), 1);
-        assert!(new_fov_result
-            .rasterized()
-            .can_fully_and_seamlessly_see_relative_square(test_square));
-        let the_positioned_visibility = visibilities_of_test_square[0].clone();
-        assert_eq!(the_positioned_visibility.lone_portal_depth_or_panic(), 1);
+        let rasterized_fov = new_fov_result.rasterized();
+        assert!(rasterized_fov.relative_square_is_fully_visible(test_square));
         assert_eq!(
-            the_positioned_visibility.lone_portal_rotation_or_panic(),
+            rasterized_fov.lone_portal_depth_for_relative_square_or_panic(test_square),
+            1
+        );
+        assert_eq!(
+            rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility =
-            the_positioned_visibility.lone_square_visibility_in_relative_frame_or_panic();
-        assert!(the_square_visibility.is_fully_visible());
     }
 
     #[test]
@@ -1736,15 +1726,26 @@ mod tests {
         let visibilities_of_test_square = new_fov_result
             .rasterized()
             .shapes_of_visibilities_of_relative_square_rotated_to_local_frame(test_square);
-        assert_eq!(visibilities_of_test_square.len(), 1);
-        let the_positioned_visibility = visibilities_of_test_square[0].clone();
-        assert_eq!(the_positioned_visibility.lone_portal_depth_or_panic(), 1);
+        let rasterized_fov = new_fov_result.rasterized();
         assert_eq!(
-            the_positioned_visibility.lone_portal_rotation_or_panic(),
+            rasterized_fov
+                .top_down_portals_for_relative_square(test_square)
+                .len(),
+            1
+        );
+        let the_positioned_visibility = visibilities_of_test_square[0].clone();
+        assert_eq!(
+            rasterized_fov.lone_portal_depth_for_relative_square_or_panic(test_square),
+            1
+        );
+        assert_eq!(
+            rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
             QuarterTurnsAnticlockwise::new(1)
         );
-        let the_square_visibility =
-            the_positioned_visibility.lone_square_visibility_in_relative_frame_or_panic();
+        let the_square_visibility = rasterized_fov
+            .lone_square_visibility_rotated_to_relative_frame_for_relative_square_or_panic(
+                test_square,
+            );
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),
@@ -1763,8 +1764,11 @@ mod tests {
 
         let rasterized_fov = narrow_fov.rasterized();
 
-        assert_eq!(rasterized_fov.positioned_visibilities().len(), dx as usize);
-        // asdfasdf
+        assert_eq!(
+            rasterized_fov.number_of_visible_relative_squares(),
+            dx as u32
+        );
+        todo!()
     }
     #[test]
     fn test_square_is_fully_visible_if_view_arc_starts_in_that_square() {

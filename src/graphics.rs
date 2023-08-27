@@ -34,7 +34,9 @@ use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
-use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
+use crate::fov_stuff::rasterized_field_of_view::{
+    TopDownPortal, TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
+};
 use crate::fov_stuff::square_visibility::RelativeSquareVisibilityTrait;
 use crate::fov_stuff::FieldOfView;
 use crate::game::{
@@ -647,9 +649,7 @@ impl Graphics {
             .collect();
     }
 
-    fn sorted_by_draw_order(
-        visibilities: Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare>,
-    ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
+    fn sorted_by_draw_order(visibilities: Vec<TopDownPortal>) -> Vec<TopDownPortal> {
         // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)
         visibilities
             .into_iter()
@@ -664,12 +664,13 @@ impl Graphics {
         tint_portals: bool,
         render_portals_with_line_of_sight: bool,
     ) -> Option<DrawableEnum> {
-        let visibilities: Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> =
+        let visibilities: Vec<TopDownPortal> =
             Self::sorted_by_draw_order(if render_portals_with_line_of_sight {
-                rasterized_fov.visibilities_of_relative_square(relative_square)
+                rasterized_fov.top_down_portals_for_relative_square(relative_square)
             } else {
-                rasterized_fov
-                    .visibilities_of_absolute_square(rasterized_fov.root_square() + relative_square)
+                rasterized_fov.top_down_portals_for_absolute_square(
+                    rasterized_fov.root_square() + relative_square,
+                )
             });
         let maybe_drawable: Option<DrawableEnum> = visibilities
             .iter()
