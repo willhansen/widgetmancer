@@ -672,15 +672,13 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         self.fully_covers_expanded_unit_square(0.0)
     }
     pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> bool {
-        dbg!("asdf", self);
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
             .map(|x| x * (0.5 + per_face_extension))
             .map(Vector2D::to_point)
             .map(Point2D::cast_unit)
             .iter()
-            .inspect(|x| println!("asdf B {}", x.to_string()))
-            .all(|&p| dbg!(self.overlapping_or_touching_point(p)))
+            .all(|&p| self.overlapping_or_touching_point(p))
     }
     pub fn extended(&self, extended_distance: f32) -> Self {
         let direction = self.direction_away_from_plane();
