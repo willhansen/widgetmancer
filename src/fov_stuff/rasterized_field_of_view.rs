@@ -119,7 +119,7 @@ impl SquareOfTopDownPortals {
     fn at(&mut self, relative_square: WorldStep) {
         todo!()
     }
-    fn from_local_draw_target(
+    fn new_direct_local_connection(
         relative_position: WorldStep,
         target_square: WorldSquare,
         visibility: &TopDownPortalShape,
@@ -167,14 +167,6 @@ impl SquareOfTopDownPortals {
                 self
             )
         }
-    }
-
-    fn new_in_local_view(
-        square_visibility: &TopDownPortalShape,
-        absolute_square: WorldSquare,
-        relative_square: WorldStep,
-    ) -> Self {
-        todo!()
     }
 
     fn one_portal_deeper(
@@ -264,10 +256,10 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
         assert!(!self.can_see_local_relative_square(relative_square));
 
         self.map_of_top_down_portal_shapes_by_coordinates.extend(
-            SquareOfTopDownPortals::new_in_local_view(
-                visibility,
-                self.relative_to_local_absolute_square(relative_square),
+            SquareOfTopDownPortals::new_direct_local_connection(
                 relative_square,
+                self.relative_to_local_absolute_square(relative_square),
+                visibility,
             )
             .map_of_top_down_portal_shapes_by_coordinates,
         );
@@ -549,11 +541,20 @@ impl TopDownifiedFieldOfView {
             map_of_top_down_portal_shapes_by_coordinates: filtered_map,
         }
     }
+    fn set_root_square(&mut self, new_root: WorldSquare) {
+        self.map_of_top_down_portal_shapes_by_coordinates.extend(
+            SquareOfTopDownPortals::new_direct_local_connection(
+                STEP_ZERO,
+                new_root,
+                &TopDownPortalShape::new_fully_visible(),
+            )
+            .map_of_top_down_portal_shapes_by_coordinates,
+        );
+    }
     fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_thing = TopDownifiedFieldOfView::default();
-        new_thing
-            .add_visible_local_relative_square(STEP_ZERO, &TopDownPortalShape::new_fully_visible());
-        new_thing
+        let mut new_fov = TopDownifiedFieldOfView::default();
+        new_fov.set_root_square(new_root);
+        new_fov
     }
 
     fn new_direct_connection_to_local_square(
