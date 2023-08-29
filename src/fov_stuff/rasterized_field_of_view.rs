@@ -8,7 +8,8 @@ use crate::graphics::drawable::{
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    CoordToString, QuarterTurnRotatable, QuarterTurnsAnticlockwise, TupleClone, STEP_ZERO,
+    CoordToString, QuarterTurnRotatable, QuarterTurnsAnticlockwise, SimpleResult, TupleClone,
+    STEP_ZERO,
 };
 use ambassador::delegatable_trait;
 use derive_more::Constructor;
@@ -43,6 +44,11 @@ pub trait TopDownifiedFieldOfViewInterface {
     fn absolute_square_is_visible(&self, world_square: WorldSquare) -> bool;
     fn absolute_squares_visible_at_relative_square(&self, relative_square: WorldStep) -> SquareSet;
     fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep);
+    fn try_add_visible_local_relative_square(
+        &mut self,
+        relative_square: WorldStep,
+        visibility: &TopDownPortalShape,
+    ) -> SimpleResult;
     fn add_visible_local_relative_square(
         &mut self,
         relative_square: WorldStep,
@@ -246,14 +252,15 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
                 .top_down_portal(),
         );
     }
-
-    fn add_visible_local_relative_square(
+    fn try_add_visible_local_relative_square(
         &mut self,
         relative_square: WorldStep,
         visibility: &TopDownPortalShape,
-    ) {
+    ) -> SimpleResult {
         // make sure there isn't a positioned visibility in the main view in the same relative square already
-        assert!(!self.can_see_local_relative_square(relative_square));
+        if !self.can_see_local_relative_square(relative_square) {
+            return Err(());
+        }
 
         self.map_of_top_down_portal_shapes_by_coordinates.extend(
             SquareOfTopDownPortals::new_direct_local_connection(
@@ -263,6 +270,19 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
             )
             .map_of_top_down_portal_shapes_by_coordinates,
         );
+        Ok(())
+    }
+
+    fn add_visible_local_relative_square(
+        &mut self,
+        relative_square: WorldStep,
+        visibility: &TopDownPortalShape,
+    ) {
+        self.try_add_visible_local_relative_square(relative_square, visibility)
+            .expect(&format!(
+                "Failed to add square: {}",
+                relative_square.to_string()
+            ));
     }
 
     fn as_seen_through_portal_by(&self, other: &Self) -> Self {
@@ -278,7 +298,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     ) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
-            new_thing.add_visible_local_relative_square(*rel_square, visibility);
+            new_thing.try_add_visible_local_relative_square(*rel_square, visibility);
         });
         new_thing
     }
