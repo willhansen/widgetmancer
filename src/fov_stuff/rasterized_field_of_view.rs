@@ -488,7 +488,9 @@ impl TopDownifiedFieldOfView {
             })
     }
     fn from_top_down_portal_iter(iter: impl Iterator<Item = TopDownPortal>) -> Self {
-        todo!()
+        Self {
+            map_of_top_down_portal_shapes_by_coordinates: iter.map(|x| x.split()).collect(),
+        }
     }
     // TODO: delete this after the refactor (currently keeping for reference)
     // fn visibilities_of_relative_square_in_one_sub_view(
@@ -603,6 +605,9 @@ impl TopDownPortal {
             target,
             shape,
         }
+    }
+    fn split(&self) -> (PositionedTopDownPortalTarget, TopDownPortalShape) {
+        ((self.relative_position, self.target), self.shape)
     }
     fn one_portal_deeper(
         &self,
