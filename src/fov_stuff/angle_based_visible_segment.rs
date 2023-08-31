@@ -12,11 +12,12 @@ use euclid::point2;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
 
 use super::fence::RelativeFenceFullyVisibleFromOriginGoingCcw;
 use super::square_visibility::RelativeSquareVisibilityTrait;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: PartialAngleInterval,
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
@@ -151,6 +152,23 @@ impl AngleBasedVisibleSegment {
             .collect()
     }
 }
+
+impl Debug for AngleBasedVisibleSegment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "radians: {:?}\n\
+            degrees: {:?}\n\
+            start line: {:?}\n\
+            end fence: {:?}\n\
+            ",
+            self.visible_angle_interval.to_radians(),
+            self.visible_angle_interval.to_degrees(),
+            self.start_internal_relative_face,
+            self.end_fence
+        )
+    }
+}
 // TODO: Applying a trait by simply calling the functions on every component member of a struct should be automated.
 impl RigidlyTransformable for AngleBasedVisibleSegment {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
@@ -175,5 +193,21 @@ mod tests {
             seg.get_touching_relative_squares(),
             (0..=5).map(|i| STEP_RIGHT * i).collect()
         )
+    }
+
+    #[test]
+    fn test_getting_square_visibilities__includes_partial_squares() {
+        let segment = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 2, STEP_RIGHT));
+        let visibilities = segment.to_square_visibilities();
+        assert!(visibilities
+            .get(&STEP_ZERO)
+            .is_some_and(SquareVisibility::is_fully_visible));
+        assert!(visibilities
+            .get(&STEP_RIGHT)
+            .is_some_and(SquareVisibility::is_only_partially_visible));
+        assert!(visibilities
+            .get(&(STEP_RIGHT * 2))
+            .is_some_and(SquareVisibility::is_only_partially_visible));
+        assert!(visibilities.get(&(STEP_RIGHT * 3)).is_none());
     }
 }

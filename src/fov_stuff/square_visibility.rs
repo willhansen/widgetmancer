@@ -202,7 +202,7 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
         write!(
             f,
             "{:#?}\n\
-             \tchars: {}",
+             \tchars: '{}'",
             self.visible_portion,
             self.as_string()
         )

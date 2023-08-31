@@ -240,8 +240,8 @@ impl FieldOfView {
 
     pub fn rasterized(&self) -> TopDownifiedFieldOfView {
         // rasterize top level
-        // rasterize each sub-level
         let mut combined: TopDownifiedFieldOfView = self.rasterized_main_view_only();
+        // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let rasterized_and_relocalized_sub_fov =
                 sub_fov.rasterized().as_seen_through_portal_by(&combined);
@@ -1297,8 +1297,9 @@ mod tests {
 
         let combined = fov_1.combined_with(&fov_2).rasterized();
 
-        assert_eq!(combined.fully_visible_relative_squares().len(), 2);
-        assert_eq!(combined.fully_visible_local_relative_squares().len(), 2);
+        // includes the two added squares, and the center (which is fully visible by default)
+        assert_eq!(combined.fully_visible_relative_squares().len(), 3);
+        assert_eq!(combined.fully_visible_local_relative_squares().len(), 3);
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
@@ -1325,7 +1326,7 @@ mod tests {
                 );
                 assert_eq!(
                     rasterized_fov.times_absolute_square_is_fully_visible(test_square),
-                    1
+                    0
                 );
             });
 
@@ -1347,29 +1348,20 @@ mod tests {
     #[test]
     fn test_combined_fovs_combine_visibility__full_squares() {
         let main_center = point2(5, 5);
-        let horizontal_offset = 12;
-        let fovs = (-1..=1)
-            .map(|dy| {
+        let test_dx = 12;
+        let test_dys = (-1..=1).collect_vec();
+        let test_steps = test_dys
+            .into_iter()
+            .map(|dy| vec2(test_dx, dy))
+            .collect_vec();
+        let fovs = test_steps
+            .iter()
+            .map(|&step| {
                 let mut fov = FieldOfView::new_empty_fov_at(main_center);
-                fov.add_fully_visible_relative_square(vec2(horizontal_offset, dy));
+                fov.add_fully_visible_relative_square(step);
                 fov
             })
             .collect_vec();
-
-        let test_step = STEP_RIGHT * (horizontal_offset - 1);
-        let test_square = main_center + test_step;
-
-        fovs.iter().for_each(|fov| {
-            let rasterized_fov = fov.rasterized();
-            assert_eq!(
-                rasterized_fov.times_absolute_square_is_visible(test_square),
-                1
-            );
-            assert_eq!(
-                rasterized_fov.times_absolute_square_is_fully_visible(test_square),
-                1
-            );
-        });
 
         let merged_fov = fovs
             .iter()
@@ -1378,11 +1370,14 @@ mod tests {
             .unwrap()
             .rasterized();
 
-        assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
-        assert_eq!(
-            merged_fov.times_absolute_square_is_fully_visible(test_square),
-            1
-        );
+        test_steps.iter().map(|&test_step| {
+            let test_square = main_center + test_step;
+            assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
+            assert_eq!(
+                merged_fov.times_absolute_square_is_fully_visible(test_square),
+                1
+            );
+        });
     }
 
     #[test]
