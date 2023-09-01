@@ -1289,6 +1289,8 @@ mod tests {
 
     #[test]
     fn test_simple_fov_combination() {
+        color_backtrace::install();
+        dbg!(PartialAngleInterval::from_octant(Octant::new(-1)));
         let main_center = point2(5, 5);
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);

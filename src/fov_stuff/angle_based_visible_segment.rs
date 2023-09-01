@@ -157,15 +157,11 @@ impl Debug for AngleBasedVisibleSegment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "radians: {:?}\n\
-            degrees: {:?}\n\
+            "visible angle: {:?}\n\
             start line: {:?}\n\
             end fence: {:?}\n\
             ",
-            self.visible_angle_interval.to_radians(),
-            self.visible_angle_interval.to_degrees(),
-            self.start_internal_relative_face,
-            self.end_fence
+            self.visible_angle_interval, self.start_internal_relative_face, self.end_fence
         )
     }
 }
