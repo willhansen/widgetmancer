@@ -21,6 +21,8 @@ use crate::utility::{
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
+use super::FAngle;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AngleInterval {
     Empty,
@@ -35,6 +37,8 @@ pub struct PartialAngleInterval {
 }
 
 impl PartialAngleInterval {
+    const DEFAULT_TOLERANCE_DEGREES: f32 = 1e-6;
+
     pub fn new_interval(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
         let (cw, ccw) = (
             standardize_angle(clockwise_end),
@@ -333,6 +337,10 @@ impl PartialAngleInterval {
 
         self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
     }
+    fn contains_angle_with_tolerance(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> bool {
+        self.center_angle().angle_to(angle).radians.abs()
+            <= self.width().radians / 2.0 + tolerance.radians.abs()
+    }
 
     pub fn width(&self) -> Angle<f32> {
         if self.clockwise_end == self.anticlockwise_end {
@@ -372,6 +380,11 @@ impl PartialAngleInterval {
         self.contains_or_touches_angle(other.anticlockwise_end)
             && self.contains_or_touches_angle(other.clockwise_end)
             && self.contains_or_touches_angle(other.center_angle())
+    }
+    pub fn contains_interval_with_tolerance(&self, other: Self, tolerance: FAngle) -> bool {
+        self.contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
+            && self.contains_angle_with_tolerance(other.clockwise_end, tolerance)
+            && self.contains_angle_with_tolerance(other.center_angle(), tolerance)
     }
     pub fn most_overlapped_edge_of_self(
         &self,
@@ -461,7 +474,7 @@ impl PartialAngleInterval {
     ) -> impl Iterator<Item = Option<WorldStep>> {
         assert!(self.is_in_one_octant(), "self: {:?}", self);
         let squares_in_octant_iter =
-            OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap());
+            OctantFOVSquareSequenceIter::new_from_center(self.lone_containing_octant().unwrap());
         let cloned_arc = self.clone();
         let squares_in_arc_iter = squares_in_octant_iter.map(move |step| {
             if step == STEP_ZERO {
@@ -476,11 +489,14 @@ impl PartialAngleInterval {
         squares_in_arc_iter
     }
     fn is_in_one_octant(&self) -> bool {
-        self.octant().is_some()
+        self.lone_containing_octant().is_some()
     }
-    fn octant(&self) -> Option<Octant> {
+    fn lone_containing_octant(&self) -> Option<Octant> {
         Octant::all_octants().find(|octant| {
-            Self::from_octant(*octant).fully_contains_interval_including_edge_overlaps(*self)
+            Self::from_octant(*octant).contains_interval_with_tolerance(
+                *self,
+                Angle::degrees(Self::DEFAULT_TOLERANCE_DEGREES),
+            )
         })
     }
 }
@@ -1356,66 +1372,30 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_interval_from_octant__radians() {
+    fn test_angle_interval_from_octant() {
+        color_backtrace::install();
         // Are the exact values really important?
-        let octant_start_end = vec![
-            (0, 0.0, PI / 4.0),
-            (1, PI / 4.0, PI / 2.0),
-            (2, PI / 2.0, PI * 3.0 / 4.0),
-            (3, PI * 3.0 / 4.0, PI),
-            (4, PI, -PI * 3.0 / 4.0),
-            (5, -PI * 3.0 / 4.0, -PI / 2.0),
-            (6, -PI / 2.0, -PI / 4.0),
-            (7, -PI / 4.0, 0.0),
+        let octant_start_end_rad_deg = vec![
+            (0, (0.0, PI / 4.0), (0.0, 45.0)),
+            (1, (PI / 4.0, PI / 2.0), (45.0, 90.0)),
+            (2, (PI / 2.0, PI * 3.0 / 4.0), (90.0, 135.0)),
+            (3, (PI * 3.0 / 4.0, PI), (135.0, 180.0)),
+            (4, (PI, -PI * 3.0 / 4.0), (180.0, -135.0)),
+            (5, (-PI * 3.0 / 4.0, -PI / 2.0), (-135.0, -90.0)),
+            (6, (-PI / 2.0, -PI / 4.0), (-90.0, -45.0)),
+            (7, (-PI / 4.0, 0.0), (-45.0, 0.0)),
         ];
-        octant_start_end
-            .into_iter()
-            .for_each(|(octant, start, end)| {
-                assert_eq!(
-                    PartialAngleInterval::from_octant(Octant::new(octant))
-                        .clockwise_end
-                        .radians,
-                    start
-                );
-                assert_eq!(
-                    PartialAngleInterval::from_octant(Octant::new(octant))
-                        .anticlockwise_end
-                        .radians,
-                    end
-                );
-            })
-    }
-    #[test]
-    fn test_angle_interval_from_octant__degrees() {
-        todo!();
-        // Are the exact values really important?
-        let octant_start_end = vec![
-            // TODO: change to degrees
-            (0, 0.0, PI / 4.0),
-            (1, PI / 4.0, PI / 2.0),
-            (2, PI / 2.0, PI * 3.0 / 4.0),
-            (3, PI * 3.0 / 4.0, PI),
-            (4, PI, -PI * 3.0 / 4.0),
-            (5, -PI * 3.0 / 4.0, -PI / 2.0),
-            (6, -PI / 2.0, -PI / 4.0),
-            (7, -PI / 4.0, 0.0),
-        ];
-        octant_start_end
-            .into_iter()
-            .for_each(|(octant, start, end)| {
-                assert_eq!(
-                    PartialAngleInterval::from_octant(Octant::new(octant))
-                        .clockwise_end
-                        .radians,
-                    start
-                );
-                assert_eq!(
-                    PartialAngleInterval::from_octant(Octant::new(octant))
-                        .anticlockwise_end
-                        .radians,
-                    end
-                );
-            })
+        octant_start_end_rad_deg.into_iter().for_each(
+            |(octant, (rad_start, rad_end), (deg_start, deg_end))| {
+                let interval = PartialAngleInterval::from_octant(Octant::new(octant));
+                let start = interval.clockwise_end();
+                let end = interval.anticlockwise_end();
+                assert_about_eq!(start.radians, rad_start);
+                assert_about_eq!(end.radians, rad_end);
+                assert_about_eq!(start.to_degrees(), deg_start);
+                assert_about_eq!(end.to_degrees(), deg_end);
+            },
+        )
     }
 
     #[test]
@@ -1467,6 +1447,47 @@ mod tests {
         assert_about_eq!(parts[2].anticlockwise_end().to_degrees(), 91.0);
     }
     #[test]
+    fn test_split_into_octants__slight_tolerance() {
+        let err = 1e-6;
+        assert_eq!(
+            PartialAngleInterval::from_degrees(0.0 - err, 45.0 + err)
+                .split_into_octants_in_ccw_order()
+                .len(),
+            1
+        );
+        assert_eq!(
+            PartialAngleInterval::from_degrees(-1.0 - err, 45.0 + err)
+                .split_into_octants_in_ccw_order()
+                .len(),
+            2
+        );
+        assert_eq!(
+            PartialAngleInterval::from_degrees(0.0 - err, 180.0 + err)
+                .split_into_octants_in_ccw_order()
+                .len(),
+            4
+        );
+    }
+
+    // TODO: These edge cases are suspect
+    #[test]
+    fn test_split_into_octants__edge_cases() {
+        let err = 1e-6;
+
+        assert_eq!(
+            PartialAngleInterval::from_degrees(0.0 - err, 0.0 + err)
+                .split_into_octants_in_ccw_order()
+                .len(),
+            0
+        );
+        assert_eq!(
+            PartialAngleInterval::from_degrees(0.0 + err, 0.0 - err)
+                .split_into_octants_in_ccw_order()
+                .len(),
+            8
+        );
+    }
+    #[test]
     fn test_split_into_octants__all_the_way_around_case() {
         let arc = PartialAngleInterval::from_degrees(10.0, 5.0);
         let parts = arc.split_into_octants_in_ccw_order();
@@ -1488,12 +1509,21 @@ mod tests {
         // fill octant's complement
         assert_false!(PartialAngleInterval::from_degrees(45.0, 0.0).is_in_one_octant());
     }
+    #[test]
+    fn test_is_in_one_octant__with_tolerance() {
+        let err = 1e-6;
+        assert!(PartialAngleInterval::from_degrees(0.0 - err, 45.0 + err).is_in_one_octant());
+        let big_err = 1e-2;
+        assert_false!(
+            PartialAngleInterval::from_degrees(0.0 - big_err, 45.0 + big_err).is_in_one_octant()
+        );
+    }
 
     #[test]
     fn test_get_containing_octant__exact_octant() {
         assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 45.0)
-                .octant()
+                .lone_containing_octant()
                 .unwrap()
                 .number(),
             0
@@ -1503,7 +1533,7 @@ mod tests {
     fn test_get_containing_octant__in_one() {
         assert_eq!(
             PartialAngleInterval::from_degrees(100.0, 120.0)
-                .octant()
+                .lone_containing_octant()
                 .unwrap()
                 .number(),
             2
@@ -1512,13 +1542,13 @@ mod tests {
     #[test]
     fn test_get_containing_octant__not_in_an_octant() {
         assert!(PartialAngleInterval::from_degrees(0.0, 120.0)
-            .octant()
+            .lone_containing_octant()
             .is_none());
     }
     #[test]
-    fn test_get_containing_octant__tricky_case() {
+    fn test_get_containing_octant__wraparound_case() {
         assert!(PartialAngleInterval::from_degrees(-10.0, -20.0)
-            .octant()
+            .lone_containing_octant()
             .is_none());
     }
     #[test]

@@ -40,6 +40,8 @@ pub mod round_robin_iterator;
 
 pub type SimpleResult = Result<(), ()>;
 
+pub type FAngle = Angle<f32>;
+
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;
