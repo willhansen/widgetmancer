@@ -39,6 +39,10 @@ pub struct PartialAngleInterval {
 impl PartialAngleInterval {
     const DEFAULT_TOLERANCE_DEGREES: f32 = 1e-6;
 
+    fn default_tolerance() -> FAngle {
+        Angle::degrees(Self::DEFAULT_TOLERANCE_DEGREES)
+    }
+
     pub fn new_interval(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
         let (cw, ccw) = (
             standardize_angle(clockwise_end),
@@ -1373,7 +1377,6 @@ mod tests {
 
     #[test]
     fn test_angle_interval_from_octant() {
-        color_backtrace::install();
         // Are the exact values really important?
         let octant_start_end_rad_deg = vec![
             (0, (0.0, PI / 4.0), (0.0, 45.0)),

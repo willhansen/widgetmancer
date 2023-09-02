@@ -18,7 +18,8 @@ use crate::utility::{
     ORTHOGONAL_STEPS, STEP_RIGHT,
 };
 use crate::{
-    get_4_rotations_of, get_8_octants_of, rotated_n_quarter_turns_counter_clockwise, Glyph,
+    get_4_rotations_of, get_8_octant_transforms_of, rotated_n_quarter_turns_counter_clockwise,
+    Glyph,
 };
 
 pub const MAX_PIECE_RANGE: u32 = 5;
@@ -102,7 +103,7 @@ impl NStep {
             .collect()
     }
     pub fn octant_symmetries(&self) -> Vec<Self> {
-        get_8_octants_of(self.stepp)
+        get_8_octant_transforms_of(self.stepp)
             .into_iter()
             .map(|step| NStep::new(step, self.n))
             .collect()
@@ -273,7 +274,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_turning_vs_omnidirectional_pawn() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_moves()),
@@ -289,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_moves()),

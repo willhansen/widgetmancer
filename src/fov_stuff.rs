@@ -14,6 +14,7 @@ use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
+use crate::utility::octant::Octant;
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
 use getset::CopyGetters;
@@ -1289,7 +1290,6 @@ mod tests {
 
     #[test]
     fn test_simple_fov_combination() {
-        color_backtrace::install();
         dbg!(PartialAngleInterval::from_octant(Octant::new(-1)));
         let main_center = point2(5, 5);
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
