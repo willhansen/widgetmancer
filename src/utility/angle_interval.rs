@@ -425,7 +425,7 @@ impl PartialAngleInterval {
     }
 
     pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
-        let iters: Vec<_> = dbg!(self)
+        let iters: Vec<_> = self
             .split_into_octants_in_ccw_order()
             .into_iter()
             .inspect(|x| {
@@ -439,7 +439,7 @@ impl PartialAngleInterval {
     }
 
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
-        if dbg!(self.is_fully_near_one_octant_boundary()) {
+        if self.is_fully_near_one_octant_boundary() {
             return vec![];
         }
         if self.is_in_one_octant() {
