@@ -439,11 +439,11 @@ impl PartialAngleInterval {
     }
 
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
+        if dbg!(self.is_fully_near_one_octant_boundary()) {
+            return vec![];
+        }
         if self.is_in_one_octant() {
             return vec![*self];
-        }
-        if self.is_fully_near_one_octant_boundary() {
-            return vec![];
         }
 
         let start_octant: Octant = Octant::from_angle_with_tie_break_toward_ccw(self.clockwise_end);
