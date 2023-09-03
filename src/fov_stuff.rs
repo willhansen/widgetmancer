@@ -1504,10 +1504,8 @@ mod tests {
     fn test_partial_visibility_in_blindspot_of_nearly_full_arc() {
         let rel_square = vec2(4, 4);
         // These values are from an observed failure.  NOT ARBITRARY
-        let arc = PartialAngleInterval::new_interval(
-            Angle::radians(0.7853978),
-            Angle::radians(0.7853982),
-        );
+        let arc =
+            PartialAngleInterval::from_angles(Angle::radians(0.7853978), Angle::radians(0.7853982));
         let visibility = single_shadow_square_visibility_from_one_view_arc(arc, rel_square);
     }
 

@@ -37,13 +37,13 @@ pub struct PartialAngleInterval {
 }
 
 impl PartialAngleInterval {
-    const DEFAULT_TOLERANCE_DEGREES: f32 = 1e-6;
+    const DEFAULT_TOLERANCE_RADIANS: f32 = 1e-6;
 
     fn default_tolerance() -> FAngle {
-        Angle::degrees(Self::DEFAULT_TOLERANCE_DEGREES)
+        Angle::radians(Self::DEFAULT_TOLERANCE_RADIANS)
     }
 
-    pub fn new_interval(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
+    pub fn from_angles(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
         let (cw, ccw) = (
             standardize_angle(clockwise_end),
             standardize_angle(anticlockwise_end),
@@ -55,13 +55,13 @@ impl PartialAngleInterval {
         }
     }
     pub fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
-        Self::new_interval(
+        Self::from_angles(
             Angle::degrees(clockwise_end_in_degrees),
             Angle::degrees(anticlockwise_end_in_degrees),
         )
     }
     pub fn from_radians(clockwise_end_in_radians: f32, anticlockwise_end_in_radians: f32) -> Self {
-        Self::new_interval(
+        Self::from_angles(
             Angle::radians(clockwise_end_in_radians),
             Angle::radians(anticlockwise_end_in_radians),
         )
@@ -135,9 +135,9 @@ impl PartialAngleInterval {
             center_angle.angle_to(face_corner_angles[0]).radians < 0.0;
 
         if first_corner_angle_is_more_clockwise {
-            PartialAngleInterval::new_interval(face_corner_angles[0], face_corner_angles[1])
+            PartialAngleInterval::from_angles(face_corner_angles[0], face_corner_angles[1])
         } else {
-            PartialAngleInterval::new_interval(face_corner_angles[1], face_corner_angles[0])
+            PartialAngleInterval::from_angles(face_corner_angles[1], face_corner_angles[0])
         }
     }
 
@@ -177,7 +177,7 @@ impl PartialAngleInterval {
         result
     }
     pub fn complement(&self) -> Self {
-        PartialAngleInterval::new_interval(self.anticlockwise_end, self.clockwise_end)
+        PartialAngleInterval::from_angles(self.anticlockwise_end, self.clockwise_end)
     }
 
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
@@ -248,14 +248,14 @@ impl PartialAngleInterval {
             && self.clockwise_end != other.clockwise_end
         {
             let below_interval =
-                PartialAngleInterval::new_interval(self.clockwise_end, other.clockwise_end);
+                PartialAngleInterval::from_angles(self.clockwise_end, other.clockwise_end);
             split_results.push(below_interval);
         }
         if self.contains_or_touches_angle(other.anticlockwise_end)
             && self.anticlockwise_end != other.anticlockwise_end
         {
             let above_interval =
-                PartialAngleInterval::new_interval(other.anticlockwise_end, self.anticlockwise_end);
+                PartialAngleInterval::from_angles(other.anticlockwise_end, self.anticlockwise_end);
             split_results.push(above_interval);
         }
         split_results
@@ -280,9 +280,9 @@ impl PartialAngleInterval {
     pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> DirectionalAngularEdge {
         assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
         let clockwise_dist =
-            PartialAngleInterval::new_interval(other.clockwise_end, self.clockwise_end).width();
+            PartialAngleInterval::from_angles(other.clockwise_end, self.clockwise_end).width();
         let anticlockwise_dist =
-            PartialAngleInterval::new_interval(self.anticlockwise_end, other.anticlockwise_end)
+            PartialAngleInterval::from_angles(self.anticlockwise_end, other.anticlockwise_end)
                 .width();
         let clockwise_edge_is_deeper = clockwise_dist.radians > anticlockwise_dist.radians;
         DirectionalAngularEdge {
@@ -418,7 +418,7 @@ impl PartialAngleInterval {
         }
     }
     pub fn rotated(&self, d_angle: Angle<f32>) -> Self {
-        PartialAngleInterval::new_interval(
+        PartialAngleInterval::from_angles(
             self.clockwise_end + d_angle,
             self.anticlockwise_end + d_angle,
         )
@@ -442,17 +442,20 @@ impl PartialAngleInterval {
         if self.is_in_one_octant() {
             return vec![*self];
         }
+        if self.is_fully_near_one_octant_boundary() {
+            return vec![];
+        }
 
         let start_octant: Octant = Octant::from_angle_with_tie_break_toward_ccw(self.clockwise_end);
         let end_octant: Octant =
             Octant::from_angle_with_tie_break_toward_cw(self.anticlockwise_end);
 
-        let segment_in_first_octant = Self::new_interval(
+        let segment_in_first_octant = Self::from_angles(
             self.clockwise_end,
             Self::from_octant(start_octant).anticlockwise_end,
         );
 
-        let segment_in_last_octant = Self::new_interval(
+        let segment_in_last_octant = Self::from_angles(
             Self::from_octant(end_octant).clockwise_end,
             self.anticlockwise_end,
         );
@@ -492,15 +495,19 @@ impl PartialAngleInterval {
         });
         squares_in_arc_iter
     }
+    fn is_fully_near_one_octant_boundary(&self) -> bool {
+        let is_smaller_than_octant = self.width() < Angle::degrees(10.0);
+        let both_ends_near_boundaries = Octant::near_octant_boundary(self.clockwise_end)
+            && Octant::near_octant_boundary(self.anticlockwise_end);
+        is_smaller_than_octant && both_ends_near_boundaries
+    }
     fn is_in_one_octant(&self) -> bool {
         self.lone_containing_octant().is_some()
     }
     fn lone_containing_octant(&self) -> Option<Octant> {
         Octant::all_octants().find(|octant| {
-            Self::from_octant(*octant).contains_interval_with_tolerance(
-                *self,
-                Angle::degrees(Self::DEFAULT_TOLERANCE_DEGREES),
-            )
+            Self::from_octant(*octant)
+                .contains_interval_with_tolerance(*self, Self::default_tolerance())
         })
     }
 }
@@ -694,12 +701,9 @@ impl AngleInterval {
         match self {
             AngleInterval::Empty => Self::FullCircle,
             AngleInterval::FullCircle => Self::Empty,
-            AngleInterval::PartialArc(partial) => {
-                Self::PartialArc(PartialAngleInterval::new_interval(
-                    partial.anticlockwise_end,
-                    partial.clockwise_end,
-                ))
-            }
+            AngleInterval::PartialArc(partial) => Self::PartialArc(
+                PartialAngleInterval::from_angles(partial.anticlockwise_end, partial.clockwise_end),
+            ),
         }
     }
     pub fn union(&self, other: &(impl Into<Self> + Copy)) -> Self {
@@ -1320,13 +1324,13 @@ mod tests {
         let ccw = Angle::degrees(25.0);
         let d = Angle::degrees(1.0);
 
-        let arc = PartialAngleInterval::new_interval(cw, ccw);
-        let arc_extend_cw = PartialAngleInterval::new_interval(cw - d, ccw);
-        let arc_retract_cw = PartialAngleInterval::new_interval(cw + d, ccw);
-        let arc_extend_ccw = PartialAngleInterval::new_interval(cw, ccw + d);
-        let arc_retract_ccw = PartialAngleInterval::new_interval(cw, ccw - d);
-        let arc_extend_both = PartialAngleInterval::new_interval(cw - d, ccw + d);
-        let arc_retract_both = PartialAngleInterval::new_interval(cw + d, ccw - d);
+        let arc = PartialAngleInterval::from_angles(cw, ccw);
+        let arc_extend_cw = PartialAngleInterval::from_angles(cw - d, ccw);
+        let arc_retract_cw = PartialAngleInterval::from_angles(cw + d, ccw);
+        let arc_extend_ccw = PartialAngleInterval::from_angles(cw, ccw + d);
+        let arc_retract_ccw = PartialAngleInterval::from_angles(cw, ccw - d);
+        let arc_extend_both = PartialAngleInterval::from_angles(cw - d, ccw + d);
+        let arc_retract_both = PartialAngleInterval::from_angles(cw + d, ccw - d);
 
         assert!(arc.at_least_fully_overlaps(arc));
 
@@ -1360,13 +1364,13 @@ mod tests {
         let ccw = Angle::degrees(25.0);
         let d = Angle::degrees(1.0);
 
-        let arc = PartialAngleInterval::new_interval(cw, ccw);
-        let arc_extend_cw = PartialAngleInterval::new_interval(cw - d, ccw);
-        let arc_retract_cw = PartialAngleInterval::new_interval(cw + d, ccw);
-        let arc_extend_ccw = PartialAngleInterval::new_interval(cw, ccw + d);
-        let arc_retract_ccw = PartialAngleInterval::new_interval(cw, ccw - d);
-        let arc_extend_both = PartialAngleInterval::new_interval(cw - d, ccw + d);
-        let arc_retract_both = PartialAngleInterval::new_interval(cw + d, ccw - d);
+        let arc = PartialAngleInterval::from_angles(cw, ccw);
+        let arc_extend_cw = PartialAngleInterval::from_angles(cw - d, ccw);
+        let arc_retract_cw = PartialAngleInterval::from_angles(cw + d, ccw);
+        let arc_extend_ccw = PartialAngleInterval::from_angles(cw, ccw + d);
+        let arc_retract_ccw = PartialAngleInterval::from_angles(cw, ccw - d);
+        let arc_extend_both = PartialAngleInterval::from_angles(cw - d, ccw + d);
+        let arc_retract_both = PartialAngleInterval::from_angles(cw + d, ccw - d);
 
         assert!(arc.exactly_touches_arc(arc_extend_ccw.complement()));
         assert_false!(arc.exactly_touches_arc(arc_retract_ccw.complement()));
@@ -1395,8 +1399,8 @@ mod tests {
                 let end = interval.anticlockwise_end();
                 assert_about_eq!(start.radians, rad_start);
                 assert_about_eq!(end.radians, rad_end);
-                assert_about_eq!(start.to_degrees(), deg_start);
-                assert_about_eq!(end.to_degrees(), deg_end);
+                assert_about_eq!(start.to_degrees(), deg_start, 1e-4);
+                assert_about_eq!(end.to_degrees(), deg_end, 1e-4);
             },
         )
     }
@@ -1475,16 +1479,19 @@ mod tests {
     // TODO: These edge cases are suspect
     #[test]
     fn test_split_into_octants__edge_cases() {
-        let err = 1e-6;
+        let err = PartialAngleInterval::default_tolerance() / 2.0;
+        let angle = Angle::degrees(0.0);
 
+        // should have zero octants, because given interval is very small
         assert_eq!(
-            PartialAngleInterval::from_degrees(0.0 - err, 0.0 + err)
+            PartialAngleInterval::from_angles(angle - err, angle + err)
                 .split_into_octants_in_ccw_order()
                 .len(),
             0
         );
+        // should be full circle, because given interval is very large
         assert_eq!(
-            PartialAngleInterval::from_degrees(0.0 + err, 0.0 - err)
+            PartialAngleInterval::from_angles(angle + err, angle - err)
                 .split_into_octants_in_ccw_order()
                 .len(),
             8

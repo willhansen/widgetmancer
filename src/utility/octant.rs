@@ -75,11 +75,12 @@ impl Octant {
 
     fn from_angle_raw(angle: FAngle) -> Self {
         let normalized = angle.to_degrees() / 45.0;
-        // direction of tie break does not matter
-        let octant = Octant::new(normalized as i32);
+        // octant 0 is above angle 0, so we want the floor rather than truncation
+
+        let octant = Octant::new(normalized.floor() as i32);
         octant
     }
-    fn near_octant_boundary(angle: FAngle) -> bool {
+    pub fn near_octant_boundary(angle: FAngle) -> bool {
         let octant_width = Angle::radians((2.0 * PI) / 8.0);
         let standardized_angle = Angle::radians(
             (angle + octant_width / 2.0)
@@ -87,31 +88,29 @@ impl Octant {
                 .rem_euclid(octant_width.radians)
                 - octant_width.radians / 2.0,
         );
-        dbg!("asdfasdf", angle, octant_width, standardized_angle);
-
         standardized_angle.radians.abs() < Self::default_angle_tolerance().radians
     }
     fn default_angle_tolerance() -> FAngle {
-        // TODO: may be too low for f32
+        // TODO: may be too small for f32
         const DEFAULT_TOLERANCE_RADIANS: f32 = 1e-6;
         Angle::radians(DEFAULT_TOLERANCE_RADIANS)
     }
 
-    pub fn from_angle_with_tie_break_toward_cw(angle: Angle<f32>) -> Self {
-        let normalized = angle.to_degrees() / 45.0;
-        let is_edge_case = normalized == normalized.floor();
-        let octant = Octant::new(normalized.floor() as i32);
-        if is_edge_case {
-            octant.next_cw()
-        } else {
-            octant
-        }
+    pub fn from_angle_with_tie_break_toward_cw(angle: FAngle) -> Self {
+        Self::from_angle_with_tie_break(angle, false)
     }
     pub fn from_angle_with_tie_break_toward_ccw(angle: FAngle) -> Self {
-        let normalized = angle.to_degrees() / 45.0;
-        // Use floor instead of truncation because want round towards neg inf, not zero.
-        let octant = Octant::new(normalized.floor() as i32);
-        octant
+        Self::from_angle_with_tie_break(angle, true)
+    }
+    fn from_angle_with_tie_break(angle: FAngle, break_tie_ccw: bool) -> Self {
+        let on_octant_boundary = Self::near_octant_boundary(angle);
+        let tie_break_sign = if break_tie_ccw { 1.0 } else { -1.0 };
+        let unambiguous_angle = if on_octant_boundary {
+            angle + Angle::degrees(20.0) * tie_break_sign
+        } else {
+            angle
+        };
+        Octant::from_angle_raw(unambiguous_angle)
     }
 
     pub fn next_cw(&self) -> Self {
@@ -131,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_angle_to_octant() {
-        // in format of degrees, octanct biased cw, octant biased ccw
+        // in format of degrees, octant biased cw, octant biased ccw
         let deg_octcw_octccw: Vec<(f32, [i32; 2])> = (0..9)
             .flat_map(|i| {
                 vec![
@@ -192,6 +191,13 @@ mod tests {
         assert_eq!(f_raw(slightly_ccw), octant_ccw);
         assert_eq!(f_raw(slightly_cw), octant_cw);
         assert_eq!(f_raw(very_cw), octant_cw);
+    }
+    #[test]
+    fn test_from_angle_raw__negative_angle() {
+        assert_eq!(
+            Octant::from_angle_raw(FAngle::radians(-0.3)),
+            Octant::new(-1)
+        );
     }
     #[test]
     fn test_near_octant_boundary() {
