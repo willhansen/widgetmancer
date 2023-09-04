@@ -1,7 +1,4 @@
-use crate::fov_stuff::{
-    single_shadow_square_visibility_from_one_view_arc, RelativeSquareVisibilityMap,
-    SquareVisibility,
-};
+use crate::fov_stuff::{RelativeSquareVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::{
@@ -137,7 +134,7 @@ impl AngleBasedVisibleSegment {
             .map(|rel_square| {
                 (
                     rel_square,
-                    single_shadow_square_visibility_from_one_view_arc(
+                    SquareVisibility::from_relative_square_and_view_arc(
                         self.visible_angle_interval,
                         rel_square,
                     )
@@ -209,11 +206,9 @@ mod tests {
         assert!(visibilities.get(&(STEP_RIGHT * 3)).is_none());
     }
     #[test]
-    fn test_getting_square_visibilities__second_test() {
+    fn test_getting_square_visibilities__from_visible_square() {
         let segment = AngleBasedVisibleSegment::from_relative_square(STEP_RIGHT * 3);
-        let visibilities = segment
-            .to_square_visibilities()
-            .rounded_towards_full_visibility(1e-3);
+        let visibilities = segment.to_square_visibilities();
         dbg!(&visibilities);
         assert!(visibilities.get(&vec2(0, 0)).unwrap().is_fully_visible());
         assert!(visibilities
