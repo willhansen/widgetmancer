@@ -1322,6 +1322,7 @@ mod tests {
 
             fovs.iter().for_each(|fov| {
                 let rasterized_fov = fov.rasterized();
+                dbg!("asdfasdf", fov, &rasterized_fov);
                 assert_eq!(
                     rasterized_fov.times_absolute_square_is_visible(test_square),
                     1
@@ -1772,5 +1773,16 @@ mod tests {
             STEP_ZERO
         )
         .is_some_and(|vis| vis.is_fully_visible()))
+    }
+    #[test]
+    fn test_rasterize_one_view_segment() {
+        let mut fov = FieldOfView::new_empty_fov_at(point2(5, 5));
+        fov.add_fully_visible_relative_square(vec2(3, 0));
+        let rasterized = fov.rasterized();
+        assert!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
+        assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
+        assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
+        assert!(rasterized.relative_square_is_fully_visible(vec2(3, 0)));
+        assert_eq!(rasterized.number_of_visible_relative_squares(), 4);
     }
 }

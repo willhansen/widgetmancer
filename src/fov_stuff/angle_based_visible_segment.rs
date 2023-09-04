@@ -179,7 +179,9 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
 }
 #[cfg(test)]
 mod tests {
-    use crate::utility::STEP_RIGHT;
+    use euclid::vec2;
+
+    use crate::{fov_stuff::square_visibility::ViewRoundable, utility::STEP_RIGHT};
 
     use super::*;
     #[test]
@@ -205,5 +207,24 @@ mod tests {
             .get(&(STEP_RIGHT * 2))
             .is_some_and(SquareVisibility::is_only_partially_visible));
         assert!(visibilities.get(&(STEP_RIGHT * 3)).is_none());
+    }
+    #[test]
+    fn test_getting_square_visibilities__second_test() {
+        let segment = AngleBasedVisibleSegment::from_relative_square(STEP_RIGHT * 3);
+        let visibilities = segment
+            .to_square_visibilities()
+            .rounded_towards_full_visibility(1e-3);
+        dbg!(&visibilities);
+        assert!(visibilities.get(&vec2(0, 0)).unwrap().is_fully_visible());
+        assert!(visibilities
+            .get(&vec2(1, 0))
+            .unwrap()
+            .is_only_partially_visible());
+        assert!(visibilities
+            .get(&vec2(2, 0))
+            .unwrap()
+            .is_only_partially_visible());
+        assert!(visibilities.get(&vec2(3, 0)).unwrap().is_fully_visible());
+        assert_eq!(visibilities.len(), 4);
     }
 }

@@ -428,9 +428,6 @@ impl PartialAngleInterval {
         let iters: Vec<_> = self
             .split_into_octants_in_ccw_order()
             .into_iter()
-            .inspect(|x| {
-                dbg!(x);
-            })
             .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
             .collect_vec();
         round_robin(iters)
@@ -763,9 +760,9 @@ impl Debug for PartialAngleInterval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "radians: {:?}\n\
-            degrees: {:?}\n\
-            ",
+            "\n\
+            \tradians: {:?}\n\
+            \tdegrees: {:?}",
             self.to_radians(),
             self.to_degrees(),
         )
@@ -774,11 +771,15 @@ impl Debug for PartialAngleInterval {
 
 #[cfg(test)]
 mod tests {
+    use euclid::point2;
     use ntest::{assert_about_eq, assert_false, timeout};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::utility::{STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use crate::{
+        fov_stuff::{rasterized_field_of_view::TopDownifiedFieldOfViewInterface, FieldOfView},
+        utility::{STEP_DOWN, STEP_RIGHT, STEP_UP},
+    };
 
     use super::*;
 

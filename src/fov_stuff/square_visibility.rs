@@ -256,30 +256,9 @@ pub trait SquareVisibilityMapFunctions: ViewRoundable {
 
 impl ViewRoundable for RelativeSquareVisibilityMap {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        todo!();
-        // let mut the_clone = self.clone();
-        // the_clone.visible_relative_squares_in_main_view_only = the_clone
-        //     .visible_relative_squares_in_main_view_only
-        //     .into_iter()
-        //     .map(|(rel_square, visibility): (WorldStep, SquareVisibility)| {
-        //         (
-        //             rel_square,
-        //             if visibility.is_nearly_or_fully_visible(tolerance) {
-        //                 SquareVisibility::new_fully_visible()
-        //             } else {
-        //                 visibility
-        //             },
-        //         )
-        //     })
-        //     .collect();
-        // the_clone.transformed_sub_fovs = the_clone
-        //     .transformed_sub_fovs
-        //     .into_iter()
-        //     .map(|sub_fov: FieldOfView| {
-        //         sub_fov.with_all_squares_rounded_towards_full_visibility(tolerance)
-        //     })
-        //     .collect();
-        // the_clone
+        self.iter()
+            .map(|(&step, vis)| (step, vis.rounded_towards_full_visibility(tolerance)))
+            .collect()
     }
 }
 

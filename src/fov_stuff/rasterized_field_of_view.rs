@@ -78,6 +78,7 @@ pub trait TopDownifiedFieldOfViewInterface {
     fn number_of_visible_relative_squares(&self) -> u32;
     fn only_partially_visible_local_relative_squares(&self) -> StepSet;
     fn relative_square_is_fully_visible(&self, step: WorldStep) -> bool;
+    fn relative_square_is_only_partially_visible(&self, step: WorldStep) -> bool;
     fn relative_square_is_only_locally_visible(&self, step: WorldStep) -> bool;
     fn relative_square_is_visible(&self, relative_square: WorldStep) -> bool;
     fn root_square(&self) -> WorldSquare;
@@ -357,6 +358,9 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     fn relative_square_is_fully_visible(&self, step: WorldStep) -> bool {
         let top_down_portals = self.top_down_portals_for_relative_square(step);
         return top_down_portals.len() == 1 && top_down_portals[0].shape.is_fully_visible();
+    }
+    fn relative_square_is_only_partially_visible(&self, step: WorldStep) -> bool {
+        self.relative_square_is_visible(step) && !self.relative_square_is_fully_visible(step)
     }
     // TODO: does name imply that the square is not also visible through any portals?
     fn relative_square_is_only_locally_visible(&self, step: WorldStep) -> bool {
