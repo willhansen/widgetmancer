@@ -382,7 +382,6 @@ mod tests {
             .iter()
             .flat_map(WorldLine::touched_squares)
             .collect_vec();
-        dbg!("asdf", &squares);
         assert_eq!(squares.len(), 2);
     }
 }

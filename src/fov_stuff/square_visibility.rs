@@ -320,6 +320,7 @@ impl ViewRoundable for RelativeSquareVisibilityMap {
 impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self {
         let mut combined_vis_map = self.clone();
+        dbg!(combined_vis_map.len());
         other.iter().for_each(|entry_to_add| {
             let (key, value_to_add) = entry_to_add;
             let mut existing_entry = combined_vis_map.entry(*key);
@@ -332,6 +333,7 @@ impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
                 }
             }
         });
+        dbg!(combined_vis_map.len());
         combined_vis_map
     }
 

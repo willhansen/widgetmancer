@@ -76,6 +76,7 @@ pub trait TopDownifiedFieldOfViewInterface {
         relative_square: WorldStep,
     ) -> SquareVisibility;
     fn number_of_visible_relative_squares(&self) -> u32;
+    fn number_of_fully_visible_relative_squares(&self) -> u32;
     fn only_partially_visible_local_relative_squares(&self) -> StepSet;
     fn relative_square_is_fully_visible(&self, step: WorldStep) -> bool;
     fn relative_square_is_only_partially_visible(&self, step: WorldStep) -> bool;
@@ -259,7 +260,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
         visibility: &TopDownPortalShape,
     ) -> SimpleResult {
         // make sure there isn't a positioned visibility in the main view in the same relative square already
-        if !self.can_see_local_relative_square(relative_square) {
+        if self.can_see_local_relative_square(relative_square) {
             return Err(());
         }
 
@@ -298,6 +299,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
         vis_map: &RelativeSquareVisibilityMap,
     ) -> Self {
         let mut new_thing = Self::new_centered_at(root);
+        dbg!(vis_map.len());
         vis_map.iter().for_each(|(rel_square, visibility)| {
             new_thing.try_add_visible_local_relative_square(*rel_square, visibility);
         });
@@ -305,11 +307,11 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     }
 
     fn fully_visible_local_relative_squares(&self) -> StepSet {
-        self.fully_visible_relative_squares(true)
+        self.fully_visible_relative_squares_optionally_local_only(true)
     }
 
     fn fully_visible_relative_squares(&self) -> StepSet {
-        self.fully_visible_relative_squares(false)
+        self.fully_visible_relative_squares_optionally_local_only(false)
     }
 
     fn lone_portal_depth_for_relative_square_or_panic(&self, relative_square: WorldStep) -> u32 {
@@ -348,6 +350,9 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
         self.visible_relative_squares().len() as u32
     }
 
+    fn number_of_fully_visible_relative_squares(&self) -> u32 {
+        self.fully_visible_relative_squares().len() as u32
+    }
     fn only_partially_visible_local_relative_squares(&self) -> StepSet {
         self.positioned_visibilities_of_only_partially_visible_squares_in_main_view_only()
             .iter()
@@ -544,7 +549,10 @@ impl TopDownifiedFieldOfView {
     //
     //     visibilities_in_frame_of_main_view
     // }
-    fn fully_visible_relative_squares(&self, local_space_only: bool) -> StepSet {
+    fn fully_visible_relative_squares_optionally_local_only(
+        &self,
+        local_space_only: bool,
+    ) -> StepSet {
         if local_space_only {
             self.local_view_only()
         } else {
@@ -859,6 +867,19 @@ mod tests {
             },
             shape: TopDownPortalShape::new_fully_visible(),
         })
+    }
+    #[test]
+    fn test_add_visible_local_relative_square() {
+        let mut rfov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let vis = SquareVisibility::top_half_visible();
+        rfov.add_visible_local_relative_square(STEP_RIGHT, &vis);
+        assert_eq!(rfov.number_of_visible_relative_squares(), 2);
+        rfov.try_add_visible_local_relative_square(STEP_RIGHT * 2, &vis)
+            .expect("");
+        assert_eq!(rfov.number_of_visible_relative_squares(), 3);
+        rfov.try_add_visible_local_relative_square(STEP_RIGHT, &vis)
+            .expect_err("");
+        assert_eq!(rfov.number_of_visible_relative_squares(), 3);
     }
     #[test]
     #[should_panic]

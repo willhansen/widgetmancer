@@ -209,7 +209,6 @@ mod tests {
     fn test_getting_square_visibilities__from_visible_square() {
         let segment = AngleBasedVisibleSegment::from_relative_square(STEP_RIGHT * 3);
         let visibilities = segment.to_square_visibilities();
-        dbg!(&visibilities);
         assert!(visibilities.get(&vec2(0, 0)).unwrap().is_fully_visible());
         assert!(visibilities
             .get(&vec2(1, 0))

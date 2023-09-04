@@ -19,7 +19,6 @@ use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
 use getset::CopyGetters;
 use itertools::*;
-use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
 
@@ -84,7 +83,10 @@ impl FieldOfView {
         self.visible_segments_in_main_view_only
             .push(AngleBasedVisibleSegment::from_relative_square(step))
     }
-    pub fn add_fully_visible_relative_face(&mut self, face: RelativeSquareWithOrthogonalDir) {
+    pub fn add_fully_visible_relative_face(
+        &mut self,
+        face: impl Into<RelativeSquareWithOrthogonalDir>,
+    ) {
         self.visible_segments_in_main_view_only
             .push(AngleBasedVisibleSegment::from_relative_face(face))
     }
@@ -258,6 +260,9 @@ impl FieldOfView {
                 .visible_segments_in_main_view_only
                 .iter()
                 .map(AngleBasedVisibleSegment::to_square_visibilities)
+                .inspect(|x| {
+                    dbg!(x.len());
+                })
                 .reduce(|a, b| a.combined_while_increasing_visibility(&b))
                 .unwrap(),
         )
@@ -1231,7 +1236,6 @@ mod tests {
 
     #[test]
     fn test_simple_fov_combination() {
-        dbg!(PartialAngleInterval::from_octant(Octant::new(-1)));
         let main_center = point2(5, 5);
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
@@ -1263,7 +1267,6 @@ mod tests {
 
             fovs.iter().for_each(|fov| {
                 let rasterized_fov = fov.rasterized();
-                dbg!("asdfasdf", fov, &rasterized_fov);
                 assert_eq!(
                     rasterized_fov.times_absolute_square_is_visible(test_square),
                     1
@@ -1693,19 +1696,21 @@ mod tests {
         assert_eq!(the_clean_string, "🬎🬎");
     }
     #[test]
-    fn test_rasterize__main_view_only() {
+    fn test_rasterize_segments_for_one_local_square() {
         let root_square = point2(5, 10);
         let mut narrow_fov = FieldOfView::new_empty_fov_with_root((root_square, STEP_UP));
-        let dx = 5;
-        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT * dx);
+        let dx = 2;
+        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT * 3);
 
         let rasterized_fov = narrow_fov.rasterized();
 
-        assert_eq!(
-            rasterized_fov.number_of_visible_relative_squares(),
-            dx as u32
-        );
-        todo!()
+        assert_eq!(rasterized_fov.number_of_visible_relative_squares(), 4);
+        assert_eq!(rasterized_fov.number_of_fully_visible_relative_squares(), 2);
+
+        assert!(rasterized_fov.relative_square_is_fully_visible(vec2(0, 0)));
+        assert!(rasterized_fov.relative_square_is_only_partially_visible(vec2(1, 0)));
+        assert!(rasterized_fov.relative_square_is_only_partially_visible(vec2(2, 0)));
+        assert!(rasterized_fov.relative_square_is_fully_visible(vec2(3, 0)));
     }
     #[test]
     fn test_square_is_fully_visible_if_view_arc_starts_in_that_square() {
@@ -1718,12 +1723,16 @@ mod tests {
     #[test]
     fn test_rasterize_one_view_segment() {
         let mut fov = FieldOfView::new_empty_fov_at(point2(5, 5));
-        fov.add_fully_visible_relative_square(vec2(3, 0));
+        fov.add_fully_visible_relative_face(((3, 0), STEP_RIGHT));
+        assert_eq!(fov.visible_segments_in_main_view_only.len(), 1);
+        assert!(fov.transformed_sub_fovs.is_empty());
+        dbg!(&fov);
         let rasterized = fov.rasterized();
+        assert_eq!(rasterized.number_of_visible_relative_squares(), 4);
+        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 1);
         assert!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
-        assert!(rasterized.relative_square_is_fully_visible(vec2(3, 0)));
-        assert_eq!(rasterized.number_of_visible_relative_squares(), 4);
+        assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
     }
 }

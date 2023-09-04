@@ -28,7 +28,9 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
-use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
+use crate::glyph::glyph_constants::{
+    BLUE, CYAN, FACE_ARROWS, GREEN, GREY, MAGENTA, RED, THIN_TRIANGLE_ARROWS, YELLOW,
+};
 use crate::piece::PieceType::King;
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::*;
@@ -1302,16 +1304,24 @@ where
     }
 }
 
-impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
+impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T>
+where
+    Self: Display,
+{
+    fn fmt(&self, mut f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
 
-// TODO: Redundant definition with debug?  Can be derived?
 impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Pos: {:?}, Dir: {:?}", self.square(), self.dir().step(),)
+        write!(
+            f,
+            "Pos: {:?}, Dir: {:?} {} ",
+            self.square(),
+            self.dir().step(),
+            Glyph::extract_arrow_from_arrow_string(self.dir().step(), FACE_ARROWS)
+        )
     }
 }
 
