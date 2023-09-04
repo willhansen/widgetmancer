@@ -89,60 +89,10 @@ impl ViewRoundable for SquareVisibilityFromOneLargeShadow {
 }
 
 impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
-    fn from_relative_square_and_view_arc(
-        view_arc: PartialAngleInterval,
-        rel_square: WorldStep,
-    ) -> Option<Self> {
-        let square_arc = PartialAngleInterval::from_relative_square(rel_square);
-        if view_arc.at_least_fully_overlaps(square_arc) {
-            Some(SquareVisibility::new_fully_visible())
-        } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
-            // Returns None if not visible
-            if rel_square == STEP_ZERO {
-                return Some(SquareVisibilityFromOneLargeShadow::new_fully_visible());
-            }
-            let square_arc = PartialAngleInterval::from_relative_square(rel_square);
-            assert!(view_arc.touches_or_overlaps(square_arc)); // This invalidates the None return case
-
-            let shadow_arc = view_arc.complement();
-            let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
-
-            let shadow_line_from_center: WorldLine = Line {
-                p1: point2(0.0, 0.0),
-                p2: unit_vector_from_angle(overlapped_shadow_edge.angle())
-                    .to_point()
-                    .cast_unit(),
-            };
-            let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
-                .to_point()
-                .cast_unit();
-
-            let shadow_half_plane = HalfPlane::from_line_and_point_on_half_plane(
-                shadow_line_from_center,
-                point_in_shadow,
-            );
-            let square_shadow = world_half_plane_to_local_square_half_plane(
-                shadow_half_plane,
-                rel_square.to_point(),
-            );
-
-            if square_shadow.fully_covers_unit_square() {
-                None
-            } else if square_shadow.at_least_partially_covers_unit_square() {
-                Some(SquareVisibilityFromOneLargeShadow::new_partially_visible(
-                    square_shadow.complement(),
-                ))
-            } else {
-                Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
-            }
-        } else {
-            None
-        }
-    }
-
     fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
+
     fn is_at_least_partially_visible(&self) -> bool {
         self.is_fully_visible() || self.is_only_partially_visible()
     }
@@ -156,7 +106,6 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
         self.visible_portion
             .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
     }
-
     fn new_fully_visible() -> Self {
         SquareVisibilityFromOneLargeShadow {
             visible_portion: None,
@@ -170,6 +119,7 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
             visible_portion: Some(visible_portion),
         }
     }
+
     fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
         if visible_portion.fully_covers_unit_square() {
             Self::new_fully_visible()
@@ -179,10 +129,10 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
             panic!("half plane does not even partially cover the unit square at (0,0)")
         }
     }
-
     fn top_half_visible() -> Self {
         Self::half_visible(Angle::degrees(270.0))
     }
+
     fn bottom_half_visible() -> Self {
         Self::half_visible(Angle::degrees(90.0))
     }
@@ -236,12 +186,60 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
                 .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
         };
     }
-
     fn is_visually_complementary_to(&self, other: Self) -> bool {
         self.as_string()
             .chars()
             .zip(other.as_string().chars())
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
+    }
+
+    fn from_relative_square_and_view_arc(
+        view_arc: PartialAngleInterval,
+        rel_square: WorldStep,
+    ) -> Option<Self> {
+        if rel_square == STEP_ZERO {
+            return Some(SquareVisibility::new_fully_visible());
+        }
+        let square_arc = PartialAngleInterval::from_relative_square(rel_square);
+        if view_arc.at_least_fully_overlaps(square_arc) {
+            Some(SquareVisibility::new_fully_visible())
+        } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
+            assert!(view_arc.touches_or_overlaps(square_arc)); // This invalidates the None return case
+
+            let shadow_arc = view_arc.complement();
+            let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
+
+            let shadow_line_from_center: WorldLine = Line {
+                p1: point2(0.0, 0.0),
+                p2: unit_vector_from_angle(overlapped_shadow_edge.angle())
+                    .to_point()
+                    .cast_unit(),
+            };
+            let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
+                .to_point()
+                .cast_unit();
+
+            let shadow_half_plane = HalfPlane::from_line_and_point_on_half_plane(
+                shadow_line_from_center,
+                point_in_shadow,
+            );
+            let square_shadow = world_half_plane_to_local_square_half_plane(
+                shadow_half_plane,
+                rel_square.to_point(),
+            );
+
+            if square_shadow.fully_covers_unit_square() {
+                None
+            } else if square_shadow.at_least_partially_covers_unit_square() {
+                Some(SquareVisibilityFromOneLargeShadow::new_partially_visible(
+                    square_shadow.complement(),
+                ))
+            } else {
+                Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
+            }
+        } else {
+            None
+        }
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
