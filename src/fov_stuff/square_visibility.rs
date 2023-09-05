@@ -301,7 +301,7 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     }
 }
 
-pub type RelativeSquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+pub type SquareVisibilitiesByRelativePosition = HashMap<WorldStep, SquareVisibility>;
 
 pub trait SquareVisibilityMapFunctions: ViewRoundable {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self;
@@ -309,7 +309,7 @@ pub trait SquareVisibilityMapFunctions: ViewRoundable {
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
 }
 
-impl ViewRoundable for RelativeSquareVisibilityMap {
+impl ViewRoundable for SquareVisibilitiesByRelativePosition {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         self.iter()
             .map(|(&step, vis)| (step, vis.rounded_towards_full_visibility(tolerance)))
@@ -317,7 +317,7 @@ impl ViewRoundable for RelativeSquareVisibilityMap {
     }
 }
 
-impl SquareVisibilityMapFunctions for RelativeSquareVisibilityMap {
+impl SquareVisibilityMapFunctions for SquareVisibilitiesByRelativePosition {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self {
         let mut combined_vis_map = self.clone();
         dbg!(combined_vis_map.len());

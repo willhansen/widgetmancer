@@ -11,7 +11,7 @@ use std::fmt::{Debug, Formatter};
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
 use crate::fov_stuff::square_visibility::{
-    RelativeSquareVisibilityMap, RelativeSquareVisibilityTrait, SquareVisibility,
+    RelativeSquareVisibilityTrait, SquareVisibilitiesByRelativePosition, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
 use crate::utility::octant::Octant;
