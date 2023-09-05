@@ -32,9 +32,8 @@ pub struct TopDownPortal {
     shape: TopDownPortalShape,
 }
 
-// Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
-// This struct and trait are the only public things in this module
-// TODO: maybe precalculate indexes
+/// Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
+/// TODO: maybe precalculate indexes
 #[derive(Clone, Default, Debug)]
 pub struct TopDownifiedFieldOfView {
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
@@ -131,6 +130,7 @@ type TopDownPortalShape = SquareVisibility;
 type UniqueTopDownPortals = HashMap<PositionedTopDownPortalTarget, TopDownPortalShape>;
 
 #[derive(Clone, Debug)]
+/// A RasterizedFieldOfView with the additional guarantee of all top-down-portals being on one square
 struct SquareOfTopDownPortals {
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
 }
@@ -221,13 +221,21 @@ impl SquareOfTopDownPortals {
             .map(|x| x.into())
             .collect()
     }
-    fn from_vec(vec: Vec<TopDownPortal>) -> Self {
-        Self {
-            map_of_top_down_portal_shapes_by_coordinates: vec
+}
+impl FromIterator<TopDownPortal> for SquareOfTopDownPortals {
+    fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
+        let new_thing = Self {
+            map_of_top_down_portal_shapes_by_coordinates: iter
                 .into_iter()
                 .map(|x| x.split())
                 .collect(),
-        }
+        };
+        assert!(new_thing
+            .top_down_portals()
+            .iter()
+            .map(|x| x.relative_position())
+            .all_equal());
+        new_thing
     }
 }
 
@@ -690,8 +698,6 @@ impl TopDownPortal {
     }
 }
 
-impl SquareOfTopDownPortals {}
-
 impl TopDownPortalTarget {
     fn portal_depth(&self) -> u32 {
         self.portal_depth
@@ -916,7 +922,7 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        SquareOfTopDownPortals::from_vec(vec![portal1, portal2]);
+        SquareOfTopDownPortals::from_iter(vec![portal1, portal2]);
     }
     #[test]
     #[should_panic]
@@ -939,6 +945,6 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        SquareOfTopDownPortals::from_vec(vec![portal1, portal2]);
+        SquareOfTopDownPortals::from_iter(vec![portal1, portal2]);
     }
 }
