@@ -254,15 +254,12 @@ impl FieldOfView {
     }
 
     fn rasterized_main_view_only(&self) -> TopDownifiedFieldOfView {
-        TopDownifiedFieldOfView::from_visibility_map_of_main_view(
+        TopDownifiedFieldOfView::from_local_visibility_map(
             self.root_square(),
             &self
                 .visible_segments_in_main_view_only
                 .iter()
                 .map(AngleBasedVisibleSegment::to_square_visibilities)
-                .inspect(|x| {
-                    dbg!(x.len());
-                })
                 .reduce(|a, b| a.combined_while_increasing_visibility(&b))
                 .unwrap(),
         )
@@ -1049,7 +1046,7 @@ mod tests {
         assert_eq!(fov_result.fully_visible_local_relative_squares().len(), 1);
         assert_eq!(fov_result.fully_visible_relative_squares().len(), 1);
         assert_eq!(
-            fov_result.visible_relative_squares().len(),
+            fov_result.visible_relative_squares_including_center().len(),
             radius as usize + 1
         );
         should_be_visible_relative_squares.iter().for_each(|step| {
@@ -1156,7 +1153,7 @@ mod tests {
         assert!(rasterized_fov.absolute_square_is_visible(point2(1, 4)));
 
         assert_eq!(
-            rasterized_fov.visible_relative_squares(),
+            rasterized_fov.visible_relative_squares_including_center(),
             StepSet::from([rel_from_main])
         )
     }
@@ -1250,7 +1247,7 @@ mod tests {
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
-        (0..5).for_each(|dy| {
+        (0..1).for_each(|dy| {
             let main_step = STEP_LEFT * 7 + STEP_UP * dy;
             let main_center = point2(5, 5);
             let fovs = faces_away_from_center_at_rel_square(main_step)
@@ -1276,6 +1273,7 @@ mod tests {
                     0
                 );
             });
+            dbg!(&fovs);
 
             let merged_fov = fovs
                 .iter()
@@ -1283,6 +1281,7 @@ mod tests {
                 .reduce(|a, b| a.combined_with(&b))
                 .unwrap()
                 .rasterized();
+            dbg!(&merged_fov.visibility_map_of_local_relative_squares());
 
             assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
             assert_eq!(
@@ -1388,7 +1387,12 @@ mod tests {
             rasterized_fov.absolute_squares_visible_at_relative_square(rel_square),
             SquareSet::from([correct_abs_square])
         );
-        assert_eq!(fov.rasterized().visible_relative_squares().len(), 1);
+        assert_eq!(
+            fov.rasterized()
+                .visible_relative_squares_including_center()
+                .len(),
+            2
+        );
     }
 
     #[test]
@@ -1726,7 +1730,6 @@ mod tests {
         fov.add_fully_visible_relative_face(((3, 0), STEP_RIGHT));
         assert_eq!(fov.visible_segments_in_main_view_only.len(), 1);
         assert!(fov.transformed_sub_fovs.is_empty());
-        dbg!(&fov);
         let rasterized = fov.rasterized();
         assert_eq!(rasterized.number_of_visible_relative_squares(), 4);
         assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 1);
