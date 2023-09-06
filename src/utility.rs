@@ -32,16 +32,27 @@ use crate::glyph::glyph_constants::{
     BLUE, CYAN, FACE_ARROWS, GREEN, GREY, MAGENTA, RED, THIN_TRIANGLE_ARROWS, YELLOW,
 };
 use crate::piece::PieceType::King;
-use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
-use crate::utility::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
-
-use self::octant::Octant;
 
 pub mod angle_interval;
 pub mod coordinate_frame_conversions;
+pub mod coordinates;
+pub mod halfplane;
+pub mod line;
 pub mod octant;
+pub mod poses;
+pub mod quadrant;
 pub mod round_robin_iterator;
+
+use self::angle_interval::*;
+use self::coordinate_frame_conversions::*;
+use self::coordinates::*;
+use self::halfplane::*;
+use self::line::*;
+use self::octant::*;
+use self::poses::*;
+use self::quadrant::*;
+use self::round_robin_iterator::*;
 
 pub type SimpleResult = Result<(), ()>;
 
@@ -159,14 +170,6 @@ impl QuarterTurnRotatable for Angle<f32> {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
         ))
-    }
-}
-#[derive(Clone, Hash, Debug, Eq, Copy)]
-pub struct Quadrant(pub i32);
-
-impl PartialEq for Quadrant {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.rem_euclid(4) == other.0.rem_euclid(4)
     }
 }
 
@@ -654,29 +657,6 @@ pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f
     the_clone
 }
 
-pub fn quadrants_of_rel_square(
-    can_be_rel_square: impl Into<WorldStep> + Copy,
-) -> HashSet<Quadrant> {
-    // A square on an axis is in two quadrants
-    // The origin is in all 4
-    (0..4)
-        .map(|i| Quadrant(i))
-        .filter(|&q| rel_square_is_in_quadrant_or_on_adjacent_axis(can_be_rel_square, q))
-        .collect()
-}
-pub fn rel_square_is_in_quadrant_or_on_adjacent_axis(
-    can_be_rel_square: impl Into<WorldStep>,
-    quadrant: Quadrant,
-) -> bool {
-    let rel_square: WorldStep = can_be_rel_square.into();
-    let dir = direction_of_quadrant(quadrant);
-
-    todo!()
-}
-pub fn direction_of_quadrant(quadrant: Quadrant) -> WorldStep {
-    STEP_UP_RIGHT.rotated(QuarterTurnsAnticlockwise::new(quadrant.0))
-}
-
 pub trait TupleClone {
     type TupleType;
     fn tuple_clone(&self) -> Self::TupleType;
@@ -794,23 +774,5 @@ mod tests {
             rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 4, 5], |a, b| (a - b).abs() as f32),
             vec![0, 1, 2, 3, 4, 5]
         );
-    }
-
-    #[test]
-    #[ignore = "Not yet implemented"]
-    fn test_quadrants_of_relative_square() {
-        let point_quadrants: Vec<((i32, i32), Vec<i32>)> = vec![
-            ((0, 0), vec![0, 1, 2, 3]),
-            ((1, 0), vec![0, 3]),
-            ((1, 1), vec![0]),
-            ((0, 1), vec![0, 1]),
-            ((0, -100), vec![3, 2]),
-        ];
-        point_quadrants.into_iter().for_each(|(p, v)| {
-            assert_eq!(
-                quadrants_of_rel_square(p),
-                v.iter().map(|&q| Quadrant(q)).collect()
-            );
-        });
     }
 }

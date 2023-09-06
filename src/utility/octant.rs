@@ -2,10 +2,9 @@ use std::f32::consts::PI;
 
 use euclid::Angle;
 
-use super::{
-    FAngle, OrthogonalWorldStep, QuarterTurnsAnticlockwise, STEP_DOWN, STEP_LEFT, STEP_RIGHT,
-    STEP_UP,
-};
+use super::FAngle;
+use super::OrthogonalWorldStep;
+use super::{QuarterTurnsAnticlockwise, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);

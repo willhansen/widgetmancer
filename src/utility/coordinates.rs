@@ -1,3 +1,5 @@
+use euclid::Point2D;
+
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;

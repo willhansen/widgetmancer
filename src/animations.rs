@@ -27,8 +27,11 @@ use crate::glyph::braille::world_points_for_braille_line;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph_constants::*;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::coordinates::{
+    is_orthogonal_king_step, round_to_king_step, DOWN_I, LEFT_I, RIGHT_I, UP_I,
+};
 use crate::utility::*;
-use crate::{is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics, RIGHT_I, UP_I};
+use crate::{lerp, Glyph, Graphics};
 
 pub mod blink_animation;
 pub mod burst_explosion_animation;
@@ -113,12 +116,12 @@ mod tests {
     use crate::animations::recoiling_board::RecoilingBoardAnimation;
     use crate::animations::simple_laser::SimpleLaserAnimation;
     use crate::graphics::FloorColorEnum;
-    use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
+    use crate::{derivative, glyph_map_to_string};
 
     use super::*;
 
     #[test]
-    
+
     fn test_recoil_distance_function_increasing_for_first_half() {
         let peak_time = RecoilingBoardAnimation::TIME_TO_PEAK_S;
         let mut prev_d = 0.0;
@@ -140,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
         let board_length = 5;
         let animation = RecoilingBoardAnimation::new(
@@ -174,7 +177,6 @@ mod tests {
     }
 
     #[test]
-    
     #[ignore = "More for visual debugging than an actual test"]
     fn test_draw_tiny_board_recoil() {
         let board_length = 3;
@@ -201,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_simple_laser_transparent_background() {
         let animation =
             SimpleLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
@@ -210,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_floaty_laser_transparent_background() {
         let animation =
             FloatyLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
@@ -219,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__start_at_zero() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(0.0),
@@ -228,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__start_fast() {
         assert!(
             derivative(
@@ -240,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__hit_peak() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
@@ -251,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__flat_peak() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
@@ -262,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__fully_relax() {
         let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
             RecoilingBoardAnimation::RECOIL_DURATION_S,
@@ -271,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_recoil_function__relax_flat() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,

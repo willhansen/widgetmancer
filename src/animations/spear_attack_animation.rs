@@ -12,10 +12,11 @@ use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
     WorldStep,
 };
-use crate::utility::{
+use crate::utility::coordinates::{
     better_angle_from_x_axis, is_king_step, is_orthodiagonal, rotate_vect, KingWorldStep,
-    KING_STEPS,
 };
+
+use crate::utility::KING_STEPS;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -102,7 +103,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_spear_attack_does_any_drawing() {
         let square = point2(3, 3);
         let dir = STEP_RIGHT;

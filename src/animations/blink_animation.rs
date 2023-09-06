@@ -11,7 +11,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
 };
-use crate::utility::Line;
+use crate::utility::line::Line;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {

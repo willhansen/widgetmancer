@@ -13,9 +13,10 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
-use crate::utility::{
-    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I, STEP_RIGHT,
+use crate::utility::coordinates::{
+    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I,
 };
+use crate::utility::STEP_RIGHT;
 
 #[derive(Clone)]
 pub struct RadialShockwave {
@@ -130,7 +131,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_triangle_wave() {
         assert_about_eq!(
             RadialShockwave::normalized_single_period_triangle_sine_wave(0.0),
@@ -172,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_has_some_glyphs() {
         let anim = RadialShockwave::new(point2(5, 5), FloorColorEnum::Solid(RED));
         assert!(anim.glyphs_at_duration(Duration::from_secs_f32(0.0)).len() < 5);
@@ -180,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_shockwave_heights() {
         // past edge of shockwave is zero
         assert_about_eq!(RadialShockwave::shockwave_height(1.0, 0.0, 1.0), 0.0);

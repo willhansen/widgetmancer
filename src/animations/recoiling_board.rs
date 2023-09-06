@@ -12,7 +12,7 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
-use crate::utility::{
+use crate::utility::coordinates::{
     is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, OrthogonalWorldStep,
     RIGHT_I,
 };
