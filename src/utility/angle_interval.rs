@@ -768,6 +768,22 @@ impl Debug for PartialAngleInterval {
         )
     }
 }
+impl RigidlyTransformable for AngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        match self {
+            AngleInterval::Empty | AngleInterval::FullCircle => *self,
+            AngleInterval::PartialArc(partial_angle_interval) => {
+                AngleInterval::PartialArc(partial_angle_interval.apply_rigid_transform(tf))
+            }
+        }
+    }
+}
+
+impl RigidlyTransformable for PartialAngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        self.rotated_quarter_turns(tf.rotation())
+    }
+}
 
 #[cfg(test)]
 mod tests {

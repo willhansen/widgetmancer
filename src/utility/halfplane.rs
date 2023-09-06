@@ -190,4 +190,121 @@ mod tests {
 
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
     }
+
+    #[test]
+    fn test_half_plane_cover_unit_square() {
+        let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
+            [0.0, 0.01, -0.01].map(|dx| {
+                HalfPlane::from_line_and_point_on_half_plane(
+                    Line::new(
+                        WorldPoint::new(-0.5 + dx, 0.0),
+                        point2(-0.5 + 2.0 * dx, 1.0),
+                    ),
+                    point2(1.5, 0.0),
+                )
+            });
+
+        assert!(more_than_cover.fully_covers_unit_square());
+        assert_false!(less_than_cover.fully_covers_unit_square());
+        assert!(exactly_cover.fully_covers_unit_square());
+    }
+    #[test]
+    fn test_halfplane_covers_expanded_unit_square() {
+        let the_plane = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(1.0, 5.0), point2(1.0, 6.0)),
+            point2(-5.0, 0.0),
+        );
+        assert!(the_plane.fully_covers_expanded_unit_square(0.0));
+        assert!(the_plane.fully_covers_expanded_unit_square(0.49));
+        assert_false!(the_plane.fully_covers_expanded_unit_square(0.51));
+        assert_false!(the_plane.fully_covers_expanded_unit_square(100.0));
+    }
+    #[test]
+    fn test_depth_of_point_in_half_plane() {
+        let horizontal = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
+            point2(0.0, 5.0),
+        );
+
+        assert_about_eq!(
+            horizontal.depth_of_point_in_half_plane(point2(0.0, 12.0)),
+            12.0
+        );
+        assert_about_eq!(
+            horizontal
+                .extended(3.0)
+                .depth_of_point_in_half_plane(point2(2000.0, 10.0)),
+            13.0
+        );
+        assert_about_eq!(
+            horizontal.depth_of_point_in_half_plane(point2(0.0, -1.0)),
+            -1.0
+        );
+
+        let diag = HalfPlane::from_line_and_point_on_half_plane(
+            Line::new(WorldPoint::new(0.0, 0.0), point2(-1.0, 1.0)),
+            point2(0.0, 5.0),
+        );
+        assert_about_eq!(
+            diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),
+            1.0 / 2.0.sqrt()
+        );
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square() {
+        //
+        //      +----------------+
+        //   o  |  o         o   |
+        //   G  |  A         B   |
+        //      |                |
+        //      |       +        |   o
+        //      |       O        |   C
+        //      |                |
+        //   F  |  E         D   |
+        //   o  |  o         o   |
+        //      +----------------+
+        //
+        let a = (-0.4, 0.4);
+        let b = (0.4, 0.4);
+        let c = (0.6, 0.0);
+        let d = (0.4, -0.4);
+        let e = (-0.4, -0.4);
+        let f = (-0.6, -0.4);
+        let g = (-0.6, 0.4);
+
+        let up: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+        let up_right: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
+        let down_right: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
+        let down: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
+        let left: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
+
+        let tolerance = 1e-5;
+
+        let f = HalfPlane::overlaps_within_unit_square;
+        let vars = vec![up, up_right, down_right, down, left];
+        // in format of f(vars[row], vars[col]).  Should be symmetric anyway
+        let correct_boolean_matrix = [
+            [1, 1, 0, 0, 0],
+            [1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        let actual_boolean_matrix: [[i32; 5]; 5] = from_fn(|row| {
+            from_fn(|col| {
+                if f(&vars[row], &vars[col], tolerance) {
+                    1
+                } else {
+                    0
+                }
+            })
+        });
+
+        assert_eq!(actual_boolean_matrix, correct_boolean_matrix);
+    }
 }

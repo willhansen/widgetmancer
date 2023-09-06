@@ -283,14 +283,141 @@ pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorld
         [faces[1], faces[0]]
     }
 }
-pub fn faces_away_from_center_at_rel_square(
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+pub struct KingWorldStep {
     step: WorldStep,
-) -> HashSet<RelativeSquareWithOrthogonalDir> {
-    ORTHOGONAL_STEPS
-        .iter()
-        .filter(|&&face_step| step.dot(face_step) >= 0)
-        .map(|&face_step| (step, face_step).into())
-        .collect()
+}
+
+impl KingWorldStep {
+    pub fn new(dir: WorldStep) -> Self {
+        assert!(is_king_step(dir));
+        KingWorldStep { step: dir }
+    }
+    pub fn step(&self) -> WorldStep {
+        self.step
+    }
+}
+
+impl QuarterTurnRotatable for KingWorldStep {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        self.step().rotated(quarter_turns_anticlockwise).into()
+    }
+}
+
+impl From<WorldStep> for KingWorldStep {
+    fn from(value: WorldStep) -> Self {
+        KingWorldStep::new(value)
+    }
+}
+
+impl From<OrthogonalWorldStep> for KingWorldStep {
+    fn from(value: OrthogonalWorldStep) -> Self {
+        KingWorldStep::new(value.step)
+    }
+}
+
+impl From<KingWorldStep> for WorldStep {
+    fn from(value: KingWorldStep) -> Self {
+        value.step
+    }
+}
+
+#[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy)]
+pub struct OrthogonalWorldStep {
+    step: WorldStep,
+}
+
+impl OrthogonalWorldStep {
+    pub fn new(dir: WorldStep) -> Self {
+        assert!(is_orthogonal_king_step(dir));
+        OrthogonalWorldStep { step: dir }
+    }
+    pub fn step(&self) -> WorldStep {
+        self.step
+    }
+    pub fn pos_on_axis(&self, pos: WorldStep) -> i32 {
+        self.step().dot(pos)
+    }
+}
+
+impl QuarterTurnRotatable for OrthogonalWorldStep {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        self.step().rotated(quarter_turns_anticlockwise).into()
+    }
+}
+
+impl From<WorldStep> for OrthogonalWorldStep {
+    fn from(value: WorldStep) -> Self {
+        OrthogonalWorldStep::new(value)
+    }
+}
+
+impl From<OrthogonalWorldStep> for WorldStep {
+    fn from(value: OrthogonalWorldStep) -> Self {
+        value.step
+    }
+}
+
+impl From<KingWorldStep> for OrthogonalWorldStep {
+    fn from(value: KingWorldStep) -> Self {
+        OrthogonalWorldStep::new(value.step)
+    }
+}
+pub fn rotate_point_around_point<U>(
+    axis_point: Point2D<f32, U>,
+    moving_point: Point2D<f32, U>,
+    angle: Angle<f32>,
+) -> Point2D<f32, U> {
+    axis_point + rotate_vect(moving_point - axis_point, angle)
+}
+
+pub fn cross_correlate_squares_with_steps(
+    squares: SquareSet,
+    steps: HashSet<WorldStep>,
+) -> HashMap<WorldSquare, u32> {
+    let mut step_count_map = HashMap::<WorldSquare, u32>::new();
+    squares.iter().for_each(|&square| {
+        steps
+            .iter()
+            .map(|&diagonal_step| square + diagonal_step)
+            .for_each(|step_square| *step_count_map.entry(step_square).or_default() += 1)
+    });
+    step_count_map
+}
+pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
+    assert!(is_king_step(dir));
+    if ORTHOGONAL_STEPS.contains(&dir) {
+        if dir.x != 0 {
+            HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
+        } else {
+            HashSet::from([dir + STEP_LEFT, dir + STEP_RIGHT])
+        }
+    } else {
+        let no_x = vec2(0, dir.y);
+        let no_y = vec2(dir.x, 0);
+        HashSet::from([no_x, no_y])
+    }
+}
+impl RigidlyTransformable for WorldSquare {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
+    }
+}
+impl RigidlyTransformable for WorldStep {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.rotation().rotate_vector(*self)
+    }
+}
+impl RigidlyTransformable for OrthogonalWorldStep {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.rotation().rotate_vector(self.step).into()
+    }
+}
+pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
+    face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
+) -> [SquareType; 2] {
+    [face.square, face.stepped().square]
 }
 
 #[cfg(test)]
@@ -401,5 +528,66 @@ mod tests {
             standardize_angle(Angle::<f32>::degrees(75.0)).radians,
             standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
+    }
+    #[test]
+    fn test_revolve_square() {
+        assert_eq!(
+            revolve_square(
+                point2(3, 4),
+                point2(5, 5),
+                QuarterTurnsAnticlockwise::new(3),
+            ),
+            point2(4, 7)
+        );
+    }
+
+    #[test]
+    fn test_quarter_turns_from_vectors() {
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_UP),
+            QuarterTurnsAnticlockwise::new(0)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
+            QuarterTurnsAnticlockwise::new(3)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
+            QuarterTurnsAnticlockwise::new(2)
+        );
+        assert_eq!(
+            QuarterTurnsAnticlockwise::from_start_and_end_directions(
+                STEP_DOWN_LEFT,
+                STEP_DOWN_RIGHT,
+            ),
+            QuarterTurnsAnticlockwise::new(1)
+        );
+    }
+    #[test]
+    fn test_project_step_onto_axis() {
+        assert_eq!(
+            distance_of_step_along_axis(STEP_UP_LEFT * 8, STEP_RIGHT.into()),
+            -8
+        );
+    }
+    #[test]
+    fn test_relative_points_in_ccw_order() {
+        assert_true!(two_in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
+        assert_true!(two_in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
+        // slight diff
+        assert_true!(two_in_ccw_order(
+            STEP_UP.to_f32(),
+            STEP_UP.to_f32() + WorldMove::new(-0.001, 0.0)
+        ));
+        assert_true!(two_in_ccw_order(
+            STEP_UP.to_f32(),
+            STEP_DOWN.to_f32() + WorldMove::new(-0.001, 0.0)
+        ));
+
+        // across
+        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_DOWN.to_f32()));
+
+        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
+        assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
     }
 }
