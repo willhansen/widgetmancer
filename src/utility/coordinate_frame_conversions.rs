@@ -192,6 +192,16 @@ pub fn world_character_point_to_world_character_square(
 ) -> WorldCharacterSquare {
     point.round().to_i32()
 }
+
+#[deprecated(note = "Invalidated by screen rotation")]
+pub fn is_world_character_square_left_square_of_world_square(
+    character_square: WorldCharacterSquare,
+) -> bool {
+    world_square_to_left_world_character_square(world_character_square_to_world_square(
+        character_square,
+    )) == character_square
+}
+
 #[cfg(test)]
 mod tests {
 

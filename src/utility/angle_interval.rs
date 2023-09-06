@@ -21,7 +21,7 @@ use crate::utility::{
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
-use super::FAngle;
+use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AngleInterval {

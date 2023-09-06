@@ -1,9 +1,25 @@
-use euclid::Point2D;
+use std::{
+    collections::{HashMap, HashSet},
+    f32::consts::TAU,
+    fmt::Display,
+    ops::{Add, Sub},
+};
 
-pub type IPoint = default::Point2D<i32>;
-pub type FPoint = default::Point2D<f32>;
-pub type IVector = default::Vector2D<i32>;
-pub type FVector = default::Vector2D<f32>;
+use euclid::{point2, vec2, Angle, Point2D, Vector2D};
+use num::{Signed, Zero};
+use ordered_float::OrderedFloat;
+
+use super::{
+    coordinate_frame_conversions::{
+        SquareGridInWorldFrame, SquareSet, WorldMove, WorldSquare, WorldStep,
+    },
+    int_cos, int_sin, int_to_T, sign,
+};
+
+pub type IPoint = euclid::default::Point2D<i32>;
+pub type FPoint = euclid::default::Point2D<f32>;
+pub type IVector = euclid::default::Vector2D<i32>;
+pub type FVector = euclid::default::Vector2D<f32>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);
@@ -67,6 +83,14 @@ pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
 ) -> Point2D<T, U> {
     rotated_n_quarter_turns_counter_clockwise(p.to_vector(), quarter_turns).to_point()
 }
+
+pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
+    (0..4)
+        .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
+        .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
+        .unwrap()
+}
+
 pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     (0..4)
         .map(|i| rotated_n_quarter_turns_counter_clockwise(v, i))
@@ -420,6 +444,130 @@ pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
     face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
 ) -> [SquareType; 2] {
     [face.square, face.stepped().square]
+}
+
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
+#[get_copy = "pub"]
+pub struct QuarterTurnsAnticlockwise {
+    quarter_turns: i32,
+}
+
+impl QuarterTurnsAnticlockwise {
+    pub fn new(quarter_turns: i32) -> Self {
+        QuarterTurnsAnticlockwise {
+            quarter_turns: quarter_turns.rem_euclid(4),
+        }
+    }
+    pub fn to_vector(&self) -> WorldStep {
+        rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
+    }
+    pub fn from_vector(dir: WorldStep) -> Self {
+        assert!(is_orthogonal(dir));
+        QuarterTurnsAnticlockwise::new(if dir.x == 0 {
+            if dir.y > 0 {
+                1
+            } else {
+                3
+            }
+        } else {
+            if dir.x > 0 {
+                0
+            } else {
+                2
+            }
+        })
+    }
+
+    pub fn from_start_and_end_directions(start: WorldStep, end: WorldStep) -> Self {
+        assert!(is_king_step(start));
+        assert!(is_king_step(end));
+        // needs to be quarter turn, no eighths
+        assert_eq!(is_diagonal(start), is_diagonal(end));
+
+        let d_angle = start.to_f32().angle_to(end.to_f32());
+        let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
+        Self::new(quarter_turns)
+    }
+
+    pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
+        standardize_angle(Angle::<f32>::degrees(
+            angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
+        ))
+    }
+    pub fn rotate_vector<T, U>(&self, v: Vector2D<T, U>) -> Vector2D<T, U>
+    where
+        T: Signed + Copy,
+    {
+        rotated_n_quarter_turns_counter_clockwise(v, self.quarter_turns)
+    }
+}
+
+impl Neg for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        QuarterTurnsAnticlockwise::new(-self.quarter_turns)
+    }
+}
+
+impl Add for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.quarter_turns() + rhs.quarter_turns())
+    }
+}
+
+impl Sub for QuarterTurnsAnticlockwise {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.quarter_turns() - rhs.quarter_turns())
+    }
+}
+
+pub trait QuarterTurnRotatable {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self;
+}
+
+impl QuarterTurnRotatable for Angle<f32> {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        standardize_angle(Angle::radians(
+            self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
+        ))
+    }
+}
+fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
+    assert!(points.len() >= 2);
+    let furthest = points
+        .iter()
+        .combinations(2)
+        .max_by_key(|two_points: &Vec<&Point2D<f32, U>>| {
+            OrderedFloat((*two_points[0] - *two_points[1]).length())
+        })
+        .unwrap();
+    let furthest_values: Vec<Point2D<f32, U>> = furthest.into_iter().copied().collect();
+    furthest_values.try_into().unwrap()
+}
+
+pub fn three_points_are_clockwise<U>(
+    a: Point2D<f32, U>,
+    b: Point2D<f32, U>,
+    c: Point2D<f32, U>,
+) -> bool {
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) < 0.0
+}
+
+pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
+    a.cross(b) > 0.0
+}
+
+pub fn in_ccw_order(v: &Vec<WorldMove>) -> bool {
+    v.iter()
+        .tuple_windows()
+        .all(|(&a, &b)| two_in_ccw_order(a, b))
 }
 
 #[cfg(test)]

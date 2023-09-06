@@ -44,15 +44,15 @@ pub mod poses;
 pub mod quadrant;
 pub mod round_robin_iterator;
 
-use self::angle_interval::*;
-use self::coordinate_frame_conversions::*;
-use self::coordinates::*;
-use self::halfplane::*;
-use self::line::*;
-use self::octant::*;
-use self::poses::*;
-use self::quadrant::*;
-use self::round_robin_iterator::*;
+pub use self::angle_interval::*;
+pub use self::coordinate_frame_conversions::*;
+pub use self::coordinates::*;
+pub use self::halfplane::*;
+pub use self::line::*;
+pub use self::octant::*;
+pub use self::poses::*;
+pub use self::quadrant::*;
+pub use self::round_robin_iterator::*;
 
 pub type SimpleResult = Result<(), ()>;
 
@@ -80,98 +80,6 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_RIGHT,
     STEP_DOWN_LEFT,
 ];
-
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
-#[get_copy = "pub"]
-pub struct QuarterTurnsAnticlockwise {
-    quarter_turns: i32,
-}
-
-impl QuarterTurnsAnticlockwise {
-    pub fn new(quarter_turns: i32) -> Self {
-        QuarterTurnsAnticlockwise {
-            quarter_turns: quarter_turns.rem_euclid(4),
-        }
-    }
-    pub fn to_vector(&self) -> WorldStep {
-        rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
-    }
-    pub fn from_vector(dir: WorldStep) -> Self {
-        assert!(is_orthogonal(dir));
-        QuarterTurnsAnticlockwise::new(if dir.x == 0 {
-            if dir.y > 0 {
-                1
-            } else {
-                3
-            }
-        } else {
-            if dir.x > 0 {
-                0
-            } else {
-                2
-            }
-        })
-    }
-
-    pub fn from_start_and_end_directions(start: WorldStep, end: WorldStep) -> Self {
-        assert!(is_king_step(start));
-        assert!(is_king_step(end));
-        // needs to be quarter turn, no eighths
-        assert_eq!(is_diagonal(start), is_diagonal(end));
-
-        let d_angle = start.to_f32().angle_to(end.to_f32());
-        let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
-        Self::new(quarter_turns)
-    }
-
-    pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
-        standardize_angle(Angle::<f32>::degrees(
-            angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
-        ))
-    }
-    pub fn rotate_vector<T, U>(&self, v: Vector2D<T, U>) -> Vector2D<T, U>
-    where
-        T: Signed + Copy,
-    {
-        rotated_n_quarter_turns_counter_clockwise(v, self.quarter_turns)
-    }
-}
-
-impl Neg for QuarterTurnsAnticlockwise {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        QuarterTurnsAnticlockwise::new(-self.quarter_turns)
-    }
-}
-
-impl Add for QuarterTurnsAnticlockwise {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() + rhs.quarter_turns())
-    }
-}
-
-impl Sub for QuarterTurnsAnticlockwise {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() - rhs.quarter_turns())
-    }
-}
-
-pub trait QuarterTurnRotatable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self;
-}
-
-impl QuarterTurnRotatable for Angle<f32> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
-        standardize_angle(Angle::radians(
-            self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
-        ))
-    }
-}
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
 pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
@@ -229,13 +137,6 @@ pub fn random_event(p: f32) -> bool {
 
 pub fn random_angle() -> Angle<f32> {
     Angle::degrees(rand::thread_rng().gen_range(0.0..360.0))
-}
-
-pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
-    (0..4)
-        .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
-        .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
-        .unwrap()
 }
 
 pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
@@ -305,61 +206,6 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
         string += "\n";
     }
     string
-}
-
-fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
-    assert!(points.len() >= 2);
-    let furthest = points
-        .iter()
-        .combinations(2)
-        .max_by_key(|two_points: &Vec<&Point2D<f32, U>>| {
-            OrderedFloat((*two_points[0] - *two_points[1]).length())
-        })
-        .unwrap();
-    let furthest_values: Vec<Point2D<f32, U>> = furthest.into_iter().copied().collect();
-    furthest_values.try_into().unwrap()
-}
-
-pub fn three_points_are_clockwise<U>(
-    a: Point2D<f32, U>,
-    b: Point2D<f32, U>,
-    c: Point2D<f32, U>,
-) -> bool {
-    let ab = b - a;
-    let ac = c - a;
-    ab.cross(ac) < 0.0
-}
-
-pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
-    a.cross(b) > 0.0
-}
-
-pub fn in_ccw_order(v: &Vec<WorldMove>) -> bool {
-    v.iter()
-        .tuple_windows()
-        .all(|(&a, &b)| two_in_ccw_order(a, b))
-}
-
-pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
-    let ab = b - a;
-    let ac = c - a;
-    ab.cross(ac) == 0.0
-}
-pub fn on_line_in_this_order<U>(
-    a: Point2D<f32, U>,
-    b: Point2D<f32, U>,
-    c: Point2D<f32, U>,
-) -> bool {
-    on_line(a, b, c) && (a - b).length() < (a - c).length()
-}
-
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn is_world_character_square_left_square_of_world_square(
-    character_square: WorldCharacterSquare,
-) -> bool {
-    world_square_to_left_world_character_square(world_character_square_to_world_square(
-        character_square,
-    )) == character_square
 }
 
 pub fn map_sum<K, V>(a: HashMap<K, V>, b: HashMap<K, V>) -> HashMap<K, V>

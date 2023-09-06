@@ -14,7 +14,9 @@ use crate::fov_stuff::square_visibility::{
     LocalVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
+use crate::utility::coordinates::{king_distance, unit_vector_from_angle, OrthogonalWorldStep};
 use crate::utility::octant::Octant;
+use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
 use getset::CopyGetters;
@@ -578,6 +580,7 @@ pub fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
 #[cfg(test)]
 mod tests {
     use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
+    use crate::utility::poses::faces_away_from_center_at_rel_square;
     use euclid::point2;
     use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
