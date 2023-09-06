@@ -45,13 +45,6 @@ pub mod round_robin_iterator;
 
 pub type SimpleResult = Result<(), ()>;
 
-pub type FAngle = Angle<f32>;
-
-pub const DOWN_I: IVector = vec2(0, -1);
-pub const UP_I: IVector = vec2(0, 1);
-pub const LEFT_I: IVector = vec2(-1, 0);
-pub const RIGHT_I: IVector = vec2(1, 0);
-
 pub const STEP_ZERO: WorldStep = vec2(0, 0);
 pub const STEP_UP: WorldStep = vec2(0, 1);
 pub const STEP_DOWN: WorldStep = vec2(0, -1);
@@ -251,21 +244,8 @@ pub fn number_to_color(i: u32) -> RGB8 {
     in_order[i as usize % in_order.len()]
 }
 
-pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
-    if vector.length() == 0.0 {
-        return vector;
-    }
-    let start_angle = better_angle_from_x_axis(vector);
-    let new_angle = start_angle + delta_angle;
-    Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
-}
-
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a * (1.0 - t) + b * t
-}
-
-pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32, U> {
-    point2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
 }
 
 pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
@@ -520,38 +500,6 @@ pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy> {
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
-
-// trait alias
-pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
-    Copy
-    + PartialEq
-    + Add<WorldStep, Output = AbsOrRelWorldSquare>
-    + Sub<WorldStep, Output = AbsOrRelWorldSquare>
-    + Sub<AbsOrRelWorldSquare, Output = WorldStep>
-    + Zero
-{
-}
-
-// TODO: not have this huge type bound exist twice
-impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
-    T: Copy
-        + PartialEq
-        + Add<WorldStep, Output = AbsOrRelWorldSquare>
-        + Sub<WorldStep, Output = AbsOrRelWorldSquare>
-        + Sub<AbsOrRelWorldSquare, Output = WorldStep>
-        + Zero
-{
-}
-
-pub trait AbsOrRelPointTrait<AbsOrRelPoint>:
-    Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
-{
-}
-
-impl<T, AbsOrRelPoint> AbsOrRelPointTrait<AbsOrRelPoint> for T where
-    T: Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
-{
-}
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -923,59 +871,8 @@ pub fn intersection<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> Has
     a.intersection(b).cloned().collect()
 }
 
-// TODO: remember the reason for this existing (there IS a good reason)
-// related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
-pub fn better_angle_from_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
-    Angle::radians(v.y.atan2(v.x))
-}
-
-pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
-    let mut radians = angle.radians;
-    if radians > -PI && radians <= PI {
-        angle
-    } else {
-        radians = radians.rem_euclid(TAU);
-        if radians > PI {
-            radians -= TAU;
-        }
-        Angle::radians(radians)
-    }
-}
-
-pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
-    Angle::radians(
-        standardize_angle(a)
-            .angle_to(standardize_angle(b))
-            .radians
-            .abs(),
-    )
-}
-
-pub fn revolve_square(
-    moving_square: WorldSquare,
-    pivot_square: WorldSquare,
-    rotation: QuarterTurnsAnticlockwise,
-) -> WorldSquare {
-    let rel_square = moving_square - pivot_square;
-    pivot_square + rotation.rotate_vector(rel_square)
-}
-
 pub fn rgb_to_string(rgb: RGB8) -> String {
     format!("( {:>3}, {:>3}, {:>3} )", rgb.r, rgb.g, rgb.b)
-}
-
-pub fn flip_y<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
-where
-    T: Signed,
-{
-    vec2(v.x, -v.y)
-}
-
-pub fn flip_x<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
-where
-    T: Signed,
-{
-    vec2(-v.x, v.y)
 }
 
 // TODO: turn into iter
@@ -1002,32 +899,12 @@ pub fn number_to_hue_rotation(x: f32, period: f32) -> RGB8 {
     hue_to_rgb(x * 360.0 / period)
 }
 
-#[deprecated(note = "use Vector2D's to_array function instead")]
-pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
-    match i {
-        0 => WorldStep::new(step.x, 0),
-        1 => WorldStep::new(0, step.y),
-        _ => panic!("Too many dimensions: {}", i),
-    }
-}
-
-pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
-    step.project_onto_vector(axis.step).dot(axis.step)
-}
-
 pub fn snap_to_nths(x: f32, denominator: u32) -> f32 {
     (x * denominator as f32).round() / denominator as f32
 }
 pub fn looping_clamp(a: f32, b: f32, x: f32) -> f32 {
     assert!(a < b);
     ((x - a).rem_euclid(b - a)) + a
-}
-
-pub fn square_is_odd(square: WorldSquare) -> bool {
-    (square.x + square.y) % 2 == 1
-}
-pub fn square_is_even(square: WorldSquare) -> bool {
-    !square_is_odd(square)
 }
 
 #[derive(Debug, Clone)]
@@ -1094,127 +971,6 @@ impl<const SIZE: usize> SquareBoolArray2D<SIZE> {
         }
         the_clone
     }
-}
-
-pub fn first_inside_square_face_hit_by_ray(
-    start: WorldPoint,
-    angle: Angle<f32>,
-    range: f32,
-    inside_faces: &HashSet<SquareWithOrthogonalDir>,
-) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
-    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
-
-    let inside_faces_facing_ray: HashSet<SquareWithOrthogonalDir> = inside_faces
-        .iter()
-        .filter(|&&face| {
-            let vector_into_face = face.direction();
-            ray_direction.dot(vector_into_face.step().to_f32()) >= 0.0
-        })
-        .cloned()
-        .collect();
-
-    let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
-
-    let squares_on_naive_line: HashSet<WorldSquare> = Supercover::new(
-        start.to_i32().to_tuple(),
-        naive_end_point.to_i32().to_tuple(),
-    )
-    .map(|(x, y)| WorldSquare::new(x, y))
-    .collect();
-
-    let inside_faces_of_squares_touching_line: HashSet<SquareWithOrthogonalDir> =
-        inside_faces_facing_ray
-            .iter()
-            .filter(|face| squares_on_naive_line.contains(&face.square()))
-            .cloned()
-            .collect();
-
-    inside_faces_of_squares_touching_line
-        .iter()
-        .map(|&face| {
-            (
-                face,
-                ray_intersection_point_with_oriented_square_face(start, angle, range, face),
-            )
-        })
-        .filter(|(face, point)| point.is_some())
-        .map(|(face, point)| (face, point.unwrap()))
-        .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
-}
-pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
-    let square_center = square.to_f32();
-    let face_center = square_center + face_direction.step().to_f32() * 0.5;
-    let p1_direction = rotated_n_quarter_turns_counter_clockwise(face_direction.step(), 1);
-    let p2_direction = -p1_direction;
-    WorldLine::new(
-        face_center + p1_direction.to_f32() * 0.5,
-        face_center + p2_direction.to_f32() * 0.5,
-    )
-}
-pub fn ray_intersection_point_with_oriented_square_face(
-    start: WorldPoint,
-    angle: Angle<f32>,
-    range: f32,
-    face: SquareWithOrthogonalDir,
-) -> Option<WorldPoint> {
-    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
-    let face_is_facing_ray = ray_direction.dot(face.dir().step().to_f32()) > 0.0;
-    if !face_is_facing_ray {
-        return None;
-    }
-    let face_line_segment = square_face_as_line(face.square, face.dir);
-    let ray_line_segment = WorldLine::from_ray(start, angle, range);
-    ray_line_segment.intersection_point_with_other_line(&face_line_segment)
-}
-pub fn does_ray_hit_oriented_square_face(
-    start: WorldPoint,
-    angle: Angle<f32>,
-    range: f32,
-    face: SquareWithOrthogonalDir,
-) -> bool {
-    ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
-}
-
-pub fn about_eq_2d<P: AbsOrRelPointTrait<P>>(p1: P, p2: P, tolerance: f32) -> bool {
-    (p1 - p2).length().abs() < tolerance
-}
-
-pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
-    let tolerance = 0.001;
-    assert!(
-        about_eq_2d(p1, p2, tolerance),
-        "Points too far apart: p1: {:?}, p2: {:?}",
-        p1,
-        p2
-    );
-}
-
-pub fn left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
-    assert_ne!(faces[0], faces[1]);
-    assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].rotated(QuarterTurnsAnticlockwise::new(1)) {
-        faces
-    } else {
-        [faces[1], faces[0]]
-    }
-}
-
-pub fn naive_ray_endpoint<U>(
-    start: Point2D<f32, U>,
-    angle: Angle<f32>,
-    length: f32,
-) -> Point2D<f32, U> {
-    start + unit_vector_from_angle(angle).cast_unit() * length
-}
-
-pub fn faces_away_from_center_at_rel_square(
-    step: WorldStep,
-) -> HashSet<RelativeSquareWithOrthogonalDir> {
-    ORTHOGONAL_STEPS
-        .iter()
-        .filter(|&&face_step| step.dot(face_step) >= 0)
-        .map(|&face_step| (step, face_step).into())
-        .collect()
 }
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -1445,30 +1201,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_round_to_kingstep() {
-        assert_eq!(
-            WorldStep::new(0, 0),
-            round_to_king_step(WorldStep::new(0, 0)),
-            "zero to zero"
-        );
-        assert_eq!(
-            WorldStep::new(1, 0),
-            round_to_king_step(WorldStep::new(5, 0)),
-            "reduce length"
-        );
-        assert_eq!(
-            WorldStep::new(0, -1),
-            round_to_king_step(WorldStep::new(5, -300)),
-            "snap to orthogonal"
-        );
-        assert_eq!(
-            WorldStep::new(-1, 1),
-            round_to_king_step(WorldStep::new(-30, 25)),
-            "snap to diagonal"
-        );
-    }
-
-    #[test]
     fn test_pair_up_glyph_map__positions() {
         let character_squares: Vec<WorldCharacterSquare> = vec![
             point2(0, 0),
@@ -1512,20 +1244,6 @@ mod tests {
     }
 
     #[test]
-    fn test_clockwise() {
-        assert!(three_points_are_clockwise::<WorldPoint>(
-            point2(0.0, 0.0),
-            point2(0.0, 1.0),
-            point2(1.0, 0.0),
-        ));
-        assert_false!(three_points_are_clockwise::<WorldPoint>(
-            point2(0.0, 0.0),
-            point2(0.0, 1.0),
-            point2(-0.1, -10.0)
-        ));
-    }
-
-    #[test]
     fn test_world_pos_to_character_world_pos() {
         assert_eq!(
             Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
@@ -1553,153 +1271,6 @@ mod tests {
             local_square_point_to_local_character_point(point2(0.0, 0.0), 1),
             point2(-0.5, 0.0)
         );
-    }
-
-    #[test]
-    fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new(point2(-1.5, -1.0), point2(0.0, 0.0));
-        let output_points = input_line.line_intersections_with_centered_unit_square();
-        let output_line = Line::new(output_points[0], output_points[1]);
-        let in_vec = input_line.p2 - input_line.p1;
-        let out_vec = output_line.p2 - output_line.p1;
-
-        let same_direction = in_vec.dot(out_vec) > 0.0;
-        assert!(same_direction);
-    }
-
-    #[test]
-    fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
-    ) {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new(point2(-0.5, -0.5), point2(-0.5, 0.5));
-        let output_points = input_line.line_intersections_with_centered_unit_square();
-        assert_eq!(input_line.p1, output_points[0]);
-        assert_eq!(input_line.p2, output_points[1]);
-    }
-
-    #[test]
-    fn test_same_side_of_line__vertical_line() {
-        let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
-        let origin = point2(0.0, 0.0);
-        let neg_point = point2(-20.0, 0.0);
-        assert_false!(line.same_side_of_line(neg_point, origin))
-    }
-
-    #[test]
-    fn test_adjacent_king_steps() {
-        assert_eq!(
-            adjacent_king_steps(STEP_UP),
-            vec![STEP_UP_RIGHT, STEP_UP_LEFT].into_iter().collect()
-        );
-        assert_eq!(
-            adjacent_king_steps(STEP_RIGHT),
-            vec![STEP_UP_RIGHT, STEP_DOWN_RIGHT].into_iter().collect()
-        );
-        assert_eq!(
-            adjacent_king_steps(STEP_DOWN_LEFT),
-            vec![STEP_DOWN, STEP_LEFT].into_iter().collect()
-        );
-    }
-
-    #[test]
-    fn test_rotate_zero_vector() {
-        assert_eq!(
-            rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
-            vec2(0.0, 0.0)
-        );
-    }
-
-    #[test]
-    fn test_half_plane_complementary_check__different_lines() {
-        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: Line<f32, SquareGridInWorldFrame> =
-            Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
-
-        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
-        let half_plane_3 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
-
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
-        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
-    }
-
-    #[test]
-    fn test_half_plane_complementary_check__equivalent_lines() {
-        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: Line<f32, SquareGridInWorldFrame> =
-            Line::new(point2(2.0, 2.0), point2(5.0, 5.0));
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
-
-        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
-
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
-    }
-
-    #[test]
-    fn test_check_line_intersection_with_standard_square() {
-        let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
-        assert_false!(line.line_intersects_with_centered_unit_square());
-    }
-
-    #[test]
-    fn test_angle_from_x_axis() {
-        assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
-            45.0
-        );
-        assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.0, 0.5)).to_degrees(),
-            90.0
-        );
-        assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.0, -0.5)).to_degrees(),
-            -90.0
-        );
-        assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(1.0, 0.0)).to_degrees(),
-            0.0
-        );
-        assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(-1.0, 0.0)).to_degrees(),
-            180.0
-        );
-    }
-
-    #[test]
-    fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
-        assert!(
-            (default::Vector2D::new(0.5, 0.5)
-                .angle_from_x_axis()
-                .to_degrees()
-                - 45.0)
-                .abs()
-                > 0.01
-        );
-    }
-
-    #[test]
-    fn test_standardize_angle() {
-        assert_about_eq!(
-            standardize_angle(Angle::<f32>::degrees(75.0)).radians,
-            standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
-        );
-    }
-
-    #[test]
-    fn test_line_intersections__observed_3_intersections() {
-        Line::new(
-            WorldPoint::new(-29.5, 5.0),
-            WorldPoint::new(-27.589872, 4.703601),
-        )
-        .line_intersections_with_centered_unit_square();
     }
 
     #[test]

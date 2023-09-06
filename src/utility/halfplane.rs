@@ -158,4 +158,36 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
+    #[test]
+    fn test_half_plane_complementary_check__different_lines() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
+        let half_plane_3 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
+
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
+    }
+
+    #[test]
+    fn test_half_plane_complementary_check__equivalent_lines() {
+        let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(2.0, 2.0), point2(5.0, 5.0));
+        let p1 = point2(0.0, 1.0);
+        let p2 = point2(1.0, 0.0);
+
+        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
+
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+    }
 }

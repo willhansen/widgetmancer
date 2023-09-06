@@ -356,6 +356,93 @@ pub struct Ray<U> {
     pub point: Point2D<f32, U>,
     pub angle: Angle<f32>,
 }
+
+pub fn first_inside_square_face_hit_by_ray(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    inside_faces: &HashSet<SquareWithOrthogonalDir>,
+) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
+    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
+
+    let inside_faces_facing_ray: HashSet<SquareWithOrthogonalDir> = inside_faces
+        .iter()
+        .filter(|&&face| {
+            let vector_into_face = face.direction();
+            ray_direction.dot(vector_into_face.step().to_f32()) >= 0.0
+        })
+        .cloned()
+        .collect();
+
+    let naive_end_point: WorldPoint = start + unit_vector_from_angle(angle).cast_unit() * range;
+
+    let squares_on_naive_line: HashSet<WorldSquare> = Supercover::new(
+        start.to_i32().to_tuple(),
+        naive_end_point.to_i32().to_tuple(),
+    )
+    .map(|(x, y)| WorldSquare::new(x, y))
+    .collect();
+
+    let inside_faces_of_squares_touching_line: HashSet<SquareWithOrthogonalDir> =
+        inside_faces_facing_ray
+            .iter()
+            .filter(|face| squares_on_naive_line.contains(&face.square()))
+            .cloned()
+            .collect();
+
+    inside_faces_of_squares_touching_line
+        .iter()
+        .map(|&face| {
+            (
+                face,
+                ray_intersection_point_with_oriented_square_face(start, angle, range, face),
+            )
+        })
+        .filter(|(face, point)| point.is_some())
+        .map(|(face, point)| (face, point.unwrap()))
+        .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
+}
+pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
+    let square_center = square.to_f32();
+    let face_center = square_center + face_direction.step().to_f32() * 0.5;
+    let p1_direction = rotated_n_quarter_turns_counter_clockwise(face_direction.step(), 1);
+    let p2_direction = -p1_direction;
+    WorldLine::new(
+        face_center + p1_direction.to_f32() * 0.5,
+        face_center + p2_direction.to_f32() * 0.5,
+    )
+}
+pub fn ray_intersection_point_with_oriented_square_face(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    face: SquareWithOrthogonalDir,
+) -> Option<WorldPoint> {
+    let ray_direction: WorldMove = unit_vector_from_angle(angle).cast_unit();
+    let face_is_facing_ray = ray_direction.dot(face.dir().step().to_f32()) > 0.0;
+    if !face_is_facing_ray {
+        return None;
+    }
+    let face_line_segment = square_face_as_line(face.square, face.dir);
+    let ray_line_segment = WorldLine::from_ray(start, angle, range);
+    ray_line_segment.intersection_point_with_other_line(&face_line_segment)
+}
+pub fn does_ray_hit_oriented_square_face(
+    start: WorldPoint,
+    angle: Angle<f32>,
+    range: f32,
+    face: SquareWithOrthogonalDir,
+) -> bool {
+    ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
+}
+pub fn naive_ray_endpoint<U>(
+    start: Point2D<f32, U>,
+    angle: Angle<f32>,
+    length: f32,
+) -> Point2D<f32, U> {
+    start + unit_vector_from_angle(angle).cast_unit() * length
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -363,4 +450,47 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
+    #[test]
+    fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(-1.5, -1.0), point2(0.0, 0.0));
+        let output_points = input_line.line_intersections_with_centered_unit_square();
+        let output_line = Line::new(output_points[0], output_points[1]);
+        let in_vec = input_line.p2 - input_line.p1;
+        let out_vec = output_line.p2 - output_line.p1;
+
+        let same_direction = in_vec.dot(out_vec) > 0.0;
+        assert!(same_direction);
+    }
+
+    #[test]
+    fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
+    ) {
+        let input_line: Line<f32, SquareGridInWorldFrame> =
+            Line::new(point2(-0.5, -0.5), point2(-0.5, 0.5));
+        let output_points = input_line.line_intersections_with_centered_unit_square();
+        assert_eq!(input_line.p1, output_points[0]);
+        assert_eq!(input_line.p2, output_points[1]);
+    }
+
+    #[test]
+    fn test_same_side_of_line__vertical_line() {
+        let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
+        let origin = point2(0.0, 0.0);
+        let neg_point = point2(-20.0, 0.0);
+        assert_false!(line.same_side_of_line(neg_point, origin))
+    }
+    #[test]
+    fn test_check_line_intersection_with_standard_square() {
+        let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
+        assert_false!(line.line_intersects_with_centered_unit_square());
+    }
+    #[test]
+    fn test_line_intersections__observed_3_intersections() {
+        Line::new(
+            WorldPoint::new(-29.5, 5.0),
+            WorldPoint::new(-27.589872, 4.703601),
+        )
+        .line_intersections_with_centered_unit_square();
+    }
 }
