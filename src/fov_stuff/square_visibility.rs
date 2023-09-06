@@ -24,28 +24,34 @@ pub trait ViewRoundable {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
 }
 
-pub trait RelativeSquareVisibilityTrait: QuarterTurnRotatable + ViewRoundable {
+pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundable {
+    // visibility checks
     fn is_fully_visible(&self) -> bool;
     fn is_at_least_partially_visible(&self) -> bool;
     fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_nearly_but_not_fully_visible(&self, tolerance_length: f32) -> bool;
+
+    // creators
     fn new_fully_visible() -> Self;
     fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
     fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
-    fn top_half_visible() -> Self;
-    fn bottom_half_visible() -> Self;
-    fn combined_increasing_visibility(&self, other: &Self) -> Self;
-    fn as_string(&self) -> String;
-    fn is_about_complementary_to(&self, other: Self) -> bool;
-    fn is_visually_complementary_to(&self, other: Self) -> bool;
-
+    fn new_top_half_visible() -> Self;
+    fn new_bottom_half_visible() -> Self;
     fn from_relative_square_and_view_arc(
         view_arc: PartialAngleInterval,
         rel_square: WorldStep,
     ) -> Option<SquareVisibility>;
+
+    // other
+    fn overlaps(&self, other: &Self, tolerance: f32) -> bool;
+    fn combined_increasing_visibility(&self, other: &Self) -> Self;
+    fn as_string(&self) -> String;
+    fn is_about_complementary_to(&self, other: Self) -> bool;
+    fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
 
+// TODO: make this a newtype with restricted points
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(PartialEq, Clone, Copy, Constructor)]
@@ -58,6 +64,16 @@ impl SquareVisibilityFromOneLargeShadow {
     pub(crate) fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
         self.visible_portion
     }
+    pub fn complement(&self) -> Option<Self> {
+        if self.is_fully_visible() {
+            None
+        } else {
+            Some(Self {
+                visible_portion: Some(self.visible_portion.unwrap().complement()),
+            })
+        }
+    }
+
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
@@ -88,7 +104,7 @@ impl ViewRoundable for SquareVisibilityFromOneLargeShadow {
     }
 }
 
-impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
+impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
@@ -129,70 +145,13 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
             panic!("half plane does not even partially cover the unit square at (0,0)")
         }
     }
-    fn top_half_visible() -> Self {
+    fn new_top_half_visible() -> Self {
         Self::half_visible(Angle::degrees(270.0))
     }
 
-    fn bottom_half_visible() -> Self {
+    fn new_bottom_half_visible() -> Self {
         Self::half_visible(Angle::degrees(90.0))
     }
-    fn combined_increasing_visibility(&self, other: &Self) -> Self {
-        if self.is_fully_visible() || other.is_fully_visible() {
-            Self::new_fully_visible()
-        } else if self
-            .visible_portion
-            .unwrap()
-            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
-        {
-            Self::new_fully_visible()
-        } else {
-            let depth_a = self
-                .visible_portion
-                .unwrap()
-                .depth_of_point_in_half_plane(point2(0.0, 0.0));
-            let depth_b = other
-                .visible_portion
-                .unwrap()
-                .depth_of_point_in_half_plane(point2(0.0, 0.0));
-
-            if depth_a > depth_b {
-                self.clone()
-            } else {
-                other.clone()
-            }
-        }
-    }
-    fn as_string(&self) -> String {
-        if self.is_fully_visible() {
-            "  ".to_string()
-        } else {
-            let fg_color = GREY;
-            PartialVisibilityDrawable::from_shadowed_drawable(
-                &SolidColorDrawable::new(fg_color),
-                *self,
-            )
-            .to_glyphs()
-            .to_clean_string()
-        }
-    }
-    fn is_about_complementary_to(&self, other: Self) -> bool {
-        return if self.is_fully_visible() {
-            !other.is_at_least_partially_visible()
-        } else if other.is_fully_visible() {
-            !self.is_at_least_partially_visible()
-        } else {
-            self.visible_portion
-                .unwrap()
-                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
-        };
-    }
-    fn is_visually_complementary_to(&self, other: Self) -> bool {
-        self.as_string()
-            .chars()
-            .zip(other.as_string().chars())
-            .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
-    }
-
     fn from_relative_square_and_view_arc(
         view_arc: PartialAngleInterval,
         rel_square: WorldStep,
@@ -240,6 +199,72 @@ impl RelativeSquareVisibilityTrait for SquareVisibilityFromOneLargeShadow {
         } else {
             None
         }
+    }
+    fn overlaps(&self, other: &Self, tolerance: f32) -> bool {
+        if self.is_fully_visible() || other.is_fully_visible() {
+            return true;
+        }
+        self.visible_portion
+            .unwrap()
+            .overlaps_within_unit_square(&other.visible_portion.unwrap(), tolerance)
+    }
+    fn combined_increasing_visibility(&self, other: &Self) -> Self {
+        if self.is_fully_visible() || other.is_fully_visible() {
+            Self::new_fully_visible()
+        } else if self
+            .visible_portion
+            .unwrap()
+            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+        {
+            Self::new_fully_visible()
+        } else {
+            let depth_a = self
+                .visible_portion
+                .unwrap()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+            let depth_b = other
+                .visible_portion
+                .unwrap()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+
+            if depth_a > depth_b {
+                self.clone()
+            } else {
+                other.clone()
+            }
+        }
+    }
+    fn as_string(&self) -> String {
+        if self.is_fully_visible() {
+            "  ".to_string()
+        } else {
+            let fg_color = GREY;
+            PartialVisibilityDrawable::from_shadowed_drawable(
+                &SolidColorDrawable::new(fg_color),
+                *self,
+            )
+            .to_glyphs()
+            .to_clean_string()
+        }
+    }
+
+    fn is_about_complementary_to(&self, other: Self) -> bool {
+        return if self.is_fully_visible() {
+            !other.is_at_least_partially_visible()
+        } else if other.is_fully_visible() {
+            !self.is_at_least_partially_visible()
+        } else {
+            self.visible_portion
+                .unwrap()
+                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+        };
+    }
+
+    fn is_visually_complementary_to(&self, other: Self) -> bool {
+        self.as_string()
+            .chars()
+            .zip(other.as_string().chars())
+            .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
@@ -301,15 +326,14 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     }
 }
 
-pub type SquareVisibilitiesByRelativePosition = HashMap<WorldStep, SquareVisibility>;
+pub type LocalVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 pub trait SquareVisibilityMapFunctions: ViewRoundable {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self;
-    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare);
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
 }
 
-impl ViewRoundable for SquareVisibilitiesByRelativePosition {
+impl ViewRoundable for LocalVisibilityMap {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         self.iter()
             .map(|(&step, vis)| (step, vis.rounded_towards_full_visibility(tolerance)))
@@ -317,7 +341,7 @@ impl ViewRoundable for SquareVisibilitiesByRelativePosition {
     }
 }
 
-impl SquareVisibilityMapFunctions for SquareVisibilitiesByRelativePosition {
+impl SquareVisibilityMapFunctions for LocalVisibilityMap {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self {
         let mut combined_vis_map = self.clone();
         dbg!(combined_vis_map.len());
@@ -326,6 +350,7 @@ impl SquareVisibilityMapFunctions for SquareVisibilitiesByRelativePosition {
             let mut existing_entry = combined_vis_map.entry(*key);
             match existing_entry {
                 std::collections::hash_map::Entry::Occupied(mut e) => {
+                    todo!("TODO: Does this just overwrite partially visible squares without combining to full visibility?");
                     e.insert(e.get().combined_increasing_visibility(value_to_add));
                 }
                 std::collections::hash_map::Entry::Vacant(e) => {
@@ -335,10 +360,6 @@ impl SquareVisibilityMapFunctions for SquareVisibilitiesByRelativePosition {
         });
         dbg!(combined_vis_map.len());
         combined_vis_map
-    }
-
-    fn add_fully_visible_absolute_square(&mut self, square: WorldSquare) {
-        todo!()
     }
 
     fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
@@ -352,7 +373,7 @@ mod tests {
     use crate::glyph::glyph_constants::{FULL_BLOCK, SPACE};
     use crate::utility::angle_interval::PartialAngleInterval;
     use euclid::vec2;
-    use ntest::timeout;
+    use ntest::{assert_false, timeout};
 
     #[test]
     fn test_square_visibility_knows_if_its_fully_visible() {
@@ -442,5 +463,40 @@ mod tests {
         assert!(!vis.is_nearly_but_not_fully_visible(0.0));
         assert!(!vis.is_nearly_but_not_fully_visible(1e-4));
         assert!(vis.is_nearly_but_not_fully_visible(1e-2));
+    }
+    #[test]
+    fn test_square_visibility_overlap__simple_non_overlap() {
+        let vis1 = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+                Line::new_horizontal(0.4),
+                (0.0, 1.0),
+            ),
+        );
+        let vis2 = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+                Line::new_horizontal(0.3),
+                (0.0, -1.0),
+            ),
+        );
+        assert_false!(vis1.overlaps(&vis2, 1e-5));
+        assert_false!(vis2.overlaps(&vis1, 1e-5));
+        assert_false!(vis1.overlaps(&vis1.complement().unwrap(), 1e-5));
+    }
+    #[test]
+    fn test_square_visibility_overlap__simple_overlap() {
+        let vis1 = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+                Line::new_horizontal(-0.3),
+                (0.0, 1.0),
+            ),
+        );
+        let vis2 = SquareVisibility::new_partially_visible(
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+                Line::new_horizontal(0.2),
+                (0.0, -1.0),
+            ),
+        );
+        assert!(vis1.overlaps(&vis2, 1e-5));
+        assert!(vis2.overlaps(&vis1, 1e-5));
     }
 }

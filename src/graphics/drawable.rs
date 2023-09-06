@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityTrait, SquareVisibility};
+use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, SquareVisibility};
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;
@@ -554,7 +554,7 @@ mod tests {
 
     fn test_shadow_over_text() {
         let shadow = PartialVisibilityDrawable::from_square_visibility(
-            SquareVisibilityFromOneLargeShadow::bottom_half_visible(),
+            SquareVisibilityFromOneLargeShadow::new_bottom_half_visible(),
         );
         let text = TextDrawable::new("a ", RED, GREEN, false);
 

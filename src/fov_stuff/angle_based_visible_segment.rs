@@ -1,4 +1,4 @@
-use crate::fov_stuff::{SquareVisibilitiesByRelativePosition, SquareVisibility};
+use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::{
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 
 use super::fence::RelativeFenceFullyVisibleFromOriginGoingCcw;
-use super::square_visibility::RelativeSquareVisibilityTrait;
+use super::square_visibility::RelativeSquareVisibilityFunctions;
 
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
@@ -127,7 +127,7 @@ impl AngleBasedVisibleSegment {
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
             .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
     }
-    pub fn to_square_visibilities(&self) -> SquareVisibilitiesByRelativePosition {
+    pub fn to_square_visibilities(&self) -> LocalVisibilityMap {
         // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
         // Watch out for the wraparound case.
         self.touched_squares_going_outwards_and_ccw()

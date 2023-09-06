@@ -192,9 +192,20 @@ impl<T, U> Line<T, U>
 where
     T: Clone + Debug + PartialEq + Signed + Copy,
 {
-    pub fn new(p1: Point2D<T, U>, p2: Point2D<T, U>) -> Line<T, U> {
+    pub fn new(
+        can_be_p1: impl Into<Point2D<T, U>>,
+        can_be_p2: impl Into<Point2D<T, U>>,
+    ) -> Line<T, U> {
+        let p1 = can_be_p1.into();
+        let p2 = can_be_p2.into();
         assert_ne!(p1, p2);
         Line { p1, p2 }
+    }
+    pub fn new_horizontal(y: T) -> Self {
+        Line::new((T::zero(), y), (T::one(), y))
+    }
+    pub fn new_through_origin(second_point: impl Into<Point2D<T, U>>) -> Self {
+        Self::new((T::zero(), T::zero()), second_point)
     }
     pub fn reverse(&mut self) {
         mem::swap(&mut self.p2, &mut self.p1);
@@ -223,6 +234,17 @@ where
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
         let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_anticlockwise));
         Self::new(new_points[0].clone(), new_points[1].clone())
+    }
+}
+
+impl<NumberType, UnitType, CanBePointType> From<(CanBePointType, CanBePointType)>
+    for Line<NumberType, UnitType>
+where
+    CanBePointType: Into<Point2D<NumberType, UnitType>>,
+    NumberType: Clone + Debug + PartialEq + Signed + Copy,
+{
+    fn from(value: (CanBePointType, CanBePointType)) -> Self {
+        Self::new(value.0, value.1)
     }
 }
 
@@ -531,20 +553,25 @@ where
 
 impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn from_line_and_point_on_half_plane(
-        dividing_line: Line<f32, U>,
-        point_on_half_plane: Point2D<f32, U>,
+        can_be_dividing_line: impl Into<Line<f32, U>>,
+        point_on_half_plane: impl Into<Point2D<f32, U>>,
     ) -> Self {
+        let dividing_line = can_be_dividing_line.into();
         HalfPlane {
             dividing_line: if three_points_are_clockwise(
                 dividing_line.p1,
                 dividing_line.p2,
-                point_on_half_plane,
+                point_on_half_plane.into(),
             ) {
                 dividing_line
             } else {
                 dividing_line.reversed()
             },
         }
+    }
+    pub fn from_line_away_from_origin(can_be_dividing_line: impl Into<Line<f32, U>>) -> Self {
+        let line: Line<f32, U> = can_be_dividing_line.into();
+        assert_false!(line.point_is_on_line((0.0, 0.0)));
     }
 
     pub fn complement(&self) -> Self {
@@ -652,6 +679,9 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         } else {
             -dist
         }
+    }
+    pub fn overlaps_within_unit_square(&self, other: &Self, tolerance: f32) -> bool {
+        todo!()
     }
 }
 
@@ -2067,9 +2097,13 @@ impl<A: Clone, B: Clone, C: Clone> TupleClone for (&A, &B, &C) {
 
 #[cfg(test)]
 mod tests {
+    use std::array::from_fn;
+
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
+
+    use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
 
     use super::*;
 
@@ -2928,5 +2962,62 @@ mod tests {
                 v.iter().map(|&q| Quadrant(q)).collect()
             );
         });
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square() {
+        //
+        //      +----------------+
+        //   o  |  o         o   |
+        //   G  |  A         B   |
+        //      |                |
+        //      |       +        |   o
+        //      |       O        |   C
+        //      |                |
+        //   F  |  E         D   |
+        //   o  |  o         o   |
+        //      +----------------+
+        //
+        let a = (-0.4, 0.4);
+        let b = (0.4, 0.4);
+        let c = (0.6, 0.0);
+        let d = (0.4, -0.4);
+        let e = (-0.4, -0.4);
+        let f = (-0.6, -0.4);
+        let g = (-0.6, 0.4);
+
+        let up: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+        let up_right: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
+        let down_right: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
+        let down: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
+        let left: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
+
+        let tolerance = 1e-5;
+
+        let f = HalfPlane::overlaps_within_unit_square;
+        let vars = vec![up, up_right, down_right, down, left];
+        // in format of f(vars[row], vars[col]).  Should be symmetric anyway
+        let correct_boolean_matrix = [
+            [1, 1, 0, 0, 0],
+            [1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        let actual_boolean_matrix: [[i32; 5]; 5] = from_fn(|row| {
+            from_fn(|col| {
+                if f(&vars[row], &vars[col], tolerance) {
+                    1
+                } else {
+                    0
+                }
+            })
+        });
+
+        assert_eq!(actual_boolean_matrix, correct_boolean_matrix);
     }
 }

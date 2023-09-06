@@ -26,7 +26,7 @@ use crate::fov_stuff::rasterized_field_of_view::{
     TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
 };
 use crate::fov_stuff::square_visibility::{
-    RelativeSquareVisibilityTrait, SquareVisibilityFunctions,
+    RelativeSquareVisibilityFunctions, SquareVisibilityFunctions,
 };
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
 use crate::glyph::glyph_constants::{

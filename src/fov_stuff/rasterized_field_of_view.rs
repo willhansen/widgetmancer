@@ -1,6 +1,7 @@
-use crate::fov_stuff::square_visibility::SquareVisibilitiesByRelativePosition;
+use crate::fov_stuff::square_visibility::LocalVisibilityMap;
 use crate::fov_stuff::square_visibility::SquareVisibility;
-use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityTrait, ViewRoundable};
+use crate::fov_stuff::square_visibility::SquareVisibilityMapFunctions;
+use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, ViewRoundable};
 use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
@@ -41,10 +42,7 @@ pub struct TopDownifiedFieldOfView {
 
 pub trait TopDownifiedFieldOfViewInterface {
     // creation
-    fn from_local_visibility_map(
-        root: WorldSquare,
-        vis_map: &SquareVisibilitiesByRelativePosition,
-    ) -> Self;
+    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self;
 
     // adding
     fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep);
@@ -63,10 +61,8 @@ pub trait TopDownifiedFieldOfViewInterface {
     fn root_square(&self) -> WorldSquare;
 
     // visibility maps
-    fn visibilities_of_partially_visible_squares_in_main_view_only(
-        &self,
-    ) -> SquareVisibilitiesByRelativePosition;
-    fn visibility_map_of_local_relative_squares(&self) -> SquareVisibilitiesByRelativePosition;
+    fn visibilities_of_partially_visible_squares_in_main_view_only(&self) -> LocalVisibilityMap;
+    fn visibility_map_of_local_relative_squares(&self) -> LocalVisibilityMap;
 
     // visible relative_squares
     fn fully_visible_relative_squares(&self) -> StepSet;
@@ -131,9 +127,7 @@ type UniqueTopDownPortals = HashMap<PositionedTopDownPortalTarget, TopDownPortal
 
 #[derive(Clone, Debug)]
 /// A RasterizedFieldOfView with the additional guarantee of all top-down-portals being on one square
-struct SquareOfTopDownPortals {
-    map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
-}
+struct SquareOfTopDownPortals(TopDownifiedFieldOfView);
 
 #[derive(Clone, Debug)]
 struct DirectConnectionToLocalSquare(TopDownPortal);
@@ -170,11 +164,13 @@ impl SquareOfTopDownPortals {
 
     fn lone_top_down_portal_or_panic(&self) -> TopDownPortal {
         let portal_count = self
+            .0
             .map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .count();
         if portal_count == 1 {
-            self.map_of_top_down_portal_shapes_by_coordinates
+            self.0
+                .map_of_top_down_portal_shapes_by_coordinates
                 .iter()
                 .next()
                 .unwrap()
@@ -209,14 +205,16 @@ impl SquareOfTopDownPortals {
     }
     fn relative_position(&self) -> WorldStep {
         // all the contained top down portals should have the same relative square.
-        self.map_of_top_down_portal_shapes_by_coordinates
+        self.0
+            .map_of_top_down_portal_shapes_by_coordinates
             .keys()
             .next()
             .unwrap()
             .0
     }
     fn top_down_portals(&self) -> Vec<TopDownPortal> {
-        self.map_of_top_down_portal_shapes_by_coordinates
+        self.0
+            .map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .map(|x| x.into())
             .collect()
@@ -224,46 +222,73 @@ impl SquareOfTopDownPortals {
 }
 impl FromIterator<TopDownPortal> for SquareOfTopDownPortals {
     fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
-        let new_thing = Self {
+        TopDownifiedFieldOfView::from_iter(iter).try_into().unwrap()
+    }
+}
+impl FromIterator<TopDownPortal> for TopDownifiedFieldOfView {
+    fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
+        let new_fov = Self {
             map_of_top_down_portal_shapes_by_coordinates: iter
                 .into_iter()
                 .map(|x| x.split())
                 .collect(),
         };
-        assert!(new_thing
-            .top_down_portals()
+        let has_portal_entrance_overlaps = new_fov
+            .top_down_portal_iter()
+            .into_group_map_by(|top_down_portal| top_down_portal.relative_position())
             .iter()
+            .any(|(rel_square, top_down_portals_for_square)| {
+                let tolerance = 1e-5;
+                top_down_portals_for_square
+                    .iter()
+                    .combinations(2)
+                    .any(|portals| portals[0].shape.overlaps(&portals[1].shape, tolerance))
+            });
+        if has_portal_entrance_overlaps {
+            panic!("can't create topdownified field of view because of overlapping top down portal entrances")
+        }
+        new_fov
+    }
+}
+impl TryFrom<TopDownifiedFieldOfView> for SquareOfTopDownPortals {
+    type Error = ();
+
+    fn try_from(value: TopDownifiedFieldOfView) -> Result<Self, Self::Error> {
+        if value
+            .top_down_portal_iter()
             .map(|x| x.relative_position())
-            .all_equal());
-        new_thing
+            .all_equal()
+        {
+            Ok(Self(value))
+        } else {
+            Err(())
+        }
     }
 }
 
 impl ViewRoundable for SquareOfTopDownPortals {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        Self {
-            map_of_top_down_portal_shapes_by_coordinates: self
+        Self::from_iter(
+            self.0
                 .map_of_top_down_portal_shapes_by_coordinates
                 .iter()
                 .map(
                     |(&draw_target_coordinates, &square_visibility_in_absolute_frame)| {
-                        (
+                        let top_down_portal: TopDownPortal = (
                             draw_target_coordinates,
                             square_visibility_in_absolute_frame
                                 .rounded_towards_full_visibility(tolerance),
                         )
+                            .into();
+                        top_down_portal
                     },
-                )
-                .collect(),
-        }
+                ),
+        )
     }
 }
 
 impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
-    fn from_local_visibility_map(
-        root: WorldSquare,
-        vis_map: &SquareVisibilitiesByRelativePosition,
-    ) -> Self {
+    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         dbg!(vis_map.len());
         vis_map.iter().for_each(|(rel_square, visibility)| {
@@ -298,6 +323,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
                 self.relative_to_local_absolute_square(relative_square),
                 visibility,
             )
+            .0
             .map_of_top_down_portal_shapes_by_coordinates,
         );
         Ok(())
@@ -320,13 +346,11 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
             .unwrap()
     }
 
-    fn visibilities_of_partially_visible_squares_in_main_view_only(
-        &self,
-    ) -> SquareVisibilitiesByRelativePosition {
+    fn visibilities_of_partially_visible_squares_in_main_view_only(&self) -> LocalVisibilityMap {
         self.filtered(true, true, false).visibility_map()
     }
 
-    fn visibility_map_of_local_relative_squares(&self) -> SquareVisibilitiesByRelativePosition {
+    fn visibility_map_of_local_relative_squares(&self) -> LocalVisibilityMap {
         self.filtered(true, true, true).visibility_map()
     }
     fn fully_visible_relative_squares(&self) -> StepSet {
@@ -511,6 +535,8 @@ impl TopDownifiedFieldOfView {
     fn add_top_down_portal(&mut self, portal: &TopDownPortal) {
         let positioned_portal_target: PositionedTopDownPortalTarget = portal.positioned_target();
         let portal_shape: TopDownPortalShape = portal.shape;
+        // TODO: check that the portal entrances do not overlap
+        todo!();
         self.map_of_top_down_portal_shapes_by_coordinates
             .insert(positioned_portal_target, portal_shape);
     }
@@ -582,6 +608,7 @@ impl TopDownifiedFieldOfView {
                 new_root,
                 &TopDownPortalShape::new_fully_visible(),
             )
+            .0
             .map_of_top_down_portal_shapes_by_coordinates,
         );
     }
@@ -630,7 +657,7 @@ impl TopDownifiedFieldOfView {
         &self.map_of_top_down_portal_shapes_by_coordinates
     }
 
-    fn visibility_map(&self) -> SquareVisibilitiesByRelativePosition {
+    fn visibility_map(&self) -> LocalVisibilityMap {
         self.portal_map()
             .into_iter()
             .map(|(&coord, &vis)| (coord.0, vis))
@@ -758,7 +785,12 @@ impl From<(WorldStep, TopDownPortalTarget, &TopDownPortalShape)> for TopDownPort
 }
 impl From<(&(WorldStep, TopDownPortalTarget), &TopDownPortalShape)> for TopDownPortal {
     fn from(value: (&(WorldStep, TopDownPortalTarget), &TopDownPortalShape)) -> Self {
-        (value.0 .0, value.0 .1, value.1.clone()).into()
+        value.tuple_clone().into()
+    }
+}
+impl From<((WorldStep, TopDownPortalTarget), TopDownPortalShape)> for TopDownPortal {
+    fn from(value: ((WorldStep, TopDownPortalTarget), TopDownPortalShape)) -> Self {
+        (value.0 .0, value.0 .1, value.1).into()
     }
 }
 
@@ -798,12 +830,7 @@ impl From<DirectConnectionToLocalSquare> for SquareOfTopDownPortals {
 }
 impl From<TopDownPortal> for SquareOfTopDownPortals {
     fn from(value: TopDownPortal) -> Self {
-        Self {
-            map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals::from([(
-                (value.relative_position, value.target),
-                value.shape,
-            )]),
-        }
+        Self::from_iter(vec![value])
     }
 }
 
@@ -891,7 +918,7 @@ mod tests {
     #[test]
     fn test_add_visible_local_relative_square() {
         let mut rfov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
-        let vis = SquareVisibility::top_half_visible();
+        let vis = SquareVisibility::new_top_half_visible();
         rfov.add_visible_local_relative_square(STEP_RIGHT, &vis);
         assert_eq!(rfov.number_of_visible_relative_squares(), 2);
         rfov.try_add_visible_local_relative_square(STEP_RIGHT * 2, &vis)

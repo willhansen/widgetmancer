@@ -11,7 +11,7 @@ use std::fmt::{Debug, Formatter};
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
 use crate::fov_stuff::square_visibility::{
-    RelativeSquareVisibilityTrait, SquareVisibilitiesByRelativePosition, SquareVisibility,
+    LocalVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
 use crate::utility::octant::Octant;
@@ -1273,7 +1273,6 @@ mod tests {
                     0
                 );
             });
-            dbg!(&fovs);
 
             let merged_fov = fovs
                 .iter()
@@ -1281,7 +1280,6 @@ mod tests {
                 .reduce(|a, b| a.combined_with(&b))
                 .unwrap()
                 .rasterized();
-            dbg!(&merged_fov.visibility_map_of_local_relative_squares());
 
             assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
             assert_eq!(

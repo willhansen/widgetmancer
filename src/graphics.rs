@@ -37,7 +37,7 @@ use crate::animations::*;
 use crate::fov_stuff::rasterized_field_of_view::{
     TopDownPortal, TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
 };
-use crate::fov_stuff::square_visibility::RelativeSquareVisibilityTrait;
+use crate::fov_stuff::square_visibility::RelativeSquareVisibilityFunctions;
 use crate::fov_stuff::FieldOfView;
 use crate::game::{
     DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD_S,
