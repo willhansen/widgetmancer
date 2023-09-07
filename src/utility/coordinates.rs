@@ -1,19 +1,37 @@
 use std::{
     collections::{HashMap, HashSet},
-    f32::consts::TAU,
+    f32::consts::{PI, TAU},
     fmt::Display,
-    ops::{Add, Sub},
+    ops::{Add, Neg, Sub},
 };
 
+use derive_more::{AddAssign, Neg};
 use euclid::{point2, vec2, Angle, Point2D, Vector2D};
 use num::{Signed, Zero};
 use ordered_float::OrderedFloat;
+use rand::rngs::StdRng;
 
+// TODO: get rid of this section
 use super::{
+    // TODO: get rid of this line
     coordinate_frame_conversions::{
-        SquareGridInWorldFrame, SquareSet, WorldMove, WorldSquare, WorldStep,
+        SquareGridInWorldFrame, SquareSet, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
     },
-    int_cos, int_sin, int_to_T, sign,
+    get_new_rng,
+    int_cos,
+    int_sin,
+    int_to_T,
+    lerp,
+    random_angle,
+    sign,
+    RigidTransform,
+    RigidlyTransformable,
+
+    ORTHOGONAL_STEPS,
+    STEP_DOWN,
+    STEP_LEFT,
+    STEP_RIGHT,
+    STEP_UP,
 };
 
 pub type IPoint = euclid::default::Point2D<i32>;
@@ -188,7 +206,7 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> default::Vector2D<f32> {
+pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> euclid::default::Vector2D<f32> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
         v.x = rng.gen_range(-1.0..=1.0);
@@ -197,7 +215,7 @@ pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> default::Vect
     v * radius
 }
 
-pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+pub fn rand_radial_offset(radius: f32) -> euclid::default::Vector2D<f32> {
     seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
 pub fn random_unit_vector() -> FVector {
@@ -425,6 +443,7 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
         HashSet::from([no_x, no_y])
     }
 }
+// TODO: move RigidlyTransformable to its own file to prevent super:: imports
 impl RigidlyTransformable for WorldSquare {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
@@ -440,13 +459,8 @@ impl RigidlyTransformable for OrthogonalWorldStep {
         tf.rotation().rotate_vector(self.step).into()
     }
 }
-pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
-    face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
-) -> [SquareType; 2] {
-    [face.square, face.stepped().square]
-}
 
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, AddAssign)]
 #[get_copy = "pub"]
 pub struct QuarterTurnsAnticlockwise {
     quarter_turns: i32,
@@ -576,6 +590,8 @@ mod tests {
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
 
+    use crate::utility::{STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO};
+
     use super::*;
     #[test]
     fn test_round_to_kingstep() {
@@ -639,23 +655,23 @@ mod tests {
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.5, 0.5)).to_degrees(),
+            better_angle_from_x_axis(euclid::default::Vector2D::new(0.5, 0.5)).to_degrees(),
             45.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.0, 0.5)).to_degrees(),
+            better_angle_from_x_axis(euclid::default::Vector2D::new(0.0, 0.5)).to_degrees(),
             90.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(0.0, -0.5)).to_degrees(),
+            better_angle_from_x_axis(euclid::default::Vector2D::new(0.0, -0.5)).to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(1.0, 0.0)).to_degrees(),
+            better_angle_from_x_axis(euclid::default::Vector2D::new(1.0, 0.0)).to_degrees(),
             0.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(default::Vector2D::new(-1.0, 0.0)).to_degrees(),
+            better_angle_from_x_axis(euclid::default::Vector2D::new(-1.0, 0.0)).to_degrees(),
             180.0
         );
     }
@@ -663,7 +679,7 @@ mod tests {
     #[test]
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
         assert!(
-            (default::Vector2D::new(0.5, 0.5)
+            (euclid::default::Vector2D::new(0.5, 0.5)
                 .angle_from_x_axis()
                 .to_degrees()
                 - 45.0)

@@ -61,6 +61,31 @@ pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
 #[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
+pub const STEP_ZERO: WorldStep = vec2(0, 0);
+pub const STEP_UP: WorldStep = vec2(0, 1);
+pub const STEP_DOWN: WorldStep = vec2(0, -1);
+pub const STEP_RIGHT: WorldStep = vec2(1, 0);
+pub const STEP_LEFT: WorldStep = vec2(-1, 0);
+
+pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
+pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
+pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
+pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
+
+pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
+pub const DIAGONAL_STEPS: [WorldStep; 4] =
+    [STEP_UP_RIGHT, STEP_UP_LEFT, STEP_DOWN_RIGHT, STEP_DOWN_LEFT];
+pub const KING_STEPS: [WorldStep; 8] = [
+    STEP_UP,
+    STEP_DOWN,
+    STEP_RIGHT,
+    STEP_LEFT,
+    STEP_UP_RIGHT,
+    STEP_UP_LEFT,
+    STEP_DOWN_RIGHT,
+    STEP_DOWN_LEFT,
+];
+
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
 ) -> WorldCharacterSquareGlyphMap {

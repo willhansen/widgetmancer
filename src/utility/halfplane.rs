@@ -1,3 +1,9 @@
+use std::fmt::Display;
+
+use euclid::Point2D;
+
+use super::{coordinates::*, line::*};
+
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T, U>
 where

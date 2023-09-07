@@ -1,4 +1,19 @@
-#[derive(Clone, Hash, Eq, PartialEq, Neg, Debug, Copy, CopyGetters, Constructor)]
+use std::ops::Add;
+
+use derive_more::Neg;
+
+use super::{
+    // TODO: Get rid of this line
+    coordinate_frame_conversions::{WorldSquare, WorldStep},
+
+    coordinates::*,
+    STEP_RIGHT,
+    STEP_ZERO,
+};
+
+#[derive(
+    Clone, Hash, Eq, PartialEq, Neg, Debug, Copy, getset::CopyGetters, derive_more::Constructor,
+)]
 #[get_copy = "pub"]
 pub struct StepWithQuarterRotations {
     stepp: WorldStep,
@@ -30,7 +45,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Copy, CopyGetters)]
+#[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters)]
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy> {
     square: SquareType,
@@ -331,6 +346,13 @@ pub fn faces_away_from_center_at_rel_square(
         .map(|&face_step| (step, face_step).into())
         .collect()
 }
+
+pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
+    face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
+) -> [SquareType; 2] {
+    [face.square, face.stepped().square]
+}
+
 #[cfg(test)]
 mod tests {
 
