@@ -579,7 +579,6 @@ pub fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
     use crate::utility::poses::faces_away_from_center_at_rel_square;
     use euclid::point2;
     use itertools::Itertools;

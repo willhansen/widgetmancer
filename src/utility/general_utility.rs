@@ -1,4 +1,5 @@
 pub use getset::CopyGetters;
+pub use itertools::Itertools;
 pub use ntest::assert_false;
 pub use std::ops::{Add, Sub};
 pub use std::{

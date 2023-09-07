@@ -837,8 +837,9 @@ impl From<TopDownPortal> for SquareOfTopDownPortals {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
-    use crate::utility::{RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use crate::utility::{
+        halfplane::LocalSquareHalfPlane, RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP,
+    };
     use euclid::point2;
     use ntest::{assert_true, timeout};
 

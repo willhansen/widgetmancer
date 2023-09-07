@@ -9,6 +9,7 @@ use crate::utility::coordinate_frame_conversions::{
     world_half_plane_to_local_square_half_plane, SquareGridInLocalSquareFrame, WorldPoint,
     WorldSquare, WorldStep,
 };
+use crate::utility::halfplane::LocalSquareHalfPlane;
 use crate::utility::{
     king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
@@ -50,9 +51,6 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_about_complementary_to(&self, other: Self) -> bool;
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
-
-// TODO: make this a newtype with restricted points
-pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(PartialEq, Clone, Copy, Constructor)]
 pub struct SquareVisibilityFromOneLargeShadow {

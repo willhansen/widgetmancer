@@ -1,5 +1,8 @@
 use super::{coordinate_frame_conversions::*, coordinates::*, general_utility::*, line::*};
 
+// TODO: make this a newtype with restricted points
+pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
+
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T, U>
 where
@@ -253,7 +256,7 @@ mod tests {
         );
         assert_about_eq!(
             diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),
-            1.0 / 2.0.sqrt()
+            1.0 / 2.0_f32.sqrt()
         );
     }
     #[test]
@@ -278,7 +281,8 @@ mod tests {
         let f = (-0.6, -0.4);
         let g = (-0.6, 0.4);
 
-        let up = HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+        let up: LocalSquareHalfPlane =
+            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
         let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
         let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
         let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));

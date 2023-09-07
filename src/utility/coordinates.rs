@@ -7,9 +7,10 @@ use std::{
 
 use derive_more::{AddAssign, Neg};
 pub use euclid::{num::Zero, point2, vec2, Angle, Point2D, Vector2D};
+use itertools::Itertools;
 use num::Signed;
 use ordered_float::OrderedFloat;
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, Rng};
 
 // TODO: get rid of this section
 use super::{

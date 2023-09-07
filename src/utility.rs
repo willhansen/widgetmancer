@@ -357,8 +357,6 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
-    use crate::fov_stuff::square_visibility::LocalSquareHalfPlane;
-
     use super::*;
 
     #[test]

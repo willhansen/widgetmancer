@@ -537,10 +537,9 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::square_visibility::{
-        LocalSquareHalfPlane, SquareVisibilityFromOneLargeShadow,
-    };
+    use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
+    use crate::utility::halfplane::LocalSquareHalfPlane;
     use euclid::point2;
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
@@ -551,7 +550,6 @@ mod tests {
     use super::*;
 
     #[test]
-
     fn test_shadow_over_text() {
         let shadow = PartialVisibilityDrawable::from_square_visibility(
             SquareVisibilityFromOneLargeShadow::new_bottom_half_visible(),
@@ -571,14 +569,12 @@ mod tests {
     }
 
     #[test]
-
     fn test_text_background() {
         let text = TextDrawable::new("a ", RED, GREEN, false);
         assert_eq!(text.color_if_backgroundified(), RED);
     }
 
     #[test]
-
     fn test_text_drawn_over_solid_to_glyphs_with_empty_space() {
         let solid_drawable = SolidColorDrawable::new(GREEN);
         let text_drawable = TextDrawable::new("♟ ", RED, BLUE, true);
@@ -588,7 +584,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
@@ -602,7 +597,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
         let character = d.rotated(QuarterTurnsAnticlockwise::new(1)).to_glyphs()[0].character;
@@ -612,13 +606,11 @@ mod tests {
         );
     }
     #[test]
-
     fn test_conveyor_belt_drawable__half_down() {
         let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
     #[test]
-
     fn test_offset_square_drawn_over_solid() {
         let top = OffsetSquareDrawable {
             offset: vec2(0.5, 0.0),
@@ -632,14 +624,12 @@ mod tests {
     // All the braille unicode consecutively for easy reference
     //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
     #[test]
-
     fn test_braille_drawable_from_chars() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
         assert_eq!(drawable.braille_array.chars()[1], SPACE);
         drawable.braille_array.print();
     }
     #[test]
-
     fn test_braille_drawable_rotation() {
         let drawable = BrailleDrawable::from_chars(['⣲', SPACE], RED);
         drawable.braille_array.print();

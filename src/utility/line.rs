@@ -1,7 +1,8 @@
 use std::ops::Add;
 
+use euclid::approxeq::ApproxEq;
 use line_drawing::Supercover;
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, Rng};
 
 use super::{
     coordinate_frame_conversions::*, coordinates::*, general_utility::*, get_new_rng, poses::*,
@@ -81,8 +82,8 @@ impl<U: Copy> Line<f32, U> {
     pub fn length(&self) -> f32 {
         (self.p1 - self.p2).length()
     }
-    pub fn point_is_on_line(&self, point: Point2D<f32, U>) -> bool {
-        on_line(self.p1, self.p2, point)
+    pub fn point_is_on_line(&self, point: impl Into<Point2D<f32, U>>) -> bool {
+        on_line(self.p1, self.p2, point.into())
     }
     pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
