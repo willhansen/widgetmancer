@@ -8,7 +8,7 @@ use crate::graphics::drawable::{
 };
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::{
-    king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
+    king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     CoordToString, QuarterTurnRotatable, QuarterTurnsAnticlockwise, SimpleResult, TupleClone,
     STEP_ZERO,
 };

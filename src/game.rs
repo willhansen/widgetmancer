@@ -302,7 +302,7 @@ impl Game {
     pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
         assert!(is_orthodiagonal(movement));
         let movement_direction = round_to_king_step(movement);
-        let movement_length = king_distance(movement);
+        let movement_length = king_step_distance(movement);
         self.try_slide_player_by_direction(movement_direction.into(), movement_length)
     }
 
@@ -1748,7 +1748,7 @@ impl Game {
         target_square: WorldSquare,
     ) -> Option<Vec<WorldSquare>> {
         fn cost_heuristic(a: WorldSquare, b: WorldSquare) -> u32 {
-            king_distance(a - b)
+            king_step_distance(a - b)
         }
         let relative_steps = KING_STEPS;
         let mut recorded_step_start_squares_by_step_end_squares =

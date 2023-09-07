@@ -11,7 +11,7 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::halfplane::LocalSquareHalfPlane;
 use crate::utility::{
-    king_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
+    king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
     QuarterTurnsAnticlockwise, WorldLine, STEP_ZERO,
 };

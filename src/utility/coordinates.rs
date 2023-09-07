@@ -160,8 +160,11 @@ pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     new_v
 }
 // TODO: remove use of specific world square units
-pub fn king_distance(step: WorldStep) -> u32 {
+pub fn king_step_distance<U>(step: Vector2D<i32, U>) -> u32 {
     step.x.abs().max(step.y.abs()) as u32
+}
+pub fn king_move_distance<U>(step: Vector2D<f32, U>) -> f32 {
+    step.x.abs().max(step.y.abs())
 }
 
 pub fn round_to_king_step(step: WorldStep) -> WorldStep {
@@ -595,6 +598,11 @@ pub fn on_line_in_this_order<U>(
     c: Point2D<f32, U>,
 ) -> bool {
     on_line(a, b, c) && (a - b).length() < (a - c).length()
+}
+
+pub fn point_is_in_unit_square<U>(point: Point2D<f32, U>, tolerance: f32) -> bool {
+    let vec = point.to_vector();
+    king_move_distance(vec) < 0.5 + tolerance
 }
 
 #[cfg(test)]

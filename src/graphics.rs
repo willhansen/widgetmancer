@@ -57,7 +57,7 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, king_distance,
+    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, king_step_distance,
     number_to_color, number_to_hue_rotation, reversed, square_is_odd, squares_on_board,
     unit_vector_from_angle, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, WorldLine,
     STEP_RIGHT,
@@ -699,7 +699,7 @@ impl Graphics {
                     // ))
                     // .to_enum()
                     SolidColorDrawable::new(number_to_hue_rotation(
-                        king_distance(
+                        king_step_distance(
                             top_down_portal.target_square() - rasterized_fov.root_square(),
                         ) as f32,
                         10.0,

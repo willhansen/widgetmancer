@@ -34,6 +34,9 @@ where
     pub fn new_horizontal(y: T) -> Self {
         Line::new((T::zero(), y), (T::one(), y))
     }
+    pub fn new_vertical(x: T) -> Self {
+        Line::new((x, T::zero()), (x, T::one()))
+    }
     pub fn new_through_origin(second_point: impl Into<Point2D<T, U>>) -> Self {
         Self::new((T::zero(), T::zero()), second_point)
     }
@@ -159,8 +162,8 @@ impl<U: Copy> Line<f32, U> {
         }
     }
 
-    pub fn reflect_point_over_line(&self, point: Point2D<f32, U>) -> Point2D<f32, U> {
-        let p1_to_p = point - self.p1;
+    pub fn reflect_point_over_line(&self, point: impl Into<Point2D<f32, U>>) -> Point2D<f32, U> {
+        let p1_to_p = point.into() - self.p1;
         let p1_to_p2 = self.p2 - self.p1;
         let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
         let perpendicular_part = p1_to_p - parallel_part;
@@ -196,13 +199,17 @@ impl<U: Copy> Line<f32, U> {
         three_points_are_clockwise(point_a, point_b, point_c)
             == three_points_are_clockwise(point_a, point_b, point_d)
     }
-    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<Point2D<f32, U>> {
+    pub fn line_intersections_with_expanded_centered_unit_square(
+        &self,
+        expansion_length: f32,
+    ) -> Vec<Point2D<f32, U>> {
         let line_point_a = self.p1;
         let line_point_b = self.p2;
         let is_same_point = line_point_a == line_point_b;
         if is_same_point {
             panic!("gave same point {}", line_point_a.to_string());
         }
+        let half_side_length = 0.5 + expansion_length;
 
         let is_vertical_line = line_point_a.x == line_point_b.x;
         let is_horizontal_line = line_point_a.y == line_point_b.y;
@@ -210,14 +217,20 @@ impl<U: Copy> Line<f32, U> {
         if is_vertical_line {
             let x = line_point_a.x;
             if x.abs() <= 0.5 {
-                self.points_in_line_order(vec![point2(x, 0.5), point2(x, -0.5)])
+                self.points_in_line_order(vec![
+                    point2(x, half_side_length),
+                    point2(x, -half_side_length),
+                ])
             } else {
                 vec![]
             }
         } else if is_horizontal_line {
             let y = line_point_a.y;
-            if y.abs() <= 0.5 {
-                self.points_in_line_order(vec![point2(0.5, y), point2(-0.5, y)])
+            if y.abs() <= half_side_length {
+                self.points_in_line_order(vec![
+                    point2(half_side_length, y),
+                    point2(-half_side_length, y),
+                ])
             } else {
                 vec![]
             }
@@ -229,19 +242,19 @@ impl<U: Copy> Line<f32, U> {
             // b = y - m*x
             let b = line_point_a.y - m * line_point_a.x;
 
-            let side_positions = vec![0.5, -0.5];
+            let side_positions = vec![half_side_length, -half_side_length];
 
             let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
             for &x in &side_positions {
                 let y = m * x + b;
-                if y.abs() <= 0.5 {
+                if y.abs() <= half_side_length {
                     candidate_intersections.push(point2(x, y));
                 }
             }
             for y in side_positions {
                 let x = (y - b) / m;
                 // top and bottom don't catch corners, sides do
-                if x.abs() < 0.5 {
+                if x.abs() < half_side_length {
                     candidate_intersections.push(point2(x, y));
                 }
             }
@@ -261,9 +274,18 @@ impl<U: Copy> Line<f32, U> {
             }
         }
     }
+    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<Point2D<f32, U>> {
+        self.line_intersections_with_expanded_centered_unit_square(0.0)
+    }
     pub fn line_intersects_with_centered_unit_square(&self) -> bool {
+        self.line_intersects_with_expanded_centered_unit_square(0.0)
+    }
+    pub fn line_intersects_with_expanded_centered_unit_square(
+        &self,
+        expansion_length: f32,
+    ) -> bool {
         !self
-            .line_intersections_with_centered_unit_square()
+            .line_intersections_with_expanded_centered_unit_square(expansion_length)
             .is_empty()
     }
     fn points_in_line_order(&self, mut points: Vec<Point2D<f32, U>>) -> Vec<Point2D<f32, U>> {

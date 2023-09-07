@@ -14,7 +14,9 @@ use crate::fov_stuff::square_visibility::{
     LocalVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
-use crate::utility::coordinates::{king_distance, unit_vector_from_angle, OrthogonalWorldStep};
+use crate::utility::coordinates::{
+    king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
+};
 use crate::utility::octant::Octant;
 use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
@@ -353,7 +355,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
     loop {
         let relative_square = steps_in_octant_iter.next().unwrap();
-        let square_is_out_of_range = king_distance(relative_square) > radius;
+        let square_is_out_of_range = king_step_distance(relative_square) > radius;
         if square_is_out_of_range {
             break;
         }
@@ -382,7 +384,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             let square_blocks_sight = sight_blockers.contains(&absolute_square);
 
             let face_is_on_edge_of_sight_radius =
-                king_distance(relative_face.stepped().square()) > radius;
+                king_step_distance(relative_face.stepped().square()) > radius;
 
             let face_blocks_sight =
                 face_has_portal || square_blocks_sight || face_is_on_edge_of_sight_radius;
