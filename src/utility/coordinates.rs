@@ -6,8 +6,8 @@ use std::{
 };
 
 use derive_more::{AddAssign, Neg};
-pub use euclid::{point2, vec2, Angle, Point2D, Vector2D};
-use num::{Signed, Zero};
+pub use euclid::{num::Zero, point2, vec2, Angle, Point2D, Vector2D};
+use num::Signed;
 use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
 
