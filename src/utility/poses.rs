@@ -1,8 +1,11 @@
 use crate::glyph::{glyph_constants::FACE_ARROWS, Glyph};
 
 use super::{
-    coordinate_frame_conversions::*, coordinates::*, general_utility::*, RigidTransform,
-    RigidlyTransformable,
+    coordinate_frame_conversions::*,
+    coordinates::*,
+    general_utility::*,
+    line::{square_face_as_line, WorldLine},
+    RigidTransform, RigidlyTransformable,
 };
 
 #[derive(
@@ -159,6 +162,11 @@ where
         other_face: OtherType,
     ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
+    }
+    // TODO: return AbsOrRelWorldLine
+    pub fn line(&self) -> WorldLine {
+        let abs_face = self.as_absolute_face();
+        square_face_as_line(abs_face.square, abs_face.dir)
     }
 }
 
