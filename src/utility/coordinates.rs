@@ -6,7 +6,7 @@ use std::{
 };
 
 use derive_more::{AddAssign, Neg};
-use euclid::{point2, vec2, Angle, Point2D, Vector2D};
+pub use euclid::{point2, vec2, Angle, Point2D, Vector2D};
 use num::{Signed, Zero};
 use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
@@ -551,7 +551,7 @@ impl QuarterTurnRotatable for Angle<f32> {
         ))
     }
 }
-fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
+pub fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
     assert!(points.len() >= 2);
     let furthest = points
         .iter()
@@ -582,6 +582,18 @@ pub fn in_ccw_order(v: &Vec<WorldMove>) -> bool {
     v.iter()
         .tuple_windows()
         .all(|(&a, &b)| two_in_ccw_order(a, b))
+}
+pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) == 0.0
+}
+pub fn on_line_in_this_order<U>(
+    a: Point2D<f32, U>,
+    b: Point2D<f32, U>,
+    c: Point2D<f32, U>,
+) -> bool {
+    on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
 #[cfg(test)]

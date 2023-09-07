@@ -1,3 +1,16 @@
+use std::ops::Add;
+
+use line_drawing::Supercover;
+use rand::rngs::StdRng;
+
+use super::{
+    coordinate_frame_conversions::*, coordinates::*, general_utility::*, get_new_rng, poses::*,
+};
+
+pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
+pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
+pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
+
 #[derive(Clone, PartialEq, Copy)]
 pub struct Line<T, U> {
     pub p1: Point2D<T, U>,
@@ -423,7 +436,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
     if !face_is_facing_ray {
         return None;
     }
-    let face_line_segment = square_face_as_line(face.square, face.dir);
+    let face_line_segment = square_face_as_line(face.square(), face.dir());
     let ray_line_segment = WorldLine::from_ray(start, angle, range);
     ray_line_segment.intersection_point_with_other_line(&face_line_segment)
 }

@@ -1,8 +1,4 @@
-use std::fmt::Display;
-
-use euclid::Point2D;
-
-use super::{coordinates::*, line::*};
+use super::{coordinate_frame_conversions::*, coordinates::*, general_utility::*, line::*};
 
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T, U>
@@ -160,8 +156,12 @@ impl<U: Copy + Debug> QuarterTurnRotatable for HalfPlane<f32, U> {
 #[cfg(test)]
 mod tests {
 
+    use std::array::from_fn;
+
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
+
+    use crate::utility::coordinate_frame_conversions::SquareGridInWorldFrame;
 
     use super::*;
     #[test]
@@ -278,16 +278,11 @@ mod tests {
         let f = (-0.6, -0.4);
         let g = (-0.6, 0.4);
 
-        let up: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
-        let up_right: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
-        let down_right: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
-        let down: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
-        let left: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
+        let up = HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+        let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
+        let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
+        let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
+        let left = HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
 
         let tolerance = 1e-5;
 

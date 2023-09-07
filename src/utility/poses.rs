@@ -1,14 +1,8 @@
-use std::ops::Add;
-
-use derive_more::Neg;
+use crate::glyph::{glyph_constants::FACE_ARROWS, Glyph};
 
 use super::{
-    // TODO: Get rid of this line
-    coordinate_frame_conversions::{WorldSquare, WorldStep},
-
-    coordinates::*,
-    STEP_RIGHT,
-    STEP_ZERO,
+    coordinate_frame_conversions::*, coordinates::*, general_utility::*, RigidTransform,
+    RigidlyTransformable,
 };
 
 #[derive(
@@ -166,11 +160,6 @@ where
     ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
-    // TODO: return AbsOrRelWorldLine
-    pub fn line(&self) -> WorldLine {
-        let abs_face = self.as_absolute_face();
-        square_face_as_line(abs_face.square, abs_face.dir)
-    }
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T>
@@ -294,7 +283,7 @@ impl SquareWithKingDir {
     }
     pub fn stepped(&self) -> SquareWithKingDir {
         SquareWithKingDir::from_square_and_step(
-            self.square + self.direction.step,
+            self.square + self.direction.step(),
             self.direction.into(),
         )
     }

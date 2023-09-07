@@ -56,10 +56,6 @@ pub use self::poses::*;
 pub use self::quadrant::*;
 pub use self::round_robin_iterator::*;
 
-pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
-pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
-pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
-
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
 }
