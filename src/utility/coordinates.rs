@@ -600,7 +600,7 @@ pub fn on_line_in_this_order<U>(
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
-pub fn point_is_in_unit_square<U>(point: Point2D<f32, U>, tolerance: f32) -> bool {
+pub fn point_is_in_centered_unit_square<U>(point: Point2D<f32, U>, tolerance: f32) -> bool {
     let vec = point.to_vector();
     king_move_distance(vec) < 0.5 + tolerance
 }

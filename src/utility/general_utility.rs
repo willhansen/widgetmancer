@@ -162,6 +162,13 @@ impl<A: Clone, B: Clone, C: Clone> TupleClone for (&A, &B, &C) {
         }
     }
 }
+pub fn all_true<'a>(v: impl IntoIterator<Item = &'a bool>) -> bool {
+    v.into_iter().all(|&x| x)
+}
+pub fn any_true<'a>(v: impl IntoIterator<Item = &'a bool>) -> bool {
+    v.into_iter().any(|&x| x)
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;
@@ -198,5 +205,19 @@ mod tests {
             rotated_to_have_split_at_max(&vec![0, 1, 2, 3, 4, 5], |a, b| (a - b).abs() as f32),
             vec![0, 1, 2, 3, 4, 5]
         );
+    }
+    #[test]
+    fn test_all_true() {
+        assert!(all_true(&vec![true, true, true]));
+        assert!(all_true(&[true, true, true]));
+        assert_false!(all_true(&[true, false, true]));
+        assert_false!(all_true(&vec![true, true, false]));
+    }
+    #[test]
+    fn test_any_true() {
+        assert!(any_true(&vec![true, true, true]));
+        assert!(any_true(&[false, true, false]));
+        assert_false!(any_true(&[false, false, false]));
+        assert_false!(any_true(&vec![false, false, false]));
     }
 }

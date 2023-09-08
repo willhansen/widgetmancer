@@ -96,6 +96,9 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .iter()
             .all(|&p| self.overlapping_or_touching_point(p))
     }
+    pub fn retracted(&self, retracted_distance: f32) -> Self {
+        self.extended(-retracted_distance)
+    }
     pub fn extended(&self, extended_distance: f32) -> Self {
         let direction = self.direction_away_from_plane();
         let move_vector = Vector2D::from_angle_and_length(direction, extended_distance);
@@ -156,7 +159,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .dividing_line
             .intersection_point_with_other_extended_line(&other.dividing_line)
         {
-            point_is_in_unit_square(intersection_point, tolerance)
+            point_is_in_centered_unit_square(intersection_point, tolerance)
         } else {
             false
         };
@@ -164,34 +167,46 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             return true;
         }
 
-        let on_same_side = todo!();
+        // from here, each plane is either is fully overlapping the square, not overlapping, or partially overlapping.
 
-        let fully_covers = [self, other].map(|hp| hp.fully_covers_expanded_unit_square(tolerance));
-        let border_crosses = [self, other].map(|hp| {
+        let full_cover = [self, other].map(|hp| hp.fully_covers_expanded_unit_square(tolerance));
+        let partial_cover = [self, other].map(|hp| {
             hp.dividing_line
                 .line_intersects_with_expanded_centered_unit_square(tolerance)
         });
         // Just in case
         (0..2).for_each(|i| {
-            assert_false!(fully_covers[i] && border_crosses[i]);
+            assert_false!(full_cover[i] && partial_cover[i]);
         });
 
-        let both_fully_cover = fully_covers.iter().all(|&x| x);
-        let any_fully_cover = fully_covers.iter().any(|&x| x);
-        let any_border_crosses = border_crosses.iter().any(|&x| x);
-        let neither_border_crosses = !any_border_crosses;
+        let no_cover = [0, 1].map(|i| !full_cover[i] && !partial_cover[i]);
 
-        let one_fully_covers_and_the_others_border_crosses = any_fully_cover && any_border_crosses;
+        let both_full_cover = all_true(&full_cover);
+        let any_full_cover = any_true(&full_cover);
+        let any_partial_cover = any_true(&partial_cover);
+        let both_partial_cover = all_true(&partial_cover);
+        let any_no_cover = any_true(&no_cover);
 
-        if both_fully_cover {
+        let one_full_cover_and_one_partial_cover = any_full_cover && any_partial_cover;
+
+        if both_full_cover || one_full_cover_and_one_partial_cover {
             return true;
-        } else if one_fully_covers_and_the_others_border_crosses {
-            return true;
-        } else if neither_border_crosses {
+        } else if any_no_cover {
             return false;
         }
+        // both partial cover case
+        assert!(both_partial_cover);
+        // we've already ruled out an intersection in the square
 
-        return false;
+        let same_direction = unit_vector_from_angle(self.direction_toward_plane())
+            .dot(unit_vector_from_angle(other.direction_toward_plane()))
+            > 0.0;
+        if same_direction {
+            return true;
+        }
+
+        // Now need to know if the two lines are on each others half planes
+        return self.point_is_on_half_plane(other.dividing_line.p1);
     }
 }
 
@@ -480,10 +495,29 @@ mod tests {
         assert_false!(a.overlaps_within_unit_square(&b, 0.0))
     }
     #[test]
-    fn test_halfplane_overlap_within_unit_square__false__exact_touch() {
+    fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exact_touch()
+    {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.complement();
         assert_false!(a.overlaps_within_unit_square(&b, 0.0))
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_extended_but_within_tolerance(
+    ) {
+        let tolerance = 0.01;
+        let a: LocalSquareHalfPlane =
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
+        let b: LocalSquareHalfPlane = a.complement().extended(tolerance / 2.0);
+        assert_false!(a.overlaps_within_unit_square(&b, -tolerance))
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square__true__opposing_parallel_half_planes_retracted_but_within_tolerance(
+    ) {
+        let tolerance = 0.01;
+        let a: LocalSquareHalfPlane =
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
+        let b: LocalSquareHalfPlane = a.complement().retracted(tolerance / 2.0);
+        assert!(a.overlaps_within_unit_square(&b, tolerance))
     }
 }
