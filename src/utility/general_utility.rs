@@ -169,6 +169,20 @@ pub fn any_true<'a>(v: impl IntoIterator<Item = &'a bool>) -> bool {
     v.into_iter().any(|&x| x)
 }
 
+pub fn get_column<const ROWS: usize, const COLS: usize, T: Copy>(
+    a: &[[T; COLS]; ROWS],
+    col: usize,
+) -> [T; ROWS] {
+    a.map(|row| row[col])
+}
+
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+pub enum BoolWithPartial {
+    True,
+    Partial,
+    False,
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;
@@ -219,5 +233,9 @@ mod tests {
         assert!(any_true(&[false, true, false]));
         assert_false!(any_true(&[false, false, false]));
         assert_false!(any_true(&vec![false, false, false]));
+    }
+    #[test]
+    fn test_get_column() {
+        assert_eq!(get_column(&[[1, 2, 3], [4, 5, 6],], 1), [2, 5]);
     }
 }

@@ -18,6 +18,8 @@ pub struct Line<T, U> {
     pub p2: Point2D<T, U>,
 }
 
+pub type DefaultLine<T> = Line<T, euclid::UnknownUnit>;
+
 impl<T, U> Line<T, U>
 where
     T: Clone + Debug + PartialEq + Signed + Copy,
@@ -278,14 +280,11 @@ impl<U: Copy> Line<f32, U> {
         self.line_intersections_with_expanded_centered_unit_square(0.0)
     }
     pub fn line_intersects_with_centered_unit_square(&self) -> bool {
-        self.line_intersects_with_expanded_centered_unit_square(0.0)
+        self.intersects_with_expanded_centered_unit_square(0.0)
     }
-    pub fn line_intersects_with_expanded_centered_unit_square(
-        &self,
-        expansion_length: f32,
-    ) -> bool {
+    pub fn intersects_with_expanded_centered_unit_square(&self, per_face_extension: f32) -> bool {
         !self
-            .line_intersections_with_expanded_centered_unit_square(expansion_length)
+            .line_intersections_with_expanded_centered_unit_square(per_face_extension)
             .is_empty()
     }
     fn points_in_line_order(&self, mut points: Vec<Point2D<f32, U>>) -> Vec<Point2D<f32, U>> {
@@ -570,6 +569,21 @@ mod tests {
             Line::new(point2(0.5, 0.0), point2(-1.5, 0.0));
         let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
+    }
+    #[test]
+    fn test_orthogonal_line_intersects_with_expanded_square() {
+        let tolerance = 0.01;
+        let fs: [fn(f32) -> DefaultLine<f32>; 2] = [Line::new_horizontal, Line::new_vertical];
+        fs.into_iter().for_each(|f| {
+            assert!(f(0.5).intersects_with_expanded_centered_unit_square(tolerance));
+            assert!(
+                f(0.5 + tolerance / 2.0).intersects_with_expanded_centered_unit_square(tolerance)
+            );
+            assert_false!(
+                f(0.5 - tolerance / 2.0).intersects_with_expanded_centered_unit_square(-tolerance)
+            );
+            assert_false!(f(0.5).intersects_with_expanded_centered_unit_square(-tolerance));
+        });
     }
 
     #[test]
