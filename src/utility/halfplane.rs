@@ -89,7 +89,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn covers_origin(&self) -> BoolWithPartial {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
-    pub fn fully_covers_unit_square(&self) -> bool {
+    pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_expanded_unit_square(0.0)
     }
     pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> bool {
@@ -552,6 +552,26 @@ mod tests {
         assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
     }
     #[test]
+    fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exactly_touching_each_other_within_square(
+    ) {
+        let a: LocalSquareHalfPlane =
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.2));
+        let b: LocalSquareHalfPlane = a.complement();
+        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square__opposing_parallel_half_planes_exactly_touching_each_other_is_consistent(
+    ) {
+        let a: LocalSquareHalfPlane =
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.2));
+        let b: LocalSquareHalfPlane =
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
+        assert_eq!(
+            a.overlaps_other_within_centered_expanded_unit_square(&a.complement(), 0.0),
+            b.overlaps_other_within_centered_expanded_unit_square(&b.complement(), 0.0,)
+        )
+    }
+    #[test]
     fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_extended_but_within_tolerance(
     ) {
         let tolerance = 0.01;
@@ -605,5 +625,15 @@ mod tests {
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(border_y_pos));
         let coverage = halfplane.covers_centered_expanded_unit_square(unit_square_expansion);
         assert_eq!(coverage, BoolWithPartial::True);
+    }
+    #[test]
+    fn test_halfplane_overlap_within_unit_square__false__exact__one_fully_covers__one_just_touches_corner() {
+        let border_y_pos = 0.55;
+        let unit_square_expansion = 0.01;
+        let a: HalfPlane =
+            HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
+        let b: HalfPlane =
+            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.0, 0.5));
+        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0));
     }
 }

@@ -176,6 +176,18 @@ pub fn get_column<const ROWS: usize, const COLS: usize, T: Copy>(
     a.map(|row| row[col])
 }
 
+/// Intended for determining how much a halfplane overlaps a shape.
+/// Needs to account for exact points at start and end of coverage
+/// All the sections of a closed intervals
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+pub enum ClosedIntervalSection {
+    After,
+    End,
+    During,
+    Start,
+    Before,
+}
+
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub enum BoolWithPartial {
     True,
