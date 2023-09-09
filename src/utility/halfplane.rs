@@ -72,16 +72,21 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
-    pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> bool {
-        self.dividing_line
-            .same_side_of_line(self.point_on_half_plane(), point)
+    pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> BoolWithPartial {
+        if self.dividing_line.point_is_on_line(point) {
+            BoolWithPartial::Partial
+        } else {
+            self.dividing_line
+                .same_side_of_line(self.point_on_half_plane(), point)
+                .into()
+        }
     }
     pub fn overlapping_or_touching_point(&self, point: Point2D<f32, U>) -> bool {
         !self
             .dividing_line
             .same_side_of_line(self.point_off_half_plane(), point)
     }
-    pub fn covers_origin(&self) -> bool {
+    pub fn covers_origin(&self) -> BoolWithPartial {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
     pub fn fully_covers_unit_square(&self) -> bool {
@@ -148,7 +153,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
-        if self.point_is_on_half_plane(point) {
+        if self.point_is_on_half_plane(point).is_true() {
             dist
         } else {
             -dist
@@ -233,7 +238,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         // higher tolerance means more chance detecting overlap, so extend the half planes
         return self
             .extended(per_face_expansion / 2.0)
-            .point_is_on_half_plane(other.extended(per_face_expansion / 2.0).dividing_line.p1);
+            .point_is_on_half_plane(other.extended(per_face_expansion / 2.0).dividing_line.p1)
+            .is_true();
     }
 }
 
