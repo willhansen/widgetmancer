@@ -88,12 +88,12 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
     pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
-        self.fully_covers_expanded_unit_square(0.0)
+        self.fully_covers_unit_square_with_tolerance(0.0)
     }
-    pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> BoolWithPartial {
+    pub fn fully_covers_unit_square_with_tolerance(&self, tolerance: f32) -> BoolWithPartial {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
-            .map(|x| x * (0.5 + per_face_extension))
+            .map(|x| x * (0.5 + tolerance))
             .map(Vector2D::to_point)
             .map(Point2D::cast_unit)
             .iter()
@@ -130,10 +130,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         &self,
         per_face_extension: f32,
     ) -> BoolWithPartial {
-        self.fully_covers_expanded_unit_square(per_face_extension)
+        self.fully_covers_unit_square_with_tolerance(per_face_extension)
             .or(self
                 .complement()
-                .fully_covers_expanded_unit_square(per_face_extension))
+                .fully_covers_unit_square_with_tolerance(per_face_extension))
             .not()
     }
 
@@ -173,7 +173,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         &self,
         per_face_extension: f32,
     ) -> IntervalLocation {
-        let fully_covers = self.fully_covers_expanded_unit_square(per_face_extension);
+        let fully_covers = self.fully_covers_unit_square_with_tolerance(per_face_extension);
         if fully_covers.is_true() {
             return IntervalLocation::After;
         } else if fully_covers.is_partial() {
@@ -190,73 +190,39 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         }
     }
 
-    pub fn overlaps_other_within_centered_expanded_unit_square(
+    pub fn overlaps_other_inside_centered_unit_square_with_tolerance(
         &self,
         other: &Self,
-        per_face_extension: f32,
+        tolerance: f32,
     ) -> BoolWithPartial {
-        let border_intersection_is_inside_square = if let Some(intersection_point) = self
+        // square corners inside a halfplane and that halfplane's intersections with the square form a convex polygon, which the other plane can test against.
+
+        // Does the border intersection point actually matter?  Not if we have the intersections with the square
+        // Does the shape of the tolerance matter?  expanded square vs expanded points
+        //     - As long as tolerance refers to circles, and expanded square refers to squares, it can stay visible, at least
+
+        let other_border_cut_points = other
             .dividing_line
-            .intersection_point_with_other_extended_line(&other.dividing_line)
-        {
-            point_is_in_centered_expanded_unit_square(intersection_point, per_face_extension)
-        } else {
-            false
-        };
-        if border_intersection_is_inside_square {
-            return true;
-        }
+            .line_intersections_with_expanded_centered_unit_square(tolerance);
 
-        let coverages: [IntervalLocation; 2] = [self, other]
-            .map(|hp| dbg!(hp).coverage_of_centered_expanded_unit_square(per_face_extension));
+        let other_covered_square_corner_points =
+            other.covered_corner_points_of_centered_unit_square(tolerance);
 
-        let full_cover = coverages.map(|c| c == BoolWithPartial::True);
-        let partial_cover = coverages.map(|c| c == BoolWithPartial::Partial);
-        let no_cover = coverages.map(|c| c == BoolWithPartial::False);
+        let polygon_corners_for_overlap_of_other_and_square = other_border_cut_points
+            .into_iter()
+            .chain(other_covered_square_corner_points.into_iter())
+            .collect();
 
-        let both_full_cover = all_true(&full_cover);
-        let any_full_cover = any_true(&full_cover);
-        let any_partial_cover = any_true(&partial_cover);
-        let both_partial_cover = all_true(&partial_cover);
-        let any_no_cover = any_true(&no_cover);
-
-        let one_full_cover_and_one_partial_cover = any_full_cover && any_partial_cover;
-
-        dbg!(
-            &per_face_extension,
-            &coverages,
-            &full_cover,
-            &partial_cover,
-            &no_cover,
-            both_full_cover,
-            any_full_cover,
-            any_partial_cover,
-            both_partial_cover,
-            any_no_cover
-        );
-
-        if both_full_cover || one_full_cover_and_one_partial_cover {
-            return true;
-        } else if any_no_cover {
-            return false;
-        }
-        // both partial cover case
-        assert!(both_partial_cover);
-        // we've already ruled out an intersection in the square
-
-        let same_direction = unit_vector_from_angle(self.direction_toward_plane())
-            .dot(unit_vector_from_angle(other.direction_toward_plane()))
-            > 0.0;
-        if same_direction {
-            return true;
-        }
-
-        // Now need to know if the two lines are on each others half planes
-        // higher tolerance means more chance detecting overlap, so extend the half planes
-        return self
-            .extended(per_face_extension / 2.0)
-            .point_is_on_half_plane(other.extended(per_face_extension / 2.0).dividing_line.p1)
-            .is_true();
+        self.covers_any_of_these_points(polygon_corners_for_overlap_of_other_and_square, tolerance)
+    }
+    fn covered_corner_points_of_centered_unit_square(
+        &self,
+        tolerance: f32,
+    ) -> Vec<Point2D<f32, U>> {
+        todo!()
+    }
+    fn covers_any_of_these_points(&self, points: Vec<Point2D<f32, U>, tolerance: f32) -> BoolWithPartial {
+        todo!()
     }
 }
 
@@ -336,10 +302,10 @@ mod tests {
             Line::new(WorldPoint::new(1.0, 5.0), point2(1.0, 6.0)),
             point2(-5.0, 0.0),
         );
-        assert!(the_plane.fully_covers_expanded_unit_square(0.0));
-        assert!(the_plane.fully_covers_expanded_unit_square(0.49));
-        assert_false!(the_plane.fully_covers_expanded_unit_square(0.51));
-        assert_false!(the_plane.fully_covers_expanded_unit_square(100.0));
+        assert!(the_plane.fully_covers_unit_square_with_tolerance(0.0));
+        assert!(the_plane.fully_covers_unit_square_with_tolerance(0.49));
+        assert_false!(the_plane.fully_covers_unit_square_with_tolerance(0.51));
+        assert_false!(the_plane.fully_covers_unit_square_with_tolerance(100.0));
     }
     #[test]
     fn test_depth_of_point_in_half_plane() {
@@ -404,7 +370,7 @@ mod tests {
 
         let tolerance = 1e-5;
 
-        let f = HalfPlane::overlaps_other_within_centered_expanded_unit_square;
+        let f = HalfPlane::overlaps_other_inside_centered_unit_square_with_tolerance;
         let vars = vec![up, up_right, down_right, down, left];
         // in format of f(vars[row], vars[col]).  Should be symmetric anyway
         let correct_boolean_matrix = [
@@ -432,7 +398,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__vertical_left() {
@@ -440,7 +406,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(-0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(-0.4));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__horizontal__both_partially_covering_square(
@@ -449,7 +415,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(-0.4));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover() {
@@ -457,14 +423,14 @@ mod tests {
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(-0.7));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover__identical() {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
         let b: LocalSquareHalfPlane = a.clone();
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__one_full_cover_one_partial_cover() {
@@ -472,7 +438,7 @@ mod tests {
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__orthogonal() {
@@ -480,7 +446,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.1));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal() {
@@ -488,7 +454,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(0.6));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.1));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal__one_fully_covers() {
@@ -496,7 +462,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(0.6));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal__neither_fully_covers() {
@@ -504,7 +470,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(0.6));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(5.0));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__diagonal_outside_square_but_inside_tolerance(
@@ -516,7 +482,7 @@ mod tests {
         let b: LocalSquareHalfPlane = HalfPlane::new_away_from_origin_from_border_line(
             Line::new_horizontal(0.5 + tolerance / 2.0),
         );
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, tolerance))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__diagonal_inside_square_but_outside_tolerance(
@@ -528,7 +494,7 @@ mod tests {
         let b: LocalSquareHalfPlane = HalfPlane::new_away_from_origin_from_border_line(
             Line::new_horizontal(0.5 + tolerance / 2.0),
         );
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, tolerance))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__angled() {
@@ -536,7 +502,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(-0.2));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new((0.0, 0.5), (0.5, -0.3)));
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__angled() {
@@ -544,21 +510,21 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(-0.2));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new((0.0, 0.5), (0.5, -0.1)));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 1e-5))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__identical_on_edge() {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.clone();
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__identical_on_corner() {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new((0.5, 0.5), (0.0, 1.0)));
         let b: LocalSquareHalfPlane = a.clone();
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exactly_touching_square(
@@ -566,7 +532,7 @@ mod tests {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.complement();
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exactly_touching_each_other_within_square(
@@ -574,7 +540,7 @@ mod tests {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.2));
         let b: LocalSquareHalfPlane = a.complement();
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__opposing_parallel_half_planes_exactly_touching_each_other_is_consistent(
@@ -584,8 +550,8 @@ mod tests {
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         assert_eq!(
-            a.overlaps_other_within_centered_expanded_unit_square(&a.complement(), 0.0),
-            b.overlaps_other_within_centered_expanded_unit_square(&b.complement(), 0.0,)
+            a.overlaps_other_inside_centered_unit_square_with_tolerance(&a.complement(), 0.0),
+            b.overlaps_other_inside_centered_unit_square_with_tolerance(&b.complement(), 0.0,)
         )
     }
     #[test]
@@ -595,7 +561,7 @@ mod tests {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.complement().extended(tolerance / 2.0);
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, -tolerance))
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, -tolerance))
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__opposing_parallel_half_planes_retracted_but_within_tolerance(
@@ -605,7 +571,7 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.complement().retracted(tolerance / 2.0);
         dbg!(&a, &b);
-        assert!(a.overlaps_other_within_centered_expanded_unit_square(&b, tolerance))
+        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance))
     }
     #[test]
     fn test_halfplane_overlap_unit_square__on_edge__partial_overlap() {
@@ -651,6 +617,6 @@ mod tests {
         let a: HalfPlane = HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
         let b: HalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.0, 0.5)));
-        assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0));
+        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0));
     }
 }

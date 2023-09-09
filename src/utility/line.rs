@@ -577,26 +577,26 @@ mod tests {
     }
     #[test]
     fn test_orthogonal_line_intersects_with_expanded_square() {
-        let tolerance = 0.01;
+        let per_side_extension = 0.01;
         let fs: [fn(f32) -> Line<f32>; 2] = [Line::new_horizontal, Line::new_vertical];
         fs.into_iter().for_each(|f| {
             let exact_line = f(0.5);
-            let closer_line = f(0.5 - tolerance / 2.0);
-            let further_line = f(0.5 + tolerance / 2.0);
+            let closer_line = f(0.5 - per_side_extension / 2.0);
+            let further_line = f(0.5 + per_side_extension / 2.0);
             let lines = [exact_line, closer_line, further_line];
             lines.into_iter().for_each(|line| {
                 let string = format!("line: {}", line);
                 assert!(
-                    line.intersects_with_expanded_centered_unit_square(tolerance),
+                    line.intersects_with_expanded_centered_unit_square(per_side_extension),
                     "{}, tolerance: {}",
                     string,
-                    tolerance
+                    per_side_extension
                 );
                 assert!(
-                    !line.intersects_with_expanded_centered_unit_square(-tolerance),
+                    !line.intersects_with_expanded_centered_unit_square(-per_side_extension),
                     "{}, tolerance: {}",
                     string,
-                    -tolerance
+                    -per_side_extension
                 );
             })
         });

@@ -18,6 +18,7 @@ use super::{
     coordinate_frame_conversions::{
         SquareGridInWorldFrame, SquareSet, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
     },
+    general_utility::*,
     get_new_rng,
     int_cos,
     int_sin,
@@ -25,6 +26,7 @@ use super::{
     lerp,
     random_angle,
     sign,
+    BoolWithPartial,
     RigidTransform,
     RigidlyTransformable,
 
@@ -600,12 +602,12 @@ pub fn on_line_in_this_order<U>(
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
-pub fn point_is_in_centered_expanded_unit_square<U>(
+pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     point: Point2D<f32, U>,
     per_face_expansion: f32,
 ) -> BoolWithPartial {
     let vec = point.to_vector();
-    BoolWithPartial::from_less_than(king_move_distance(vec) , 0.5 + per_face_expansion)
+    BoolWithPartial::from_less_than(king_move_distance(vec), 0.5 + per_face_expansion)
 }
 
 #[cfg(test)]
@@ -781,45 +783,59 @@ mod tests {
         assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__simple_true() {
-        assert!(point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(0.0, 0.0),
-            0.0
-        ))
+    fn test_point_is_in_centered_unit_square__simple_true() {
+        assert!(
+            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.0, 0.0), 0.0)
+                .is_true()
+        )
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__simple_false() {
-        assert!(!point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(5.0, 0.0),
-            0.0
-        ))
+    fn test_point_is_in_centered_unit_square__simple_false() {
+        assert!(
+            !point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(5.0, 0.0), 0.0)
+                .is_false()
+        )
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__outside_square__inside_tolerance() {
-        assert!(point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(0.51, 0.0),
-            0.2
-        ))
+    fn test_point_is_in_centered_unit_square__outside_square__inside_tolerance() {
+        assert!(
+            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.0), 0.2)
+                .is_partial()
+        )
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__inside_square__outside_tolerance() {
-        assert!(!point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(0.49, 0.0),
-            -0.2
-        ))
+    fn test_point_is_in_centered_unit_square__inside_square__inside_tolerance() {
+        assert!(
+            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), 0.2)
+                .is_partial()
+        )
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__outside_square_diagonally__inside_tolerance() {
-        assert!(point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(0.51, 0.51),
-            0.2
-        ))
+    fn test_point_is_in_centered_unit_square__inside_square__outside_tolerance() {
+        assert!(
+            !point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), -0.2)
+                .is_false()
+        )
     }
     #[test]
-    fn test_point_in_centered_expanded_unit_square__inside_square_diagonally__outside_tolerance() {
-        assert!(!point_is_in_centered_expanded_unit_square(
-            WorldPoint::new(0.49, 0.49),
-            -0.2
-        ))
+    fn test_point_is_in_centered_unit_square__outside_square_diagonally__inside_tolerance() {
+        assert!(
+            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.51), 0.2)
+                .is_partial()
+        )
+    }
+    #[test]
+    fn test_point_is_in_centered_unit_square__inside_square_diagonally__inside_tolerance() {
+        assert!(
+            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
+                .is_partial()
+        )
+    }
+    #[test]
+    fn test_point_is_in_centered_unit_square__inside_square_diagonally__outside_tolerance() {
+        assert!(
+            !point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), -0.2)
+                .is_false()
+        )
     }
 }
