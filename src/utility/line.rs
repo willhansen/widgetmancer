@@ -13,12 +13,10 @@ pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
 pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
 
 #[derive(Clone, PartialEq, Copy)]
-pub struct Line<T, U> {
+pub struct Line<T, U = euclid::UnknownUnit> {
     pub p1: Point2D<T, U>,
     pub p2: Point2D<T, U>,
 }
-
-pub type DefaultLine<T> = Line<T, euclid::UnknownUnit>;
 
 impl<T, U> Line<T, U>
 where
@@ -580,7 +578,7 @@ mod tests {
     #[test]
     fn test_orthogonal_line_intersects_with_expanded_square() {
         let tolerance = 0.01;
-        let fs: [fn(f32) -> DefaultLine<f32>; 2] = [Line::new_horizontal, Line::new_vertical];
+        let fs: [fn(f32) -> Line<f32>; 2] = [Line::new_horizontal, Line::new_vertical];
         fs.into_iter().for_each(|f| {
             let exact_line = f(0.5);
             let closer_line = f(0.5 - tolerance / 2.0);

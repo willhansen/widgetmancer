@@ -204,7 +204,10 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         }
         self.visible_portion
             .unwrap()
-            .overlaps_other_within_expanded_unit_square(&other.visible_portion.unwrap(), tolerance)
+            .overlaps_other_within_centered_expanded_unit_square(
+                &other.visible_portion.unwrap(),
+                tolerance,
+            )
     }
     fn combined_increasing_visibility(&self, other: &Self) -> Self {
         if self.is_fully_visible() || other.is_fully_visible() {
