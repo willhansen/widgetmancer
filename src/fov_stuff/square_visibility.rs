@@ -4,12 +4,10 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
-use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
-use crate::utility::coordinate_frame_conversions::{
-    world_half_plane_to_local_square_half_plane, SquareGridInLocalSquareFrame, WorldPoint,
-    WorldSquare, WorldStep,
-};
-use crate::utility::halfplane::LocalSquareHalfPlane;
+use crate::utility::angle_interval::*;
+use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::general_utility::*;
+use crate::utility::halfplane::*;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
@@ -118,7 +116,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
     fn is_just_barely_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion.is_some_and(|v: LocalSquareHalfPlane| {
-            v.fully_covers_unit_square_with_tolerance(-tolerance)
+            v.fully_covers_centered_unit_square_with_tolerance(-tolerance)
                 .is_partial()
         })
     }
@@ -213,6 +211,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 &other.visible_portion.unwrap(),
                 tolerance,
             )
+            .is_true()
     }
     fn combined_increasing_visibility(&self, other: &Self) -> Self {
         if self.is_fully_visible() || other.is_fully_visible() {

@@ -44,6 +44,18 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::from_line_and_point_on_half_plane(line, (0.0, 0.0))
     }
+    pub fn new_toward_vector_from_point_on_border(
+        point_on_border: impl Into<Point2D<f32, U>>,
+        normal_direction_into_plane: impl Into<Vector2D<f32, U>>,
+    ) -> Self {
+        let p = point_on_border.into();
+        let v = normal_direction_into_plane.into();
+        let border_line: Line<f32, U> =
+            Line::new(p, p + rotated_n_quarter_turns_counter_clockwise(v, 1));
+        let point_on_half_plane = p + v;
+        assert_ne!(v.square_length(), 0.0);
+        Self::from_line_and_point_on_half_plane(border_line, point_on_half_plane)
+    }
 
     pub fn complement(&self) -> Self {
         HalfPlane::from_line_and_point_on_half_plane(
@@ -88,9 +100,12 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         self.point_is_on_half_plane(point2(0.0, 0.0))
     }
     pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
-        self.fully_covers_unit_square_with_tolerance(0.0)
+        self.fully_covers_centered_unit_square_with_tolerance(0.0)
     }
-    pub fn fully_covers_unit_square_with_tolerance(&self, tolerance: f32) -> BoolWithPartial {
+    pub fn fully_covers_centered_unit_square_with_tolerance(
+        &self,
+        tolerance: f32,
+    ) -> BoolWithPartial {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
             .map(|x| x * (0.5 + tolerance))
@@ -130,10 +145,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         &self,
         per_face_extension: f32,
     ) -> BoolWithPartial {
-        self.fully_covers_unit_square_with_tolerance(per_face_extension)
+        self.fully_covers_centered_unit_square_with_tolerance(per_face_extension)
             .or(self
                 .complement()
-                .fully_covers_unit_square_with_tolerance(per_face_extension))
+                .fully_covers_centered_unit_square_with_tolerance(per_face_extension))
             .not()
     }
 
@@ -173,7 +188,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         &self,
         per_face_extension: f32,
     ) -> IntervalLocation {
-        let fully_covers = self.fully_covers_unit_square_with_tolerance(per_face_extension);
+        let fully_covers =
+            self.fully_covers_centered_unit_square_with_tolerance(per_face_extension);
         if fully_covers.is_true() {
             return IntervalLocation::After;
         } else if fully_covers.is_partial() {
@@ -221,7 +237,11 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     ) -> Vec<Point2D<f32, U>> {
         todo!()
     }
-    fn covers_any_of_these_points(&self, points: Vec<Point2D<f32, U>, tolerance: f32) -> BoolWithPartial {
+    fn covers_any_of_these_points(
+        &self,
+        points: Vec<Point2D<f32, U>>,
+        tolerance: f32,
+    ) -> BoolWithPartial {
         todo!()
     }
 }
@@ -292,20 +312,25 @@ mod tests {
                 )
             });
 
-        assert!(more_than_cover.fully_covers_unit_square());
-        assert_false!(less_than_cover.fully_covers_unit_square());
-        assert!(exactly_cover.fully_covers_unit_square());
+        assert!(more_than_cover.fully_covers_unit_square().is_true());
+        assert!(less_than_cover.fully_covers_unit_square().is_false());
+        assert!(exactly_cover.fully_covers_unit_square().is_partial());
     }
     #[test]
-    fn test_halfplane_covers_expanded_unit_square() {
-        let the_plane = HalfPlane::from_line_and_point_on_half_plane(
-            Line::new(WorldPoint::new(1.0, 5.0), point2(1.0, 6.0)),
-            point2(-5.0, 0.0),
-        );
-        assert!(the_plane.fully_covers_unit_square_with_tolerance(0.0));
-        assert!(the_plane.fully_covers_unit_square_with_tolerance(0.49));
-        assert_false!(the_plane.fully_covers_unit_square_with_tolerance(0.51));
-        assert_false!(the_plane.fully_covers_unit_square_with_tolerance(100.0));
+    fn test_halfplane_covers_centered_unit_square_with_tolerance() {
+        let f = |x, tolerance| {
+            let the_plane: HalfPlane<f32> =
+                HalfPlane::new_toward_vector_from_point_on_border((x, 0.0), (-1.0, 0.0));
+
+            the_plane.fully_covers_centered_unit_square_with_tolerance(tolerance)
+        };
+        assert!(f(0.0, 0.0).is_false());
+        assert!(f(0.49, 0.0).is_false());
+        assert!(f(0.5, 0.0).is_partial());
+        assert!(f(0.51, 0.0).is_true());
+        assert!(f(0.49, 0.2).is_partial());
+        assert!(f(0.5, 0.2).is_partial());
+        assert!(f(0.51, 0.2).is_partial());
     }
     #[test]
     fn test_depth_of_point_in_half_plane() {
@@ -382,7 +407,7 @@ mod tests {
         ];
         let actual_boolean_matrix: [[i32; 5]; 5] = from_fn(|row| {
             from_fn(|col| {
-                if f(&vars[row], &vars[col], tolerance) {
+                if f(&vars[row], &vars[col], tolerance).try_into().unwrap() {
                     1
                 } else {
                     0
@@ -398,7 +423,9 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4));
-        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
+        assert!(a
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
+            .is_true())
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__vertical_left() {
@@ -406,7 +433,9 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(-0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_vertical(-0.4));
-        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
+        assert!(a
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
+            .is_true())
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__horizontal__both_partially_covering_square(
@@ -415,7 +444,9 @@ mod tests {
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(-0.4));
-        assert_false!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
+        assert_false!(a
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
+            .is_false())
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover() {
@@ -423,14 +454,18 @@ mod tests {
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
         let b: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(-0.7));
-        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
+        assert!(a
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
+            .is_true())
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover__identical() {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(5.0));
         let b: LocalSquareHalfPlane = a.clone();
-        assert!(a.overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5))
+        assert!(a
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
+            .is_true())
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__one_full_cover_one_partial_cover() {

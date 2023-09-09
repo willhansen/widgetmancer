@@ -17,6 +17,7 @@ use super::{
     // TODO: get rid of this line
     coordinate_frame_conversions::{
         SquareGridInWorldFrame, SquareSet, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
+        DIAGONAL_STEPS,
     },
     general_utility::*,
     get_new_rng,
@@ -608,6 +609,13 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
 ) -> BoolWithPartial {
     let vec = point.to_vector();
     BoolWithPartial::from_less_than(king_move_distance(vec), 0.5 + per_face_expansion)
+}
+
+pub fn corner_points_of_centered_unit_square<U>() -> Vec<Point2D<f32, U>> {
+    get_4_rotations_of(vec2::<f32, U>(0.5, 0.5))
+        .into_iter()
+        .map(|v| point2(0.0, 0.0) + v)
+        .collect()
 }
 
 #[cfg(test)]
