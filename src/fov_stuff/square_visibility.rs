@@ -31,7 +31,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_at_least_partially_visible(&self) -> bool;
     fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
-    fn is_nearly_but_not_fully_visible(&self, tolerance_length: f32) -> bool;
+    fn is_just_barely_fully_visible(&self, tolerance_length: f32) -> bool;
 
     // creators
     fn new_fully_visible() -> Self;
@@ -114,11 +114,12 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         self.visible_portion.is_some()
     }
     fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
-        self.is_fully_visible() || self.is_nearly_but_not_fully_visible(tolerance)
+        self.is_fully_visible() || self.is_just_barely_fully_visible(tolerance)
     }
-    fn is_nearly_but_not_fully_visible(&self, tolerance: f32) -> bool {
-        self.visible_portion
-            .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
+    fn is_just_barely_fully_visible(&self, tolerance: f32) -> bool {
+        self.visible_portion.is_some_and(|v: LocalSquareHalfPlane| {
+            v.fully_covers_expanded_unit_square(-tolerance).is_partial()
+        })
     }
     fn new_fully_visible() -> Self {
         SquareVisibilityFromOneLargeShadow {
@@ -128,14 +129,14 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
 
     fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
         assert!(visible_portion.at_least_partially_covers_unit_square());
-        assert!(!visible_portion.fully_covers_unit_square());
+        assert!(visible_portion.fully_covers_unit_square().is_false());
         SquareVisibilityFromOneLargeShadow {
             visible_portion: Some(visible_portion),
         }
     }
 
     fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
-        if visible_portion.fully_covers_unit_square() {
+        if visible_portion.fully_covers_unit_square().is_true() {
             Self::new_fully_visible()
         } else if visible_portion.at_least_partially_covers_unit_square() {
             Self::new_partially_visible(visible_portion)
@@ -185,7 +186,10 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 rel_square.to_point(),
             );
 
-            if square_shadow.fully_covers_unit_square() {
+            if square_shadow
+                .fully_covers_unit_square()
+                .is_at_least_partial()
+            {
                 None
             } else if square_shadow.at_least_partially_covers_unit_square() {
                 Some(SquareVisibilityFromOneLargeShadow::new_partially_visible(
@@ -461,9 +465,9 @@ mod tests {
             LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-3),
         );
 
-        assert!(!vis.is_nearly_but_not_fully_visible(0.0));
-        assert!(!vis.is_nearly_but_not_fully_visible(1e-4));
-        assert!(vis.is_nearly_but_not_fully_visible(1e-2));
+        assert!(!vis.is_just_barely_fully_visible(0.0));
+        assert!(!vis.is_just_barely_fully_visible(1e-4));
+        assert!(vis.is_just_barely_fully_visible(1e-2));
     }
     #[test]
     fn test_square_visibility_overlap__simple_non_overlap() {

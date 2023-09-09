@@ -180,12 +180,50 @@ pub fn get_column<const ROWS: usize, const COLS: usize, T: Copy>(
 /// Needs to account for exact points at start and end of coverage
 /// All the sections of a closed intervals
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
-pub enum ClosedIntervalSection {
+pub enum IntervalLocation {
     After,
     End,
     During,
     Start,
     Before,
+}
+impl IntervalLocation {
+    pub fn on_closed_interval(&self) -> bool {
+        match self {
+            IntervalLocation::After => false,
+            IntervalLocation::End => true,
+            IntervalLocation::During => true,
+            IntervalLocation::Start => true,
+            IntervalLocation::Before => false,
+        }
+    }
+    pub fn on_open_interval(&self) -> bool {
+        match self {
+            IntervalLocation::After => false,
+            IntervalLocation::End => false,
+            IntervalLocation::During => true,
+            IntervalLocation::Start => false,
+            IntervalLocation::Before => false,
+        }
+    }
+    pub fn is_before(&self) -> BoolWithPartial {
+        match self {
+            IntervalLocation::After => BoolWithPartial::False,
+            IntervalLocation::End => BoolWithPartial::False,
+            IntervalLocation::During => BoolWithPartial::False,
+            IntervalLocation::Start => BoolWithPartial::Partial,
+            IntervalLocation::Before => BoolWithPartial::True,
+        }
+    }
+    pub fn is_after(&self) -> BoolWithPartial {
+        match self {
+            IntervalLocation::After => BoolWithPartial::True,
+            IntervalLocation::End => BoolWithPartial::Partial,
+            IntervalLocation::During => BoolWithPartial::False,
+            IntervalLocation::Start => BoolWithPartial::False,
+            IntervalLocation::Before => BoolWithPartial::False,
+        }
+    }
 }
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
@@ -205,18 +243,24 @@ impl BoolWithPartial {
     pub fn is_false(&self) -> bool {
         matches!(self, Self::False)
     }
+    pub fn is_at_least_partial(&self) -> bool {
+        !self.is_false()
+    }
+    pub fn is_at_most_partial(&self) -> bool {
+        !self.is_true()
+    }
     fn to_number(&self) -> i32 {
         match self {
-            BoolWithPartial::True => 2,
-            BoolWithPartial::Partial => 1,
-            BoolWithPartial::False => 0,
+            BoolWithPartial::True => 1,
+            BoolWithPartial::Partial => 0,
+            BoolWithPartial::False => -1,
         }
     }
     fn from_number(number: i32) -> Self {
-        match number.clamp(0, 2) {
-            2 => BoolWithPartial::True,
-            1 => BoolWithPartial::Partial,
-            0 => BoolWithPartial::False,
+        match number.clamp(-1, 1) {
+            1 => BoolWithPartial::True,
+            0 => BoolWithPartial::Partial,
+            -1 => BoolWithPartial::False,
             _ => panic!("invalid number: {}", number),
         }
     }
@@ -225,6 +269,15 @@ impl BoolWithPartial {
     }
     pub fn or(&self, other: Self) -> Self {
         Self::from_number(self.to_number().max(other.to_number()))
+    }
+    pub fn from_less_than<T:  PartialOrd+ PartialEq>(a: T, b: T) -> Self {
+        if a < b {
+            BoolWithPartial::True
+        } else if a == b {
+            BoolWithPartial::Partial
+        } else {
+            BoolWithPartial::False
+        }
     }
 }
 
@@ -333,4 +386,13 @@ mod tests {
         assert_eq!(f.or(p), p);
         assert_eq!(f.or(f), f);
     }
+    #[test]
+    fn test_bool_with_partial__from_less_than() {
+        let t = BoolWithPartial::True;
+        let p = BoolWithPartial::Partial;
+        let f = BoolWithPartial::False;
+        assert_eq!(BoolWithPartial::from_less_than(-1, 0), t);
+        assert_eq!(BoolWithPartial::from_less_than(1.0, 0.0), f);
+        assert_eq!(BoolWithPartial::from_less_than(0, 0), p);
+        }
 }

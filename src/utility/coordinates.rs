@@ -603,9 +603,9 @@ pub fn on_line_in_this_order<U>(
 pub fn point_is_in_centered_expanded_unit_square<U>(
     point: Point2D<f32, U>,
     per_face_expansion: f32,
-) -> bool {
+) -> BoolWithPartial {
     let vec = point.to_vector();
-    king_move_distance(vec) < 0.5 + per_face_expansion
+    BoolWithPartial::from_less_than(king_move_distance(vec) , 0.5 + per_face_expansion)
 }
 
 #[cfg(test)]

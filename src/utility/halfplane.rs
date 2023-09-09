@@ -81,10 +81,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .into()
         }
     }
-    pub fn overlapping_or_touching_point(&self, point: Point2D<f32, U>) -> bool {
-        !self
-            .dividing_line
-            .same_side_of_line(self.point_off_half_plane(), point)
+    pub fn point_is_on_or_touching_half_plane(&self, point: Point2D<f32, U>) -> bool {
+        self.point_is_on_half_plane(point).is_true()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
         self.point_is_on_half_plane(point2(0.0, 0.0))
@@ -92,14 +90,16 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_expanded_unit_square(0.0)
     }
-    pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> bool {
+    pub fn fully_covers_expanded_unit_square(&self, per_face_extension: f32) -> BoolWithPartial {
         DIAGONAL_STEPS
             .map(Vector2D::to_f32)
             .map(|x| x * (0.5 + per_face_extension))
             .map(Vector2D::to_point)
             .map(Point2D::cast_unit)
             .iter()
-            .all(|&p| self.overlapping_or_touching_point(p))
+            .fold(BoolWithPartial::False, |coverage_so_far, &p| {
+                coverage_so_far.and(self.point_is_on_half_plane(p))
+            })
     }
     pub fn retracted(&self, retracted_distance: f32) -> Self {
         self.extended(-retracted_distance)
@@ -124,7 +124,17 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
 
     pub fn at_least_partially_covers_unit_square(&self) -> bool {
-        !self.complement().fully_covers_unit_square()
+        !self.complement().fully_covers_unit_square().is_true()
+    }
+    pub fn partially_covers_expanded_unit_square(
+        &self,
+        per_face_extension: f32,
+    ) -> BoolWithPartial {
+        self.fully_covers_expanded_unit_square(per_face_extension)
+            .or(self
+                .complement()
+                .fully_covers_expanded_unit_square(per_face_extension))
+            .not()
     }
 
     //Fn(Point2D<f32, U>) -> Point2D<f32, V>,
@@ -159,29 +169,37 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             -dist
         }
     }
-    pub fn covers_centered_expanded_unit_square(&self, per_face_extension: f32) -> BoolWithPartial {
-        if self.fully_covers_expanded_unit_square(per_face_extension) {
-            BoolWithPartial::True
-        } else if self
-            .dividing_line
-            .intersects_with_expanded_centered_unit_square(per_face_extension)
-        {
-            BoolWithPartial::Partial
+    pub fn coverage_of_centered_expanded_unit_square(
+        &self,
+        per_face_extension: f32,
+    ) -> IntervalLocation {
+        let fully_covers = self.fully_covers_expanded_unit_square(per_face_extension);
+        if fully_covers.is_true() {
+            return IntervalLocation::After;
+        } else if fully_covers.is_partial() {
+            return IntervalLocation::End;
+        }
+
+        let partially_covers = self.partially_covers_expanded_unit_square(per_face_extension);
+        if partially_covers.is_true() {
+            IntervalLocation::During
+        } else if partially_covers.is_partial() {
+            IntervalLocation::Start
         } else {
-            BoolWithPartial::False
+            IntervalLocation::Before
         }
     }
 
     pub fn overlaps_other_within_centered_expanded_unit_square(
         &self,
         other: &Self,
-        per_face_expansion: f32,
-    ) -> bool {
+        per_face_extension: f32,
+    ) -> BoolWithPartial {
         let border_intersection_is_inside_square = if let Some(intersection_point) = self
             .dividing_line
             .intersection_point_with_other_extended_line(&other.dividing_line)
         {
-            point_is_in_centered_expanded_unit_square(intersection_point, per_face_expansion)
+            point_is_in_centered_expanded_unit_square(intersection_point, per_face_extension)
         } else {
             false
         };
@@ -189,9 +207,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             return true;
         }
 
-        // from here, each plane is either is fully overlapping the square, not overlapping, or partially overlapping.
-        let coverages: [BoolWithPartial; 2] = [self, other]
-            .map(|hp| dbg!(hp).covers_centered_expanded_unit_square(per_face_expansion));
+        let coverages: [IntervalLocation; 2] = [self, other]
+            .map(|hp| dbg!(hp).coverage_of_centered_expanded_unit_square(per_face_extension));
 
         let full_cover = coverages.map(|c| c == BoolWithPartial::True);
         let partial_cover = coverages.map(|c| c == BoolWithPartial::Partial);
@@ -206,7 +223,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         let one_full_cover_and_one_partial_cover = any_full_cover && any_partial_cover;
 
         dbg!(
-            &per_face_expansion,
+            &per_face_extension,
             &coverages,
             &full_cover,
             &partial_cover,
@@ -237,8 +254,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         // Now need to know if the two lines are on each others half planes
         // higher tolerance means more chance detecting overlap, so extend the half planes
         return self
-            .extended(per_face_expansion / 2.0)
-            .point_is_on_half_plane(other.extended(per_face_expansion / 2.0).dividing_line.p1)
+            .extended(per_face_extension / 2.0)
+            .point_is_on_half_plane(other.extended(per_face_extension / 2.0).dividing_line.p1)
             .is_true();
     }
 }
@@ -596,7 +613,7 @@ mod tests {
         let unit_square_expansion = 0.01;
         let halfplane: HalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(border_y_pos));
-        let coverage = halfplane.covers_centered_expanded_unit_square(unit_square_expansion);
+        let coverage = halfplane.coverage_of_centered_expanded_unit_square(unit_square_expansion);
         assert_eq!(coverage, BoolWithPartial::Partial);
     }
     #[test]
@@ -605,7 +622,7 @@ mod tests {
         let unit_square_expansion = -0.01;
         let halfplane: HalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(border_y_pos));
-        let coverage = halfplane.covers_centered_expanded_unit_square(unit_square_expansion);
+        let coverage = halfplane.coverage_of_centered_expanded_unit_square(unit_square_expansion);
         assert_eq!(coverage, BoolWithPartial::False);
     }
     #[test]
@@ -614,7 +631,7 @@ mod tests {
         let unit_square_expansion = -0.01;
         let halfplane: HalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(border_y_pos));
-        let coverage = halfplane.covers_centered_expanded_unit_square(unit_square_expansion);
+        let coverage = halfplane.coverage_of_centered_expanded_unit_square(unit_square_expansion);
         assert_eq!(coverage, BoolWithPartial::False);
     }
     #[test]
@@ -623,17 +640,17 @@ mod tests {
         let unit_square_expansion = 0.01;
         let halfplane: HalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(border_y_pos));
-        let coverage = halfplane.covers_centered_expanded_unit_square(unit_square_expansion);
+        let coverage = halfplane.coverage_of_centered_expanded_unit_square(unit_square_expansion);
         assert_eq!(coverage, BoolWithPartial::True);
     }
     #[test]
-    fn test_halfplane_overlap_within_unit_square__false__exact__one_fully_covers__one_just_touches_corner() {
+    fn test_halfplane_overlap_within_unit_square__false__exact__one_fully_covers__one_just_touches_corner(
+    ) {
         let border_y_pos = 0.55;
         let unit_square_expansion = 0.01;
-        let a: HalfPlane =
-            HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
+        let a: HalfPlane = HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
         let b: HalfPlane =
-            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.0, 0.5));
+            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.0, 0.5)));
         assert_false!(a.overlaps_other_within_centered_expanded_unit_square(&b, 0.0));
     }
 }
