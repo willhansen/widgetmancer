@@ -270,6 +270,9 @@ impl BoolWithPartial {
     pub fn or(&self, other: Self) -> Self {
         Self::from_number(self.to_number().max(other.to_number()))
     }
+    pub fn not(&self) -> Self {
+        Self::from_number(-self.to_number())
+    }
     pub fn from_less_than<T: PartialOrd + PartialEq>(a: T, b: T) -> Self {
         if a < b {
             BoolWithPartial::True
@@ -385,6 +388,15 @@ mod tests {
         assert_eq!(f.or(t), t);
         assert_eq!(f.or(p), p);
         assert_eq!(f.or(f), f);
+    }
+    #[test]
+    fn test_bool_with_partial__not() {
+        let t = BoolWithPartial::True;
+        let p = BoolWithPartial::Partial;
+        let f = BoolWithPartial::False;
+        assert_eq!(t.not(), f);
+        assert_eq!(p.not(), p);
+        assert_eq!(f.not(), t);
     }
     #[test]
     fn test_bool_with_partial__from_less_than() {
