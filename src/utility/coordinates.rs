@@ -614,7 +614,7 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
 pub fn corner_points_of_centered_unit_square<U>() -> Vec<Point2D<f32, U>> {
     get_4_rotations_of(vec2::<f32, U>(0.5, 0.5))
         .into_iter()
-        .map(|v| point2(0.0, 0.0) + v)
+        .map(Vector2D::to_point)
         .collect()
 }
 

@@ -87,7 +87,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
-    pub fn point_is_on_half_plane(&self, point: Point2D<f32, U>) -> BoolWithPartial {
+    pub fn covers_point(&self, point: Point2D<f32, U>) -> BoolWithPartial {
         if self.dividing_line.point_is_on_line(point) {
             BoolWithPartial::Partial
         } else {
@@ -96,11 +96,11 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .into()
         }
     }
-    pub fn point_is_on_or_touching_half_plane(&self, point: Point2D<f32, U>) -> bool {
-        self.point_is_on_half_plane(point).is_true()
+    pub fn at_least_partially_covers_point(&self, point: Point2D<f32, U>) -> bool {
+        self.covers_point(point).is_true()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
-        self.point_is_on_half_plane(point2(0.0, 0.0))
+        self.covers_point(point2(0.0, 0.0))
     }
     pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_centered_unit_square_with_tolerance(0.0)
@@ -109,15 +109,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         &self,
         tolerance: f32,
     ) -> BoolWithPartial {
-        DIAGONAL_STEPS
-            .map(Vector2D::to_f32)
-            .map(|x| x * (0.5 + tolerance))
-            .map(Vector2D::to_point)
-            .map(Point2D::cast_unit)
-            .iter()
-            .fold(BoolWithPartial::False, |coverage_so_far, &p| {
-                coverage_so_far.and(self.point_is_on_half_plane(p))
-            })
+        self.covers_all_of_these_points(corner_points_of_centered_unit_square(), tolerance)
     }
     pub fn retracted(&self, retracted_distance: f32) -> Self {
         self.extended(-retracted_distance)
@@ -181,7 +173,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
-        if self.point_is_on_half_plane(point).is_true() {
+        if self.covers_point(point).is_true() {
             dist
         } else {
             -dist
@@ -192,6 +184,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         tolerance: f32,
     ) -> IntervalLocation {
         let fully_covers = self.fully_covers_centered_unit_square_with_tolerance(tolerance);
+        dbg!(&fully_covers);
         if fully_covers.is_true() {
             return IntervalLocation::After;
         } else if fully_covers.is_partial() {
@@ -199,6 +192,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         }
 
         let partially_covers = self.partially_covers_expanded_unit_square(tolerance);
+        dbg!(&partially_covers);
         if partially_covers.is_true() {
             IntervalLocation::During
         } else if partially_covers.is_partial() {
@@ -224,7 +218,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .line_intersections_with_expanded_centered_unit_square(tolerance);
 
         let other_covered_square_corner_points =
-            other.covered_corner_points_of_centered_unit_square(tolerance);
+            other.at_least_partially_covered_corner_points_of_centered_unit_square(tolerance);
 
         let polygon_corners_for_overlap_of_other_and_square = other_border_cut_points
             .into_iter()
@@ -233,18 +227,28 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 
         self.covers_any_of_these_points(polygon_corners_for_overlap_of_other_and_square, tolerance)
     }
-    fn covered_corner_points_of_centered_unit_square(
+    fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
         tolerance: f32,
     ) -> Vec<Point2D<f32, U>> {
-        todo!()
+        corner_points_of_centered_unit_square()
+            .into_iter()
+            .filter(|&p| self.covers_point(p).is_at_least_partial())
+            .collect()
     }
     fn covers_any_of_these_points(
         &self,
         points: Vec<Point2D<f32, U>>,
         tolerance: f32,
     ) -> BoolWithPartial {
-        todo!()
+        BoolWithPartial::any(points.into_iter().map(|p| self.covers_point(p)))
+    }
+    fn covers_all_of_these_points(
+        &self,
+        points: Vec<Point2D<f32, U>>,
+        tolerance: f32,
+    ) -> BoolWithPartial {
+        BoolWithPartial::all(points.into_iter().map(|p| self.covers_point(p)))
     }
 }
 
@@ -302,24 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_half_plane_cover_unit_square() {
-        let [exactly_cover, less_than_cover, more_than_cover]: [HalfPlane<_, _>; 3] =
-            [0.0, 0.01, -0.01].map(|dx| {
-                HalfPlane::from_line_and_point_on_half_plane(
-                    Line::new(
-                        WorldPoint::new(-0.5 + dx, 0.0),
-                        point2(-0.5 + 2.0 * dx, 1.0),
-                    ),
-                    point2(1.5, 0.0),
-                )
-            });
-
-        assert!(more_than_cover.fully_covers_unit_square().is_true());
-        assert!(less_than_cover.fully_covers_unit_square().is_false());
-        assert!(exactly_cover.fully_covers_unit_square().is_partial());
-    }
-    #[test]
-    fn test_halfplane_covers_centered_unit_square_with_tolerance() {
+    fn test_halfplane_fully_covers_centered_unit_square_with_tolerance() {
         let f = |x, tolerance| {
             let the_plane: HalfPlane<f32> =
                 HalfPlane::new_toward_vector_from_point_on_border((x, 0.0), (-1.0, 0.0));
@@ -654,6 +641,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_unit_square() {
         let f = |top_y: f32, tolerance: f32| {
+            dbg!(&top_y, &tolerance);
             HalfPlane::<f32>::down(top_y).coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
         use IntervalLocation::*;

@@ -282,6 +282,20 @@ impl BoolWithPartial {
             BoolWithPartial::False
         }
     }
+    pub fn any(iter: impl IntoIterator<Item = Self>) -> Self {
+        iter.into_iter()
+            .map(|x| x.to_number())
+            .max()
+            .map(BoolWithPartial::from_number)
+            .unwrap_or(BoolWithPartial::False)
+    }
+    pub fn all(iter: impl IntoIterator<Item = Self>) -> Self {
+        iter.into_iter()
+            .map(|x| x.to_number())
+            .min()
+            .map(BoolWithPartial::from_number)
+            .unwrap_or(BoolWithPartial::True)
+    }
 }
 
 impl From<bool> for BoolWithPartial {
@@ -406,5 +420,43 @@ mod tests {
         assert_eq!(BoolWithPartial::from_less_than(-1, 0), t);
         assert_eq!(BoolWithPartial::from_less_than(1.0, 0.0), f);
         assert_eq!(BoolWithPartial::from_less_than(0, 0), p);
+    }
+    #[test]
+    fn test_bool_with_partial__any() {
+        let t = BoolWithPartial::True;
+        let p = BoolWithPartial::Partial;
+        let f = BoolWithPartial::False;
+
+        // has true
+        assert_eq!(BoolWithPartial::any([t, t, f, p, t]), t);
+        assert_eq!(BoolWithPartial::any(vec![t, t, f, p, t]), t);
+        assert_eq!(BoolWithPartial::any(vec![t, t, f, p, t].into_iter()), t);
+        // has partial
+        assert_eq!(BoolWithPartial::any([f, p, f, p, p]), p);
+        assert_eq!(BoolWithPartial::any(vec![f, p, f, p, p]), p);
+        assert_eq!(BoolWithPartial::any(vec![f, p, f, p, p].into_iter()), p);
+        // only has false
+        assert_eq!(BoolWithPartial::any([f, f, f, f, f]), f);
+        // empty
+        assert_eq!(BoolWithPartial::any([]), f);
+    }
+    #[test]
+    fn test_bool_with_partial__all() {
+        let t = BoolWithPartial::True;
+        let p = BoolWithPartial::Partial;
+        let f = BoolWithPartial::False;
+
+        // has false
+        assert_eq!(BoolWithPartial::all([t, t, f, p, t]), f);
+        assert_eq!(BoolWithPartial::all(vec![t, t, f, p, t]), f);
+        assert_eq!(BoolWithPartial::all(vec![t, t, f, p, t].into_iter()), f);
+        // has partial
+        assert_eq!(BoolWithPartial::all([t, p, t, p, p]), p);
+        assert_eq!(BoolWithPartial::all(vec![t, p, t, p, p]), p);
+        assert_eq!(BoolWithPartial::all(vec![t, p, t, p, p].into_iter()), p);
+        // only has true
+        assert_eq!(BoolWithPartial::all([t, t, t, t, t]), t);
+        // empty
+        assert_eq!(BoolWithPartial::all([]), t);
     }
 }
