@@ -40,6 +40,13 @@ where
     pub fn new_through_origin(second_point: impl Into<Point2D<T, U>>) -> Self {
         Self::new((T::zero(), T::zero()), second_point)
     }
+    pub fn from_point_and_direction(
+        point: impl Into<Point2D<T, U>>,
+        direction: impl Into<Vector2D<T, U>>,
+    ) -> Self {
+        let p = point.into();
+        Self::new(p, p + direction.into())
+    }
     pub fn reverse(&mut self) {
         mem::swap(&mut self.p2, &mut self.p1);
     }
@@ -198,6 +205,41 @@ impl<U: Copy> Line<f32, U> {
 
         three_points_are_clockwise(point_a, point_b, point_c)
             == three_points_are_clockwise(point_a, point_b, point_d)
+    }
+    pub fn line_intersections_with_centered_unit_square_with_tolerance(
+        &self,
+        tolerance: f32,
+    ) -> Vec<Point2D<f32, U>> {
+        let regular_intersections = self.line_intersections_with_centered_unit_square();
+        if !regular_intersections.is_empty() {
+            return regular_intersections;
+        }
+
+        let square_corners_and_distances = corner_points_of_centered_unit_square()
+            .iter()
+            .map(|&p| (p, self.normal_distance_to_point(p)))
+            .collect_vec();
+        let filtered_by_distance = square_corners_and_distances
+            .iter()
+            .filter(|(point, dist)| *dist <= tolerance)
+            .collect_vec();
+
+        if filtered_by_distance.is_empty() {
+            return vec![];
+        }
+
+        let grouped_by_distance = filtered_by_distance
+            .iter()
+            .sorted_by_key(|(point, distance)| OrderedFloat(*distance))
+            .group_by(|(point, distance)| distance);
+        let closest_points = grouped_by_distance
+            .into_iter()
+            .next()
+            .unwrap()
+            .1
+            .map(|(point, distance)| *point)
+            .collect_vec();
+        closest_points
     }
     pub fn line_intersections_with_expanded_centered_unit_square(
         &self,
@@ -522,7 +564,7 @@ mod tests {
     }
     #[test]
     fn test_check_line_intersection_with_standard_square() {
-        let line: WorldLine = Line::new(point2(5.0, 5.0), point2(4.0, 5.0));
+        let line: WorldLine = Line::new_horizontal(5.0);
         assert_false!(line.line_intersects_with_centered_unit_square());
     }
     #[test]
@@ -922,5 +964,161 @@ mod tests {
         );
         assert_eq!(result.unwrap().0, (point2(5, 6), STEP_UP).into());
         assert_about_eq_2d(result.unwrap().1, point2(5.0, 6.5));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__regular_intersections() {
+        let y = 0.2;
+
+        let expected_points = [(0.5, y), (-0.5, y)];
+        let intersections = Line::<f32>::new_horizontal(y)
+            .line_intersections_with_centered_unit_square_with_tolerance(0.1);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__is_intersecting__within_tolerance(
+    ) {
+        let y = 0.49;
+        let tolerance = 0.1;
+
+        let expected_points = [(0.5, y), (-0.5, y)];
+        let intersections = Line::<f32>::new_horizontal(y)
+            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__exactly_on_edge() {
+        let y = 0.5;
+        let tolerance = 0.0;
+
+        let expected_points = [(0.5, y), (-0.5, y)];
+        let intersections = Line::<f32>::new_horizontal(y)
+            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__not_intersecting__parallel__within_tolerance(
+    ) {
+        let y = 0.51;
+        let tolerance = 0.1;
+
+        let expected_points = [(0.5, 0.5), (-0.5, 0.5)];
+        let intersections = Line::<f32>::new_horizontal(y)
+            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__not_intersecting__parallel__outside_tolerance(
+    ) {
+        let y = 0.7;
+        let tolerance = 0.1;
+
+        let intersections = Line::<f32>::new_horizontal(y)
+            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert!(intersections.is_empty());
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner__within_tolerance(
+    ) {
+        let line: Line<f32> = Line::new((0.49, 0.5), (0.5, 0.49));
+        let tolerance = 0.1;
+
+        let expected_points = [(0.49, 0.5), (0.5, 0.49)];
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner_exact() {
+        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.5), (1.0, -1.0));
+        let tolerance = 0.1;
+
+        let expected_points = [(0.5, 0.5)];
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__within_tolerance(
+    ) {
+        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let tolerance = 0.1;
+        let expected_points = [(0.5, 0.5)];
+
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__outside_tolerance(
+    ) {
+        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let tolerance = 0.0001;
+
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert!(intersections.is_empty());
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__all_corners_within_tolerance(
+    ) {
+        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let tolerance = 100.0;
+        let expected_points = [(0.5, 0.5)];
+
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_parallel__all_corners_within_tolerance(
+    ) {
+        let line: Line<f32> = Line::new_horizontal(0.7);
+        let tolerance = 100.0;
+        let expected_points = [(-0.5, 0.5), (0.5, 0.5)];
+
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
+    }
+    #[test]
+    fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_almost_parallel__all_corners_within_tolerance(
+    ) {
+        let line: Line<f32> = Line::from_point_and_direction((0.0, 0.52), (1.0, 0.0001));
+        let tolerance = 100.0;
+        let expected_points = [(-0.5, 0.5)];
+
+        let intersections =
+            line.line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        assert_eq!(intersections.len(), expected_points.len());
+        expected_points
+            .iter()
+            .for_each(|&p| assert!(intersections.contains(&p.into())));
     }
 }

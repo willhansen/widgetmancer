@@ -91,13 +91,15 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
 
     pub fn covers_point(&self, point: Point2D<f32, U>) -> BoolWithPartial {
-        if self.dividing_line.point_is_on_line(point) {
-            BoolWithPartial::Partial
-        } else {
-            self.dividing_line
-                .same_side_of_line(self.point_on_half_plane(), point)
-                .into()
-        }
+        self.covers_point_with_tolerance(point, 0.0)
+    }
+    pub fn covers_point_with_tolerance(
+        &self,
+        point: Point2D<f32, U>,
+        tolerance: f32,
+    ) -> BoolWithPartial {
+        let depth = self.depth_of_point_in_half_plane(point);
+        BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
     pub fn at_least_partially_covers_point(&self, point: Point2D<f32, U>) -> bool {
         self.covers_point(point).is_true()
@@ -105,14 +107,17 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn covers_origin(&self) -> BoolWithPartial {
         self.covers_point(point2(0.0, 0.0))
     }
-    pub fn fully_covers_unit_square(&self) -> BoolWithPartial {
+    pub fn fully_covers_centered_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_centered_unit_square_with_tolerance(0.0)
     }
     pub fn fully_covers_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
     ) -> BoolWithPartial {
-        self.covers_all_of_these_points(corner_points_of_centered_unit_square(), tolerance)
+        self.covers_all_of_these_points_with_tolerance(
+            corner_points_of_centered_unit_square(),
+            tolerance,
+        )
     }
     pub fn retracted(&self, retracted_distance: f32) -> Self {
         self.extended(-retracted_distance)
@@ -137,16 +142,19 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
 
     pub fn at_least_partially_covers_unit_square(&self) -> bool {
-        !self.complement().fully_covers_unit_square().is_true()
+        !self
+            .complement()
+            .fully_covers_centered_unit_square()
+            .is_true()
     }
-    pub fn partially_covers_expanded_unit_square(
+    pub fn partially_covers_centered_unit_square_with_tolerance(
         &self,
-        per_face_extension: f32,
+        tolerance: f32,
     ) -> BoolWithPartial {
-        self.fully_covers_centered_unit_square_with_tolerance(per_face_extension)
+        self.fully_covers_centered_unit_square_with_tolerance(tolerance)
             .or(self
                 .complement()
-                .fully_covers_centered_unit_square_with_tolerance(per_face_extension))
+                .fully_covers_centered_unit_square_with_tolerance(tolerance))
             .not()
     }
 
@@ -176,16 +184,23 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
-        if self.covers_point(point).is_true() {
+        let is_on_half_plane = self
+            .dividing_line
+            .same_side_of_line(self.point_on_half_plane(), point);
+        if is_on_half_plane {
             dist
         } else {
             -dist
         }
     }
+    pub fn distance_of_point_from_half_plane(&self, point: Point2D<f32, U>) -> f32 {
+        -self.depth_of_point_in_half_plane(point)
+    }
     pub fn coverage_of_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
     ) -> IntervalLocation {
+        assert!(tolerance >= 0.0);
         let fully_covers = self.fully_covers_centered_unit_square_with_tolerance(tolerance);
         dbg!(&fully_covers);
         if fully_covers.is_true() {
@@ -194,7 +209,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             return IntervalLocation::End;
         }
 
-        let partially_covers = self.partially_covers_expanded_unit_square(tolerance);
+        let partially_covers = self.partially_covers_centered_unit_square_with_tolerance(tolerance);
         dbg!(&partially_covers);
         if partially_covers.is_true() {
             IntervalLocation::During
@@ -210,6 +225,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         other: &Self,
         tolerance: f32,
     ) -> BoolWithPartial {
+        assert!(tolerance >= 0.0);
         // square corners inside a halfplane and that halfplane's intersections with the square form a convex polygon, which the other plane can test against.
 
         // Does the border intersection point actually matter?  Not if we have the intersections with the square
@@ -218,7 +234,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 
         let other_border_cut_points = other
             .dividing_line
-            .line_intersections_with_expanded_centered_unit_square(tolerance);
+            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+        dbg!(&other_border_cut_points);
 
         let other_covered_square_corner_points =
             other.at_least_partially_covered_corner_points_of_centered_unit_square(tolerance);
@@ -228,7 +245,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .chain(other_covered_square_corner_points.into_iter())
             .collect();
 
-        self.covers_any_of_these_points(polygon_corners_for_overlap_of_other_and_square, tolerance)
+        dbg!(self.covers_any_of_these_points_with_tolerance(
+            dbg!(polygon_corners_for_overlap_of_other_and_square),
+            tolerance,
+        ))
     }
     fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
@@ -239,19 +259,27 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .filter(|&p| self.covers_point(p).is_at_least_partial())
             .collect()
     }
-    fn covers_any_of_these_points(
+    fn covers_any_of_these_points_with_tolerance(
         &self,
         points: Vec<Point2D<f32, U>>,
         tolerance: f32,
     ) -> BoolWithPartial {
-        BoolWithPartial::any(points.into_iter().map(|p| self.covers_point(p)))
+        BoolWithPartial::any(
+            points
+                .into_iter()
+                .map(|p| self.covers_point_with_tolerance(p, tolerance)),
+        )
     }
-    fn covers_all_of_these_points(
+    fn covers_all_of_these_points_with_tolerance(
         &self,
         points: Vec<Point2D<f32, U>>,
         tolerance: f32,
     ) -> BoolWithPartial {
-        BoolWithPartial::all(points.into_iter().map(|p| self.covers_point(p)))
+        BoolWithPartial::all(
+            points
+                .into_iter()
+                .map(|p| self.covers_point_with_tolerance(p, tolerance)),
+        )
     }
 }
 
@@ -316,13 +344,24 @@ mod tests {
 
             the_plane.fully_covers_centered_unit_square_with_tolerance(tolerance)
         };
+        // half cover
         assert!(f(0.0, 0.0).is_false());
+        // almost full cover, outside tolerance
         assert!(f(0.49, 0.0).is_false());
+        // exact cover, on tolerance
         assert!(f(0.5, 0.0).is_partial());
+        // more than full cover, outside tolerance
         assert!(f(0.51, 0.0).is_true());
+        // almost full cover, inside tolerance
         assert!(f(0.49, 0.2).is_partial());
+        // exact full cover, inside tolerance
         assert!(f(0.5, 0.2).is_partial());
+        // more than full cover, inside tolerance
         assert!(f(0.51, 0.2).is_partial());
+        // almost full cover, on tolerance
+        assert!(f(0.49, 0.1).is_partial());
+        // more than full cover, on tolerance
+        assert!(f(0.51, 0.1).is_partial());
     }
     #[test]
     fn test_depth_of_point_in_half_plane() {
@@ -608,14 +647,14 @@ mod tests {
         )
     }
     #[test]
-    fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_extended_but_within_tolerance(
+    fn test_halfplane_overlap_within_unit_square__partial__opposing_parallel_half_planes_extended_but_within_tolerance(
     ) {
         let tolerance = 0.01;
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.5));
         let b: LocalSquareHalfPlane = a.complement().extended(tolerance / 2.0);
         assert!(a
-            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, -tolerance)
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance)
             .is_partial())
     }
     #[test]
@@ -630,16 +669,15 @@ mod tests {
             .is_partial())
     }
     #[test]
-    fn test_halfplane_overlap_inside_unit_square__false__exact__one_fully_covers__one_just_touches_corner(
+    fn test_halfplane_overlap_inside_unit_square__partial__exact__one_fully_covers__one_just_touches_corner(
     ) {
-        let border_y_pos = 0.55;
-        let unit_square_expansion = 0.01;
-        let a: HalfPlane = HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
-        let b: HalfPlane =
-            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.0, 0.5)));
-        assert!(a
-            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 0.0)
-            .is_false());
+        let just_fully_covering: HalfPlane =
+            HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
+        let just_touching_corner: HalfPlane =
+            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.5, 0.5)));
+        assert!(just_fully_covering
+            .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)
+            .is_partial());
     }
     #[test]
     fn test_halfplane_overlap_unit_square() {
@@ -651,10 +689,6 @@ mod tests {
 
         // more than fully covered
         assert_eq!(f(5.5, 0.01), After);
-        // outside far edge, and outside negative threshold
-        assert_eq!(f(0.51, -0.1), After);
-        // inside far edge, but outside negative threshold
-        assert_eq!(f(0.49, -0.1), After);
         // past far edge, but within threshold
         assert_eq!(f(0.51, 0.1), End);
         // on far edge exactly
@@ -669,10 +703,6 @@ mod tests {
         assert_eq!(f(-0.5, 0.0), Start);
         // before near edge, but within tolerance
         assert_eq!(f(-0.51, 0.1), Start);
-        // inside near edge, but outside negative threshold
-        assert_eq!(f(-0.49, -0.1), Before);
-        // outside near edge, and outside negative threshold
-        assert_eq!(f(-0.51, -0.1), Before);
         // not even close
         assert_eq!(f(-50.0, 0.1), Before);
     }

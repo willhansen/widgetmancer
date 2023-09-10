@@ -1,3 +1,7 @@
+use std::ops::{Add, Sub};
+
+use num::{Num, Zero};
+
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub enum BoolWithPartial {
     True,
@@ -45,13 +49,20 @@ impl BoolWithPartial {
     pub fn not(&self) -> Self {
         Self::from_number(-self.to_number())
     }
-    pub fn from_less_than<T: PartialOrd + PartialEq>(a: T, b: T) -> Self {
-        if a < b {
-            BoolWithPartial::True
-        } else if a == b {
-            BoolWithPartial::Partial
-        } else {
+    pub fn from_less_than<T: Num + PartialOrd + Copy>(smaller: T, bigger: T) -> Self {
+        Self::from_less_than_with_tolerance(smaller, bigger, T::zero())
+    }
+    pub fn from_less_than_with_tolerance<T: Num + PartialOrd + Copy>(
+        smaller: T,
+        bigger: T,
+        tolerance: T,
+    ) -> Self {
+        if smaller > bigger + tolerance {
             BoolWithPartial::False
+        } else if smaller < bigger - tolerance {
+            BoolWithPartial::True
+        } else {
+            BoolWithPartial::Partial
         }
     }
     pub fn any(iter: impl IntoIterator<Item = Self>) -> Self {
@@ -140,6 +151,50 @@ mod tests {
         assert_eq!(BoolWithPartial::from_less_than(-1, 0), t);
         assert_eq!(BoolWithPartial::from_less_than(1.0, 0.0), f);
         assert_eq!(BoolWithPartial::from_less_than(0, 0), p);
+    }
+    #[test]
+    fn test_bool_with_partial__from_less_than_with_tolerance() {
+        let t = BoolWithPartial::True;
+        let p = BoolWithPartial::Partial;
+        let f = BoolWithPartial::False;
+
+        // true, outside tolerance
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(-1.0, 0.0, 0.0),
+            t
+        );
+        assert_eq!(BoolWithPartial::from_less_than_with_tolerance(5, 50, 10), t);
+        // true, on tolerance border
+        assert_eq!(BoolWithPartial::from_less_than_with_tolerance(0, 1, 1), p);
+        // true, but within tolerance
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(5.0, 10.0, 7.0),
+            p
+        );
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(5.0, 6.0, 9.0),
+            p
+        );
+        // exact
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(5.0, 5.0, 0.0),
+            p
+        );
+        // false, but within tolerance
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(7.0, 5.0, 3.0),
+            p
+        );
+        // false, on tolerance border
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(7.0, 5.0, 2.0),
+            p
+        );
+        // false, outside tolerance
+        assert_eq!(
+            BoolWithPartial::from_less_than_with_tolerance(70.0, 5.0, 2.0),
+            f
+        );
     }
     #[test]
     fn test_bool_with_partial__any() {
