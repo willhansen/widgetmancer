@@ -1,4 +1,7 @@
-use super::{coordinate_frame_conversions::*, coordinates::*, general_utility::*, line::*};
+use super::{
+    bool_with_partial::*, coordinate_frame_conversions::*, coordinates::*, general_utility::*,
+    interval_location::*, line::*,
+};
 
 // TODO: make this a newtype with restricted points
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;

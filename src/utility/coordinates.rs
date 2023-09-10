@@ -14,6 +14,7 @@ use rand::{rngs::StdRng, Rng};
 
 // TODO: get rid of this section
 use super::{
+    bool_with_partial::*,
     // TODO: get rid of this line
     coordinate_frame_conversions::{
         SquareGridInWorldFrame, SquareSet, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
@@ -27,7 +28,6 @@ use super::{
     lerp,
     random_angle,
     sign,
-    BoolWithPartial,
     RigidTransform,
     RigidlyTransformable,
 

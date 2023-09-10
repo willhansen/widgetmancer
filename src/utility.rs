@@ -35,10 +35,12 @@ use crate::piece::PieceType::King;
 use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
+pub mod bool_with_partial;
 pub mod coordinate_frame_conversions;
 pub mod coordinates;
 pub mod general_utility;
 pub mod halfplane;
+pub mod interval_location;
 pub mod line;
 pub mod octant;
 pub mod poses;
