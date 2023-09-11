@@ -377,7 +377,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     }
 
     fn visible_local_relative_squares(&self) -> StepSet {
-        self.filtered(true, false, true)
+        self.filtered(true, true, true)
             .visible_relative_squares_including_center()
     }
     fn visible_relative_squares_including_center(&self) -> StepSet {
@@ -533,12 +533,23 @@ impl TopDownifiedFieldOfView {
         );
     }
     fn add_top_down_portal(&mut self, portal: &TopDownPortal) {
-        let positioned_portal_target: PositionedTopDownPortalTarget = portal.positioned_target();
-        let portal_shape: TopDownPortalShape = portal.shape;
-        // TODO: check that the portal entrances do not overlap
-        todo!();
+        let new_positioned_portal_target: PositionedTopDownPortalTarget =
+            portal.positioned_target();
+        let new_portal_shape: TopDownPortalShape = portal.shape;
+
+        // TODO: put this part in its own function
+        let existing_shapes = self
+            .top_down_portals_for_relative_square(new_positioned_portal_target.0)
+            .iter()
+            .map(|portal| portal.shape_rotated_to_relative_frame())
+            .collect_vec();
+        let found_overlap = existing_shapes
+            .into_iter()
+            .any(|existing_shape| new_portal_shape.overlaps(&existing_shape, 1e-5));
+        assert!(!found_overlap);
+
         self.map_of_top_down_portal_shapes_by_coordinates
-            .insert(positioned_portal_target, portal_shape);
+            .insert(new_positioned_portal_target, new_portal_shape);
     }
 
     fn can_see_local_relative_square(&self, rel_square: WorldStep) -> bool {
@@ -915,6 +926,56 @@ mod tests {
             },
             shape: TopDownPortalShape::new_fully_visible(),
         })
+    }
+    #[test]
+    #[should_panic]
+    fn test_add_a_view_of_a_square__that_overlaps_another_view() {
+        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+
+        rasterized_fov.add_top_down_portal(&TopDownPortal {
+            relative_position: (4, 5).into(),
+            target: TopDownPortalTarget {
+                absolute_square: (10, 10).into(),
+                portal_depth: 1,
+                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+            },
+            shape: TopDownPortalShape::new_fully_visible(),
+        });
+        rasterized_fov.add_top_down_portal(&TopDownPortal {
+            relative_position: (4, 5).into(),
+            target: TopDownPortalTarget {
+                absolute_square: (90, 10).into(),
+                portal_depth: 1,
+                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+            },
+            shape: TopDownPortalShape::new_top_half_visible(),
+        });
+    }
+    #[test]
+    #[should_panic]
+    fn test_add_a_view_of_a_square__that_overlaps_another_view__slightly() {
+        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+
+        rasterized_fov.add_top_down_portal(&TopDownPortal {
+            relative_position: (4, 5).into(),
+            target: TopDownPortalTarget {
+                absolute_square: (10, 10).into(),
+                portal_depth: 1,
+                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+            },
+            shape: TopDownPortalShape::new_bottom_half_visible(),
+        });
+        rasterized_fov.add_top_down_portal(&TopDownPortal {
+            relative_position: (4, 5).into(),
+            target: TopDownPortalTarget {
+                absolute_square: (90, 10).into(),
+                portal_depth: 1,
+                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+            },
+            shape: TopDownPortalShape::from_visible_half_plane(
+                LocalSquareHalfPlane::top_half_plane().extended(0.001),
+            ),
+        });
     }
     #[test]
     fn test_add_visible_local_relative_square() {
