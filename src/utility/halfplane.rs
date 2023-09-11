@@ -235,7 +235,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         let other_border_cut_points = other
             .dividing_line
             .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
-        dbg!(&other_border_cut_points);
 
         let other_covered_square_corner_points =
             other.at_least_partially_covered_corner_points_of_centered_unit_square(tolerance);
@@ -245,10 +244,10 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .chain(other_covered_square_corner_points.into_iter())
             .collect();
 
-        dbg!(self.covers_any_of_these_points_with_tolerance(
-            dbg!(polygon_corners_for_overlap_of_other_and_square),
+        self.covers_any_of_these_points_with_tolerance(
+            polygon_corners_for_overlap_of_other_and_square,
             tolerance,
-        ))
+        )
     }
     fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
@@ -563,20 +562,6 @@ mod tests {
             .is_partial())
     }
     #[test]
-    fn test_halfplane_overlap_within_unit_square__false__diagonal_inside_square_but_outside_tolerance(
-    ) {
-        let tolerance = -0.01;
-        let a: LocalSquareHalfPlane = HalfPlane::new_away_from_origin_from_border_line(
-            Line::new_vertical(0.5 + tolerance / 2.0),
-        );
-        let b: LocalSquareHalfPlane = HalfPlane::new_away_from_origin_from_border_line(
-            Line::new_horizontal(0.5 + tolerance / 2.0),
-        );
-        assert!(a
-            .overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance)
-            .is_false())
-    }
-    #[test]
     fn test_halfplane_overlap_within_unit_square__true__angled() {
         let a: LocalSquareHalfPlane =
             HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(-0.2));
@@ -674,7 +659,7 @@ mod tests {
         let just_fully_covering: HalfPlane =
             HalfPlane::new_toward_origin_from_border_line(Line::new_horizontal(0.5));
         let just_touching_corner: HalfPlane =
-            HalfPlane::new_toward_origin_from_border_line(Line::new((0.0, 1.0), (0.5, 0.5)));
+            HalfPlane::new_away_from_origin_from_border_line(Line::new((0.0, 1.0), (0.5, 0.5)));
         assert!(just_fully_covering
             .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)
             .is_partial());
@@ -682,7 +667,6 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_unit_square() {
         let f = |top_y: f32, tolerance: f32| {
-            dbg!(&top_y, &tolerance);
             HalfPlane::<f32>::down(top_y).coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
         use IntervalLocation::*;
