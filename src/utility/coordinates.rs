@@ -607,6 +607,7 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     point: Point2D<f32, U>,
     tolerance: f32,
 ) -> BoolWithPartial {
+    assert!(tolerance >= 0.0);
     let vec = point.to_vector();
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
@@ -819,13 +820,6 @@ mod tests {
         )
     }
     #[test]
-    fn test_point_is_in_centered_unit_square__inside_square__outside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), -0.2)
-                .is_false()
-        )
-    }
-    #[test]
     fn test_point_is_in_centered_unit_square__outside_square_diagonally__inside_tolerance() {
         assert!(
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.51), 0.2)
@@ -837,13 +831,6 @@ mod tests {
         assert!(
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
                 .is_partial()
-        )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__inside_square_diagonally__outside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), -0.2)
-                .is_false()
         )
     }
 }

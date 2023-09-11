@@ -98,6 +98,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         point: Point2D<f32, U>,
         tolerance: f32,
     ) -> BoolWithPartial {
+        assert!(tolerance >= 0.0);
         let depth = self.depth_of_point_in_half_plane(point);
         BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
@@ -263,6 +264,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         points: Vec<Point2D<f32, U>>,
         tolerance: f32,
     ) -> BoolWithPartial {
+        assert!(tolerance >= 0.0);
         BoolWithPartial::any(
             points
                 .into_iter()
@@ -274,6 +276,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         points: Vec<Point2D<f32, U>>,
         tolerance: f32,
     ) -> BoolWithPartial {
+        assert!(tolerance >= 0.0);
         BoolWithPartial::all(
             points
                 .into_iter()

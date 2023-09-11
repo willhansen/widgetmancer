@@ -57,6 +57,7 @@ impl BoolWithPartial {
         bigger: T,
         tolerance: T,
     ) -> Self {
+        assert!(tolerance >= T::zero());
         if smaller > bigger + tolerance {
             BoolWithPartial::False
         } else if smaller < bigger - tolerance {

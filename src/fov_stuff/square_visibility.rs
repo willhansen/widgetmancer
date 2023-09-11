@@ -116,7 +116,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
     fn is_just_barely_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion.is_some_and(|v: LocalSquareHalfPlane| {
-            v.fully_covers_centered_unit_square_with_tolerance(-tolerance)
+            v.fully_covers_centered_unit_square_with_tolerance(tolerance)
                 .is_partial()
         })
     }
