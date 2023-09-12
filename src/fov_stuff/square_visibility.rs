@@ -360,7 +360,6 @@ impl SquareVisibilityMapFunctions for LocalVisibilityMap {
             let mut existing_entry = combined_vis_map.entry(*key);
             match existing_entry {
                 std::collections::hash_map::Entry::Occupied(mut e) => {
-                    todo!("TODO: Does this just overwrite partially visible squares without combining to full visibility?");
                     e.insert(e.get().combined_increasing_visibility(value_to_add));
                 }
                 std::collections::hash_map::Entry::Vacant(e) => {
