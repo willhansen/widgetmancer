@@ -42,16 +42,24 @@ impl AngleBasedVisibleSegment {
         }
     }
     fn start_face_spans_angle_interval(&self) -> bool {
-        self.start_internal_relative_face.is_none()
-            || self.start_internal_relative_face.is_some_and(
-                |face: RelativeSquareWithOrthogonalDir| {
-                    !face.line().parallel_directions().iter().any(|&line_angle| {
-                        !self
-                            .visible_angle_interval
-                            .contains_or_touches_angle(line_angle)
-                    })
-                },
-            )
+        if self.start_internal_relative_face.is_none() {
+            return true;
+        }
+
+        let start_face = self.start_internal_relative_face.unwrap();
+
+        let interval_includes_any_line_end =
+            start_face
+                .line()
+                .parallel_directions()
+                .iter()
+                .any(|&line_angle| {
+                    let interval_includes_line_end = self
+                        .visible_angle_interval
+                        .contains_or_touches_angle(line_angle);
+                    interval_includes_line_end
+                });
+        !interval_includes_any_line_end
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let actual_face = relative_face.into();
@@ -75,17 +83,22 @@ impl AngleBasedVisibleSegment {
     }
     pub fn with_weakly_applied_start_face(
         &self,
-        relative_face: RelativeSquareWithOrthogonalDir,
+        relative_face: impl Into<RelativeSquareWithOrthogonalDir>,
     ) -> Self {
         if self.start_internal_relative_face.is_some() {
             return self.clone();
         }
 
         let thing = Self {
-            start_internal_relative_face: Some(relative_face),
+            start_internal_relative_face: Some(relative_face.into()),
             ..self.clone()
         };
-        assert!(thing.start_face_spans_angle_interval());
+        assert!(
+            thing.start_face_spans_angle_interval(),
+            "angle_interval: {}\n start_face: {}",
+            self.visible_angle_interval,
+            thing.start_internal_relative_face.unwrap()
+        );
         thing
     }
     pub fn with_visible_angle_interval(&self, angle_interval: PartialAngleInterval) -> Self {
@@ -178,7 +191,13 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
 mod tests {
     use euclid::vec2;
 
-    use crate::{fov_stuff::square_visibility::ViewRoundable, utility::STEP_RIGHT};
+    use crate::{
+        fov_stuff::square_visibility::ViewRoundable,
+        utility::{
+            coordinate_frame_conversions::{STEP_DOWN, STEP_UP},
+            STEP_RIGHT,
+        },
+    };
 
     use super::*;
     #[test]
@@ -220,5 +239,12 @@ mod tests {
             .is_only_partially_visible());
         assert!(visibilities.get(&vec2(3, 0)).unwrap().is_fully_visible());
         assert_eq!(visibilities.len(), 4);
+    }
+    #[test]
+    fn test_start_face_spans_angle_interval() {
+        let segment = AngleBasedVisibleSegment::from_relative_square(STEP_DOWN * 5);
+        assert!(segment.start_face_spans_angle_interval());
+        let with_face = segment.with_weakly_applied_start_face((STEP_DOWN * 2, STEP_UP));
+        assert!(with_face.start_face_spans_angle_interval());
     }
 }

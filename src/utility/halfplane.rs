@@ -203,7 +203,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     ) -> IntervalLocation {
         assert!(tolerance >= 0.0);
         let fully_covers = self.fully_covers_centered_unit_square_with_tolerance(tolerance);
-        dbg!(&fully_covers);
         if fully_covers.is_true() {
             return IntervalLocation::After;
         } else if fully_covers.is_partial() {
@@ -211,7 +210,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         }
 
         let partially_covers = self.partially_covers_centered_unit_square_with_tolerance(tolerance);
-        dbg!(&partially_covers);
         if partially_covers.is_true() {
             IntervalLocation::During
         } else if partially_covers.is_partial() {
