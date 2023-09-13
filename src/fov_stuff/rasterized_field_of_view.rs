@@ -290,7 +290,6 @@ impl ViewRoundable for SquareOfTopDownPortals {
 impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self {
         let mut new_thing = Self::new_centered_at(root);
-        dbg!(vis_map.len());
         vis_map.iter().for_each(|(rel_square, visibility)| {
             new_thing.try_add_visible_local_relative_square(*rel_square, visibility);
         });
