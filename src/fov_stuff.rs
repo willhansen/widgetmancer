@@ -1251,43 +1251,49 @@ mod tests {
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
-        (0..1).for_each(|dy| {
-            let main_step = STEP_LEFT * 7 + STEP_UP * dy;
-            let main_center = point2(5, 5);
-            let fovs = faces_away_from_center_at_rel_square(main_step)
+        (0..5).for_each(|dy| {
+            let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
+            let absolute_fov_center_square = point2(5, 5);
+            let absolute_fully_visible_square =
+                absolute_fov_center_square + relative_fully_visible_square;
+            let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
                 .iter()
                 .map(|&rel_face| {
-                    let mut fov = FieldOfView::new_empty_fov_at(main_center);
+                    let mut fov = FieldOfView::new_empty_fov_at(absolute_fov_center_square);
                     fov.add_fully_visible_relative_face(rel_face);
                     fov
                 })
                 .collect_vec();
 
-            let test_step = main_step + STEP_RIGHT;
-            let test_square = main_center + test_step;
-
-            fovs.iter().for_each(|fov| {
+            face_fovs.iter().for_each(|fov| {
                 let rasterized_fov = fov.rasterized();
+                assert!(rasterized_fov
+                    .relative_square_is_only_partially_visible(relative_fully_visible_square));
                 assert_eq!(
-                    rasterized_fov.times_absolute_square_is_visible(test_square),
+                    rasterized_fov.times_absolute_square_is_visible(absolute_fully_visible_square),
                     1
                 );
                 assert_eq!(
-                    rasterized_fov.times_absolute_square_is_fully_visible(test_square),
+                    rasterized_fov
+                        .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
                     0
                 );
             });
 
-            let merged_fov = fovs
+            let merged_fov = face_fovs
                 .iter()
                 .cloned()
                 .reduce(|a, b| a.combined_with(&b))
                 .unwrap()
                 .rasterized();
 
-            assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
+            assert!(rasterized_fov.relative_square_is_fully_visible(relative_fully_visible_square));
             assert_eq!(
-                merged_fov.times_absolute_square_is_fully_visible(test_square),
+                merged_fov.times_absolute_square_is_visible(absolute_fully_visible_square),
+                1
+            );
+            assert_eq!(
+                merged_fov.times_absolute_square_is_fully_visible(absolute_fully_visible_square),
                 1
             );
         });
