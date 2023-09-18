@@ -229,15 +229,32 @@ impl FieldOfView {
     ///
 
     /// I suspect this may also catch the case of two different FOVs going through two different, but coherent portals (ie the two portals have the same rigid transform).  I don't know if that would be bad or not.
-    ///                                                                      
-    ///          ┊             │    Coherent, but disconnected portals       
-    ///          ┊             │                                             
-    ///          ┯             ┷                                             
-    ///          │             ┊                                             
-    ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────                                    
-    ///                                                                      
-    ///                                                                      
+    ///                                      
+    ///                                      
+    ///          Coherent, but disconnected portals
+    ///                                      
+    ///                                      
+    ///          ┊             │             
+    ///          ┊             │             
+    ///          ┯             ┷             
+    ///          │             ┊             
+    ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────    
+    ///                                      
+    ///                                      
     /// One case that needs to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
+    ///                                            
+    ///                                            
+    ///                                            
+    ///         ┊             ┊      │             
+    ///         ┊             ┊      │             
+    ///         ┊             ┯      ┷             
+    ///         ┯             ┷      ┊             
+    ///         │             ┊      ┊             
+    ///         ○ ──┨┄┄┄┄┄    ◌      ◌ ┄┄┠─────    
+    ///                                            
+    ///                                            
+    ///                                            
+    ///                                            
     /// Another case is where two views have the same root, go through two portals to different places, and go through another two different portals that make them have the same root again.  This time they have the same portal depth, and I'm not exactly sure how to handle it.
     fn combined_sub_fovs(
         sub_fovs_1: &Vec<FieldOfView>,
