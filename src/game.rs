@@ -23,7 +23,7 @@ use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::rasterized_field_of_view::{
-    TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
+    RasterizedFieldOfView, TopDownifiedFieldOfViewInterface,
 };
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityFunctions, SquareVisibilityFunctions,
@@ -2371,7 +2371,7 @@ impl Game {
             &self.portal_geometry,
         )
     }
-    fn rasterized_player_field_of_view(&self) -> TopDownifiedFieldOfView {
+    fn rasterized_player_field_of_view(&self) -> RasterizedFieldOfView {
         self.player_field_of_view().rasterized()
     }
 

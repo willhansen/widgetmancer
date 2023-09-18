@@ -35,8 +35,8 @@ pub struct TopDownPortal {
 
 /// Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
 /// TODO: maybe precalculate indexes
-#[derive(Clone, Default, Debug)]
-pub struct TopDownifiedFieldOfView {
+#[derive(PartialEq, Clone, Default, Debug)]
+pub struct RasterizedFieldOfView {
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
 }
 
@@ -127,7 +127,7 @@ type UniqueTopDownPortals = HashMap<PositionedTopDownPortalTarget, TopDownPortal
 
 #[derive(Clone, Debug)]
 /// A RasterizedFieldOfView with the additional guarantee of all top-down-portals being on one square
-struct SquareOfTopDownPortals(TopDownifiedFieldOfView);
+struct SquareOfTopDownPortals(RasterizedFieldOfView);
 
 #[derive(Clone, Debug)]
 struct DirectConnectionToLocalSquare(TopDownPortal);
@@ -222,10 +222,10 @@ impl SquareOfTopDownPortals {
 }
 impl FromIterator<TopDownPortal> for SquareOfTopDownPortals {
     fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
-        TopDownifiedFieldOfView::from_iter(iter).try_into().unwrap()
+        RasterizedFieldOfView::from_iter(iter).try_into().unwrap()
     }
 }
-impl FromIterator<TopDownPortal> for TopDownifiedFieldOfView {
+impl FromIterator<TopDownPortal> for RasterizedFieldOfView {
     fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
         let new_fov = Self {
             map_of_top_down_portal_shapes_by_coordinates: iter
@@ -250,10 +250,10 @@ impl FromIterator<TopDownPortal> for TopDownifiedFieldOfView {
         new_fov
     }
 }
-impl TryFrom<TopDownifiedFieldOfView> for SquareOfTopDownPortals {
+impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
     type Error = ();
 
-    fn try_from(value: TopDownifiedFieldOfView) -> Result<Self, Self::Error> {
+    fn try_from(value: RasterizedFieldOfView) -> Result<Self, Self::Error> {
         if value
             .top_down_portal_iter()
             .map(|x| x.relative_position())
@@ -287,7 +287,7 @@ impl ViewRoundable for SquareOfTopDownPortals {
     }
 }
 
-impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
+impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
     fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
@@ -519,7 +519,7 @@ impl TopDownifiedFieldOfViewInterface for TopDownifiedFieldOfView {
     }
 }
 
-impl TopDownifiedFieldOfView {
+impl RasterizedFieldOfView {
     fn add_partially_visible_local_relative_square(
         &mut self,
         step: WorldStep,
@@ -623,7 +623,7 @@ impl TopDownifiedFieldOfView {
         );
     }
     fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_fov = TopDownifiedFieldOfView::default();
+        let mut new_fov = RasterizedFieldOfView::default();
         new_fov.set_root_square(new_root);
         new_fov
     }
@@ -855,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_center_square_is_always_visible() {
-        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         assert_eq!(rasterized_fov.portal_map().len(), 1);
         assert_eq!(
             rasterized_fov
@@ -868,7 +868,7 @@ mod tests {
 
     #[test]
     fn test_rounding_towards_full_visibility() {
-        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_fully_visible_local_relative_square(STEP_RIGHT);
 
@@ -914,7 +914,7 @@ mod tests {
     }
     #[test]
     fn test_add_a_view_of_a_square() {
-        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_top_down_portal(&TopDownPortal {
             relative_position: (4, 5).into(),
@@ -929,7 +929,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_add_a_view_of_a_square__that_overlaps_another_view() {
-        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_top_down_portal(&TopDownPortal {
             relative_position: (4, 5).into(),
@@ -953,7 +953,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_add_a_view_of_a_square__that_overlaps_another_view__slightly() {
-        let mut rasterized_fov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_top_down_portal(&TopDownPortal {
             relative_position: (4, 5).into(),
@@ -978,7 +978,7 @@ mod tests {
     }
     #[test]
     fn test_add_visible_local_relative_square() {
-        let mut rfov = TopDownifiedFieldOfView::new_centered_at(point2(5, 5));
+        let mut rfov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         let vis = SquareVisibility::new_top_half_visible();
         rfov.add_visible_local_relative_square(STEP_RIGHT, &vis);
         assert_eq!(rfov.number_of_visible_relative_squares(), 2);

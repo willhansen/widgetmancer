@@ -50,7 +50,9 @@ pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy> {
 }
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
+pub type Face = SquareWithOrthogonalDir;
 pub type RelativeSquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldStep>;
+pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where

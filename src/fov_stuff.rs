@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
-use crate::fov_stuff::rasterized_field_of_view::TopDownifiedFieldOfView;
+use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     LocalVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
@@ -49,7 +49,7 @@ use self::rasterized_field_of_view::TopDownifiedFieldOfViewInterface;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-#[derive(Debug, Clone, Constructor)]
+#[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
@@ -69,6 +69,18 @@ impl FieldOfView {
             new_center, STEP_UP,
         ))
     }
+    pub fn new_with_visible_face(
+        center: impl Into<WorldSquare>,
+        face: impl Into<RelativeFace>,
+    ) -> Self {
+        Self::new_empty_fov_at(center.into()).with_fully_visible_relative_face(face)
+    }
+    pub fn new_with_visible_square(
+        center: impl Into<WorldSquare>,
+        square: impl Into<WorldStep>,
+    ) -> Self {
+        Self::new_empty_fov_at(center.into()).with_fully_visible_relative_square(square)
+    }
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
     }
@@ -83,9 +95,14 @@ impl FieldOfView {
     pub fn transformed_sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
-    pub fn add_fully_visible_relative_square(&mut self, step: WorldStep) {
+    pub fn add_fully_visible_relative_square(&mut self, step: impl Into<WorldStep>) {
         self.visible_segments_in_main_view_only
-            .push(AngleBasedVisibleSegment::from_relative_square(step))
+            .push(AngleBasedVisibleSegment::from_relative_square(step.into()))
+    }
+    // passthrough version
+    pub fn with_fully_visible_relative_square(mut self, step: impl Into<WorldStep>) -> Self {
+        self.add_fully_visible_relative_square(step);
+        self
     }
     pub fn add_fully_visible_relative_face(
         &mut self,
@@ -93,6 +110,11 @@ impl FieldOfView {
     ) {
         self.visible_segments_in_main_view_only
             .push(AngleBasedVisibleSegment::from_relative_face(face))
+    }
+    // passthrough version
+    pub fn with_fully_visible_relative_face(mut self, face: impl Into<RelativeFace>) -> Self {
+        self.add_fully_visible_relative_face(face);
+        self
     }
 
     pub fn visible_segments_in_main_view_only(&self) -> &Vec<AngleBasedVisibleSegment> {
@@ -106,6 +128,7 @@ impl FieldOfView {
         );
 
         // TODO: combine visible segments where possible
+        // TODO: delete this commented code
 
         // let squares_visible_in_only_one_view: StepSet = self
         //     .at_least_partially_visible_relative_squares_in_main_view_only()
@@ -160,6 +183,7 @@ impl FieldOfView {
         // let mut all_visibilities: StepVisibilityMap = visibility_of_squares_only_visible_in_self;
         // all_visibilities.extend(visibility_of_squares_only_visible_in_other);
         // all_visibilities.extend(visibility_of_squares_visible_in_both_views);
+        todo!();
 
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
@@ -195,6 +219,26 @@ impl FieldOfView {
         }
     }
 
+    /// Two sub-FieldOfViews can be combined if they have the same root position and rotation.
+    /// I think the original intent behind this was when two different fovs from adjacent octants travel through a portal, and each of those adjacent top-level local FOVs has a sub-FOV on the other side of the portal, those sub-FOVs can still be combined for correct drawing.
+    ///
+    ///
+    ///          ○ ══╡ ╞════  
+    ///
+    ///
+    ///
+
+    /// I suspect this may also catch the case of two different FOVs going through two different, but coherent portals (ie the two portals have the same rigid transform).  I don't know if that would be bad or not.
+    ///                                                                      
+    ///          ┊             │    Coherent, but disconnected portals       
+    ///          ┊             │                                             
+    ///          ┯             ┷                                             
+    ///          │             ┊                                             
+    ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────                                    
+    ///                                                                      
+    ///                                                                      
+    /// One case that needs to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
+    /// Another case is where two views have the same root, go through two portals to different places, and go through another two different portals that make them have the same root again.  This time they have the same portal depth, and I'm not exactly sure how to handle it.
     fn combined_sub_fovs(
         sub_fovs_1: &Vec<FieldOfView>,
         sub_fovs_2: &Vec<FieldOfView>,
@@ -224,6 +268,13 @@ impl FieldOfView {
         combined_by_root
     }
 
+    pub fn combine_multiple(others: impl IntoIterator<Item = Self>) -> Self {
+        others
+            .into_iter()
+            .reduce(|a, b| a.combined_with(&b))
+            .unwrap()
+    }
+
     pub fn combined_with(&self, other: &Self) -> Self {
         assert_eq!(
             self.root_square_with_direction,
@@ -245,9 +296,9 @@ impl FieldOfView {
         }
     }
 
-    pub fn rasterized(&self) -> TopDownifiedFieldOfView {
+    pub fn rasterized(&self) -> RasterizedFieldOfView {
         // rasterize top level
-        let mut combined: TopDownifiedFieldOfView = self.rasterized_main_view_only();
+        let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let rasterized_and_relocalized_sub_fov =
@@ -257,8 +308,8 @@ impl FieldOfView {
         combined
     }
 
-    fn rasterized_main_view_only(&self) -> TopDownifiedFieldOfView {
-        TopDownifiedFieldOfView::from_local_visibility_map(
+    fn rasterized_main_view_only(&self) -> RasterizedFieldOfView {
+        RasterizedFieldOfView::from_local_visibility_map(
             self.root_square(),
             &self
                 .visible_segments_in_main_view_only
@@ -1251,51 +1302,67 @@ mod tests {
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
-        (0..5).for_each(|dy| {
-            let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
-            let absolute_fov_center_square = point2(5, 5);
-            let absolute_fully_visible_square =
-                absolute_fov_center_square + relative_fully_visible_square;
-            let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
-                .iter()
-                .map(|&rel_face| {
-                    let mut fov = FieldOfView::new_empty_fov_at(absolute_fov_center_square);
-                    fov.add_fully_visible_relative_face(rel_face);
-                    fov
-                })
-                .collect_vec();
+        // Non-deterministic test
+        // TODO: remove outer loop when deterministic
+        (0..100).foreach(|i| {
+            dbg!(i);
+            (0..5).for_each(|dy| {
+                let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
+                let absolute_fov_center_square = point2(5, 5);
+                let absolute_fully_visible_square =
+                    absolute_fov_center_square + relative_fully_visible_square;
+                let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
+                    .iter()
+                    .map(|&rel_face| {
+                        FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
+                    })
+                    .collect_vec();
 
-            face_fovs.iter().for_each(|fov| {
-                let rasterized_fov = fov.rasterized();
-                assert!(rasterized_fov
-                    .relative_square_is_only_partially_visible(relative_fully_visible_square));
+                face_fovs
+                    .iter()
+                    .map(FieldOfView::rasterized)
+                    .for_each(|rasterized_fov| {
+                        assert!(rasterized_fov.relative_square_is_only_partially_visible(
+                            relative_fully_visible_square
+                        ));
+                        assert_eq!(
+                            rasterized_fov
+                                .times_absolute_square_is_visible(absolute_fully_visible_square),
+                            1
+                        );
+                        assert_eq!(
+                            rasterized_fov.times_absolute_square_is_fully_visible(
+                                absolute_fully_visible_square
+                            ),
+                            0
+                        );
+                    });
+
+                let merged_fov = FieldOfView::combine_multiple(face_fovs);
+
+                let merged_rfov = merged_fov.rasterized();
+
+                let fov_created_whole = FieldOfView::new_empty_fov_at(absolute_fov_center_square)
+                    .with_fully_visible_relative_square(relative_fully_visible_square);
+                let rfov_created_whole = fov_created_whole.rasterized();
+
+                assert_eq!(merged_fov, fov_created_whole);
+                assert_eq!(merged_rfov, rfov_created_whole);
+
+                assert!(
+                    merged_rfov.relative_square_is_fully_visible(relative_fully_visible_square),
+                    "Should be fully visible"
+                );
                 assert_eq!(
-                    rasterized_fov.times_absolute_square_is_visible(absolute_fully_visible_square),
+                    merged_rfov.times_absolute_square_is_visible(absolute_fully_visible_square),
                     1
                 );
                 assert_eq!(
-                    rasterized_fov
+                    merged_rfov
                         .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
-                    0
+                    1
                 );
             });
-
-            let merged_fov = face_fovs
-                .iter()
-                .cloned()
-                .reduce(|a, b| a.combined_with(&b))
-                .unwrap()
-                .rasterized();
-
-            assert!(rasterized_fov.relative_square_is_fully_visible(relative_fully_visible_square));
-            assert_eq!(
-                merged_fov.times_absolute_square_is_visible(absolute_fully_visible_square),
-                1
-            );
-            assert_eq!(
-                merged_fov.times_absolute_square_is_fully_visible(absolute_fully_visible_square),
-                1
-            );
         });
     }
 

@@ -35,7 +35,7 @@ use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::rasterized_field_of_view::{
-    TopDownPortal, TopDownifiedFieldOfView, TopDownifiedFieldOfViewInterface,
+    RasterizedFieldOfView, TopDownPortal, TopDownifiedFieldOfViewInterface,
 };
 use crate::fov_stuff::square_visibility::RelativeSquareVisibilityFunctions;
 use crate::fov_stuff::FieldOfView;
@@ -253,7 +253,7 @@ impl Graphics {
 
     pub fn maybe_drawable_for_rel_square_of_fov(
         &self,
-        rasterized_fov: &TopDownifiedFieldOfView,
+        rasterized_fov: &RasterizedFieldOfView,
         rel_square: WorldStep,
     ) -> Option<DrawableEnum> {
         Self::drawable_at_relative_square(
@@ -267,7 +267,7 @@ impl Graphics {
 
     pub fn load_screen_buffer_from_fov(
         &mut self,
-        rasterized_field_of_view: &TopDownifiedFieldOfView,
+        rasterized_field_of_view: &RasterizedFieldOfView,
     ) {
         for screen_square in self.screen.all_screen_squares() {
             let world_square = self
@@ -658,7 +658,7 @@ impl Graphics {
     }
 
     pub(crate) fn drawable_at_relative_square(
-        rasterized_fov: &TopDownifiedFieldOfView,
+        rasterized_fov: &RasterizedFieldOfView,
         relative_square: WorldStep,
         maybe_drawable_map: Option<&HashMap<WorldSquare, DrawableEnum>>,
         tint_portals: bool,
