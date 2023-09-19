@@ -221,25 +221,26 @@ impl FieldOfView {
 
     /// Two sub-FieldOfViews can be combined if they have the same root position and rotation.
     /// I think the original intent behind this was when two different fovs from adjacent octants travel through a portal, and each of those adjacent top-level local FOVs has a sub-FOV on the other side of the portal, those sub-FOVs can still be combined for correct drawing.
-    ///
-    ///
-    ///          ○ ══╡ ╞════  
-    ///
-    ///
-    ///
+    ///                                      
+    ///  Two sight lines through one portal  
+    ///                                      
+    ///          ○ ══╡ ╞════                 
+    ///              a a                     
+    ///                                      
+    ///                                      
 
     /// I suspect this may also catch the case of two different FOVs going through two different, but coherent portals (ie the two portals have the same rigid transform).  I don't know if that would be bad or not.
     ///                                      
     ///                                      
-    ///          Coherent, but disconnected portals
+    ///    Coherent, but disconnected portals
     ///                                      
     ///                                      
     ///          ┊             │             
     ///          ┊             │             
-    ///          ┯             ┷             
+    ///          ┯a            ┷a            
     ///          │             ┊             
     ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────    
-    ///                                      
+    ///              b             b         
     ///                                      
     /// One case that needs to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
     ///                                            
@@ -247,15 +248,45 @@ impl FieldOfView {
     ///                                            
     ///         ┊             ┊      │             
     ///         ┊             ┊      │             
-    ///         ┊             ┯      ┷             
-    ///         ┯             ┷      ┊             
+    ///         ┊             ┯b     ┷b            
+    ///         ┯a            ┷a     ┊             
     ///         │             ┊      ┊             
     ///         ○ ──┨┄┄┄┄┄    ◌      ◌ ┄┄┠─────    
-    ///                                            
+    ///             c                    c         
     ///                                            
     ///                                            
     ///                                            
     /// Another case is where two views have the same root, go through two portals to different places, and go through another two different portals that make them have the same root again.  This time they have the same portal depth, and I'm not exactly sure how to handle it.
+    ///                                            
+    ///                                            
+    ///       With connected portals               
+    ///                                            
+    ///             a  b                           
+    ///         ◌ ┄┄┠──┨┄┄┄┄┄┄                     
+    ///                                            
+    ///             a  b                           
+    ///         ○ ──┨┄┄┠───                        
+    ///           🮡─┨┄┄┠───                        
+    ///             c  d                           
+    ///                                            
+    ///         ◌ ┄┄┠──┨┄┄┄┄┄┄                     
+    ///             c  d                           
+    ///                                            
+    ///                                            
+    ///        With disconnected portals           
+    ///                                            
+    ///         ┊             ┊      │             
+    ///         ┊             ┊      │             
+    ///         ┊             ┯b     ┷b            
+    ///         ┯a            ┷a     ┊             
+    ///         │             ┊      ┊             
+    ///         ○ ──┨┄┄┄┄┄    ◌      ◌ ┄┄┄┄┠─────  
+    ///             c                      d       
+    ///                                            
+    ///         ◌ ┄┄┠──┨┄┄┄┄┄┄                     
+    ///             c  d                           
+    ///                                            
+    ///                                            
     fn combined_sub_fovs(
         sub_fovs_1: &Vec<FieldOfView>,
         sub_fovs_2: &Vec<FieldOfView>,
