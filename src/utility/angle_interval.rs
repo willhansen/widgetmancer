@@ -54,6 +54,12 @@ impl PartialAngleInterval {
             anticlockwise_end: ccw,
         }
     }
+    pub fn cw(&self) -> FAngle {
+        self.clockwise_end
+    }
+    pub fn ccw(&self) -> FAngle {
+        self.anticlockwise_end
+    }
     pub fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
         Self::from_angles(
             Angle::degrees(clockwise_end_in_degrees),

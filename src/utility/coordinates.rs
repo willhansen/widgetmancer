@@ -585,11 +585,13 @@ pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
     a.cross(b) > 0.0
 }
 
-pub fn in_ccw_order(v: &Vec<WorldMove>) -> bool {
-    v.iter()
+pub fn in_ccw_order(v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>) -> bool {
+    v.into_iter()
+        .map(|x| x.into())
         .tuple_windows()
-        .all(|(&a, &b)| two_in_ccw_order(a, b))
+        .all(|(a, b)| two_in_ccw_order(a, b))
 }
+
 pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
     let ab = b - a;
     let ac = c - a;

@@ -1,6 +1,7 @@
 use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
+use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
     RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
@@ -11,7 +12,7 @@ use ordered_float::OrderedFloat;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 
-use super::fence::RelativeFenceFullyVisibleFromOriginGoingCcw;
+use super::fence::{Fence, RelativeFenceFullyVisibleFromOriginGoingCcw};
 use super::square_visibility::RelativeSquareVisibilityFunctions;
 
 #[derive(Clone, PartialEq)]
@@ -21,6 +22,29 @@ pub struct AngleBasedVisibleSegment {
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
 }
 impl AngleBasedVisibleSegment {
+    pub fn new(arc: PartialAngleInterval, end_fence: Fence) -> Self {
+        let x = Self {
+            visible_angle_interval: arc,
+            start_internal_relative_face: None,
+            end_fence,
+        };
+        x.validate();
+        x
+    }
+
+    pub fn new_with_start_face(
+        arc: PartialAngleInterval,
+        end_fence: Fence,
+        start_face: impl Into<RelativeFace>,
+    ) -> Self {
+        let x = Self {
+            visible_angle_interval: arc,
+            start_internal_relative_face: Some(start_face.into()),
+            end_fence,
+        };
+        x.validate();
+        x
+    }
     pub fn validate(&self) {
         if !self.start_face_spans_angle_interval()
             || !self.end_fence_fully_covers_angle_interval_with_no_overlap()
@@ -63,13 +87,10 @@ impl AngleBasedVisibleSegment {
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let actual_face = relative_face.into();
-        Self {
-            visible_angle_interval: PartialAngleInterval::from_relative_square_face(actual_face),
-            start_internal_relative_face: None,
-            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_ccw_relative_edges(vec![
-                actual_face,
-            ]),
-        }
+        Self::new(
+            PartialAngleInterval::from_relative_square_face(actual_face),
+            RelativeFenceFullyVisibleFromOriginGoingCcw::from_ccw_relative_faces(vec![actual_face]),
+        )
     }
     pub fn from_relative_square(step: WorldStep) -> Self {
         let faces = faces_away_from_center_at_rel_square(step);
@@ -89,17 +110,14 @@ impl AngleBasedVisibleSegment {
             return self.clone();
         }
 
-        let thing = Self {
-            start_internal_relative_face: Some(relative_face.into()),
-            ..self.clone()
-        };
-        assert!(
-            thing.start_face_spans_angle_interval(),
-            "angle_interval: {}\n start_face: {}",
+        self.with_start_face(relative_face)
+    }
+    pub fn with_start_face(&self, relative_face: impl Into<RelativeFace>) -> Self {
+        Self::new_with_start_face(
             self.visible_angle_interval,
-            thing.start_internal_relative_face.unwrap()
-        );
-        thing
+            self.end_fence.clone(),
+            relative_face,
+        )
     }
     pub fn with_visible_angle_interval(&self, angle_interval: PartialAngleInterval) -> Self {
         Self {
@@ -111,6 +129,12 @@ impl AngleBasedVisibleSegment {
         self.touched_squares_going_outwards_and_ccw().collect()
     }
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
+        todo!()
+    }
+    pub fn combine_multiple(unsorted_segments: &impl IntoIterator<Item = Self>) -> Vec<Self> {
+        todo!();
+    }
+    pub fn combined_with(&self, other: &Self) -> Option<Self> {
         todo!()
     }
     fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
@@ -192,11 +216,8 @@ mod tests {
     use euclid::vec2;
 
     use crate::{
-        fov_stuff::square_visibility::ViewRoundable,
-        utility::{
-            coordinate_frame_conversions::{STEP_DOWN, STEP_UP},
-            STEP_RIGHT,
-        },
+        fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
+        utility::coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
     };
 
     use super::*;
@@ -244,7 +265,55 @@ mod tests {
     fn test_start_face_spans_angle_interval() {
         let segment = AngleBasedVisibleSegment::from_relative_square(STEP_DOWN * 5);
         assert!(segment.start_face_spans_angle_interval());
-        let with_face = segment.with_weakly_applied_start_face((STEP_DOWN * 2, STEP_UP));
+        let with_face = segment.with_start_face((STEP_DOWN * 2, STEP_UP));
         assert!(with_face.start_face_spans_angle_interval());
+    }
+    #[test]
+    fn test_combine_two__valid() {
+        let rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
+        let a_square = rel_square;
+        let b_square = a_square + STEP_UP;
+        let start_face = (STEP_RIGHT * 2, STEP_LEFT);
+        let mut a =
+            AngleBasedVisibleSegment::from_relative_square(a_square).with_start_face(start_face);
+        let mut b =
+            AngleBasedVisibleSegment::from_relative_square(b_square).with_start_face(start_face);
+
+        let c: AngleBasedVisibleSegment = a.combined_with(&b).unwrap();
+
+        //  🄱
+        //  🄰
+
+        assert_eq!(c.visible_angle_interval.cw(), a.visible_angle_interval.cw());
+        assert_eq!(
+            c.visible_angle_interval.ccw(),
+            b.visible_angle_interval.ccw()
+        );
+
+        assert_eq!(
+            c.end_fence,
+            Fence::new(vec![
+                (a_square, STEP_DOWN),
+                (a_square, STEP_RIGHT),
+                (b_square, STEP_RIGHT),
+                (b_square, STEP_UP)
+            ])
+        );
+    }
+    #[test]
+    fn test_combine_two__fail_because_overlap() {
+        todo!()
+    }
+    #[test]
+    fn test_combine_two__fail_because_not_touching() {
+        todo!()
+    }
+    #[test]
+    fn test_combine_two__fail_because_different_start_lines() {
+        todo!()
+    }
+    #[test]
+    fn test_combine_two__fail_because_end_fences_can_not_connect() {
+        todo!()
     }
 }

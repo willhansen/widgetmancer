@@ -183,14 +183,17 @@ impl FieldOfView {
         // let mut all_visibilities: StepVisibilityMap = visibility_of_squares_only_visible_in_self;
         // all_visibilities.extend(visibility_of_squares_only_visible_in_other);
         // all_visibilities.extend(visibility_of_squares_visible_in_both_views);
-        todo!();
+
+        let segments = self
+            .visible_segments_in_main_view_only
+            .iter()
+            .chain(other.visible_segments_in_main_view_only.iter())
+            .cloned();
+        let combined_view_segments = AngleBasedVisibleSegment::combine_multiple(&segments);
 
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
-            visible_segments_in_main_view_only: concat([
-                self.visible_segments_in_main_view_only.clone(),
-                other.visible_segments_in_main_view_only.clone(),
-            ]),
+            visible_segments_in_main_view_only: combined_view_segments,
             transformed_sub_fovs: vec![],
         }
     }
@@ -266,10 +269,10 @@ impl FieldOfView {
     ///                                            
     ///             a  b                           
     ///         ○ ──┨┄┄┠───                        
-    ///           🮡─┨┄┄┠───                        
+    ///          🮡──┨┄┄┠───                        
     ///             c  d                           
-    ///                                            
-    ///         ◌ ┄┄┠──┨┄┄┄┄┄┄                     
+    ///         ◌                                  
+    ///          🮡┄┄┠──┨┄┄┄┄┄┄                     
     ///             c  d                           
     ///                                            
     ///                                            
