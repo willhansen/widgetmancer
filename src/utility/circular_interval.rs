@@ -21,21 +21,18 @@ pub fn try_combine_circular_intervals(
         return None;
     }
 
-    // Feel like this should be a matrix somehow
-    let a0_in_b = in_or_touching_looping_interval(a.0, b, modulo);
-    let a1_in_b = in_or_touching_looping_interval(a.1, b, modulo);
-    let b0_in_a = in_or_touching_looping_interval(b.0, a, modulo);
-    let b1_in_a = in_or_touching_looping_interval(b.1, a, modulo);
-
-    let a_is_full_loop = is_full_interval(a);
-    let b_is_full_loop = is_full_interval(b);
-    let sum_to_full_loop = todo!();
-
-    if a_is_full_loop || b_is_full_loop || sum_to_full_loop {
+    if is_full_interval(a) || is_full_interval(b) || do_connect_at_both_ends(a, b) {
         return Some(full_interval());
     }
 
-    todo!()
+    // Feel like this should be a matrix somehow
+    let a0_in_b = in_or_touching_looping_interval(a.0, b, modulo);
+    let a1_in_b = in_or_touching_looping_interval(a.1, b, modulo);
+
+    let start = if a0_in_b { b.0 } else { a.0 };
+    let end = if a1_in_b { b.1 } else { a.1 };
+
+    Some((start, end))
 }
 
 fn full_interval() -> (i32, i32) {
@@ -44,6 +41,10 @@ fn full_interval() -> (i32, i32) {
 
 fn is_full_interval(x: (i32, i32)) -> bool {
     x.0 == x.1
+}
+
+fn do_connect_at_both_ends(a: (i32, i32), b: (i32, i32)) -> bool {
+    a.1 == b.0 && b.1 == a.0
 }
 
 fn intervals_are_overlapping(a: (i32, i32), b: (i32, i32), modulo: u32) -> BoolWithPartial {
@@ -145,6 +146,13 @@ mod tests {
     fn test_combine_circular_intervals__two_half_intervals_combine_to_full() {
         assert_eq!(
             try_combine_circular_intervals((0, 5), (5, 0), 10),
+            Some((0, 0)),
+        );
+    }
+    #[test]
+    fn test_combine_circular_intervals__two_half_intervals_combine_to_full__and_modulo() {
+        assert_eq!(
+            try_combine_circular_intervals((1, 6), (506, 9001), 10),
             Some((0, 0)),
         );
     }
