@@ -1,5 +1,6 @@
 use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
+use crate::utility::circular_reduction_with_failable_operator;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
@@ -92,7 +93,8 @@ impl AngleBasedVisibleSegment {
             RelativeFenceFullyVisibleFromOriginGoingCcw::from_ccw_relative_faces(vec![actual_face]),
         )
     }
-    pub fn from_relative_square(step: WorldStep) -> Self {
+    pub fn from_relative_square(step: impl Into<WorldStep>) -> Self {
+        let step = step.into();
         let faces = faces_away_from_center_at_rel_square(step);
         Self {
             visible_angle_interval: PartialAngleInterval::from_relative_square(step),
@@ -131,8 +133,14 @@ impl AngleBasedVisibleSegment {
     pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
         todo!()
     }
-    pub fn combine_multiple(unsorted_segments: &impl IntoIterator<Item = Self>) -> Vec<Self> {
-        todo!();
+    pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
+        let sorted_ccw = unsorted_segments.into_iter().sorted_by_key(|segment| {
+            OrderedFloat(segment.visible_angle_interval.center_angle().radians)
+        });
+
+        let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
+
+        circular_reduction_with_failable_operator(sorted_ccw, reduction_function)
     }
     pub fn combined_with(&self, other: &Self) -> Option<Self> {
         todo!()
@@ -269,6 +277,41 @@ mod tests {
         assert!(with_face.start_face_spans_angle_interval());
     }
     #[test]
+    #[should_panic]
+    fn test_create_with_invalid_fence() {
+        AngleBasedVisibleSegment::new(
+            PartialAngleInterval::from_degrees(10.0, 20.0),
+            Fence::from_one_edge(((5, 0), STEP_RIGHT)),
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn test_create_with_invalid_start_face() {
+        AngleBasedVisibleSegment::new_with_start_face(
+            PartialAngleInterval::from_degrees(0.0, 1.0),
+            Fence::from_one_edge(((5, 0), STEP_RIGHT)),
+            ((-1, 0), STEP_LEFT),
+        );
+    }
+    #[test]
+    fn test_face_direction_agnostic() {
+        let arc = PartialAngleInterval::from_degrees(0.0, 1.0);
+
+        let a = AngleBasedVisibleSegment::new_with_start_face(
+            arc,
+            Fence::from_one_edge(((5, 0), STEP_RIGHT)),
+            ((1, 0), STEP_RIGHT),
+        );
+
+        let b = AngleBasedVisibleSegment::new_with_start_face(
+            arc,
+            Fence::from_one_edge(((6, 0), STEP_LEFT)),
+            ((2, 0), STEP_LEFT),
+        );
+
+        assert_eq!(a, b);
+    }
+    #[test]
     fn test_combine_two__valid() {
         let rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
         let a_square = rel_square;
@@ -302,15 +345,23 @@ mod tests {
     }
     #[test]
     fn test_combine_two__fail_because_overlap() {
-        todo!()
+        let a = AngleBasedVisibleSegment::from_relative_square((5, 0));
+        let b = AngleBasedVisibleSegment::from_relative_square((10, 1));
+        assert!(a.combined_with(&b).is_none());
     }
     #[test]
     fn test_combine_two__fail_because_not_touching() {
-        todo!()
+        let a = AngleBasedVisibleSegment::from_relative_square((5, 0));
+        let b = AngleBasedVisibleSegment::from_relative_square((5, 2));
+        assert!(a.combined_with(&b).is_none());
     }
     #[test]
     fn test_combine_two__fail_because_different_start_lines() {
-        todo!()
+        let a = AngleBasedVisibleSegment::from_relative_square((5, 0))
+            .with_start_face(((1, 0), STEP_RIGHT));
+        let b = AngleBasedVisibleSegment::from_relative_square((5, 1))
+            .with_start_face(((2, 0), STEP_RIGHT));
+        assert!(a.combined_with(&b).is_none());
     }
     #[test]
     fn test_combine_two__fail_because_end_fences_can_not_connect() {

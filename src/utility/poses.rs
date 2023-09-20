@@ -337,8 +337,9 @@ where
     }
 }
 pub fn faces_away_from_center_at_rel_square(
-    step: WorldStep,
+    step: impl Into<WorldStep>,
 ) -> HashSet<RelativeSquareWithOrthogonalDir> {
+    let step = step.into();
     ORTHOGONAL_STEPS
         .iter()
         .filter(|&&face_step| step.dot(face_step) >= 0)

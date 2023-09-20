@@ -89,7 +89,8 @@ impl PartialAngleInterval {
         Self::from_radians(n as f32 * step_length, (n + 1) as f32 * step_length)
     }
 
-    pub fn from_relative_square(relative_square: WorldStep) -> Self {
+    pub fn from_relative_square(relative_square: impl Into<WorldStep>) -> Self {
+        let relative_square = relative_square.into();
         assert_ne!(relative_square, vec2(0, 0));
         let rel_square_center = relative_square.to_f32();
         let rel_square_corners: Vec<WorldMove> = vec![
