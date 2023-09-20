@@ -366,6 +366,24 @@ pub fn combine_circularly_overlapping_intervals(
     todo!()
 }
 
+fn in_or_touching_looping_interval(interval: (i32, i32), val: i32, cycle_mod: u32) -> bool {
+    let val = val.rem_euclid(cycle_mod as i32);
+    let interval = (
+        interval.0.rem_euclid(cycle_mod as i32),
+        interval.1.rem_euclid(cycle_mod as i32),
+    );
+    if interval.0 == interval.1 {
+        // full loop
+        true
+    } else if interval.0 < interval.1 {
+        // no loop around
+        interval.0 <= val && val <= interval.1
+    } else {
+        // is loop around
+        val <= interval.0 || interval.1 <= val
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;

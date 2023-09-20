@@ -189,7 +189,7 @@ impl FieldOfView {
             .iter()
             .chain(other.visible_segments_in_main_view_only.iter())
             .cloned();
-        let combined_view_segments = AngleBasedVisibleSegment::combine_multiple(&segments);
+        let combined_view_segments = AngleBasedVisibleSegment::combine_multiple(segments);
 
         FieldOfView {
             root_square_with_direction: self.root_square_with_direction,
