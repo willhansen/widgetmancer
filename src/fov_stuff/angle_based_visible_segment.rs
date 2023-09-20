@@ -1,6 +1,6 @@
 use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
-use crate::utility::circular_interval::circular_reduction_with_failable_operator;
+use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
@@ -140,7 +140,7 @@ impl AngleBasedVisibleSegment {
 
         let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
 
-        circular_reduction_with_failable_operator(sorted_ccw, reduction_function)
+        circular_merging(sorted_ccw, reduction_function)
     }
     pub fn combined_with(&self, other: &Self) -> Option<Self> {
         todo!()
