@@ -200,22 +200,22 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     pub fn coverage_of_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
-    ) -> IntervalLocation {
+    ) -> RelativeIntervalLocation {
         assert!(tolerance >= 0.0);
         let fully_covers = self.fully_covers_centered_unit_square_with_tolerance(tolerance);
         if fully_covers.is_true() {
-            return IntervalLocation::After;
+            return RelativeIntervalLocation::After;
         } else if fully_covers.is_partial() {
-            return IntervalLocation::End;
+            return RelativeIntervalLocation::End;
         }
 
         let partially_covers = self.partially_covers_centered_unit_square_with_tolerance(tolerance);
         if partially_covers.is_true() {
-            IntervalLocation::During
+            RelativeIntervalLocation::During
         } else if partially_covers.is_partial() {
-            IntervalLocation::Start
+            RelativeIntervalLocation::Start
         } else {
-            IntervalLocation::Before
+            RelativeIntervalLocation::Before
         }
     }
 
@@ -670,7 +670,7 @@ mod tests {
         let f = |top_y: f32, tolerance: f32| {
             HalfPlane::<f32>::down(top_y).coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
-        use IntervalLocation::*;
+        use RelativeIntervalLocation::*;
 
         // more than fully covered
         assert_eq!(f(5.5, 0.01), After);

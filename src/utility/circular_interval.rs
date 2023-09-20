@@ -30,6 +30,7 @@ fn in_or_touching_looping_interval(interval: (i32, i32), val: i32, cycle_mod: u3
         val <= interval.0 || interval.1 <= val
     }
 }
+fn position_relative_to_circular_interval(val: i32, interval: (i32, i32), modulo: u32) -> PositionInInterval
 
 #[cfg(test)]
 mod tests {

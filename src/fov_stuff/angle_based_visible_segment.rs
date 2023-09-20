@@ -1,6 +1,6 @@
 use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
-use crate::utility::circular_reduction_with_failable_operator;
+use crate::utility::circular_interval::circular_reduction_with_failable_operator;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::poses::RelativeFace;
 use crate::utility::{

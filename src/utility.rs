@@ -36,6 +36,7 @@ use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
 pub mod bool_with_partial;
+pub mod circular_interval;
 pub mod coordinate_frame_conversions;
 pub mod coordinates;
 pub mod general_utility;
