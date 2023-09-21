@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use super::{
     bool_with_partial::BoolWithPartial, relative_interval_location::RelativeIntervalLocation,
 };
@@ -24,22 +26,61 @@ pub fn circular_merging<T>(
             output.push(t);
         }
     });
-    todo!("wraparound merge");
+    if output.len() >= 2 {
+        let last = output.last().unwrap();
+        let first = output.first().unwrap();
+        if let Some(combined) = merge_function(&last, &first) {
+            output.pop();
+            output.remove(0);
+            output.insert(0, combined);
+        }
+    }
+    output
 }
 
+type Interval = (i32, i32);
+
+pub fn circular_merge_intervals_mod10(
+    sorted_data: impl IntoIterator<Item = Interval>,
+) -> Vec<Interval> {
+    circular_merging(sorted_data, try_combine_circular_intervals_mod10)
+}
+
+pub fn circular_merge_intervals_mod10_no_overlap(
+    sorted_data: impl IntoIterator<Item = Interval>,
+) -> Vec<Interval> {
+    circular_merging(sorted_data, try_combine_circular_intervals_mod10_no_overlap)
+}
+
+pub fn try_combine_circular_intervals_mod10(a: &Interval, b: &Interval) -> Option<Interval> {
+    try_combine_circular_intervals_allowing_overlap(a, b, 10)
+}
+pub fn try_combine_circular_intervals_mod10_no_overlap(
+    a: &Interval,
+    b: &Interval,
+) -> Option<Interval> {
+    try_combine_circular_intervals(a, b, 10, false)
+}
 pub fn try_combine_circular_intervals(
-    a: (i32, i32),
-    b: (i32, i32),
+    a: impl Borrow<Interval>,
+    b: impl Borrow<Interval>,
     modulo: u32,
-) -> Option<(i32, i32)> {
+    allow_overlap: bool,
+) -> Option<Interval> {
     let a = standardize_interval(a, modulo);
     let b = standardize_interval(b, modulo);
 
-    if intervals_are_overlapping(a, b, modulo).is_false() {
-        return None;
+    match intervals_are_overlapping(a, b, modulo) {
+        BoolWithPartial::True => {
+            if !allow_overlap {
+                panic!("Disallowed overlap found:\na: {:?}\nb: {:?}", a, b);
+            }
+        }
+        BoolWithPartial::Partial => (),
+        BoolWithPartial::False => return None,
     }
 
-    if is_full_interval(a) || is_full_interval(b) || do_connect_at_both_ends(a, b) {
+    if interval_is_full(a) || interval_is_full(b) || intervals_sum_to_full(a, b) {
         return Some(full_interval());
     }
 
@@ -53,44 +94,59 @@ pub fn try_combine_circular_intervals(
     Some((start, end))
 }
 
-fn full_interval() -> (i32, i32) {
+pub fn try_combine_circular_intervals_allowing_overlap(
+    a: impl Borrow<Interval>,
+    b: impl Borrow<Interval>,
+    modulo: u32,
+) -> Option<Interval> {
+    try_combine_circular_intervals(a, b, modulo, true)
+}
+pub fn try_combine_circular_intervals_no_overlap(
+    a: impl Borrow<Interval>,
+    b: impl Borrow<Interval>,
+    modulo: u32,
+) -> Option<Interval> {
+    try_combine_circular_intervals(a, b, modulo, false)
+}
+
+fn full_interval() -> Interval {
     (0, 0)
 }
 
-fn is_full_interval(x: (i32, i32)) -> bool {
+fn interval_is_full(x: Interval) -> bool {
     x.0 == x.1
 }
 
-fn do_connect_at_both_ends(a: (i32, i32), b: (i32, i32)) -> bool {
+fn intervals_sum_to_full(a: Interval, b: Interval) -> bool {
     a.1 == b.0 && b.1 == a.0
 }
 
-fn intervals_are_overlapping(a: (i32, i32), b: (i32, i32), modulo: u32) -> BoolWithPartial {
+fn intervals_are_overlapping(a: Interval, b: Interval, modulo: u32) -> BoolWithPartial {
     in_looping_interval(a.0, b, modulo)
         .or(in_looping_interval(a.1, b, modulo))
         .or(in_looping_interval(b.0, a, modulo))
         .or(in_looping_interval(b.1, a, modulo))
 }
 
-fn in_or_touching_looping_interval(val: i32, interval: (i32, i32), modulo: u32) -> bool {
+fn in_or_touching_looping_interval(val: i32, interval: Interval, modulo: u32) -> bool {
     let val = val.rem_euclid(modulo as i32);
     let interval = standardize_interval(interval, modulo);
     position_relative_to_circular_interval(val, interval, modulo).in_closed_interval()
 }
-fn in_looping_interval(val: i32, interval: (i32, i32), modulo: u32) -> BoolWithPartial {
+fn in_looping_interval(val: i32, interval: Interval, modulo: u32) -> BoolWithPartial {
     let val = val.rem_euclid(modulo as i32);
     let interval = standardize_interval(interval, modulo);
     position_relative_to_circular_interval(val, interval, modulo).in_interval()
 }
 fn position_relative_to_circular_interval(
     val: i32,
-    interval: (i32, i32),
+    interval: Interval,
     modulo: u32,
 ) -> RelativeIntervalLocation {
     let interval = standardize_interval(interval, modulo);
     let val = val.rem_euclid(modulo as i32);
 
-    if is_full_interval(interval) {
+    if interval_is_full(interval) {
         RelativeIntervalLocation::Inside
     } else if val == interval.0 {
         RelativeIntervalLocation::Start
@@ -113,18 +169,18 @@ fn position_relative_to_circular_interval(
     }
 }
 
-fn interval_wraps_around(interval: (i32, i32), modulo: u32) -> bool {
+fn interval_wraps_around(interval: Interval, modulo: u32) -> bool {
     let interval = standardize_interval(interval, modulo);
 
     interval.0 >= interval.1
 }
 
-fn standardize_interval(interval: (i32, i32), modulo: u32) -> (i32, i32) {
+fn standardize_interval(interval: impl Borrow<Interval>, modulo: u32) -> Interval {
     let interval = (
-        interval.0.rem_euclid(modulo as i32),
-        interval.1.rem_euclid(modulo as i32),
+        interval.borrow().0.rem_euclid(modulo as i32),
+        interval.borrow().1.rem_euclid(modulo as i32),
     );
-    if is_full_interval(interval) {
+    if interval_is_full(interval) {
         full_interval()
     } else {
         interval
@@ -139,7 +195,7 @@ mod tests {
     #[test]
     fn test_combine_circular_intervals__simple_touching() {
         assert_eq!(
-            try_combine_circular_intervals((0, 1), (1, 2), 10),
+            try_combine_circular_intervals_allowing_overlap((0, 1), (1, 2), 10),
             Some((0, 2)),
         );
     }
@@ -147,7 +203,7 @@ mod tests {
     fn test_combine_circular_intervals__simple_overlap() {
         for i in 10..20 {
             assert_eq!(
-                try_combine_circular_intervals((0, 3), (1, 7), i),
+                try_combine_circular_intervals_allowing_overlap((0, 3), (1, 7), i),
                 Some((0, 7)),
             );
         }
@@ -155,99 +211,122 @@ mod tests {
     #[test]
     fn test_combine_circular_intervals__duplicate_input() {
         assert_eq!(
-            try_combine_circular_intervals((2, 5), (2, 5), 10),
+            try_combine_circular_intervals_allowing_overlap((2, 5), (2, 5), 10),
             Some((2, 5)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__full_containment() {
         assert_eq!(
-            try_combine_circular_intervals((2, 5), (1, 7), 10),
+            try_combine_circular_intervals_allowing_overlap((2, 5), (1, 7), 10),
             Some((1, 7)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__full_containment_crossing_end() {
         assert_eq!(
-            try_combine_circular_intervals((6, 8), (5, 2), 10),
+            try_combine_circular_intervals_allowing_overlap((6, 8), (5, 2), 10),
             Some((5, 2)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__not_touching() {
-        assert_eq!(try_combine_circular_intervals((1, 3), (4, 7), 10), None,);
+        assert_eq!(
+            try_combine_circular_intervals_allowing_overlap((1, 3), (4, 7), 10),
+            None,
+        );
     }
     #[test]
     fn test_combine_circular_intervals__combine_while_one_crosses_end() {
         assert_eq!(
-            try_combine_circular_intervals((6, 8), (8, 2), 10),
+            try_combine_circular_intervals_allowing_overlap((6, 8), (8, 2), 10),
             Some((6, 2)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__two_half_intervals_combine_to_full() {
         assert_eq!(
-            try_combine_circular_intervals((0, 5), (5, 0), 10),
+            try_combine_circular_intervals_allowing_overlap((0, 5), (5, 0), 10),
             Some((0, 0)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__two_half_intervals_combine_to_full__and_modulo() {
         assert_eq!(
-            try_combine_circular_intervals((1, 6), (506, 9001), 10),
+            try_combine_circular_intervals_allowing_overlap((1, 6), (506, 9001), 10),
             Some((0, 0)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__two_full_intervals() {
         assert_eq!(
-            try_combine_circular_intervals((0, 0), (8, 8), 10),
+            try_combine_circular_intervals_allowing_overlap((0, 0), (8, 8), 10),
             Some((0, 0)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__full_intervals_have_canonical_representation() {
         assert_eq!(
-            try_combine_circular_intervals((5, 5), (8, 8), 10),
+            try_combine_circular_intervals_allowing_overlap((5, 5), (8, 8), 10),
             Some((0, 0)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__inputs_are_standardized() {
         assert_eq!(
-            try_combine_circular_intervals((5, 16), (26, -2), 10),
+            try_combine_circular_intervals_allowing_overlap((5, 16), (26, -2), 10),
             Some((5, 8)),
         );
     }
     #[test]
     fn test_combine_circular_intervals__other_interval_lengths() {
         assert_eq!(
-            try_combine_circular_intervals((5, 6), (6, 8), 5),
+            try_combine_circular_intervals_allowing_overlap((5, 6), (6, 8), 5),
             Some((0, 3)),
         );
         assert_eq!(
-            try_combine_circular_intervals((5, 6), (6, 8), 6),
+            try_combine_circular_intervals_allowing_overlap((5, 6), (6, 8), 6),
             Some((5, 2)),
         );
         assert_eq!(
-            try_combine_circular_intervals((5, 6), (6, 8), 7),
+            try_combine_circular_intervals_allowing_overlap((5, 6), (6, 8), 7),
             Some((5, 1)),
         );
         assert_eq!(
-            try_combine_circular_intervals((5, 6), (6, 8), 8),
+            try_combine_circular_intervals_allowing_overlap((5, 6), (6, 8), 8),
             Some((5, 0)),
         );
         assert_eq!(
-            try_combine_circular_intervals((5, 6), (6, 8), 9000),
+            try_combine_circular_intervals_allowing_overlap((5, 6), (6, 8), 9000),
             Some((5, 8)),
         );
     }
 
     #[test]
     fn test_circular_merging__simple_case() {
-        let data = vec![(0, 1), (2, 3), (3, 5), (6, 9)];
-        let output = circular_merging(data, |&a, &b| try_combine_circular_intervals(a, b, 10));
+        let data = vec![(0, 1), (2, 3), (3, 5), (6, 0)];
         let correct_output = vec![(6, 1), (2, 5)];
+        let output = circular_merge_intervals_mod10(data);
         assert_eq!(output, correct_output);
+    }
+    #[test]
+    fn test_circular_merging__no_merges() {
+        let data = vec![(0, 1), (2, 3)];
+        let correct_output = vec![(0, 1), (2, 3)];
+        let output = circular_merge_intervals_mod10(data);
+        assert_eq!(output, correct_output);
+    }
+    #[test]
+    fn test_circular_merging__merge_to_full_circle() {
+        let data = vec![(0, 2), (2, 3), (3, 0)];
+        let correct_output = vec![full_interval()];
+        let output = circular_merge_intervals_mod10(data);
+        assert_eq!(output, correct_output);
+    }
+    #[test]
+    #[should_panic]
+    fn test_circular_merging__disallowing_overlaps() {
+        let data = vec![(0, 2), (1, 3)];
+        circular_merge_intervals_mod10_no_overlap(data);
     }
 }
