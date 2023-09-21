@@ -9,7 +9,22 @@ pub fn circular_merging<T>(
     sorted_data: impl IntoIterator<Item = T>,
     merge_function: fn(&T, &T) -> Option<T>,
 ) -> Vec<T> {
-    todo!()
+    let mut output = vec![];
+    sorted_data.into_iter().for_each(|t| {
+        if output.is_empty() {
+            output.push(t);
+            return;
+        }
+        let last_placed = output.pop().unwrap();
+
+        if let Some(combined) = merge_function(&last_placed, &t) {
+            output.push(combined);
+        } else {
+            output.push(last_placed);
+            output.push(t);
+        }
+    });
+    todo!("wraparound merge");
 }
 
 pub fn try_combine_circular_intervals(
