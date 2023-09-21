@@ -17,6 +17,9 @@ pub fn try_combine_circular_intervals(
     b: (i32, i32),
     modulo: u32,
 ) -> Option<(i32, i32)> {
+    let a = standardize_interval(a, modulo);
+    let b = standardize_interval(b, modulo);
+
     if intervals_are_overlapping(a, b, modulo).is_false() {
         return None;
     }
@@ -48,13 +51,21 @@ fn do_connect_at_both_ends(a: (i32, i32), b: (i32, i32)) -> bool {
 }
 
 fn intervals_are_overlapping(a: (i32, i32), b: (i32, i32), modulo: u32) -> BoolWithPartial {
-    todo!();
+    in_looping_interval(a.0, b, modulo)
+        .or(in_looping_interval(a.1, b, modulo))
+        .or(in_looping_interval(b.0, a, modulo))
+        .or(in_looping_interval(b.1, a, modulo))
 }
 
 fn in_or_touching_looping_interval(val: i32, interval: (i32, i32), modulo: u32) -> bool {
     let val = val.rem_euclid(modulo as i32);
     let interval = standardize_interval(interval, modulo);
-    position_relative_to_circular_interval(val, interval, modulo).on_closed_interval()
+    position_relative_to_circular_interval(val, interval, modulo).in_closed_interval()
+}
+fn in_looping_interval(val: i32, interval: (i32, i32), modulo: u32) -> BoolWithPartial {
+    let val = val.rem_euclid(modulo as i32);
+    let interval = standardize_interval(interval, modulo);
+    position_relative_to_circular_interval(val, interval, modulo).in_interval()
 }
 fn position_relative_to_circular_interval(
     val: i32,
@@ -62,20 +73,32 @@ fn position_relative_to_circular_interval(
     modulo: u32,
 ) -> RelativeIntervalLocation {
     let interval = standardize_interval(interval, modulo);
-    if interval.0 == interval.1 {
-        // full loop
-        true
-    } else if interval.0 < interval.1 {
-        // no loop around
-        interval.0 <= val && val <= interval.1
+    let val = val.rem_euclid(modulo as i32);
+
+    if is_full_interval(interval) {
+        RelativeIntervalLocation::Inside
+    } else if val == interval.0 {
+        RelativeIntervalLocation::Start
+    } else if val == interval.1 {
+        RelativeIntervalLocation::End
     } else {
-        // is loop around
-        val <= interval.0 || interval.1 <= val
-    };
-    todo!();
+        let is_inside = if interval_wraps_around(interval, modulo) {
+            // is loop around
+            val < interval.1 || interval.0 < val
+        } else {
+            // no loop around
+            interval.0 < val && val < interval.1
+        };
+        if is_inside {
+            RelativeIntervalLocation::Inside
+        } else {
+            // TODO: make a version of the enum more compatible with periodicity
+            RelativeIntervalLocation::Before
+        }
+    }
 }
 
-fn interval_crosses_break(interval: (i32, i32), modulo: u32) -> bool {
+fn interval_wraps_around(interval: (i32, i32), modulo: u32) -> bool {
     let interval = standardize_interval(interval, modulo);
 
     interval.0 >= interval.1
@@ -86,7 +109,11 @@ fn standardize_interval(interval: (i32, i32), modulo: u32) -> (i32, i32) {
         interval.0.rem_euclid(modulo as i32),
         interval.1.rem_euclid(modulo as i32),
     );
-    todo!();
+    if is_full_interval(interval) {
+        full_interval()
+    } else {
+        interval
+    }
 }
 
 #[cfg(test)]
@@ -173,7 +200,7 @@ mod tests {
     #[test]
     fn test_combine_circular_intervals__inputs_are_standardized() {
         assert_eq!(
-            try_combine_circular_intervals((5, 16), (26, -8), 10),
+            try_combine_circular_intervals((5, 16), (26, -2), 10),
             Some((5, 8)),
         );
     }
@@ -181,7 +208,7 @@ mod tests {
     fn test_combine_circular_intervals__other_interval_lengths() {
         assert_eq!(
             try_combine_circular_intervals((5, 6), (6, 8), 5),
-            Some((5, 3)),
+            Some((0, 3)),
         );
         assert_eq!(
             try_combine_circular_intervals((5, 6), (6, 8), 6),
@@ -202,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_circular_reduction__simple_case() {
+    fn test_circular_merging__simple_case() {
         let data = vec![(0, 1), (2, 3), (3, 5), (6, 9)];
         let output = circular_merging(data, |&a, &b| try_combine_circular_intervals(a, b, 10));
         let correct_output = vec![(6, 1), (2, 5)];

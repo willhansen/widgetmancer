@@ -1,4 +1,4 @@
-use super::bool_with_partial::*;
+use super::bool_with_partial::{self, *};
 
 /// Intended for determining how much a halfplane overlaps a shape.
 /// Needs to account for exact points at start and end of coverage
@@ -7,34 +7,31 @@ use super::bool_with_partial::*;
 pub enum RelativeIntervalLocation {
     After,
     End,
-    During,
+    Inside,
     Start,
     Before,
 }
 impl RelativeIntervalLocation {
-    pub fn on_closed_interval(&self) -> bool {
+    pub fn in_interval(&self) -> BoolWithPartial {
         match self {
-            RelativeIntervalLocation::After => false,
-            RelativeIntervalLocation::End => true,
-            RelativeIntervalLocation::During => true,
-            RelativeIntervalLocation::Start => true,
-            RelativeIntervalLocation::Before => false,
+            RelativeIntervalLocation::After => false.into(),
+            RelativeIntervalLocation::End => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Inside => true.into(),
+            RelativeIntervalLocation::Start => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Before => false.into(),
         }
     }
-    pub fn on_open_interval(&self) -> bool {
-        match self {
-            RelativeIntervalLocation::After => false,
-            RelativeIntervalLocation::End => false,
-            RelativeIntervalLocation::During => true,
-            RelativeIntervalLocation::Start => false,
-            RelativeIntervalLocation::Before => false,
-        }
+    pub fn in_closed_interval(&self) -> bool {
+        self.in_interval().is_at_least_partial()
+    }
+    pub fn in_open_interval(&self) -> bool {
+        self.in_interval().is_true()
     }
     pub fn is_before(&self) -> BoolWithPartial {
         match self {
             RelativeIntervalLocation::After => BoolWithPartial::False,
             RelativeIntervalLocation::End => BoolWithPartial::False,
-            RelativeIntervalLocation::During => BoolWithPartial::False,
+            RelativeIntervalLocation::Inside => BoolWithPartial::False,
             RelativeIntervalLocation::Start => BoolWithPartial::Partial,
             RelativeIntervalLocation::Before => BoolWithPartial::True,
         }
@@ -43,7 +40,7 @@ impl RelativeIntervalLocation {
         match self {
             RelativeIntervalLocation::After => BoolWithPartial::True,
             RelativeIntervalLocation::End => BoolWithPartial::Partial,
-            RelativeIntervalLocation::During => BoolWithPartial::False,
+            RelativeIntervalLocation::Inside => BoolWithPartial::False,
             RelativeIntervalLocation::Start => BoolWithPartial::False,
             RelativeIntervalLocation::Before => BoolWithPartial::False,
         }

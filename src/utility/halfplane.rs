@@ -211,7 +211,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 
         let partially_covers = self.partially_covers_centered_unit_square_with_tolerance(tolerance);
         if partially_covers.is_true() {
-            RelativeIntervalLocation::During
+            RelativeIntervalLocation::Inside
         } else if partially_covers.is_partial() {
             RelativeIntervalLocation::Start
         } else {
@@ -681,7 +681,7 @@ mod tests {
         // before far edge, but within threshold
         assert_eq!(f(0.49, 0.1), End);
         // in the middle somewhere
-        assert_eq!(f(0.2, 0.1), During);
+        assert_eq!(f(0.2, 0.1), Inside);
         // past near edge, but within tolerance
         assert_eq!(f(-0.49, 0.1), Start);
         // on near edge exactly
