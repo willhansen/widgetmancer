@@ -36,7 +36,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         Self::from_ccw_relative_faces(faces)
     }
     pub fn from_ccw_relative_faces(
-        faces: impl IntoIterator<Item = impl Into<RelativeFace> + Copy> + Clone,
+        faces: impl IntoIterator<Item = impl Into<RelativeFace>> + Clone,
     ) -> Self {
         assert!(faces_in_ccw_order(faces.clone()));
 
@@ -45,8 +45,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         iter.for_each(|edge| fence.add_edge_or_panic(edge));
         fence
     }
-    pub fn from_one_edge(edge: impl Into<RelativeSquareWithOrthogonalDir> + Copy) -> Self {
-        Self::from_ccw_relative_faces(vec![edge])
+    pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
+        Self::from_ccw_relative_faces(vec![edge.into()])
     }
     fn try_add_to_ccw_end(&mut self, edge: RelativeFace) -> SimpleResult {
         if self.can_connect_to_ccw_end(edge) {
@@ -262,6 +262,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn apply_rigid_transform(&self, tf: crate::utility::RigidTransform) -> Self {
         todo!()
+    }
+}
+
+impl<T> From<T> for Fence
+where
+    T: Into<RelativeFace>,
+{
+    fn from(value: T) -> Self {
+        Self::from_one_edge(value)
     }
 }
 

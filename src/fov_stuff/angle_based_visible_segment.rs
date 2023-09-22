@@ -23,11 +23,11 @@ pub struct AngleBasedVisibleSegment {
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
 }
 impl AngleBasedVisibleSegment {
-    pub fn new(arc: PartialAngleInterval, end_fence: Fence) -> Self {
+    pub fn new(arc: PartialAngleInterval, end_fence: impl Into<Fence>) -> Self {
         let x = Self {
             visible_angle_interval: arc,
             start_internal_relative_face: None,
-            end_fence,
+            end_fence: end_fence.into(),
         };
         x.validate();
         x
@@ -143,6 +143,15 @@ impl AngleBasedVisibleSegment {
         circular_merging(sorted_ccw, reduction_function)
     }
     pub fn combined_with(&self, other: &Self) -> Option<Self> {
+        let a = self;
+        let b = other;
+        let same_start_line = a.start_internal_relative_face.is_some_and(|a_start_face| {
+            b.start_internal_relative_face
+                .is_some_and(|b_start_face| a_start_face.face_is_on_same_line(b_start_face))
+        });
+        let both_no_start_line =
+            a.start_internal_relative_face.is_none() && b.start_internal_relative_face.is_none();
+
         todo!()
     }
     fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
@@ -365,6 +374,14 @@ mod tests {
     }
     #[test]
     fn test_combine_two__fail_because_end_fences_can_not_connect() {
+        let a = AngleBasedVisibleSegment::new(
+            PartialAngleInterval::from_degrees(0.0, 45.0),
+            ((5, 0), STEP_RIGHT),
+        );
+        let b = AngleBasedVisibleSegment::new(
+            PartialAngleInterval::from_degrees(-45.0, 0.0),
+            ((6, 0), STEP_RIGHT),
+        );
         todo!()
     }
 }

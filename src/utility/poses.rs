@@ -353,7 +353,7 @@ pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
     [face.square, face.stepped().square]
 }
 
-pub fn faces_in_ccw_order<T: IntoIterator<Item = T2> + Clone, T2: Into<RelativeFace> + Copy>(
+pub fn faces_in_ccw_order<T: IntoIterator<Item = T2> + Clone, T2: Into<RelativeFace>>(
     v: T,
 ) -> bool {
     in_ccw_order(v.into_iter().map(|e| e.into().face_center_point()))
