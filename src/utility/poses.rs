@@ -170,6 +170,12 @@ where
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
     }
+    pub fn cw_end_of_face(&self) -> PointType {
+        todo!()
+    }
+    pub fn ccw_end_of_face(&self) -> PointType {
+        todo!()
+    }
 }
 
 impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T>

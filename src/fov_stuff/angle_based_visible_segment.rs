@@ -7,7 +7,7 @@ use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
     RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
 };
-use euclid::point2;
+use euclid::{point2, Angle};
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
@@ -45,6 +45,17 @@ impl AngleBasedVisibleSegment {
         };
         x.validate();
         x
+    }
+    pub fn new_with_optional_start_face(
+        arc: PartialAngleInterval,
+        end_fence: Fence,
+        optional_start_face: Option<impl Into<RelativeFace>>,
+    ) -> Self {
+        if let Some(start_face) = optional_start_face {
+            Self::new_with_start_face(arc, end_fence, start_face)
+        } else {
+            Self::new(arc, end_fence)
+        }
     }
     pub fn validate(&self) {
         if !self.start_face_spans_angle_interval()
@@ -145,6 +156,7 @@ impl AngleBasedVisibleSegment {
     pub fn combined_with(&self, other: &Self) -> Option<Self> {
         let a = self;
         let b = other;
+
         let same_start_line = a.start_internal_relative_face.is_some_and(|a_start_face| {
             b.start_internal_relative_face
                 .is_some_and(|b_start_face| a_start_face.face_is_on_same_line(b_start_face))
@@ -152,7 +164,32 @@ impl AngleBasedVisibleSegment {
         let both_no_start_line =
             a.start_internal_relative_face.is_none() && b.start_internal_relative_face.is_none();
 
-        todo!()
+        if !(both_no_start_line || same_start_line) {
+            return None;
+        }
+
+        let common_start_line = a.start_internal_relative_face;
+
+        let maybe_combined_arc: Option<PartialAngleInterval> = self
+            .visible_angle_interval
+            .combine_touching_panic_overlapping(other.visible_angle_interval, Angle::degrees(0.1));
+        if maybe_combined_arc.is_none() {
+            return None;
+        }
+        let combined_arc = maybe_combined_arc.unwrap();
+
+        let maybe_combined_fence: Option<Fence> = self.end_fence.try_concatenate(&other.end_fence);
+
+        if maybe_combined_fence.is_none() {
+            return None;
+        }
+        let combined_fence = maybe_combined_fence.unwrap();
+
+        Some(Self::new_with_optional_start_face(
+            combined_arc,
+            combined_fence,
+            common_start_line,
+        ))
     }
     fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
         if let Some(line) = self.start_internal_relative_face.map(|face| face.line()) {

@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
@@ -21,6 +22,7 @@ use crate::utility::{
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
+use super::bool_with_partial::BoolWithPartial;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -183,12 +185,23 @@ impl PartialAngleInterval {
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
     }
+    pub fn combine_touching_panic_overlapping(
+        &self,
+        other: Self,
+        tolerance: FAngle,
+    ) -> Option<Self> {
+        todo!()
+    }
     pub fn complement(&self) -> Self {
         PartialAngleInterval::from_angles(self.anticlockwise_end, self.clockwise_end)
     }
 
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
+    }
+    pub fn overlaps(&self, other: PartialAngleInterval) -> BoolWithPartial {
+        self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width();
+        todo!()
     }
 
     pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
@@ -1689,5 +1702,47 @@ mod tests {
         //     .overlapping_but_not_exactly_touching(AngleInterval::FullCircle));
         // assert!(!AngleInterval::from_degrees(20.0, 30.0)
         //     .overlapping_but_not_exactly_touching(AngleInterval::Empty));
+    }
+    #[test]
+    fn test_combine_touching_panic_overlapping__non_panic_case() {
+        let tolerance = Angle::degrees(0.1);
+        let a = PartialAngleInterval::from_degrees(0.0, 10.0);
+        let b = PartialAngleInterval::from_degrees(10.0, 20.0);
+        let b_bigger =
+            PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() / 2.0, 20.0);
+
+        let b_smaller =
+            PartialAngleInterval::from_degrees(10.0 + tolerance.to_degrees() / 2.0, 20.0);
+        let b_way_smaller =
+            PartialAngleInterval::from_degrees(10.0 + tolerance.to_degrees() * 2.0, 20.0);
+
+        let correct = PartialAngleInterval::from_degrees(0.0, 20.0);
+        assert_eq!(
+            a.combine_touching_panic_overlapping(b, tolerance),
+            Some(correct)
+        );
+        assert_eq!(
+            a.combine_touching_panic_overlapping(b_bigger, tolerance),
+            Some(correct)
+        );
+        assert_eq!(
+            a.combine_touching_panic_overlapping(b_smaller, tolerance),
+            Some(correct)
+        );
+        assert_eq!(
+            a.combine_touching_panic_overlapping(b_way_smaller, tolerance),
+            None
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn test_combine_touching_panic_overlapping__panic_case() {
+        let tolerance = Angle::degrees(0.1);
+        let a = PartialAngleInterval::from_degrees(0.0, 10.0);
+
+        let b_way_bigger =
+            PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
+
+        a.combine_touching_panic_overlapping(b_way_bigger, tolerance);
     }
 }
