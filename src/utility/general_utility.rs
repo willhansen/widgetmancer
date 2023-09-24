@@ -17,6 +17,7 @@ pub use num::Signed;
 pub use ordered_float::OrderedFloat;
 
 pub type SimpleResult = Result<(), ()>;
+pub type OkOrMessage = Result<(), String>;
 
 pub fn sign(x: f32) -> f32 {
     if x < 0.0 {

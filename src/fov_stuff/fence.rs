@@ -5,7 +5,8 @@ use ordered_float::OrderedFloat;
 
 use crate::rotated_to_have_split_at_max;
 
-use crate::utility::poses::{faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
+use crate::utility::general_utility::all_true;
+use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
 use crate::utility::{
     angle_interval::{AngleInterval, PartialAngleInterval},
     better_angle_from_x_axis,
@@ -13,8 +14,8 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
 use crate::utility::{
-    in_ccw_order, quadrants_of_rel_square, squares_sharing_face, two_in_ccw_order, CoordToString,
-    Quadrant, SimpleResult, STEP_ZERO,
+    check_vectors_in_ccw_order, quadrants_of_rel_square, squares_sharing_face, two_in_ccw_order,
+    CoordToString, Quadrant, SimpleResult, STEP_ZERO,
 };
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -43,11 +44,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn try_from_faces_in_ccw_order(
         faces: impl IntoIterator<Item = impl Into<RelativeFace>> + Clone,
     ) -> Result<Self, String> {
-        if !faces_in_ccw_order(faces.clone()) {
-            return Err(format!(
-                "faces out of order: {:?}",
-                faces.into_iter().map(|x| x.into()).collect_vec()
-            ));
+        let ccw_check_result = check_faces_in_ccw_order(faces.clone());
+        if ccw_check_result.is_err() {
+            return Err(ccw_check_result.err().unwrap());
         }
 
         let mut new_fence = Self::default();
@@ -174,54 +173,33 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 && a.point_by_index(0) == b.point_by_index(-2)
         };
 
-        let touch_at_self_cw = a_cw_touching_b_ccw(self, other);
-        let overlap_at_self_cw = a_cw_overlapping_b_ccw(self, other);
+        let touch_at_self_cw_ccw = [
+            a_cw_touching_b_ccw(self, other),
+            a_cw_touching_b_ccw(other, self),
+        ];
+        let overlap_at_self_cw_ccw = [
+            a_cw_overlapping_b_ccw(self, other),
+            a_cw_overlapping_b_ccw(other, self),
+        ];
 
-        let touch_at_self_ccw = a_cw_touching_b_ccw(other, self);
-        let overlap_at_self_ccw = a_cw_overlapping_b_ccw(other, self);
+        let connect_at_self_cw_ccw =
+            [0, 1].map(|i| touch_at_self_cw_ccw[i] || overlap_at_self_cw_ccw[i]);
 
-        let connect_at_self_cw = touch_at_self_cw || overlap_at_self_cw;
-        let connect_at_self_ccw = touch_at_self_ccw || overlap_at_self_ccw;
+        let both_ends_connect = all_true(&connect_at_self_cw_ccw);
 
-        let both_ends_connect = connect_at_self_cw && connect_at_self_ccw;
+        let num_to_skip_at_start_of_self = if overlap_at_self_cw_ccw[0] { 1 } else { 0 };
+        let num_to_skip_at_start_of_other = if overlap_at_self_cw_ccw[1] { 1 } else { 0 };
 
-        if both_ends_connect {
-            let self_iter = self
-                .edges
-                .iter()
-                .skip(if overlap_at_self_cw { 1 } else { 0 });
-            let other_iter = self
-                .edges
-                .iter()
-                .skip(if overlap_at_self_ccw { 1 } else { 0 });
-            Self::try_from_faces_in_ccw_order(self_iter.chain(other_iter).cloned())
+        let self_iter = self.edges.iter().skip(num_to_skip_at_start_of_self);
+        let other_iter = other.edges.iter().skip(num_to_skip_at_start_of_other);
+
+        let (first_iter, second_iter) = if connect_at_self_cw_ccw[1] {
+            (self_iter, other_iter)
         } else {
-            if connect_at_self_cw {
-                Self::try_from_faces_in_ccw_order(
-                    other
-                        .edges
-                        .iter()
-                        .chain(
-                            self.edges
-                                .iter()
-                                .skip(if overlap_at_self_cw { 1 } else { 0 }),
-                        )
-                        .cloned(),
-                )
-            } else {
-                Self::try_from_faces_in_ccw_order(
-                    self.edges
-                        .iter()
-                        .chain(
-                            other
-                                .edges
-                                .iter()
-                                .skip(if overlap_at_self_ccw { 1 } else { 0 }),
-                        )
-                        .cloned(),
-                )
-            }
-        }
+            (other_iter, self_iter)
+        };
+
+        Self::try_from_faces_in_ccw_order(first_iter.cloned().chain(second_iter.cloned()))
     }
     fn has_angle_overlap_with_edge(&self, edge: RelativeFace) -> bool {
         self.spanned_angle_from_origin()
@@ -651,6 +629,22 @@ mod tests {
         ]);
     }
     #[test]
+    fn test_create_with_midpoints_of_end_edges_passing_through_origin() {
+        let a = Fence::from_faces_in_ccw_order([
+            ((3, 0), STEP_RIGHT),
+            ((3, 1), STEP_RIGHT),
+            ((3, 2), STEP_RIGHT),
+            ((3, 2), STEP_UP),
+            ((2, 2), STEP_UP),
+            ((1, 2), STEP_UP),
+            ((0, 2), STEP_UP),
+            ((-1, 2), STEP_UP),
+            ((-1, 2), STEP_LEFT),
+            ((-1, 1), STEP_LEFT),
+            ((-1, 0), STEP_LEFT),
+        ]);
+    }
+    #[test]
     fn test_try_concatenate__pass__simple() {
         let a = Fence::from_faces_in_ccw_order([((3, 0), STEP_RIGHT), ((3, 1), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((3, 2), STEP_RIGHT), ((3, 3), STEP_RIGHT)]);
@@ -667,7 +661,7 @@ mod tests {
         assert_eq!(b.try_concatenate_allowing_one_edge_of_overlap(&a), Ok(ab));
     }
     #[test]
-    fn test_try_concatenate__pass__sum_to_full_surround() {
+    fn test_try_concatenate__pass__sum_to_full_surround__no_overlap() {
         let a = Fence::from_faces_in_ccw_order([
             ((3, 0), STEP_RIGHT),
             ((3, 1), STEP_RIGHT),
@@ -692,7 +686,17 @@ mod tests {
             ((3, -2), STEP_RIGHT),
             ((3, -1), STEP_RIGHT),
         ]);
-        let ab = Fence::from_faces_in_ccw_order([
+        let ab =
+            Fence::from_faces_in_ccw_order(a.edges.iter().cloned().chain(b.edges.iter().cloned()));
+        assert_eq!(
+            a.try_concatenate_allowing_one_edge_of_overlap(&b),
+            Ok(ab.clone())
+        );
+        assert!(b.try_concatenate_allowing_one_edge_of_overlap(&a).is_ok());
+    }
+    #[test]
+    fn test_no_standard_representation_for_full_circle_fences() {
+        let a = Fence::from_faces_in_ccw_order([
             ((3, 0), STEP_RIGHT),
             ((3, 1), STEP_RIGHT),
             ((3, 2), STEP_RIGHT),
@@ -704,6 +708,8 @@ mod tests {
             ((-1, 2), STEP_LEFT),
             ((-1, 1), STEP_LEFT),
             ((-1, 0), STEP_LEFT),
+        ]);
+        let b = Fence::from_faces_in_ccw_order([
             ((-1, -1), STEP_LEFT),
             ((-1, -2), STEP_LEFT),
             ((-1, -2), STEP_DOWN),
@@ -714,11 +720,11 @@ mod tests {
             ((3, -2), STEP_RIGHT),
             ((3, -1), STEP_RIGHT),
         ]);
-        assert_eq!(
-            a.try_concatenate_allowing_one_edge_of_overlap(&b),
-            Ok(ab.clone())
+        // No standard representation for full circle fences
+        assert_ne!(
+            b.try_concatenate_allowing_one_edge_of_overlap(&a),
+            a.try_concatenate_allowing_one_edge_of_overlap(&b)
         );
-        assert_eq!(b.try_concatenate_allowing_one_edge_of_overlap(&a), Ok(ab));
     }
     #[test]
     fn test_try_concatenate__fail__not_touching() {

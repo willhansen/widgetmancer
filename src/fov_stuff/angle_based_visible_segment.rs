@@ -417,13 +417,13 @@ mod tests {
     #[test]
     fn test_combine_two__fail_because_end_fences_can_not_connect() {
         let a = AngleBasedVisibleSegment::new(
-            PartialAngleInterval::from_degrees(0.0, 45.0),
+            PartialAngleInterval::from_degrees(0.0, 1.0),
             ((5, 0), STEP_RIGHT),
         );
         let b = AngleBasedVisibleSegment::new(
-            PartialAngleInterval::from_degrees(-45.0, 0.0),
+            PartialAngleInterval::from_degrees(1.0, 2.0),
             ((6, 0), STEP_RIGHT),
         );
-        todo!()
+        assert!(a.combined_with(&b).is_none());
     }
 }

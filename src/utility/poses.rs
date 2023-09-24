@@ -359,10 +359,12 @@ pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
     [face.square, face.stepped().square]
 }
 
-pub fn faces_in_ccw_order<T: IntoIterator<Item = T2> + Clone, T2: Into<RelativeFace>>(
+pub fn check_faces_in_ccw_order<T: IntoIterator<Item = impl Into<RelativeFace>> + Clone>(
     v: T,
-) -> bool {
-    in_ccw_order(v.into_iter().map(|e| e.into().face_center_point()))
+) -> OkOrMessage {
+    dbg!(check_vectors_in_ccw_order(
+        v.into_iter().map(|e| e.into().face_center_point())
+    ))
 }
 
 #[cfg(test)]

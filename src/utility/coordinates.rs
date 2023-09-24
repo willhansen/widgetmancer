@@ -593,11 +593,27 @@ pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
     }
 }
 
-pub fn in_ccw_order(v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>) -> bool {
+pub fn check_vectors_in_ccw_order(
+    v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>,
+) -> OkOrMessage {
     v.into_iter()
         .map(|x| x.into())
+        .inspect(|x| {
+            dbg!("individual", x);
+        })
         .tuple_windows()
-        .all(|(a, b)| two_in_ccw_order(a, b))
+        .inspect(|x| {
+            dbg!("window", x);
+        })
+        .map(|(a, b)| match two_in_ccw_order(a, b) {
+            true => Ok(()),
+            false => Err(format!(
+                "These two points not in order: \na: {}\nb: {}",
+                a.to_string(),
+                b.to_string()
+            )),
+        })
+        .collect()
 }
 
 pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
