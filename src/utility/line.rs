@@ -66,6 +66,9 @@ where
     pub fn is_orthogonal(&self) -> bool {
         self.p1.x == self.p2.x || self.p1.y == self.p2.y
     }
+    pub fn as_array(&self) -> [Point2D<T, U>; 2] {
+        [self.p1, self.p2]
+    }
 }
 impl<T, U> QuarterTurnRotatable for Line<T, U>
 where

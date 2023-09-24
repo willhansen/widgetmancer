@@ -84,24 +84,23 @@ impl AngleBasedVisibleSegment {
 
         let start_face = self.start_internal_relative_face.unwrap();
 
-        let interval_includes_any_line_end =
-            start_face
-                .line()
-                .parallel_directions()
-                .iter()
-                .any(|&line_angle| {
-                    let interval_includes_line_end = self
-                        .visible_angle_interval
-                        .contains_or_touches_angle(line_angle);
-                    interval_includes_line_end
-                });
+        let interval_includes_any_line_end = start_face
+            .face_line_segment()
+            .parallel_directions()
+            .iter()
+            .any(|&line_angle| {
+                let interval_includes_line_end = self
+                    .visible_angle_interval
+                    .contains_or_touches_angle(line_angle);
+                interval_includes_line_end
+            });
         !interval_includes_any_line_end
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let actual_face = relative_face.into();
         Self::new(
             PartialAngleInterval::from_relative_square_face(actual_face),
-            RelativeFenceFullyVisibleFromOriginGoingCcw::from_ccw_relative_faces(vec![actual_face]),
+            RelativeFenceFullyVisibleFromOriginGoingCcw::from_faces_in_ccw_order(vec![actual_face]),
         )
     }
     pub fn from_relative_square(step: impl Into<WorldStep>) -> Self {
@@ -178,7 +177,10 @@ impl AngleBasedVisibleSegment {
         }
         let combined_arc = maybe_combined_arc.unwrap();
 
-        let maybe_combined_fence: Option<Fence> = self.end_fence.try_concatenate(&other.end_fence);
+        let maybe_combined_fence: Option<Fence> = self
+            .end_fence
+            .try_concatenate_allowing_one_edge_of_overlap(&other.end_fence)
+            .ok();
 
         if maybe_combined_fence.is_none() {
             return None;
@@ -192,7 +194,10 @@ impl AngleBasedVisibleSegment {
         ))
     }
     fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
-        if let Some(line) = self.start_internal_relative_face.map(|face| face.line()) {
+        if let Some(line) = self
+            .start_internal_relative_face
+            .map(|face| face.face_line_segment())
+        {
             // TODO: generalize to allow passing in the relative squares, not needing absolute points
             line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0, 0.0))
         } else {

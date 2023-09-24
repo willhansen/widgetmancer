@@ -166,15 +166,9 @@ where
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
     // TODO: return AbsOrRelWorldLine
-    pub fn line(&self) -> WorldLine {
+    pub fn face_line_segment(&self) -> WorldLine {
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
-    }
-    pub fn cw_end_of_face(&self) -> PointType {
-        todo!()
-    }
-    pub fn ccw_end_of_face(&self) -> PointType {
-        todo!()
     }
 }
 
@@ -212,6 +206,12 @@ impl RelativeSquareWithOrthogonalDir {
             ps.reverse();
         }
         ps
+    }
+    pub fn cw_end_of_face(&self) -> WorldMove {
+        self.face_end_points_in_ccw_order()[0]
+    }
+    pub fn ccw_end_of_face(&self) -> WorldMove {
+        self.face_end_points_in_ccw_order()[1]
     }
     pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
         let tolerance = 1e-6;

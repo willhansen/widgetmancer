@@ -585,6 +585,14 @@ pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
     a.cross(b) > 0.0
 }
 
+pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
+    if two_in_ccw_order(v[0], v[1]) {
+        v
+    } else {
+        [v[1], v[0]]
+    }
+}
+
 pub fn in_ccw_order(v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>) -> bool {
     v.into_iter()
         .map(|x| x.into())
