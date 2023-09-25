@@ -167,16 +167,27 @@ impl PartialAngleInterval {
             },
         }
     }
-
-    pub fn union(&self, other: Self) -> Self {
-        assert!(self.overlaps_or_touches(other));
+    pub fn combine_with_overlapping_or_touching_arc_with_tolerance(
+        &self,
+        other: Self,
+        tolerance: FAngle,
+    ) -> Self {
+        assert!(self
+            .overlaps_arc_with_tolerance(other, tolerance)
+            .is_at_least_partial());
         let result = PartialAngleInterval {
-            anticlockwise_end: if self.contains_or_touches_angle(other.anticlockwise_end) {
+            anticlockwise_end: if self
+                .contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
+                .is_at_least_partial()
+            {
                 self.anticlockwise_end
             } else {
                 other.anticlockwise_end
             },
-            clockwise_end: if self.contains_or_touches_angle(other.clockwise_end) {
+            clockwise_end: if self
+                .contains_angle_with_tolerance(other.clockwise_end, tolerance)
+                .is_at_least_partial()
+            {
                 self.clockwise_end
             } else {
                 other.clockwise_end
@@ -185,12 +196,22 @@ impl PartialAngleInterval {
         //println!("A:     {}\nB:     {}\nA + B: {}", self, other, result);
         result
     }
-    pub fn combine_touching_panic_overlapping(
+
+    pub fn combine_with_overlapping_or_touching_arc(&self, other: Self) -> Self {
+        self.combine_with_overlapping_or_touching_arc_with_tolerance(other, FAngle::degrees(0.0))
+    }
+    pub fn combine_if_touching_panic_if_overlapping(
         &self,
         other: Self,
         tolerance: FAngle,
     ) -> Option<Self> {
-        todo!()
+        match self.overlaps_arc_with_tolerance(other, tolerance) {
+            BoolWithPartial::True => panic!("overlapping!"),
+            BoolWithPartial::Partial => {
+                Some(self.combine_with_overlapping_or_touching_arc_with_tolerance(other, tolerance))
+            }
+            BoolWithPartial::False => None,
+        }
     }
     pub fn complement(&self) -> Self {
         PartialAngleInterval::from_angles(self.anticlockwise_end, self.clockwise_end)
@@ -199,7 +220,11 @@ impl PartialAngleInterval {
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
-    pub fn overlaps(&self, other: PartialAngleInterval) -> BoolWithPartial {
+    pub fn overlaps_arc_with_tolerance(
+        &self,
+        other: PartialAngleInterval,
+        tolerance: Angle<f32>,
+    ) -> BoolWithPartial {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width();
         todo!()
     }
@@ -361,9 +386,16 @@ impl PartialAngleInterval {
 
         self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
     }
-    fn contains_angle_with_tolerance(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> bool {
-        self.center_angle().angle_to(angle).radians.abs()
-            <= self.width().radians / 2.0 + tolerance.radians.abs()
+    fn contains_angle_with_tolerance(
+        &self,
+        angle: Angle<f32>,
+        tolerance: Angle<f32>,
+    ) -> BoolWithPartial {
+        BoolWithPartial::from_less_than_with_tolerance(
+            self.center_angle().angle_to(angle).radians.abs(),
+            self.width().radians / 2.0,
+            tolerance.radians.abs(),
+        )
     }
 
     pub fn width(&self) -> Angle<f32> {
@@ -405,10 +437,10 @@ impl PartialAngleInterval {
             && self.contains_or_touches_angle(other.clockwise_end)
             && self.contains_or_touches_angle(other.center_angle())
     }
-    pub fn contains_interval_with_tolerance(&self, other: Self, tolerance: FAngle) -> bool {
+    pub fn contains_arc_with_tolerance(&self, other: Self, tolerance: FAngle) -> BoolWithPartial {
         self.contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
-            && self.contains_angle_with_tolerance(other.clockwise_end, tolerance)
-            && self.contains_angle_with_tolerance(other.center_angle(), tolerance)
+            .and(self.contains_angle_with_tolerance(other.clockwise_end, tolerance))
+            .and(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
     }
     pub fn most_overlapped_edge_of_self(
         &self,
@@ -524,7 +556,8 @@ impl PartialAngleInterval {
     fn lone_containing_octant(&self) -> Option<Octant> {
         Octant::all_octants().find(|octant| {
             Self::from_octant(*octant)
-                .contains_interval_with_tolerance(*self, Self::default_tolerance())
+                .contains_arc_with_tolerance(*self, Self::default_tolerance())
+                .is_at_least_partial()
         })
     }
 }
@@ -533,7 +566,7 @@ impl Add for PartialAngleInterval {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        self.union(rhs)
+        self.combine_with_overlapping_or_touching_arc(rhs)
     }
 }
 
@@ -602,7 +635,8 @@ impl AngleIntervalSet {
         for i in 1..self.intervals.len() {
             let interval = self.intervals[i];
             if accumulating_interval.overlaps_or_touches(interval) {
-                accumulating_interval = accumulating_interval.union(interval);
+                accumulating_interval =
+                    accumulating_interval.combine_with_overlapping_or_touching_arc(interval);
             } else {
                 new_intervals.push(accumulating_interval);
                 accumulating_interval = interval;
@@ -612,7 +646,8 @@ impl AngleIntervalSet {
             if is_last_interval {
                 if !is_only_interval && accumulating_interval.overlaps_or_touches(new_intervals[0])
                 {
-                    new_intervals[0] = new_intervals[0].union(accumulating_interval);
+                    new_intervals[0] = new_intervals[0]
+                        .combine_with_overlapping_or_touching_arc(accumulating_interval);
                 } else {
                     new_intervals.push(accumulating_interval);
                 }
@@ -731,7 +766,9 @@ impl AngleInterval {
             AngleInterval::PartialArc(self_arc) => match other_interval {
                 AngleInterval::Empty => *self,
                 AngleInterval::FullCircle => AngleInterval::FullCircle,
-                AngleInterval::PartialArc(other_arc) => self_arc.union(other_arc).into(),
+                AngleInterval::PartialArc(other_arc) => self_arc
+                    .combine_with_overlapping_or_touching_arc(other_arc)
+                    .into(),
             },
         }
     }
@@ -951,14 +988,18 @@ mod tests {
     fn test_angle_interval_union() {
         assert_eq!(
             PartialAngleInterval::from_degrees(80.0, 100.0)
-                .union(PartialAngleInterval::from_degrees(40.0, 90.0)),
+                .combine_with_overlapping_or_touching_arc(PartialAngleInterval::from_degrees(
+                    40.0, 90.0
+                )),
             PartialAngleInterval::from_degrees(40.0, 100.0),
             "from overlap"
         );
 
         assert_eq!(
             PartialAngleInterval::from_degrees(80.0, 100.0)
-                .union(PartialAngleInterval::from_degrees(40.0, 80.0)),
+                .combine_with_overlapping_or_touching_arc(PartialAngleInterval::from_degrees(
+                    40.0, 80.0
+                )),
             PartialAngleInterval::from_degrees(40.0, 100.0),
             "from exactly touching"
         );
@@ -1718,19 +1759,19 @@ mod tests {
 
         let correct = PartialAngleInterval::from_degrees(0.0, 20.0);
         assert_eq!(
-            a.combine_touching_panic_overlapping(b, tolerance),
+            a.combine_if_touching_panic_if_overlapping(b, tolerance),
             Some(correct)
         );
         assert_eq!(
-            a.combine_touching_panic_overlapping(b_bigger, tolerance),
+            a.combine_if_touching_panic_if_overlapping(b_bigger, tolerance),
             Some(correct)
         );
         assert_eq!(
-            a.combine_touching_panic_overlapping(b_smaller, tolerance),
+            a.combine_if_touching_panic_if_overlapping(b_smaller, tolerance),
             Some(correct)
         );
         assert_eq!(
-            a.combine_touching_panic_overlapping(b_way_smaller, tolerance),
+            a.combine_if_touching_panic_if_overlapping(b_way_smaller, tolerance),
             None
         );
     }
@@ -1743,6 +1784,6 @@ mod tests {
         let b_way_bigger =
             PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
 
-        a.combine_touching_panic_overlapping(b_way_bigger, tolerance);
+        a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
     }
 }

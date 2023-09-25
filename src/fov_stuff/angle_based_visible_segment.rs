@@ -171,7 +171,10 @@ impl AngleBasedVisibleSegment {
 
         let maybe_combined_arc: Option<PartialAngleInterval> = self
             .visible_angle_interval
-            .combine_touching_panic_overlapping(other.visible_angle_interval, Angle::degrees(0.1));
+            .combine_if_touching_panic_if_overlapping(
+                other.visible_angle_interval,
+                Angle::degrees(0.1),
+            );
         if maybe_combined_arc.is_none() {
             return None;
         }

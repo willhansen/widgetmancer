@@ -598,13 +598,7 @@ pub fn check_vectors_in_ccw_order(
 ) -> OkOrMessage {
     v.into_iter()
         .map(|x| x.into())
-        .inspect(|x| {
-            dbg!("individual", x);
-        })
         .tuple_windows()
-        .inspect(|x| {
-            dbg!("window", x);
-        })
         .map(|(a, b)| match two_in_ccw_order(a, b) {
             true => Ok(()),
             false => Err(format!(
