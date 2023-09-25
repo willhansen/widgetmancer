@@ -593,6 +593,10 @@ pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
     }
 }
 
+pub fn opposite_angle(a: FAngle) -> FAngle {
+    a + FAngle::degrees(180.0)
+}
+
 pub fn check_vectors_in_ccw_order(
     v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>,
 ) -> OkOrMessage {

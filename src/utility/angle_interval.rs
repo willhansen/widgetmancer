@@ -74,6 +74,9 @@ impl PartialAngleInterval {
             Angle::radians(anticlockwise_end_in_radians),
         )
     }
+    pub fn from_center_and_width(center_angle: FAngle, width: FAngle) -> Self {
+        Self::from_angles(center_angle - width / 2.0, center_angle + width / 2.0)
+    }
     pub fn to_degrees(&self) -> (f32, f32) {
         (
             self.clockwise_end.to_degrees(),
@@ -173,7 +176,7 @@ impl PartialAngleInterval {
         tolerance: FAngle,
     ) -> Self {
         assert!(self
-            .overlaps_arc_with_tolerance(other, tolerance)
+            .overlaps_other_with_tolerance(other, tolerance)
             .is_at_least_partial());
         let result = PartialAngleInterval {
             anticlockwise_end: if self
@@ -205,7 +208,7 @@ impl PartialAngleInterval {
         other: Self,
         tolerance: FAngle,
     ) -> Option<Self> {
-        match self.overlaps_arc_with_tolerance(other, tolerance) {
+        match self.overlaps_other_with_tolerance(other, tolerance) {
             BoolWithPartial::True => panic!("overlapping!"),
             BoolWithPartial::Partial => {
                 Some(self.combine_with_overlapping_or_touching_arc_with_tolerance(other, tolerance))
@@ -220,7 +223,7 @@ impl PartialAngleInterval {
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
-    pub fn overlaps_arc_with_tolerance(
+    pub fn overlaps_other_with_tolerance(
         &self,
         other: PartialAngleInterval,
         tolerance: Angle<f32>,
@@ -412,6 +415,10 @@ impl PartialAngleInterval {
         };
         assert!(full_width.radians >= 0.0);
         full_width
+    }
+
+    pub fn narrowed(&self, smallerness: FAngle) -> Self {
+        Self::from_center_and_width(self.center_angle(), self.width() - smallerness * 2.0)
     }
 
     pub fn center_angle(&self) -> Angle<f32> {
@@ -851,7 +858,10 @@ mod tests {
 
     use crate::{
         fov_stuff::{rasterized_field_of_view::TopDownifiedFieldOfViewInterface, FieldOfView},
-        utility::{STEP_DOWN, STEP_RIGHT, STEP_UP},
+        utility::{
+            coordinates::opposite_angle, relative_interval_location::RelativeIntervalLocation,
+            STEP_DOWN, STEP_RIGHT, STEP_UP,
+        },
     };
 
     use super::*;
@@ -1785,5 +1795,65 @@ mod tests {
             PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
 
         a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
+    }
+    #[test]
+    fn test_overlapping_arcs_with_tolerance() {
+        let a = PartialAngleInterval::from_degrees(10.0, 20.0);
+        let tolerance = FAngle::degrees(1.0);
+
+        use RelativeIntervalLocation::*;
+
+        let offset_endpoints = |arc: &PartialAngleInterval,
+
+                                cw_pos: RelativeIntervalLocation,
+                                ccw_pos: RelativeIntervalLocation|
+         -> [FAngle; 2] {
+            let pos_to_ccw_halves_offset = |pos| match pos {
+                After => 3.0,
+                End => 1.0,
+                Inside => 0.0,
+                Start => -1.0,
+                Before => -3.0,
+            };
+            [
+                arc.center_angle() - arc.width() / 2.0
+                    + tolerance * 0.5 * pos_to_ccw_halves_offset(cw_pos),
+                arc.center_angle()
+                    + arc.width() / 2.0
+                    + tolerance * 0.5 * pos_to_ccw_halves_offset(ccw_pos),
+            ]
+        };
+
+        let all_relative_position_pairs: Vec<[RelativeIntervalLocation; 2]> = todo!();
+
+        let opposite_center = opposite_angle(a.center_angle());
+
+        for [cw_pos, ccw_pos] in all_relative_position_pairs {
+            let [offset_cw_angle, offset_ccw_angle] = offset_endpoints(&a, cw_pos, ccw_pos);
+            let opposite_to_cw =
+                PartialAngleInterval::from_angles(opposite_center, offset_cw_angle);
+
+            let ccw_to_opposite =
+                PartialAngleInterval::from_angles(offset_ccw_angle, opposite_center);
+
+            let ccw_to_cw = PartialAngleInterval::from_angles(offset_ccw_angle, offset_cw_angle);
+            let cw_to_ccw = PartialAngleInterval::from_angles(offset_cw_angle, offset_ccw_angle);
+
+            assert_eq!(
+                a.overlaps_other_with_tolerance(opposite_to_cw, tolerance),
+                cw_pos.in_interval()
+            );
+            assert_eq!(
+                a.overlaps_other_with_tolerance(ccw_to_opposite, tolerance),
+                ccw_pos.in_interval()
+            );
+            assert_eq!(
+                a.overlaps_other_with_tolerance(ccw_to_cw, tolerance),
+                ccw_pos.in_interval().or(cw_pos.in_interval())
+            );
+            assert!(a
+                .overlaps_other_with_tolerance(cw_to_ccw, tolerance)
+                .is_true());
+        }
     }
 }
