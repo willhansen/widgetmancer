@@ -421,6 +421,10 @@ impl PartialAngleInterval {
         full_width
     }
 
+    pub fn half_width(&self) -> FAngle {
+        self.width() / 2.0
+    }
+
     pub fn narrowed(&self, smallerness: FAngle) -> Self {
         Self::from_center_and_width(self.center_angle(), self.width() - smallerness * 2.0)
     }
@@ -729,7 +733,7 @@ impl Display for PartialAngleInterval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "From {:.1}° to {:.1}°",
+            "From {}° to {}°",
             self.clockwise_end.to_degrees(),
             self.anticlockwise_end.to_degrees()
         )
@@ -1815,28 +1819,29 @@ mod tests {
     #[test]
     fn test_overlapping_arcs_with_tolerance__all_cases_at_once() {
         let a = PartialAngleInterval::from_degrees(10.0, 20.0);
-        let tolerance = FAngle::degrees(1.0);
+        let tolerance = FAngle::degrees(0.01);
 
         use RelativeIntervalLocation::*;
 
-        let offset_endpoints = |arc: &PartialAngleInterval,
+        let offset_endpoints_cw_ccw = |arc: &PartialAngleInterval,
 
-                                cw_pos: RelativeIntervalLocation,
-                                ccw_pos: RelativeIntervalLocation|
+                                       cw_pos: RelativeIntervalLocation,
+                                       ccw_pos: RelativeIntervalLocation|
          -> [FAngle; 2] {
-            let pos_to_ccw_halves_offset = |pos| match pos {
-                After => 3.0,
-                End => 1.0,
-                Inside => 0.0,
-                Start => -1.0,
-                Before => -3.0,
+            let pos_to_ccw_angle_offset = |pos| {
+                tolerance
+                    * 0.5
+                    * match pos {
+                        After => 3.0,
+                        End => 1.0,
+                        Inside => 0.0,
+                        Start => -1.0,
+                        Before => -3.0,
+                    }
             };
             [
-                arc.center_angle() - arc.width() / 2.0
-                    + tolerance * 0.5 * pos_to_ccw_halves_offset(cw_pos),
-                arc.center_angle()
-                    + arc.width() / 2.0
-                    + tolerance * 0.5 * pos_to_ccw_halves_offset(ccw_pos),
+                arc.center_angle() - arc.half_width() + pos_to_ccw_angle_offset(cw_pos),
+                arc.center_angle() + arc.half_width() + pos_to_ccw_angle_offset(ccw_pos),
             ]
         };
 
@@ -1849,32 +1854,64 @@ mod tests {
 
         let opposite_center = opposite_angle(a.center_angle());
 
-        for (cw_pos, ccw_pos) in all_relative_position_pairs {
-            let [offset_cw_angle, offset_ccw_angle] = offset_endpoints(&a, cw_pos, ccw_pos);
-            let opposite_to_cw =
-                PartialAngleInterval::from_angles(opposite_center, offset_cw_angle);
-
-            let ccw_to_opposite =
-                PartialAngleInterval::from_angles(offset_ccw_angle, opposite_center);
-
-            let ccw_to_cw = PartialAngleInterval::from_angles(offset_ccw_angle, offset_cw_angle);
-            let cw_to_ccw = PartialAngleInterval::from_angles(offset_cw_angle, offset_ccw_angle);
-
-            assert_eq!(
-                a.overlaps_other_with_tolerance(opposite_to_cw, tolerance),
-                cw_pos.in_interval()
+        for (pos_relative_to_cw_end_of_self, pos_relative_to_ccw_end_of_self) in
+            all_relative_position_pairs
+        {
+            let [offset_cw_angle_of_self, offset_ccw_angle_of_self] = offset_endpoints_cw_ccw(
+                &a,
+                pos_relative_to_cw_end_of_self,
+                pos_relative_to_ccw_end_of_self,
             );
-            assert_eq!(
-                a.overlaps_other_with_tolerance(ccw_to_opposite, tolerance),
-                ccw_pos.in_interval()
-            );
-            assert_eq!(
-                a.overlaps_other_with_tolerance(ccw_to_cw, tolerance),
-                ccw_pos.in_interval().or(cw_pos.in_interval())
-            );
-            assert!(a
-                .overlaps_other_with_tolerance(cw_to_ccw, tolerance)
-                .is_true());
+            let offset_at_cw_end_of_self_should_be_inside =
+                pos_relative_to_cw_end_of_self.is_after();
+            let offset_at_ccw_end_of_self_should_be_inside =
+                pos_relative_to_ccw_end_of_self.is_before();
+
+            struct TestData {
+                cw_end_of_other: FAngle,
+                ccw_end_of_other: FAngle,
+                correct_overlap_result: BoolWithPartial,
+            };
+
+            let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; _] = [
+                TestData {
+                    cw_end_of_other: opposite_center,
+                    ccw_end_of_other: offset_cw_angle_of_self,
+                    correct_overlap_result: offset_at_cw_end_of_self_should_be_inside,
+                },
+                (
+                    (offset_ccw_angle_of_self, opposite_center),
+                    offset_at_ccw_end_of_self_should_be_inside,
+                ),
+                (
+                    (offset_ccw_angle_of_self, offset_cw_angle_of_self),
+                    offset_at_ccw_end_of_self_should_be_inside
+                        .or(offset_at_cw_end_of_self_should_be_inside),
+                ),
+                (
+                    (offset_cw_angle_of_self, offset_ccw_angle_of_self),
+                    BoolWithPartial::True,
+                ),
+            ];
+
+            other_cw_ccw_pairs_and_should_be_overlappings
+                .into_iter()
+                .for_each(|((other_cw, other_ccw), correct_overlap_result)| {
+                    let other_arc = PartialAngleInterval::from_angles(other_cw, other_ccw);
+                    let measured_overlap_result =
+                        a.overlaps_other_with_tolerance(other_arc, tolerance);
+                    assert_eq!(
+                        measured_overlap_result,
+                        correct_overlap_result,
+                        "\nrel_cw_of_self: {}\nrel_ccw_of_self: {}\na: {}\nb: {}\nMeasured overlap result: {}\nCorrect overlap result: {}",
+                        pos_relative_to_cw_end_of_self,
+                        pos_relative_to_ccw_end_of_self,
+                        &a,
+                        &other_arc,
+                        measured_overlap_result,
+                        correct_overlap_result
+                    );
+                });
         }
     }
 }

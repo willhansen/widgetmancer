@@ -1,8 +1,9 @@
 use std::ops::{Add, Sub};
 
+use derive_more::Display;
 use num::{Num, Zero};
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Display, Copy)]
 pub enum BoolWithPartial {
     True,
     Partial,
