@@ -1863,53 +1863,62 @@ mod tests {
                 pos_relative_to_ccw_end_of_self,
             );
             let offset_at_cw_end_of_self_should_be_inside =
-                pos_relative_to_cw_end_of_self.is_after();
+                pos_relative_to_cw_end_of_self.is_after_grey_zone();
             let offset_at_ccw_end_of_self_should_be_inside =
-                pos_relative_to_ccw_end_of_self.is_before();
+                pos_relative_to_ccw_end_of_self.is_before_grey_zone();
 
             struct TestData {
                 cw_end_of_other: FAngle,
                 ccw_end_of_other: FAngle,
                 correct_overlap_result: BoolWithPartial,
+                case_name: String,
             };
 
-            let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; _] = [
+            let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; 4] = [
                 TestData {
                     cw_end_of_other: opposite_center,
                     ccw_end_of_other: offset_cw_angle_of_self,
                     correct_overlap_result: offset_at_cw_end_of_self_should_be_inside,
+                    case_name: "opposite to cw end".to_owned(),
                 },
-                (
-                    (offset_ccw_angle_of_self, opposite_center),
-                    offset_at_ccw_end_of_self_should_be_inside,
-                ),
-                (
-                    (offset_ccw_angle_of_self, offset_cw_angle_of_self),
-                    offset_at_ccw_end_of_self_should_be_inside
+                TestData {
+                    cw_end_of_other: offset_ccw_angle_of_self,
+                    ccw_end_of_other: opposite_center,
+                    correct_overlap_result: offset_at_ccw_end_of_self_should_be_inside,
+                    case_name: "ccw end to opposite".to_owned(),
+                },
+                TestData {
+                    cw_end_of_other: offset_ccw_angle_of_self,
+                    ccw_end_of_other: offset_cw_angle_of_self,
+                    correct_overlap_result: offset_at_ccw_end_of_self_should_be_inside
                         .or(offset_at_cw_end_of_self_should_be_inside),
-                ),
-                (
-                    (offset_cw_angle_of_self, offset_ccw_angle_of_self),
-                    BoolWithPartial::True,
-                ),
+                    case_name: "ccw end to cw end.  almost complement".to_owned(),
+                },
+                TestData {
+                    cw_end_of_other: offset_cw_angle_of_self,
+                    ccw_end_of_other: offset_ccw_angle_of_self,
+                    correct_overlap_result: BoolWithPartial::True,
+                    case_name: "cw end to ccw end.  almost identical".to_owned(),
+                },
             ];
 
             other_cw_ccw_pairs_and_should_be_overlappings
                 .into_iter()
-                .for_each(|((other_cw, other_ccw), correct_overlap_result)| {
-                    let other_arc = PartialAngleInterval::from_angles(other_cw, other_ccw);
+                .for_each(|case_data| {
+                    let other_arc = PartialAngleInterval::from_angles(case_data.cw_end_of_other, case_data.ccw_end_of_other);
                     let measured_overlap_result =
                         a.overlaps_other_with_tolerance(other_arc, tolerance);
                     assert_eq!(
                         measured_overlap_result,
-                        correct_overlap_result,
-                        "\nrel_cw_of_self: {}\nrel_ccw_of_self: {}\na: {}\nb: {}\nMeasured overlap result: {}\nCorrect overlap result: {}",
+                        case_data.correct_overlap_result,
+                        "\n\ncase: {}\nrel_cw_of_self: {}\nrel_ccw_of_self: {}\na: {}\nb: {}\nMeasured overlap result: {}\nCorrect overlap result: {}",
+                        case_data.case_name,
                         pos_relative_to_cw_end_of_self,
                         pos_relative_to_ccw_end_of_self,
                         &a,
                         &other_arc,
                         measured_overlap_result,
-                        correct_overlap_result
+                        case_data.correct_overlap_result
                     );
                 });
         }

@@ -48,6 +48,25 @@ impl RelativeIntervalLocation {
             RelativeIntervalLocation::Before => BoolWithPartial::False,
         }
     }
+    // TODO: how treat edge cases of Start and End here?
+    pub fn is_before_grey_zone(&self) -> BoolWithPartial {
+        match self {
+            RelativeIntervalLocation::After => BoolWithPartial::False,
+            RelativeIntervalLocation::End => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Inside => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Start => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Before => BoolWithPartial::True,
+        }
+    }
+    pub fn is_after_grey_zone(&self) -> BoolWithPartial {
+        match self {
+            RelativeIntervalLocation::After => BoolWithPartial::True,
+            RelativeIntervalLocation::End => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Inside => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Start => BoolWithPartial::Partial,
+            RelativeIntervalLocation::Before => BoolWithPartial::False,
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
