@@ -228,8 +228,12 @@ impl PartialAngleInterval {
         other: PartialAngleInterval,
         tolerance: Angle<f32>,
     ) -> BoolWithPartial {
-        self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width();
-        todo!()
+        self.contains_angle_with_tolerance(other.cw(), tolerance)
+            .or(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
+            .or(self.contains_angle_with_tolerance(other.ccw(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.cw(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.center_angle(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.ccw(), tolerance))
     }
 
     pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
@@ -1797,6 +1801,16 @@ mod tests {
             PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
 
         a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
+    }
+    #[test]
+    fn test_overlapping_arcs_with_tolerance__narrow_full_overlap_case() {
+        let a = PartialAngleInterval::from_degrees(0.0, 20.0);
+        let b = PartialAngleInterval::from_degrees(6.0, 7.0);
+        let tolerance = FAngle::degrees(0.01);
+        assert!(a.overlaps_other_with_tolerance(b, tolerance).is_true());
+        assert!(b.overlaps_other_with_tolerance(a, tolerance).is_true());
+        assert!(a.overlaps_other_with_tolerance(a, tolerance).is_true());
+        assert!(b.overlaps_other_with_tolerance(b, tolerance).is_true());
     }
     #[test]
     fn test_overlapping_arcs_with_tolerance__all_cases_at_once() {
