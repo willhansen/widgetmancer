@@ -852,9 +852,11 @@ impl RigidlyTransformable for PartialAngleInterval {
 #[cfg(test)]
 mod tests {
     use euclid::point2;
+    use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, timeout};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
+    use strum::IntoEnumIterator;
 
     use crate::{
         fov_stuff::{rasterized_field_of_view::TopDownifiedFieldOfViewInterface, FieldOfView},
@@ -1797,7 +1799,7 @@ mod tests {
         a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
     }
     #[test]
-    fn test_overlapping_arcs_with_tolerance() {
+    fn test_overlapping_arcs_with_tolerance__all_cases_at_once() {
         let a = PartialAngleInterval::from_degrees(10.0, 20.0);
         let tolerance = FAngle::degrees(1.0);
 
@@ -1824,11 +1826,16 @@ mod tests {
             ]
         };
 
-        let all_relative_position_pairs: Vec<[RelativeIntervalLocation; 2]> = todo!();
+        let all_relative_position_pairs: Vec<(RelativeIntervalLocation, RelativeIntervalLocation)> =
+            iproduct!(
+                RelativeIntervalLocation::iter(),
+                RelativeIntervalLocation::iter()
+            )
+            .collect();
 
         let opposite_center = opposite_angle(a.center_angle());
 
-        for [cw_pos, ccw_pos] in all_relative_position_pairs {
+        for (cw_pos, ccw_pos) in all_relative_position_pairs {
             let [offset_cw_angle, offset_ccw_angle] = offset_endpoints(&a, cw_pos, ccw_pos);
             let opposite_to_cw =
                 PartialAngleInterval::from_angles(opposite_center, offset_cw_angle);
