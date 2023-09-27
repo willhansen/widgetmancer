@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::{Debug, Display, Formatter};
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -18,7 +19,7 @@ use crate::utility::{
     CoordToString, Quadrant, SimpleResult, STEP_ZERO,
 };
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,
 }
@@ -344,6 +345,17 @@ where
 {
     fn from(value: T) -> Self {
         Self::from_one_edge(value)
+    }
+}
+
+impl Debug for Fence {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "edges: {:?}\nspanned angle: {}",
+            self.edges,
+            self.spanned_angle_from_origin()
+        )
     }
 }
 

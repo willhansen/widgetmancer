@@ -247,7 +247,8 @@ pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32,
 }
 // TODO: remember the reason for this existing (there IS a good reason)
 // related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
-pub fn better_angle_from_x_axis<U>(v: Vector2D<f32, U>) -> Angle<f32> {
+pub fn better_angle_from_x_axis<U>(v: impl Into<Vector2D<f32, U>>) -> Angle<f32> {
+    let v = v.into();
     Angle::radians(v.y.atan2(v.x))
 }
 

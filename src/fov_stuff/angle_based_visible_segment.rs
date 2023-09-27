@@ -19,18 +19,12 @@ use super::square_visibility::RelativeSquareVisibilityFunctions;
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
     visible_angle_interval: PartialAngleInterval,
-    start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
+    start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl AngleBasedVisibleSegment {
     pub fn new(arc: PartialAngleInterval, end_fence: impl Into<Fence>) -> Self {
-        let x = Self {
-            visible_angle_interval: arc,
-            start_internal_relative_face: None,
-            end_fence: end_fence.into(),
-        };
-        x.validate();
-        x
+        Self::new_with_optional_start_face(arc, end_fence, Option::<RelativeFace>::None)
     }
 
     pub fn new_with_start_face(
@@ -38,30 +32,27 @@ impl AngleBasedVisibleSegment {
         end_fence: Fence,
         start_face: impl Into<RelativeFace>,
     ) -> Self {
+        Self::new_with_optional_start_face(arc, end_fence, Some(start_face.into()))
+    }
+    pub fn new_with_optional_start_face(
+        arc: PartialAngleInterval,
+        end_fence: impl Into<Fence>,
+        optional_start_face: Option<impl Into<RelativeFace>>,
+    ) -> Self {
         let x = Self {
             visible_angle_interval: arc,
-            start_internal_relative_face: Some(start_face.into()),
-            end_fence,
+            end_fence: end_fence.into(),
+            start_internal_relative_face: optional_start_face.map(|y| y.into()),
         };
         x.validate();
         x
     }
-    pub fn new_with_optional_start_face(
-        arc: PartialAngleInterval,
-        end_fence: Fence,
-        optional_start_face: Option<impl Into<RelativeFace>>,
-    ) -> Self {
-        if let Some(start_face) = optional_start_face {
-            Self::new_with_start_face(arc, end_fence, start_face)
-        } else {
-            Self::new(arc, end_fence)
-        }
-    }
     pub fn validate(&self) {
-        if !self.start_face_spans_angle_interval()
-            || !self.end_fence_fully_covers_angle_interval_with_no_overlap()
-        {
-            panic!("INVALID VISIBLE AREA SEGMENT: {:?}", self);
+        if !self.start_face_spans_angle_interval() {
+            panic!("START FACE DOES NOT SPAN ARC: {:?}", self);
+        }
+        if !self.end_fence_fully_covers_angle_interval_with_no_overlap() {
+            panic!("END FACE DOES NOT SPAN ARC: {:?}", self);
         }
     }
     pub fn end_fence(&self) -> &RelativeFenceFullyVisibleFromOriginGoingCcw {
@@ -105,14 +96,13 @@ impl AngleBasedVisibleSegment {
     }
     pub fn from_relative_square(step: impl Into<WorldStep>) -> Self {
         let step = step.into();
+        let arc = PartialAngleInterval::from_relative_square(step);
+
         let faces = faces_away_from_center_at_rel_square(step);
-        Self {
-            visible_angle_interval: PartialAngleInterval::from_relative_square(step),
-            start_internal_relative_face: None,
-            end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw::from_unordered_relative_edges(
-                faces,
-            ),
-        }
+        let end_fence =
+            RelativeFenceFullyVisibleFromOriginGoingCcw::from_unordered_relative_edges(faces);
+
+        Self::new(arc, end_fence)
     }
     pub fn with_weakly_applied_start_face(
         &self,
@@ -131,11 +121,12 @@ impl AngleBasedVisibleSegment {
             relative_face,
         )
     }
-    pub fn with_visible_angle_interval(&self, angle_interval: PartialAngleInterval) -> Self {
-        Self {
-            visible_angle_interval: angle_interval,
-            ..self.clone()
-        }
+    pub fn with_arc(&self, arc: PartialAngleInterval) -> Self {
+        Self::new_with_optional_start_face(
+            arc,
+            self.end_fence.clone(),
+            self.start_internal_relative_face,
+        )
     }
     pub fn get_touching_relative_squares(&self) -> StepSet {
         self.touched_squares_going_outwards_and_ccw().collect()
@@ -264,22 +255,25 @@ impl Debug for AngleBasedVisibleSegment {
 // TODO: Applying a trait by simply calling the functions on every component member of a struct should be automated.
 impl RigidlyTransformable for AngleBasedVisibleSegment {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        Self {
-            visible_angle_interval: self.visible_angle_interval.apply_rigid_transform(tf),
-            start_internal_relative_face: self
-                .start_internal_relative_face
+        Self::new_with_optional_start_face(
+            self.visible_angle_interval.apply_rigid_transform(tf),
+            self.end_fence.apply_rigid_transform(tf),
+            self.start_internal_relative_face
                 .map(|face| face.apply_rigid_transform(tf)),
-            end_fence: self.end_fence.apply_rigid_transform(tf),
-        }
+        )
     }
 }
 #[cfg(test)]
 mod tests {
     use euclid::vec2;
+    use ntest::assert_about_eq;
 
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
-        utility::coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
+        utility::{
+            coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
+            coordinates::FVector,
+        },
     };
 
     use super::*;
@@ -428,5 +422,28 @@ mod tests {
             ((6, 0), STEP_RIGHT),
         );
         assert!(a.combined_with(&b).is_none());
+    }
+    #[test]
+    fn test_from_relative_square__does_not_crash() {
+        AngleBasedVisibleSegment::from_relative_square((5, 2));
+    }
+    #[test]
+    fn test_from_relative_square__is_correct() {
+        let segment = AngleBasedVisibleSegment::from_relative_square((5, 2));
+        assert_about_eq!(
+            segment.visible_angle_interval.cw().radians,
+            better_angle_from_x_axis(FVector::new(5.5, 1.5)).radians,
+            1e-4
+        );
+        assert_about_eq!(
+            segment.visible_angle_interval.ccw().radians,
+            better_angle_from_x_axis(FVector::new(4.5, 2.5)).radians,
+            1e-4
+        );
+        assert_eq!(segment.start_internal_relative_face, None);
+        assert_eq!(
+            segment.end_fence,
+            Fence::from_faces_in_ccw_order([((5, 2), STEP_DOWN), ((4, 2), STEP_RIGHT)])
+        );
     }
 }
