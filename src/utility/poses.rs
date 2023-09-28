@@ -194,30 +194,38 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 
 // TODO: generalize for absolute squares too
 impl RelativeSquareWithOrthogonalDir {
-    pub fn face_center_point(&self) -> WorldMove {
+    pub fn center_point_of_face(&self) -> WorldMove {
         self.square().to_f32() + self.dir().step().to_f32() * 0.5
     }
-    pub fn face_end_points(&self) -> [WorldMove; 2] {
-        [self.left(), self.right()].map(|dir| self.face_center_point() + dir.step().to_f32() * 0.5)
+    pub fn end_points_of_face(&self) -> [WorldMove; 2] {
+        [self.left(), self.right()]
+            .map(|dir| self.center_point_of_face() + dir.step().to_f32() * 0.5)
     }
-    pub fn face_end_points_in_ccw_order(&self) -> [WorldMove; 2] {
-        let mut ps = self.face_end_points();
+    pub fn end_points_of_face_in_ccw_order(&self) -> [WorldMove; 2] {
+        let mut ps = self.end_points_of_face();
         if !two_in_ccw_order(ps[0], ps[1]) {
             ps.reverse();
         }
         ps
     }
     pub fn cw_end_of_face(&self) -> WorldMove {
-        self.face_end_points_in_ccw_order()[0]
+        self.end_points_of_face_in_ccw_order()[0]
     }
     pub fn ccw_end_of_face(&self) -> WorldMove {
-        self.face_end_points_in_ccw_order()[1]
+        self.end_points_of_face_in_ccw_order()[1]
     }
     pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
         let tolerance = 1e-6;
-        self.face_end_points()
+        self.end_points_of_face()
             .into_iter()
             .any(|end_point| about_eq_2d(end_point, point, tolerance))
+    }
+    pub fn flipped_to_face_origin(&self) -> Self {
+        if self.square().dot(self.direction().into()) < 0 {
+            self.stepped().turned_back()
+        } else {
+            *self
+        }
     }
 }
 
@@ -362,7 +370,7 @@ pub fn squares_sharing_face<SquareType: AbsOrRelSquareTrait<SquareType>>(
 pub fn check_faces_in_ccw_order<T: IntoIterator<Item = impl Into<RelativeFace>> + Clone>(
     v: T,
 ) -> OkOrMessage {
-    check_vectors_in_ccw_order(v.into_iter().map(|e| e.into().face_center_point()))
+    check_vectors_in_ccw_order(v.into_iter().map(|e| e.into().center_point_of_face()))
 }
 
 #[cfg(test)]
@@ -426,5 +434,63 @@ mod tests {
                 (step, STEP_RIGHT).into()
             ])
         );
+    }
+    #[test]
+    fn test_make_face_face_center() {
+        let x_y_dir_shouldflip = [
+            (1, 1, STEP_RIGHT, false),
+            (1, 1, STEP_LEFT, true),
+            (1, 1, STEP_UP, false),
+            (1, 1, STEP_DOWN, true),
+            (0, 1, STEP_RIGHT, false),
+            (0, 1, STEP_LEFT, false),
+            (0, 1, STEP_UP, false),
+            (0, 1, STEP_DOWN, true),
+            (-1, 1, STEP_RIGHT, true),
+            (-1, 1, STEP_LEFT, false),
+            (-1, 1, STEP_UP, false),
+            (-1, 1, STEP_DOWN, true),
+            (1, 0, STEP_RIGHT, false),
+            (1, 0, STEP_LEFT, true),
+            (1, 0, STEP_UP, false),
+            (1, 0, STEP_DOWN, false),
+            (0, 0, STEP_RIGHT, false),
+            (0, 0, STEP_LEFT, false),
+            (0, 0, STEP_UP, false),
+            (0, 0, STEP_DOWN, false),
+            (-1, 0, STEP_RIGHT, true),
+            (-1, 0, STEP_LEFT, false),
+            (-1, 0, STEP_UP, false),
+            (-1, 0, STEP_DOWN, false),
+            (1, -1, STEP_RIGHT, false),
+            (1, -1, STEP_LEFT, true),
+            (1, -1, STEP_UP, true),
+            (1, -1, STEP_DOWN, false),
+            (0, -1, STEP_RIGHT, false),
+            (0, -1, STEP_LEFT, false),
+            (0, -1, STEP_UP, true),
+            (0, -1, STEP_DOWN, false),
+            (-1, -1, STEP_RIGHT, true),
+            (-1, -1, STEP_LEFT, false),
+            (-1, -1, STEP_UP, true),
+            (-1, -1, STEP_DOWN, false),
+        ];
+
+        x_y_dir_shouldflip
+            .into_iter()
+            .for_each(|(x, y, dir, should_flip)| {
+                let edge: RelativeFace = ((5 * x, 5 * y), dir).into();
+                let correct = if should_flip {
+                    edge.stepped().turned_back()
+                } else {
+                    edge
+                };
+                let canonicalized = edge.flipped_to_face_origin();
+                assert_eq!(
+                    canonicalized, correct,
+                    "edge: {:?}\ncanonicalized: {:?}\ncorrect: {:?}",
+                    edge, canonicalized, correct
+                );
+            });
     }
 }

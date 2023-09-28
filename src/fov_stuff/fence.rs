@@ -19,7 +19,7 @@ use crate::utility::{
     CoordToString, Quadrant, SimpleResult, STEP_ZERO,
 };
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,
 }
@@ -100,7 +100,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         self.try_add_edge(edge).expect("Failed to add edge: ");
     }
     fn try_add_edge(&mut self, edge: impl Into<RelativeFace>) -> Result<(), String> {
-        let edge = edge.into();
+        let edge = edge.into().flipped_to_face_origin();
+
         if self.edges.is_empty() {
             self.edges.push(edge);
             return Ok(());
@@ -136,14 +137,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn can_connect_to_ccw_end(&self, edge: RelativeFace) -> bool {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.ccw_end_point());
-        let edge_is_ccw_of_self = two_in_ccw_order(self.ccw_end_point(), edge.face_center_point());
+        let edge_is_ccw_of_self =
+            two_in_ccw_order(self.ccw_end_point(), edge.center_point_of_face());
 
         !overlapping && ends_touch && edge_is_ccw_of_self
     }
     fn can_connect_to_cw_end(&self, edge: RelativeFace) -> bool {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.cw_end_point());
-        let edge_is_cw_of_self = two_in_ccw_order(edge.face_center_point(), self.cw_end_point());
+        let edge_is_cw_of_self = two_in_ccw_order(edge.center_point_of_face(), self.cw_end_point());
 
         !overlapping && ends_touch && edge_is_cw_of_self
     }
@@ -223,9 +225,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
             // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].face_end_points_in_ccw_order()[1]
+            self.edges[0].end_points_of_face_in_ccw_order()[1]
         } else {
-            let points_from_last_edge = self.edges.last().unwrap().face_end_points();
+            let points_from_last_edge = self.edges.last().unwrap().end_points_of_face();
             let second_last_edge = self.edges.get(self.edges.len() - 2).unwrap();
             points_from_last_edge
                 .into_iter()
@@ -240,9 +242,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             panic!("no points on an empty fence");
         } else if self.edges.len() == 1 {
             // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].face_end_points_in_ccw_order()[0]
+            self.edges[0].end_points_of_face_in_ccw_order()[0]
         } else {
-            let points_from_first_edge = self.edges.first().unwrap().face_end_points();
+            let points_from_first_edge = self.edges.first().unwrap().end_points_of_face();
             let second_edge = self.edges.get(1).unwrap();
             points_from_first_edge
                 .into_iter()
@@ -260,13 +262,13 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .into_iter()
             .map(Into::<RelativeSquareWithOrthogonalDir>::into)
             .sorted_by_key(|edge| {
-                OrderedFloat(better_angle_from_x_axis(edge.face_center_point()).radians)
+                OrderedFloat(better_angle_from_x_axis(edge.center_point_of_face()).radians)
             })
             .collect_vec();
 
         let edge_angle_gap_function = |a: RelativeFace, b: RelativeFace| {
-            a.face_center_point()
-                .angle_to(b.face_center_point())
+            a.center_point_of_face()
+                .angle_to(b.center_point_of_face())
                 .radians
                 .abs()
         };
@@ -323,7 +325,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             );
         }
         fence_edges_with_angle_overlap.iter().any(|&edge| {
-            (rel_square.square_length() as f32) < edge.face_center_point().square_length()
+            (rel_square.square_length() as f32) < edge.center_point_of_face().square_length()
         })
     }
     pub fn touched_quadrants(&self) -> HashSet<Quadrant> {
@@ -833,5 +835,23 @@ mod tests {
             ((5, 4), STEP_LEFT),
         ]);
         fence.point_by_index(-7);
+    }
+    #[test]
+    fn test_fence_has_canonical_representation() {
+        assert_eq!(
+            Fence::from_one_edge(((5, 2), STEP_DOWN)).edges()[0],
+            ((5, 1), STEP_UP).into(),
+            "quadrant 1, flip fence"
+        );
+        assert_eq!(
+            Fence::from_one_edge(((5, 2), STEP_UP)).edges()[0],
+            ((5, 2), STEP_UP).into(),
+            "quadrant 1, no change"
+        );
+        assert_eq!(
+            Fence::from_one_edge(((-5, 2), STEP_RIGHT)).edges()[0],
+            ((-4, 2), STEP_LEFT).into(),
+            "quadrant 2, flip face"
+        );
     }
 }

@@ -458,10 +458,12 @@ impl PartialAngleInterval {
         contains_other_edges && other_does_not_contain_these_edges
     }
 
+    #[deprecated(note = "use contains_arc instead")]
     pub fn fully_contains_interval_including_edge_overlaps(&self, other: Self) -> bool {
-        self.contains_or_touches_angle(other.anticlockwise_end)
-            && self.contains_or_touches_angle(other.clockwise_end)
-            && self.contains_or_touches_angle(other.center_angle())
+        self.contains_arc(other).is_at_least_partial()
+    }
+    pub fn contains_arc(&self, other: Self) -> BoolWithPartial {
+        self.contains_arc_with_tolerance(other, FAngle::degrees(0.0))
     }
     pub fn contains_arc_with_tolerance(&self, other: Self, tolerance: FAngle) -> BoolWithPartial {
         self.contains_angle_with_tolerance(other.anticlockwise_end, tolerance)

@@ -2,6 +2,7 @@ use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
+use crate::utility::coordinates::FAngle;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
@@ -42,7 +43,8 @@ impl AngleBasedVisibleSegment {
         let x = Self {
             visible_angle_interval: arc,
             end_fence: end_fence.into(),
-            start_internal_relative_face: optional_start_face.map(|y| y.into()),
+            start_internal_relative_face: optional_start_face
+                .map(|y| y.into().flipped_to_face_origin()),
         };
         x.validate();
         x
@@ -75,7 +77,7 @@ impl AngleBasedVisibleSegment {
 
         let start_face = self.start_internal_relative_face.unwrap();
 
-        let interval_includes_any_line_end = start_face
+        let any_line_end_points_within_angle_interval = start_face
             .face_line_segment()
             .parallel_directions()
             .iter()
@@ -85,7 +87,22 @@ impl AngleBasedVisibleSegment {
                     .contains_or_touches_angle(line_angle);
                 interval_includes_line_end
             });
-        !interval_includes_any_line_end
+
+        let start_line = start_face.face_line_segment();
+        let vector_to_line_from_origin = start_line.normal_vector_from_origin();
+        if vector_to_line_from_origin.square_length() == 0.0 {
+            return false;
+        }
+
+        let angle_span_of_extended_line_as_seen_from_origin =
+            PartialAngleInterval::from_center_and_width(
+                better_angle_from_x_axis(vector_to_line_from_origin),
+                FAngle::degrees(180.0),
+            );
+
+        angle_span_of_extended_line_as_seen_from_origin
+            .contains_arc(self.visible_angle_interval)
+            .is_at_least_partial()
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let actual_face = relative_face.into();
@@ -334,11 +351,22 @@ mod tests {
     }
     #[test]
     #[should_panic]
-    fn test_create_with_invalid_start_face() {
+    fn test_create_with_invalid_start_face__offset() {
         AngleBasedVisibleSegment::new_with_start_face(
             PartialAngleInterval::from_degrees(0.0, 1.0),
             Fence::from_one_edge(((5, 0), STEP_RIGHT)),
             ((-1, 0), STEP_LEFT),
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn test_create_with_invalid_start_face__angle() {
+        let end_fence =
+            Fence::from_faces_in_ccw_order([((2, -1), STEP_RIGHT), ((2, 0), STEP_RIGHT)]);
+        let segment = AngleBasedVisibleSegment::new_with_start_face(
+            end_fence.spanned_angle_from_origin().try_into().unwrap(),
+            end_fence,
+            ((1, 0), STEP_DOWN),
         );
     }
     #[test]
@@ -443,7 +471,7 @@ mod tests {
         assert_eq!(segment.start_internal_relative_face, None);
         assert_eq!(
             segment.end_fence,
-            Fence::from_faces_in_ccw_order([((5, 2), STEP_DOWN), ((4, 2), STEP_RIGHT)])
+            Fence::from_faces_in_ccw_order([((5, 2), STEP_RIGHT), ((5, 3), STEP_DOWN)])
         );
     }
 }

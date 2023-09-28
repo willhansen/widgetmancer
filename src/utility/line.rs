@@ -101,12 +101,19 @@ impl<U: Copy> Line<f32, U> {
     pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
-    pub fn normal_distance_to_point(&self, point: Point2D<f32, U>) -> f32 {
+    pub fn normal_vector_to_point(&self, point: impl Into<Point2D<f32, U>>) -> Vector2D<f32, U> {
+        let point = point.into();
         let p1_to_point = point - self.p1;
         let p1_to_p2 = self.p2 - self.p1;
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
         let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
-        perpendicular_part_of_p1_to_point.length()
+        perpendicular_part_of_p1_to_point
+    }
+    pub fn normal_vector_from_origin(&self) -> Vector2D<f32, U> {
+        -self.normal_vector_to_point((0.0, 0.0))
+    }
+    pub fn normal_distance_to_point(&self, point: Point2D<f32, U>) -> f32 {
+        self.normal_vector_to_point(point).length()
     }
     pub fn a_point_clockwise_of_line(&self) -> Point2D<f32, U> {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
