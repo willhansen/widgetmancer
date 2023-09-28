@@ -27,6 +27,7 @@ use super::{
     int_to_T,
     lerp,
     random_angle,
+    relative_interval_location::RelativeIntervalLocation,
     sign,
     RigidTransform,
     RigidlyTransformable,

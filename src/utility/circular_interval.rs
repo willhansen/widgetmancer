@@ -38,35 +38,38 @@ pub fn circular_merging<T>(
     output
 }
 
-type Interval = (i32, i32);
+type i32Interval = (i32, i32);
 
 pub fn circular_merge_intervals_mod10(
-    sorted_data: impl IntoIterator<Item = Interval>,
-) -> Vec<Interval> {
+    sorted_data: impl IntoIterator<Item = i32Interval>,
+) -> Vec<i32Interval> {
     circular_merging(sorted_data, try_combine_circular_intervals_mod10)
 }
 
 pub fn circular_merge_intervals_mod10_no_overlap(
-    sorted_data: impl IntoIterator<Item = Interval>,
-) -> Vec<Interval> {
+    sorted_data: impl IntoIterator<Item = i32Interval>,
+) -> Vec<i32Interval> {
     circular_merging(sorted_data, try_combine_circular_intervals_mod10_no_overlap)
 }
 
-pub fn try_combine_circular_intervals_mod10(a: &Interval, b: &Interval) -> Option<Interval> {
+pub fn try_combine_circular_intervals_mod10(
+    a: &i32Interval,
+    b: &i32Interval,
+) -> Option<i32Interval> {
     try_combine_circular_intervals_allowing_overlap(a, b, 10)
 }
 pub fn try_combine_circular_intervals_mod10_no_overlap(
-    a: &Interval,
-    b: &Interval,
-) -> Option<Interval> {
+    a: &i32Interval,
+    b: &i32Interval,
+) -> Option<i32Interval> {
     try_combine_circular_intervals(a, b, 10, false)
 }
 pub fn try_combine_circular_intervals(
-    a: impl Borrow<Interval>,
-    b: impl Borrow<Interval>,
+    a: impl Borrow<i32Interval>,
+    b: impl Borrow<i32Interval>,
     modulo: u32,
     allow_overlap: bool,
-) -> Option<Interval> {
+) -> Option<i32Interval> {
     let a = standardize_interval(a, modulo);
     let b = standardize_interval(b, modulo);
 
@@ -95,52 +98,52 @@ pub fn try_combine_circular_intervals(
 }
 
 pub fn try_combine_circular_intervals_allowing_overlap(
-    a: impl Borrow<Interval>,
-    b: impl Borrow<Interval>,
+    a: impl Borrow<i32Interval>,
+    b: impl Borrow<i32Interval>,
     modulo: u32,
-) -> Option<Interval> {
+) -> Option<i32Interval> {
     try_combine_circular_intervals(a, b, modulo, true)
 }
 pub fn try_combine_circular_intervals_no_overlap(
-    a: impl Borrow<Interval>,
-    b: impl Borrow<Interval>,
+    a: impl Borrow<i32Interval>,
+    b: impl Borrow<i32Interval>,
     modulo: u32,
-) -> Option<Interval> {
+) -> Option<i32Interval> {
     try_combine_circular_intervals(a, b, modulo, false)
 }
 
-fn full_interval() -> Interval {
+fn full_interval() -> i32Interval {
     (0, 0)
 }
 
-fn interval_is_full(x: Interval) -> bool {
+fn interval_is_full(x: i32Interval) -> bool {
     x.0 == x.1
 }
 
-fn intervals_sum_to_full(a: Interval, b: Interval) -> bool {
+fn intervals_sum_to_full(a: i32Interval, b: i32Interval) -> bool {
     a.1 == b.0 && b.1 == a.0
 }
 
-fn intervals_are_overlapping(a: Interval, b: Interval, modulo: u32) -> BoolWithPartial {
+fn intervals_are_overlapping(a: i32Interval, b: i32Interval, modulo: u32) -> BoolWithPartial {
     in_looping_interval(a.0, b, modulo)
         .or(in_looping_interval(a.1, b, modulo))
         .or(in_looping_interval(b.0, a, modulo))
         .or(in_looping_interval(b.1, a, modulo))
 }
 
-fn in_or_touching_looping_interval(val: i32, interval: Interval, modulo: u32) -> bool {
+fn in_or_touching_looping_interval(val: i32, interval: i32Interval, modulo: u32) -> bool {
     let val = val.rem_euclid(modulo as i32);
     let interval = standardize_interval(interval, modulo);
     position_relative_to_circular_interval(val, interval, modulo).in_closed_interval()
 }
-fn in_looping_interval(val: i32, interval: Interval, modulo: u32) -> BoolWithPartial {
+fn in_looping_interval(val: i32, interval: i32Interval, modulo: u32) -> BoolWithPartial {
     let val = val.rem_euclid(modulo as i32);
     let interval = standardize_interval(interval, modulo);
     position_relative_to_circular_interval(val, interval, modulo).in_interval()
 }
 fn position_relative_to_circular_interval(
     val: i32,
-    interval: Interval,
+    interval: i32Interval,
     modulo: u32,
 ) -> RelativeIntervalLocation {
     let interval = standardize_interval(interval, modulo);
@@ -169,13 +172,13 @@ fn position_relative_to_circular_interval(
     }
 }
 
-fn interval_wraps_around(interval: Interval, modulo: u32) -> bool {
+fn interval_wraps_around(interval: i32Interval, modulo: u32) -> bool {
     let interval = standardize_interval(interval, modulo);
 
     interval.0 >= interval.1
 }
 
-fn standardize_interval(interval: impl Borrow<Interval>, modulo: u32) -> Interval {
+fn standardize_interval(interval: impl Borrow<i32Interval>, modulo: u32) -> i32Interval {
     let interval = (
         interval.borrow().0.rem_euclid(modulo as i32),
         interval.borrow().1.rem_euclid(modulo as i32),

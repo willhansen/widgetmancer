@@ -175,9 +175,14 @@ impl PartialAngleInterval {
         other: Self,
         tolerance: FAngle,
     ) -> Self {
-        assert!(self
-            .overlaps_other_with_tolerance(other, tolerance)
-            .is_at_least_partial());
+        assert!(
+            self.overlaps_other_with_tolerance(other, tolerance)
+                .is_at_least_partial(),
+            "Arcs don't overlap:\nself: {}\nother: {}\ntolerance: {}°",
+            self,
+            other,
+            tolerance.to_degrees()
+        );
         let result = PartialAngleInterval {
             anticlockwise_end: if self
                 .contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
@@ -398,6 +403,12 @@ impl PartialAngleInterval {
         angle: Angle<f32>,
         tolerance: Angle<f32>,
     ) -> BoolWithPartial {
+        let angle = standardize_angle(angle);
+
+        if angle == self.cw() || angle == self.ccw() {
+            return BoolWithPartial::Partial;
+        }
+
         BoolWithPartial::from_less_than_with_tolerance(
             self.center_angle().angle_to(angle).radians.abs(),
             self.width().radians / 2.0,
@@ -991,6 +1002,42 @@ mod tests {
                 .contains_or_touches_angle(Angle::degrees(180.0)),
             "inside a large arc"
         );
+    }
+    #[test]
+    fn test_interval_contains_angle_with_tolerance() {
+        use BoolWithPartial::*;
+
+        let t = |low, high, x, tol, result| {
+            assert_eq!(
+                PartialAngleInterval::from_degrees(low, high)
+                    .contains_angle_with_tolerance(Angle::degrees(x), Angle::degrees(tol)),
+                result,
+                "\n\nlow: {}\nhigh: {}\nx: {}\ntolerance: {}",
+                low,
+                high,
+                x,
+                tol
+            );
+        };
+        // explicitly not testing the end points of tolerance
+        t(0.0, 10.0, 5.0, 1.0, True);
+        t(0.0, 10.0, 0.0, 1.0, Partial);
+        t(0.0, 10.0, -1.0, 1.1, Partial);
+        t(0.0, 10.0, -1.1, 1.0, False);
+        t(-5.0, 10.0, -1.1, 1.0, True);
+        t(-5.0, 10.0, -7.0, 1.0, False);
+        t(-5.0, 10.0, 9.0, 1.1, Partial);
+        t(-5.0, 10.0, 10.0, 1.0, Partial);
+        t(-5.0, 10.0, 11.0, 1.1, Partial);
+        t(-5.0, 10.0, 12.0, 1.0, False);
+
+        // around 180
+        t(170.0, 190.0, 175.0, 1.0, True);
+        t(170.0, 190.0, 185.0, 1.0, True);
+
+        // tolerance crosses seam
+        t(170.0, 179.0, 181.0, 5.0, Partial);
+        t(-179.0, -170.0, 179.0, 5.0, Partial);
     }
 
     #[ignore = "zero width partial arc no longer valid"]
@@ -1805,6 +1852,18 @@ mod tests {
             PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
 
         a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
+    }
+    #[test]
+    fn test_overlapping_arcs_with_tolerance__barely_touching__observed_failure() {
+        let a = -6.340192;
+        let b = 18.434948;
+        let c = 29.054604;
+        assert!(PartialAngleInterval::from_degrees(a, b)
+            .overlaps_other_with_tolerance(
+                PartialAngleInterval::from_degrees(b, c),
+                FAngle::degrees(0.0)
+            )
+            .is_partial());
     }
     #[test]
     fn test_overlapping_arcs_with_tolerance__narrow_full_overlap_case() {
