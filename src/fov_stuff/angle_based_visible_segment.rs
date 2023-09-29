@@ -390,14 +390,15 @@ mod tests {
     #[test]
     fn test_combine_two__valid() {
         let rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
-        let a_square = rel_square;
-        let b_square = a_square + STEP_UP;
+        let a_face: RelativeFace = (rel_square, STEP_RIGHT).into();
+        let b_face = a_face.strafed_left();
         let start_face = (STEP_RIGHT * 2, STEP_LEFT);
         let mut a =
-            AngleBasedVisibleSegment::from_relative_square(a_square).with_start_face(start_face);
+            AngleBasedVisibleSegment::from_relative_face(a_face).with_start_face(start_face);
         let mut b =
-            AngleBasedVisibleSegment::from_relative_square(b_square).with_start_face(start_face);
+            AngleBasedVisibleSegment::from_relative_face(b_face).with_start_face(start_face);
 
+        dbg!(&a, &b);
         let c: AngleBasedVisibleSegment = a.combined_with(&b).unwrap();
 
         //  🄱
@@ -409,21 +410,14 @@ mod tests {
             b.visible_angle_interval.ccw()
         );
 
-        assert_eq!(
-            c.end_fence,
-            Fence::new(vec![
-                (a_square, STEP_DOWN),
-                (a_square, STEP_RIGHT),
-                (b_square, STEP_RIGHT),
-                (b_square, STEP_UP)
-            ])
-        );
+        assert_eq!(c.end_fence, Fence::new(vec![a_face, b_face,]));
     }
     #[test]
+    #[should_panic]
     fn test_combine_two__fail_because_overlap() {
         let a = AngleBasedVisibleSegment::from_relative_square((5, 0));
         let b = AngleBasedVisibleSegment::from_relative_square((10, 1));
-        assert!(a.combined_with(&b).is_none());
+        a.combined_with(&b);
     }
     #[test]
     fn test_combine_two__fail_because_not_touching() {
