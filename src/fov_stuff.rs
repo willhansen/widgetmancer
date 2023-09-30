@@ -126,7 +126,10 @@ impl FieldOfView {
         self.add_fully_visible_relative_face(face);
         self
     }
-    pub fn with_visible_segment(mut self, segment: impl Into<AngleBasedVisibleSegment>) -> Self {
+    pub fn with_local_visible_segment(
+        mut self,
+        segment: impl Into<AngleBasedVisibleSegment>,
+    ) -> Self {
         self.visible_segments_in_main_view_only.push(segment.into());
         self
     }

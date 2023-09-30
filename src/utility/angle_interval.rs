@@ -39,9 +39,11 @@ pub struct PartialAngleInterval {
 }
 
 impl PartialAngleInterval {
+    #[deprecated(note = "don't use defaults in utility module")]
     const DEFAULT_TOLERANCE_RADIANS: f32 = 1e-6;
 
-    fn default_tolerance() -> FAngle {
+    #[deprecated(note = "don't use defaults in utility module")]
+    pub fn default_tolerance() -> FAngle {
         Angle::radians(Self::DEFAULT_TOLERANCE_RADIANS)
     }
 
@@ -211,18 +213,21 @@ impl PartialAngleInterval {
     }
     pub fn combine_if_touching_panic_if_overlapping(
         &self,
-        other: Self,
+        other: impl Into<AngleInterval>,
         tolerance: FAngle,
     ) -> Option<Self> {
+        use BoolWithPartial::*;
+        let other = other.into();
+
         match self.overlaps_other_with_tolerance(other, tolerance) {
-            BoolWithPartial::True => panic!(
+            True => panic!(
                 "overlapping!\n====\nself: {:?}\nother: {:?}\ntolerance: {:?}",
                 self, other, tolerance
             ),
-            BoolWithPartial::Partial => {
+            Partial => {
                 Some(self.combine_with_overlapping_or_touching_arc_with_tolerance(other, tolerance))
             }
-            BoolWithPartial::False => None,
+            False => None,
         }
     }
     pub fn complement(&self) -> Self {
@@ -234,15 +239,22 @@ impl PartialAngleInterval {
     }
     pub fn overlaps_other_with_tolerance(
         &self,
-        other: PartialAngleInterval,
+        other: impl Into<AngleInterval>,
         tolerance: Angle<f32>,
     ) -> BoolWithPartial {
-        self.contains_angle_with_tolerance(other.cw(), tolerance)
-            .or(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
-            .or(self.contains_angle_with_tolerance(other.ccw(), tolerance))
-            .or(other.contains_angle_with_tolerance(self.cw(), tolerance))
-            .or(other.contains_angle_with_tolerance(self.center_angle(), tolerance))
-            .or(other.contains_angle_with_tolerance(self.ccw(), tolerance))
+        use BoolWithPartial::*;
+        let other = other.into();
+        match other {
+            AngleInterval::Empty => False,
+            AngleInterval::FullCircle => True,
+            AngleInterval::PartialArc(other_partial_arc) => self
+                .contains_angle_with_tolerance(other_partial_arc.cw(), tolerance)
+                .or(self.contains_angle_with_tolerance(other_partial_arc.center_angle(), tolerance))
+                .or(self.contains_angle_with_tolerance(other_partial_arc.ccw(), tolerance))
+                .or(other.contains_angle_with_tolerance(self.cw(), tolerance))
+                .or(other.contains_angle_with_tolerance(self.center_angle(), tolerance))
+                .or(other.contains_angle_with_tolerance(self.ccw(), tolerance)),
+        }
     }
 
     pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
@@ -467,11 +479,30 @@ impl PartialAngleInterval {
         self.contains_arc(other).is_at_least_partial()
     }
     // TODO: get rid of all the non-toleranced float comparison functions
-    #[deprecated(note = "use contains_arc_with_tolerance instead")]
+    #[deprecated(note = "use contains_partial_arc_with_tolerance instead")]
     pub fn contains_arc(&self, other: Self) -> BoolWithPartial {
-        self.contains_arc_with_tolerance(other, FAngle::degrees(0.0))
+        self.contains_partial_arc_with_tolerance(other, FAngle::degrees(0.0))
     }
-    pub fn contains_arc_with_tolerance(&self, other: Self, tolerance: FAngle) -> BoolWithPartial {
+    pub fn contains_arc_with_tolerance(
+        &self,
+        other: impl Into<AngleInterval>,
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
+        use AngleInterval::*;
+        use BoolWithPartial::*;
+        match other.into() {
+            Empty => False,
+            FullCircle => False,
+            PartialArc(other_partial_arc) => {
+                self.contains_partial_arc_with_tolerance(other_partial_arc, tolerance)
+            }
+        }
+    }
+    pub fn contains_partial_arc_with_tolerance(
+        &self,
+        other: Self,
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
         self.contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
             .and(self.contains_angle_with_tolerance(other.clockwise_end, tolerance))
             .and(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
@@ -590,7 +621,7 @@ impl PartialAngleInterval {
     fn lone_containing_octant(&self) -> Option<Octant> {
         Octant::all_octants().find(|octant| {
             Self::from_octant(*octant)
-                .contains_arc_with_tolerance(*self, Self::default_tolerance())
+                .contains_partial_arc_with_tolerance(*self, Self::default_tolerance())
                 .is_at_least_partial()
         })
     }
@@ -792,6 +823,26 @@ impl AngleInterval {
             ),
         }
     }
+    pub fn combine_if_touching_panic_if_overlapping(
+        &self,
+        other: impl Into<Self>,
+        tolerance: FAngle,
+    ) -> Option<Self> {
+        use AngleInterval::*;
+        use BoolWithPartial::*;
+        let other = other.into();
+
+        match self {
+            Empty => None,
+            FullCircle => match other {
+                Empty => Some(*self), // TODO: double check this
+                _ => panic!("overlap"),
+            },
+            PartialArc(self_partial_arc) => {
+                self_partial_arc.combine_if_touching_panic_if_overlapping(other)
+            }
+        }
+    }
     pub fn union(&self, other: &(impl Into<Self> + Copy)) -> Self {
         let other_interval = Into::<Self>::into(*other);
         match self {
@@ -810,7 +861,49 @@ impl AngleInterval {
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
         AngleInterval::PartialArc(PartialAngleInterval::from_degrees(cw, ccw))
     }
+    pub fn contains_arc_with_tolerance(
+        &self,
+        other: impl Into<Self>,
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
+        use AngleInterval::*;
+        use BoolWithPartial::*;
+        let other = other.into();
 
+        match self {
+            Empty => False,
+            FullCircle => match other {
+                Empty => False,
+                FullCircle => Partial, // TODO: doucle check this
+                PartialArc(_) => True,
+            },
+            PartialArc(self_partial_arc) => {
+                self_partial_arc.contains_arc_with_tolerance(other, tolerance)
+            }
+        }
+    }
+    pub fn overlaps_arc_with_tolerance(
+        &self,
+        other: impl Into<Self>,
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
+        todo!()
+    }
+    pub fn contains_angle_with_tolerance(
+        &self,
+        angle: Angle<f32>,
+        tolerance: Angle<f32>,
+    ) -> BoolWithPartial {
+        use AngleInterval::*;
+        use BoolWithPartial::*;
+        match self {
+            Empty => False,
+            FullCircle => True,
+            PartialArc(partial_arc) => partial_arc.contains_angle_with_tolerance(angle, tolerance),
+        }
+    }
+
+    #[deprecated(note = "use overlaps_arc_with_tolerance instead")]
     pub fn overlapping_but_not_exactly_touching(
         &self,
         can_be_partial: impl TryInto<PartialAngleInterval>,

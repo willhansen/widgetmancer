@@ -19,13 +19,16 @@ use super::square_visibility::RelativeSquareVisibilityFunctions;
 
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
-    visible_angle_interval: AngleInterval,
+    visible_arc: AngleInterval,
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl AngleBasedVisibleSegment {
     pub fn new(arc: impl Into<AngleInterval>, end_fence: impl Into<Fence>) -> Self {
         Self::new_with_optional_start_face(arc, end_fence, Option::<RelativeFace>::None)
+    }
+    fn default_angle_tolerance() -> FAngle {
+        Angle::radians(1e-6)
     }
 
     pub fn new_with_start_face(
@@ -41,7 +44,7 @@ impl AngleBasedVisibleSegment {
         optional_start_face: Option<impl Into<RelativeFace>>,
     ) -> Self {
         let x = Self {
-            visible_angle_interval: arc.into(),
+            visible_arc: arc.into(),
             end_fence: end_fence.into(),
             start_internal_relative_face: optional_start_face
                 .map(|y| y.into().flipped_to_face_origin()),
@@ -65,7 +68,7 @@ impl AngleBasedVisibleSegment {
         // TODO: use standard tolerance
         self.end_fence
             .spanned_angle_from_origin()
-            .contains_arc_with_tolerance(self.visible_angle_interval, Angle::radians(0.01))
+            .contains_arc_with_tolerance(self.visible_arc, Angle::radians(0.01))
             .is_at_least_partial()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
@@ -81,8 +84,9 @@ impl AngleBasedVisibleSegment {
             .iter()
             .any(|&line_angle| {
                 let interval_includes_line_end = self
-                    .visible_angle_interval
-                    .contains_or_touches_angle(line_angle);
+                    .visible_arc
+                    .contains_angle_with_tolerance(line_angle, todo!())
+                    .is_at_least_partial();
                 interval_includes_line_end
             });
 
@@ -99,7 +103,7 @@ impl AngleBasedVisibleSegment {
             );
 
         angle_span_of_extended_line_as_seen_from_origin
-            .contains_arc(self.visible_angle_interval)
+            .contains_arc_with_tolerance(self.visible_arc, Self::default_angle_tolerance())
             .is_at_least_partial()
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
@@ -133,11 +137,7 @@ impl AngleBasedVisibleSegment {
         self.with_start_face(relative_face)
     }
     pub fn with_start_face(&self, relative_face: impl Into<RelativeFace>) -> Self {
-        Self::new_with_start_face(
-            self.visible_angle_interval,
-            self.end_fence.clone(),
-            relative_face,
-        )
+        Self::new_with_start_face(self.visible_arc, self.end_fence.clone(), relative_face)
     }
     pub fn with_arc(&self, arc: PartialAngleInterval) -> Self {
         Self::new_with_optional_start_face(
@@ -154,7 +154,10 @@ impl AngleBasedVisibleSegment {
     }
     pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
         let sorted_ccw = unsorted_segments.into_iter().sorted_by_key(|segment| {
-            OrderedFloat(segment.visible_angle_interval.center_angle().radians)
+            OrderedFloat(match segment.visible_arc {
+                AngleInterval::PartialArc(partial_arc) => partial_arc.center_angle().radians,
+                _ => 0.0,
+            })
         });
 
         let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
@@ -178,11 +181,10 @@ impl AngleBasedVisibleSegment {
 
         let common_start_line = a.start_internal_relative_face;
 
-        let maybe_combined_arc: Option<PartialAngleInterval> = self
-            .visible_angle_interval
-            .combine_if_touching_panic_if_overlapping(
-                other.visible_angle_interval,
-                Angle::degrees(0.1),
+        let maybe_combined_arc: Option<PartialAngleInterval> =
+            self.visible_arc.combine_if_touching_panic_if_overlapping(
+                other.visible_arc,
+                Self::default_angle_tolerance(),
             );
         if maybe_combined_arc.is_none() {
             return None;
@@ -229,7 +231,7 @@ impl AngleBasedVisibleSegment {
     /// This iterator ends when squares in the segment run out
     pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> + '_ {
         let max_square_length = self.furthest_overlapping_square().square_length();
-        self.visible_angle_interval
+        self.visible_arc
             .touched_squares_going_outwards_and_ccw()
             .take_while(move |&rel_square| rel_square.square_length() <= max_square_length)
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
@@ -243,7 +245,7 @@ impl AngleBasedVisibleSegment {
                 (
                     rel_square,
                     SquareVisibility::from_relative_square_and_view_arc(
-                        self.visible_angle_interval,
+                        self.visible_arc,
                         rel_square,
                     )
                     .unwrap(),
@@ -266,7 +268,7 @@ impl Debug for AngleBasedVisibleSegment {
             start line: {:?}\n\
             end fence: {:?}\n\
             ",
-            self.visible_angle_interval, self.start_internal_relative_face, self.end_fence
+            self.visible_arc, self.start_internal_relative_face, self.end_fence
         )
     }
 }
@@ -274,7 +276,7 @@ impl Debug for AngleBasedVisibleSegment {
 impl RigidlyTransformable for AngleBasedVisibleSegment {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::new_with_optional_start_face(
-            self.visible_angle_interval.apply_rigid_transform(tf),
+            self.visible_arc.apply_rigid_transform(tf),
             self.end_fence.apply_rigid_transform(tf),
             self.start_internal_relative_face
                 .map(|face| face.apply_rigid_transform(tf)),
@@ -405,11 +407,8 @@ mod tests {
         //  🄱
         //  🄰
 
-        assert_eq!(c.visible_angle_interval.cw(), a.visible_angle_interval.cw());
-        assert_eq!(
-            c.visible_angle_interval.ccw(),
-            b.visible_angle_interval.ccw()
-        );
+        assert_eq!(c.visible_arc.cw(), a.visible_arc.cw());
+        assert_eq!(c.visible_arc.ccw(), b.visible_arc.ccw());
 
         assert_eq!(c.end_fence, Fence::new(vec![a_face, b_face,]));
     }
@@ -454,12 +453,12 @@ mod tests {
     fn test_from_relative_square__is_correct() {
         let segment = AngleBasedVisibleSegment::from_relative_square((5, 2));
         assert_about_eq!(
-            segment.visible_angle_interval.cw().radians,
+            segment.visible_arc.cw().radians,
             better_angle_from_x_axis(FVector::new(5.5, 1.5)).radians,
             1e-4
         );
         assert_about_eq!(
-            segment.visible_angle_interval.ccw().radians,
+            segment.visible_arc.ccw().radians,
             better_angle_from_x_axis(FVector::new(4.5, 2.5)).radians,
             1e-4
         );
