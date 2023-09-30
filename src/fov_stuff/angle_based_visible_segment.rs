@@ -51,17 +51,17 @@ impl AngleBasedVisibleSegment {
     }
     pub fn validate(&self) {
         if !self.start_face_spans_angle_interval() {
-            panic!("START FACE DOES NOT SPAN ARC: {:?}", self);
+            panic!("START FACE DOES NOT SPAN ARC:\n{:?}", self);
         }
-        if !self.end_fence_fully_covers_angle_interval_with_no_overlap() {
-            panic!("END FACE DOES NOT SPAN ARC: {:?}", self);
+        if !self.end_fence_fully_covers_angle_interval() {
+            panic!("END FENCE DOES NOT SPAN ARC:\n{:?}", self);
         }
     }
     pub fn end_fence(&self) -> &RelativeFenceFullyVisibleFromOriginGoingCcw {
         &self.end_fence
     }
 
-    fn end_fence_fully_covers_angle_interval_with_no_overlap(&self) -> bool {
+    fn end_fence_fully_covers_angle_interval(&self) -> bool {
         match self.end_fence.spanned_angle_from_origin() {
             AngleInterval::Empty => false,
             AngleInterval::FullCircle => true,

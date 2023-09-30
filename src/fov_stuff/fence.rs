@@ -282,14 +282,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         Self::from_faces_in_ccw_order(Self::edges_sorted_going_ccw(edges))
     }
 
-    // TODO: probably make faster
     pub fn spanned_angle_from_origin(&self) -> AngleInterval {
-        self.edges
-            .iter()
-            .map(|x| PartialAngleInterval::from_relative_square_face(*x))
-            .fold(AngleInterval::Empty, |acc, x| {
-                AngleInterval::union(&acc, &x)
-            })
+        if self.cw_end_point() == self.ccw_end_point() {
+            AngleInterval::FullCircle
+        } else {
+            AngleInterval::PartialArc(PartialAngleInterval::from_angles(
+                better_angle_from_x_axis(self.cw_end_point()),
+                better_angle_from_x_axis(self.ccw_end_point()),
+            ))
+        }
     }
 
     pub fn on_same_side_of_fence(
@@ -852,6 +853,24 @@ mod tests {
             Fence::from_one_edge(((-5, 2), STEP_RIGHT)).edges()[0],
             ((-4, 2), STEP_LEFT).into(),
             "quadrant 2, flip face"
+        );
+    }
+    #[test]
+    fn test_spanned_angle_of_fence__full_circle() {
+        let fence = Fence::from_faces_in_ccw_order([
+            ((0, 0), STEP_RIGHT),
+            ((0, 0), STEP_UP),
+            ((0, 0), STEP_LEFT),
+            ((0, 0), STEP_DOWN),
+        ]);
+        assert_eq!(fence.spanned_angle_from_origin(), AngleInterval::FullCircle);
+    }
+    #[test]
+    fn test_spanned_angle_of_fence__partial() {
+        let fence = Fence::from_faces_in_ccw_order([((0, 0), STEP_RIGHT)]);
+        assert_eq!(
+            fence.spanned_angle_from_origin(),
+            AngleInterval::from_degrees(-45.0, 45.0)
         );
     }
 }

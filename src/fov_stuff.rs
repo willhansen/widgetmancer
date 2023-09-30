@@ -517,7 +517,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             // create a segment ending at this face
             let visible_segment_up_to_relative_face =
                 AngleBasedVisibleSegment::from_relative_face(relative_face)
-                    .with_arc(visible_arc_of_face);
+                    .with_visible_angle_interval(visible_arc_of_face);
 
             fov_result
                 .visible_segments_in_main_view_only

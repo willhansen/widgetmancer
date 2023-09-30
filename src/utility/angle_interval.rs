@@ -56,6 +56,7 @@ impl PartialAngleInterval {
             anticlockwise_end: ccw,
         }
     }
+
     pub fn cw(&self) -> FAngle {
         self.clockwise_end
     }
@@ -214,7 +215,10 @@ impl PartialAngleInterval {
         tolerance: FAngle,
     ) -> Option<Self> {
         match self.overlaps_other_with_tolerance(other, tolerance) {
-            BoolWithPartial::True => panic!("overlapping!"),
+            BoolWithPartial::True => panic!(
+                "overlapping!\n====\nself: {:?}\nother: {:?}\ntolerance: {:?}",
+                self, other, tolerance
+            ),
             BoolWithPartial::Partial => {
                 Some(self.combine_with_overlapping_or_touching_arc_with_tolerance(other, tolerance))
             }
@@ -801,8 +805,8 @@ impl AngleInterval {
         }
     }
 
-    pub fn from_degrees(ccw: f32, cw: f32) -> PartialAngleInterval {
-        PartialAngleInterval::from_degrees(ccw, cw)
+    pub fn from_degrees(cw: f32, ccw: f32) -> Self {
+        AngleInterval::PartialArc(PartialAngleInterval::from_degrees(cw, ccw))
     }
 
     pub fn overlapping_but_not_exactly_touching(
