@@ -64,12 +64,13 @@ impl FieldOfView {
             transformed_sub_fovs: Vec::new(),
         }
     }
-    pub fn new_empty_fov_at(new_center: WorldSquare) -> Self {
+    pub fn new_empty_fov_at(new_center: impl Into<WorldSquare>) -> Self {
         Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
-            new_center, STEP_UP,
+            new_center.into(),
+            STEP_UP,
         ))
     }
-    pub fn new_with_single_visible_face(
+    pub fn new_with_visible_face(
         center: impl Into<WorldSquare>,
         face: impl Into<RelativeFace>,
     ) -> Self {
@@ -80,6 +81,15 @@ impl FieldOfView {
         square: impl Into<WorldStep>,
     ) -> Self {
         Self::new_empty_fov_at(center.into()).with_fully_visible_relative_square(square)
+    }
+    pub fn new_with_arc_and_radius(
+        center: impl Into<WorldSquare>,
+        arc: AngleInterval,
+        radius: u32,
+    ) -> Self {
+        Self::new_empty_fov_at(center).with_local_visible_segment(
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(arc, radius),
+        )
     }
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
@@ -114,6 +124,10 @@ impl FieldOfView {
     // passthrough version
     pub fn with_fully_visible_relative_face(mut self, face: impl Into<RelativeFace>) -> Self {
         self.add_fully_visible_relative_face(face);
+        self
+    }
+    pub fn with_visible_segment(mut self, segment: impl Into<AngleBasedVisibleSegment>) -> Self {
+        self.visible_segments_in_main_view_only.push(segment.into());
         self
     }
 
@@ -629,6 +643,7 @@ pub fn portal_aware_field_of_view_from_square(
                 portal_geometry,
             );
             let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
+            dbg!(&combined_fov);
             combined_fov
         },
     )
@@ -763,7 +778,7 @@ mod tests {
     fn test_small_field_of_view_with_no_obstacles() {
         let start_square = point2(5, 5);
         let radius = 2;
-        let fov_result = portal_aware_field_of_view_from_square(
+        let rasterized_fov_result = portal_aware_field_of_view_from_square(
             start_square,
             radius,
             &SquareSet::default(),
@@ -771,14 +786,17 @@ mod tests {
         )
         .rasterized();
 
+        dbg!(&rasterized_fov_result);
         //print_fov_as_relative(&fov_result, 5);
-        assert!(fov_result
+        assert!(rasterized_fov_result
             .only_partially_visible_local_relative_squares()
             .is_empty());
-        assert!(fov_result.relative_square_is_fully_visible(STEP_ZERO));
+        assert!(rasterized_fov_result.relative_square_is_fully_visible(STEP_ZERO));
         let square_area = (radius * 2 + 1).pow(2);
         assert_eq!(
-            fov_result.fully_visible_local_relative_squares().len(),
+            rasterized_fov_result
+                .fully_visible_local_relative_squares()
+                .len(),
             square_area as usize
         );
     }
@@ -1340,10 +1358,28 @@ mod tests {
     #[test]
     fn test_simple_fov_combination() {
         let main_center = point2(5, 5);
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
-        fov_1.add_fully_visible_relative_square(STEP_RIGHT);
-        fov_2.add_fully_visible_relative_square(STEP_UP);
+        let mut fov_1 = FieldOfView::new_with_visible_square(main_center, STEP_RIGHT);
+        let mut fov_2 = FieldOfView::new_with_visible_square(main_center, STEP_UP);
+
+        let combined = fov_1.combined_with(&fov_2).rasterized();
+
+        // includes the two added squares, and the center (which is fully visible by default)
+        assert_eq!(combined.fully_visible_relative_squares().len(), 3);
+        assert_eq!(combined.fully_visible_local_relative_squares().len(), 3);
+    }
+    #[test]
+    fn test_combine_fovs_to_make_full_circle() {
+        let main_center = point2(5, 5);
+        let mut fov_1 = FieldOfView::new_with_arc_and_radius(
+            main_center,
+            AngleInterval::from_degrees(10.0, 55.0),
+            4,
+        );
+        let mut fov_2 = FieldOfView::new_with_arc_and_radius(
+            main_center,
+            AngleInterval::from_degrees(55.0, 10.0),
+            4,
+        );
 
         let combined = fov_1.combined_with(&fov_2).rasterized();
 
@@ -1365,10 +1401,7 @@ mod tests {
                 let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
                     .iter()
                     .map(|&rel_face| {
-                        FieldOfView::new_with_single_visible_face(
-                            absolute_fov_center_square,
-                            rel_face,
-                        )
+                        FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
                     })
                     .collect_vec();
 
@@ -1432,7 +1465,7 @@ mod tests {
         let rel_squares_that_should_be_fully_visible = [(12, 1), (12, 2)];
         let fovs = visible_rel_faces
             .iter()
-            .map(|&rel_face| FieldOfView::new_with_single_visible_face(fov_center, rel_face))
+            .map(|&rel_face| FieldOfView::new_with_visible_face(fov_center, rel_face))
             .collect_vec();
 
         let merged_and_rasterized_fov = FieldOfView::combine_multiple(fovs).rasterized();

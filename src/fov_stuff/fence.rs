@@ -62,6 +62,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
         Self::from_faces_in_ccw_order(vec![edge.into()])
     }
+    pub fn from_radius_and_arc(radius: u32, arc: AngleInterval) -> Self {
+        todo!()
+    }
     fn try_add_to_ccw_end(&mut self, edge: RelativeFace) -> SimpleResult {
         if self.can_connect_to_ccw_end(edge) {
             self.add_to_ccw_end(edge);

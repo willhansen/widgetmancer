@@ -466,6 +466,8 @@ impl PartialAngleInterval {
     pub fn fully_contains_interval_including_edge_overlaps(&self, other: Self) -> bool {
         self.contains_arc(other).is_at_least_partial()
     }
+    // TODO: get rid of all the non-toleranced float comparison functions
+    #[deprecated(note = "use contains_arc_with_tolerance instead")]
     pub fn contains_arc(&self, other: Self) -> BoolWithPartial {
         self.contains_arc_with_tolerance(other, FAngle::degrees(0.0))
     }

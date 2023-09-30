@@ -19,29 +19,29 @@ use super::square_visibility::RelativeSquareVisibilityFunctions;
 
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
-    visible_angle_interval: PartialAngleInterval,
+    visible_angle_interval: AngleInterval,
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl AngleBasedVisibleSegment {
-    pub fn new(arc: PartialAngleInterval, end_fence: impl Into<Fence>) -> Self {
+    pub fn new(arc: impl Into<AngleInterval>, end_fence: impl Into<Fence>) -> Self {
         Self::new_with_optional_start_face(arc, end_fence, Option::<RelativeFace>::None)
     }
 
     pub fn new_with_start_face(
-        arc: PartialAngleInterval,
+        arc: impl Into<AngleInterval>,
         end_fence: Fence,
         start_face: impl Into<RelativeFace>,
     ) -> Self {
         Self::new_with_optional_start_face(arc, end_fence, Some(start_face.into()))
     }
     pub fn new_with_optional_start_face(
-        arc: PartialAngleInterval,
+        arc: impl Into<AngleInterval>,
         end_fence: impl Into<Fence>,
         optional_start_face: Option<impl Into<RelativeFace>>,
     ) -> Self {
         let x = Self {
-            visible_angle_interval: arc,
+            visible_angle_interval: arc.into(),
             end_fence: end_fence.into(),
             start_internal_relative_face: optional_start_face
                 .map(|y| y.into().flipped_to_face_origin()),
@@ -62,13 +62,11 @@ impl AngleBasedVisibleSegment {
     }
 
     fn end_fence_fully_covers_angle_interval(&self) -> bool {
-        match self.end_fence.spanned_angle_from_origin() {
-            AngleInterval::Empty => false,
-            AngleInterval::FullCircle => true,
-            AngleInterval::PartialArc(arc) => {
-                arc.fully_contains_interval_including_edge_overlaps(self.visible_angle_interval)
-            }
-        }
+        // TODO: use standard tolerance
+        self.end_fence
+            .spanned_angle_from_origin()
+            .contains_arc_with_tolerance(self.visible_angle_interval, Angle::radians(0.01))
+            .is_at_least_partial()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
         if self.start_internal_relative_face.is_none() {
@@ -120,6 +118,9 @@ impl AngleBasedVisibleSegment {
             RelativeFenceFullyVisibleFromOriginGoingCcw::from_unordered_relative_edges(faces);
 
         Self::new(arc, end_fence)
+    }
+    pub fn from_arc_and_fence_radius(arc: AngleInterval, fence_radius: u32) -> Self {
+        Self::new(arc, Fence::from_radius_and_arc(fence_radius, arc))
     }
     pub fn with_weakly_applied_start_face(
         &self,
@@ -466,6 +467,14 @@ mod tests {
         assert_eq!(
             segment.end_fence,
             Fence::from_faces_in_ccw_order([((5, 2), STEP_RIGHT), ((5, 3), STEP_DOWN)])
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn test_no_excess_fence() {
+        AngleBasedVisibleSegment::new(
+            AngleInterval::from_degrees(0.0, 1.0),
+            Fence::from_faces_in_ccw_order([(3, 0, STEP_RIGHT), (3, 1, STEP_RIGHT)]),
         );
     }
 }
