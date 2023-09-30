@@ -276,6 +276,19 @@ where
         Self::from_square_and_step(value.0.into(), value.1)
     }
 }
+
+impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
+    for AbsOrRelSquareWithOrthogonalDir<SquareType>
+where
+    (T, T): Into<SquareType>,
+    SquareType: AbsOrRelSquareTrait<SquareType>,
+    DirectionType: Into<OrthogonalWorldStep>,
+{
+    fn from(value: (T, T, DirectionType)) -> Self {
+        Self::from_square_and_step((value.0, value.1).into(), value.2)
+    }
+}
+
 impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
     for (SquareType, OrthogonalWorldStep)
 where

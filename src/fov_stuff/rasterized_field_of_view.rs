@@ -76,10 +76,10 @@ pub trait TopDownifiedFieldOfViewInterface {
     // visible absolute squares
 
     // checks on a relative square
-    fn relative_square_is_fully_visible(&self, step: WorldStep) -> bool;
+    fn relative_square_is_fully_visible(&self, step: impl Into<WorldStep>) -> bool;
     fn relative_square_is_only_partially_visible(&self, step: WorldStep) -> bool;
     fn relative_square_is_only_locally_visible(&self, step: WorldStep) -> bool;
-    fn relative_square_is_visible(&self, relative_square: WorldStep) -> bool;
+    fn relative_square_is_visible(&self, relative_square: impl Into<WorldStep>) -> bool;
     fn lone_portal_depth_for_relative_square_or_panic(&self, relative_square: WorldStep) -> u32;
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
@@ -386,7 +386,8 @@ impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
             .collect()
     }
 
-    fn relative_square_is_fully_visible(&self, step: WorldStep) -> bool {
+    fn relative_square_is_fully_visible(&self, step: impl Into<WorldStep>) -> bool {
+        let step = step.into();
         let top_down_portals = self.top_down_portals_for_relative_square(step);
         return top_down_portals.len() == 1 && top_down_portals[0].shape.is_fully_visible();
     }
@@ -403,7 +404,8 @@ impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
                 .all(|portal| portal.portal_depth() == 0)
     }
 
-    fn relative_square_is_visible(&self, step: WorldStep) -> bool {
+    fn relative_square_is_visible(&self, step: impl Into<WorldStep>) -> bool {
+        let step = step.into();
         self.visible_relative_squares_including_center()
             .contains(&step)
     }

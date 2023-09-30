@@ -69,7 +69,7 @@ impl FieldOfView {
             new_center, STEP_UP,
         ))
     }
-    pub fn new_with_visible_face(
+    pub fn new_with_single_visible_face(
         center: impl Into<WorldSquare>,
         face: impl Into<RelativeFace>,
     ) -> Self {
@@ -1365,7 +1365,10 @@ mod tests {
                 let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
                     .iter()
                     .map(|&rel_face| {
-                        FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
+                        FieldOfView::new_with_single_visible_face(
+                            absolute_fov_center_square,
+                            rel_face,
+                        )
                     })
                     .collect_vec();
 
@@ -1418,38 +1421,38 @@ mod tests {
     }
 
     #[test]
-    fn test_combined_fovs_combine_visibility__full_squares() {
-        let main_center = point2(5, 5);
-        let test_dx = 12;
-        let test_dys = (-1..=1).collect_vec();
-        let test_steps = test_dys
-            .into_iter()
-            .map(|dy| vec2(test_dx, dy))
-            .collect_vec();
-        let fovs = test_steps
+    fn test_combined_fovs_combine_visibility__full_squares_from_faces() {
+        let fov_center = point2(5, 5);
+        let visible_rel_faces = [
+            (12, 0, STEP_RIGHT),
+            (12, 1, STEP_RIGHT),
+            (12, 2, STEP_RIGHT),
+            (12, 3, STEP_RIGHT),
+        ];
+        let rel_squares_that_should_be_fully_visible = [(12, 1), (12, 2)];
+        let fovs = visible_rel_faces
             .iter()
-            .map(|&step| {
-                let mut fov = FieldOfView::new_empty_fov_at(main_center);
-                fov.add_fully_visible_relative_square(step);
-                fov
-            })
+            .map(|&rel_face| FieldOfView::new_with_single_visible_face(fov_center, rel_face))
             .collect_vec();
 
-        let merged_fov = fovs
-            .iter()
-            .cloned()
-            .reduce(|a, b| a.combined_with(&b))
-            .unwrap()
-            .rasterized();
+        let merged_and_rasterized_fov = FieldOfView::combine_multiple(fovs).rasterized();
 
-        test_steps.iter().map(|&test_step| {
-            let test_square = main_center + test_step;
-            assert_eq!(merged_fov.times_absolute_square_is_visible(test_square), 1);
-            assert_eq!(
-                merged_fov.times_absolute_square_is_fully_visible(test_square),
-                1
-            );
-        });
+        rel_squares_that_should_be_fully_visible
+            .iter()
+            .map(|&rel_square| {
+                let rel_square: WorldStep = rel_square.into();
+                let abs_square = fov_center + rel_square;
+                assert_eq!(
+                    merged_and_rasterized_fov.times_absolute_square_is_visible(abs_square),
+                    1
+                );
+                assert_eq!(
+                    merged_and_rasterized_fov.times_absolute_square_is_fully_visible(abs_square),
+                    1
+                );
+                assert!(merged_and_rasterized_fov.relative_square_is_visible(rel_square));
+                assert!(merged_and_rasterized_fov.relative_square_is_fully_visible(rel_square));
+            });
     }
 
     #[test]
