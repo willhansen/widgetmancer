@@ -181,7 +181,7 @@ impl AngleBasedVisibleSegment {
 
         let common_start_line = a.start_internal_relative_face;
 
-        let maybe_combined_arc: Option<PartialAngleInterval> =
+        let maybe_combined_arc: Option<AngleInterval> =
             self.visible_arc.combine_if_touching_panic_if_overlapping(
                 other.visible_arc,
                 Self::default_angle_tolerance(),

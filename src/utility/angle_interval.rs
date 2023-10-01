@@ -175,9 +175,11 @@ impl PartialAngleInterval {
     }
     pub fn combine_with_overlapping_or_touching_arc_with_tolerance(
         &self,
-        other: Self,
+        other: impl Into<AngleInterval>,
         tolerance: FAngle,
     ) -> Self {
+        todo!("rename, return option");
+        let other = other.into();
         assert!(
             self.overlaps_other_with_tolerance(other, tolerance)
                 .is_at_least_partial(),
@@ -209,6 +211,7 @@ impl PartialAngleInterval {
     }
 
     pub fn combine_with_overlapping_or_touching_arc(&self, other: Self) -> Self {
+        todo!("remove");
         self.combine_with_overlapping_or_touching_arc_with_tolerance(other, FAngle::degrees(0.0))
     }
     pub fn combine_if_touching_panic_if_overlapping(
@@ -541,17 +544,6 @@ impl PartialAngleInterval {
         )
     }
 
-    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
-        let iters: Vec<_> = self
-            .split_into_octants_in_ccw_order()
-            .into_iter()
-            .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
-            .collect_vec();
-        round_robin(iters)
-            .filter_map(|maybe_step| maybe_step)
-            .unique()
-    }
-
     fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
         if self.is_fully_near_one_octant_boundary() {
             return vec![];
@@ -619,7 +611,7 @@ impl PartialAngleInterval {
         self.lone_containing_octant().is_some()
     }
     fn lone_containing_octant(&self) -> Option<Octant> {
-        Octant::all_octants().find(|octant| {
+        Octant::all_octants_going_ccw().find(|octant| {
             Self::from_octant(*octant)
                 .contains_partial_arc_with_tolerance(*self, Self::default_tolerance())
                 .is_at_least_partial()
@@ -843,6 +835,7 @@ impl AngleInterval {
             }
         }
     }
+
     pub fn union(&self, other: &(impl Into<Self> + Copy)) -> Self {
         let other_interval = Into::<Self>::into(*other);
         match self {
@@ -856,6 +849,34 @@ impl AngleInterval {
                     .into(),
             },
         }
+    }
+    pub fn from_octant(octant: Octant) -> Self {
+        AngleInterval::PartialArc(PartialAngleInterval::from_octant(octant))
+    }
+    fn split_into_octants_in_ccw_order(&self) -> Vec<Self> {
+        use AngleInterval::*;
+        match self {
+            Empty => vec![],
+            FullCircle => Octant::all_octants_going_ccw()
+                .map(Self::from_octant)
+                .collect(),
+            PartialArc(self_partial_arc) => self_partial_arc
+                .split_into_octants_in_ccw_order()
+                .into_iter()
+                .map(|partial| PartialArc(partial))
+                .collect(),
+        }
+    }
+
+    pub fn touched_squares_going_outwards_and_ccw(&self) -> impl Iterator<Item = WorldStep> {
+        let iters: Vec<_> = self
+            .split_into_octants_in_ccw_order()
+            .into_iter()
+            .map(|arc| arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders())
+            .collect_vec();
+        round_robin(iters)
+            .filter_map(|maybe_step| maybe_step)
+            .unique()
     }
 
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
