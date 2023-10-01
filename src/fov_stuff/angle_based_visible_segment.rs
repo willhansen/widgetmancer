@@ -1,8 +1,9 @@
 use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
-use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::coordinates::FAngle;
+use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
@@ -68,7 +69,7 @@ impl AngleBasedVisibleSegment {
         // TODO: use standard tolerance
         self.end_fence
             .spanned_angle_from_origin()
-            .contains_arc_with_tolerance(self.visible_arc, Angle::radians(0.01))
+            .contains_arc(self.visible_arc, Angle::radians(0.01))
             .is_at_least_partial()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
@@ -96,11 +97,10 @@ impl AngleBasedVisibleSegment {
             return false;
         }
 
-        let angle_span_of_extended_line_as_seen_from_origin =
-            PartialAngleInterval::from_center_and_width(
-                better_angle_from_x_axis(vector_to_line_from_origin),
-                FAngle::degrees(180.0),
-            );
+        let angle_span_of_extended_line_as_seen_from_origin = AngleInterval::from_center_and_width(
+            better_angle_from_x_axis(vector_to_line_from_origin),
+            FAngle::degrees(180.0),
+        );
 
         angle_span_of_extended_line_as_seen_from_origin
             .contains_arc(self.visible_arc, Self::default_angle_tolerance())
@@ -367,7 +367,7 @@ mod tests {
         let end_fence =
             Fence::from_faces_in_ccw_order([((2, -1), STEP_RIGHT), ((2, 0), STEP_RIGHT)]);
         let segment = AngleBasedVisibleSegment::new_with_start_face(
-            end_fence.spanned_angle_from_origin().try_into().unwrap(),
+            end_fence.spanned_angle_from_origin(),
             end_fence,
             ((1, 0), STEP_DOWN),
         );

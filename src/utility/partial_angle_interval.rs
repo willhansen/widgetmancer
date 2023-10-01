@@ -58,6 +58,16 @@ pub struct PartialAngleInterval {
     pub clockwise_end: Angle<f32>,
     pub anticlockwise_end: Angle<f32>,
 }
+impl Display for PartialAngleInterval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "From {}° to {}°",
+            self.clockwise_end.to_degrees(),
+            self.anticlockwise_end.to_degrees()
+        )
+    }
+}
 
 impl PartialAngleInterval {
     #[deprecated(note = "don't use defaults in utility module")]
@@ -199,43 +209,32 @@ impl PartialAngleInterval {
         other: Self,
         tolerance: FAngle,
     ) -> BoolWithPartial {
-        self.contains_arc(other.complement(), tolerance)
+        self.contains_partial_arc(other.complement(), tolerance)
     }
 
-    #[deprecated(note = "use try_combine and full angle intervals instead")]
-    pub fn combine_with_overlapping_or_touching_arc(&self, other: Self) -> Self {
-        self.try_combine(other, FAngle::degrees(0.0))
-            .unwrap()
-            .try_into()
-            .unwrap()
-    }
     pub fn complement(&self) -> Self {
         PartialAngleInterval::from_angles(self.anticlockwise_end, self.clockwise_end)
     }
 
+    #[deprecated(note = "use version with tolerance instead")]
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
     pub fn overlaps_other_with_tolerance(
         &self,
-        other: impl Into<AngleInterval>,
+        other: Self,
         tolerance: Angle<f32>,
     ) -> BoolWithPartial {
         use BoolWithPartial::*;
-        let other = other.into();
-        match other {
-            AngleInterval::Empty => False,
-            AngleInterval::FullCircle => True,
-            AngleInterval::PartialArc(other_partial_arc) => self
-                .contains_angle_with_tolerance(other_partial_arc.cw(), tolerance)
-                .or(self.contains_angle_with_tolerance(other_partial_arc.center_angle(), tolerance))
-                .or(self.contains_angle_with_tolerance(other_partial_arc.ccw(), tolerance))
-                .or(other.contains_angle(self.cw(), tolerance))
-                .or(other.contains_angle(self.center_angle(), tolerance))
-                .or(other.contains_angle(self.ccw(), tolerance)),
-        }
+        self.contains_angle(self.cw(), tolerance)
+            .or(self.contains_angle(self.center_angle(), tolerance))
+            .or(self.contains_angle(self.ccw(), tolerance))
+            .or(other.contains_angle(self.cw(), tolerance))
+            .or(other.contains_angle(self.center_angle(), tolerance))
+            .or(other.contains_angle(self.ccw(), tolerance))
     }
 
+    #[deprecated(note = "use version with tolerance instead")]
     pub fn overlapping_but_not_exactly_touching(&self, other: PartialAngleInterval) -> bool {
         // self overlap
         if other == *self {
@@ -250,12 +249,13 @@ impl PartialAngleInterval {
                 && other.anticlockwise_end != self.clockwise_end)
     }
 
+    #[deprecated(note = "use version with tolerance instead")]
     pub fn touches_or_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) > 0
             || other.num_contained_or_touching_edges(*self) > 0
     }
 
-    #[deprecated(note = "use version with tolerance instead")]
+    // TODO: Add tolerance
     fn num_contained_or_touching_edges(&self, other: PartialAngleInterval) -> u32 {
         let mut sum = 0;
         if self.contains_or_touches_angle(other.anticlockwise_end) {
@@ -360,9 +360,11 @@ impl PartialAngleInterval {
 
         edges_touch && !contains_other_edge
     }
+    #[deprecated(note = "use version with tolerance instead")]
     pub fn overlaps_or_touches(&self, other: PartialAngleInterval) -> bool {
         self.overlapping_but_not_exactly_touching(other) || self.exactly_touches_arc(other)
     }
+    #[deprecated(note = "use version with tolerance instead")]
     pub fn overlaps_other_by_at_least_this_much(
         &self,
         other: PartialAngleInterval,
@@ -380,9 +382,11 @@ impl PartialAngleInterval {
         overlap.radians >= thresh.radians
     }
 
+    #[deprecated(note = "use version with tolerance instead")]
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
         self.clockwise_end == angle || angle == self.anticlockwise_end
     }
+    #[deprecated(note = "use version with tolerance instead")]
     fn contains_angle_not_including_edges(&self, angle: Angle<f32>) -> bool {
         if self.exactly_touches_angle(angle) {
             return false;
@@ -399,11 +403,7 @@ impl PartialAngleInterval {
 
         self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
     }
-    pub fn contains_angle_with_tolerance(
-        &self,
-        angle: Angle<f32>,
-        tolerance: Angle<f32>,
-    ) -> BoolWithPartial {
+    pub fn contains_angle(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> BoolWithPartial {
         let angle = standardize_angle(angle);
 
         if angle == self.cw() || angle == self.ccw() {
@@ -462,32 +462,13 @@ impl PartialAngleInterval {
     // TODO: get rid of all the non-toleranced float comparison functions
     #[deprecated(note = "use contains_arc instead")]
     pub fn fully_contains_interval_including_edge_overlaps(&self, other: Self) -> bool {
-        self.contains_arc(other, FAngle::degrees(0.0))
+        self.contains_partial_arc(other, FAngle::degrees(0.0))
             .is_at_least_partial()
     }
-    pub fn contains_arc(
-        &self,
-        other: impl Into<AngleInterval>,
-        tolerance: FAngle,
-    ) -> BoolWithPartial {
-        use AngleInterval::*;
-        use BoolWithPartial::*;
-        match other.into() {
-            Empty => False,
-            FullCircle => False,
-            PartialArc(other_partial_arc) => {
-                self.contains_partial_arc_with_tolerance(other_partial_arc, tolerance)
-            }
-        }
-    }
-    pub fn contains_partial_arc_with_tolerance(
-        &self,
-        other: Self,
-        tolerance: FAngle,
-    ) -> BoolWithPartial {
-        self.contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
-            .and(self.contains_angle_with_tolerance(other.clockwise_end, tolerance))
-            .and(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
+    pub fn contains_partial_arc(&self, other: Self, tolerance: FAngle) -> BoolWithPartial {
+        self.contains_angle(other.anticlockwise_end, tolerance)
+            .and(self.contains_angle(other.clockwise_end, tolerance))
+            .and(self.contains_angle(other.center_angle(), tolerance))
     }
     pub fn most_overlapped_edge_of_self(
         &self,
@@ -594,7 +575,7 @@ impl PartialAngleInterval {
     fn lone_containing_octant(&self) -> Option<Octant> {
         Octant::all_octants_going_ccw().find(|octant| {
             Self::from_octant(*octant)
-                .contains_partial_arc_with_tolerance(*self, Self::default_tolerance())
+                .contains_partial_arc(*self, Self::default_tolerance())
                 .is_at_least_partial()
         })
     }
@@ -617,6 +598,10 @@ mod tests {
     };
 
     use super::*;
+
+    fn default_angle_tolerance_for_tests() -> FAngle {
+        FAngle::degrees(0.001)
+    }
 
     #[test]
     fn num_contained_edges_is_symmetric__weird_wrapping_case() {
@@ -745,26 +730,6 @@ mod tests {
         assert_false!(arc.fully_contains_interval_including_edge_overlaps(arc.complement()));
     }
     #[test]
-    fn test_square_going_outwards_and_ccw__very_small_angle() {
-        let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
-        let iter = arc.touched_squares_going_outwards_and_ccw();
-        let expected: Vec<WorldStep> = vec![
-            (0, 0),
-            (1, 0),
-            (2, 0),
-            (3, 0),
-            (4, 0),
-            (5, 0),
-            (6, 0),
-            (7, 0),
-            (8, 0),
-        ]
-        .into_iter()
-        .map(|t| t.into())
-        .collect_vec();
-        assert_eq!(iter.take(expected.len()).collect_vec(), expected);
-    }
-    #[test]
     fn test_outward_and_ccw_squares_in_one_octant_with_placeholders() {
         let arc = PartialAngleInterval::from_degrees(0.0, 0.01);
         let iter = arc.touched_rel_squares_going_outwards_in_one_octant_with_placeholders();
@@ -783,48 +748,6 @@ mod tests {
         .map(|t| t.map(|x| x.into()))
         .collect_vec();
         assert_eq!(iter.take(expected.len()).collect_vec(), expected);
-    }
-    #[test]
-    fn test_combine_touching_panic_overlapping__non_panic_case() {
-        let tolerance = Angle::degrees(0.1);
-        let a = PartialAngleInterval::from_degrees(0.0, 10.0);
-        let b = PartialAngleInterval::from_degrees(10.0, 20.0);
-        let b_bigger =
-            PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() / 2.0, 20.0);
-
-        let b_smaller =
-            PartialAngleInterval::from_degrees(10.0 + tolerance.to_degrees() / 2.0, 20.0);
-        let b_way_smaller =
-            PartialAngleInterval::from_degrees(10.0 + tolerance.to_degrees() * 2.0, 20.0);
-
-        let correct = PartialAngleInterval::from_degrees(0.0, 20.0);
-        assert_eq!(
-            a.combine_if_touching_panic_if_overlapping(b, tolerance),
-            Some(correct)
-        );
-        assert_eq!(
-            a.combine_if_touching_panic_if_overlapping(b_bigger, tolerance),
-            Some(correct)
-        );
-        assert_eq!(
-            a.combine_if_touching_panic_if_overlapping(b_smaller, tolerance),
-            Some(correct)
-        );
-        assert_eq!(
-            a.combine_if_touching_panic_if_overlapping(b_way_smaller, tolerance),
-            None
-        );
-    }
-    #[test]
-    #[should_panic]
-    fn test_combine_touching_panic_overlapping__panic_case() {
-        let tolerance = Angle::degrees(0.1);
-        let a = PartialAngleInterval::from_degrees(0.0, 10.0);
-
-        let b_way_bigger =
-            PartialAngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
-
-        a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
     }
     #[test]
     fn test_overlapping_arcs_with_tolerance__barely_touching__observed_failure() {
@@ -1035,7 +958,7 @@ mod tests {
         let t = |low, high, x, tol, result| {
             assert_eq!(
                 PartialAngleInterval::from_degrees(low, high)
-                    .contains_angle_with_tolerance(Angle::degrees(x), Angle::degrees(tol)),
+                    .contains_angle(Angle::degrees(x), Angle::degrees(tol)),
                 result,
                 "\n\nlow: {}\nhigh: {}\nx: {}\ntolerance: {}",
                 low,
@@ -1073,27 +996,6 @@ mod tests {
                 .width()
                 .to_degrees(),
             0.0
-        );
-    }
-
-    #[test]
-    fn test_angle_interval_union() {
-        assert_eq!(
-            PartialAngleInterval::from_degrees(80.0, 100.0)
-                .combine_with_overlapping_or_touching_arc(PartialAngleInterval::from_degrees(
-                    40.0, 90.0
-                )),
-            PartialAngleInterval::from_degrees(40.0, 100.0),
-            "from overlap"
-        );
-
-        assert_eq!(
-            PartialAngleInterval::from_degrees(80.0, 100.0)
-                .combine_with_overlapping_or_touching_arc(PartialAngleInterval::from_degrees(
-                    40.0, 80.0
-                )),
-            PartialAngleInterval::from_degrees(40.0, 100.0),
-            "from exactly touching"
         );
     }
 

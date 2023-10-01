@@ -18,6 +18,7 @@ use crate::utility::coordinates::{
     king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
 };
 use crate::utility::octant::Octant;
+use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
@@ -41,7 +42,7 @@ use crate::graphics::drawable::{
 use crate::graphics::Graphics;
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry};
-use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
