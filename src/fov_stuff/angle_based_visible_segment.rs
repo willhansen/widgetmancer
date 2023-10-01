@@ -85,7 +85,7 @@ impl AngleBasedVisibleSegment {
             .any(|&line_angle| {
                 let interval_includes_line_end = self
                     .visible_arc
-                    .contains_angle_with_tolerance(line_angle, todo!())
+                    .contains_angle(line_angle, todo!())
                     .is_at_least_partial();
                 interval_includes_line_end
             });

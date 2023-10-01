@@ -43,6 +43,7 @@ pub mod general_utility;
 pub mod halfplane;
 pub mod line;
 pub mod octant;
+pub mod partial_angle_interval;
 pub mod poses;
 pub mod quadrant;
 pub mod relative_interval_location;
