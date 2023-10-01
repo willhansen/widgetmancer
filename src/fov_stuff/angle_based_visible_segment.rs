@@ -103,7 +103,7 @@ impl AngleBasedVisibleSegment {
             );
 
         angle_span_of_extended_line_as_seen_from_origin
-            .contains_arc_with_tolerance(self.visible_arc, Self::default_angle_tolerance())
+            .contains_arc(self.visible_arc, Self::default_angle_tolerance())
             .is_at_least_partial()
     }
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {

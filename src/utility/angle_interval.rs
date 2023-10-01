@@ -173,21 +173,36 @@ impl PartialAngleInterval {
             },
         }
     }
-    pub fn combine_with_overlapping_or_touching_arc_with_tolerance(
+    pub fn try_combine(
         &self,
         other: impl Into<AngleInterval>,
         tolerance: FAngle,
-    ) -> Self {
-        todo!("rename, return option");
+    ) -> Option<AngleInterval> {
         let other = other.into();
-        assert!(
-            self.overlaps_other_with_tolerance(other, tolerance)
-                .is_at_least_partial(),
-            "Arcs don't overlap:\nself: {}\nother: {}\ntolerance: {}°",
-            self,
-            other,
-            tolerance.to_degrees()
-        );
+        match other {
+            AngleInterval::Empty => None, // TODO: double check this
+            AngleInterval::FullCircle => Some(AngleInterval::FullCircle),
+            AngleInterval::PartialArc(other_partial) => {
+                self.try_combine_with_partial_arc(other_partial, tolerance)
+            }
+        }
+    }
+    fn combines_to_full_circle(a: Self, b: Self, tolernace: FAngle) -> bool {
+        a.contains_arc(b.ccw(), tolerance) && a.contains_arc(b.cw(), tolerance);
+        todo!()
+    }
+
+    pub fn try_combine_with_partial_arc(
+        &self,
+        other: PartialAngleInterval,
+        tolerance: FAngle,
+    ) -> Option<AngleInterval> {
+        if self
+            .overlaps_other_with_tolerance(other, tolerance)
+            .is_false()
+        {
+            return None;
+        }
         let result = PartialAngleInterval {
             anticlockwise_end: if self
                 .contains_angle_with_tolerance(other.anticlockwise_end, tolerance)
@@ -210,9 +225,12 @@ impl PartialAngleInterval {
         result
     }
 
+    #[deprecated(note = "use try_combine and full angle intervals instead")]
     pub fn combine_with_overlapping_or_touching_arc(&self, other: Self) -> Self {
-        todo!("remove");
-        self.combine_with_overlapping_or_touching_arc_with_tolerance(other, FAngle::degrees(0.0))
+        self.try_combine(other, FAngle::degrees(0.0))
+            .unwrap()
+            .try_into()
+            .unwrap()
     }
     pub fn combine_if_touching_panic_if_overlapping(
         &self,
@@ -227,9 +245,7 @@ impl PartialAngleInterval {
                 "overlapping!\n====\nself: {:?}\nother: {:?}\ntolerance: {:?}",
                 self, other, tolerance
             ),
-            Partial => {
-                Some(self.combine_with_overlapping_or_touching_arc_with_tolerance(other, tolerance))
-            }
+            Partial => Some(self.try_combine(other, tolerance)),
             False => None,
         }
     }
@@ -477,16 +493,13 @@ impl PartialAngleInterval {
         contains_other_edges && other_does_not_contain_these_edges
     }
 
+    // TODO: get rid of all the non-toleranced float comparison functions
     #[deprecated(note = "use contains_arc instead")]
     pub fn fully_contains_interval_including_edge_overlaps(&self, other: Self) -> bool {
-        self.contains_arc(other).is_at_least_partial()
+        self.contains_arc(other, FAngle::degrees(0.0))
+            .is_at_least_partial()
     }
-    // TODO: get rid of all the non-toleranced float comparison functions
-    #[deprecated(note = "use contains_partial_arc_with_tolerance instead")]
-    pub fn contains_arc(&self, other: Self) -> BoolWithPartial {
-        self.contains_partial_arc_with_tolerance(other, FAngle::degrees(0.0))
-    }
-    pub fn contains_arc_with_tolerance(
+    pub fn contains_arc(
         &self,
         other: impl Into<AngleInterval>,
         tolerance: FAngle,
@@ -898,9 +911,7 @@ impl AngleInterval {
                 FullCircle => Partial, // TODO: doucle check this
                 PartialArc(_) => True,
             },
-            PartialArc(self_partial_arc) => {
-                self_partial_arc.contains_arc_with_tolerance(other, tolerance)
-            }
+            PartialArc(self_partial_arc) => self_partial_arc.contains_arc(other, tolerance),
         }
     }
     pub fn overlaps_arc_with_tolerance(
@@ -2103,5 +2114,18 @@ mod tests {
                     );
                 });
         }
+    }
+    #[test]
+    fn test_combine_two_partial_to_full_circle() {
+        let a = PartialAngleInterval::from_degrees(0.0, 20.0);
+        let b = PartialAngleInterval::from_degrees(20.0, 0.0);
+        assert_eq!(
+            a.try_combine_with_partial_arc(b, FAngle::degrees(0.01)),
+            Some(AngleInterval::FullCircle)
+        );
+        assert_eq!(
+            a.try_combine(b, FAngle::degrees(0.01)),
+            Some(AngleInterval::FullCircle)
+        );
     }
 }
