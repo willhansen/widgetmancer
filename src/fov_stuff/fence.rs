@@ -7,9 +7,10 @@ use ordered_float::OrderedFloat;
 use crate::rotated_to_have_split_at_max;
 
 use crate::utility::general_utility::all_true;
+use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
 use crate::utility::{
-    angle_interval::{AngleInterval, PartialAngleInterval},
+    angle_interval::AngleInterval,
     better_angle_from_x_axis,
     coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,

@@ -114,7 +114,7 @@ impl AngleInterval {
         use BoolWithPartial::*;
         let other = other.into();
 
-        match self.overlaps_arc_with_tolerance(other, tolerance) {
+        match self.overlaps_arc(other, tolerance) {
             True => panic!("overlap"),
             Partial => self.try_combine(other, tolerance), // TODO: potential misalignment
             False => None,
@@ -140,10 +140,10 @@ impl AngleInterval {
         b: PartialAngleInterval,
         tolerance: FAngle,
     ) -> Option<Self> {
-        if a.overlaps_other_with_tolerance(b, tolerance).is_false() {
+        if a.overlaps_partial_arc(b, tolerance).is_false() {
             return None;
         }
-        if a.combines_with_other_partial_arc_to_full_circle(b, tolerance)
+        if a.would_combine_with_other_partial_arc_to_full_circle(b, tolerance)
             .is_at_least_partial()
         {
             return Some(AngleInterval::FullCircle);
@@ -203,6 +203,14 @@ impl AngleInterval {
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
         AngleInterval::PartialArc(PartialAngleInterval::from_degrees(cw, ccw))
     }
+    pub fn from_relative_square(relative_square: impl Into<WorldStep>) -> Self {
+        let relative_square = relative_square.into();
+        if relative_square == STEP_ZERO {
+            AngleInterval::FullCircle
+        } else {
+            AngleInterval::PartialArc(PartialAngleInterval::from_relative_square(relative_square))
+        }
+    }
     pub fn contains_arc(&self, other: impl Into<Self>, tolerance: FAngle) -> BoolWithPartial {
         use AngleInterval::*;
         use BoolWithPartial::*;
@@ -224,12 +232,21 @@ impl AngleInterval {
             },
         }
     }
-    pub fn overlaps_arc_with_tolerance(
-        &self,
-        other: impl Into<Self>,
-        tolerance: FAngle,
-    ) -> BoolWithPartial {
-        todo!()
+    pub fn overlaps_arc(&self, other: impl Into<Self>, tolerance: FAngle) -> BoolWithPartial {
+        use AngleInterval::*;
+        use BoolWithPartial::*;
+        match self {
+            Empty => False,
+            FullCircle => match other.into() {
+                Empty => False,
+                _ => True,
+            },
+            PartialArc(self_partial) => match other.into() {
+                Empty => False,
+                FullCircle => True,
+                PartialArc(other_partial) => self_partial.overlaps_partial_arc(other_partial,  tolerance),
+            },
+        }
     }
     pub fn contains_angle(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> BoolWithPartial {
         use AngleInterval::*;
@@ -241,7 +258,7 @@ impl AngleInterval {
         }
     }
 
-    #[deprecated(note = "use overlaps_arc_with_tolerance instead")]
+    #[deprecated(note = "use overlaps_arc instead")]
     pub fn overlapping_but_not_exactly_touching(
         &self,
         can_be_partial: impl TryInto<PartialAngleInterval>,

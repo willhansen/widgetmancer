@@ -204,7 +204,7 @@ impl PartialAngleInterval {
             },
         }
     }
-    pub fn combines_with_other_partial_arc_to_full_circle(
+    pub fn would_combine_with_other_partial_arc_to_full_circle(
         &self,
         other: Self,
         tolerance: FAngle,
@@ -220,11 +220,7 @@ impl PartialAngleInterval {
     pub fn at_least_fully_overlaps(&self, other: PartialAngleInterval) -> bool {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
-    pub fn overlaps_other_with_tolerance(
-        &self,
-        other: Self,
-        tolerance: Angle<f32>,
-    ) -> BoolWithPartial {
+    pub fn overlaps_partial_arc(&self, other: Self, tolerance: Angle<f32>) -> BoolWithPartial {
         use BoolWithPartial::*;
         self.contains_angle(self.cw(), tolerance)
             .or(self.contains_angle(self.center_angle(), tolerance))
@@ -755,7 +751,7 @@ mod tests {
         let b = 18.434948;
         let c = 29.054604;
         assert!(PartialAngleInterval::from_degrees(a, b)
-            .overlaps_other_with_tolerance(
+            .overlaps_partial_arc(
                 PartialAngleInterval::from_degrees(b, c),
                 FAngle::degrees(0.0)
             )
@@ -766,10 +762,10 @@ mod tests {
         let a = PartialAngleInterval::from_degrees(0.0, 20.0);
         let b = PartialAngleInterval::from_degrees(6.0, 7.0);
         let tolerance = FAngle::degrees(0.01);
-        assert!(a.overlaps_other_with_tolerance(b, tolerance).is_true());
-        assert!(b.overlaps_other_with_tolerance(a, tolerance).is_true());
-        assert!(a.overlaps_other_with_tolerance(a, tolerance).is_true());
-        assert!(b.overlaps_other_with_tolerance(b, tolerance).is_true());
+        assert!(a.overlaps_partial_arc(b, tolerance).is_true());
+        assert!(b.overlaps_partial_arc(a, tolerance).is_true());
+        assert!(a.overlaps_partial_arc(a, tolerance).is_true());
+        assert!(b.overlaps_partial_arc(b, tolerance).is_true());
     }
     #[test]
     fn test_overlapping_arcs_with_tolerance__all_cases_at_once() {
@@ -862,7 +858,7 @@ mod tests {
                 .for_each(|case_data| {
                     let other_arc = PartialAngleInterval::from_angles(case_data.cw_end_of_other, case_data.ccw_end_of_other);
                     let measured_overlap_result =
-                        a.overlaps_other_with_tolerance(other_arc, tolerance);
+                        a.overlaps_partial_arc(other_arc, tolerance);
                     assert_eq!(
                         measured_overlap_result,
                         case_data.correct_overlap_result,

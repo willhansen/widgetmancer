@@ -6,8 +6,10 @@ use crate::graphics::drawable::{
 };
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::coordinates::FAngle;
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
+use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
@@ -38,8 +40,8 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn new_top_half_visible() -> Self;
     fn new_bottom_half_visible() -> Self;
     fn from_relative_square_and_view_arc(
-        view_arc: PartialAngleInterval,
-        rel_square: WorldStep,
+        view_arc: impl Into<AngleInterval>,
+        rel_square: impl Into<WorldStep>,
     ) -> Option<SquareVisibility>;
 
     // other
@@ -156,19 +158,32 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         Self::half_visible(Angle::degrees(90.0))
     }
     fn from_relative_square_and_view_arc(
-        view_arc: PartialAngleInterval,
-        rel_square: WorldStep,
+        view_arc: impl Into<AngleInterval>,
+        rel_square: impl Into<WorldStep>,
     ) -> Option<Self> {
+        let tolerance = FAngle::degrees(0.01); // TODO: double check this
+        let rel_square = rel_square.into(); // TODO: tired of writing this out a bunch
+        let partial_view_arc = match view_arc.into() {
+            AngleInterval::Empty => return None,
+            AngleInterval::FullCircle => return Some(SquareVisibility::new_fully_visible()),
+            AngleInterval::PartialArc(partial) => partial,
+        };
         if rel_square == STEP_ZERO {
             return Some(SquareVisibility::new_fully_visible());
         }
         let square_arc = PartialAngleInterval::from_relative_square(rel_square);
-        if view_arc.at_least_fully_overlaps(square_arc) {
+        if partial_view_arc
+            .contains_partial_arc(square_arc, tolerance)
+            .is_at_least_partial()
+        {
             Some(SquareVisibility::new_fully_visible())
-        } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
-            assert!(view_arc.touches_or_overlaps(square_arc)); // This invalidates the None return case
+        } else if partial_view_arc
+            .overlaps_partial_arc(square_arc, tolerance)
+            .is_at_least_partial()
+        {
+            // TODO: double check tolerance choice on this if
 
-            let shadow_arc = view_arc.complement();
+            let shadow_arc = partial_view_arc.complement();
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
             let shadow_line_from_center: WorldLine = Line {
@@ -378,7 +393,6 @@ impl SquareVisibilityMapFunctions for LocalVisibilityMap {
 mod tests {
     use super::*;
     use crate::glyph::glyph_constants::{FULL_BLOCK, SPACE};
-    use crate::utility::angle_interval::PartialAngleInterval;
     use euclid::vec2;
     use ntest::{assert_false, timeout};
 
