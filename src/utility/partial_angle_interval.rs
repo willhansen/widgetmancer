@@ -78,11 +78,8 @@ impl PartialAngleInterval {
         Angle::radians(Self::DEFAULT_TOLERANCE_RADIANS)
     }
 
-    pub fn from_angles(clockwise_end: Angle<f32>, anticlockwise_end: Angle<f32>) -> Self {
-        let (cw, ccw) = (
-            standardize_angle(clockwise_end),
-            standardize_angle(anticlockwise_end),
-        );
+    pub fn from_angles(cw: Angle<f32>, ccw: Angle<f32>) -> Self {
+        let (cw, ccw) = (standardize_angle(cw), standardize_angle(ccw));
         assert_ne!(cw, ccw);
         Self {
             clockwise_end: cw,
@@ -96,11 +93,8 @@ impl PartialAngleInterval {
     pub fn ccw(&self) -> FAngle {
         self.anticlockwise_end
     }
-    pub fn from_degrees(clockwise_end_in_degrees: f32, anticlockwise_end_in_degrees: f32) -> Self {
-        Self::from_angles(
-            Angle::degrees(clockwise_end_in_degrees),
-            Angle::degrees(anticlockwise_end_in_degrees),
-        )
+    pub fn from_degrees(cw: f32, ccw: f32) -> Self {
+        Self::from_angles(Angle::degrees(cw), Angle::degrees(ccw))
     }
     pub fn from_radians(clockwise_end_in_radians: f32, anticlockwise_end_in_radians: f32) -> Self {
         Self::from_angles(
@@ -209,7 +203,8 @@ impl PartialAngleInterval {
         other: Self,
         tolerance: FAngle,
     ) -> BoolWithPartial {
-        self.contains_partial_arc(other.complement(), tolerance)
+        //self.contains_partial_arc(other.complement(), tolerance)
+        dbg!(self).contains_partial_arc(dbg!(dbg!(other).complement()), tolerance)
     }
 
     pub fn complement(&self) -> Self {
@@ -222,9 +217,9 @@ impl PartialAngleInterval {
     }
     pub fn overlaps_partial_arc(&self, other: Self, tolerance: Angle<f32>) -> BoolWithPartial {
         use BoolWithPartial::*;
-        self.contains_angle(self.cw(), tolerance)
-            .or(self.contains_angle(self.center_angle(), tolerance))
-            .or(self.contains_angle(self.ccw(), tolerance))
+        self.contains_angle(other.cw(), tolerance)
+            .or(self.contains_angle(other.center_angle(), tolerance))
+            .or(self.contains_angle(other.ccw(), tolerance))
             .or(other.contains_angle(self.cw(), tolerance))
             .or(other.contains_angle(self.center_angle(), tolerance))
             .or(other.contains_angle(self.ccw(), tolerance))

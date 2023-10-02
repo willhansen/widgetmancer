@@ -8,7 +8,7 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use crate::utility::angle_interval::{AngleInterval, PartialAngleInterval};
+use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::{
     AbsoluteWorldCoordinate, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };

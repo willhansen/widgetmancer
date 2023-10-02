@@ -401,7 +401,6 @@ mod tests {
         let mut b =
             AngleBasedVisibleSegment::from_relative_face(b_face).with_start_face(start_face);
 
-        dbg!(&a, &b);
         let c: AngleBasedVisibleSegment = a.combined_with(&b).unwrap();
 
         //  🄱

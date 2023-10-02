@@ -244,7 +244,9 @@ impl AngleInterval {
             PartialArc(self_partial) => match other.into() {
                 Empty => False,
                 FullCircle => True,
-                PartialArc(other_partial) => self_partial.overlaps_partial_arc(other_partial,  tolerance),
+                PartialArc(other_partial) => {
+                    self_partial.overlaps_partial_arc(other_partial, tolerance)
+                }
             },
         }
     }
@@ -328,7 +330,7 @@ impl RigidlyTransformable for PartialAngleInterval {
 mod tests {
     use euclid::point2;
     use itertools::iproduct;
-    use ntest::{assert_about_eq, assert_false, timeout};
+    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
     use strum::IntoEnumIterator;
@@ -413,23 +415,20 @@ mod tests {
     fn test_combine_two_partial_to_full_circle() {
         let a = PartialAngleInterval::from_degrees(0.0, 20.0);
         let b = PartialAngleInterval::from_degrees(20.0, 0.0);
-        let c = PartialAngleInterval::from_degrees(0.0, 10.0);
-        assert_eq!(
-            AngleInterval::try_combine_partial_arcs(a, b, FAngle::degrees(0.01)),
-            Some(AngleInterval::FullCircle)
-        );
-        assert_eq!(
-            AngleInterval::try_combine_partial_arcs(b, a, FAngle::degrees(0.01)),
-            Some(AngleInterval::FullCircle)
-        );
-        assert_eq!(
-            AngleInterval::try_combine_partial_arcs(a, c, FAngle::degrees(0.01)),
-            None
-        );
-        assert_eq!(
-            AngleInterval::try_combine_partial_arcs(b, c, FAngle::degrees(0.01)),
-            None
-        );
+        let c = PartialAngleInterval::from_degrees(30.0, 40.0);
+        let t = FAngle::degrees(0.01);
+        let f = |p1, p2| AngleInterval::try_combine_partial_arcs(p1, p2, t);
+        let g = |p1: PartialAngleInterval, p2| {
+            p1.would_combine_with_other_partial_arc_to_full_circle(p2, t)
+        };
+        assert_eq!(f(a, b), Some(AngleInterval::FullCircle));
+        assert_eq!(g(a, b), BoolWithPartial::Partial);
+        assert_eq!(f(b, a), Some(AngleInterval::FullCircle));
+        assert_eq!(g(b, a), BoolWithPartial::Partial);
+        assert_eq!(f(a, c), None);
+        assert_eq!(g(a, c), BoolWithPartial::False);
+        assert_eq!(f(b, c), Some(b.into()));
+        assert_eq!(g(b, c), BoolWithPartial::False);
     }
     #[test]
     fn test_combine_empty_and_partial_is_partial() {
