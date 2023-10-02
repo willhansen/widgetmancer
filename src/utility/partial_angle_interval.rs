@@ -204,7 +204,8 @@ impl PartialAngleInterval {
         tolerance: FAngle,
     ) -> BoolWithPartial {
         //self.contains_partial_arc(other.complement(), tolerance)
-        dbg!(self).contains_partial_arc(dbg!(dbg!(other).complement()), tolerance)
+        dbg!("=============================================================================================================================================================================");
+        dbg!(dbg!(self).contains_partial_arc(dbg!(dbg!(other).complement()), tolerance))
     }
 
     pub fn complement(&self) -> Self {
@@ -457,9 +458,10 @@ impl PartialAngleInterval {
             .is_at_least_partial()
     }
     pub fn contains_partial_arc(&self, other: Self, tolerance: FAngle) -> BoolWithPartial {
-        self.contains_angle(other.anticlockwise_end, tolerance)
-            .and(self.contains_angle(other.clockwise_end, tolerance))
-            .and(self.contains_angle(other.center_angle(), tolerance))
+        // fully contains other if other does not touch self's complement
+        self.complement()
+            .overlaps_partial_arc(other, tolerance)
+            .not()
     }
     pub fn most_overlapped_edge_of_self(
         &self,
@@ -488,7 +490,7 @@ impl PartialAngleInterval {
             anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),
         }
     }
-    pub fn rotated(&self, d_angle: Angle<f32>) -> Self {
+    pub fn rotated_ccw(&self, d_angle: Angle<f32>) -> Self {
         PartialAngleInterval::from_angles(
             self.clockwise_end + d_angle,
             self.anticlockwise_end + d_angle,
@@ -1316,15 +1318,15 @@ mod tests {
 
         assert_false!(arc1.overlaps_other_by_at_least_this_much(arc2, Angle::degrees(5.0)));
         assert_false!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated(Angle::degrees(-4.9)),
+            arc2.rotated_ccw(Angle::degrees(-4.9)),
             Angle::degrees(5.0)
         ));
         assert!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated(Angle::degrees(-5.1)),
+            arc2.rotated_ccw(Angle::degrees(-5.1)),
             Angle::degrees(5.0),
         ));
         assert_false!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated(Angle::degrees(5.1)),
+            arc2.rotated_ccw(Angle::degrees(5.1)),
             Angle::degrees(5.0)
         ));
         // TODO: more cases here
@@ -1410,5 +1412,35 @@ mod tests {
         assert_about_eq!(parts[0].anticlockwise_end().to_degrees(), 45.0);
         assert_about_eq!(parts[8].clockwise_end().to_degrees(), 0.0);
         assert_about_eq!(parts[8].anticlockwise_end().to_degrees(), 5.0);
+    }
+    #[test]
+    fn test_contains_partial_arc__observed_error() {
+        let a = PartialAngleInterval::from_degrees(20.0, 0.0);
+        let b = PartialAngleInterval::from_degrees(40.0, 30.0);
+        let t = default_angle_tolerance_for_tests();
+        assert!(a.contains_partial_arc(b, t).is_false());
+    }
+    #[test]
+    fn test_contains_partial_arc__wide_intervals() {
+        use BoolWithPartial::*;
+        let a = PartialAngleInterval::from_degrees(10.0, 0.0);
+        let b = PartialAngleInterval::from_degrees(30.0, 11.0);
+        let t = default_angle_tolerance_for_tests();
+        assert_eq!(
+            a.contains_partial_arc(b.rotated_ccw(FAngle::degrees(0.0)), t),
+            False
+        );
+        assert_eq!(
+            a.contains_partial_arc(b.rotated_ccw(FAngle::degrees(-1.0)), t),
+            False
+        );
+        assert_eq!(
+            a.contains_partial_arc(b.rotated_ccw(FAngle::degrees(-2.0)), t),
+            False
+        );
+        assert_eq!(
+            a.contains_partial_arc(b.rotated_ccw(FAngle::degrees(-2.0)), t),
+            False
+        );
     }
 }

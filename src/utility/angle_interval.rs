@@ -417,18 +417,18 @@ mod tests {
         let b = PartialAngleInterval::from_degrees(20.0, 0.0);
         let c = PartialAngleInterval::from_degrees(30.0, 40.0);
         let t = FAngle::degrees(0.01);
-        let f = |p1, p2| AngleInterval::try_combine_partial_arcs(p1, p2, t);
-        let g = |p1: PartialAngleInterval, p2| {
+        let combine = |p1, p2| AngleInterval::try_combine_partial_arcs(p1, p2, t);
+        let would_combine = |p1: PartialAngleInterval, p2| {
             p1.would_combine_with_other_partial_arc_to_full_circle(p2, t)
         };
-        assert_eq!(f(a, b), Some(AngleInterval::FullCircle));
-        assert_eq!(g(a, b), BoolWithPartial::Partial);
-        assert_eq!(f(b, a), Some(AngleInterval::FullCircle));
-        assert_eq!(g(b, a), BoolWithPartial::Partial);
-        assert_eq!(f(a, c), None);
-        assert_eq!(g(a, c), BoolWithPartial::False);
-        assert_eq!(f(b, c), Some(b.into()));
-        assert_eq!(g(b, c), BoolWithPartial::False);
+        assert_eq!(combine(a, b), Some(AngleInterval::FullCircle));
+        assert_eq!(would_combine(a, b), BoolWithPartial::Partial);
+        assert_eq!(combine(b, a), Some(AngleInterval::FullCircle));
+        assert_eq!(would_combine(b, a), BoolWithPartial::Partial);
+        assert_eq!(combine(a, c), None);
+        assert_eq!(would_combine(a, c), BoolWithPartial::False);
+        assert_eq!(combine(b, c), Some(b.into()));
+        assert_eq!(would_combine(b, c), BoolWithPartial::False);
     }
     #[test]
     fn test_combine_empty_and_partial_is_partial() {
