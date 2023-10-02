@@ -38,6 +38,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     {
         Self::from_faces_in_ccw_order(faces)
     }
+    pub fn len(&self) -> usize {
+        self.edges.len()
+    }
     pub fn from_faces_in_ccw_order(
         faces: impl IntoIterator<Item = impl Into<RelativeFace>> + Clone,
     ) -> Self {
@@ -153,7 +156,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 
         !overlapping && ends_touch && edge_is_cw_of_self
     }
-    fn point_by_index(&self, index: i32) -> WorldMove {
+    pub fn point_by_index(&self, index: i32) -> WorldMove {
         let num_points = self.edges.len() + 1;
         let positive_point_index: usize = if index >= 0 {
             index

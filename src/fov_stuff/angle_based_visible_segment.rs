@@ -10,7 +10,7 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
 };
 use euclid::{point2, Angle};
-use itertools::Itertools;
+use itertools::{all, Itertools};
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -60,37 +60,41 @@ impl AngleBasedVisibleSegment {
         if !self.end_fence_fully_covers_angle_interval() {
             panic!("END FENCE DOES NOT SPAN ARC:\n{:?}", self);
         }
+        if self.end_fence_has_extra_segments() {
+            panic!("END FENCE HAS EXTRA SEGMENTS:\n{:?}", self);
+        }
     }
     pub fn end_fence(&self) -> &RelativeFenceFullyVisibleFromOriginGoingCcw {
         &self.end_fence
     }
 
+    fn end_fence_has_extra_segments(&self) -> bool {
+        if self.end_fence.len() < 2 {
+            return false;
+        }
+
+        let points_that_should_be_in_arc = [1, -2].map(|i| self.end_fence.point_by_index(i));
+        all(points_that_should_be_in_arc, |point| {
+            self.visible_arc
+                .contains_angle(
+                    better_angle_from_x_axis(point),
+                    Self::default_angle_tolerance(),
+                )
+                .is_false()
+        })
+    }
     fn end_fence_fully_covers_angle_interval(&self) -> bool {
-        // TODO: use standard tolerance
         self.end_fence
             .spanned_angle_from_origin()
-            .contains_arc(self.visible_arc, Angle::radians(0.01))
+            .contains_arc(self.visible_arc, Self::default_angle_tolerance())
             .is_at_least_partial()
     }
     fn start_face_spans_angle_interval(&self) -> bool {
         if self.start_internal_relative_face.is_none() {
-            return true;
+            return true; // This behavior may not be consistent with the function's name
         }
 
         let start_face = self.start_internal_relative_face.unwrap();
-
-        let any_line_end_points_within_angle_interval = start_face
-            .face_line_segment()
-            .parallel_directions()
-            .iter()
-            .any(|&line_angle| {
-                let interval_includes_line_end = self
-                    .visible_arc
-                    .contains_angle(line_angle, todo!())
-                    .is_at_least_partial();
-                interval_includes_line_end
-            });
-
         let start_line = start_face.face_line_segment();
         let vector_to_line_from_origin = start_line.normal_vector_from_origin();
         if vector_to_line_from_origin.square_length() == 0.0 {
