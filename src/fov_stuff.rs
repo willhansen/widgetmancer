@@ -561,7 +561,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 portal_geometry,
                 transformed_center,
                 radius,
-                visible_arc_of_face.rotated_quarter_turns(transform.rotation()),
+                visible_arc_of_face.rotated(transform.rotation()),
                 steps_in_octant_iter.rotated(transform.rotation()),
             )
             .with_weakly_applied_start_line(relative_portal_exit_in_sub_fov);

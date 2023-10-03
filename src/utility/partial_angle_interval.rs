@@ -69,6 +69,11 @@ impl Display for PartialAngleInterval {
         )
     }
 }
+impl RigidlyTransformable for PartialAngleInterval {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        self.rotated_quarter_turns(tf.rotation())
+    }
+}
 
 impl PartialAngleInterval {
     #[deprecated(note = "don't use defaults in utility module")]
@@ -564,6 +569,20 @@ impl PartialAngleInterval {
         })
     }
 }
+
+impl Debug for PartialAngleInterval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "\n\
+            \tradians: {:?}\n\
+            \tdegrees: {:?}",
+            self.to_radians(),
+            self.to_degrees(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use euclid::point2;

@@ -23,7 +23,9 @@ use crate::utility::{
 };
 
 use super::bool_with_partial::BoolWithPartial;
+use super::coordinates::QuarterTurnRotatable;
 use super::partial_angle_interval::PartialAngleInterval;
+use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -64,6 +66,10 @@ impl AngleInterval {
     }
     pub fn is_partial(&self) -> bool {
         matches!(self, AngleInterval::PartialArc(_))
+    }
+    pub fn about_eq(&self, other: Self, tolerance: FAngle) -> bool {
+        self.cw().angle_to(other.cw()).radians.abs() <= tolerance.radians
+            && self.ccw().angle_to(other.ccw()).radians.abs() <= tolerance.radians
     }
     fn get_partial(&self) -> PartialAngleInterval {
         match self {
@@ -106,13 +112,19 @@ impl AngleInterval {
             _ => panic!("No endpoints to get"),
         }
     }
+    pub fn width(&self) -> FAngle {
+        use AngleInterval::*;
+        match self {
+            PartialArc(p) => p.width(),
+            Empty => FAngle::zero(),
+            FullCircle => FAngle::two_pi(),
+        }
+    }
     pub fn complement(&self) -> Self {
         match self {
             AngleInterval::Empty => Self::FullCircle,
             AngleInterval::FullCircle => Self::Empty,
-            AngleInterval::PartialArc(partial) => Self::PartialArc(
-                PartialAngleInterval::from_angles(partial.anticlockwise_end, partial.clockwise_end),
-            ),
+            AngleInterval::PartialArc(p) => p.complement().into(),
         }
     }
     pub fn combine_if_touching_panic_if_overlapping(
@@ -173,6 +185,24 @@ impl AngleInterval {
             }
             .into(),
         )
+    }
+    // TODO: Does this need a tolerance?
+    pub fn subtract(&self, other: impl Into<Self>) -> Vec<Self> {
+        use AngleInterval::*;
+        let other = other.into();
+        match self {
+            Empty => vec![Empty],
+            FullCircle => vec![other.complement()],
+            PartialArc(self_partial) => match other {
+                Empty => vec![*self],
+                FullCircle => vec![Empty],
+                PartialArc(other_partial) => self_partial
+                    .subtract(other_partial)
+                    .into_iter()
+                    .map_into()
+                    .collect(),
+            },
+        }
     }
     pub fn from_octant(octant: Octant) -> Self {
         AngleInterval::PartialArc(PartialAngleInterval::from_octant(octant))
@@ -309,18 +339,6 @@ impl TryFrom<AngleInterval> for PartialAngleInterval {
     }
 }
 
-impl Debug for PartialAngleInterval {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "\n\
-            \tradians: {:?}\n\
-            \tdegrees: {:?}",
-            self.to_radians(),
-            self.to_degrees(),
-        )
-    }
-}
 impl RigidlyTransformable for AngleInterval {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         match self {
@@ -331,10 +349,14 @@ impl RigidlyTransformable for AngleInterval {
         }
     }
 }
-
-impl RigidlyTransformable for PartialAngleInterval {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        self.rotated_quarter_turns(tf.rotation())
+impl QuarterTurnRotatable for AngleInterval {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+        match self {
+            AngleInterval::PartialArc(partial_arc) => partial_arc
+                .rotated_quarter_turns(quarter_turns_anticlockwise)
+                .into(),
+            _ => *self,
+        }
     }
 }
 
@@ -565,5 +587,43 @@ mod tests {
         let b_way_bigger = AngleInterval::from_degrees(10.0 - tolerance.to_degrees() * 2.0, 20.0);
 
         a.combine_if_touching_panic_if_overlapping(b_way_bigger, tolerance);
+    }
+    #[test]
+    fn test_subtract() {
+        use AngleInterval::*;
+
+        let a = AngleInterval::from_degrees(0.0, 20.0);
+        let b = AngleInterval::from_degrees(10.0, 20.0);
+        let c = AngleInterval::from_degrees(0.0, 10.0);
+
+        let tolerance = FAngle::degrees(0.01); // TODO:standardize
+
+        let comp =
+            |x1: AngleInterval, x2, x3| x1.subtract(x2).first().unwrap().about_eq(x3, tolerance);
+
+        assert!(comp(FullCircle, Empty, FullCircle));
+        assert!(comp(FullCircle, FullCircle, Empty));
+        assert!(comp(Empty, FullCircle, Empty));
+        assert!(comp(Empty, Empty, Empty));
+
+        assert!(comp(a, b, c));
+        assert!(comp(a, c, b));
+        assert!(comp(b, c, b));
+        assert!(comp(c, b, b));
+        assert!(comp(FullCircle, b, b.complement()));
+        assert!(comp(a, Empty, a));
+        assert!(comp(a, a, Empty));
+        assert!(comp(b, a, Empty));
+
+        // Detailed tests for the splitting case should be the PartialAngleInterval tests
+
+        let splitter = AngleInterval::from_degrees(5.0, 15.0);
+        let d1 = AngleInterval::from_degrees(0.0, 5.0);
+        let d2 = AngleInterval::from_degrees(15.0, 20.0);
+
+        let after_split = a.subtract(splitter);
+        assert_eq!(after_split.len(), 2);
+        assert!(after_split[0].about_eq(d1, tolerance));
+        assert!(after_split[1].about_eq(d2, tolerance));
     }
 }
