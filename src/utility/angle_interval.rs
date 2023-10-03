@@ -33,33 +33,6 @@ pub enum AngleInterval {
     PartialArc(PartialAngleInterval),
 }
 
-impl Add for PartialAngleInterval {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        todo!("remove");
-        //self.combine_with_overlapping_or_touching_arc(rhs)
-    }
-}
-
-impl Sub for PartialAngleInterval {
-    type Output = Vec<Self>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        todo!("remove");
-        self.subtract(rhs)
-    }
-}
-
-impl Neg for PartialAngleInterval {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        todo!("remove");
-        self.complement()
-    }
-}
-
 impl Display for AngleInterval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -82,6 +55,12 @@ impl AngleInterval {
             }
             _ => panic!("not in one octant: {}", self),
         }
+    }
+    pub fn is_full(&self) -> bool {
+        matches!(self, AngleInterval::FullCircle)
+    }
+    pub fn is_empty(&self) -> bool {
+        matches!(self, AngleInterval::Empty)
     }
     pub fn cw(&self) -> FAngle {
         use AngleInterval::*;

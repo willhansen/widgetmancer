@@ -487,15 +487,10 @@ pub fn field_of_view_within_arc_in_single_octant(
         ];
         let absolute_square = oriented_center_square.square() + relative_square;
 
-        let mut view_blocking_arc_for_this_square: Option<PartialAngleInterval> = None;
+        let mut view_blocking_arc_for_this_square: AngleInterval = AngleInterval::Empty;
         for face_direction in face_directions {
-            let relative_face: RelativeSquareWithOrthogonalDir =
-                (relative_square, face_direction).into();
-            let absolute_face: SquareWithOrthogonalDir = (
-                oriented_center_square.square() + relative_square,
-                face_direction,
-            )
-                .into();
+            let relative_face: RelativeFace = (relative_square, face_direction).into();
+            let absolute_face: Face = (absolute_square, face_direction).into();
 
             let face_has_portal = portal_geometry
                 .get_portal_by_entrance(absolute_face)
@@ -509,9 +504,10 @@ pub fn field_of_view_within_arc_in_single_octant(
             let face_blocks_sight =
                 face_has_portal || square_blocks_sight || face_is_on_edge_of_sight_radius;
 
-            let view_arc_of_face = PartialAngleInterval::from_relative_square_face(relative_face);
+            let visible_arc_of_face =
+                PartialAngleInterval::from_relative_square_face(relative_face);
 
-            let face_is_at_least_partially_visible = view_arc_of_face
+            let face_is_at_least_partially_visible = visible_arc_of_face
                 .overlaps_other_by_at_least_this_much(
                     view_arc,
                     Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
@@ -521,15 +517,16 @@ pub fn field_of_view_within_arc_in_single_octant(
                 continue;
             }
 
-            let visible_arc_of_face = view_arc.intersection(view_arc_of_face);
+            let visible_arc_of_face = view_arc.intersection(visible_arc_of_face);
 
             if !face_blocks_sight {
                 continue;
             }
 
             view_blocking_arc_for_this_square = Some(
-                view_blocking_arc_for_this_square
-                    .map_or(view_arc_of_face, |old_val| old_val + view_arc_of_face),
+                view_blocking_arc_for_this_square.map_or(visible_arc_of_face, |old_val| {
+                    old_val.combine(visible_arc_of_face, Self::default_angle_tolerance())
+                }),
             );
 
             // create a segment ending at this face
@@ -570,12 +567,12 @@ pub fn field_of_view_within_arc_in_single_octant(
             .with_weakly_applied_start_line(relative_portal_exit_in_sub_fov);
             fov_result.transformed_sub_fovs.push(sub_arc_fov);
         }
-        if view_blocking_arc_for_this_square.is_none() {
+        if view_blocking_arc_for_this_square.is_empty() {
             continue;
         }
         // split arc around the blocked faces
         let view_arcs_on_either_side_of_blocked_faces =
-            view_arc - view_blocking_arc_for_this_square.unwrap();
+            view_arc.subtract(view_blocking_arc_for_this_square.unwrap());
         view_arcs_on_either_side_of_blocked_faces
             .into_iter()
             .filter(|new_sub_arc| {
