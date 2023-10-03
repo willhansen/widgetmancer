@@ -467,9 +467,11 @@ pub fn field_of_view_within_arc_in_single_octant(
     portal_geometry: &PortalGeometry,
     oriented_center_square: SquareWithOrthogonalDir,
     radius: u32,
-    view_arc: PartialAngleInterval,
+    view_arc: AngleInterval,
     mut steps_in_octant_iter: OctantFOVSquareSequenceIter,
 ) -> FieldOfView {
+    let tolerance = FAngle::degrees(0.001); // TODO: standardize
+    assert!(view_arc.is_in_one_octant());
     let mut fov_result = FieldOfView::new_empty_fov_with_root(oriented_center_square);
     let octant = steps_in_octant_iter.octant();
 
@@ -504,14 +506,14 @@ pub fn field_of_view_within_arc_in_single_octant(
             let face_blocks_sight =
                 face_has_portal || square_blocks_sight || face_is_on_edge_of_sight_radius;
 
-            let visible_arc_of_face =
-                PartialAngleInterval::from_relative_square_face(relative_face);
+            let visible_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
 
             let face_is_at_least_partially_visible = visible_arc_of_face
-                .overlaps_other_by_at_least_this_much(
+                .overlaps_arc(
                     view_arc,
                     Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-                );
+                )
+                .is_at_least_partial();
 
             if !face_is_at_least_partially_visible {
                 continue;
@@ -523,11 +525,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                 continue;
             }
 
-            view_blocking_arc_for_this_square = Some(
-                view_blocking_arc_for_this_square.map_or(visible_arc_of_face, |old_val| {
-                    old_val.combine(visible_arc_of_face, Self::default_angle_tolerance())
-                }),
-            );
+            view_blocking_arc_for_this_square = view_blocking_arc_for_this_square
+                .try_combine(visible_arc_of_face, tolerance)
+                .unwrap();
 
             // create a segment ending at this face
             let visible_segment_up_to_relative_face =
@@ -572,7 +572,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         }
         // split arc around the blocked faces
         let view_arcs_on_either_side_of_blocked_faces =
-            view_arc.subtract(view_blocking_arc_for_this_square.unwrap());
+            view_arc.subtract(view_blocking_arc_for_this_square);
         view_arcs_on_either_side_of_blocked_faces
             .into_iter()
             .filter(|new_sub_arc| {

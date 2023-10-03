@@ -62,6 +62,36 @@ impl AngleInterval {
     pub fn is_empty(&self) -> bool {
         matches!(self, AngleInterval::Empty)
     }
+    pub fn is_partial(&self) -> bool {
+        matches!(self, AngleInterval::PartialArc(_))
+    }
+    fn get_partial(&self) -> PartialAngleInterval {
+        match self {
+            AngleInterval::PartialArc(partial) => *partial,
+            _ => panic!("Angle interval is not partial: {}", self),
+        }
+    }
+    pub fn intersection(&self, other: Self) -> Self {
+        use AngleInterval::*;
+        match self {
+            Empty => Empty,
+            FullCircle => other,
+            PartialArc(self_partial_arc) => match other {
+                Empty => Empty,
+                FullCircle => *self,
+                PartialArc(other_partial_arc) => {
+                    self_partial_arc.intersection(other_partial_arc).into()
+                }
+            },
+        }
+    }
+    // TODO: make a new type with this guarantee instead of checking
+    pub fn is_in_one_octant(&self) -> bool {
+        match self {
+            AngleInterval::PartialArc(p) => p.is_in_one_octant(),
+            _ => false,
+        }
+    }
     pub fn cw(&self) -> FAngle {
         use AngleInterval::*;
         match self {
@@ -189,6 +219,9 @@ impl AngleInterval {
         } else {
             AngleInterval::PartialArc(PartialAngleInterval::from_relative_square(relative_square))
         }
+    }
+    pub fn from_relative_square_face(relative_face: impl Into<RelativeFace>) -> Self {
+        PartialAngleInterval::from_relative_square_face(relative_face).into()
     }
     pub fn contains_arc(&self, other: impl Into<Self>, tolerance: FAngle) -> BoolWithPartial {
         use AngleInterval::*;

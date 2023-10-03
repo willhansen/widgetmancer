@@ -23,6 +23,7 @@ use crate::utility::{
 };
 
 use super::bool_with_partial::BoolWithPartial;
+use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
@@ -153,9 +154,7 @@ impl PartialAngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_relative_square_face(
-        rel_face: impl Into<RelativeSquareWithOrthogonalDir> + Copy,
-    ) -> Self {
+    pub fn from_relative_square_face(rel_face: impl Into<RelativeFace> + Copy) -> Self {
         let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
@@ -362,16 +361,8 @@ impl PartialAngleInterval {
         other: PartialAngleInterval,
         thresh: Angle<f32>,
     ) -> bool {
-        let self_minus_other = self.subtract(other);
-
-        let sum_of_widths_of_self_minus_other = self_minus_other
-            .iter()
-            .map(|angle_interval| angle_interval.width())
-            .sum();
-
-        let overlap = self.width() - sum_of_widths_of_self_minus_other;
-
-        overlap.radians >= thresh.radians
+        self.overlaps_partial_arc(other, thresh)
+            .is_at_least_partial()
     }
 
     #[deprecated(note = "use version with tolerance instead")]
@@ -562,7 +553,7 @@ impl PartialAngleInterval {
             && Octant::near_octant_boundary(self.anticlockwise_end);
         is_smaller_than_octant && both_ends_near_boundaries
     }
-    fn is_in_one_octant(&self) -> bool {
+    pub fn is_in_one_octant(&self) -> bool {
         self.lone_containing_octant().is_some()
     }
     fn lone_containing_octant(&self) -> Option<Octant> {

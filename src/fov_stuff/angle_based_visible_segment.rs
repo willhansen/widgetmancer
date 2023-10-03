@@ -3,7 +3,6 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
 use crate::utility::coordinates::FAngle;
-use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
@@ -113,13 +112,13 @@ impl AngleBasedVisibleSegment {
     pub fn from_relative_face(relative_face: impl Into<RelativeSquareWithOrthogonalDir>) -> Self {
         let actual_face = relative_face.into();
         Self::new(
-            PartialAngleInterval::from_relative_square_face(actual_face),
+            AngleInterval::from_relative_square_face(actual_face),
             RelativeFenceFullyVisibleFromOriginGoingCcw::from_faces_in_ccw_order(vec![actual_face]),
         )
     }
     pub fn from_relative_square(step: impl Into<WorldStep>) -> Self {
         let step = step.into();
-        let arc = PartialAngleInterval::from_relative_square(step);
+        let arc = AngleInterval::from_relative_square(step);
 
         let faces = faces_away_from_center_at_rel_square(step);
         let end_fence =
@@ -143,7 +142,7 @@ impl AngleBasedVisibleSegment {
     pub fn with_start_face(&self, relative_face: impl Into<RelativeFace>) -> Self {
         Self::new_with_start_face(self.visible_arc, self.end_fence.clone(), relative_face)
     }
-    pub fn with_arc(&self, arc: PartialAngleInterval) -> Self {
+    pub fn with_arc(&self, arc: AngleInterval) -> Self {
         Self::new_with_optional_start_face(
             arc,
             self.end_fence.clone(),
@@ -352,7 +351,7 @@ mod tests {
     #[should_panic]
     fn test_create_with_invalid_fence() {
         AngleBasedVisibleSegment::new(
-            PartialAngleInterval::from_degrees(10.0, 20.0),
+            AngleInterval::from_degrees(10.0, 20.0),
             Fence::from_one_edge(((5, 0), STEP_RIGHT)),
         );
     }
@@ -360,7 +359,7 @@ mod tests {
     #[should_panic]
     fn test_create_with_invalid_start_face__offset() {
         AngleBasedVisibleSegment::new_with_start_face(
-            PartialAngleInterval::from_degrees(0.0, 1.0),
+            AngleInterval::from_degrees(0.0, 1.0),
             Fence::from_one_edge(((5, 0), STEP_RIGHT)),
             ((-1, 0), STEP_LEFT),
         );
@@ -378,7 +377,7 @@ mod tests {
     }
     #[test]
     fn test_face_direction_agnostic() {
-        let arc = PartialAngleInterval::from_degrees(0.0, 1.0);
+        let arc = AngleInterval::from_degrees(0.0, 1.0);
 
         let a = AngleBasedVisibleSegment::new_with_start_face(
             arc,
@@ -439,11 +438,11 @@ mod tests {
     #[test]
     fn test_combine_two__fail_because_end_fences_can_not_connect() {
         let a = AngleBasedVisibleSegment::new(
-            PartialAngleInterval::from_degrees(0.0, 1.0),
+            AngleInterval::from_degrees(0.0, 1.0),
             ((5, 0), STEP_RIGHT),
         );
         let b = AngleBasedVisibleSegment::new(
-            PartialAngleInterval::from_degrees(1.0, 2.0),
+            AngleInterval::from_degrees(1.0, 2.0),
             ((6, 0), STEP_RIGHT),
         );
         assert!(a.combined_with(&b).is_none());
