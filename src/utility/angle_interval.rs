@@ -68,6 +68,10 @@ impl AngleInterval {
         matches!(self, AngleInterval::PartialArc(_))
     }
     pub fn about_eq(&self, other: Self, tolerance: FAngle) -> bool {
+        use AngleInterval::*;
+        if (self.is_empty() && other.is_empty()) || (self.is_full() && other.is_full()) {
+            return true;
+        }
         self.cw().angle_to(other.cw()).radians.abs() <= tolerance.radians
             && self.ccw().angle_to(other.ccw()).radians.abs() <= tolerance.radians
     }
@@ -85,9 +89,10 @@ impl AngleInterval {
             PartialArc(self_partial_arc) => match other {
                 Empty => Empty,
                 FullCircle => *self,
-                PartialArc(other_partial_arc) => self_partial_arc
-                    .intersection_with_other_partial_arc(other_partial_arc, tolerance)
-                    .into(),
+                PartialArc(other_partial_arc) => {
+                    Self::intersect_partial_arcs(*self_partial_arc, other_partial_arc, tolerance)
+                        .into()
+                }
             },
         }
     }
@@ -618,22 +623,29 @@ mod tests {
 
         let tolerance = FAngle::degrees(0.01); // TODO:standardize
 
-        let comp =
-            |x1: AngleInterval, x2, x3| x1.subtract(x2).first().unwrap().about_eq(x3, tolerance);
+        let test_subtract = |x1: AngleInterval, x2, x3| {
+            assert!(
+                x1.subtract(x2).first().unwrap().about_eq(x3, tolerance),
+                "{} - {} = {} is false",
+                x1,
+                x2,
+                x3
+            )
+        };
 
-        assert!(comp(FullCircle, Empty, FullCircle));
-        assert!(comp(FullCircle, FullCircle, Empty));
-        assert!(comp(Empty, FullCircle, Empty));
-        assert!(comp(Empty, Empty, Empty));
+        test_subtract(FullCircle, Empty, FullCircle);
+        test_subtract(FullCircle, FullCircle, Empty);
+        test_subtract(Empty, FullCircle, Empty);
+        test_subtract(Empty, Empty, Empty);
 
-        assert!(comp(a, b, c));
-        assert!(comp(a, c, b));
-        assert!(comp(b, c, b));
-        assert!(comp(c, b, b));
-        assert!(comp(FullCircle, b, b.complement()));
-        assert!(comp(a, Empty, a));
-        assert!(comp(a, a, Empty));
-        assert!(comp(b, a, Empty));
+        test_subtract(a, b, c);
+        test_subtract(a, c, b);
+        test_subtract(b, c, b);
+        test_subtract(c, b, b);
+        test_subtract(FullCircle, b, b.complement());
+        test_subtract(a, Empty, a);
+        test_subtract(a, a, Empty);
+        test_subtract(b, a, Empty);
 
         // Detailed tests for the splitting case should be the PartialAngleInterval tests
 

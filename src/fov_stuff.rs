@@ -508,18 +508,14 @@ pub fn field_of_view_within_arc_in_single_octant(
 
             let visible_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
 
-            let face_is_at_least_partially_visible = visible_arc_of_face
-                .overlaps_arc(
-                    view_arc,
-                    Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-                )
-                .is_at_least_partial();
+            let visible_arc_of_face = view_arc.intersection(
+                visible_arc_of_face,
+                Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+            );
 
-            if !face_is_at_least_partially_visible {
+            if visible_arc_of_face.is_empty() {
                 continue;
             }
-
-            let visible_arc_of_face = view_arc.intersection(visible_arc_of_face);
 
             if !face_blocks_sight {
                 continue;
