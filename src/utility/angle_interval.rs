@@ -77,7 +77,7 @@ impl AngleInterval {
             _ => panic!("Angle interval is not partial: {}", self),
         }
     }
-    pub fn intersection(&self, other: Self) -> Self {
+    pub fn intersection(&self, other: Self, tolerance: FAngle) -> Self {
         use AngleInterval::*;
         match self {
             Empty => Empty,
@@ -85,9 +85,9 @@ impl AngleInterval {
             PartialArc(self_partial_arc) => match other {
                 Empty => Empty,
                 FullCircle => *self,
-                PartialArc(other_partial_arc) => {
-                    self_partial_arc.intersection(other_partial_arc).into()
-                }
+                PartialArc(other_partial_arc) => self_partial_arc
+                    .intersection_with_other_partial_arc(other_partial_arc, tolerance)
+                    .into(),
             },
         }
     }
@@ -186,6 +186,23 @@ impl AngleInterval {
             .into(),
         )
     }
+    fn intersect_partial_arcs(
+        a: PartialAngleInterval,
+        b: PartialAngleInterval,
+        tolerance: FAngle,
+    ) -> Self {
+        if a.has_wraparound_double_overlap(b, tolerance).is_true() {
+            panic!("Wraparound double overlap:\n{}\n{}", a, b);
+        }
+
+        if a.contains_angle(b.cw(), tolerance).is_true() {
+            AngleInterval::from_angles(b.cw(), a.ccw())
+        } else if a.contains_angle(b.ccw(), tolerance).is_true() {
+            AngleInterval::from_angles(a.cw(), b.ccw())
+        } else {
+            AngleInterval::Empty
+        }
+    }
     // TODO: Does this need a tolerance?
     pub fn subtract(&self, other: impl Into<Self>) -> Vec<Self> {
         use AngleInterval::*;
@@ -205,7 +222,7 @@ impl AngleInterval {
         }
     }
     pub fn from_octant(octant: Octant) -> Self {
-        AngleInterval::PartialArc(PartialAngleInterval::from_octant(octant))
+        PartialAngleInterval::from_octant(octant).into()
     }
     pub fn from_center_and_width(center_angle: FAngle, width: FAngle) -> Self {
         Self::PartialArc(PartialAngleInterval::from_center_and_width(
@@ -240,7 +257,10 @@ impl AngleInterval {
     }
 
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
-        AngleInterval::PartialArc(PartialAngleInterval::from_degrees(cw, ccw))
+        PartialAngleInterval::from_degrees(cw, ccw).into()
+    }
+    pub fn from_angles(cw: FAngle, ccw: FAngle) -> Self {
+        PartialAngleInterval::from_angles(cw, ccw).into()
     }
     pub fn from_relative_square(relative_square: impl Into<WorldStep>) -> Self {
         let relative_square = relative_square.into();
@@ -625,5 +645,14 @@ mod tests {
         assert_eq!(after_split.len(), 2);
         assert!(after_split[0].about_eq(d1, tolerance));
         assert!(after_split[1].about_eq(d2, tolerance));
+    }
+    #[test]
+    fn test_intersection() {
+        let deg = AngleInterval::from_degrees;
+        let a = deg(0.0, 20.0);
+        let b = deg(20.0, 40.0);
+        let t = FAngle::degrees(1.0);
+        let c = a.intersection(b, t);
+        assert!(c.is_empty());
     }
 }

@@ -159,7 +159,7 @@ impl PartialAngleInterval {
             clockwise_end: *most_clockwise,
         }
     }
-    pub fn from_relative_square_face(rel_face: impl Into<RelativeFace> + Copy) -> Self {
+    pub fn from_relative_square_face(rel_face: impl Into<RelativeFace>) -> Self {
         let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
@@ -185,23 +185,6 @@ impl PartialAngleInterval {
         }
     }
 
-    pub fn intersection(&self, other: Self) -> Self {
-        assert!(self.overlapping_but_not_exactly_touching(other));
-        assert_false!(self.has_wraparound_double_overlap_not_counting_touching(other));
-
-        PartialAngleInterval {
-            anticlockwise_end: if self.contains_angle_not_including_edges(other.anticlockwise_end) {
-                other.anticlockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            clockwise_end: if self.contains_angle_not_including_edges(other.clockwise_end) {
-                other.clockwise_end
-            } else {
-                self.clockwise_end
-            },
-        }
-    }
     pub fn would_combine_with_other_partial_arc_to_full_circle(
         &self,
         other: Self,
@@ -221,7 +204,6 @@ impl PartialAngleInterval {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
     pub fn overlaps_partial_arc(&self, other: Self, tolerance: Angle<f32>) -> BoolWithPartial {
-        use BoolWithPartial::*;
         self.contains_angle(other.cw(), tolerance)
             .or(self.contains_angle(other.center_angle(), tolerance))
             .or(self.contains_angle(other.ccw(), tolerance))
@@ -273,13 +255,15 @@ impl PartialAngleInterval {
         }
         sum
     }
-    #[deprecated(note = "use version with tolerance instead")]
-    fn has_wraparound_double_overlap_not_counting_touching(
+    pub fn has_wraparound_double_overlap(
         &self,
         other: PartialAngleInterval,
-    ) -> bool {
-        self.num_contained_not_touching_edges(other) == 2
-            && other.num_contained_not_touching_edges(*self) == 2
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
+        self.contains_angle(other.cw(), tolerance)
+            .and(self.contains_angle(other.ccw(), tolerance))
+            .and(other.contains_angle(self.cw(), tolerance))
+            .and(other.contains_angle(self.ccw(), tolerance))
     }
     #[deprecated(note = "use version with tolerance instead")]
     pub fn partially_overlaps_other_while_including_edges(
@@ -1005,8 +989,9 @@ mod tests {
     #[test]
     fn test_angle_interval_intersection__simple_overlap() {
         assert_eq!(
-            PartialAngleInterval::from_degrees(80.0, 100.0)
-                .intersection(PartialAngleInterval::from_degrees(40.0, 90.0)),
+            PartialAngleInterval::from_degrees(80.0, 100.0).intersection_with_other_partial_arc(
+                PartialAngleInterval::from_degrees(40.0, 90.0)
+            ),
             PartialAngleInterval::from_degrees(80.0, 90.0),
             "from overlap"
         );
@@ -1016,15 +1001,15 @@ mod tests {
     #[should_panic]
     fn test_angle_interval_intersection__no_overlap() {
         PartialAngleInterval::from_degrees(95.0, 100.0)
-            .intersection(PartialAngleInterval::from_degrees(40.0, 90.0));
+            .intersection_with_other_partial_arc(PartialAngleInterval::from_degrees(40.0, 90.0));
     }
 
     #[test]
     fn test_angle_interval_intersection__full_overlap() {
         let small = PartialAngleInterval::from_degrees(80.0, 100.0);
         let big = PartialAngleInterval::from_degrees(60.0, 120.0);
-        assert_eq!(big.intersection(small), small);
-        assert_eq!(small.intersection(big), small);
+        assert_eq!(big.intersection_with_other_partial_arc(small), small);
+        assert_eq!(small.intersection_with_other_partial_arc(big), small);
     }
 
     #[test]
@@ -1032,7 +1017,7 @@ mod tests {
     fn test_angle_interval_intersection__wraparound_double_overlap() {
         let small = PartialAngleInterval::from_degrees(80.0, 100.0);
         let big = PartialAngleInterval::from_degrees(60.0, 120.0);
-        big.intersection(small.complement());
+        big.intersection_with_other_partial_arc(small.complement());
     }
 
     #[test]

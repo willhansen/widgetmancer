@@ -621,7 +621,7 @@ pub fn single_octant_field_of_view(
         portal_geometry,
         SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP),
         radius,
-        PartialAngleInterval::from_octant(octant),
+        AngleInterval::from_octant(octant),
         OctantFOVSquareSequenceIter::new_from_center(octant),
     );
     fov_result
@@ -1140,7 +1140,7 @@ mod tests {
         );
 
         let clockwise_end_in_degrees = 0.1;
-        let view_arc = PartialAngleInterval::from_degrees(
+        let view_arc = AngleInterval::from_degrees(
             clockwise_end_in_degrees,
             clockwise_end_in_degrees + NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES * 2.0,
         );
