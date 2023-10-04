@@ -655,4 +655,45 @@ mod tests {
         let c = a.intersection(b, t);
         assert!(c.is_empty());
     }
+
+    #[test]
+    fn test_angle_interval_intersection__simple_overlap() {
+        let a = AngleInterval::from_degrees(80.0, 100.0);
+        let b = AngleInterval::from_degrees(40.0, 90.0);
+        let c = AngleInterval::from_degrees(80.0, 90.0);
+
+        assert_eq!(a.intersection(b, default_angle_tolerance_for_tests()), c);
+    }
+
+    #[test]
+    fn test_angle_interval_intersection__no_overlap() {
+        let a = AngleInterval::from_degrees(95.0, 100.0);
+        let b = AngleInterval::from_degrees(40.0, 90.0);
+        assert_eq!(
+            a.intersection(b, default_angle_tolerance_for_tests()),
+            AngleInterval::Empty,
+        );
+    }
+
+    #[test]
+    fn test_angle_interval_intersection__full_overlap() {
+        let small = AngleInterval::from_degrees(80.0, 100.0);
+        let big = AngleInterval::from_degrees(60.0, 120.0);
+        assert_eq!(
+            big.intersection(small, default_angle_tolerance_for_tests()),
+            small
+        );
+        assert_eq!(
+            small.intersection(big, default_angle_tolerance_for_tests()),
+            small
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_angle_interval_intersection__wraparound_double_overlap() {
+        let small = AngleInterval::from_degrees(80.0, 100.0);
+        let big = AngleInterval::from_degrees(60.0, 120.0);
+        big.intersection(small.complement(), default_angle_tolerance_for_tests());
+    }
 }

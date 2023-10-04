@@ -987,40 +987,6 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_interval_intersection__simple_overlap() {
-        assert_eq!(
-            PartialAngleInterval::from_degrees(80.0, 100.0).intersection_with_other_partial_arc(
-                PartialAngleInterval::from_degrees(40.0, 90.0)
-            ),
-            PartialAngleInterval::from_degrees(80.0, 90.0),
-            "from overlap"
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_angle_interval_intersection__no_overlap() {
-        PartialAngleInterval::from_degrees(95.0, 100.0)
-            .intersection_with_other_partial_arc(PartialAngleInterval::from_degrees(40.0, 90.0));
-    }
-
-    #[test]
-    fn test_angle_interval_intersection__full_overlap() {
-        let small = PartialAngleInterval::from_degrees(80.0, 100.0);
-        let big = PartialAngleInterval::from_degrees(60.0, 120.0);
-        assert_eq!(big.intersection_with_other_partial_arc(small), small);
-        assert_eq!(small.intersection_with_other_partial_arc(big), small);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_angle_interval_intersection__wraparound_double_overlap() {
-        let small = PartialAngleInterval::from_degrees(80.0, 100.0);
-        let big = PartialAngleInterval::from_degrees(60.0, 120.0);
-        big.intersection_with_other_partial_arc(small.complement());
-    }
-
-    #[test]
     fn test_interval_fully_contain_other_interval() {
         assert!(
             PartialAngleInterval::from_degrees(-10.0, 10.0)
