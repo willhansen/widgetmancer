@@ -63,7 +63,7 @@ impl Display for PartialAngleInterval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "From {}° to {}°",
+            "({}° to {}°)",
             self.clockwise_end.to_degrees(),
             self.anticlockwise_end.to_degrees()
         )
@@ -273,28 +273,6 @@ impl PartialAngleInterval {
         let contained_in_self = self.num_contained_or_touching_edges(other);
         let contained_in_other = other.num_contained_or_touching_edges(*self);
         contained_in_self >= 1 && contained_in_other >= 1
-    }
-    pub fn subtract(&self, other: PartialAngleInterval) -> Vec<PartialAngleInterval> {
-        if !self.touches_or_overlaps(other) {
-            return vec![self.clone()];
-        }
-
-        let mut split_results = vec![];
-        if self.contains_or_touches_angle(other.clockwise_end)
-            && self.clockwise_end != other.clockwise_end
-        {
-            let below_interval =
-                PartialAngleInterval::from_angles(self.clockwise_end, other.clockwise_end);
-            split_results.push(below_interval);
-        }
-        if self.contains_or_touches_angle(other.anticlockwise_end)
-            && self.anticlockwise_end != other.anticlockwise_end
-        {
-            let above_interval =
-                PartialAngleInterval::from_angles(other.anticlockwise_end, self.anticlockwise_end);
-            split_results.push(above_interval);
-        }
-        split_results
     }
     pub fn edge_of_this_overlapped_by(
         &self,
@@ -1122,27 +1100,6 @@ mod tests {
         let arc = PartialAngleInterval::from_relative_square(vec2(0, -1));
         assert_about_eq!(arc.clockwise_end.to_degrees(), -135.0);
         assert_about_eq!(arc.anticlockwise_end.to_degrees(), -45.0);
-    }
-
-    #[test]
-    fn test_split_interval_around_interval() {
-        let new_arcs = assert_eq!(
-            PartialAngleInterval::from_degrees(0.0, 30.0)
-                .subtract(PartialAngleInterval::from_degrees(10.0, 20.0)),
-            vec![
-                PartialAngleInterval::from_degrees(0.0, 10.0),
-                PartialAngleInterval::from_degrees(20.0, 30.0),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_interval_subtraction__touching_from_inside() {
-        let new_arcs = assert_eq!(
-            PartialAngleInterval::from_degrees(0.0, 30.0)
-                .subtract(PartialAngleInterval::from_degrees(-10.0, 30.0)),
-            vec![]
-        );
     }
 
     #[test]

@@ -38,8 +38,8 @@ pub enum AngleInterval {
 impl Display for AngleInterval {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            AngleInterval::Empty => write!(f, "Empty"),
-            AngleInterval::FullCircle => write!(f, "FullCircle"),
+            AngleInterval::Empty => write!(f, "(Empty)"),
+            AngleInterval::FullCircle => write!(f, "(FullCircle)"),
             AngleInterval::PartialArc(arc) => std::fmt::Display::fmt(&arc, f),
         }
     }
@@ -218,13 +218,35 @@ impl AngleInterval {
             PartialArc(self_partial) => match other {
                 Empty => vec![*self],
                 FullCircle => vec![Empty],
-                PartialArc(other_partial) => self_partial
-                    .subtract(other_partial)
-                    .into_iter()
-                    .map_into()
-                    .collect(),
+                PartialArc(other_partial) => {
+                    Self::subtract_partial_arcs(*self_partial, other_partial)
+                }
             },
         }
+    }
+    fn subtract_partial_arcs(
+        a: PartialAngleInterval,
+        b: PartialAngleInterval,
+        // TODO: have a tolerance?
+        //tolerance: FAngle,
+    ) -> Vec<Self> {
+        if !a.touches_or_overlaps(b) {
+            return vec![a.into()];
+        }
+
+        let mut split_results = vec![];
+        if a.contains_or_touches_angle(b.cw()) && a.cw() != b.cw() {
+            let below_interval = AngleInterval::from_angles(a.cw(), b.cw());
+            split_results.push(below_interval);
+        }
+        if a.contains_or_touches_angle(b.ccw()) && a.ccw() != b.ccw() {
+            let above_interval = AngleInterval::from_angles(b.ccw(), a.ccw());
+            split_results.push(above_interval);
+        }
+        if split_results.is_empty() {
+            split_results.push(AngleInterval::Empty);
+        }
+        split_results
     }
     pub fn from_octant(octant: Octant) -> Self {
         PartialAngleInterval::from_octant(octant).into()
@@ -626,7 +648,7 @@ mod tests {
         let test_subtract = |x1: AngleInterval, x2, x3| {
             assert!(
                 x1.subtract(x2).first().unwrap().about_eq(x3, tolerance),
-                "{} - {} = {} is false",
+                "{} - {} = {} should be true",
                 x1,
                 x2,
                 x3
@@ -641,7 +663,7 @@ mod tests {
         test_subtract(a, b, c);
         test_subtract(a, c, b);
         test_subtract(b, c, b);
-        test_subtract(c, b, b);
+        test_subtract(c, b, c);
         test_subtract(FullCircle, b, b.complement());
         test_subtract(a, Empty, a);
         test_subtract(a, a, Empty);
@@ -708,4 +730,32 @@ mod tests {
         let big = AngleInterval::from_degrees(60.0, 120.0);
         big.intersection(small.complement(), default_angle_tolerance_for_tests());
     }
+
+    #[test]
+    fn test_split_interval_around_interval() {
+        let new_arcs = assert_eq!(
+            AngleInterval::from_degrees(0.0, 30.0)
+                .subtract(AngleInterval::from_degrees(10.0, 20.0)),
+            vec![
+                AngleInterval::from_degrees(0.0, 10.0),
+                AngleInterval::from_degrees(20.0, 30.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_interval_subtraction__touching_from_inside() {
+        let new_arcs = assert_eq!(
+            AngleInterval::from_degrees(0.0, 30.0)
+                .subtract(AngleInterval::from_degrees(-10.0, 30.0)),
+            vec![AngleInterval::Empty]
+        );
+    }
+
+
+
+
+
+
+    
 }
