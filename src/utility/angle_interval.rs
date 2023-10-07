@@ -191,6 +191,8 @@ impl AngleInterval {
             .into(),
         )
     }
+
+    // TODO: Watch out for misalignments between containment checks in this function
     fn intersect_partial_arcs(
         a: PartialAngleInterval,
         b: PartialAngleInterval,
@@ -200,10 +202,19 @@ impl AngleInterval {
             panic!("Wraparound double overlap:\n{}\n{}", a, b);
         }
 
-        if a.contains_angle(b.cw(), tolerance).is_true() {
-            AngleInterval::from_angles(b.cw(), a.ccw())
-        } else if a.contains_angle(b.ccw(), tolerance).is_true() {
-            AngleInterval::from_angles(a.cw(), b.ccw())
+        if a.overlaps_partial_arc(b, tolerance).is_true() {
+            AngleInterval::from_angles(
+                if b.contains_angle(a.cw(), tolerance).is_true() {
+                    a.cw()
+                } else {
+                    b.cw()
+                },
+                if b.contains_angle(a.ccw(), tolerance).is_true() {
+                    a.ccw()
+                } else {
+                    b.ccw()
+                },
+            )
         } else {
             AngleInterval::Empty
         }
@@ -751,11 +762,4 @@ mod tests {
             vec![AngleInterval::Empty]
         );
     }
-
-
-
-
-
-
-    
 }
