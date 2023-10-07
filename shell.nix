@@ -3,7 +3,7 @@ let
   unstable = import <nixos-unstable> {};
 in
 {}:
-  pkgs.mkShell rec {
+  pkgs.mkShell {
     buildInputs = with unstable.pkgs; [
       cargo
       rustc

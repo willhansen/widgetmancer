@@ -51,27 +51,35 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
-// trait alias
-pub trait AbsOrRelSquareTrait:
+pub trait Coordinate<T, U>:
     Copy
     + PartialEq
-    + Add<WorldStep, Output = Self>
-    + Sub<WorldStep, Output = Self>
-    + Sub<Self, Output = WorldStep>
+    + Add<Vector2D<T, U>, Output = Self>
+    + Sub<Vector2D<T, U>, Output = Self>
+    + Sub<Self, Output = Vector2D<T, U>>
     + Zero
 {
+    fn x(&self) -> T;
+    fn y(&self) -> T;
 }
 
-// TODO: not have this huge type bound exist twice
-impl<T> AbsOrRelSquareTrait for T where
-    T: Copy
-        + PartialEq
-        + Add<WorldStep, Output = Self>
-        + Sub<WorldStep, Output = Self>
-        + Sub<Self, Output = WorldStep>
-        + Zero
+// TODO: trait alias
+impl<T, U> Coordinate<T, U> for Vector2D<T, U>
+where
+    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Zero,
 {
+    fn x(&self) -> T {
+        self.x
+    }
+
+    fn y(&self) -> T {
+        self.y
+    }
 }
+
+pub trait AbsOrRelSquareTrait: Coordinate<f32, SquareGridInWorldFrame> {}
+
+impl<T> AbsOrRelSquareTrait for T where T: Coordinate<f32, SquareGridInWorldFrame> {}
 
 pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
 
@@ -85,13 +93,13 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     (point - point.round()).to_point()
 }
 
-pub fn rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
-    v: Vector2D<T, U>,
+pub fn rotated_n_quarter_turns_counter_clockwise<T, U, V: Coordinate<T, U>>(
+    v: V,
     quarter_turns: i32,
-) -> Vector2D<T, U> {
+) -> V {
     vec2(
-        v.x * int_to_T(int_cos(quarter_turns)) - v.y * int_to_T(int_sin(quarter_turns)),
-        v.x * int_to_T(int_sin(quarter_turns)) + v.y * int_to_T(int_cos(quarter_turns)),
+        v.x() * int_to_T(int_cos(quarter_turns)) - v.y() * int_to_T(int_sin(quarter_turns)),
+        v.x() * int_to_T(int_sin(quarter_turns)) + v.y() * int_to_T(int_cos(quarter_turns)),
     )
 }
 pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
