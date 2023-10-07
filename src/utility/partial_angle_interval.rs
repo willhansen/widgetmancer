@@ -322,15 +322,6 @@ impl PartialAngleInterval {
     pub fn overlaps_or_touches(&self, other: PartialAngleInterval) -> bool {
         self.overlapping_but_not_exactly_touching(other) || self.exactly_touches_arc(other)
     }
-    #[deprecated(note = "use version with tolerance instead")]
-    pub fn overlaps_other_by_at_least_this_much(
-        &self,
-        other: PartialAngleInterval,
-        thresh: Angle<f32>,
-    ) -> bool {
-        self.overlaps_partial_arc(other, thresh)
-            .is_at_least_partial()
-    }
 
     #[deprecated(note = "use version with tolerance instead")]
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
@@ -1229,26 +1220,6 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_overlap_at_least_this_much() {
-        let arc1 = PartialAngleInterval::from_degrees(0.0, 90.0);
-        let arc2 = PartialAngleInterval::from_degrees(90.0, 180.0);
-
-        assert_false!(arc1.overlaps_other_by_at_least_this_much(arc2, Angle::degrees(5.0)));
-        assert_false!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated_ccw(Angle::degrees(-4.9)),
-            Angle::degrees(5.0)
-        ));
-        assert!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated_ccw(Angle::degrees(-5.1)),
-            Angle::degrees(5.0),
-        ));
-        assert_false!(arc1.overlaps_other_by_at_least_this_much(
-            arc2.rotated_ccw(Angle::degrees(5.1)),
-            Angle::degrees(5.0)
-        ));
-        // TODO: more cases here
-    }
     #[test]
     fn test_split_into_octants__one_octant() {
         let single_octant_degrees = vec![
