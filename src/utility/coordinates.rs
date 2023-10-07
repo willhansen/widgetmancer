@@ -73,15 +73,9 @@ impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T wher
 {
 }
 
-pub trait AbsOrRelPointTrait<AbsOrRelPoint>:
-    Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
-{
-}
+pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
 
-impl<T, AbsOrRelPoint> AbsOrRelPointTrait<AbsOrRelPoint> for T where
-    T: Copy + PartialEq + Sub<AbsOrRelPoint, Output = WorldMove>
-{
-}
+impl<T> AbsOrRelPoint for T where T: Copy + PartialEq + Sub<T, Output = WorldMove> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x), sign(point.y))
@@ -314,12 +308,12 @@ pub fn square_is_odd(square: WorldSquare) -> bool {
 pub fn square_is_even(square: WorldSquare) -> bool {
     !square_is_odd(square)
 }
-pub fn about_eq_2d<P: AbsOrRelPointTrait<P>>(p1: P, p2: P, tolerance: f32) -> bool {
+pub fn about_eq_2d<P: AbsOrRelPoint>(p1: P, p2: P, tolerance: f32) -> bool {
     (p1 - p2).length().abs() < tolerance
 }
 
-pub fn assert_about_eq_2d<P: AbsOrRelPointTrait<P> + Debug>(p1: P, p2: P) {
-    let tolerance = 0.001; // TODO: parameterize
+pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
+    let tolerance = 0.001; // TODO: make parameter
     assert!(
         about_eq_2d(p1, p2, tolerance),
         "Points too far apart: p1: {:?}, p2: {:?}",

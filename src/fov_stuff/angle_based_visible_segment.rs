@@ -127,7 +127,7 @@ impl AngleBasedVisibleSegment {
         Self::new(arc, end_fence)
     }
     pub fn from_arc_and_fence_radius(arc: AngleInterval, fence_radius: u32) -> Self {
-        Self::new(arc, Fence::from_radius_and_arc(fence_radius, arc))
+        Self::new(arc, Fence::from_radius_of_square_and_arc(fence_radius, arc))
     }
     pub fn with_weakly_applied_start_face(
         &self,
