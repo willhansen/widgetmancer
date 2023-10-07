@@ -52,23 +52,23 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 pub type FAngle = Angle<f32>;
 
 // trait alias
-pub trait AbsOrRelSquareTrait<AbsOrRelWorldSquare>:
+pub trait AbsOrRelSquareTrait:
     Copy
     + PartialEq
-    + Add<WorldStep, Output = AbsOrRelWorldSquare>
-    + Sub<WorldStep, Output = AbsOrRelWorldSquare>
-    + Sub<AbsOrRelWorldSquare, Output = WorldStep>
+    + Add<WorldStep, Output = Self>
+    + Sub<WorldStep, Output = Self>
+    + Sub<Self, Output = WorldStep>
     + Zero
 {
 }
 
 // TODO: not have this huge type bound exist twice
-impl<T, AbsOrRelWorldSquare> AbsOrRelSquareTrait<AbsOrRelWorldSquare> for T where
+impl<T> AbsOrRelSquareTrait for T where
     T: Copy
         + PartialEq
-        + Add<WorldStep, Output = AbsOrRelWorldSquare>
-        + Sub<WorldStep, Output = AbsOrRelWorldSquare>
-        + Sub<AbsOrRelWorldSquare, Output = WorldStep>
+        + Add<WorldStep, Output = Self>
+        + Sub<WorldStep, Output = Self>
+        + Sub<Self, Output = WorldStep>
         + Zero
 {
 }
@@ -545,6 +545,17 @@ impl Sub for QuarterTurnsAnticlockwise {
 
 pub trait QuarterTurnRotatable {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self;
+    fn quadrant_rotations_in_ccw_order(&self) -> [Self; 4]
+    where
+        Self: Sized + Debug,
+    {
+        (0..4)
+            .into_iter()
+            .map(|i| self.rotated(QuarterTurnsAnticlockwise::new(i)))
+            .collect_vec()
+            .try_into()
+            .unwrap()
+    }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {

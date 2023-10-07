@@ -6,6 +6,7 @@ use ordered_float::OrderedFloat;
 
 use crate::rotated_to_have_split_at_max;
 
+use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinates::FAngle;
 use crate::utility::general_utility::all_true;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -72,7 +73,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         Self::square_fence(radius_of_square).sub_fence_in_arc(arc, tolerance)
     }
     fn square_fence(radius: u32) -> Self {
-        todo!()
+        let start: RelativeFace = ((radius as i32, radius as i32), STEP_UP).into();
+        Self::from_faces_in_ccw_order(
+            start
+                .quadrant_rotations_in_ccw_order()
+                .into_iter()
+                .flat_map(|start_face: RelativeFace| {
+                    (0..(2 * radius + 1)).map(|i| start_face.strafed_left_n(i as i32))
+                }),
+        )
     }
     fn sub_fence_in_arc(&self, arc: AngleInterval, tolerance: FAngle) -> Self {
         todo!()
@@ -225,49 +234,18 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 edge,
             ))
     }
-    // TODO: add tolerance?
-    fn has_non_zero_angle_overlap_with_rel_square(&self, rel_square: WorldStep) -> bool {
-        if rel_square == STEP_ZERO {
-            return !self.edges.is_empty();
-        }
-        self.spanned_angle_from_origin()
-            .overlapping_but_not_exactly_touching(PartialAngleInterval::from_relative_square(
-                rel_square,
-            ))
-    }
     fn ccw_end_point(&self) -> WorldMove {
-        if self.edges.is_empty() {
-            panic!("no points on an empty fence");
-        } else if self.edges.len() == 1 {
-            // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].end_points_of_face_in_ccw_order()[1]
-        } else {
-            let points_from_last_edge = self.edges.last().unwrap().end_points_of_face();
-            let second_last_edge = self.edges.get(self.edges.len() - 2).unwrap();
-            points_from_last_edge
-                .into_iter()
-                .find(|&candidate_endpoint| {
-                    !second_last_edge.face_end_point_approx_touches_point(candidate_endpoint)
-                })
-                .unwrap()
-        }
+        self.point_by_index(-1)
     }
     fn cw_end_point(&self) -> WorldMove {
-        if self.edges.is_empty() {
-            panic!("no points on an empty fence");
-        } else if self.edges.len() == 1 {
-            // the choice of which edge is the end is arbitrary, as long as it's different from the start point
-            self.edges[0].end_points_of_face_in_ccw_order()[0]
-        } else {
-            let points_from_first_edge = self.edges.first().unwrap().end_points_of_face();
-            let second_edge = self.edges.get(1).unwrap();
-            points_from_first_edge
-                .into_iter()
-                .find(|&candidate_endpoint| {
-                    !second_edge.face_end_point_approx_touches_point(candidate_endpoint)
-                })
-                .unwrap()
-        }
+        self.point_by_index(0)
+    }
+
+    fn start_point(&self) -> WorldMove {
+        self.cw_end_point()
+    }
+    fn end_point(&self) -> WorldMove {
+        self.ccw_end_point()
     }
 
     fn edges_sorted_going_ccw(
