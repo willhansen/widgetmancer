@@ -318,8 +318,8 @@ pub fn about_eq_2d<P: AbsOrRelPointTrait<P>>(p1: P, p2: P, tolerance: f32) -> bo
     (p1 - p2).length().abs() < tolerance
 }
 
-pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
-    let tolerance = 0.001;
+pub fn assert_about_eq_2d<P: AbsOrRelPointTrait<P> + Debug>(p1: P, p2: P) {
+    let tolerance = 0.001; // TODO: parameterize
     assert!(
         about_eq_2d(p1, p2, tolerance),
         "Points too far apart: p1: {:?}, p2: {:?}",

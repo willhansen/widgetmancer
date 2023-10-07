@@ -6,6 +6,7 @@ use ordered_float::OrderedFloat;
 
 use crate::rotated_to_have_split_at_max;
 
+use crate::utility::coordinates::FAngle;
 use crate::utility::general_utility::all_true;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
@@ -66,7 +67,14 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
         Self::from_faces_in_ccw_order(vec![edge.into()])
     }
-    pub fn from_radius_and_arc(radius: u32, arc: AngleInterval) -> Self {
+    pub fn from_radius_of_square_and_arc(radius_of_square: u32, arc: AngleInterval) -> Self {
+        let tolerance = FAngle::degrees(0.01); // TODO: standardize
+        Self::square_fence(radius_of_square).sub_fence_in_arc(arc, tolerance)
+    }
+    fn square_fence(radius: u32) -> Self {
+        todo!()
+    }
+    fn sub_fence_in_arc(&self, arc: AngleInterval, tolerance: FAngle) -> Self {
         todo!()
     }
     fn try_add_to_ccw_end(&mut self, edge: RelativeFace) -> SimpleResult {
@@ -845,7 +853,7 @@ mod tests {
         fence.point_by_index(-7);
     }
     #[test]
-    fn test_fence_has_canonical_representation() {
+    fn test_fence_has_canonical_orientation() {
         assert_eq!(
             Fence::from_one_edge(((5, 2), STEP_DOWN)).edges()[0],
             ((5, 1), STEP_UP).into(),
@@ -879,5 +887,16 @@ mod tests {
             fence.spanned_angle_from_origin(),
             AngleInterval::from_degrees(-45.0, 45.0)
         );
+    }
+    #[test]
+    fn test_full_circle_fence_has_canonical_break_point() {
+        let fence = Fence::from_faces_in_ccw_order([
+            ((0, 0), STEP_LEFT),
+            ((0, 0), STEP_DOWN),
+            ((0, 0), STEP_RIGHT),
+            ((0, 0), STEP_UP),
+        ]);
+        assert_about_eq_2d(fence.cw_end_point(), (0.5, 0.5).into());
+        assert_about_eq_2d(fence.ccw_end_point(), (0.5, 0.5).into());
     }
 }
