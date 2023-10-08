@@ -1585,17 +1585,18 @@ mod tests {
 
         let quarter_turns = 3;
 
-        let sub_fov_direction = rotated_n_quarter_turns_counter_clockwise(
-            fov.root_square_with_direction.direction().step(),
-            quarter_turns,
-        );
+        let sub_fov_direction = fov
+            .root_square_with_direction
+            .direction()
+            .step()
+            .rotated_n_quarter_turns_counter_clockwise(quarter_turns);
         let mut sub_fov = FieldOfView::new_empty_fov_with_root(
             SquareWithOrthogonalDir::from_square_and_step(sub_center, sub_fov_direction),
         );
 
         let rel_square = STEP_DOWN_LEFT * 3;
         let rotated_rel_square =
-            rotated_n_quarter_turns_counter_clockwise(rel_square, quarter_turns);
+            rel_square.rotated_n_quarter_turns_counter_clockwise(quarter_turns);
         let abs_square = sub_center + rotated_rel_square;
 
         sub_fov.add_fully_visible_relative_square(rotated_rel_square);

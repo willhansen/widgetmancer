@@ -65,6 +65,10 @@ where
     fn x(&self) -> T;
     fn y(&self) -> T;
     fn new(x: T, y: T) -> Self;
+    fn rotated_n_quarter_turns_counter_clockwise(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw>,
+    ) -> Self;
 }
 
 // TODO: trait alias
@@ -82,6 +86,18 @@ where
 
     fn new(x: T, y: T) -> Self {
         Self::new(x, y)
+    }
+    fn rotated_n_quarter_turns_counter_clockwise(
+        &self,
+        quarter_turns: impl Into<QuarterTurnsCcw>,
+    ) -> Self {
+        let quarter_turns: i32 = quarter_turns.into().quarter_turns;
+        Self::new(
+            self.x() * int_to_T(int_cos(quarter_turns))
+                - self.y() * int_to_T(int_sin(quarter_turns)),
+            self.x() * int_to_T(int_sin(quarter_turns))
+                + self.y() * int_to_T(int_cos(quarter_turns)),
+        )
     }
 }
 impl<T, U> Coordinate<T, U> for Point2D<T, U>
@@ -117,27 +133,14 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     (point - point.round()).to_point()
 }
 
-pub fn rotated_n_quarter_turns_counter_clockwise<
-    T: Signed + Mul<Output = T>,
-    U,
-    V: Coordinate<T, U>,
->(
-    v: V,
-    quarter_turns: impl Into<QuarterTurnsCcw>,
-) -> V {
-    let quarter_turns: i32 = quarter_turns.into().quarter_turns;
-    V::new(
-        v.x() * int_to_T(int_cos(quarter_turns)) - v.y() * int_to_T(int_sin(quarter_turns)),
-        v.x() * int_to_T(int_sin(quarter_turns)) + v.y() * int_to_T(int_cos(quarter_turns)),
-    )
-}
-
 #[deprecated(note = "use rotated_n_quarter_turns_counter_clockwise instead")]
 pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
     p: Point2D<T, U>,
     quarter_turns: i32,
 ) -> Point2D<T, U> {
-    rotated_n_quarter_turns_counter_clockwise(p.to_vector(), quarter_turns).to_point()
+    p.to_vector()
+        .rotated_n_quarter_turns_counter_clockwise(quarter_turns)
+        .to_point()
 }
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
@@ -149,7 +152,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
 
 pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     (0..4)
-        .map(|i| rotated_n_quarter_turns_counter_clockwise(v, i))
+        .map(|i| v.rotated_n_quarter_turns_counter_clockwise(i))
         .collect()
 }
 
@@ -177,17 +180,15 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
     }
 }
 
-impl<T: Signed + Copy, U> QuarterTurnRotatable for Point2D<T, U> {
+impl<T, U, V> QuarterTurnRotatable for V
+where
+    V: Coordinate<T, U>,
+{
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise)
+        self.rotated_n_quarter_turns_counter_clockwise(quarter_turns_ccw)
     }
 }
 
-impl<T: Signed + Copy, U> QuarterTurnRotatable for Vector2D<T, U> {
-    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
-        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise)
-    }
-}
 pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     let mut new_v = v.clone();
     new_v.reverse();
@@ -383,8 +384,8 @@ impl KingWorldStep {
 }
 
 impl QuarterTurnRotatable for KingWorldStep {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
-        self.step().rotated(quarter_turns_anticlockwise).into()
+    fn rotated(&self, quarter_turns_ccw: QuarterTurnsCcw) -> Self {
+        self.step().rotated(quarter_turns_ccw).into()
     }
 }
 
@@ -425,8 +426,8 @@ impl OrthogonalWorldStep {
 }
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
-        self.step().rotated(quarter_turns_anticlockwise).into()
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        self.step().rotated(quarter_turns_ccw).into()
     }
 }
 
@@ -601,9 +602,9 @@ pub trait QuarterTurnRotatable {
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_ccw: QuarterTurnsCcw) -> Self {
         standardize_angle(Angle::radians(
-            self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
+            self.radians + PI / 2.0 * quarter_turns_ccw.quarter_turns as f32,
         ))
     }
 }

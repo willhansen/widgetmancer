@@ -44,7 +44,10 @@ impl Add for StepWithQuarterRotations {
 
 #[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters)]
 #[get_copy = "pub"]
-pub struct AbsOrRelSquareWithOrthogonalDir<SquareType: Copy> {
+pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
+where
+    SquareType: Copy + QuarterTurnRotatable,
+{
     square: SquareType,
     dir: OrthogonalWorldStep,
 }
@@ -96,6 +99,14 @@ where
     }
     pub fn strafed_left_n(&self, n: i32) -> Self {
         self.strafed_right_n(-n)
+    }
+
+    pub fn revolved(&self, quarter_turns: impl Into<QuarterTurnsCcw>) -> Self {
+        (
+            self.square.rotated(quarter_turns),
+            self.dir.rotated(quarter_turns),
+        )
+            .into()
     }
 
     pub fn turned_left(&self) -> Self {
