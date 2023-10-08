@@ -540,12 +540,17 @@ mod tests {
     #[test]
     fn test_rotate_vs_revolve_a_face() {
         let rel_face: RelativeFace = (3, 5, STEP_UP).into();
-        let abs_face: Face = (5, 1, STEP_LEFT).into();
 
         assert_eq!(rel_face.rotated(1), (3, 5, STEP_LEFT).into());
+        assert_eq!(rel_face.revolved(1), (-5, 3, STEP_LEFT).into());
+        assert_eq!(rel_face.rotated(2), (3, 5, STEP_DOWN).into());
         assert_eq!(rel_face.revolved(2), (-3, -5, STEP_DOWN).into());
 
-        assert_eq!(abs_face.rotated(-1), (1, -5, STEP_UP).into());
-        assert_eq!(rel_face.revolved(2), (-5, -1, STEP_RIGHT).into());
+        let abs_face: Face = (5, 1, STEP_LEFT).into();
+
+        assert_eq!(abs_face.rotated(-1), (5, 1, STEP_UP).into());
+        assert_eq!(abs_face.revolved(-1), (1, -5, STEP_UP).into());
+        assert_eq!(abs_face.rotated(2), (5, 1, STEP_RIGHT).into());
+        assert_eq!(abs_face.revolved(2), (-5, -1, STEP_RIGHT).into());
     }
 }

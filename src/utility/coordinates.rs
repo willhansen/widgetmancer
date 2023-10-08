@@ -71,87 +71,87 @@ where
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
 }
 
-// macro_rules! coordinatify {
-//     ($class:ident) => {
-//         impl<T, U> Coordinate for $class<T, U>
-//         where
-//             // TODO: trait alias
-//             T: Copy
-//                 + PartialEq
-//                 + Add<Output = T>
-//                 + Sub<Output = T>
-//                 + Mul<Output = T>
-//                 + Zero
-//                 + Signed
-//                 + Debug,
-//         {
-//             type DataType = T;
-//             type UnitType = U;
+macro_rules! coordinatify {
+    ($class:ident) => {
+        impl<T, U> Coordinate for $class<T, U>
+        where
+            // TODO: trait alias
+            T: Copy
+                + PartialEq
+                + Add<Output = T>
+                + Sub<Output = T>
+                + Mul<Output = T>
+                + Zero
+                + Signed
+                + Debug,
+        {
+            type DataType = T;
+            type UnitType = U;
 
-//             fn x(&self) -> T {
-//                 self.x
-//             }
+            fn x(&self) -> T {
+                self.x
+            }
 
-//             fn y(&self) -> T {
-//                 self.y
-//             }
+            fn y(&self) -> T {
+                self.y
+            }
 
-//             fn new(x: T, y: T) -> Self {
-//                 Self::new(x, y)
-//             }
-//         }
-//     };
+            fn new(x: T, y: T) -> Self {
+                Self::new(x, y)
+            }
+        }
+    };
+}
+
+coordinatify!(Vector2D);
+coordinatify!(Point2D);
+// impl<T, U> Coordinate for Vector2D<T, U>
+// where
+//     // TODO: trait alias
+//     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
+// {
+//     type DataType = T;
+//     type UnitType = U;
+
+//     fn x(&self) -> T {
+//         self.x
+//     }
+
+//     fn y(&self) -> T {
+//         self.y
+//     }
+
+//     fn new(x: T, y: T) -> Self {
+//         Self::new(x, y)
+//     }
 // }
+// impl<T, U> Coordinate for Point2D<T, U>
+// where
+//     // TODO: trait alias
+//     T: Copy
+//         + PartialEq
+//         + Add<Output = T>
+//         + Sub<Output = T>
+//         + Mul<Output = T>
+//         + Zero
+//         + Signed
+//         + Debug,
+// {
+//     type DataType = T;
+//     type UnitType = U;
 
-// coordinatify!(Vector2D);
-// coordinatify!(Point2D);
-impl<T, U> Coordinate for Vector2D<T, U>
-where
-    // TODO: trait alias
-    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
-{
-    type DataType = T;
-    type UnitType = U;
+//     fn x(&self) -> T {
+//         self.x
+//     }
 
-    fn x(&self) -> T {
-        self.x
-    }
+//     fn y(&self) -> T {
+//         self.y
+//     }
 
-    fn y(&self) -> T {
-        self.y
-    }
-
-    fn new(x: T, y: T) -> Self {
-        Self::new(x, y)
-    }
-}
-impl<T, U> Coordinate for Point2D<T, U>
-where
-    // TODO: trait alias
-    T: Copy
-        + PartialEq
-        + Add<Output = T>
-        + Sub<Output = T>
-        + Mul<Output = T>
-        + Zero
-        + Signed
-        + Debug,
-{
-    type DataType = T;
-    type UnitType = U;
-
-    fn x(&self) -> T {
-        self.x
-    }
-
-    fn y(&self) -> T {
-        self.y
-    }
-
-    fn new(x: T, y: T) -> Self {
-        Self::new(x, y)
-    }
-}
+//     fn new(x: T, y: T) -> Self {
+//         Self::new(x, y)
+//     }
+// }
 
 pub trait WorldGridCoordinate:
     Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
@@ -585,7 +585,7 @@ impl QuarterTurnsCcw {
     }
     pub fn rotate_vector<T, U>(&self, v: Vector2D<T, U>) -> Vector2D<T, U>
     where
-        T: Signed + Copy,
+        T: Signed + Copy + Debug,
     {
         v.rotated(self.quarter_turns)
     }
