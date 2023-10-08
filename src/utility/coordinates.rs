@@ -68,10 +68,6 @@ where
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
-    fn rotated_n_quarter_turns_counter_clockwise(
-        &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw>,
-    ) -> Self;
 }
 
 // TODO: trait alias
@@ -79,6 +75,9 @@ impl<T, U> Coordinate for Vector2D<T, U>
 where
     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
+    type DataType = T;
+    type UnitType = U;
+
     fn x(&self) -> T {
         self.x
     }
@@ -90,23 +89,14 @@ where
     fn new(x: T, y: T) -> Self {
         Self::new(x, y)
     }
-    fn rotated_n_quarter_turns_counter_clockwise(
-        &self,
-        quarter_turns: impl Into<QuarterTurnsCcw>,
-    ) -> Self {
-        let quarter_turns: i32 = quarter_turns.into().quarter_turns;
-        Self::new(
-            self.x() * int_to_T(int_cos(quarter_turns))
-                - self.y() * int_to_T(int_sin(quarter_turns)),
-            self.x() * int_to_T(int_sin(quarter_turns))
-                + self.y() * int_to_T(int_cos(quarter_turns)),
-        )
-    }
 }
 impl<T, U> Coordinate for Point2D<T, U>
 where
     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
+    type DataType = T;
+    type UnitType = U;
+
     fn x(&self) -> T {
         self.x
     }
@@ -142,14 +132,12 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     (point - point.round()).to_point()
 }
 
-#[deprecated(note = "use rotated_n_quarter_turns_counter_clockwise instead")]
+#[deprecated(note = "use rotated instead")]
 pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
     p: Point2D<T, U>,
     quarter_turns: i32,
 ) -> Point2D<T, U> {
-    p.to_vector()
-        .rotated_n_quarter_turns_counter_clockwise(quarter_turns)
-        .to_point()
+    p.to_vector().rotated(quarter_turns).to_point()
 }
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
@@ -160,9 +148,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
 }
 
 pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
-    (0..4)
-        .map(|i| v.rotated_n_quarter_turns_counter_clockwise(i))
-        .collect()
+    (0..4).map(|i| v.rotated(i)).collect()
 }
 
 pub fn get_8_octant_transforms_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
@@ -192,9 +178,16 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
 impl<V, T, U> QuarterTurnRotatable for V
 where
     V: Coordinate<DataType = T, UnitType = U>,
+    T: Mul<Output = T> + Signed + Sub<Output = T>, //T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self.rotated_n_quarter_turns_counter_clockwise(quarter_turns_ccw)
+        let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
+        Self::new(
+            self.x() * int_to_T(int_cos(quarter_turns))
+                - self.y() * int_to_T(int_sin(quarter_turns)),
+            self.x() * int_to_T(int_sin(quarter_turns))
+                + self.y() * int_to_T(int_cos(quarter_turns)),
+        )
     }
 }
 
@@ -393,7 +386,7 @@ impl KingWorldStep {
 }
 
 impl QuarterTurnRotatable for KingWorldStep {
-    fn rotated(&self, quarter_turns_ccw: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         self.step().rotated(quarter_turns_ccw).into()
     }
 }
@@ -522,7 +515,7 @@ impl QuarterTurnsCcw {
         }
     }
     pub fn to_vector(&self) -> WorldStep {
-        STEP_RIGHT.rotated_n_quarter_turns_counter_clockwise(self.quarter_turns)
+        STEP_RIGHT.rotated(self.quarter_turns)
     }
     pub fn from_vector(dir: WorldStep) -> Self {
         assert!(is_orthogonal(dir));
@@ -561,7 +554,7 @@ impl QuarterTurnsCcw {
     where
         T: Signed + Copy,
     {
-        v.rotated_n_quarter_turns_counter_clockwise(self.quarter_turns)
+        v.rotated(self.quarter_turns)
     }
 }
 

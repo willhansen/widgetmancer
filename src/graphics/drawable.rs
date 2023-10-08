@@ -52,7 +52,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn rotated(&self, b: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, b: impl Into<QuarterTurnsCcw>) -> Self {
         match self {
             Self::Text(a) => a.rotated(b).into(),
             Self::PartialVisibility(a) => a.rotated(b).into(),
@@ -86,7 +86,7 @@ impl TextDrawable {
 }
 
 impl QuarterTurnRotatable for TextDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         // lmao no
         self.clone().into()
     }
@@ -148,7 +148,7 @@ impl PartialVisibilityDrawable {
 }
 
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self.visibility.rotated(quarter_turns_anticlockwise);
         the_clone.into()
@@ -238,7 +238,7 @@ impl BrailleDrawable {
 }
 
 impl QuarterTurnRotatable for BrailleDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         let r = self.braille_array.rotated(quarter_turns_anticlockwise);
         Self {
             braille_array: r,
@@ -291,7 +291,7 @@ impl SolidColorDrawable {
 }
 
 impl QuarterTurnRotatable for SolidColorDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         self.clone().into()
     }
 }
@@ -348,7 +348,7 @@ impl ArrowDrawable {
 }
 
 impl QuarterTurnRotatable for ArrowDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         ArrowDrawable {
             direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
@@ -412,7 +412,7 @@ impl ConveyorBeltDrawable {
 }
 
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         ConveyorBeltDrawable {
             direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
@@ -498,7 +498,7 @@ impl OffsetSquareDrawable {
 }
 
 impl QuarterTurnRotatable for OffsetSquareDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.rotated(quarter_turns_anticlockwise),
             ..self.clone()
