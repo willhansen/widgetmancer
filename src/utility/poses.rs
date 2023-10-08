@@ -105,10 +105,10 @@ where
         Self::from_square_and_step(self.square, self.right())
     }
     fn left(&self) -> OrthogonalWorldStep {
-        self.direction().rotated(QuarterTurnsCcw::new(1))
+        self.direction().rotated(1)
     }
     fn right(&self) -> OrthogonalWorldStep {
-        self.direction().rotated(QuarterTurnsCcw::new(3))
+        self.direction().rotated(3)
     }
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_step(self.square, -self.direction().step())
@@ -191,6 +191,7 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 
 impl<T: Copy> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+        todo!("revolve not rotate");
         (
             rotated_n_quarter_turns_counter_clockwise(
                 self.square(),
@@ -518,5 +519,16 @@ mod tests {
                     edge, canonicalized, correct
                 );
             });
+    }
+    #[test]
+    fn test_rotate_vs_revolve_a_face() {
+        let rel_face: RelativeFace = (3, 5, STEP_UP).into();
+        let abs_face: Face = (5, 1, STEP_LEFT).into();
+
+        assert_eq!(rel_face.rotated(1), (3, 5, STEP_LEFT).into());
+        assert_eq!(rel_face.revolved(2), (-3, -5, STEP_DOWN).into());
+
+        assert_eq!(abs_face.rotated(-1), (1, -5, STEP_UP).into());
+        assert_eq!(rel_face.revolved(2), (-5, -1, STEP_RIGHT).into());
     }
 }

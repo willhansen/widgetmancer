@@ -123,13 +123,16 @@ pub fn rotated_n_quarter_turns_counter_clockwise<
     V: Coordinate<T, U>,
 >(
     v: V,
-    quarter_turns: i32,
+    quarter_turns: impl Into<QuarterTurnsCcw>,
 ) -> V {
+    let quarter_turns: i32 = quarter_turns.into().quarter_turns;
     V::new(
         v.x() * int_to_T(int_cos(quarter_turns)) - v.y() * int_to_T(int_sin(quarter_turns)),
         v.x() * int_to_T(int_sin(quarter_turns)) + v.y() * int_to_T(int_cos(quarter_turns)),
     )
 }
+
+#[deprecated(note = "use rotated_n_quarter_turns_counter_clockwise instead")]
 pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
     p: Point2D<T, U>,
     quarter_turns: i32,
@@ -175,17 +178,14 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
 }
 
 impl<T: Signed + Copy, U> QuarterTurnRotatable for Point2D<T, U> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
-        point_rotated_n_quarter_turns_counter_clockwise(
-            *self,
-            quarter_turns_anticlockwise.quarter_turns,
-        )
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise)
     }
 }
 
 impl<T: Signed + Copy, U> QuarterTurnRotatable for Vector2D<T, U> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
-        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise.quarter_turns)
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+        rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise)
     }
 }
 pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
@@ -425,7 +425,7 @@ impl OrthogonalWorldStep {
 }
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
         self.step().rotated(quarter_turns_anticlockwise).into()
     }
 }
@@ -579,15 +579,21 @@ impl Sub for QuarterTurnsCcw {
     }
 }
 
+impl From<i32> for QuarterTurnsCcw {
+    fn from(value: i32) -> Self {
+        Self::new(value)
+    }
+}
+
 pub trait QuarterTurnRotatable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self;
-    fn quadrant_rotations_in_ccw_order(&self) -> [Self; 4]
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self;
+    fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
         Self: Sized + Debug,
     {
         (0..4)
             .into_iter()
-            .map(|i| self.rotated(QuarterTurnsCcw::new(i)))
+            .map(|i| self.rotated(i))
             .collect_vec()
             .try_into()
             .unwrap()
