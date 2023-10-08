@@ -338,6 +338,7 @@ impl PartialSquareVisibilityFromPointSource {
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
             .visibility_switch_angles_going_ccw

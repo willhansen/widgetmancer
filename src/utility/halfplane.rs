@@ -284,6 +284,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 
 impl<U: Copy + Debug> QuarterTurnRotatable for HalfPlane<f32, U> {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
         let point = self.point_on_half_plane();
         let new_point = point.rotated(quarter_turns_ccw);

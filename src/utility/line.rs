@@ -66,8 +66,11 @@ where
     pub fn is_orthogonal(&self) -> bool {
         self.p1.x == self.p2.x || self.p1.y == self.p2.y
     }
-    pub fn as_array(&self) -> [Point2D<T, U>; 2] {
+    pub fn to_array(&self) -> [Point2D<T, U>; 2] {
         [self.p1, self.p2]
+    }
+    pub fn from_array(a: [Point2D<T, U>; 2]) -> Self {
+        Self::new(a[0], a[1])
     }
 }
 impl<T, U> QuarterTurnRotatable for Line<T, U>
@@ -75,8 +78,11 @@ where
     T: Clone + Debug + PartialEq + Signed + Copy,
 {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_ccw));
-        Self::new(new_points[0].clone(), new_points[1].clone())
+        let quarter_turns_ccw = quarter_turns_ccw.into();
+        let new_points = self.to_array().map(|p| p.rotated(quarter_turns_ccw));
+        Self::from_array(new_points)
+        // let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_ccw));
+        // Self::new(new_points[0].clone(), new_points[1].clone())
     }
 }
 

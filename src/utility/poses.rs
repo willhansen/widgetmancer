@@ -102,6 +102,7 @@ where
     }
 
     pub fn revolved(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         (
             self.square.rotated(quarter_turns_ccw),
             self.dir.rotated(quarter_turns_ccw),
@@ -197,11 +198,14 @@ where
 }
 impl<T: WorldGridCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO: tidy
         write!(
             f,
-            "Pos: {:?}, Dir: {:?} {} ",
-            self.square(),
-            self.dir().step(),
+            "Pos: (x:{}, y:{}), Dir: (x: {}, y: {}) {} ",
+            self.square().x(),
+            self.square().y(),
+            self.dir().step().x(),
+            self.dir().step().y(),
             Glyph::extract_arrow_from_arrow_string(self.dir().step(), FACE_ARROWS)
         )
     }

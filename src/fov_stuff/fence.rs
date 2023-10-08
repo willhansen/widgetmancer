@@ -79,7 +79,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
                 .quadrant_revolutions_in_ccw_order()
                 .into_iter()
                 .flat_map(|start_face: RelativeFace| {
-                    (0..(2 * radius + 1)).map(|i| start_face.strafed_left_n(i as i32))
+                    (0..(2 * radius + 1))
+                        .map(|i| start_face.strafed_left_n(i as i32))
+                        .collect_vec()
                 }),
         )
     }

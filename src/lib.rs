@@ -1,9 +1,6 @@
 #![allow(warnings)]
 #![allow(non_snake_case)]
 
-#[macro_use]
-extern crate static_assertions;
-
 extern crate approx;
 extern crate core;
 extern crate line_drawing;
