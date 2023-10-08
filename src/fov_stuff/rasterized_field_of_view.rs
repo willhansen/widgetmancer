@@ -8,8 +8,8 @@ use crate::graphics::drawable::{
 };
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    CoordToString, QuarterTurnRotatable, QuarterTurnsCcw, SimpleResult, TupleClone, STEP_ZERO,
+    king_step_distance, number_to_hue_rotation, CoordToString, QuarterTurnRotatable,
+    QuarterTurnsCcw, SimpleResult, TupleClone, STEP_ZERO,
 };
 use ambassador::delegatable_trait;
 use derive_more::Constructor;
@@ -586,7 +586,7 @@ impl RasterizedFieldOfView {
     // ) -> Vec<LocallyPositionedNonOverlappingDrawTargetsFromOneSquare> {
     //     let view_transform_to_sub_view = self.view_transform_to(sub_view);
     //
-    //     let rotation_moving_forward_through_portal: QuarterTurnsAnticlockwise =
+    //     let rotation_moving_forward_through_portal: QuarterTurnsCcw =
     //         view_transform_to_sub_view.rotation();
     //
     //     let rotated_relative_square = rotated_n_quarter_turns_counter_clockwise(

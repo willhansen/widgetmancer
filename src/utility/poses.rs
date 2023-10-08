@@ -202,16 +202,13 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 
 impl<T: Copy> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
-        todo!("revolve not rotate");
         (
-            rotated_n_quarter_turns_counter_clockwise(
-                self.square(),
-                quarter_turns_anticlockwise.quarter_turns(),
-            ),
-            rotated_n_quarter_turns_counter_clockwise(
-                self.direction().dir(),
-                quarter_turns_anticlockwise.quarter_turns(),
-            ),
+            self.square,
+            self.direction()
+                .dir()
+                .rotated_n_quarter_turns_counter_clockwise(
+                    quarter_turns_anticlockwise.quarter_turns(),
+                ),
         )
             .into()
     }

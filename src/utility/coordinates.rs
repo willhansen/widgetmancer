@@ -513,7 +513,7 @@ impl QuarterTurnsCcw {
         }
     }
     pub fn to_vector(&self) -> WorldStep {
-        rotated_n_quarter_turns_counter_clockwise(STEP_RIGHT, self.quarter_turns)
+        STEP_RIGHT.rotated_n_quarter_turns_counter_clockwise(self.quarter_turns)
     }
     pub fn from_vector(dir: WorldStep) -> Self {
         assert!(is_orthogonal(dir));
@@ -552,7 +552,7 @@ impl QuarterTurnsCcw {
     where
         T: Signed + Copy,
     {
-        rotated_n_quarter_turns_counter_clockwise(v, self.quarter_turns)
+        v.rotated_n_quarter_turns_counter_clockwise(self.quarter_turns)
     }
 }
 

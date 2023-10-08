@@ -279,10 +279,9 @@ impl RigidTransform {
         &self,
         pose: RelativeSquareWithOrthogonalDir,
     ) -> RelativeSquareWithOrthogonalDir {
-        let end_square = rotated_n_quarter_turns_counter_clockwise(
-            pose.square(),
-            self.rotation().quarter_turns(),
-        );
+        let end_square = pose
+            .square()
+            .rotated_n_quarter_turns_counter_clockwise(self.rotation().quarter_turns());
 
         let end_direction = self.rotation().rotate_vector(pose.direction().step());
 
