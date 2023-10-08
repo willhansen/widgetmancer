@@ -74,7 +74,7 @@ impl<T, U> QuarterTurnRotatable for Line<T, U>
 where
     T: Clone + Debug + PartialEq + Signed + Copy,
 {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_anticlockwise));
         Self::new(new_points[0].clone(), new_points[1].clone())
     }

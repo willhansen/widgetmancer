@@ -435,7 +435,7 @@ impl OctantFOVSquareSequenceIter {
     }
 
     // todo: change to implementation of QuarterTurnRotatable trait
-    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+    pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         Self {
             outward_dir: self.outward_dir.rotated(quarter_turns),
             across_dir: self.across_dir.rotated(quarter_turns),
@@ -709,8 +709,8 @@ mod tests {
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        better_angle_from_x_axis, QuarterTurnsAnticlockwise, SquareWithKingDir,
-        SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
+        better_angle_from_x_axis, QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir,
+        STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
     use super::*;
@@ -1320,7 +1320,7 @@ mod tests {
 
         let transform = portal.get_transform();
         assert_eq!(transform.translation(), vec2(47, 67));
-        assert_eq!(transform.rotation(), QuarterTurnsAnticlockwise::new(3));
+        assert_eq!(transform.rotation(), QuarterTurnsCcw::new(3));
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
             (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
@@ -1780,7 +1780,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsAnticlockwise::new(0)
+            QuarterTurnsCcw::new(0)
         );
     }
 
@@ -1843,7 +1843,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsAnticlockwise::new(1)
+            QuarterTurnsCcw::new(1)
         );
         let the_square_visibility = rasterized_fov
             .lone_square_visibility_rotated_to_relative_frame_for_relative_square_or_panic(

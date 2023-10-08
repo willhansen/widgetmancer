@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
     fmt::Display,
-    ops::{Add, Neg, Sub},
+    ops::{Add, Mul, Neg, Sub},
 };
 
 use derive_more::{AddAssign, Neg};
@@ -57,16 +57,20 @@ pub trait Coordinate<T, U>:
     + Add<Vector2D<T, U>, Output = Self>
     + Sub<Vector2D<T, U>, Output = Self>
     + Sub<Self, Output = Vector2D<T, U>>
+    + Mul<T, Output = Self>
     + Zero
+where
+    T: Mul<Output = T> + Signed,
 {
     fn x(&self) -> T;
     fn y(&self) -> T;
+    fn new(x: T, y: T) -> Self;
 }
 
 // TODO: trait alias
 impl<T, U> Coordinate<T, U> for Vector2D<T, U>
 where
-    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Zero,
+    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
     fn x(&self) -> T {
         self.x
@@ -75,11 +79,31 @@ where
     fn y(&self) -> T {
         self.y
     }
+
+    fn new(x: T, y: T) -> Self {
+        Self::new(x, y)
+    }
+}
+impl<T, U> Coordinate<T, U> for Point2D<T, U>
+where
+    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
+{
+    fn x(&self) -> T {
+        self.x
+    }
+
+    fn y(&self) -> T {
+        self.y
+    }
+
+    fn new(x: T, y: T) -> Self {
+        Self::new(x, y)
+    }
 }
 
-pub trait AbsOrRelSquareTrait: Coordinate<f32, SquareGridInWorldFrame> {}
+pub trait AbsOrRelSquareTrait: Coordinate<i32, SquareGridInWorldFrame> {}
 
-impl<T> AbsOrRelSquareTrait for T where T: Coordinate<f32, SquareGridInWorldFrame> {}
+impl<T> AbsOrRelSquareTrait for T where T: Coordinate<i32, SquareGridInWorldFrame> {}
 
 pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
 
@@ -93,11 +117,15 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     (point - point.round()).to_point()
 }
 
-pub fn rotated_n_quarter_turns_counter_clockwise<T, U, V: Coordinate<T, U>>(
+pub fn rotated_n_quarter_turns_counter_clockwise<
+    T: Signed + Mul<Output = T>,
+    U,
+    V: Coordinate<T, U>,
+>(
     v: V,
     quarter_turns: i32,
 ) -> V {
-    vec2(
+    V::new(
         v.x() * int_to_T(int_cos(quarter_turns)) - v.y() * int_to_T(int_sin(quarter_turns)),
         v.x() * int_to_T(int_sin(quarter_turns)) + v.y() * int_to_T(int_cos(quarter_turns)),
     )
@@ -147,7 +175,7 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
 }
 
 impl<T: Signed + Copy, U> QuarterTurnRotatable for Point2D<T, U> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         point_rotated_n_quarter_turns_counter_clockwise(
             *self,
             quarter_turns_anticlockwise.quarter_turns,
@@ -156,7 +184,7 @@ impl<T: Signed + Copy, U> QuarterTurnRotatable for Point2D<T, U> {
 }
 
 impl<T: Signed + Copy, U> QuarterTurnRotatable for Vector2D<T, U> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         rotated_n_quarter_turns_counter_clockwise(*self, quarter_turns_anticlockwise.quarter_turns)
     }
 }
@@ -280,7 +308,7 @@ pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
 pub fn revolve_square(
     moving_square: WorldSquare,
     pivot_square: WorldSquare,
-    rotation: QuarterTurnsAnticlockwise,
+    rotation: QuarterTurnsCcw,
 ) -> WorldSquare {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
@@ -332,7 +360,7 @@ pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].rotated(QuarterTurnsAnticlockwise::new(1)) {
+    if faces[0] == faces[1].rotated(QuarterTurnsCcw::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -355,7 +383,7 @@ impl KingWorldStep {
 }
 
 impl QuarterTurnRotatable for KingWorldStep {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         self.step().rotated(quarter_turns_anticlockwise).into()
     }
 }
@@ -397,7 +425,7 @@ impl OrthogonalWorldStep {
 }
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         self.step().rotated(quarter_turns_anticlockwise).into()
     }
 }
@@ -473,13 +501,13 @@ impl RigidlyTransformable for OrthogonalWorldStep {
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, AddAssign)]
 #[get_copy = "pub"]
-pub struct QuarterTurnsAnticlockwise {
+pub struct QuarterTurnsCcw {
     quarter_turns: i32,
 }
 
-impl QuarterTurnsAnticlockwise {
+impl QuarterTurnsCcw {
     pub fn new(quarter_turns: i32) -> Self {
-        QuarterTurnsAnticlockwise {
+        QuarterTurnsCcw {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
@@ -488,7 +516,7 @@ impl QuarterTurnsAnticlockwise {
     }
     pub fn from_vector(dir: WorldStep) -> Self {
         assert!(is_orthogonal(dir));
-        QuarterTurnsAnticlockwise::new(if dir.x == 0 {
+        QuarterTurnsCcw::new(if dir.x == 0 {
             if dir.y > 0 {
                 1
             } else {
@@ -527,15 +555,15 @@ impl QuarterTurnsAnticlockwise {
     }
 }
 
-impl Neg for QuarterTurnsAnticlockwise {
+impl Neg for QuarterTurnsCcw {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        QuarterTurnsAnticlockwise::new(-self.quarter_turns)
+        QuarterTurnsCcw::new(-self.quarter_turns)
     }
 }
 
-impl Add for QuarterTurnsAnticlockwise {
+impl Add for QuarterTurnsCcw {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -543,7 +571,7 @@ impl Add for QuarterTurnsAnticlockwise {
     }
 }
 
-impl Sub for QuarterTurnsAnticlockwise {
+impl Sub for QuarterTurnsCcw {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -552,14 +580,14 @@ impl Sub for QuarterTurnsAnticlockwise {
 }
 
 pub trait QuarterTurnRotatable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self;
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self;
     fn quadrant_rotations_in_ccw_order(&self) -> [Self; 4]
     where
         Self: Sized + Debug,
     {
         (0..4)
             .into_iter()
-            .map(|i| self.rotated(QuarterTurnsAnticlockwise::new(i)))
+            .map(|i| self.rotated(QuarterTurnsCcw::new(i)))
             .collect_vec()
             .try_into()
             .unwrap()
@@ -567,7 +595,7 @@ pub trait QuarterTurnRotatable {
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_anticlockwise.quarter_turns as f32,
         ))
@@ -772,11 +800,7 @@ mod tests {
     #[test]
     fn test_revolve_square() {
         assert_eq!(
-            revolve_square(
-                point2(3, 4),
-                point2(5, 5),
-                QuarterTurnsAnticlockwise::new(3),
-            ),
+            revolve_square(point2(3, 4), point2(5, 5), QuarterTurnsCcw::new(3),),
             point2(4, 7)
         );
     }
@@ -784,23 +808,20 @@ mod tests {
     #[test]
     fn test_quarter_turns_from_vectors() {
         assert_eq!(
-            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_UP),
-            QuarterTurnsAnticlockwise::new(0)
+            QuarterTurnsCcw::from_start_and_end_directions(STEP_UP, STEP_UP),
+            QuarterTurnsCcw::new(0)
         );
         assert_eq!(
-            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
-            QuarterTurnsAnticlockwise::new(3)
+            QuarterTurnsCcw::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
+            QuarterTurnsCcw::new(3)
         );
         assert_eq!(
-            QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
-            QuarterTurnsAnticlockwise::new(2)
+            QuarterTurnsCcw::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
+            QuarterTurnsCcw::new(2)
         );
         assert_eq!(
-            QuarterTurnsAnticlockwise::from_start_and_end_directions(
-                STEP_DOWN_LEFT,
-                STEP_DOWN_RIGHT,
-            ),
-            QuarterTurnsAnticlockwise::new(1)
+            QuarterTurnsCcw::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
+            QuarterTurnsCcw::new(1)
         );
     }
     #[test]

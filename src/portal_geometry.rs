@@ -16,7 +16,7 @@ use crate::utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
     ith_projection_of_step, naive_ray_endpoint, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle,
-    AbsOrRelSquareWithOrthogonalDir, QuarterTurnsAnticlockwise, RelativeSquareWithOrthogonalDir,
+    AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw, RelativeSquareWithOrthogonalDir,
     RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations,
     WorldLine, STEP_RIGHT, STEP_ZERO,
 };

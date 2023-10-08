@@ -18,8 +18,8 @@ use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, partial_angle_interval,
     rotated_n_quarter_turns_counter_clockwise, standardize_angle, Octant, OrthogonalWorldStep,
-    QuarterTurnsAnticlockwise, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir,
-    ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
+    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 use super::bool_with_partial::BoolWithPartial;
@@ -408,7 +408,7 @@ impl RigidlyTransformable for AngleInterval {
     }
 }
 impl QuarterTurnRotatable for AngleInterval {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         match self {
             AngleInterval::PartialArc(partial_arc) => partial_arc
                 .rotated_quarter_turns(quarter_turns_anticlockwise)

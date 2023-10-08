@@ -14,7 +14,7 @@ use super::{
 #[get_copy = "pub"]
 pub struct StepWithQuarterRotations {
     stepp: WorldStep,
-    rotation: QuarterTurnsAnticlockwise,
+    rotation: QuarterTurnsCcw,
 }
 
 impl StepWithQuarterRotations {
@@ -30,7 +30,7 @@ impl StepWithQuarterRotations {
 
 impl Default for StepWithQuarterRotations {
     fn default() -> Self {
-        StepWithQuarterRotations::new(STEP_ZERO, QuarterTurnsAnticlockwise::new(0))
+        StepWithQuarterRotations::new(STEP_ZERO, QuarterTurnsCcw::new(0))
     }
 }
 
@@ -58,8 +58,8 @@ impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
     SquareType: AbsOrRelSquareTrait + Copy + PartialEq,
 {
-    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsAnticlockwise {
-        QuarterTurnsAnticlockwise::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
+    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
+        QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
     }
     pub fn from_square_and_step<S: Into<OrthogonalWorldStep>>(
         square: SquareType,
@@ -70,10 +70,7 @@ where
             dir: direction.into(),
         }
     }
-    pub fn from_square_and_turns(
-        square: SquareType,
-        quarter_turns: QuarterTurnsAnticlockwise,
-    ) -> Self {
+    pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::from_square_and_step(square, quarter_turns.to_vector())
     }
     pub fn direction(&self) -> OrthogonalWorldStep {
@@ -108,10 +105,10 @@ where
         Self::from_square_and_step(self.square, self.right())
     }
     fn left(&self) -> OrthogonalWorldStep {
-        rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 1).into()
+        self.direction().rotated(QuarterTurnsCcw::new(1))
     }
     fn right(&self) -> OrthogonalWorldStep {
-        rotated_n_quarter_turns_counter_clockwise(self.direction().into(), 3).into()
+        self.direction().rotated(QuarterTurnsCcw::new(3))
     }
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_step(self.square, -self.direction().step())
@@ -193,15 +190,15 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 }
 
 impl<T: Copy> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         (
             rotated_n_quarter_turns_counter_clockwise(
                 self.square(),
-                quarter_turns_anticlockwise.value(),
+                quarter_turns_anticlockwise.quarter_turns(),
             ),
             rotated_n_quarter_turns_counter_clockwise(
                 self.direction().dir(),
-                quarter_turns_anticlockwise.value(),
+                quarter_turns_anticlockwise.quarter_turns(),
             ),
         )
             .into()

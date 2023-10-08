@@ -233,7 +233,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
 pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
 
 impl<const SIZE: usize> SquareBoolArray2D<SIZE> {
-    pub fn rotated(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+    pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         let rotation_function = match quarter_turns.quarter_turns() {
             0 => |x, y| (x, y),
             1 => |x, y| (SIZE - 1 - y, x),
@@ -271,7 +271,7 @@ impl RigidTransform {
     pub fn translation(&self) -> WorldStep {
         (self.end_pose - self.start_pose).stepp()
     }
-    pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
+    pub fn rotation(&self) -> QuarterTurnsCcw {
         (self.end_pose - self.start_pose).rotation()
     }
     // TODO: maybe te.st this if sus

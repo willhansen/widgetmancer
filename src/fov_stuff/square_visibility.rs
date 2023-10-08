@@ -13,7 +13,7 @@ use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
     standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
-    QuarterTurnsAnticlockwise, WorldLine, STEP_ZERO,
+    QuarterTurnsCcw, WorldLine, STEP_ZERO,
 };
 use derive_more::Constructor;
 use euclid::{point2, Angle};
@@ -293,7 +293,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         Self {
             visible_portion: self
                 .visible_portion
@@ -340,7 +340,7 @@ impl PartialSquareVisibilityFromPointSource {
 }
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
             .visibility_switch_angles_going_ccw

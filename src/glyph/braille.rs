@@ -307,7 +307,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
-    
+
     fn test_array_to_braille_char() {
         // 10
         // 00
@@ -331,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_set_braille_dot() {
         let mut b = EMPTY_BRAILLE;
         b = add_braille_dot(b, point2(0, 0));
@@ -340,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_braille_grid_to_character_grid() {
         assert_eq!(
             world_braille_square_to_world_character_square(point2(0, 0)),
@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_pos_to_braille_pos() {
         assert_eq!(
             world_character_point_to_braille_point(point2(0.0, 0.0)),
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_braille_pos_to_world_pos() {
         assert_eq!(
             braille_pos_to_character_world_pos(point2(0.5, 1.5)),
@@ -399,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_braille_square_to_dot_in_character() {
         assert_eq!(
             braille_square_to_dot_in_character(point2(0, 0)),
@@ -420,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_combine_braille_character() {
         assert_eq!(
             combine_braille_characters('\u{2800}', '\u{2820}'),
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_point_to_braille_char() {
         assert_eq!(
             character_world_pos_to_braille_char(point2(0.0, 0.0)),
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_point_to_braille_char_is_always_braille() {
         for _ in 0..200 {
             //let random_point = p(rand_in_range(0.0, 30.0), rand_in_range(0.0, 30.0));
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_count_braille_dots() {
         assert_eq!(count_braille_dots('\u{2800}'), 0);
         assert_eq!(count_braille_dots('\u{2818}'), 2);
@@ -474,7 +474,7 @@ mod tests {
     } //⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿
 
     #[test]
-    
+
     fn test_chars_for_horizontal_braille_line_without_rounding() {
         let start: WorldCharacterPoint = point2(-0.25, -0.4);
         let end: WorldCharacterPoint = point2(1.75, -0.4);
@@ -497,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_chars_for_horizontal_braille_line_with_offset_without_rounding() {
         let start = WorldCharacterPoint::new(-0.25, 0.4);
         let end = WorldCharacterPoint::new(1.75, 0.4);
@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_chars_for_vertical_braille_line_without_rounding() {
         let start = WorldCharacterPoint::new(-0.25, -0.4);
         let end = WorldCharacterPoint::new(-0.25, 0.875);
@@ -547,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_points_to_braille_chars() {
         // ┌──┬──┐┌──┬──┐
         // │  │  ││  │  │
@@ -577,21 +577,21 @@ mod tests {
         assert_eq!(chars.get(&point2(3, 0)).unwrap(), &'⠒');
     }
     #[test]
-    
+
     fn test_the_big_braille_string() {
         ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING
             .chars()
             .for_each(|c| assert!(char_is_braille(c)));
     }
     #[test]
-    
+
     fn test_braille_array_to_and_from_char() {
         ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING
             .chars()
             .for_each(|c| assert_eq!(BrailleArray::from_char(c).char(), c));
     }
     #[test]
-    
+
     fn test_double_braille_array_rotation() {
         let mut array = DoubleBrailleArray::empty();
         array.set_xy(2, 0, true);
@@ -609,16 +609,14 @@ mod tests {
         for t in turns_xys {
             for p in t.1 {
                 assert_eq!(
-                    array
-                        .rotated(QuarterTurnsAnticlockwise::new(t.0))
-                        .get_xy(p.0, p.1),
+                    array.rotated(QuarterTurnsCcw::new(t.0)).get_xy(p.0, p.1),
                     true
                 );
             }
         }
     }
     #[test]
-    
+
     fn test_braille_array_parse_space() {
         assert_eq!(BrailleArray::from_char(SPACE).char(), SPACE);
     }

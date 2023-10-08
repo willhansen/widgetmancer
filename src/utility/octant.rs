@@ -4,7 +4,7 @@ use euclid::Angle;
 
 use super::FAngle;
 use super::OrthogonalWorldStep;
-use super::{QuarterTurnsAnticlockwise, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
+use super::{QuarterTurnsCcw, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
@@ -13,10 +13,7 @@ impl Octant {
     pub fn new(octant: i32) -> Self {
         Octant(octant.rem_euclid(8))
     }
-    pub fn with_n_quarter_turns_anticlockwise(
-        &self,
-        quarter_turns: QuarterTurnsAnticlockwise,
-    ) -> Self {
+    pub fn with_n_quarter_turns_anticlockwise(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::new(self.0 + quarter_turns.quarter_turns() * 2)
     }
     pub fn outward_and_across_directions(&self) -> (OrthogonalWorldStep, OrthogonalWorldStep) {

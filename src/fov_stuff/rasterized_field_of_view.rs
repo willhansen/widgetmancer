@@ -9,8 +9,7 @@ use crate::graphics::drawable::{
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    CoordToString, QuarterTurnRotatable, QuarterTurnsAnticlockwise, SimpleResult, TupleClone,
-    STEP_ZERO,
+    CoordToString, QuarterTurnRotatable, QuarterTurnsCcw, SimpleResult, TupleClone, STEP_ZERO,
 };
 use ambassador::delegatable_trait;
 use derive_more::Constructor;
@@ -22,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 struct TopDownPortalTarget {
     absolute_square: WorldSquare,
     portal_depth: u32,
-    portal_rotation_to_target: QuarterTurnsAnticlockwise,
+    portal_rotation_to_target: QuarterTurnsCcw,
 }
 type PositionedTopDownPortalTarget = (WorldStep, TopDownPortalTarget);
 
@@ -84,7 +83,7 @@ pub trait TopDownifiedFieldOfViewInterface {
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
-    ) -> QuarterTurnsAnticlockwise;
+    ) -> QuarterTurnsCcw;
     fn lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
@@ -149,7 +148,7 @@ impl SquareOfTopDownPortals {
     fn lone_portal_depth_or_panic(&self) -> u32 {
         self.lone_top_down_portal_or_panic().target.portal_depth
     }
-    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsAnticlockwise {
+    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsCcw {
         self.lone_top_down_portal_or_panic()
             .target
             .portal_rotation_to_target
@@ -188,10 +187,7 @@ impl SquareOfTopDownPortals {
         }
     }
 
-    fn one_portal_deeper(
-        &self,
-        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
-    ) -> Self {
+    fn one_portal_deeper(&self, forward_rotation_through_portal: QuarterTurnsCcw) -> Self {
         todo!()
         // Self::from(self.top_down_portals.iter().map(|x| {
         //     Into::<TopDownPortal>::into(x.tuple_clone())
@@ -415,7 +411,7 @@ impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
-    ) -> QuarterTurnsAnticlockwise {
+    ) -> QuarterTurnsCcw {
         todo!()
     }
     fn lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
@@ -702,10 +698,7 @@ impl TopDownPortal {
     fn split(&self) -> (PositionedTopDownPortalTarget, TopDownPortalShape) {
         ((self.relative_position, self.target), self.shape)
     }
-    fn one_portal_deeper(
-        &self,
-        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
-    ) -> Self {
+    fn one_portal_deeper(&self, forward_rotation_through_portal: QuarterTurnsCcw) -> Self {
         Self {
             target: self
                 .target
@@ -722,7 +715,7 @@ impl TopDownPortal {
     pub fn portal_depth(&self) -> u32 {
         self.target.portal_depth
     }
-    pub fn portal_rotation_to_target(&self) -> QuarterTurnsAnticlockwise {
+    pub fn portal_rotation_to_target(&self) -> QuarterTurnsCcw {
         self.target.portal_rotation_to_target
     }
 
@@ -745,13 +738,10 @@ impl TopDownPortalTarget {
         Self {
             absolute_square,
             portal_depth: 0,
-            portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+            portal_rotation_to_target: QuarterTurnsCcw::default(),
         }
     }
-    fn one_portal_deeper(
-        &self,
-        forward_rotation_through_portal: QuarterTurnsAnticlockwise,
-    ) -> Self {
+    fn one_portal_deeper(&self, forward_rotation_through_portal: QuarterTurnsCcw) -> Self {
         Self {
             portal_depth: self.portal_depth + 1,
             portal_rotation_to_target: self.portal_rotation_to_target
@@ -923,7 +913,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             shape: TopDownPortalShape::new_fully_visible(),
         })
@@ -938,7 +928,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             shape: TopDownPortalShape::new_fully_visible(),
         });
@@ -947,7 +937,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             shape: TopDownPortalShape::new_top_half_visible(),
         });
@@ -962,7 +952,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             shape: TopDownPortalShape::new_bottom_half_visible(),
         });
@@ -971,7 +961,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             shape: TopDownPortalShape::from_visible_half_plane(
                 LocalSquareHalfPlane::top_half_plane().extended(0.001),
@@ -999,7 +989,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 5),
                 portal_depth: 3,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1008,7 +998,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 7),
                 portal_depth: 5,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1022,7 +1012,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 5),
                 portal_depth: 3,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1031,7 +1021,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 7),
                 portal_depth: 5,
-                portal_rotation_to_target: QuarterTurnsAnticlockwise::default(),
+                portal_rotation_to_target: QuarterTurnsCcw::default(),
             },
             SquareVisibility::new_fully_visible(),
         );

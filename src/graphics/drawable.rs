@@ -26,7 +26,7 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::{
     rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
-    OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsAnticlockwise,
+    OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
 };
 
 #[delegatable_trait]
@@ -52,7 +52,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn rotated(&self, b: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, b: QuarterTurnsCcw) -> Self {
         match self {
             Self::Text(a) => a.rotated(b).into(),
             Self::PartialVisibility(a) => a.rotated(b).into(),
@@ -86,7 +86,7 @@ impl TextDrawable {
 }
 
 impl QuarterTurnRotatable for TextDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         // lmao no
         self.clone().into()
     }
@@ -148,7 +148,7 @@ impl PartialVisibilityDrawable {
 }
 
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self.visibility.rotated(quarter_turns_anticlockwise);
         the_clone.into()
@@ -238,7 +238,7 @@ impl BrailleDrawable {
 }
 
 impl QuarterTurnRotatable for BrailleDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         let r = self.braille_array.rotated(quarter_turns_anticlockwise);
         Self {
             braille_array: r,
@@ -291,7 +291,7 @@ impl SolidColorDrawable {
 }
 
 impl QuarterTurnRotatable for SolidColorDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         self.clone().into()
     }
 }
@@ -348,7 +348,7 @@ impl ArrowDrawable {
 }
 
 impl QuarterTurnRotatable for ArrowDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         ArrowDrawable {
             direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
@@ -412,7 +412,7 @@ impl ConveyorBeltDrawable {
 }
 
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         ConveyorBeltDrawable {
             direction: self.direction.rotated(quarter_turns_anticlockwise),
             ..self.clone()
@@ -498,7 +498,7 @@ impl OffsetSquareDrawable {
 }
 
 impl QuarterTurnRotatable for OffsetSquareDrawable {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsAnticlockwise) -> Self {
+    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.rotated(quarter_turns_anticlockwise),
             ..self.clone()
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
-        let character = d.rotated(QuarterTurnsAnticlockwise::new(1)).to_glyphs()[0].character;
+        let character = d.rotated(QuarterTurnsCcw::new(1)).to_glyphs()[0].character;
         assert_eq!(
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
@@ -635,7 +635,7 @@ mod tests {
         drawable.braille_array.print();
         let f = |i| {
             drawable
-                .rotated(QuarterTurnsAnticlockwise::new(i))
+                .rotated(QuarterTurnsCcw::new(i))
                 .to_glyphs()
                 .chars()
         };

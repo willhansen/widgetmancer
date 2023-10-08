@@ -17,7 +17,7 @@ use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
+    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsCcw,
     RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
@@ -433,7 +433,7 @@ impl PartialAngleInterval {
         )
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
-    pub fn rotated_quarter_turns(&self, quarter_turns: QuarterTurnsAnticlockwise) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         PartialAngleInterval {
             clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
             anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),

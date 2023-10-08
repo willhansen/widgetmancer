@@ -13,9 +13,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::CoordToString;
-use crate::utility::{
-    flip_y, get_by_point, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP,
-};
+use crate::utility::{flip_y, get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -45,7 +43,7 @@ pub const SCREEN_STEP_DOWN_RIGHT: ScreenBufferStep = vec2(1, 1);
 
 pub struct Screen {
     screen_origin: WorldSquare,
-    rotation: QuarterTurnsAnticlockwise,
+    rotation: QuarterTurnsCcw,
     pub screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
     pub current_screen_state: Vec<Vec<Glyph>>,
@@ -58,7 +56,7 @@ impl Screen {
     pub fn new(terminal_width: u16, terminal_height: u16) -> Self {
         Screen {
             screen_origin: point2(0, terminal_height as i32 - 1),
-            rotation: QuarterTurnsAnticlockwise::default(),
+            rotation: QuarterTurnsCcw::default(),
             screen_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
                 terminal_width as usize
@@ -190,17 +188,17 @@ impl Screen {
             && buffer_char_pos.y < self.terminal_height as i32;
     }
 
-    pub fn rotate(&mut self, rotation: QuarterTurnsAnticlockwise) {
+    pub fn rotate(&mut self, rotation: QuarterTurnsCcw) {
         let old_center = self.screen_center_as_world_square();
         self.rotation += rotation;
         self.set_screen_center_by_world_square(old_center);
     }
-    pub fn set_rotation(&mut self, rotation: QuarterTurnsAnticlockwise) {
+    pub fn set_rotation(&mut self, rotation: QuarterTurnsCcw) {
         let old_center = self.screen_center_as_world_square();
         self.rotation = rotation;
         self.set_screen_center_by_world_square(old_center);
     }
-    pub fn rotation(&self) -> QuarterTurnsAnticlockwise {
+    pub fn rotation(&self) -> QuarterTurnsCcw {
         self.rotation
     }
 
@@ -474,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_to_screen_buffer() {
         let g = set_up_10x10_character_screen();
 
@@ -495,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_to_screen__should_bias_up_left() {
         let s0 = set_up_nxn_square_screen(5);
         assert_eq!(s0.screen_origin_as_world_square(), point2(0, 4));
@@ -529,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_origin_set_get_consistency() {
         let mut s = set_up_nxn_square_screen(23);
         let new_center = point2(24, 89);
@@ -538,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_max_position() {
         let mut s = set_up_nxn_square_screen(5);
 
@@ -548,17 +546,17 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_max_position__with_rotation() {
         let mut s = set_up_nxn_square_screen(5);
-        s.set_rotation(QuarterTurnsAnticlockwise::new(3));
+        s.set_rotation(QuarterTurnsCcw::new(3));
         s.set_screen_origin_by_world_square(point2(3, 79));
 
         assert_eq!(s.screen_max_as_world_square(), point2(-1, 75));
     }
 
     #[test]
-    
+
     fn test_world_to_screen__with_screen_motion() {
         let mut g = set_up_10x10_character_screen();
 
@@ -574,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_square_is_on_screen() {
         let mut g = Screen::new(41, 20);
         let xmax = 20;
@@ -612,14 +610,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_rotation__square_to_square() {
         let mut s = Screen::new(20, 20);
         let center = point2(3, 5);
         s.set_screen_center_by_world_square(center);
         assert_eq!(s.screen_center_as_world_square(), center);
 
-        assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(0));
+        assert_eq!(s.rotation(), QuarterTurnsCcw::new(0));
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
             point2(4, 7)
@@ -629,9 +627,9 @@ mod tests {
             point2(-1, 16)
         );
 
-        s.rotate(QuarterTurnsAnticlockwise::new(1));
+        s.rotate(QuarterTurnsCcw::new(1));
 
-        assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(1));
+        assert_eq!(s.rotation(), QuarterTurnsCcw::new(1));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
@@ -643,9 +641,9 @@ mod tests {
             ),
             center + STEP_UP * 2
         );
-        s.rotate(QuarterTurnsAnticlockwise::new(6));
+        s.rotate(QuarterTurnsCcw::new(6));
 
-        assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(3));
+        assert_eq!(s.rotation(), QuarterTurnsCcw::new(3));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_LEFT),
@@ -660,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_world_square_is_on_screen__with_screen_rotation() {
         let mut s = Screen::new_by_square_dimensions(100, 5);
         s.set_screen_center_by_world_square(point2(300, 20));
@@ -670,7 +668,7 @@ mod tests {
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(370, 20)));
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
 
-        s.set_rotation(QuarterTurnsAnticlockwise::new(1));
+        s.set_rotation(QuarterTurnsCcw::new(1));
         assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
 
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
@@ -679,20 +677,20 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_rotation_pivots_around_center_square() {
         let mut s = Screen::new(20, 20);
         let center = point2(3, 5);
         s.set_screen_center_by_world_square(center);
         let start_origin = s.screen_origin_as_world_square();
 
-        assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(0));
+        assert_eq!(s.rotation(), QuarterTurnsCcw::new(0));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(s.screen_origin_as_world_square(), start_origin);
         (0..3).for_each(|i| {
-            s.rotate(QuarterTurnsAnticlockwise::new(1));
+            s.rotate(QuarterTurnsCcw::new(1));
 
-            assert_eq!(s.rotation(), QuarterTurnsAnticlockwise::new(i + 1));
+            assert_eq!(s.rotation(), QuarterTurnsCcw::new(i + 1));
             assert_eq!(s.screen_center_as_world_square(), center);
             assert_ne!(s.screen_origin_as_world_square(), start_origin);
         });
