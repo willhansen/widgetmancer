@@ -180,7 +180,7 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
     }
 }
 
-impl<T, U, V> QuarterTurnRotatable for V
+impl<T, U, V> QuarterTurnRotatable for V<T, U>
 where
     V: Coordinate<T, U>,
 {

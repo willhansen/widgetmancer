@@ -16,10 +16,9 @@ use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsCcw,
-    RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    abs_angle_distance, better_angle_from_x_axis, standardize_angle, Octant, OrthogonalWorldStep,
+    QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
+    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
 
 use super::bool_with_partial::BoolWithPartial;
@@ -166,10 +165,8 @@ impl PartialAngleInterval {
         let face_center = square_center + face_direction.step().to_f32() / 2.0;
         let face_corners = [1, -1].map(|sign| {
             face_center
-                + rotated_n_quarter_turns_counter_clockwise(
-                    face_direction.step().to_f32() / 2.0,
-                    sign,
-                )
+                + (face_direction.step().to_f32() / 2.0)
+                    .rotated_n_quarter_turns_counter_clockwise(sign)
         });
 
         let center_angle = better_angle_from_x_axis(face_center);

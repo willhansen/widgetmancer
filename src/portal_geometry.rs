@@ -14,8 +14,7 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
-    ith_projection_of_step, naive_ray_endpoint, revolve_square,
-    rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle,
+    ith_projection_of_step, naive_ray_endpoint, revolve_square, unit_vector_from_angle,
     AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw, RelativeSquareWithOrthogonalDir,
     RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations,
     WorldLine, STEP_RIGHT, STEP_ZERO,
@@ -166,14 +165,15 @@ impl PortalGeometry {
                     // if the second portal is only on the x side, the player steps in the y direction to go through it, but then they need to go left or right on the other side to get to the real destination.
                     // step through, but turn left or right?
                     let y_dir_to_x_dir_is_left =
-                        rotated_n_quarter_turns_counter_clockwise(y_step, 1) == x_step;
+                        y_step.rotated_n_quarter_turns_counter_clockwise(1) == x_step;
 
                     let turn_after_portal = if y_dir_to_x_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(
-                        second_x_portal.exit.direction().step(),
-                        turn_after_portal,
-                    );
+                    let sideways_dir_after_portal = second_x_portal
+                        .exit
+                        .direction()
+                        .step()
+                        .rotated_n_quarter_turns_counter_clockwise(turn_after_portal);
 
                     let dest_square = second_x_portal.exit.square();
                     let dest_dir =
@@ -186,14 +186,15 @@ impl PortalGeometry {
                 } else if maybe_second_y_portal.is_some() && maybe_second_x_portal.is_none() {
                     let second_y_portal = maybe_second_y_portal.unwrap();
                     let x_dir_to_y_dir_is_left =
-                        rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
+                        x_step.rotated_n_quarter_turns_counter_clockwise(1) == y_step;
 
                     let turn_after_portal = if x_dir_to_y_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(
-                        second_y_portal.exit.direction().step(),
-                        turn_after_portal,
-                    );
+                    let sideways_dir_after_portal = second_y_portal
+                        .exit
+                        .direction()
+                        .step()
+                        .rotated_n_quarter_turns_counter_clockwise(turn_after_portal);
 
                     let dest_square = second_y_portal.exit.square();
                     let dest_dir =

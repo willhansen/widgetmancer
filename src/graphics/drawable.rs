@@ -25,8 +25,8 @@ use crate::utility::coordinate_frame_conversions::{
     WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
-    rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
-    OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
+    rotate_vect, tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable,
+    QuarterTurnsCcw,
 };
 
 #[delegatable_trait]

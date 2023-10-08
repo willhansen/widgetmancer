@@ -11,9 +11,8 @@ use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, unit_vector_from_angle, HalfPlane, Line, QuarterTurnRotatable,
-    QuarterTurnsCcw, WorldLine, STEP_ZERO,
+    king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,
+    HalfPlane, Line, QuarterTurnRotatable, QuarterTurnsCcw, WorldLine, STEP_ZERO,
 };
 use derive_more::Constructor;
 use euclid::{point2, Angle};
@@ -78,12 +77,10 @@ impl SquareVisibilityFromOneLargeShadow {
         Self::new_partially_visible(HalfPlane::from_line_and_point_on_half_plane(
             Line::new(
                 point2(0.0, 0.0),
-                rotated_n_quarter_turns_counter_clockwise(
-                    unit_vector_from_angle(shadow_direction),
-                    1,
-                )
-                .to_point()
-                .cast_unit(),
+                unit_vector_from_angle(shadow_direction)
+                    .rotated_n_quarter_turns_counter_clockwise(1)
+                    .to_point()
+                    .cast_unit(),
             ),
             unit_vector_from_angle(shadow_direction)
                 .to_point()

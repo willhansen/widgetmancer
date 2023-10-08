@@ -497,7 +497,9 @@ pub fn first_inside_square_face_hit_by_ray(
 pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
     let square_center = square.to_f32();
     let face_center = square_center + face_direction.step().to_f32() * 0.5;
-    let p1_direction = rotated_n_quarter_turns_counter_clockwise(face_direction.step(), 1);
+    let p1_direction = face_direction
+        .step()
+        .rotated_n_quarter_turns_counter_clockwise(1);
     let p2_direction = -p1_direction;
     WorldLine::new(
         face_center + p1_direction.to_f32() * 0.5,
