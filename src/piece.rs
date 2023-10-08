@@ -96,7 +96,8 @@ impl NStep {
     }
 
     pub fn quadrant_symmetries(&self) -> Vec<Self> {
-        get_4_rotations_of(self.stepp)
+        self.stepp
+            .quadrant_rotations_going_ccw()
             .into_iter()
             .map(|step| NStep::new(step, self.n))
             .collect()

@@ -154,15 +154,11 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
         .unwrap()
 }
 
-pub fn get_4_rotations_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
-    (0..4).map(|i| v.rotated(i)).collect()
-}
-
 pub fn get_8_octant_transforms_of<T: Signed + Copy, U>(v: Vector2D<T, U>) -> Vec<Vector2D<T, U>> {
     let transpose = Vector2D::<T, U>::new(v.y, v.x);
     vec![v, transpose]
         .into_iter()
-        .map(get_4_rotations_of)
+        .map(|x| x.quadrant_rotations_going_ccw())
         .flatten()
         .collect()
 }
@@ -696,7 +692,8 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
 }
 
 pub fn corner_points_of_centered_unit_square<U>() -> Vec<Point2D<f32, U>> {
-    get_4_rotations_of(vec2::<f32, U>(0.5, 0.5))
+    vec2::<f32, U>(0.5, 0.5)
+        .quadrant_rotations_going_ccw()
         .into_iter()
         .map(Vector2D::to_point)
         .collect()
