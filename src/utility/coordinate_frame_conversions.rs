@@ -1,27 +1,31 @@
+use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 
 // empty enums for euclid typing
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInWorldFrame;
+
+#[deprecated(note = "Obselete since screen rotation")]
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInWorldFrame;
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInBufferFrame;
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInScreenFrame;
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInLocalCharacterFrame;
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInLocalSquareFrame;
 
-pub type WorldSquare = Point2D<i32, SquareGridInWorldFrame>;
-pub type WorldPoint = Point2D<f32, SquareGridInWorldFrame>;
+pub type RelativeWorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
+pub type AbsoluteWorldCoordinate<DataType> = Point2D<DataType, SquareGridInWorldFrame>;
+
+pub type WorldSquare = AbsoluteWorldCoordinate<i32>;
+pub type WorldPoint = AbsoluteWorldCoordinate<f32>;
 pub type WorldSquareRect = Box2D<i32, SquareGridInWorldFrame>;
 pub type BoardSize = Size2D<u32, SquareGridInWorldFrame>;
 
-pub type WorldStep = Vector2D<i32, SquareGridInWorldFrame>;
-pub type WorldMove = Vector2D<f32, SquareGridInWorldFrame>;
+pub type WorldStep = RelativeWorldCoordinate<i32>;
+pub type WorldMove = RelativeWorldCoordinate<f32>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
@@ -33,8 +37,14 @@ pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
 
+#[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
+pub type WorldCharacterStep = Vector2D<i32, CharacterGridInWorldFrame>;
+#[deprecated(note = "Obselete since screen rotation")]
+pub type WorldCharacterMove = Vector2D<f32, CharacterGridInWorldFrame>;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
@@ -42,18 +52,40 @@ pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;
 
-pub type BufferCharacterSquare = Point2D<i32, CharacterGridInBufferFrame>;
-pub type BufferCharacterPoint = Point2D<f32, CharacterGridInBufferFrame>;
-
-pub type ScreenCharacterSquare = Point2D<i32, CharacterGridInScreenFrame>;
-pub type ScreenCharacterPoint = Point2D<f32, CharacterGridInScreenFrame>;
-
+#[deprecated(note = "World does not know about glyphs")]
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
+#[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
+pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
 
+#[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
 
-pub type BufferGlyphMap = HashMap<BufferCharacterSquare, Glyph>;
+pub const STEP_ZERO: WorldStep = vec2(0, 0);
+pub const STEP_UP: WorldStep = vec2(0, 1);
+pub const STEP_DOWN: WorldStep = vec2(0, -1);
+pub const STEP_RIGHT: WorldStep = vec2(1, 0);
+pub const STEP_LEFT: WorldStep = vec2(-1, 0);
+
+pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
+pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
+pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
+pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
+
+pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
+pub const DIAGONAL_STEPS: [WorldStep; 4] =
+    [STEP_UP_RIGHT, STEP_UP_LEFT, STEP_DOWN_RIGHT, STEP_DOWN_LEFT];
+pub const KING_STEPS: [WorldStep; 8] = [
+    STEP_UP,
+    STEP_DOWN,
+    STEP_RIGHT,
+    STEP_LEFT,
+    STEP_UP_RIGHT,
+    STEP_UP_LEFT,
+    STEP_DOWN_RIGHT,
+    STEP_DOWN_LEFT,
+];
+
 pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_square_glyph_map: WorldSquareGlyphMap,
 ) -> WorldCharacterSquareGlyphMap {
@@ -69,6 +101,7 @@ pub fn world_square_glyph_map_to_world_character_glyph_map(
     world_character_glyph_map
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_square_to_left_world_character_square(
     world_square: WorldSquare,
 ) -> WorldCharacterSquare {
@@ -82,6 +115,13 @@ pub fn world_square_to_both_world_character_squares(
 ) -> [WorldCharacterSquare; 2] {
     let left_char_square = world_square_to_left_world_character_square(world_square);
     [left_char_square, left_char_square + STEP_RIGHT.cast_unit()]
+}
+
+pub fn world_square_to_world_character_square(
+    world_square: WorldSquare,
+    index: usize,
+) -> WorldCharacterSquare {
+    world_square_to_both_world_character_squares(world_square)[index]
 }
 
 pub fn world_point_to_local_character_point(
@@ -124,24 +164,30 @@ pub fn local_square_point_to_local_character_point(
         };
     world_point_to_local_character_point(world_point, ref_character_square)
 }
+
 // TODO: make this more general
+pub fn world_half_plane_to_local_square_half_plane(
+    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
+    ref_square: WorldSquare,
+) -> HalfPlane<f32, SquareGridInLocalSquareFrame> {
+    world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
+}
+
+pub fn local_square_half_plane_to_local_character_half_plane(
+    square_half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
+    character_index_in_square: usize,
+) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+    square_half_plane.with_transformed_points(|p| {
+        local_square_point_to_local_character_point(p, character_index_in_square)
+    })
+}
+
 pub fn world_half_plane_to_local_character_half_plane(
     world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
     ref_char_square: WorldCharacterSquare,
 ) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
-    HalfPlane::new(
-        Line {
-            p1: world_point_to_local_character_point(
-                world_half_plane.dividing_line.p1,
-                ref_char_square,
-            ),
-            p2: world_point_to_local_character_point(
-                world_half_plane.dividing_line.p2,
-                ref_char_square,
-            ),
-        },
-        world_point_to_local_character_point(world_half_plane.point_on_half_plane, ref_char_square),
-    )
+    world_half_plane
+        .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }
 
 pub fn world_point_to_world_character_point(
@@ -156,6 +202,7 @@ pub fn world_character_point_to_world_point(
     point2((pos.x - 0.5) / 2.0, pos.y)
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
     world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
 }
@@ -164,8 +211,56 @@ pub fn world_point_to_world_square(point: WorldPoint) -> WorldSquare {
     point.round().to_i32()
 }
 
+#[deprecated(note = "Invalidated by screen rotation")]
 pub fn world_character_point_to_world_character_square(
     point: WorldCharacterPoint,
 ) -> WorldCharacterSquare {
     point.round().to_i32()
+}
+
+#[deprecated(note = "Invalidated by screen rotation")]
+pub fn is_world_character_square_left_square_of_world_square(
+    character_square: WorldCharacterSquare,
+) -> bool {
+    world_square_to_left_world_character_square(world_character_square_to_world_square(
+        character_square,
+    )) == character_square
+}
+
+#[cfg(test)]
+mod tests {
+
+    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    use super::*;
+    #[test]
+    fn test_world_pos_to_character_world_pos() {
+        assert_eq!(
+            Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
+            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
+                0.0, 0.0,
+            )),
+            "zero is actually between two characters"
+        );
+        assert_eq!(
+            Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
+            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
+                1.0, 1.0,
+            )),
+            "diagonal a bit"
+        );
+    }
+
+    #[test]
+    fn test_local_square_point_to_local_character_point() {
+        assert_eq!(
+            local_square_point_to_local_character_point(point2(0.0, 0.0), 0),
+            point2(0.5, 0.0)
+        );
+        assert_eq!(
+            local_square_point_to_local_character_point(point2(0.0, 0.0), 1),
+            point2(-0.5, 0.0)
+        );
+    }
 }

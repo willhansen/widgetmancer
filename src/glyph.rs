@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use ::num::clamp;
@@ -11,12 +12,12 @@ use rgb::*;
 use termion::color;
 use termion::color::Black;
 
-use crate::glyph::floating_square::character_for_square_with_1d_offset;
-use crate::piece::Upgrade;
 use braille::*;
 use glyph_constants::*;
 use hextant_blocks::*;
 
+use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
+use crate::piece::Upgrade;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::sign;
 use crate::utility::*;
@@ -28,6 +29,7 @@ pub mod glyph_constants;
 pub mod hextant_blocks;
 
 // x, y
+pub type DoubleChar = [char; 2];
 pub type DoubleGlyph = [Glyph; 2];
 
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
@@ -57,7 +59,7 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 //	🩐 	🩑 	🩒 	🩓
 //	🩠 	🩡 	🩢 	🩣 	🩤 	🩥 	🩦 	🩧 	🩨 	🩩 	🩪 	🩫 	🩬 	🩭
 
-#[derive(Clone, PartialEq, Eq, Debug, Copy)]
+#[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Glyph {
     pub character: char,
     pub fg_color: RGB8,
@@ -77,6 +79,9 @@ impl Glyph {
     pub fn default_transparent() -> Glyph {
         Glyph::fg_only(' ', WHITE)
     }
+    pub fn default_background() -> Glyph {
+        Glyph::new(FULL_BLOCK, BLACK, BLACK)
+    }
 
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
         Glyph {
@@ -84,6 +89,13 @@ impl Glyph {
             fg_color,
             bg_color: BLACK,
             bg_transparent: true,
+        }
+    }
+    fn tinted(&self, color: RGB8, strength: f32) -> Self {
+        Glyph {
+            fg_color: tint_color(self.fg_color, color, strength),
+            bg_color: tint_color(self.bg_color, color, strength),
+            ..*self
         }
     }
 
@@ -131,12 +143,17 @@ impl Glyph {
         dup.bg_color = new_bg;
         dup
     }
+    pub fn with_transparent_bg(&self, bg_transparent: bool) -> Glyph {
+        let mut dup = self.clone();
+        dup.bg_transparent = bg_transparent;
+        dup
+    }
 
     pub fn reset_colors() -> String {
         format!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),)
     }
 
-    pub fn offset_board_square_glyphs(
+    pub fn orthogonally_offset_board_square_glyphs(
         offset_vector: WorldMove,
         square_color: RGB8,
         background_color: RGB8,
@@ -158,7 +175,7 @@ impl Glyph {
             )
             .map(|character_offset| {
                 Glyph::new(
-                    character_for_square_with_1d_offset(true, character_offset),
+                    character_for_half_square_with_1d_offset(true, character_offset),
                     square_color,
                     background_color,
                 )
@@ -169,7 +186,7 @@ impl Glyph {
             );
             character_offsets.map(|character_offset| {
                 Glyph::new(
-                    character_for_square_with_1d_offset(false, character_offset),
+                    character_for_half_square_with_1d_offset(false, character_offset),
                     square_color,
                     background_color,
                 )
@@ -209,17 +226,19 @@ impl Glyph {
         char_is_braille(self.character)
     }
 
-    pub fn get_glyphs_for_player(faced_direction: WorldStep) -> DoubleGlyph {
+    #[deprecated(note = "Use ArrowDrawable instead")]
+    pub fn get_glyphs_for_player(faced_direction: KingWorldStep) -> DoubleGlyph {
         // ⭠⭢⭡⭣ ⭦⭧⭨⭩
 
         let mut glyphs = [
             Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
-                faced_direction,
-                "🢀🢂🢁🢃🢄🢅🢆🢇",
-            )),
-            Glyph::from_char(' '),
+                faced_direction.into(),
+                THICK_ARROWS,
+            ))
+            .with_transparent_bg(true),
+            Glyph::transparent_glyph(),
         ];
-        glyphs[0].fg_color = PLAYER_GREEN;
+        glyphs[0].fg_color = PLAYER_COLOR;
 
         glyphs
     }
@@ -246,7 +265,7 @@ impl Glyph {
     pub fn solid_bg(color: RGB8) -> Glyph {
         Glyph {
             character: SPACE,
-            fg_color: RED,
+            fg_color: MAGENTA,
             bg_color: color,
             bg_transparent: false,
         }
@@ -257,6 +276,8 @@ impl Glyph {
             Some(self.fg_color)
         } else if KNOWN_BG_ONLY_CHARS.contains(&self.character) {
             Some(self.bg_color)
+        } else if self.fg_color == self.bg_color {
+            Some(self.fg_color)
         } else {
             None
         }
@@ -286,16 +307,13 @@ impl Glyph {
     }
     pub fn char_is_fullwidth(c: char) -> bool {
         Glyph::char_is_chess(c)
-            || THICK_ARROWS.contains(&c)
+            || THICK_ARROWS.contains(c)
             || c == MOVE_AND_CAPTURE_SQUARE_CHARS[0]
             || c == CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS[0]
             || c == MOVE_ONLY_SQUARE_CHARS[0]
             || c == CAPTURE_ONLY_SQUARE_CHARS[0]
     }
-    fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
-        assert!(KING_STEPS.contains(&dir));
-        assert_eq!(arrow_string.chars().count(), 8);
-
+    pub fn extract_arrow_from_arrow_string(dir: WorldStep, arrow_string: &str) -> char {
         let arrow_string_direction_order = [
             STEP_LEFT,
             STEP_RIGHT,
@@ -314,12 +332,12 @@ impl Glyph {
 
         arrow_string.chars().nth(index_of_char).unwrap()
     }
-    pub fn char_for_flying_arrow(dir: WorldStep) -> char {
+    pub fn char_for_flying_arrow(dir: KingWorldStep) -> char {
         //"🡐🡒🡑🡓🡔🡕🡖🡗")
-        Glyph::extract_arrow_from_arrow_string(dir, "⭠⭢⭡⭣⭦⭧⭨⭩")
+        Glyph::extract_arrow_from_arrow_string(dir.into(), THIN_TRIANGLE_ARROWS)
     }
 
-    pub fn glyphs_for_flying_arrow(dir: WorldStep) -> DoubleGlyph {
+    pub fn glyphs_for_flying_arrow(dir: KingWorldStep) -> DoubleGlyph {
         [
             Glyph::fg_only(Glyph::char_for_flying_arrow(dir), RED),
             Glyph::transparent_glyph(),
@@ -381,8 +399,13 @@ impl Glyph {
         let top = *self;
 
         if top.has_fg() {
-            if top.bg_transparent && let Some(combined_character) = combine_characters(top.character, bottom.character) {
-                Glyph::new(combined_character, top.fg_color, bottom.bg_color)
+            let maybe_combined_character = combine_characters(top.character, bottom.character);
+            if top.bg_transparent && maybe_combined_character.is_some() {
+                Glyph::new(
+                    maybe_combined_character.unwrap(),
+                    top.fg_color,
+                    bottom.bg_color,
+                )
             } else {
                 let bg = if !top.bg_transparent {
                     top.bg_color
@@ -436,13 +459,34 @@ impl Glyph {
     }
 }
 
+impl Debug for Glyph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "char: {}\n\
+             fg: {}\n\
+             bg: {}\n\
+             bg_transparent: {}",
+            self.character,
+            rgb_to_string(self.fg_color),
+            rgb_to_string(self.bg_color),
+            self.bg_transparent
+        )
+    }
+}
+
 pub trait DoubleGlyphFunctions {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
     fn to_string(&self) -> String;
     fn to_clean_string(&self) -> String;
+    fn chars(&self) -> DoubleChar;
     fn get_solid_color(&self) -> Option<RGB8>;
     fn looks_solid(&self) -> bool;
+    fn fg_only(character: &str, color: RGB8) -> DoubleGlyph;
+    fn fg_colors(&self) -> [RGB8; 2];
+    fn solid_color(color: RGB8) -> DoubleGlyph;
+    fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -461,6 +505,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
             })
         }
     }
+
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph {
         let top_left = self[0];
         let top_right = self[1];
@@ -491,12 +536,15 @@ impl DoubleGlyphFunctions for DoubleGlyph {
 
         return output;
     }
-
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()
     }
+
     fn to_clean_string(&self) -> String {
         self[0].character.to_string() + &self[1].character.to_string()
+    }
+    fn chars(&self) -> DoubleChar {
+        self.map(|g| g.character)
     }
 
     fn get_solid_color(&self) -> Option<RGB8> {
@@ -514,6 +562,23 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     fn looks_solid(&self) -> bool {
         self.get_solid_color().is_some()
     }
+
+    fn fg_only(string: &str, color: RGB8) -> DoubleGlyph {
+        assert_eq!(string.chars().count(), 2);
+        [0, 1].map(|i| Glyph::fg_only(string.chars().nth(i).unwrap(), color))
+    }
+
+    fn fg_colors(&self) -> [RGB8; 2] {
+        [0, 1].map(|i| self[i].fg_color)
+    }
+
+    fn solid_color(color: RGB8) -> DoubleGlyph {
+        [Glyph::new(SPACE, color, color); 2]
+    }
+
+    fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph {
+        self.map(|g| g.tinted(color, strength))
+    }
 }
 
 fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
@@ -530,13 +595,15 @@ fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
 
 #[cfg(test)]
 mod tests {
+    use ntest::{assert_false, timeout};
+
     use super::*;
-    use ntest::assert_false;
 
     #[test]
+    
     fn test_double_glyph_square_offset__up() {
         // offset up
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, UPPER_HALF_BLOCK);
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -546,9 +613,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__150_up() {
         // offset up
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -558,9 +626,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__50_down() {
         // offset down
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -572,17 +641,19 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
+    
     fn test_double_glyph_square_offset__1_left() {
         // offset left
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(RED));
         assert!(glyphs[1].looks_solid_color(RED));
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__14_left() {
         // offset left
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
         assert!(
             glyphs[0].looks_solid_color(RED),
             "glyph: {}",
@@ -593,9 +664,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__25_left() {
         // offset left
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(RED));
         assert_eq!(glyphs[1].character, '▌');
         assert_eq!(glyphs[1].fg_color, RED);
@@ -603,9 +675,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__75_left() {
         // offset left
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -613,9 +686,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__25_right() {
         // offset right
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, RIGHT_HALF_BLOCK);
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -623,17 +697,19 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__50_right() {
         // offset right
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(BLACK));
         assert!(glyphs[1].looks_solid_color(RED));
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__75_right() {
         // offset right
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, SPACE);
         assert_eq!(glyphs[0].fg_color, RED);
         assert_eq!(glyphs[0].bg_color, BLACK);
@@ -643,9 +719,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__slightly_past_full_square_right() {
         // offset right
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
         assert!(
             glyphs[0].looks_solid_color(BLACK),
             "glyph: {}",
@@ -659,9 +736,10 @@ mod tests {
     }
 
     #[test]
+    
     fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
         // offset right
-        let glyphs = Glyph::offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
+        let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0], Glyph::new(LEFT_HALF_BLOCK, RED, BLACK));
         assert!(
             glyphs[1].looks_solid_color(BLACK),
@@ -671,6 +749,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__zeros() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.0),
@@ -679,6 +758,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_4_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.25),
@@ -687,6 +767,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_4_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.25),
@@ -695,6 +776,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_2_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.5),
@@ -703,6 +785,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_2_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.5),
@@ -711,6 +794,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-1.0),
@@ -719,6 +803,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_square_offset_to_character_offsets__1_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(1.0),
@@ -727,6 +812,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_get_solid_color_if_there_is_one() {
         let glyph = Glyph::new(' ', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), Some(RED));
@@ -735,12 +821,14 @@ mod tests {
     }
 
     #[test]
+    
     fn test_can_not_get_solid_color_if_there_is_not_one() {
         let glyph = Glyph::new('a', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), None);
     }
 
     #[test]
+    
     fn test_braille_line_has_transparent_background() {
         let glyph_map =
             Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
@@ -748,6 +836,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_basic_drawn_over_case() {
         let bottom_glyphs = [Glyph {
             character: 'b',
@@ -776,6 +865,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_hextant_drawn_over_hextant_combines() {
         let bottom_glyphs = [Glyph::fg_only('🬀', GREEN); 2];
         let top_glyphs = [Glyph::fg_only('🬑', RED); 2];
@@ -785,7 +875,9 @@ mod tests {
         assert_eq!(combo_glyphs[0].character, '🬒');
         assert_eq!(combo_glyphs[0].fg_color, RED);
     }
+
     #[test]
+    
     fn test_space_drawn_over_hextant_does_nothing() {
         let the_char = '🬒';
         let bottom_glyphs = [Glyph::fg_only(the_char, RED); 2];
@@ -797,6 +889,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_braille_drawn_over_braille_combines() {
         let bottom_glyphs = [Glyph::fg_only('⠎', BLUE); 2];
         let top_glyphs = [Glyph::fg_only('⠁', RED); 2];
@@ -808,6 +901,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_halfwidth_char_drawn_over_right_side_of_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -830,6 +924,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_fullwidth_char_drawn_over_two_halfwidth_chars() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -846,7 +941,9 @@ mod tests {
         assert_eq!(combo_glyphs[1].character, halfwidth_char);
         assert_eq!(combo_glyphs[1].fg_color, bottom_color);
     }
+
     #[test]
+    
     fn test_two_halfwidth_chars_drawn_over_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -864,7 +961,9 @@ mod tests {
         assert_eq!(combo_glyphs[1].fg_color, top_color);
         assert_eq!(combo_glyphs[1].bg_color, bottom_color);
     }
+
     #[test]
+    
     fn test_fullwidth_char_drawn_over_fullwidth_char() {
         let fullwidth_char = '🢃';
         let top_color = RED;
@@ -882,6 +981,7 @@ mod tests {
     }
 
     #[test]
+    
     fn test_character_width_detection() {
         assert!(Glyph::char_is_fullwidth('🢂'));
         assert_false!(Glyph::char_is_fullwidth('>'));

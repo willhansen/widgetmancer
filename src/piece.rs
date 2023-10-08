@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 use std::f32::consts::PI;
 
-use derive_getters::Getters;
 use derive_more::Constructor;
 use euclid::*;
+use getset::CopyGetters;
 use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::Display;
@@ -13,11 +13,13 @@ use crate::glyph::DoubleGlyph;
 use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::coordinates::QuarterTurnRotatable;
+use crate::utility::coordinates::QuarterTurnsCcw;
 use crate::utility::{
-    adjacent_king_steps, get_new_rng, random_choice, DIAGONAL_STEPS, KING_STEPS, ORTHOGONAL_STEPS,
-    STEP_RIGHT,
+    adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
+    ORTHOGONAL_STEPS, STEP_RIGHT,
 };
-use crate::{get_4_rotations_of, get_8_octants_of, quarter_turns_counter_clockwise, Glyph};
+use crate::{get_8_octant_transforms_of, Glyph};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 
@@ -75,28 +77,33 @@ impl FactionFactory {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, Getters)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, CopyGetters)]
+#[get_copy = "pub"]
 pub struct NStep {
-    step: WorldStep,
+    stepp: WorldStep,
     n: Option<u32>,
 }
 
 impl NStep {
-    pub fn one(step: WorldStep) -> Self {
-        NStep { step, n: Some(1) }
+    pub fn one(stepp: WorldStep) -> Self {
+        NStep { stepp, n: Some(1) }
     }
     pub fn dir(step: WorldStep) -> Self {
-        NStep { step, n: None }
+        NStep {
+            stepp: step,
+            n: None,
+        }
     }
 
     pub fn quadrant_symmetries(&self) -> Vec<Self> {
-        get_4_rotations_of(self.step)
+        self.stepp
+            .quadrant_rotations_going_ccw()
             .into_iter()
             .map(|step| NStep::new(step, self.n))
             .collect()
     }
     pub fn octant_symmetries(&self) -> Vec<Self> {
-        get_8_octants_of(self.step)
+        get_8_octant_transforms_of(self.stepp)
             .into_iter()
             .map(|step| NStep::new(step, self.n))
             .collect()
@@ -107,7 +114,7 @@ impl NStep {
 pub struct Piece {
     pub piece_type: PieceType,
     pub faction: Faction,
-    faced_direction: Option<WorldStep>,
+    faced_direction: Option<KingWorldStep>,
 }
 
 impl Piece {
@@ -129,14 +136,14 @@ impl Piece {
     pub fn king() -> Piece {
         Piece::from_type(King)
     }
-    pub fn arrow(dir: WorldStep) -> Piece {
+    pub fn arrow(dir: KingWorldStep) -> Piece {
         let mut piece = Piece::from_type(Arrow);
         piece.set_faced_direction(dir);
         piece.faction = Faction::Unaligned;
         piece
     }
 
-    pub fn faced_direction(&self) -> WorldStep {
+    pub fn faced_direction(&self) -> KingWorldStep {
         if let Some(dir) = self.faced_direction {
             dir
         } else {
@@ -144,7 +151,7 @@ impl Piece {
         }
     }
 
-    pub fn set_faced_direction(&mut self, dir: WorldStep) {
+    pub fn set_faced_direction(&mut self, dir: KingWorldStep) {
         assert!(self.can_turn());
         self.faced_direction = Some(dir);
     }
@@ -153,25 +160,10 @@ impl Piece {
         self.faced_direction.is_some()
     }
 
-    pub fn turned_by_quarters(&self, quarter_turns: i32) -> Piece {
-        assert!(self.can_turn());
-        Piece {
-            piece_type: self.piece_type,
-            faction: self.faction,
-            faced_direction: Some(quarter_turns_counter_clockwise(
-                &self.faced_direction(),
-                quarter_turns,
-            )),
-        }
-    }
-
     pub fn turned_versions(&self) -> HashSet<Piece> {
         assert!(self.can_turn());
 
-        [-1, 1]
-            .into_iter()
-            .map(|i| self.turned_by_quarters(i))
-            .collect()
+        [-1, 1].into_iter().map(|i| self.rotated(i)).collect()
     }
 
     pub fn random_subordinate_type() -> PieceType {
@@ -218,7 +210,7 @@ impl Piece {
             piece_type,
             faction,
             faced_direction: if TURNING_PIECE_TYPES.contains(&piece_type) {
-                Some(STEP_RIGHT)
+                Some(STEP_RIGHT.into())
             } else {
                 None
             },
@@ -234,7 +226,7 @@ impl Piece {
             OmniDirectionalPawn | OmniDirectionalSoldier => ORTHOGONAL_STEPS.map(NStep::one).into(),
             King => KING_STEPS.map(NStep::one).into(),
             Knight => NStep::one(WorldStep::new(1, 2)).octant_symmetries(),
-            TurningPawn | TurningSoldier => vec![NStep::one(self.faced_direction.unwrap())],
+            TurningPawn | TurningSoldier => vec![NStep::one(self.faced_direction.unwrap().into())],
             Bishop => DIAGONAL_STEPS.map(NStep::dir).into(),
             Rook => ORTHOGONAL_STEPS.map(NStep::dir).into(),
             Queen => KING_STEPS.map(NStep::dir).into(),
@@ -245,7 +237,7 @@ impl Piece {
     pub(crate) fn relative_captures(&self) -> NStepList {
         match self.piece_type {
             OmniDirectionalPawn => DIAGONAL_STEPS.map(NStep::one).into(),
-            TurningPawn => adjacent_king_steps(self.faced_direction.unwrap())
+            TurningPawn => adjacent_king_steps(self.faced_direction.unwrap().into())
                 .into_iter()
                 .map(NStep::one)
                 .collect(),
@@ -254,8 +246,20 @@ impl Piece {
     }
 }
 
+impl QuarterTurnRotatable for Piece {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Piece {
+        assert!(self.can_turn());
+        Piece {
+            piece_type: self.piece_type,
+            faction: self.faction,
+            faced_direction: Some(self.faced_direction().rotated(quarter_turns_ccw)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use ntest::timeout;
     use std::collections::HashSet;
 
     use pretty_assertions::{assert_eq, assert_ne};
@@ -263,6 +267,7 @@ mod tests {
     use super::*;
 
     #[test]
+
     fn test_turning_vs_omnidirectional_pawn() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalPawn).relative_moves()),
@@ -278,6 +283,7 @@ mod tests {
     }
 
     #[test]
+
     fn test_turning_vs_omnidirectional_soldier() {
         assert_eq!(
             HashSet::from_iter(Piece::from_type(OmniDirectionalSoldier).relative_moves()),

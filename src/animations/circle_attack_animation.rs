@@ -1,5 +1,5 @@
 use crate::animations::Animation;
-use crate::glyph::glyph_constants::{CYAN, EXPLOSION_COLOR};
+use crate::glyph::glyph_constants::CYAN;
 use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,

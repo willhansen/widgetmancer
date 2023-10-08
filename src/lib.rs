@@ -1,18 +1,6 @@
-//#![allow(non_snake_case)]
-#![feature(is_sorted)]
-#![feature(drain_filter)]
 #![allow(warnings)]
-#![feature(trait_upcasting)]
-#![feature(duration_consts_float)]
-#![feature(int_abs_diff)]
-#![feature(inline_const_pat)]
-#![feature(is_some_and)]
-#![feature(let_chains)]
-#![feature(drain_keep_rest)]
-#![feature(inherent_associated_types)]
-#![feature(iter_next_chunk)]
+#![allow(non_snake_case)]
 
-#[macro_use]
 extern crate approx;
 extern crate core;
 extern crate line_drawing;
@@ -21,11 +9,6 @@ extern crate shrinkwraprs;
 extern crate std;
 extern crate termion;
 
-use std::char;
-use std::cmp::{max, min};
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
-use std::fmt::Debug;
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
@@ -34,11 +17,7 @@ use std::time::{Duration, Instant};
 use enum_as_inner::EnumAsInner;
 use euclid::default::Point2D;
 use euclid::point2;
-use ntest::timeout;
-use num::Integer;
 use rand::SeedableRng;
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
@@ -65,6 +44,7 @@ pub mod utils_for_tests;
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
+        stdout().flush().expect("flush stdout");
         write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
         write!(stdout(), "{:?}", panic_info).expect("display panic info");
     }));
@@ -104,17 +84,25 @@ pub fn do_everything() {
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
     let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    game.set_up_test_map();
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
-    game.set_up_columns();
+    //game.set_up_columns();
+    //game.set_up_simple_portal_map();
+    //game.set_up_portal_across_wall_map(2, 0);
+    //game.set_up_simple_freestanding_portal();
+    // game.place_dense_horizontal_portals(
+    //     game.player_square() + STEP_RIGHT * 10 + STEP_DOWN_RIGHT * 5,
+    //     3,
+    //     6,
+    // );
     //game.set_up_vs_mini_factions();
     //game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();
     //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
     //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
     //game.set_up_vs_arrows();
-    game.set_up_n_pillars(3);
 
     let mut prev_tick_start_time = Instant::now();
     while game.running() {
@@ -125,16 +113,11 @@ pub fn do_everything() {
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
 
         while let Ok(event) = event_receiver.try_recv() {
-            game.on_turn_start();
-
             input_map.handle_event(&mut game, event);
 
-            game.move_non_arrow_factions();
-            game.tick_arrows();
-
-            game.on_turn_end();
+            game.tick_game_logic();
         }
-        game.advance_realtime_effects(delta);
+        game.tick_realtime_effects(delta);
         game.draw(&mut wrapped_terminal, Instant::now());
         thread::sleep(Duration::from_millis(21));
     }

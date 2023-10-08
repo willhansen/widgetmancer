@@ -10,11 +10,10 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
-use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    is_clockwise, line_intersections_with_centered_unit_square, point_to_string, same_side_of_line,
-    snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
+    snap_angle_to_diagonal, three_points_are_clockwise, unit_vector_from_angle, CoordToString,
+    HalfPlane, Line,
 };
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -75,6 +74,23 @@ pub fn angled_block_char_to_snap_points_map() -> HashMap<char, (SnapGridPoint, S
         .into_iter()
         .map(|(a, b)| (b, a))
         .collect()
+}
+
+pub fn angle_block_char_complement(c: char) -> char {
+    if c == FULL_BLOCK {
+        return SPACE;
+    }
+    if c == SPACE {
+        return FULL_BLOCK;
+    }
+    let points_for_block = angled_block_char_to_snap_points_map()
+        .get(&c)
+        .unwrap()
+        .clone();
+    let points_for_complement = (points_for_block.1, points_for_block.0);
+    *points_to_angled_block_mapping()
+        .get(&points_for_complement)
+        .unwrap()
 }
 
 //                                                           🬼 	🬽 	🬾 	🬿
@@ -177,7 +193,7 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
         let same_y = pointA.y == pointB.y;
         let both_on_same_edge =
             (same_x && [0, 2].contains(&pointA.x)) || (same_y && [0, 3].contains(&pointA.y));
-        let center_is_clockwise = is_clockwise(
+        let center_is_clockwise = three_points_are_clockwise(
             local_snap_grid_to_local_character_frame(pointA),
             local_snap_grid_to_local_character_frame(pointB),
             point2(0.0, 0.0),
@@ -192,8 +208,8 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
             if pointA == pointB {
                 panic!(
                     "Can't be same points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    pointA.to_string(),
+                    pointB.to_string()
                 );
             }
 
@@ -201,15 +217,15 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
             if !valid_points.contains(&pointA) || !valid_points.contains(&pointB) {
                 panic!(
                     "gave non-valid points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    pointA.to_string(),
+                    pointB.to_string()
                 );
             }
 
             panic!(
                 "Missed case for points: A: {}, B: {}",
-                point_to_string(pointA),
-                point_to_string(pointB)
+                pointA.to_string(),
+                pointB.to_string()
             );
         }
     }
@@ -236,8 +252,9 @@ pub fn half_plane_to_angled_block_character(
         .map(local_snap_grid_to_local_character_frame)
         .collect();
 
-    let raw_intersection_points =
-        line_intersections_with_centered_unit_square(half_plane.dividing_line);
+    let raw_intersection_points = half_plane
+        .dividing_line()
+        .line_intersections_with_centered_unit_square();
     assert!(raw_intersection_points.len() <= 2);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
@@ -260,26 +277,23 @@ pub fn half_plane_to_angled_block_character(
         .collect();
 
     if snapped_points.len() < 2 || snapped_points[0] == snapped_points[1] {
-        if same_side_of_line(
-            half_plane.dividing_line,
-            half_plane.point_on_half_plane,
-            point2(0.0, 0.0),
-        ) {
+        if half_plane
+            .dividing_line()
+            .same_side_of_line(half_plane.point_on_half_plane(), point2(0.0, 0.0))
+        {
             FULL_BLOCK
         } else {
             SPACE
         }
     } else {
-        //dbg!( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, is_clockwise( snapped_points[0], snapped_points[1], half_plane.point_on_half_plane, ) );
-
         let mut grid_line = Line::new(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
-        if !is_clockwise(
-            half_plane.dividing_line.p1,
-            half_plane.dividing_line.p2,
-            half_plane.point_on_half_plane,
+        if !three_points_are_clockwise(
+            half_plane.dividing_line().p1,
+            half_plane.dividing_line().p2,
+            half_plane.point_on_half_plane(),
         ) {
             grid_line.reverse();
         }
@@ -327,16 +341,18 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
     use crate::utility::Line;
+    use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
 
     #[test]
+
     fn test_line_and_inside_point_to_angled_block_character__left_edge_full_block() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
             half_plane_to_angled_block_character(
-                HalfPlane::new(
+                HalfPlane::from_line_and_point_on_half_plane(
                     Line {
                         p1: point2(-0.5, -0.5),
                         p2: point2(-0.5, 0.5),
@@ -350,10 +366,11 @@ mod tests {
         );
     }
     #[test]
+
     fn test_line_and_inside_point_to_angled_block_character__left_edge_empty_block() {
         assert_eq!(
             half_plane_to_angled_block_character(
-                HalfPlane::new(
+                HalfPlane::from_line_and_point_on_half_plane(
                     Line {
                         p1: point2(-0.5, -0.5),
                         p2: point2(-0.5, 0.5)
@@ -367,10 +384,11 @@ mod tests {
         );
     }
     #[test]
+
     fn test_line_and_inside_point_to_angled_block_character__lower_right_diagonal() {
         assert_eq!(
             half_plane_to_angled_block_character(
-                HalfPlane::new(
+                HalfPlane::from_line_and_point_on_half_plane(
                     Line {
                         p1: point2(-0.5, -0.5),
                         p2: point2(-0.4, -0.4)
@@ -384,10 +402,11 @@ mod tests {
         );
     }
     #[test]
+
     fn test_line_and_inside_point_to_angled_block_character__notch_off_bottom_right() {
         assert_eq!(
             half_plane_to_angled_block_character(
-                HalfPlane::new(
+                HalfPlane::from_line_and_point_on_half_plane(
                     Line {
                         p1: point2(0.0, -0.5),
                         p2: point2(0.5, -0.15),
@@ -402,6 +421,7 @@ mod tests {
     }
 
     #[test]
+
     fn test_snap_to_grid() {
         assert_eq!(
             snap_to_grid(point2(-0.45, -0.51)),
@@ -421,6 +441,7 @@ mod tests {
     }
 
     #[test]
+
     fn test_snap_points_to_character() {
         assert_eq!(
             get_character_from_snap_points(Line::new(point2(0, 0), point2(2, 3))),
@@ -452,15 +473,65 @@ mod tests {
     }
 
     #[test]
+
     fn test_half_plane_to_character__from_failure_data() {
-        let half_plane = HalfPlane {
-            dividing_line: Line {
+        let half_plane = HalfPlane::from_line_and_point_on_half_plane(
+            Line {
                 p1: point2(-1.5, -1.0),
                 p2: point2(-0.08, -0.3),
             },
-            point_on_half_plane: point2(-0.06, -0.3),
-        };
+            point2(-0.06, -0.3),
+        );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
         assert!(['🭈', '🭊'].contains(&the_char));
+    }
+
+    //                                                           🬼 	🬽 	🬾 	🬿
+    //U+1FB4x 	🭀 	🭁 	🭂 	🭃 	🭄 	🭅 	🭆 	🭇 	🭈 	🭉 	🭊 	🭋 	🭌 	🭍 	🭎 	🭏
+    //U+1FB5x 	🭐 	🭑 	🭒 	🭓 	🭔 	🭕 	🭖 	🭗 	🭘 	🭙 	🭚 	🭛 	🭜 	🭝 	🭞 	🭟
+    //U+1FB6x 	🭠 	🭡 	🭢 	🭣 	🭤 	🭥 	🭦 	🭧
+
+    #[test]
+
+    fn test_angle_block_char_complement() {
+        assert_eq!(angle_block_char_complement('🭦'), '🭐');
+        assert_eq!(angle_block_char_complement('🭗'), '🭁');
+        assert_eq!(angle_block_char_complement(FULL_BLOCK), SPACE);
+        assert_eq!(angle_block_char_complement(SPACE), FULL_BLOCK);
+    }
+
+    #[test]
+
+    fn test_top_half_visible_with_exactly_horizontal_line() {
+        assert_eq!(
+            half_plane_to_angled_block_character(
+                HalfPlane::from_line_and_point_on_half_plane(
+                    Line {
+                        p1: point2(0.5, 0.0),
+                        p2: point2(-1.5, 0.0),
+                    },
+                    point2(0.0, 25.0),
+                ),
+                Angle::degrees(-90.0)
+            ),
+            '🬎',
+        );
+    }
+    #[test]
+
+    fn test_left_half_visible_with_exactly_vertical_line() {
+        assert_eq!(
+            half_plane_to_angled_block_character(
+                HalfPlane::from_line_and_point_on_half_plane(
+                    Line {
+                        p1: point2(0.0, 0.5),
+                        p2: point2(0.0, -1.5),
+                    },
+                    point2(-20.0, 0.0),
+                ),
+                Angle::degrees(0.0)
+            ),
+            LEFT_HALF_BLOCK,
+        );
     }
 }

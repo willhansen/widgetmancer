@@ -1,3 +1,10 @@
+use std::f32::consts::{PI, TAU};
+use std::time::{Duration, Instant};
+
+use euclid::{point2, vec2, Angle};
+use num::ToPrimitive;
+use rand::{Rng, SeedableRng};
+
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
@@ -5,17 +12,16 @@ use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
     WorldStep,
 };
-use crate::utility::{angle_from_better_x_axis, is_orthodiagonal, rotate_vect, KING_STEPS};
-use euclid::{point2, vec2, Angle};
-use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
-use std::f32::consts::{PI, TAU};
-use std::time::{Duration, Instant};
+use crate::utility::coordinates::{
+    better_angle_from_x_axis, is_king_step, is_orthodiagonal, rotate_vect, KingWorldStep,
+};
+
+use crate::utility::KING_STEPS;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
     start_square: WorldSquare,
-    direction: WorldStep,
+    direction: KingWorldStep,
     range: u32,
     start_time: Instant,
 }
@@ -23,10 +29,9 @@ pub struct SpearAttackAnimation {
 impl SpearAttackAnimation {
     pub fn new(
         start_square: WorldSquare,
-        direction: WorldStep,
+        direction: KingWorldStep,
         range: u32,
     ) -> SpearAttackAnimation {
-        assert!(KING_STEPS.contains(&direction));
         SpearAttackAnimation {
             start_square,
             direction,
@@ -67,7 +72,7 @@ impl Animation for SpearAttackAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
-        let angle = angle_from_better_x_axis(self.direction.to_f32());
+        let angle = better_angle_from_x_axis(self.direction.step().to_f32());
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
             let relative_position = WorldMove::from_angle_and_length(
@@ -80,24 +85,29 @@ impl Animation for SpearAttackAnimation {
         let rel_spear_tip = WorldMove::from_angle_and_length(angle, spear_length);
         let mut spearhead_points: PointList = SpearAttackAnimation::points_in_an_arrow()
             .into_iter()
-            .map(|p: WorldMove| rotate_vect(p, angle_from_better_x_axis(rel_spear_tip)))
+            .map(|p: WorldMove| rotate_vect(p, better_angle_from_x_axis(rel_spear_tip)))
             .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
             .collect();
         points_to_draw.append(&mut spearhead_points);
         Glyph::points_to_braille_glyphs(points_to_draw, SPEAR_COLOR)
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::utility::STEP_RIGHT;
     use euclid::point2;
+    use ntest::timeout;
+
+    use crate::utility::STEP_RIGHT;
+
+    use super::*;
 
     #[test]
+
     fn test_spear_attack_does_any_drawing() {
         let square = point2(3, 3);
         let dir = STEP_RIGHT;
-        let animation = SpearAttackAnimation::new(square, dir, 3);
+        let animation = SpearAttackAnimation::new(square, dir.into(), 3);
         let double_glyphs = animation.double_glyphs_at_duration(Duration::from_secs_f32(0.1));
         assert!(double_glyphs.contains_key(&(square + STEP_RIGHT)));
     }
