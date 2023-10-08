@@ -71,66 +71,101 @@ where
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
 }
 
-// TODO: trait alias
-impl<T, U> Coordinate for Vector2D<T, U>
-where
-    T: Copy
-        + PartialEq
-        + Add<Output = T>
-        + Sub<Output = T>
-        + Mul<Output = T>
-        + Zero
-        + Signed
-        + Debug,
-{
-    type DataType = T;
-    type UnitType = U;
+macro_rules! coordinatify {
+    ($class:ident) => {
+        impl<T, U> Coordinate for $class<T, U>
+        where
+            // TODO: trait alias
+            T: Copy
+                + PartialEq
+                + Add<Output = T>
+                + Sub<Output = T>
+                + Mul<Output = T>
+                + Zero
+                + Signed
+                + Debug,
+        {
+            type DataType = T;
+            type UnitType = U;
 
-    fn x(&self) -> T {
-        self.x
-    }
+            fn x(&self) -> T {
+                self.x
+            }
 
-    fn y(&self) -> T {
-        self.y
-    }
+            fn y(&self) -> T {
+                self.y
+            }
 
-    fn new(x: T, y: T) -> Self {
-        Self::new(x, y)
-    }
-}
-impl<T, U> Coordinate for Point2D<T, U>
-where
-    T: Copy
-        + PartialEq
-        + Add<Output = T>
-        + Sub<Output = T>
-        + Mul<Output = T>
-        + Zero
-        + Signed
-        + Debug,
-{
-    type DataType = T;
-    type UnitType = U;
-
-    fn x(&self) -> T {
-        self.x
-    }
-
-    fn y(&self) -> T {
-        self.y
-    }
-
-    fn new(x: T, y: T) -> Self {
-        Self::new(x, y)
-    }
+            fn new(x: T, y: T) -> Self {
+                Self::new(x, y)
+            }
+        }
+    };
 }
 
-pub trait AbsOrRelSquareTrait:
+coordinatify!(Vector2D);
+coordinatify!(Point2D);
+
+// impl<T, U> Coordinate for Vector2D<T, U>
+// where
+//     // TODO: trait alias
+//     T: Copy
+//         + PartialEq
+//         + Add<Output = T>
+//         + Sub<Output = T>
+//         + Mul<Output = T>
+//         + Zero
+//         + Signed
+//         + Debug,
+// {
+//     type DataType = T;
+//     type UnitType = U;
+
+//     fn x(&self) -> T {
+//         self.x
+//     }
+
+//     fn y(&self) -> T {
+//         self.y
+//     }
+
+//     fn new(x: T, y: T) -> Self {
+//         Self::new(x, y)
+//     }
+// }
+// impl<T, U> Coordinate for Point2D<T, U>
+// where
+//     T: Copy
+//         + PartialEq
+//         + Add<Output = T>
+//         + Sub<Output = T>
+//         + Mul<Output = T>
+//         + Zero
+//         + Signed
+//         + Debug,
+// {
+//     type DataType = T;
+//     type UnitType = U;
+
+//     fn x(&self) -> T {
+//         self.x
+//     }
+
+//     fn y(&self) -> T {
+//         self.y
+//     }
+
+//     fn new(x: T, y: T) -> Self {
+//         Self::new(x, y)
+//     }
+// }
+
+pub trait WorldGridCoordinate:
     Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
 {
 }
 
-impl<T> AbsOrRelSquareTrait for T where
+impl<T> WorldGridCoordinate for T where
     T: Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
 {
 }
@@ -178,11 +213,7 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
     }
 }
 
-impl<V, T, U> QuarterTurnRotatable for V
-where
-    V: Coordinate<DataType = T, UnitType = U>,
-    T: Mul<Output = T> + Signed + Sub<Output = T>, //T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
-{
+impl<V: Coordinate> QuarterTurnRotatable for V {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
         Self::new(
@@ -905,5 +936,9 @@ mod tests {
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
                 .is_partial()
         )
+    }
+    #[test]
+    fn test_coordinate_type_implementations() {
+        assert_impl_all!(WorldMove: Coordinate);
     }
 }

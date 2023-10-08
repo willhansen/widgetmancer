@@ -19,7 +19,7 @@ use crate::utility::{
     adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
     ORTHOGONAL_STEPS, STEP_RIGHT,
 };
-use crate::{get_4_rotations_of, get_8_octant_transforms_of, Glyph};
+use crate::{get_8_octant_transforms_of, Glyph};
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 
