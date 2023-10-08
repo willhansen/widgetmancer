@@ -13,6 +13,8 @@ use crate::glyph::DoubleGlyph;
 use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::coordinates::QuarterTurnRotatable;
+use crate::utility::coordinates::QuarterTurnsCcw;
 use crate::utility::{
     adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
     ORTHOGONAL_STEPS, STEP_RIGHT,
@@ -157,27 +159,10 @@ impl Piece {
         self.faced_direction.is_some()
     }
 
-    pub fn turned_by_quarters(&self, quarter_turns: i32) -> Piece {
-        assert!(self.can_turn());
-        Piece {
-            piece_type: self.piece_type,
-            faction: self.faction,
-            faced_direction: Some(
-                self.faced_direction()
-                    .into()
-                    .rotated_n_quarter_turns_counter_clockwise(quarter_turns)
-                    .into(),
-            ),
-        }
-    }
-
     pub fn turned_versions(&self) -> HashSet<Piece> {
         assert!(self.can_turn());
 
-        [-1, 1]
-            .into_iter()
-            .map(|i| self.turned_by_quarters(i))
-            .collect()
+        [-1, 1].into_iter().map(|i| self.rotated(i)).collect()
     }
 
     pub fn random_subordinate_type() -> PieceType {
@@ -256,6 +241,17 @@ impl Piece {
                 .map(NStep::one)
                 .collect(),
             _ => self.relative_moves(),
+        }
+    }
+}
+
+impl QuarterTurnRotatable for Piece {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Piece {
+        assert!(self.can_turn());
+        Piece {
+            piece_type: self.piece_type,
+            faction: self.faction,
+            faced_direction: Some(self.faced_direction().rotated(quarter_turns_ccw)),
         }
     }
 }

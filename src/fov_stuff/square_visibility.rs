@@ -78,7 +78,7 @@ impl SquareVisibilityFromOneLargeShadow {
             Line::new(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
-                    .rotated_n_quarter_turns_counter_clockwise(1)
+                    .rotated(1)
                     .to_point()
                     .cast_unit(),
             ),

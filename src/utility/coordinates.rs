@@ -59,6 +59,7 @@ pub trait Coordinate:
     + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
     + Mul<Self::DataType, Output = Self>
     + Zero
+    + Debug
 where
     Self::DataType: Mul<Output = Self::DataType> + Signed,
 {
@@ -73,7 +74,14 @@ where
 // TODO: trait alias
 impl<T, U> Coordinate for Vector2D<T, U>
 where
-    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
+    T: Copy
+        + PartialEq
+        + Add<Output = T>
+        + Sub<Output = T>
+        + Mul<Output = T>
+        + Zero
+        + Signed
+        + Debug,
 {
     type DataType = T;
     type UnitType = U;
@@ -92,7 +100,14 @@ where
 }
 impl<T, U> Coordinate for Point2D<T, U>
 where
-    T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
+    T: Copy
+        + PartialEq
+        + Add<Output = T>
+        + Sub<Output = T>
+        + Mul<Output = T>
+        + Zero
+        + Signed
+        + Debug,
 {
     type DataType = T;
     type UnitType = U;
@@ -130,14 +145,6 @@ pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 
 pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     (point - point.round()).to_point()
-}
-
-#[deprecated(note = "use rotated instead")]
-pub fn point_rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
-    p: Point2D<T, U>,
-    quarter_turns: i32,
-) -> Point2D<T, U> {
-    p.to_vector().rotated(quarter_turns).to_point()
 }
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
@@ -604,9 +611,9 @@ pub trait QuarterTurnRotatable {
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn rotated(&self, quarter_turns_ccw: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         standardize_angle(Angle::radians(
-            self.radians + PI / 2.0 * quarter_turns_ccw.quarter_turns as f32,
+            self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
         ))
     }
 }

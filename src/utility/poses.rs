@@ -101,12 +101,19 @@ where
         self.strafed_right_n(-n)
     }
 
-    pub fn revolved(&self, quarter_turns: impl Into<QuarterTurnsCcw>) -> Self {
+    pub fn revolved(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         (
-            self.square.rotated(quarter_turns),
-            self.dir.rotated(quarter_turns),
+            self.square.rotated(quarter_turns_ccw),
+            self.dir.rotated(quarter_turns_ccw),
         )
             .into()
+    }
+    pub fn quadrant_revolutions_in_ccw_order(&self) -> [Self; 4] {
+        (0..4)
+            .map(|i| self.revolved(i))
+            .collect_vec()
+            .try_into()
+            .unwrap()
     }
 
     pub fn turned_left(&self) -> Self {
@@ -206,9 +213,7 @@ impl<T: Coordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> 
             self.square,
             self.direction()
                 .dir()
-                .rotated_n_quarter_turns_counter_clockwise(
-                    quarter_turns_anticlockwise.quarter_turns(),
-                ),
+                .rotated(quarter_turns_anticlockwise.quarter_turns()),
         )
             .into()
     }

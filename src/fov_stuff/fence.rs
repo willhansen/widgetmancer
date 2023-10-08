@@ -76,7 +76,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let start: RelativeFace = ((radius as i32, radius as i32), STEP_UP).into();
         Self::from_faces_in_ccw_order(
             start
-                .quadrant_rotations_in_ccw_order()
+                .quadrant_revolutions_in_ccw_order()
                 .into_iter()
                 .flat_map(|start_face: RelativeFace| {
                     (0..(2 * radius + 1)).map(|i| start_face.strafed_left_n(i as i32))

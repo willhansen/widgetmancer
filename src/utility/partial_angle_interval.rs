@@ -22,6 +22,7 @@ use crate::utility::{
 };
 
 use super::bool_with_partial::BoolWithPartial;
+use super::coordinates::QuarterTurnRotatable;
 use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
@@ -163,11 +164,8 @@ impl PartialAngleInterval {
             rel_face.into().into();
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.step().to_f32() / 2.0;
-        let face_corners = [1, -1].map(|sign| {
-            face_center
-                + (face_direction.step().to_f32() / 2.0)
-                    .rotated_n_quarter_turns_counter_clockwise(sign)
-        });
+        let face_corners =
+            [1, -1].map(|sign| face_center + (face_direction.step().to_f32() / 2.0).rotated(sign));
 
         let center_angle = better_angle_from_x_axis(face_center);
         let face_corner_angles = face_corners.map(better_angle_from_x_axis);
@@ -430,7 +428,8 @@ impl PartialAngleInterval {
         )
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
-    pub fn rotated_quarter_turns(&self, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<QuarterTurnsCcw>) -> Self {
+        let quarter_turns = quarter_turns.into();
         PartialAngleInterval {
             clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
             anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),

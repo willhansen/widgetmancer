@@ -56,8 +56,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
-        let border_line: Line<f32, U> =
-            Line::new(p, p + v.rotated_n_quarter_turns_counter_clockwise(1));
+        let border_line: Line<f32, U> = Line::new(p, p + v.rotated(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::from_line_and_point_on_half_plane(border_line, point_on_half_plane)
