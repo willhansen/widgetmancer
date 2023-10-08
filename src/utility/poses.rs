@@ -46,7 +46,7 @@ impl Add for StepWithQuarterRotations {
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: Copy + QuarterTurnRotatable,
+    SquareType: Coordinate,
 {
     square: SquareType,
     dir: OrthogonalWorldStep,
@@ -180,7 +180,7 @@ where
     }
 }
 
-impl<T: Debug + Copy> Debug for AbsOrRelSquareWithOrthogonalDir<T>
+impl<T: Coordinate> Debug for AbsOrRelSquareWithOrthogonalDir<T>
 where
     Self: Display,
 {
@@ -188,7 +188,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
+impl<T: Coordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -200,7 +200,7 @@ impl<T: Debug + Copy> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     }
 }
 
-impl<T: Copy> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
+impl<T: Coordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
     fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
         (
             self.square,

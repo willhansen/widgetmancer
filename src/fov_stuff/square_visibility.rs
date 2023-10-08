@@ -6,7 +6,7 @@ use crate::graphics::drawable::{
 };
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::FAngle;
+use crate::utility::coordinates::{Coordinate, FAngle};
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -290,11 +290,11 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         Self {
             visible_portion: self
                 .visible_portion
-                .map(|half_plane| half_plane.rotated(quarter_turns_anticlockwise)),
+                .map(|half_plane| half_plane.rotated(quarter_turns_ccw)),
         }
     }
 }
@@ -337,12 +337,12 @@ impl PartialSquareVisibilityFromPointSource {
 }
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn rotated(&self, quarter_turns_anticlockwise: QuarterTurnsCcw) -> Self {
+    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
             .visibility_switch_angles_going_ccw
             .iter()
-            .map(|angle: &Angle<f32>| angle.rotated(quarter_turns_anticlockwise))
+            .map(|angle: &Angle<f32>| angle.rotated(quarter_turns_ccw))
             .collect_vec();
         the_clone
     }

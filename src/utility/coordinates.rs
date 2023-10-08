@@ -51,20 +51,23 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
-pub trait Coordinate<T, U>:
+pub trait Coordinate:
     Copy
     + PartialEq
-    + Add<Vector2D<T, U>, Output = Self>
-    + Sub<Vector2D<T, U>, Output = Self>
-    + Sub<Self, Output = Vector2D<T, U>>
-    + Mul<T, Output = Self>
+    + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
+    + Mul<Self::DataType, Output = Self>
     + Zero
 where
-    T: Mul<Output = T> + Signed,
+    Self::DataType: Mul<Output = Self::DataType> + Signed,
 {
-    fn x(&self) -> T;
-    fn y(&self) -> T;
-    fn new(x: T, y: T) -> Self;
+    type DataType;
+    type UnitType;
+
+    fn x(&self) -> Self::DataType;
+    fn y(&self) -> Self::DataType;
+    fn new(x: Self::DataType, y: Self::DataType) -> Self;
     fn rotated_n_quarter_turns_counter_clockwise(
         &self,
         quarter_turns_ccw: impl Into<QuarterTurnsCcw>,
@@ -72,7 +75,7 @@ where
 }
 
 // TODO: trait alias
-impl<T, U> Coordinate<T, U> for Vector2D<T, U>
+impl<T, U> Coordinate for Vector2D<T, U>
 where
     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
@@ -100,7 +103,7 @@ where
         )
     }
 }
-impl<T, U> Coordinate<T, U> for Point2D<T, U>
+impl<T, U> Coordinate for Point2D<T, U>
 where
     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed,
 {
@@ -117,9 +120,15 @@ where
     }
 }
 
-pub trait AbsOrRelSquareTrait: Coordinate<i32, SquareGridInWorldFrame> {}
+pub trait AbsOrRelSquareTrait:
+    Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
+{
+}
 
-impl<T> AbsOrRelSquareTrait for T where T: Coordinate<i32, SquareGridInWorldFrame> {}
+impl<T> AbsOrRelSquareTrait for T where
+    T: Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
+{
+}
 
 pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
 
@@ -180,9 +189,9 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
     }
 }
 
-impl<T, U, V> QuarterTurnRotatable for V<T, U>
+impl<V, T, U> QuarterTurnRotatable for V
 where
-    V: Coordinate<T, U>,
+    V: Coordinate<DataType = T, UnitType = U>,
 {
     fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         self.rotated_n_quarter_turns_counter_clockwise(quarter_turns_ccw)
