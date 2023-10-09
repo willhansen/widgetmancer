@@ -69,6 +69,15 @@ where
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
+    fn is_horizontal(&self) -> bool {
+        self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
+    }
+    fn is_vertical(&self) -> bool {
+        self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
+    }
+    fn is_zero(&self) -> bool {
+        self.x() == Self::DataType::zero() && self.y() == Self::DataType::zero()
+    }
 }
 
 macro_rules! coordinatify {
@@ -383,15 +392,21 @@ pub fn square_is_even(square: WorldSquare) -> bool {
 pub fn about_eq_2d<P: AbsOrRelPoint>(p1: P, p2: P, tolerance: f32) -> bool {
     (p1 - p2).length().abs() < tolerance
 }
+pub fn check_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) -> OkOrMessage {
+    let tolerance = 0.001; // TODO: make parameter
+
+    if about_eq_2d(p1, p2, tolerance) {
+        Ok(())
+    } else {
+        Err(format!(
+            "\nPoints too far apart:\n\tp1: {:?}\n\tp2: {:?}\n",
+            p1, p2
+        ))
+    }
+}
 
 pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
-    let tolerance = 0.001; // TODO: make parameter
-    assert!(
-        about_eq_2d(p1, p2, tolerance),
-        "Points too far apart: p1: {:?}, p2: {:?}",
-        p1,
-        p2
-    );
+    check_about_eq_2d(p1, p2).unwrap();
 }
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);

@@ -7,7 +7,7 @@ use ordered_float::OrderedFloat;
 use crate::rotated_to_have_split_at_max;
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinates::FAngle;
+use crate::utility::coordinates::{about_eq_2d, FAngle};
 use crate::utility::general_utility::all_true;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
@@ -33,13 +33,6 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<RelativeFace> {
         &self.edges
     }
-    pub fn new<T, T2>(faces: T) -> Self
-    where
-        T: IntoIterator<Item = T2> + Clone,
-        T2: Into<RelativeFace> + Copy,
-    {
-        Self::from_faces_in_ccw_order(faces)
-    }
     pub fn len(&self) -> usize {
         self.edges.len()
     }
@@ -60,10 +53,36 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let iter = faces.into_iter();
         let edge_adding_result: Result<(), String> =
             iter.map(|edge| new_fence.try_add_edge(edge)).collect();
-        match edge_adding_result {
-            Ok(_) => Ok(new_fence),
-            Err(err_string) => Err(err_string),
+
+        if let Err(err_string) = edge_adding_result {
+            return Err(err_string);
         }
+
+        // TODO: standardize tolerance
+        let endpoints_are_connected =
+            about_eq_2d(new_fence.start_point(), new_fence.end_point(), 0.001);
+        if !endpoints_are_connected {
+            return Ok(new_fence);
+        }
+
+        let break_point_is_valid = new_fence
+            .edges
+            .first()
+            .unwrap()
+            .face_crosses_positive_x_axis();
+
+        if break_point_is_valid {
+            return Ok(new_fence);
+        }
+
+        let index_of_correct_first_edge = new_fence
+            .edges
+            .iter()
+            .position(|edge| edge.face_crosses_positive_x_axis())
+            .unwrap();
+        new_fence.edges.rotate_left(index_of_correct_first_edge);
+
+        Ok(new_fence)
     }
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
         Self::from_faces_in_ccw_order(vec![edge.into()])
@@ -629,7 +648,7 @@ mod tests {
     }
     #[test]
     fn test_convenient_creation() {
-        let x: RelativeFenceFullyVisibleFromOriginGoingCcw = Fence::new(vec![
+        let x: RelativeFenceFullyVisibleFromOriginGoingCcw = Fence::from_faces_in_ccw_order(vec![
             ((3, 0), STEP_DOWN),
             ((3, 0), STEP_RIGHT),
             ((3, 1), STEP_RIGHT),
@@ -704,6 +723,7 @@ mod tests {
         );
         assert!(b.try_concatenate_allowing_one_edge_of_overlap(&a).is_ok());
     }
+    #[ignore = "Turns out having a canonical representation is convenient"]
     #[test]
     fn test_no_standard_representation_for_full_circle_fences() {
         let a = Fence::from_faces_in_ccw_order([
@@ -876,7 +896,9 @@ mod tests {
             ((0, 0), STEP_RIGHT),
             ((0, 0), STEP_UP),
         ]);
-        assert_about_eq_2d(fence.cw_end_point(), (0.5, 0.5).into());
-        assert_about_eq_2d(fence.ccw_end_point(), (0.5, 0.5).into());
+        let correct_break_point: WorldMove =
+            RelativeFace::from((0, 0, STEP_RIGHT)).cw_end_of_face();
+        check_about_eq_2d(fence.cw_end_point(), correct_break_point).unwrap();
+        check_about_eq_2d(fence.ccw_end_point(), correct_break_point).unwrap();
     }
 }

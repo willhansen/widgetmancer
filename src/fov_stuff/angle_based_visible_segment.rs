@@ -412,7 +412,10 @@ mod tests {
         assert_eq!(c.visible_arc.cw(), a.visible_arc.cw());
         assert_eq!(c.visible_arc.ccw(), b.visible_arc.ccw());
 
-        assert_eq!(c.end_fence, Fence::new(vec![a_face, b_face,]));
+        assert_eq!(
+            c.end_fence,
+            Fence::from_faces_in_ccw_order(vec![a_face, b_face,])
+        );
     }
     #[test]
     #[should_panic]

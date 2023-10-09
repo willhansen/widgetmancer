@@ -141,12 +141,14 @@ where
     pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction().step())
     }
+    // TODO: remove this?
     fn as_relative_face(&self) -> RelativeSquareWithOrthogonalDir {
         RelativeSquareWithOrthogonalDir::from_square_and_step(
             self.square() - SquareType::zero(),
             self.dir(),
         )
     }
+    // TODO: remove this?
     fn as_absolute_face(&self) -> SquareWithOrthogonalDir {
         SquareWithOrthogonalDir::from_square_and_step(
             WorldSquare::zero() + self.as_relative_face().square(),
@@ -181,10 +183,26 @@ where
     ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
+    // TODO: make return type relative to Self::UnitType?
     // TODO: return AbsOrRelWorldLine
     pub fn face_line_segment(&self) -> WorldLine {
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
+    }
+
+    // TODO: make return type relative to Self::UnitType?
+    pub fn middle_point_of_face(&self) -> WorldPoint {
+        //self.square.to_f32() + self.direction().to_f32() * 0.5;
+        todo!()
+    }
+    pub fn face_crosses_positive_x_axis(&self) -> bool {
+        if self.square == SquareType::zero() {
+            return self.direction() == STEP_RIGHT.into();
+        }
+
+        self.square.x() > SquareType::DataType::zero()
+            && self.square.y() == 0
+            && self.direction().step().is_horizontal()
     }
 }
 
