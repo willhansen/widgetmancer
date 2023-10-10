@@ -18,8 +18,8 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
 use crate::utility::{
-    check_vectors_in_ccw_order, quadrants_of_rel_square, squares_sharing_face, two_in_ccw_order,
-    CoordToString, Quadrant, SimpleResult, STEP_ZERO,
+    check_vectors_in_ccw_order, get_by_index, quadrants_of_rel_square, squares_sharing_face,
+    two_in_ccw_order, CoordToString, Quadrant, SimpleResult, STEP_ZERO,
 };
 
 #[derive(Clone, PartialEq, Eq, Default)]
@@ -84,6 +84,10 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 
         Ok(new_fence)
     }
+    pub fn from_cw_end_and_length(first_edge: impl Into<RelativeFace>, length: u32) -> Self {
+        let first_edge = first_edge.into().flipped_to_face_origin();
+        todo!();
+    }
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
         Self::from_faces_in_ccw_order(vec![edge.into()])
     }
@@ -105,7 +109,18 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         )
     }
     fn sub_fence_in_arc(&self, arc: AngleInterval, tolerance: FAngle) -> Self {
-        todo!()
+        let edges_touching_arc = self
+            .edges
+            .iter()
+            .filter(|edge| {
+                arc.overlaps_relative_face(**edge, tolerance)
+                    .is_at_least_partial()
+            })
+            .cloned()
+            .collect();
+
+        // unordered because the arc might cross the break point of a full circle fence
+        Self::from_unordered_relative_edges(edges_touching_arc)
     }
     fn try_add_to_ccw_end(&mut self, edge: RelativeFace) -> SimpleResult {
         if self.can_connect_to_ccw_end(edge) {
@@ -193,6 +208,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let edge_is_cw_of_self = two_in_ccw_order(edge.center_point_of_face(), self.cw_end_point());
 
         !overlapping && ends_touch && edge_is_cw_of_self
+    }
+    pub fn edge_by_index(&self, index: i32) -> &RelativeFace {
+        get_by_index(&self.edges, index)
+    }
+    pub fn cw_edge(&self) -> RelativeFace {
+        *self.edge_by_index(0)
+    }
+    pub fn ccw_edge(&self) -> RelativeFace {
+        *self.edge_by_index(-1)
     }
     pub fn point_by_index(&self, index: i32) -> WorldMove {
         let num_points = self.edges.len() + 1;
@@ -385,6 +409,10 @@ mod tests {
     use crate::utility::*;
 
     use super::*;
+
+    fn default_test_angle_tolerance() -> FAngle {
+        FAngle::degrees(0.001)
+    }
 
     #[test]
     fn test_make_a_fence_from_square_faces() {
@@ -900,5 +928,24 @@ mod tests {
             RelativeFace::from((0, 0, STEP_RIGHT)).cw_end_of_face();
         check_about_eq_2d(fence.cw_end_point(), correct_break_point).unwrap();
         check_about_eq_2d(fence.ccw_end_point(), correct_break_point).unwrap();
+    }
+    #[test]
+    fn test_sub_fence_in_arc__simple_case() {
+        let fence = Fence::from_cw_end_and_length((5, -2, STEP_RIGHT), 20);
+
+        let start_segment = fence.edges[4];
+        let end_segment = fence.edges[15];
+        let start_angle =
+            better_angle_from_x_axis(start_segment.middle_point_of_face().to_vector());
+        let end_angle = better_angle_from_x_axis(end_segment.middle_point_of_face().to_vector());
+
+        let arc = AngleInterval::from_angles(start_angle, end_angle);
+
+        let sub_fence = fence.sub_fence_in_arc(arc, default_test_angle_tolerance());
+
+        // start at 4, end at 15
+        assert_eq!(sub_fence.len(), 12);
+        assert_eq!(sub_fence.cw_edge(), start_segment);
+        assert_eq!(sub_fence.ccw_edge(), end_segment);
     }
 }

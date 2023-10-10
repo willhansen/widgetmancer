@@ -350,6 +350,14 @@ impl AngleInterval {
             },
         }
     }
+    pub fn overlaps_relative_face(
+        &self,
+        face: impl Into<RelativeFace>,
+        tolerance: FAngle,
+    ) -> BoolWithPartial {
+        self.overlaps_arc(Self::from_relative_square_face(face.into()), tolerance)
+    }
+
     pub fn contains_angle(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> BoolWithPartial {
         use AngleInterval::*;
         use BoolWithPartial::*;

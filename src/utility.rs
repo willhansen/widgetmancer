@@ -350,6 +350,15 @@ pub trait RigidlyTransformable {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
 }
 
+pub fn get_by_index<T>(vector: &Vec<T>, index: i32) -> &T {
+    let index = if index < 0 {
+        vector.len() as i32 + index
+    } else {
+        index
+    } as usize;
+    vector.get(index).unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;
