@@ -106,13 +106,16 @@ impl FieldOfView {
     pub fn transformed_sub_fovs(&self) -> &Vec<FieldOfView> {
         &self.transformed_sub_fovs
     }
-    pub fn add_fully_visible_relative_square(&mut self, step: impl Into<WorldStep>) {
+    pub fn add_view_segment_for_fully_visible_relative_square(
+        &mut self,
+        step: impl Into<WorldStep>,
+    ) {
         self.visible_segments_in_main_view_only
             .push(AngleBasedVisibleSegment::from_relative_square(step.into()))
     }
     // passthrough version
     pub fn with_fully_visible_relative_square(mut self, step: impl Into<WorldStep>) -> Self {
-        self.add_fully_visible_relative_square(step);
+        self.add_view_segment_for_fully_visible_relative_square(step);
         self
     }
     pub fn add_fully_visible_relative_face(
@@ -1115,7 +1118,7 @@ mod tests {
         let center: WorldSquare = point2(5, 5);
         let mut fov = FieldOfView::new_empty_fov_at(center);
         let relative_square = vec2(2, 2);
-        fov.add_fully_visible_relative_square(relative_square);
+        fov.add_view_segment_for_fully_visible_relative_square(relative_square);
 
         assert!(fov
             .rasterized()
@@ -1262,7 +1265,9 @@ mod tests {
 
         let target_square: WorldSquare = point2(1, 4);
 
-        sub_fov.add_fully_visible_relative_square(target_square - sub_fov.root_square());
+        sub_fov.add_view_segment_for_fully_visible_relative_square(
+            target_square - sub_fov.root_square(),
+        );
 
         main_fov.transformed_sub_fovs.push(sub_fov);
 
@@ -1547,7 +1552,7 @@ mod tests {
         let rel_square = STEP_DOWN_LEFT * 3;
         let correct_abs_square = main_center + rel_square;
 
-        fov.add_fully_visible_relative_square(rel_square);
+        fov.add_view_segment_for_fully_visible_relative_square(rel_square);
 
         let rasterized_fov = fov.rasterized();
 
@@ -1566,11 +1571,18 @@ mod tests {
             rasterized_fov.absolute_squares_visible_at_relative_square(rel_square),
             SquareSet::from([correct_abs_square])
         );
+
+        // ..vo
+        // .vvv
+        // vvv.
+        // xv..
+        // 10 visible squares
+
         assert_eq!(
             fov.rasterized()
                 .visible_relative_squares_including_center()
                 .len(),
-            2
+            10
         );
     }
 
@@ -1585,7 +1597,7 @@ mod tests {
         let rel_square = STEP_DOWN_LEFT * 3;
         let abs_square = sub_center + rel_square;
 
-        sub_fov.add_fully_visible_relative_square(rel_square);
+        sub_fov.add_view_segment_for_fully_visible_relative_square(rel_square);
 
         fov.transformed_sub_fovs.push(sub_fov);
 
@@ -1618,7 +1630,7 @@ mod tests {
         let rotated_rel_square = rel_square.rotated(quarter_turns);
         let abs_square = sub_center + rotated_rel_square;
 
-        sub_fov.add_fully_visible_relative_square(rotated_rel_square);
+        sub_fov.add_view_segment_for_fully_visible_relative_square(rotated_rel_square);
         fov.transformed_sub_fovs.push(sub_fov);
 
         assert_eq!(
@@ -1883,7 +1895,7 @@ mod tests {
         let root_square = point2(5, 10);
         let mut narrow_fov = FieldOfView::new_empty_fov_with_root((root_square, STEP_UP));
         let dx = 2;
-        narrow_fov.add_fully_visible_relative_square(STEP_RIGHT * 3);
+        narrow_fov.add_view_segment_for_fully_visible_relative_square(STEP_RIGHT * 3);
 
         let rasterized_fov = narrow_fov.rasterized();
 
