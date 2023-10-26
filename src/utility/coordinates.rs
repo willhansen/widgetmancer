@@ -115,59 +115,9 @@ macro_rules! coordinatify {
 
 coordinatify!(Vector2D);
 coordinatify!(Point2D);
-// impl<T, U> Coordinate for Vector2D<T, U>
-// where
-//     // TODO: trait alias
-//     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
-// {
-//     type DataType = T;
-//     type UnitType = U;
-
-//     fn x(&self) -> T {
-//         self.x
-//     }
-
-//     fn y(&self) -> T {
-//         self.y
-//     }
-
-//     fn new(x: T, y: T) -> Self {
-//         Self::new(x, y)
-//     }
-// }
-// impl<T, U> Coordinate for Point2D<T, U>
-// where
-//     // TODO: trait alias
-//     T: Copy
-//         + PartialEq
-//         + Add<Output = T>
-//         + Sub<Output = T>
-//         + Mul<Output = T>
-//         + Zero
-//         + Signed
-//         + Debug,
-// {
-//     type DataType = T;
-//     type UnitType = U;
-
-//     fn x(&self) -> T {
-//         self.x
-//     }
-
-//     fn y(&self) -> T {
-//         self.y
-//     }
-
-//     fn new(x: T, y: T) -> Self {
-//         Self::new(x, y)
-//     }
-// }
 
 trait_alias_macro!(pub trait WorldGridCoordinate = Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>);
-
-pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
-
-impl<T> AbsOrRelPoint for T where T: Copy + PartialEq + Sub<T, Output = WorldMove> {}
+trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x), sign(point.y))

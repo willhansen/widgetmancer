@@ -190,11 +190,6 @@ where
         square_face_as_line(abs_face.square, abs_face.dir)
     }
 
-    // TODO: make return type relative to Self::UnitType?
-    pub fn middle_point_of_face(&self) -> WorldPoint {
-        //self.square.to_f32() + self.direction().to_f32() * 0.5
-        todo!()
-    }
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
             return self.direction() == STEP_RIGHT.into();
@@ -241,6 +236,12 @@ impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogon
     }
 }
 
+impl SquareWithOrthogonalDir {
+    pub fn middle_point_of_face(&self) -> WorldPoint {
+        self.square.to_f32() + self.direction().step().to_f32() * 0.5
+    }
+}
+
 // TODO: generalize for absolute squares too
 impl RelativeSquareWithOrthogonalDir {
     pub fn center_point_of_face(&self) -> WorldMove {
@@ -275,6 +276,9 @@ impl RelativeSquareWithOrthogonalDir {
         } else {
             *self
         }
+    }
+    pub fn middle_point_of_face(&self) -> WorldMove {
+        self.square.to_f32() + self.direction().step().to_f32() * 0.5
     }
 }
 
