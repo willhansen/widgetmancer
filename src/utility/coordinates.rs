@@ -29,9 +29,10 @@ use super::{
     random_angle,
     relative_interval_location::RelativeIntervalLocation,
     sign,
+    trait_alias_macro::*,
+
     RigidTransform,
     RigidlyTransformable,
-
     ORTHOGONAL_STEPS,
     STEP_DOWN,
     STEP_LEFT,
@@ -162,15 +163,7 @@ coordinatify!(Point2D);
 //     }
 // }
 
-pub trait WorldGridCoordinate:
-    Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
-{
-}
-
-impl<T> WorldGridCoordinate for T where
-    T: Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>
-{
-}
+trait_alias_macro!(pub trait WorldGridCoordinate = Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>);
 
 pub trait AbsOrRelPoint: Copy + PartialEq + Sub<Self, Output = WorldMove> {}
 

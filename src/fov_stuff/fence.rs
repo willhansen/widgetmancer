@@ -84,9 +84,12 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 
         Ok(new_fence)
     }
-    pub fn from_cw_end_and_length(first_edge: impl Into<RelativeFace>, length: u32) -> Self {
+    pub fn straight_fence_from_cw_end_and_length(
+        first_edge: impl Into<RelativeFace>,
+        length: u32,
+    ) -> Self {
         let first_edge = first_edge.into().flipped_to_face_origin();
-        todo!();
+        Fence::from_faces_in_ccw_order((0..length).map(|i| first_edge.strafed_left_n(i as i32)))
     }
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
         Self::from_faces_in_ccw_order(vec![edge.into()])
@@ -931,7 +934,7 @@ mod tests {
     }
     #[test]
     fn test_sub_fence_in_arc__simple_case() {
-        let fence = Fence::from_cw_end_and_length((5, -2, STEP_RIGHT), 20);
+        let fence = Fence::straight_fence_from_cw_end_and_length((5, -2, STEP_RIGHT), 20);
 
         let start_segment = fence.edges[4];
         let end_segment = fence.edges[15];

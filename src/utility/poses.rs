@@ -192,7 +192,7 @@ where
 
     // TODO: make return type relative to Self::UnitType?
     pub fn middle_point_of_face(&self) -> WorldPoint {
-        //self.square.to_f32() + self.direction().to_f32() * 0.5;
+        //self.square.to_f32() + self.direction().to_f32() * 0.5
         todo!()
     }
     pub fn face_crosses_positive_x_axis(&self) -> bool {

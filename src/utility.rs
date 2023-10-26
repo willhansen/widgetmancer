@@ -48,6 +48,7 @@ pub mod poses;
 pub mod quadrant;
 pub mod relative_interval_location;
 pub mod round_robin_iterator;
+pub mod trait_alias_macro;
 
 pub use self::angle_interval::*;
 pub use self::coordinate_frame_conversions::*;
