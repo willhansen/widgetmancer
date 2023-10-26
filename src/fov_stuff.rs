@@ -46,7 +46,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-use self::rasterized_field_of_view::TopDownifiedFieldOfViewInterface;
+use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 

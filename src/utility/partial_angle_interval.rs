@@ -542,7 +542,7 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use crate::{
-        fov_stuff::{rasterized_field_of_view::TopDownifiedFieldOfViewInterface, FieldOfView},
+        fov_stuff::{rasterized_field_of_view::RasterizedFieldOfViewFunctions, FieldOfView},
         utility::{
             coordinates::opposite_angle, relative_interval_location::RelativeIntervalLocation,
             STEP_DOWN, STEP_RIGHT, STEP_UP,

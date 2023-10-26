@@ -23,7 +23,7 @@ use strum_macros::EnumIter;
 
 use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::rasterized_field_of_view::{
-    RasterizedFieldOfView, TopDownifiedFieldOfViewInterface,
+    RasterizedFieldOfView, RasterizedFieldOfViewFunctions,
 };
 use crate::fov_stuff::square_visibility::{
     RelativeSquareVisibilityFunctions, SquareVisibilityFunctions,

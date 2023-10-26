@@ -35,7 +35,7 @@ use crate::animations::spear_attack_animation::SpearAttackAnimation;
 use crate::animations::static_board::StaticBoard;
 use crate::animations::*;
 use crate::fov_stuff::rasterized_field_of_view::{
-    RasterizedFieldOfView, TopDownPortal, TopDownifiedFieldOfViewInterface,
+    RasterizedFieldOfView, RasterizedFieldOfViewFunctions, TopDownPortal,
 };
 use crate::fov_stuff::square_visibility::RelativeSquareVisibilityFunctions;
 use crate::fov_stuff::FieldOfView;

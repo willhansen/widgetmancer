@@ -39,7 +39,7 @@ pub struct RasterizedFieldOfView {
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
 }
 
-pub trait TopDownifiedFieldOfViewInterface {
+pub trait RasterizedFieldOfViewFunctions {
     // creation
     fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self;
 
@@ -285,7 +285,7 @@ impl ViewRoundable for SquareOfTopDownPortals {
     }
 }
 
-impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
+impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
