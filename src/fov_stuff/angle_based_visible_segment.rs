@@ -1,4 +1,4 @@
-use crate::fov_stuff::{LocalVisibilityMap, SquareVisibility};
+use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
@@ -242,8 +242,8 @@ impl AngleBasedVisibleSegment {
             .filter(|&rel_square| self.rel_square_is_after_start_line(rel_square))
             .filter(|&rel_square| self.rel_square_is_before_end_fence(rel_square))
     }
-    pub fn to_square_visibilities(&self) -> LocalVisibilityMap {
-        // A visible segment has two edges to it's view arc, and those are the only things that can split one of these squares.
+    pub fn to_local_square_visibility_map(&self) -> LocalSquareVisibilityMap {
+        // A visible segment has two edges to its view arc, and those are the only things that can split one of these squares.
         // Watch out for the wraparound case.
         self.touched_squares_going_outwards_and_ccw()
             .map(|rel_square| {
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_getting_square_visibilities__includes_partial_squares() {
         let segment = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 2, STEP_RIGHT));
-        let visibilities = segment.to_square_visibilities();
+        let visibilities = segment.to_local_square_visibility_map();
         assert!(visibilities
             .get(&STEP_ZERO)
             .is_some_and(SquareVisibility::is_fully_visible));
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_getting_square_visibilities__from_visible_square() {
         let segment = AngleBasedVisibleSegment::from_relative_square(STEP_RIGHT * 3);
-        let visibilities = segment.to_square_visibilities();
+        let visibilities = segment.to_local_square_visibility_map();
         assert!(visibilities.get(&vec2(0, 0)).unwrap().is_fully_visible());
         assert!(visibilities
             .get(&vec2(1, 0))

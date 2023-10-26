@@ -349,14 +349,16 @@ impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
     }
 }
 
-pub type LocalVisibilityMap = HashMap<WorldStep, SquareVisibility>;
+pub type LocalSquareVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
 pub trait SquareVisibilityMapFunctions: ViewRoundable {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self;
-    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep);
+    fn add_fully_visible_relative_square(&mut self, rel_square: impl Into<WorldStep>);
+    fn new_empty() -> Self;
+    fn new_with_only_center_visible() -> Self;
 }
 
-impl ViewRoundable for LocalVisibilityMap {
+impl ViewRoundable for LocalSquareVisibilityMap {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         self.iter()
             .map(|(&step, vis)| (step, vis.rounded_towards_full_visibility(tolerance)))
@@ -364,7 +366,7 @@ impl ViewRoundable for LocalVisibilityMap {
     }
 }
 
-impl SquareVisibilityMapFunctions for LocalVisibilityMap {
+impl SquareVisibilityMapFunctions for LocalSquareVisibilityMap {
     fn combined_while_increasing_visibility(&self, other: &Self) -> Self {
         let mut combined_vis_map = self.clone();
         other.iter().for_each(|entry_to_add| {
@@ -382,8 +384,16 @@ impl SquareVisibilityMapFunctions for LocalVisibilityMap {
         combined_vis_map
     }
 
-    fn add_fully_visible_relative_square(&mut self, rel_square: WorldStep) {
-        todo!()
+    fn add_fully_visible_relative_square(&mut self, rel_square: impl Into<WorldStep>) {
+        self.insert(rel_square.into(), SquareVisibility::new_fully_visible());
+    }
+    fn new_empty() -> Self {
+        Self::new()
+    }
+    fn new_with_only_center_visible() -> Self {
+        let mut new_thing = Self::new_empty();
+        new_thing.add_fully_visible_relative_square((0, 0));
+        new_thing
     }
 }
 

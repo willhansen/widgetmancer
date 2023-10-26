@@ -11,7 +11,7 @@ use std::fmt::{Debug, Formatter};
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
-    LocalVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
+    LocalSquareVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
     SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
 };
 use crate::utility::coordinates::{
@@ -386,9 +386,9 @@ impl FieldOfView {
             &self
                 .visible_segments_in_main_view_only
                 .iter()
-                .map(AngleBasedVisibleSegment::to_square_visibilities)
+                .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
                 .reduce(|a, b| a.combined_while_increasing_visibility(&b))
-                .unwrap(),
+                .unwrap_or(LocalSquareVisibilityMap::new_with_only_center_visible()),
         )
     }
 
@@ -1928,5 +1928,19 @@ mod tests {
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
+    }
+    #[test]
+    fn test_rasterize_empty_fov() {
+        let mut fov = FieldOfView::new_empty_fov_at(point2(5, 5));
+
+        assert_eq!(fov.visible_segments_in_main_view_only.len(), 0);
+        assert!(fov.transformed_sub_fovs.is_empty());
+
+        let rasterized = fov.rasterized();
+
+        // Center square should be fully visible, even on an empty fov
+        assert_eq!(rasterized.number_of_visible_relative_squares(), 1);
+        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 1);
+        assert!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
     }
 }

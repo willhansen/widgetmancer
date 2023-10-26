@@ -1,4 +1,4 @@
-use crate::fov_stuff::square_visibility::LocalVisibilityMap;
+use crate::fov_stuff::square_visibility::LocalSquareVisibilityMap;
 use crate::fov_stuff::square_visibility::SquareVisibility;
 use crate::fov_stuff::square_visibility::SquareVisibilityMapFunctions;
 use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, ViewRoundable};
@@ -41,7 +41,7 @@ pub struct RasterizedFieldOfView {
 
 pub trait TopDownifiedFieldOfViewInterface {
     // creation
-    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self;
+    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self;
 
     // adding
     fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep);
@@ -60,8 +60,10 @@ pub trait TopDownifiedFieldOfViewInterface {
     fn root_square(&self) -> WorldSquare;
 
     // visibility maps
-    fn visibilities_of_partially_visible_squares_in_main_view_only(&self) -> LocalVisibilityMap;
-    fn visibility_map_of_local_relative_squares(&self) -> LocalVisibilityMap;
+    fn visibilities_of_partially_visible_squares_in_main_view_only(
+        &self,
+    ) -> LocalSquareVisibilityMap;
+    fn visibility_map_of_local_relative_squares(&self) -> LocalSquareVisibilityMap;
 
     // visible relative_squares
     fn fully_visible_relative_squares(&self) -> StepSet;
@@ -284,7 +286,7 @@ impl ViewRoundable for SquareOfTopDownPortals {
 }
 
 impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
-    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalVisibilityMap) -> Self {
+    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self {
         let mut new_thing = Self::new_centered_at(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
             new_thing.try_add_visible_local_relative_square(*rel_square, visibility);
@@ -341,11 +343,13 @@ impl TopDownifiedFieldOfViewInterface for RasterizedFieldOfView {
             .unwrap()
     }
 
-    fn visibilities_of_partially_visible_squares_in_main_view_only(&self) -> LocalVisibilityMap {
+    fn visibilities_of_partially_visible_squares_in_main_view_only(
+        &self,
+    ) -> LocalSquareVisibilityMap {
         self.filtered(true, true, false).visibility_map()
     }
 
-    fn visibility_map_of_local_relative_squares(&self) -> LocalVisibilityMap {
+    fn visibility_map_of_local_relative_squares(&self) -> LocalSquareVisibilityMap {
         self.filtered(true, true, true).visibility_map()
     }
     fn fully_visible_relative_squares(&self) -> StepSet {
@@ -665,7 +669,7 @@ impl RasterizedFieldOfView {
         &self.map_of_top_down_portal_shapes_by_coordinates
     }
 
-    fn visibility_map(&self) -> LocalVisibilityMap {
+    fn visibility_map(&self) -> LocalSquareVisibilityMap {
         self.portal_map()
             .into_iter()
             .map(|(&coord, &vis)| (coord.0, vis))
