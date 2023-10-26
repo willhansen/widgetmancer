@@ -86,10 +86,10 @@ impl FieldOfView {
     pub fn new_with_arc_and_radius(
         center: impl Into<WorldSquare>,
         arc: AngleInterval,
-        radius: u32,
+        square_radius: u32,
     ) -> Self {
         Self::new_empty_fov_at(center).with_local_visible_segment(
-            AngleBasedVisibleSegment::from_arc_and_fence_radius(arc, radius),
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(arc, square_radius),
         )
     }
     pub fn root_square(&self) -> WorldSquare {
@@ -1367,22 +1367,42 @@ mod tests {
     #[test]
     fn test_combine_fovs_to_make_full_circle() {
         let main_center = point2(5, 5);
+        let radius = 4;
         let mut fov_1 = FieldOfView::new_with_arc_and_radius(
             main_center,
             AngleInterval::from_degrees(10.0, 55.0),
-            4,
+            radius,
         );
         let mut fov_2 = FieldOfView::new_with_arc_and_radius(
             main_center,
             AngleInterval::from_degrees(55.0, 10.0),
-            4,
+            radius,
         );
 
-        let combined = fov_1.combined_with(&fov_2).rasterized();
+        let combined_fov = fov_1.combined_with(&fov_2);
+        let combined_and_rasterized = combined_fov.rasterized();
 
-        // includes the two added squares, and the center (which is fully visible by default)
-        assert_eq!(combined.fully_visible_relative_squares().len(), 3);
-        assert_eq!(combined.fully_visible_local_relative_squares().len(), 3);
+        let expected_area = (radius * 2 + 1).pow(2);
+
+        assert_eq!(combined_fov.visible_segments_in_main_view_only.len(), 1);
+        let lone_segment = combined_fov
+            .visible_segments_in_main_view_only
+            .first()
+            .unwrap();
+        assert_true!(lone_segment.arc().is_full());
+
+        assert_eq!(
+            combined_and_rasterized
+                .fully_visible_relative_squares()
+                .len() as u32,
+            expected_area
+        );
+        assert_eq!(
+            combined_and_rasterized
+                .fully_visible_local_relative_squares()
+                .len() as u32,
+            expected_area
+        );
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
