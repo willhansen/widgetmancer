@@ -373,8 +373,10 @@ impl FieldOfView {
         let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
-            let rasterized_and_relocalized_sub_fov =
-                sub_fov.rasterized().as_seen_through_portal_by(&combined);
+            let portal_transform = self.view_transform_to(sub_fov);
+            let rasterized_and_relocalized_sub_fov = sub_fov
+                .rasterized()
+                .as_seen_through_portal_by(&combined, portal_transform);
             combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
         });
         combined
@@ -1604,7 +1606,7 @@ mod tests {
         assert_eq!(
             fov.rasterized()
                 .absolute_squares_visible_at_relative_square(rel_square),
-            SquareSet::from([abs_square])
+            [abs_square].into()
         );
     }
 

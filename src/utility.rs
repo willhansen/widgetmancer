@@ -286,6 +286,12 @@ impl RigidTransform {
 
         RelativeSquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
     }
+    pub fn inverse(&self) -> Self {
+        Self {
+            start_pose: self.end_pose,
+            end_pose: self.start_pose,
+        }
+    }
     pub fn transform_octant(&self, octant: Octant) -> Octant {
         octant.with_n_quarter_turns_anticlockwise(self.rotation())
     }
