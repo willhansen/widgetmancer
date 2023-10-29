@@ -269,6 +269,9 @@ impl RigidTransform {
             end_pose: end.into(),
         }
     }
+    pub fn identity() -> Self {
+        Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
+    }
     pub fn translation(&self) -> WorldStep {
         (self.end_pose - self.start_pose).stepp()
     }

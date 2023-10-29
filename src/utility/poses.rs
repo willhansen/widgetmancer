@@ -42,7 +42,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters)]
+#[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters, Default)]
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
