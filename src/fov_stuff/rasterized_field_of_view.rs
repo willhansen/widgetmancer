@@ -560,17 +560,9 @@ impl RasterizedFieldOfView {
             portal.positioned_target();
         let new_portal_shape: TopDownPortalShape = portal.shape_in_exit_frame;
 
-        // TODO: put this part in its own function
-        todo!();
-        let existing_shapes = self
-            .top_down_portals_for_relative_square(new_positioned_portal_target.0)
-            .iter()
-            .map(|portal| portal.shape_in_entrance_frame())
-            .collect_vec();
-        let found_overlap = existing_shapes
-            .into_iter()
-            .any(|existing_shape| new_portal_shape.overlaps(&existing_shape, 1e-5));
-        assert!(!found_overlap);
+        assert!(!portal.has_entrance_overlap_with_any(
+            self.top_down_portals_for_relative_square(new_positioned_portal_target.0)
+        ));
 
         self.map_of_top_down_portal_shapes_by_coordinates
             .insert(new_positioned_portal_target, new_portal_shape);
@@ -774,7 +766,14 @@ impl TopDownPortal {
         (self.relative_position, self.target)
     }
     fn has_entrance_overlap_with(&self, other: Self) -> bool {
-        todo!()
+        let tolerance = 1e-5; // TODO: standardize
+        self.shape_in_entrance_frame()
+            .overlaps(other.shape_in_entrance_frame(), tolerance)
+    }
+    fn has_entrance_overlap_with_any(&self, others: impl IntoIterator<Item = Self>) -> bool {
+        others
+            .into_iter()
+            .any(|other_top_down_portal| self.has_entrance_overlap_with(other_top_down_portal))
     }
     fn any_have_entrance_overlap(portals: impl IntoIterator<Item = Self>) -> bool {
         let has_portal_entrance_overlaps = portals
@@ -782,15 +781,12 @@ impl TopDownPortal {
             .into_group_map_by(|top_down_portal| top_down_portal.relative_position())
             .iter()
             .any(|(rel_square, top_down_portals_for_square)| {
-                let tolerance = 1e-5; // TODO: standardize
                 top_down_portals_for_square
                     .iter()
                     .combinations(2)
                     .any(|portals| {
                         // TODO: check entrance vs exit frame overlap check is correct
-                        portals[0]
-                            .shape_in_exit_frame
-                            .overlaps(&portals[1].shape_in_exit_frame, tolerance)
+                        portals[0].has_entrance_overlap_with(*portals[1])
                     })
             });
         has_portal_entrance_overlaps
@@ -1254,20 +1250,20 @@ mod tests {
         )
     }
 
-    fn two_top_down_portals_with_overlapping_entrances_but_not_exits() -> Vec<TopDownPortal> {
+    fn two_top_down_portals_with_overlapping_entrances_but_not_exits() -> [TopDownPortal; 2] {
         let mut p = get_generic_top_down_portal();
         let p1 = p.clone();
         p.target.portal_rotation_to_target += 1.into();
         p.target.absolute_square += STEP_DOWN;
-        [p1, p].into()
+        [p1, p]
     }
     // Note that the exits do overlap
     fn two_top_down_portals_on_one_square_with_overlapping_exits_but_not_entrances(
-    ) -> Vec<TopDownPortal> {
+    ) -> [TopDownPortal; 2] {
         let mut p = get_generic_top_down_portal();
         let p1 = p.clone();
         p.target.portal_rotation_to_target += 2.into();
-        [p1, p].into()
+        [p1, p]
     }
 
     #[test]
@@ -1276,7 +1272,7 @@ mod tests {
         let non_overlapping =
             two_top_down_portals_on_one_square_with_overlapping_exits_but_not_entrances();
 
-        // TODO: test for exit overlaps
+        // TODO: test for exit overlaps (when it become relevant, I suppose)
         assert_true!(overlapping[0].has_entrance_overlap_with(overlapping[1]));
         assert_false!(non_overlapping[0].has_entrance_overlap_with(non_overlapping[1]));
     }

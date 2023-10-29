@@ -44,7 +44,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     ) -> Option<SquareVisibility>;
 
     // other
-    fn overlaps(&self, other: &Self, tolerance: f32) -> bool;
+    fn overlaps(&self, other: Self, tolerance: f32) -> bool;
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
     fn as_string(&self) -> String;
     fn is_about_complementary_to(&self, other: Self) -> bool;
@@ -218,7 +218,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             None
         }
     }
-    fn overlaps(&self, other: &Self, tolerance: f32) -> bool {
+    fn overlaps(&self, other: Self, tolerance: f32) -> bool {
         if self.is_fully_visible() || other.is_fully_visible() {
             return true;
         }
@@ -507,9 +507,9 @@ mod tests {
                 (0.0, -1.0),
             ),
         );
-        assert_false!(vis1.overlaps(&vis2, 1e-5));
-        assert_false!(vis2.overlaps(&vis1, 1e-5));
-        assert_false!(vis1.overlaps(&vis1.complement().unwrap(), 1e-5));
+        assert_false!(vis1.overlaps(vis2, 1e-5));
+        assert_false!(vis2.overlaps(vis1, 1e-5));
+        assert_false!(vis1.overlaps(vis1.complement().unwrap(), 1e-5));
     }
     #[test]
     fn test_square_visibility_overlap__simple_overlap() {
@@ -525,7 +525,7 @@ mod tests {
                 (0.0, -1.0),
             ),
         );
-        assert!(vis1.overlaps(&vis2, 1e-5));
-        assert!(vis2.overlaps(&vis1, 1e-5));
+        assert!(vis1.overlaps(vis2, 1e-5));
+        assert!(vis2.overlaps(vis1, 1e-5));
     }
 }
