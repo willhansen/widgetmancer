@@ -400,7 +400,7 @@ impl From<KingWorldStep> for WorldStep {
     }
 }
 
-#[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy)]
+#[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy, Default)]
 pub struct OrthogonalWorldStep {
     step: WorldStep,
 }

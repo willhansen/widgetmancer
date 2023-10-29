@@ -714,7 +714,7 @@ impl Graphics {
                         PartialVisibilityDrawable::from_shadowed_drawable(
                             &drawable,
                             if render_portals_with_line_of_sight {
-                                top_down_portal.shape_rotated_to_relative_frame()
+                                top_down_portal.shape_in_entrance_frame()
                             } else {
                                 top_down_portal.shape_rotated_to_absolute_frame()
                             },
