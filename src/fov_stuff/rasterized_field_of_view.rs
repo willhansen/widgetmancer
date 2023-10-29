@@ -226,11 +226,9 @@ impl SquareOfTopDownPortals {
             .map(|x| x.into())
             .collect()
     }
-}
-impl FromIterator<TopDownPortal> for SquareOfTopDownPortals {
-    fn from_iter<T: IntoIterator<Item = TopDownPortal>>(iter: T) -> Self {
+    fn from_top_down_portals<T: IntoIterator<Item = TopDownPortal> + Clone>(iter: T) -> Self {
         // TODO: double check the use of default pose here
-        RasterizedFieldOfView::from_top_down_portal_iter(SquareWithOrthogonalDir::default(), iter)
+        RasterizedFieldOfView::from_top_down_portals(SquareWithOrthogonalDir::default(), iter)
             .try_into()
             .unwrap()
     }
@@ -248,7 +246,8 @@ impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
 
     fn try_from(value: RasterizedFieldOfView) -> Result<Self, Self::Error> {
         if value
-            .top_down_portal_iter()
+            .top_down_portals()
+            .into_iter()
             .map(|x| x.relative_position())
             .all_equal()
         {
@@ -261,7 +260,7 @@ impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
 
 impl ViewRoundable for SquareOfTopDownPortals {
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        Self::from_iter(
+        Self::from_top_down_portals(
             self.0
                 .map_of_top_down_portal_shapes_by_coordinates
                 .iter()
@@ -521,9 +520,10 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     }
 
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
-        Self::from_top_down_portal_iter(
+        Self::from_top_down_portals(
             self.view_root,
-            self.top_down_portal_iter()
+            self.top_down_portals()
+                .into_iter()
                 .map(|x| x.rounded_towards_full_visibility(tolerance)),
         )
     }
@@ -592,10 +592,11 @@ impl RasterizedFieldOfView {
                 )
             })
     }
-    fn from_top_down_portal_iter(
+    fn from_top_down_portals(
         view_root: SquareWithOrthogonalDir,
-        iter: impl IntoIterator<Item = TopDownPortal>,
+        iter: impl IntoIterator<Item = TopDownPortal> + Clone,
     ) -> Self {
+        assert!(!TopDownPortal::any_have_entrance_overlap(iter.clone()));
         Self {
             view_root,
             map_of_top_down_portal_shapes_by_coordinates: iter
@@ -708,13 +709,10 @@ impl RasterizedFieldOfView {
     }
 
     fn top_down_portals(&self) -> Vec<TopDownPortal> {
-        self.top_down_portal_iter().collect()
-    }
-
-    fn top_down_portal_iter(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
         self.map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .map(Into::<TopDownPortal>::into)
+            .collect()
     }
 }
 
@@ -904,7 +902,7 @@ impl From<DirectConnectionToLocalSquare> for SquareOfTopDownPortals {
 }
 impl From<TopDownPortal> for SquareOfTopDownPortals {
     fn from(value: TopDownPortal) -> Self {
-        Self::from_iter(vec![value])
+        Self::from_top_down_portals(vec![value])
     }
 }
 
@@ -1055,7 +1053,7 @@ mod tests {
     }
     #[test]
     #[should_panic]
-    fn test_no_overlapping_top_down_portal_entrances() {
+    fn test_no_overlapping_top_down_portal_entrances__two_fully_visible() {
         let portal1 = TopDownPortal::new(
             STEP_UP,
             TopDownPortalTarget {
@@ -1074,7 +1072,7 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        SquareOfTopDownPortals::from_iter(vec![portal1, portal2]);
+        SquareOfTopDownPortals::from_top_down_portals(vec![portal1, portal2]);
     }
     #[test]
     #[should_panic]
@@ -1097,7 +1095,7 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        SquareOfTopDownPortals::from_iter(vec![portal1, portal2]);
+        SquareOfTopDownPortals::from_top_down_portals(vec![portal1, portal2]);
     }
     #[test]
     fn test_top_down_portal_one_portal_deeper() {
@@ -1158,7 +1156,7 @@ mod tests {
 
         assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
 
-        let deeper_top_down_portal = new_rasterized_fov.top_down_portal_iter().next().unwrap();
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
 
         assert_eq!(
             deeper_top_down_portal.target.absolute_square,
@@ -1223,7 +1221,7 @@ mod tests {
         let new_rasterized_fov =
             fov.as_seen_through_portal_from_pose(new_fov_root_pose, forward_tf_through_portal);
 
-        let deeper_top_down_portal = new_rasterized_fov.top_down_portal_iter().next().unwrap();
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
 
         assert_eq!(
             deeper_top_down_portal.target.absolute_square,
@@ -1290,6 +1288,6 @@ mod tests {
     #[should_panic]
     fn test_prevent_top_down_portal_entrance_overlap__add_all_at_once() {
         let portals = two_top_down_portals_with_overlapping_entrances_but_not_exits();
-        RasterizedFieldOfView::from_top_down_portal_iter(Default::default(), portals);
+        RasterizedFieldOfView::from_top_down_portals(Default::default(), portals);
     }
 }
