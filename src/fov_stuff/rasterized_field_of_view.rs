@@ -123,7 +123,7 @@ pub trait RasterizedFieldOfViewFunctions {
     fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize;
 
     // modifying
-    fn as_seen_through_portal_from_pose(
+    fn as_seen_through_portal_from_other_view_root(
         &self,
         new_view_root: SquareWithOrthogonalDir,
         portal_transform_from_other_to_self: RigidTransform,
@@ -502,13 +502,17 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     }
 
     /// Note: does not account for any field of view limitations of the portal.  The entire rasterized field of view is propagated through
-    fn as_seen_through_portal_from_pose(
+    fn as_seen_through_portal_from_other_view_root(
         &self,
         new_view_root: SquareWithOrthogonalDir,
         portal_transform_from_other_to_self: RigidTransform,
     ) -> Self {
         // self root is used only for finding how the top-down portals look from the new view root, and is otherwise discarded
-        todo!();
+        let self_on_other_side_of_portal = self.as_seen_through_portal_from_same_relative_position(
+            portal_transform_from_other_to_self,
+        );
+
+        self.as_seen_from_other_local_view_root(new_view_root)
 
         // Self::from_top_down_portal_iter(self.top_down_portal_iter().map(|top_down_portal| {
         //     top_down_portal.one_portal_deeper(portal_transform_from_other_to_self)
@@ -531,6 +535,29 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
 
 // These are only the private functions, put the public ones in the trait for easier visibility
 impl RasterizedFieldOfView {
+    fn as_seen_through_portal_from_same_relative_position(
+        &self,
+        portal_transform_from_other_to_self: RigidTransform,
+    ) -> Self {
+        Self::from_top_down_portals(
+            self.view_root
+                .apply_rigid_transform(portal_transform_from_other_to_self.inverse()),
+            self.top_down_portals().into_iter().map(|top_down_portal| {
+                top_down_portal.one_portal_deeper(portal_transform_from_other_to_self.rotation())
+            }),
+        )
+    }
+    fn as_seen_from_other_local_view_root(&self, new_view_root: SquareWithOrthogonalDir) -> Self {
+        let tf_new_to_old = RigidTransform::from_start_and_end_poses(new_view_root, self.view_root);
+
+        Self::from_top_down_portals(
+            new_view_root,
+            self.top_down_portals().into_iter().map(|top_down_portal| {
+                top_down_portal.with_rigidly_transformed_entrance(tf_new_to_old)
+                todo!();
+            }),
+        )
+    }
     fn new_with_one_top_down_portal(
         view_root: impl Into<SquareWithOrthogonalDir>,
         top_down_portal: TopDownPortal,
@@ -740,6 +767,12 @@ impl TopDownPortal {
             ..self.clone()
         }
     }
+    pub fn with_rigidly_transformed_entrance(&self, tf: RigidTransform) -> Self {
+        let mut  the_copy = self.clone();
+        the_copy.target.portal_rotation_to_target = self.target.portal_rotation_to_target.rotated(tf.rotation());
+        the_copy.relative_position = self.relative_position.apply_rigid_transform(tf);
+        the_copy
+    }
     pub fn shape_in_entrance_frame(&self) -> SquareVisibility {
         self.shape_in_exit_frame
             .rotated(-self.target.portal_rotation_to_target)
@@ -910,7 +943,8 @@ impl From<TopDownPortal> for SquareOfTopDownPortals {
 mod tests {
     use super::*;
     use crate::utility::{
-        halfplane::LocalSquareHalfPlane, RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP,
+        coordinate_frame_conversions::STEP_LEFT, halfplane::LocalSquareHalfPlane, RigidTransform,
+        STEP_DOWN, STEP_RIGHT, STEP_UP,
     };
     use euclid::point2;
     use ntest::{assert_false, assert_true, timeout};
@@ -1151,8 +1185,10 @@ mod tests {
         assert_eq!(forward_tf_through_portal.rotation(), 0.into());
         assert_eq!(forward_tf_through_portal.translation(), (0, 0).into());
 
-        let new_rasterized_fov = old_rasterized_fov
-            .as_seen_through_portal_from_pose(new_fov_root_pose, forward_tf_through_portal);
+        let new_rasterized_fov = old_rasterized_fov.as_seen_through_portal_from_other_view_root(
+            new_fov_root_pose,
+            forward_tf_through_portal,
+        );
 
         assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
 
@@ -1182,11 +1218,66 @@ mod tests {
     #[test]
     fn test_rasterized_field_of_view_with_one_square_seen_through_portal__new_fov_root_translated()
     {
-        todo!();
+        let top_down_portal = TopDownPortal::new(
+            (5, 3),
+            TopDownPortalTarget::new((20, 205), 5, 2),
+            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::down(0.0)),
+        );
+
+        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let new_fov_root_pose: SquareWithOrthogonalDir =
+            old_fov_root_pose.clone().with_offset(STEP_RIGHT * 2);
+
+        let old_rasterized_fov =
+            RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
+
+        let forward_tf_through_portal = RigidTransform::identity();
+
+        let new_rasterized_fov = old_rasterized_fov.as_seen_through_portal_from_other_view_root(
+            new_fov_root_pose,
+            forward_tf_through_portal,
+        );
+
+        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        assert_eq!(
+            deeper_top_down_portal.relative_position,
+            top_down_portal.relative_position + STEP_LEFT * 2
+        );
     }
     #[test]
     fn test_rasterized_field_of_view_with_one_square_seen_through_portal__portal_translated() {
-        todo!();
+        let top_down_portal = TopDownPortal::new(
+            (5, 3),
+            TopDownPortalTarget::new((20, 205), 5, 2),
+            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::down(0.0)),
+        );
+
+        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let new_fov_root_pose: SquareWithOrthogonalDir = old_fov_root_pose.clone();
+
+        let old_rasterized_fov =
+            RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
+
+        let forward_tf_through_portal = RigidTransform::from_start_and_end_poses(
+            old_fov_root_pose.stepped_n(2),
+            old_fov_root_pose.stepped().strafed_right(),
+        );
+
+        let new_rasterized_fov = old_rasterized_fov.as_seen_through_portal_from_other_view_root(
+            new_fov_root_pose,
+            forward_tf_through_portal,
+        );
+
+        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+        assert_eq!(new_rasterized_fov.view_root.square(), (1, 0).into());
+
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        assert_eq!(
+            deeper_top_down_portal.relative_position,
+            top_down_portal.relative_position
+        );
     }
     #[test]
     fn test_rasterized_field_of_view_with_one_square_seen_through_portal__portal_moved_and_rotated()
@@ -1218,8 +1309,10 @@ mod tests {
 
         let new_fov_root_pose: SquareWithOrthogonalDir = (5, 5, STEP_RIGHT).into();
 
-        let new_rasterized_fov =
-            fov.as_seen_through_portal_from_pose(new_fov_root_pose, forward_tf_through_portal);
+        let new_rasterized_fov = fov.as_seen_through_portal_from_other_view_root(
+            new_fov_root_pose,
+            forward_tf_through_portal,
+        );
 
         let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
 

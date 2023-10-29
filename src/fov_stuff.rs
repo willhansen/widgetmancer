@@ -376,7 +376,7 @@ impl FieldOfView {
             let portal_transform = self.view_transform_to(sub_fov);
             let rasterized_and_relocalized_sub_fov = sub_fov
                 .rasterized()
-                .as_seen_through_portal_from_pose(combined.view_root, portal_transform);
+                .as_seen_through_portal_from_other_view_root(combined.view_root, portal_transform);
             combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
         });
         combined
