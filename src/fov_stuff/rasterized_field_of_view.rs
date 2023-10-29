@@ -999,7 +999,7 @@ mod tests {
     fn test_add_a_view_of_a_square__that_overlaps_another_view() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_top_down_portal(&TopDownPortal {
+        rasterized_fov.add_top_down_portal(TopDownPortal {
             relative_position: (4, 5).into(),
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
@@ -1008,7 +1008,7 @@ mod tests {
             },
             shape_in_exit_frame: TopDownPortalShape::new_fully_visible(),
         });
-        rasterized_fov.add_top_down_portal(&TopDownPortal {
+        rasterized_fov.add_top_down_portal(TopDownPortal {
             relative_position: (4, 5).into(),
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
@@ -1023,7 +1023,7 @@ mod tests {
     fn test_add_a_view_of_a_square__that_overlaps_another_view__slightly() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
-        rasterized_fov.add_top_down_portal(&TopDownPortal {
+        rasterized_fov.add_top_down_portal(TopDownPortal {
             relative_position: (4, 5).into(),
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
@@ -1032,7 +1032,7 @@ mod tests {
             },
             shape_in_exit_frame: TopDownPortalShape::new_bottom_half_visible(),
         });
-        rasterized_fov.add_top_down_portal(&TopDownPortal {
+        rasterized_fov.add_top_down_portal(TopDownPortal {
             relative_position: (4, 5).into(),
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
@@ -1059,7 +1059,7 @@ mod tests {
     }
     #[test]
     #[should_panic]
-    fn test_no_overlapping_portals_in_one_square() {
+    fn test_no_overlapping_top_down_portal_entrances() {
         let portal1 = TopDownPortal::new(
             STEP_UP,
             TopDownPortalTarget {
