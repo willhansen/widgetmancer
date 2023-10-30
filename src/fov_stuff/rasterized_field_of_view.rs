@@ -1281,6 +1281,36 @@ mod tests {
     #[test]
     fn test_rasterized_field_of_view_with_one_square_seen_through_portal__portal_moved_and_rotated()
     {
+        let top_down_portal = TopDownPortal::new(
+            (5, 3),
+            TopDownPortalTarget::new((20, 205), 5, 2),
+            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::down(0.0)),
+        );
+
+        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let new_fov_root_pose: SquareWithOrthogonalDir = old_fov_root_pose.clone();
+
+        let old_rasterized_fov =
+            RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
+
+        let forward_tf_through_portal = RigidTransform::from_start_and_end_poses(
+            old_fov_root_pose.stepped_n(2),
+            old_fov_root_pose.stepped().strafed_right().turned_right(),
+        );
+
+        let new_rasterized_fov = old_rasterized_fov.as_seen_through_portal_from_other_view_root(
+            new_fov_root_pose,
+            forward_tf_through_portal,
+        );
+
+        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        assert_eq!(
+            deeper_top_down_portal.relative_position,
+            top_down_portal.relative_position
+        );
+
         todo!();
     }
     #[test]
