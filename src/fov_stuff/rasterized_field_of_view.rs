@@ -538,7 +538,7 @@ impl RasterizedFieldOfView {
     ) -> Self {
         Self::from_top_down_portals(
             self.view_root
-                .apply_rigid_transform(portal_transform_from_other_to_self.inverse()),
+                .apply_rigid_transform(portal_transform_from_other_to_self),
             self.top_down_portals().into_iter().map(|top_down_portal| {
                 top_down_portal.one_portal_deeper(portal_transform_from_other_to_self.rotation())
             }),
@@ -1246,7 +1246,8 @@ mod tests {
         );
     }
     #[test]
-    fn test_rasterized_field_of_view_with_one_square_seen_through_portal__portal_translated() {
+    fn test_rasterized_field_of_view_with_one_square_seen_through_portal__portal_translated__same_relative_view_root(
+    ) {
         let top_down_portal = TopDownPortal::new(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
@@ -1254,7 +1255,7 @@ mod tests {
         );
 
         let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
-        let new_fov_root_pose: SquareWithOrthogonalDir = old_fov_root_pose.clone();
+        let new_fov_root_pose: SquareWithOrthogonalDir = (3, 0, STEP_UP).into();
 
         let old_rasterized_fov =
             RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
@@ -1270,7 +1271,6 @@ mod tests {
         );
 
         assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
-        assert_eq!(new_rasterized_fov.view_root.square(), (1, 0).into());
 
         let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
         assert_eq!(
