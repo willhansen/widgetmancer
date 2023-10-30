@@ -581,7 +581,7 @@ impl From<i32> for QuarterTurnsCcw {
 
 impl RigidlyTransformable for QuarterTurnsCcw {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        self + tf.rotation()
+        *self + tf.rotation()
     }
 }
 

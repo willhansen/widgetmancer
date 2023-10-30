@@ -508,11 +508,8 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         portal_transform_from_other_to_self: RigidTransform,
     ) -> Self {
         // self root is used only for finding how the top-down portals look from the new view root, and is otherwise discarded
-        let self_on_other_side_of_portal = self.as_seen_through_portal_from_same_relative_position(
-            portal_transform_from_other_to_self,
-        );
-
-        self.as_seen_from_other_local_view_root(new_view_root)
+        self.as_seen_through_portal_from_same_relative_position(portal_transform_from_other_to_self)
+            .as_seen_from_other_local_view_root(new_view_root)
 
         // Self::from_top_down_portal_iter(self.top_down_portal_iter().map(|top_down_portal| {
         //     top_down_portal.one_portal_deeper(portal_transform_from_other_to_self)
@@ -554,7 +551,6 @@ impl RasterizedFieldOfView {
             new_view_root,
             self.top_down_portals().into_iter().map(|top_down_portal| {
                 top_down_portal.with_rigidly_transformed_entrance(tf_new_to_old)
-                todo!();
             }),
         )
     }
@@ -768,9 +764,12 @@ impl TopDownPortal {
         }
     }
     pub fn with_rigidly_transformed_entrance(&self, tf: RigidTransform) -> Self {
-        let mut  the_copy = self.clone();
-        the_copy.target.portal_rotation_to_target = self.target.portal_rotation_to_target.rotated(tf.rotation());
-        the_copy.relative_position = self.relative_position.apply_rigid_transform(tf);
+        let mut the_copy = self.clone();
+        the_copy.target.portal_rotation_to_target = self
+            .target
+            .portal_rotation_to_target
+            .apply_rigid_transform(tf);
+        the_copy.relative_position = self.relative_position + tf.translation();
         the_copy
     }
     pub fn shape_in_entrance_frame(&self) -> SquareVisibility {

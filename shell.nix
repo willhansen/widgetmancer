@@ -12,5 +12,6 @@ in
       rust-analyzer
       clippy
       lldb
+      gdb
     ];
   }
