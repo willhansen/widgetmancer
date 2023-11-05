@@ -482,12 +482,12 @@ impl RigidlyTransformable for WorldSquare {
         revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
     }
 }
-// Ambiguous.  Leaving undefined.
-// impl RigidlyTransformable for WorldStep {
-//     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-//         tf.rotation().rotate_vector(*self)
-//     }
-// }
+// TODO: Double check this
+impl RigidlyTransformable for WorldStep {
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        tf.rotation().rotate_vector(*self)
+    }
+}
 impl RigidlyTransformable for OrthogonalWorldStep {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         tf.rotation().rotate_vector(self.step).into()
