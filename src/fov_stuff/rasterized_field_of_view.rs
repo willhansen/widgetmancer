@@ -41,7 +41,7 @@ pub struct TopDownPortal {
 
 /// Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
 /// TODO: maybe precalculate indexes
-#[derive(PartialEq, Clone, Default, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct RasterizedFieldOfView {
     pub view_root: SquareWithOrthogonalDir,
     map_of_top_down_portal_shapes_by_coordinates: UniqueTopDownPortals,
@@ -232,7 +232,7 @@ impl SquareOfTopDownPortals {
     }
     fn from_top_down_portals<T: IntoIterator<Item = TopDownPortal> + Clone>(iter: T) -> Self {
         // TODO: double check the use of default pose here
-        RasterizedFieldOfView::from_top_down_portals(SquareWithOrthogonalDir::default(), iter)
+        RasterizedFieldOfView::from_top_down_portals(ORIGIN_POSE(), iter)
             .try_into()
             .unwrap()
     }
@@ -543,7 +543,7 @@ impl RasterizedFieldOfView {
         let tf_self_to_other = portal_transform_from_other_to_self.inverse();
 
         Self::from_top_down_portals(
-            dbg!(self.view_root.apply_rigid_transform(tf_self_to_other)),
+            self.view_root.apply_rigid_transform(tf_self_to_other),
             self.top_down_portals()
                 .into_iter()
                 .map(|top_down_portal| top_down_portal.one_portal_deeper()),
@@ -696,7 +696,7 @@ impl RasterizedFieldOfView {
         );
     }
     fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_fov = RasterizedFieldOfView::default();
+        let mut new_fov = RasterizedFieldOfView::new_empty_with_view_root(ORIGIN_POSE());
         new_fov.set_root_square(new_root);
         new_fov
     }
@@ -1428,7 +1428,7 @@ mod tests {
     #[should_panic]
     fn test_prevent_top_down_portal_entrance_overlap__add_all_at_once() {
         let portals = two_top_down_portals_with_overlapping_entrances_but_not_exits();
-        RasterizedFieldOfView::from_top_down_portals(Default::default(), portals);
+        RasterizedFieldOfView::from_top_down_portals(ORIGIN_POSE(), portals);
     }
     #[test]
     fn test_local_positions_are_relative_to_view_root_orientation() {

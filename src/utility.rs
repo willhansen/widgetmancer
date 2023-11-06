@@ -429,4 +429,17 @@ mod tests {
         assert!(squares.contains(&point2(4, 20)));
         assert_false!(squares.contains(&point2(14, 2)));
     }
+    #[test]
+    fn test_parts_of_identity_rigid_transform() {
+        let tf = RigidTransform::from_start_and_end_poses((2, 5, STEP_UP), (2, 5, STEP_UP));
+        assert_eq!(tf.rotation(), 0.into());
+        assert_eq!(tf.translation(), (0, 0).into());
+    }
+    #[test]
+    fn test_inverse_of_identity_rigid_transform() {
+        let p = ORIGIN_POSE();
+        let tf = RigidTransform::from_start_and_end_poses(p, p).inverse();
+        assert_eq!(tf.rotation(), 0.into());
+        assert_eq!(tf.translation(), (0, 0).into());
+    }
 }

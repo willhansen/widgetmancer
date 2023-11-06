@@ -42,7 +42,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters, Default)]
+#[derive(Clone, Hash, Eq, PartialEq, Copy, getset::CopyGetters)]
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -412,7 +412,7 @@ where
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::from_square_and_step(
             self.square().apply_rigid_transform(tf),
-            self.dir().apply_rigid_transform(tf),
+            self.dir().rotated(tf.rotation()),
         )
     }
 }

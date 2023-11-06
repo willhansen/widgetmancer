@@ -479,6 +479,7 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
 // TODO: move RigidlyTransformable to its own file to prevent super:: imports
 impl RigidlyTransformable for WorldSquare {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        dbg!(self, tf.end_pose.dir());
         revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
     }
 }
