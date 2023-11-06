@@ -269,6 +269,15 @@ impl RigidTransform {
             end_pose: end.into(),
         }
     }
+    pub fn relative_transform_from_start_to_end(
+        start: impl Into<SquareWithOrthogonalDir>,
+        end: impl Into<SquareWithOrthogonalDir>,
+    ) -> Self {
+        let start = start.into();
+        let end = end.into();
+
+        Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_as_seen_from_self(end))
+    }
     pub fn identity() -> Self {
         Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
     }
@@ -441,5 +450,13 @@ mod tests {
         let tf = RigidTransform::from_start_and_end_poses(p, p).inverse();
         assert_eq!(tf.rotation(), 0.into());
         assert_eq!(tf.translation(), (0, 0).into());
+    }
+    #[test]
+    fn test_relative_rigid_transform() {
+        let start = (4, 3, STEP_LEFT);
+        let end = (2, 2, STEP_RIGHT);
+        let rel_tf = RigidTransform::relative_transform_from_start_to_end(start, end);
+        assert_eq!(rel_tf.translation(), (-1, 2).into());
+        assert_eq!(rel_tf.rotation(), 2.into());
     }
 }

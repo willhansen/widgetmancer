@@ -527,7 +527,12 @@ impl QuarterTurnsCcw {
         })
     }
 
-    pub fn from_start_and_end_directions(start: WorldStep, end: WorldStep) -> Self {
+    pub fn from_start_and_end_directions(
+        start: impl Into<WorldStep>,
+        end: impl Into<WorldStep>,
+    ) -> Self {
+        let start = start.into();
+        let end = end.into();
         assert!(is_king_step(start));
         assert!(is_king_step(end));
         // needs to be quarter turn, no eighths

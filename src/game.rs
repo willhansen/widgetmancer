@@ -342,7 +342,7 @@ impl Game {
         self.try_set_player_position(new_pos)?;
 
         let rotation_from_portals =
-            QuarterTurnsCcw::from_start_and_end_directions(direction.into(), new_dir.into());
+            QuarterTurnsCcw::from_start_and_end_directions(direction, new_dir);
         self.graphics.screen.rotate(rotation_from_portals);
 
         Ok(())

@@ -11,6 +11,7 @@ use crate::utility::coordinate_frame_conversions::STEP_LEFT;
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::poses::SquareWithOrthogonalDir;
+use crate::utility::poses::StepWithQuarterRotations;
 use crate::utility::trait_alias_macro::function_short_name;
 use crate::utility::RigidTransform;
 use crate::utility::RigidlyTransformable;
@@ -554,7 +555,10 @@ impl RasterizedFieldOfView {
         new_view_root: impl Into<SquareWithOrthogonalDir>,
     ) -> Self {
         let new_view_root = new_view_root.into();
-        let tf_new_to_old = RigidTransform::from_start_and_end_poses(new_view_root, self.view_root);
+
+        // tf is relative to the new view root
+        let tf_new_to_old =
+            RigidTransform::relative_transform_from_start_to_end(new_view_root, self.view_root);
 
         Self::from_top_down_portals(
             new_view_root,
@@ -641,9 +645,10 @@ impl RasterizedFieldOfView {
             })
     }
     fn from_top_down_portals(
-        view_root: SquareWithOrthogonalDir,
+        view_root: impl Into<SquareWithOrthogonalDir>,
         iter: impl IntoIterator<Item = TopDownPortal> + Clone,
     ) -> Self {
+        let view_root = view_root.into();
         assert!(!TopDownPortal::any_have_entrance_overlap(iter.clone()));
         Self {
             view_root,

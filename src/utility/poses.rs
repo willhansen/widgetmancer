@@ -62,7 +62,7 @@ where
     SquareType: WorldGridCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
-        QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
+        QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir)
     }
     pub fn from_square_and_step(
         square: SquareType,
@@ -239,6 +239,17 @@ impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogon
 impl SquareWithOrthogonalDir {
     pub fn middle_point_of_face(&self) -> WorldPoint {
         self.square.to_f32() + self.direction().step().to_f32() * 0.5
+    }
+
+    pub fn other_pose_as_seen_from_self(&self, other: impl Into<Self>) -> Self {
+        let other = other.into();
+
+        let naive_translation = other.square - self.square;
+        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
+        Self::from_square_and_step(
+            naive_translation.to_point().rotated(rotation),
+            other.dir.rotated(rotation),
+        )
     }
 }
 
