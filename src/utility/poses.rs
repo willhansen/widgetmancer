@@ -64,13 +64,13 @@ where
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
         QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir.into())
     }
-    pub fn from_square_and_step<S: Into<OrthogonalWorldStep>>(
+    pub fn from_square_and_step(
         square: SquareType,
-        direction: S,
+        direction: impl Into<OrthogonalWorldStep>,
     ) -> Self {
         Self {
             square,
-            dir: direction.into(),
+            dir: Into::into(direction),
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {

@@ -485,7 +485,7 @@ impl RigidlyTransformable for WorldSquare {
 // TODO: Double check this
 impl RigidlyTransformable for WorldStep {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        tf.rotation().rotate_vector(*self)
+        self.to_point().apply_rigid_transform(tf).to_vector()
     }
 }
 impl RigidlyTransformable for OrthogonalWorldStep {

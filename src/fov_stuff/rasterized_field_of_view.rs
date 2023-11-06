@@ -6,10 +6,12 @@ use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
+use crate::utility::coordinate_frame_conversions::ORIGIN_POSE;
 use crate::utility::coordinate_frame_conversions::STEP_LEFT;
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::poses::SquareWithOrthogonalDir;
+use crate::utility::trait_alias_macro::function_short_name;
 use crate::utility::RigidTransform;
 use crate::utility::RigidlyTransformable;
 use crate::utility::{
@@ -313,7 +315,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         self.map_of_top_down_portal_shapes_by_coordinates.extend(
             SquareOfTopDownPortals::new_direct_local_connection(
                 relative_square,
-                self.relative_to_local_absolute_square(relative_square),
+                self.relative_square_to_absolute_square(relative_square),
                 visibility,
             )
             .0
@@ -562,7 +564,7 @@ impl RasterizedFieldOfView {
         )
     }
     fn as_seen_from_oriented_origin(&self) -> Self {
-        self.as_seen_from_other_local_view_root((0, 0, STEP_UP))
+        self.as_seen_from_other_local_view_root(ORIGIN_POSE())
     }
     fn new_with_one_top_down_portal(
         view_root: impl Into<SquareWithOrthogonalDir>,
@@ -706,7 +708,7 @@ impl RasterizedFieldOfView {
     ) -> DirectConnectionToLocalSquare {
         DirectConnectionToLocalSquare::new(
             relative_square,
-            self.relative_to_local_absolute_square(relative_square),
+            self.relative_square_to_absolute_square(relative_square),
             top_down_portal_shape,
         )
     }
@@ -750,8 +752,16 @@ impl RasterizedFieldOfView {
         self.filtered(true, true, false).portal_map().clone()
     }
 
-    fn relative_to_local_absolute_square(&self, relative_square: WorldStep) -> WorldSquare {
-        self.root_square() + relative_square
+    fn relative_square_to_absolute_square(
+        &self,
+        relative_square: impl Into<WorldStep>,
+    ) -> WorldSquare {
+        let relative_square = relative_square.into();
+        let tf_to_absolute_frame =
+            RigidTransform::from_start_and_end_poses(self.view_root, ORIGIN_POSE()).inverse();
+        relative_square
+            .apply_rigid_transform(tf_to_absolute_frame)
+            .to_point()
     }
 
     fn top_down_portals(&self) -> Vec<TopDownPortal> {
@@ -792,7 +802,14 @@ impl TopDownPortal {
             .target
             .portal_rotation_to_target
             .apply_rigid_transform(tf);
-        the_copy.relative_position = self.relative_position + tf.translation();
+        // the_copy.relative_position = self.relative_position + tf.translation();
+        the_copy.relative_position = self.relative_position.apply_rigid_transform(tf);
+        dbg!(
+            function_short_name!(),
+            self.relative_position,
+            tf,
+            the_copy.relative_position
+        );
         the_copy
     }
     pub fn shape_in_entrance_frame(&self) -> SquareVisibility {
@@ -1421,12 +1438,17 @@ mod tests {
         );
 
         assert_eq!(
+            rfov.relative_square_to_absolute_square((2, 3)),
+            (6, 2).into()
+        );
+
+        assert_eq!(
             rfov.top_down_portals().first().unwrap().target_square(),
-            (1, 7).into()
+            (6, 2).into()
         );
     }
     #[test]
-    fn test_seen_from_other_local_view_root() {
+    fn test_seen_from_other_local_view_root__origin() {
         let rfov = RasterizedFieldOfView::from_view_root_and_one_direct_local_connection(
             (3, 4, STEP_RIGHT),
             (2, 3),
@@ -1438,15 +1460,32 @@ mod tests {
                 .first()
                 .unwrap()
                 .relative_position(),
-            (1, 7).into()
+            (6, 2).into()
         );
+    }
+    #[test]
+    fn test_seen_from_other_local_view_root__non_origin() {
+        let rfov = RasterizedFieldOfView::from_view_root_and_one_direct_local_connection(
+            (3, 4, STEP_RIGHT),
+            (2, 3),
+        );
+        let new_rfov = rfov.as_seen_from_other_local_view_root((5, 5, STEP_LEFT));
         assert_eq!(
-            rfov.as_seen_from_other_local_view_root((5, 5, STEP_LEFT))
+            new_rfov
                 .top_down_portals()
                 .first()
                 .unwrap()
                 .relative_position(),
             (-3, -1).into()
+        );
+        assert_eq!(
+            new_rfov
+                .as_seen_from_oriented_origin()
+                .top_down_portals()
+                .first()
+                .unwrap()
+                .relative_position(),
+            (6, 2).into()
         );
     }
 }
