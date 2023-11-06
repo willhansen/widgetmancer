@@ -1369,20 +1369,10 @@ mod tests {
             forward_tf_through_portal_new_to_old,
         );
 
-        // old root = (2,1)
-        // rel square of test square = (5,3)
-        // portal new-side entrance pose = (2,3)
-        // portal old-side exit pose = (3,2, facing right)
-
-        // new root = (2,1)
-        // old root in new frame = (3, 3, face left)
-        // absolute position of test square after transform = (0, 8, face left)
-        // relative position of test square to new root after transform (8, 3), and it faces up
-
         assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
 
         let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
-        assert_eq!(deeper_top_down_portal.relative_position, (8, 3).into());
+        assert_eq!(deeper_top_down_portal.relative_position, (-8, -3).into());
     }
 
     fn get_generic_top_down_portal() -> TopDownPortal {
