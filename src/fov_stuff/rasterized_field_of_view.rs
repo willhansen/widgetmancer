@@ -1333,7 +1333,7 @@ mod tests {
             .top_down_portals()[0];
         assert_eq!(
             absolute_deeper_top_down_portal.relative_position,
-            (-2, 7).into()
+            (0, 8).into()
         );
 
         let relative_deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
