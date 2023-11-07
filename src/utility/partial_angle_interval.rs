@@ -185,9 +185,7 @@ impl PartialAngleInterval {
         other: Self,
         tolerance: FAngle,
     ) -> BoolWithPartial {
-        //self.contains_partial_arc(other.complement(), tolerance)
-        dbg!("=============================================================================================================================================================================");
-        dbg!(dbg!(self).contains_partial_arc(dbg!(dbg!(other).complement()), tolerance))
+        self.contains_partial_arc(other.complement(), tolerance)
     }
 
     pub fn complement(&self) -> Self {

@@ -644,9 +644,7 @@ pub fn portal_aware_field_of_view_from_square(
                 sight_blockers,
                 portal_geometry,
             );
-            let combined_fov = fov_result_accumulator.combined_with(&new_fov_result);
-            dbg!(&combined_fov);
-            combined_fov
+            fov_result_accumulator.combined_with(&new_fov_result)
         },
     )
 }
@@ -788,7 +786,6 @@ mod tests {
         )
         .rasterized();
 
-        dbg!(&rasterized_fov_result);
         //print_fov_as_relative(&fov_result, 5);
         assert!(rasterized_fov_result
             .only_partially_visible_local_relative_squares()
@@ -1433,6 +1430,7 @@ mod tests {
                     .iter()
                     .map(FieldOfView::rasterized)
                     .for_each(|rasterized_fov| {
+                        dbg!(&rasterized_fov);
                         assert!(rasterized_fov.relative_square_is_only_partially_visible(
                             relative_fully_visible_square
                         ));
@@ -1930,6 +1928,12 @@ mod tests {
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
+
+        assert_eq!(
+            rasterized.relative_square_to_absolute_square((2, 0)),
+            (7, 5).into()
+        );
+        assert_eq!(rasterized.times_absolute_square_is_visible((7, 5)), 1);
     }
     #[test]
     fn test_rasterize_empty_fov() {

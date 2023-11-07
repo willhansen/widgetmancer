@@ -757,7 +757,7 @@ impl RasterizedFieldOfView {
         self.filtered(true, true, false).portal_map().clone()
     }
 
-    fn relative_square_to_absolute_square(
+    pub fn relative_square_to_absolute_square(
         &self,
         relative_square: impl Into<WorldStep>,
     ) -> WorldSquare {
@@ -809,12 +809,6 @@ impl TopDownPortal {
             .apply_rigid_transform(tf);
         // the_copy.relative_position = self.relative_position + tf.translation();
         the_copy.relative_position = self.relative_position.apply_rigid_transform(tf);
-        dbg!(
-            function_short_name!(),
-            self.relative_position,
-            tf,
-            the_copy.relative_position
-        );
         the_copy
     }
     pub fn shape_in_entrance_frame(&self) -> SquareVisibility {
