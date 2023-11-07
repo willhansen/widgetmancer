@@ -82,7 +82,7 @@ pub trait RasterizedFieldOfViewFunctions {
     fn number_of_visible_relative_squares(&self) -> u32;
     fn number_of_fully_visible_relative_squares(&self) -> u32;
     fn visible_local_relative_squares(&self) -> StepSet;
-    fn visible_relative_squares_including_center(&self) -> StepSet;
+    fn visible_relative_squares(&self) -> StepSet;
 
     // visible absolute squares
 
@@ -122,10 +122,10 @@ pub trait RasterizedFieldOfViewFunctions {
     fn absolute_square_is_visible(&self, world_square: WorldSquare) -> bool;
     fn top_down_portals_for_absolute_square(
         &self,
-        absolute_square: WorldSquare,
+        absolute_square: impl Into<WorldSquare>,
     ) -> Vec<TopDownPortal>;
     fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize;
-    fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize;
+    fn times_absolute_square_is_visible(&self, absolute_square: impl Into<WorldSquare>) -> usize;
 
     // modifying
     fn as_seen_through_portal_from_other_view_root(
@@ -350,22 +350,19 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         self.filtered(true, true, true).visibility_map()
     }
     fn fully_visible_relative_squares(&self) -> StepSet {
-        self.filtered(false, false, true)
-            .visible_relative_squares_including_center()
+        self.filtered(false, false, true).visible_relative_squares()
     }
 
     fn fully_visible_local_relative_squares(&self) -> StepSet {
-        self.filtered(true, false, true)
-            .visible_relative_squares_including_center()
+        self.filtered(true, false, true).visible_relative_squares()
     }
 
     fn only_partially_visible_local_relative_squares(&self) -> StepSet {
-        self.filtered(true, true, false)
-            .visible_relative_squares_including_center()
+        self.filtered(true, true, false).visible_relative_squares()
     }
 
     fn number_of_visible_relative_squares(&self) -> u32 {
-        self.visible_relative_squares_including_center().len() as u32
+        self.visible_relative_squares().len() as u32
     }
 
     fn number_of_fully_visible_relative_squares(&self) -> u32 {
@@ -373,10 +370,9 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     }
 
     fn visible_local_relative_squares(&self) -> StepSet {
-        self.filtered(true, true, true)
-            .visible_relative_squares_including_center()
+        self.filtered(true, true, true).visible_relative_squares()
     }
-    fn visible_relative_squares_including_center(&self) -> StepSet {
+    fn visible_relative_squares(&self) -> StepSet {
         self.map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .map(|(coord, vis)| coord.0)
@@ -404,8 +400,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
 
     fn relative_square_is_visible(&self, step: impl Into<WorldStep>) -> bool {
         let step = step.into();
-        self.visible_relative_squares_including_center()
-            .contains(&step)
+        self.visible_relative_squares().contains(&step)
     }
     fn lone_portal_depth_for_relative_square_or_panic(&self, relative_square: WorldStep) -> u32 {
         todo!()
@@ -480,8 +475,9 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
 
     fn top_down_portals_for_absolute_square(
         &self,
-        absolute_square: WorldSquare,
+        absolute_square: impl Into<WorldSquare>,
     ) -> Vec<TopDownPortal> {
+        let absolute_square = absolute_square.into();
         self.map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .filter(|(coords, vis)| coords.1.absolute_square == absolute_square)
@@ -500,7 +496,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             })
             .count()
     }
-    fn times_absolute_square_is_visible(&self, absolute_square: WorldSquare) -> usize {
+    fn times_absolute_square_is_visible(&self, absolute_square: impl Into<WorldSquare>) -> usize {
         self.top_down_portals_for_absolute_square(absolute_square)
             .len()
     }
@@ -689,21 +685,8 @@ impl RasterizedFieldOfView {
     fn local_view_only(&self) -> Self {
         self.filtered(true, true, true)
     }
-    fn set_root_square(&mut self, new_root: WorldSquare) {
-        self.map_of_top_down_portal_shapes_by_coordinates.extend(
-            SquareOfTopDownPortals::new_direct_local_connection(
-                STEP_ZERO,
-                new_root,
-                &TopDownPortalShape::new_fully_visible(),
-            )
-            .0
-            .map_of_top_down_portal_shapes_by_coordinates,
-        );
-    }
-    fn new_centered_at(new_root: WorldSquare) -> Self {
-        let mut new_fov = RasterizedFieldOfView::new_empty_with_view_root(ORIGIN_POSE());
-        new_fov.set_root_square(new_root);
-        new_fov
+    fn new_centered_at(new_root: impl Into<WorldSquare>) -> Self {
+        RasterizedFieldOfView::new_empty_with_view_root((new_root, STEP_UP))
     }
 
     fn new_direct_connection_to_local_square(
@@ -985,6 +968,7 @@ mod tests {
     use euclid::point2;
     use ntest::{assert_false, assert_true, timeout};
 
+    #[ignore = "Maybe don't want this"]
     #[test]
     fn test_center_square_is_always_visible() {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
@@ -1003,6 +987,7 @@ mod tests {
         let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
 
         rasterized_fov.add_fully_visible_local_relative_square(STEP_RIGHT);
+        rasterized_fov.add_fully_visible_local_relative_square(STEP_ZERO);
 
         rasterized_fov.add_partially_visible_local_relative_square(
             STEP_UP,
@@ -1113,13 +1098,13 @@ mod tests {
         let mut rfov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         let vis = SquareVisibility::new_top_half_visible();
         rfov.add_visible_local_relative_square(STEP_RIGHT, &vis);
-        assert_eq!(rfov.number_of_visible_relative_squares(), 2);
+        assert_eq!(rfov.number_of_visible_relative_squares(), 1);
         rfov.try_add_visible_local_relative_square(STEP_RIGHT * 2, &vis)
             .expect("");
-        assert_eq!(rfov.number_of_visible_relative_squares(), 3);
+        assert_eq!(rfov.number_of_visible_relative_squares(), 2);
         rfov.try_add_visible_local_relative_square(STEP_RIGHT, &vis)
             .expect_err("");
-        assert_eq!(rfov.number_of_visible_relative_squares(), 3);
+        assert_eq!(rfov.number_of_visible_relative_squares(), 2);
     }
     #[test]
     #[should_panic]

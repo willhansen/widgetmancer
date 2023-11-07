@@ -1169,7 +1169,7 @@ mod tests {
         assert_eq!(fov_result.fully_visible_local_relative_squares().len(), 1);
         assert_eq!(fov_result.fully_visible_relative_squares().len(), 1);
         assert_eq!(
-            fov_result.visible_relative_squares_including_center().len(),
+            fov_result.visible_relative_squares().len(),
             radius as usize + 1
         );
         should_be_visible_relative_squares.iter().for_each(|step| {
@@ -1278,7 +1278,7 @@ mod tests {
         assert!(rasterized_fov.absolute_square_is_visible(point2(1, 4)));
 
         assert_eq!(
-            rasterized_fov.visible_relative_squares_including_center(),
+            rasterized_fov.visible_relative_squares(),
             StepSet::from([rel_from_main])
         )
     }
@@ -1578,12 +1578,7 @@ mod tests {
         // xv..
         // 10 visible squares
 
-        assert_eq!(
-            fov.rasterized()
-                .visible_relative_squares_including_center()
-                .len(),
-            10
-        );
+        assert_eq!(fov.rasterized().visible_relative_squares().len(), 10);
     }
 
     #[test]
@@ -1928,6 +1923,8 @@ mod tests {
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
+
+        assert_eq!(rasterized.view_root, (5, 5, STEP_UP).into());
 
         assert_eq!(
             rasterized.relative_square_to_absolute_square((2, 0)),
