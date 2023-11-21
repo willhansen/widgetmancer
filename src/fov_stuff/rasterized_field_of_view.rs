@@ -518,7 +518,14 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     }
 
     fn combined_with(&self, other: &Self) -> Self {
-        todo!()
+        assert_eq!(self.view_root, other.view_root);
+
+        Self::from_top_down_portals(
+            self.view_root,
+            self.top_down_portals()
+                .into_iter()
+                .chain(other.top_down_portals()),
+        )
     }
 
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
@@ -645,7 +652,15 @@ impl RasterizedFieldOfView {
         iter: impl IntoIterator<Item = TopDownPortal> + Clone,
     ) -> Self {
         let view_root = view_root.into();
-        assert!(!TopDownPortal::any_have_entrance_overlap(iter.clone()));
+
+        let top_down_portals_with_conflicting_entrances: Vec<[TopDownPortal; 2]> =
+            TopDownPortal::find_conflicting_entrances(iter.clone());
+
+        assert!(
+            top_down_portals_with_conflicting_entrances.is_empty(),
+            "{:#?}",
+            top_down_portals_with_conflicting_entrances
+        );
         Self {
             view_root,
             map_of_top_down_portal_shapes_by_coordinates: iter
@@ -827,21 +842,25 @@ impl TopDownPortal {
             .into_iter()
             .any(|other_top_down_portal| self.has_entrance_overlap_with(other_top_down_portal))
     }
-    fn any_have_entrance_overlap(portals: impl IntoIterator<Item = Self>) -> bool {
-        let has_portal_entrance_overlaps = portals
+    fn find_conflicting_entrances(portals: impl IntoIterator<Item = Self>) -> Vec<[Self; 2]> {
+        portals
             .into_iter()
-            .into_group_map_by(|top_down_portal| top_down_portal.relative_position())
-            .iter()
-            .any(|(rel_square, top_down_portals_for_square)| {
-                top_down_portals_for_square
-                    .iter()
-                    .combinations(2)
-                    .any(|portals| {
-                        // TODO: check entrance vs exit frame overlap check is correct
-                        portals[0].has_entrance_overlap_with(*portals[1])
-                    })
-            });
-        has_portal_entrance_overlaps
+            .into_group_map_by(|&top_down_portal| top_down_portal.relative_position())
+            .into_iter()
+            .flat_map(|(rel_square, top_down_portals_for_square)| {
+                let conflicting_pairs_in_this_square: Vec<[TopDownPortal; 2]> =
+                    top_down_portals_for_square
+                        .iter()
+                        .combinations(2)
+                        .map(|v| [*v[0], *v[1]])
+                        .filter(|&portals| {
+                            // TODO: check entrance vs exit frame overlap check is correct
+                            portals[0].has_entrance_overlap_with(portals[1])
+                        })
+                        .collect();
+                conflicting_pairs_in_this_square
+            })
+            .collect()
     }
 }
 
