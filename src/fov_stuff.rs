@@ -1254,32 +1254,30 @@ mod tests {
 
     #[test]
     fn test_sub_fov_view_transform() {
-        let sub_center = SquareWithOrthogonalDir::from_square_and_step(point2(1, 0), STEP_RIGHT);
-        let mut sub_fov = FieldOfView::new_empty_fov_at(sub_center.square());
-        sub_fov.root_square_with_direction = sub_center;
+        let sub_center: SquareWithOrthogonalDir = (3, 1, STEP_RIGHT).into();
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root(sub_center);
 
-        let main_center = SquareWithOrthogonalDir::from_square_and_step(point2(50, 0), STEP_UP);
-        let mut main_fov = FieldOfView::new_empty_fov_at(main_center.square());
-        main_fov.root_square_with_direction = main_center;
+        let main_center: SquareWithOrthogonalDir = (50, 10, STEP_UP).into();
+        let mut main_fov = FieldOfView::new_empty_fov_with_root(main_center);
 
-        let target_square: WorldSquare = point2(1, 4);
+        let absolute_test_square: WorldSquare = point2(1, 4);
+        let test_square_relative_to_sub_fov = sub_fov
+            .root_square_with_direction
+            .other_square_as_seen_from_self(absolute_test_square);
+        assert_eq!(test_square_relative_to_sub_fov, WorldStep::new(-3, -2));
 
-        sub_fov.add_view_segment_for_fully_visible_relative_square(
-            target_square - sub_fov.root_square(),
-        );
+        sub_fov.add_view_segment_for_fully_visible_relative_square(test_square_relative_to_sub_fov);
 
         main_fov.transformed_sub_fovs.push(sub_fov);
 
-        let rel_from_main = STEP_LEFT * 4;
-
         let rasterized_fov = main_fov.rasterized();
 
-        assert!(rasterized_fov.relative_square_is_fully_visible(rel_from_main));
-        assert!(rasterized_fov.absolute_square_is_visible(point2(1, 4)));
+        assert!(rasterized_fov.relative_square_is_fully_visible(test_square_relative_to_sub_fov));
+        assert!(rasterized_fov.absolute_square_is_visible(absolute_test_square));
 
         assert_eq!(
             rasterized_fov.visible_relative_squares(),
-            StepSet::from([rel_from_main])
+            StepSet::from([test_square_relative_to_sub_fov])
         )
     }
 

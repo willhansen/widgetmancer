@@ -65,11 +65,11 @@ where
         QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir)
     }
     pub fn from_square_and_step(
-        square: SquareType,
+        square: impl Into<SquareType>,
         direction: impl Into<OrthogonalWorldStep>,
     ) -> Self {
         Self {
-            square,
+            square: square.into(),
             dir: Into::into(direction),
         }
     }
@@ -250,6 +250,11 @@ impl SquareWithOrthogonalDir {
             naive_translation.to_point().rotated(rotation),
             other.dir.rotated(rotation),
         )
+    }
+    pub fn other_square_as_seen_from_self(&self, other: impl Into<WorldSquare>) -> WorldStep {
+        self.other_pose_as_seen_from_self((other.into(), STEP_UP))
+            .square()
+            .to_vector()
     }
 }
 
@@ -585,5 +590,20 @@ mod tests {
         assert_eq!(abs_face.revolved(-1), (1, -5, STEP_UP).into());
         assert_eq!(abs_face.rotated(2), (5, 1, STEP_RIGHT).into());
         assert_eq!(abs_face.revolved(2), (-5, -1, STEP_RIGHT).into());
+    }
+    #[test]
+    fn test_square_relative_to_pose() {
+        // |
+        // |.....x
+        // |..>  .
+        // |  .  .
+        // +-------
+        let abs_square = WorldSquare::new(6, 3);
+        let observer_pose = SquareWithOrthogonalDir::from_square_and_step((3, 2), STEP_RIGHT);
+        let correct_rel_square = WorldStep::new(-1, 3);
+        assert_eq!(
+            observer_pose.other_square_as_seen_from_self(abs_square),
+            correct_rel_square
+        );
     }
 }
