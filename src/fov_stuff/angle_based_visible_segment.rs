@@ -246,6 +246,7 @@ impl AngleBasedVisibleSegment {
         // A visible segment has two edges to its view arc, and those are the only things that can split one of these squares.
         // Watch out for the wraparound case.
         self.touched_squares_going_outwards_and_ccw()
+            .skip(1)
             .map(|rel_square| {
                 (
                     rel_square,
@@ -288,7 +289,7 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
 #[cfg(test)]
 mod tests {
     use euclid::vec2;
-    use ntest::assert_about_eq;
+    use ntest::{assert_about_eq, assert_false};
 
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
@@ -312,9 +313,7 @@ mod tests {
     fn test_getting_square_visibilities__includes_partial_squares() {
         let segment = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 2, STEP_RIGHT));
         let visibilities = segment.to_local_square_visibility_map();
-        assert!(visibilities
-            .get(&STEP_ZERO)
-            .is_some_and(SquareVisibility::is_fully_visible));
+        assert!(visibilities.get(&STEP_ZERO).is_none());
         assert!(visibilities
             .get(&STEP_RIGHT)
             .is_some_and(SquareVisibility::is_only_partially_visible));
@@ -327,7 +326,7 @@ mod tests {
     fn test_getting_square_visibilities__from_visible_square() {
         let segment = AngleBasedVisibleSegment::from_relative_square(STEP_RIGHT * 3);
         let visibilities = segment.to_local_square_visibility_map();
-        assert!(visibilities.get(&vec2(0, 0)).unwrap().is_fully_visible());
+        assert!(visibilities.get(&vec2(0, 0)).is_none());
         assert!(visibilities
             .get(&vec2(1, 0))
             .unwrap()
@@ -337,7 +336,7 @@ mod tests {
             .unwrap()
             .is_only_partially_visible());
         assert!(visibilities.get(&vec2(3, 0)).unwrap().is_fully_visible());
-        assert_eq!(visibilities.len(), 4);
+        assert_eq!(visibilities.len(), 3);
     }
     #[test]
     fn test_start_face_spans_angle_interval() {
@@ -479,5 +478,12 @@ mod tests {
             AngleInterval::from_degrees(0.0, 1.0),
             Fence::from_faces_in_ccw_order([(3, 0, STEP_RIGHT), (3, 1, STEP_RIGHT)]),
         );
+    }
+    #[test]
+    fn test_local_square_visibility_map_does_not_include_start_square() {
+        let segment = AngleBasedVisibleSegment::from_relative_square((5, 4));
+        let map = segment.to_local_square_visibility_map();
+
+        assert_false!(map.contains_key(&(0, 0).into()));
     }
 }

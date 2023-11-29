@@ -374,10 +374,17 @@ impl FieldOfView {
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let portal_transform = self.view_transform_to(sub_fov);
-            let rasterized_and_relocalized_sub_fov = sub_fov
-                .rasterized()
-                .as_seen_through_portal_from_other_view_root(combined.view_root, portal_transform);
-            combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
+            let rasterized_sub_fov = sub_fov.rasterized();
+
+            // let rasterized_and_relocalized_sub_fov = rasterized_sub_fov
+            //     .as_seen_through_portal_from_other_view_root(combined.view_root, portal_transform);
+            // dbg!(
+            //     "asdf",
+            //     rasterized_sub_fov.visible_relative_squares(),
+            //     // rasterized_and_relocalized_sub_fov.visible_relative_squares()
+            // );
+            // combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
+            combined = combined.combined_with(&rasterized_sub_fov);
         });
         combined
     }
@@ -390,7 +397,7 @@ impl FieldOfView {
                 .iter()
                 .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
                 .reduce(|a, b| a.combined_while_increasing_visibility(&b))
-                .unwrap_or(LocalSquareVisibilityMap::new_with_only_center_visible()),
+                .unwrap_or(LocalSquareVisibilityMap::new_empty()),
         )
     }
 
@@ -1268,17 +1275,35 @@ mod tests {
 
         sub_fov.add_view_segment_for_fully_visible_relative_square(test_square_relative_to_sub_fov);
 
+        let rasterized_sub_fov = sub_fov.rasterized();
+
         main_fov.transformed_sub_fovs.push(sub_fov);
 
         let rasterized_fov = main_fov.rasterized();
 
-        assert!(rasterized_fov.relative_square_is_fully_visible(test_square_relative_to_sub_fov));
-        assert!(rasterized_fov.absolute_square_is_visible(absolute_test_square));
+        dbg!(
+            "asdf2",
+            rasterized_sub_fov.fully_visible_relative_squares(),
+            rasterized_sub_fov.fully_visible_absolute_squares(),
+            rasterized_fov.fully_visible_relative_squares(),
+            rasterized_fov.fully_visible_absolute_squares()
+        );
 
         assert_eq!(
-            rasterized_fov.visible_relative_squares(),
-            StepSet::from([test_square_relative_to_sub_fov])
-        )
+            rasterized_sub_fov.fully_visible_relative_squares(),
+            [test_square_relative_to_sub_fov].into()
+        );
+        assert_eq!(rasterized_sub_fov.fully_visible_absolute_squares().len(), 2);
+        assert!(rasterized_sub_fov
+            .fully_visible_absolute_squares()
+            .contains(&absolute_test_square));
+
+        assert!(rasterized_fov.relative_square_is_visible(test_square_relative_to_sub_fov));
+        assert!(rasterized_fov.relative_square_is_fully_visible(test_square_relative_to_sub_fov));
+        assert!(rasterized_fov.absolute_square_is_visible(absolute_test_square));
+        assert!(rasterized_fov.absolute_square_is_fully_visible(absolute_test_square));
+
+        assert_eq!(rasterized_fov.fully_visible_relative_squares().len(), 1);
     }
 
     #[test]
@@ -1411,7 +1436,7 @@ mod tests {
         // Non-deterministic test
         // TODO: remove outer loop when deterministic
         (0..100).foreach(|i| {
-            dbg!(i);
+            // dbg!(i);
             (0..5).for_each(|dy| {
                 let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
                 let absolute_fov_center_square = point2(5, 5);
@@ -1428,7 +1453,7 @@ mod tests {
                     .iter()
                     .map(FieldOfView::rasterized)
                     .for_each(|rasterized_fov| {
-                        dbg!(&rasterized_fov);
+                        // dbg!(&rasterized_fov);
                         assert!(rasterized_fov.relative_square_is_only_partially_visible(
                             relative_fully_visible_square
                         ));
@@ -1940,8 +1965,8 @@ mod tests {
         let rasterized = fov.rasterized();
 
         // Center square should be fully visible, even on an empty fov
-        assert_eq!(rasterized.number_of_visible_relative_squares(), 1);
-        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 1);
-        assert!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
+        assert_eq!(rasterized.number_of_visible_relative_squares(), 0);
+        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 0);
+        assert_false!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
     }
 }

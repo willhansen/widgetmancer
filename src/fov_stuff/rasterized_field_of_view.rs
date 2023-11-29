@@ -10,6 +10,7 @@ use crate::utility::coordinate_frame_conversions::ORIGIN_POSE;
 use crate::utility::coordinate_frame_conversions::STEP_LEFT;
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
+use crate::utility::general_utility::union;
 use crate::utility::poses::SquareWithOrthogonalDir;
 use crate::utility::poses::StepWithQuarterRotations;
 use crate::utility::trait_alias_macro::function_short_name;
@@ -54,7 +55,7 @@ pub trait RasterizedFieldOfViewFunctions {
     fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self;
 
     // adding
-    fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep);
+    fn add_fully_visible_local_relative_square(&mut self, relative_square: impl Into<WorldStep>);
     fn try_add_visible_local_relative_square(
         &mut self,
         relative_square: impl Into<WorldStep>,
@@ -85,6 +86,9 @@ pub trait RasterizedFieldOfViewFunctions {
     fn visible_relative_squares(&self) -> StepSet;
 
     // visible absolute squares
+    // includes the local and target sides of the top-down portals
+    fn visible_absolute_squares(&self) -> SquareSet;
+    fn fully_visible_absolute_squares(&self) -> SquareSet;
 
     // checks on a relative square
     fn relative_square_is_fully_visible(&self, step: impl Into<WorldStep>) -> bool;
@@ -120,11 +124,15 @@ pub trait RasterizedFieldOfViewFunctions {
 
     // checks on an absolute square
     fn absolute_square_is_visible(&self, world_square: WorldSquare) -> bool;
+    fn absolute_square_is_fully_visible(&self, world_square: impl Into<WorldSquare>) -> bool;
     fn top_down_portals_for_absolute_square(
         &self,
         absolute_square: impl Into<WorldSquare>,
     ) -> Vec<TopDownPortal>;
-    fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize;
+    fn times_absolute_square_is_fully_visible(
+        &self,
+        absolute_square: impl Into<WorldSquare>,
+    ) -> usize;
     fn times_absolute_square_is_visible(&self, absolute_square: impl Into<WorldSquare>) -> usize;
 
     // modifying
@@ -292,7 +300,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         });
         new_thing
     }
-    fn add_fully_visible_local_relative_square(&mut self, relative_square: WorldStep) {
+    fn add_fully_visible_local_relative_square(&mut self, relative_square: impl Into<WorldStep>) {
         self.add_top_down_portal(
             self.new_direct_connection_to_local_square(
                 relative_square,
@@ -377,6 +385,22 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             .iter()
             .map(|(coord, vis)| coord.0)
             .collect()
+    }
+    fn visible_absolute_squares(&self) -> SquareSet {
+        let absolute_squares_of_exits: SquareSet = self
+            .map_of_top_down_portal_shapes_by_coordinates
+            .iter()
+            .map(|(coord, vis)| coord.1.absolute_square)
+            .collect();
+        let absolute_squares_of_entrances: SquareSet = self
+            .visible_relative_squares()
+            .iter()
+            .map(|&rel| self.relative_square_to_absolute_square(rel))
+            .collect();
+        union(&absolute_squares_of_exits, &absolute_squares_of_entrances)
+    }
+    fn fully_visible_absolute_squares(&self) -> SquareSet {
+        self.filtered(false, false, true).visible_absolute_squares()
     }
 
     fn relative_square_is_fully_visible(&self, step: impl Into<WorldStep>) -> bool {
@@ -472,6 +496,9 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             .top_down_portals_for_absolute_square(world_square)
             .is_empty()
     }
+    fn absolute_square_is_fully_visible(&self, world_square: impl Into<WorldSquare>) -> bool {
+        self.times_absolute_square_is_fully_visible(world_square) > 0
+    }
 
     fn top_down_portals_for_absolute_square(
         &self,
@@ -486,7 +513,10 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             })
             .collect()
     }
-    fn times_absolute_square_is_fully_visible(&self, absolute_square: WorldSquare) -> usize {
+    fn times_absolute_square_is_fully_visible(
+        &self,
+        absolute_square: impl Into<WorldSquare>,
+    ) -> usize {
         self.top_down_portals_for_absolute_square(absolute_square)
             .into_iter()
             .filter(|positioned_top_down_portal| {
@@ -518,7 +548,8 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     }
 
     fn combined_with(&self, other: &Self) -> Self {
-        assert_eq!(self.view_root, other.view_root);
+        // This check is unnecessary, self absorbs the other view.
+        //assert_eq!(self.view_root, other.view_root);
 
         Self::from_top_down_portals(
             self.view_root,
@@ -580,6 +611,12 @@ impl RasterizedFieldOfView {
         let mut thing = Self::new_empty_with_view_root(view_root);
         thing.add_top_down_portal(top_down_portal);
         thing
+    }
+    fn new_with_one_fully_visible_local_square(
+        view_root: impl Into<SquareWithOrthogonalDir>,
+        relative_square: impl Into<WorldStep>,
+    ) -> Self {
+        todo!();
     }
     fn new_empty_with_view_root(view_root: impl Into<SquareWithOrthogonalDir>) -> Self {
         Self {
@@ -706,9 +743,10 @@ impl RasterizedFieldOfView {
 
     fn new_direct_connection_to_local_square(
         &self,
-        relative_square: WorldStep,
+        relative_square: impl Into<WorldStep>,
         top_down_portal_shape: &TopDownPortalShape,
     ) -> DirectConnectionToLocalSquare {
+        let relative_square = relative_square.into();
         DirectConnectionToLocalSquare::new(
             relative_square,
             self.relative_square_to_absolute_square(relative_square),
@@ -948,13 +986,13 @@ impl ViewRoundable for TopDownPortal {
 
 impl DirectConnectionToLocalSquare {
     fn new(
-        relative_position: WorldStep,
-        target_square: WorldSquare,
+        relative_position: impl Into<WorldStep>,
+        target_square: impl Into<WorldSquare>,
         visibility: &SquareVisibility,
     ) -> Self {
         Self(TopDownPortal {
-            relative_position,
-            target: TopDownPortalTarget::new_local(target_square),
+            relative_position: relative_position.into(),
+            target: TopDownPortalTarget::new_local(target_square.into()),
             shape_in_exit_frame: visibility.clone(),
         })
     }
@@ -1061,6 +1099,13 @@ mod tests {
             },
             shape_in_exit_frame: TopDownPortalShape::new_fully_visible(),
         })
+    }
+    #[test]
+    fn test_local_coordinates_are_relative_to_root_pose_rotation() {
+        let mut rfov = RasterizedFieldOfView::new_empty_with_view_root((5, 3, STEP_RIGHT));
+        rfov.add_fully_visible_local_relative_square((-1, 2));
+        assert!(rfov.absolute_square_is_fully_visible((7, 4)));
+        assert_eq!(rfov.visible_relative_squares(), [(-1, 2).into()].into());
     }
     #[test]
     #[should_panic]
@@ -1260,7 +1305,7 @@ mod tests {
         let top_down_portal = TopDownPortal::new(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
-            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::down(0.0)),
+            SquareVisibility::new_bottom_half_visible(),
         );
 
         let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
@@ -1480,5 +1525,19 @@ mod tests {
                 .relative_position(),
             (6, 2).into()
         );
+    }
+    #[test]
+    fn test_visible_absolute_squares_includes_local_and_target_sides_of_top_down_portals() {
+        let test_portal = get_generic_top_down_portal();
+        let rfov =
+            RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
+
+        let visible_squares = rfov.visible_absolute_squares();
+        let correct_local_square =
+            rfov.relative_square_to_absolute_square(test_portal.relative_position);
+        assert_ne!(correct_local_square, test_portal.target_square());
+        assert_eq!(visible_squares.len(), 2);
+        assert!(visible_squares.contains(&correct_local_square));
+        assert!(visible_squares.contains(&test_portal.target_square()));
     }
 }

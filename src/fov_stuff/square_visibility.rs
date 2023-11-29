@@ -166,7 +166,8 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             AngleInterval::PartialArc(partial) => partial,
         };
         if rel_square == STEP_ZERO {
-            return Some(SquareVisibility::new_fully_visible());
+            // return Some(SquareVisibility::new_fully_visible());
+            return None;
         }
         let square_arc = PartialAngleInterval::from_relative_square(rel_square);
         if partial_view_arc
@@ -527,5 +528,15 @@ mod tests {
         );
         assert!(vis1.overlaps(vis2, 1e-5));
         assert!(vis2.overlaps(vis1, 1e-5));
+    }
+    #[test]
+    fn test_view_arc_source_is_not_visible_by_default() {
+        assert_eq!(
+            SquareVisibility::from_relative_square_and_view_arc(
+                AngleInterval::from_degrees(0.0, 45.0),
+                (0, 0)
+            ),
+            None
+        );
     }
 }
