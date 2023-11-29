@@ -391,7 +391,7 @@ impl FieldOfView {
 
     fn rasterized_main_view_only(&self) -> RasterizedFieldOfView {
         RasterizedFieldOfView::from_local_visibility_map(
-            self.root_square(),
+            self.root_square_with_direction,
             &self
                 .visible_segments_in_main_view_only
                 .iter()
@@ -800,8 +800,8 @@ mod tests {
         assert!(rasterized_fov_result
             .only_partially_visible_local_relative_squares()
             .is_empty());
-        assert!(rasterized_fov_result.relative_square_is_fully_visible(STEP_ZERO));
-        let square_area = (radius * 2 + 1).pow(2);
+        assert_false!(rasterized_fov_result.relative_square_is_visible(STEP_ZERO));
+        let square_area = (radius * 2 + 1).pow(2) - 1;
         assert_eq!(
             rasterized_fov_result
                 .fully_visible_local_relative_squares()
@@ -1284,19 +1284,13 @@ mod tests {
 
         let rasterized_fov = main_fov.rasterized();
 
-        dbg!(
-            "asdf2",
-            rasterized_sub_fov.fully_visible_relative_squares(),
-            rasterized_sub_fov.fully_visible_absolute_squares(),
-            rasterized_fov.fully_visible_relative_squares(),
-            rasterized_fov.fully_visible_absolute_squares()
-        );
+        assert_eq!(rasterized_sub_fov.view_root, sub_center);
 
         assert_eq!(
             rasterized_sub_fov.fully_visible_relative_squares(),
             [test_square_relative_to_sub_fov].into()
         );
-        assert_eq!(rasterized_sub_fov.fully_visible_absolute_squares().len(), 2);
+        assert_eq!(rasterized_sub_fov.fully_visible_absolute_squares().len(), 1);
         assert!(rasterized_sub_fov
             .fully_visible_absolute_squares()
             .contains(&absolute_test_square));
@@ -1922,10 +1916,10 @@ mod tests {
 
         let rasterized_fov = narrow_fov.rasterized();
 
-        assert_eq!(rasterized_fov.number_of_visible_relative_squares(), 4);
-        assert_eq!(rasterized_fov.number_of_fully_visible_relative_squares(), 2);
+        assert_eq!(rasterized_fov.number_of_visible_relative_squares(), 3);
+        assert_eq!(rasterized_fov.number_of_fully_visible_relative_squares(), 1);
 
-        assert!(rasterized_fov.relative_square_is_fully_visible(vec2(0, 0)));
+        assert_false!(rasterized_fov.relative_square_is_visible(vec2(0, 0)));
         assert!(rasterized_fov.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized_fov.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized_fov.relative_square_is_fully_visible(vec2(3, 0)));

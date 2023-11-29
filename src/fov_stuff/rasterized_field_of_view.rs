@@ -52,7 +52,10 @@ pub struct RasterizedFieldOfView {
 // these are the public functions.
 pub trait RasterizedFieldOfViewFunctions {
     // creation
-    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self;
+    fn from_local_visibility_map(
+        root: impl Into<SquareWithOrthogonalDir>,
+        vis_map: &LocalSquareVisibilityMap,
+    ) -> Self;
 
     // adding
     fn add_fully_visible_local_relative_square(&mut self, relative_square: impl Into<WorldStep>);
@@ -293,8 +296,11 @@ impl ViewRoundable for SquareOfTopDownPortals {
 }
 
 impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
-    fn from_local_visibility_map(root: WorldSquare, vis_map: &LocalSquareVisibilityMap) -> Self {
-        let mut new_thing = Self::new_centered_at(root);
+    fn from_local_visibility_map(
+        root: impl Into<SquareWithOrthogonalDir>,
+        vis_map: &LocalSquareVisibilityMap,
+    ) -> Self {
+        let mut new_thing = Self::new_empty_with_view_root(root);
         vis_map.iter().for_each(|(rel_square, visibility)| {
             new_thing.try_add_visible_local_relative_square(*rel_square, visibility);
         });
