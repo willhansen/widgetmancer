@@ -387,17 +387,10 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             .collect()
     }
     fn visible_absolute_squares(&self) -> SquareSet {
-        let absolute_squares_of_exits: SquareSet = self
-            .map_of_top_down_portal_shapes_by_coordinates
+        self.map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .map(|(coord, vis)| coord.1.absolute_square)
-            .collect();
-        let absolute_squares_of_entrances: SquareSet = self
-            .visible_relative_squares()
-            .iter()
-            .map(|&rel| self.relative_square_to_absolute_square(rel))
-            .collect();
-        union(&absolute_squares_of_exits, &absolute_squares_of_entrances)
+            .collect()
     }
     fn fully_visible_absolute_squares(&self) -> SquareSet {
         self.filtered(false, false, true).visible_absolute_squares()
@@ -616,7 +609,9 @@ impl RasterizedFieldOfView {
         view_root: impl Into<SquareWithOrthogonalDir>,
         relative_square: impl Into<WorldStep>,
     ) -> Self {
-        todo!();
+        let mut fov = Self::new_empty_with_view_root(view_root);
+        fov.add_fully_visible_local_relative_square(relative_square);
+        fov
     }
     fn new_empty_with_view_root(view_root: impl Into<SquareWithOrthogonalDir>) -> Self {
         Self {
@@ -803,6 +798,18 @@ impl RasterizedFieldOfView {
         relative_square
             .apply_rigid_transform(tf_to_absolute_frame)
             .to_point()
+    }
+    // TODO: untested
+    pub fn absolute_square_to_relative_square(
+        &self,
+        absolute_square: impl Into<WorldSquare>,
+    ) -> WorldStep {
+        let absolute_square = absolute_square.into();
+        let tf_to_relative_frame =
+            RigidTransform::from_start_and_end_poses(self.view_root, ORIGIN_POSE());
+        absolute_square
+            .apply_rigid_transform(tf_to_relative_frame)
+            .to_vector()
     }
 
     fn top_down_portals(&self) -> Vec<TopDownPortal> {
@@ -1418,7 +1425,7 @@ mod tests {
         assert_eq!(deeper_top_down_portal.relative_position, (-8, -3).into());
     }
 
-    fn get_generic_top_down_portal() -> TopDownPortal {
+    fn get_generic_partial_square_top_down_portal() -> TopDownPortal {
         TopDownPortal::new(
             (5, 5),
             TopDownPortalTarget::new((20, 10), 3, 0),
@@ -1427,7 +1434,7 @@ mod tests {
     }
 
     fn two_top_down_portals_with_overlapping_entrances_but_not_exits() -> [TopDownPortal; 2] {
-        let mut p = get_generic_top_down_portal();
+        let mut p = get_generic_partial_square_top_down_portal();
         let p1 = p.clone();
         p.target.portal_rotation_to_target += 1.into();
         p.target.absolute_square += STEP_DOWN;
@@ -1436,7 +1443,7 @@ mod tests {
     // Note that the exits do overlap
     fn two_top_down_portals_on_one_square_with_overlapping_exits_but_not_entrances(
     ) -> [TopDownPortal; 2] {
-        let mut p = get_generic_top_down_portal();
+        let mut p = get_generic_partial_square_top_down_portal();
         let p1 = p.clone();
         p.target.portal_rotation_to_target += 2.into();
         [p1, p]
@@ -1527,17 +1534,60 @@ mod tests {
         );
     }
     #[test]
-    fn test_visible_absolute_squares_includes_local_and_target_sides_of_top_down_portals() {
-        let test_portal = get_generic_top_down_portal();
+    fn test_visible_absolute_squares_only_counts_target_side_of_portal__actual_portal() {
+        /// Because the local side might be hidden behind a portal
+        let test_portal = get_generic_partial_square_top_down_portal();
         let rfov =
             RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
 
-        let visible_squares = rfov.visible_absolute_squares();
+        let visible_absolute_squares = rfov.visible_absolute_squares();
         let correct_local_square =
             rfov.relative_square_to_absolute_square(test_portal.relative_position);
-        assert_ne!(correct_local_square, test_portal.target_square());
-        assert_eq!(visible_squares.len(), 2);
-        assert!(visible_squares.contains(&correct_local_square));
-        assert!(visible_squares.contains(&test_portal.target_square()));
+        assert_ne!(correct_local_square, test_portal.target_square()); // test data validation
+        assert_eq!(visible_absolute_squares.len(), 1);
+        assert_false!(visible_absolute_squares.contains(&correct_local_square));
+        assert!(visible_absolute_squares.contains(&test_portal.target_square()));
+    }
+    #[test]
+    fn test_visible_absolute_squares_only_counts_target_side_of_portal__direct_local_connection() {
+        /// Because the local side might be hidden behind a portal
+        let rfov = RasterizedFieldOfView::new_with_one_fully_visible_local_square(
+            (3, 4, STEP_RIGHT),
+            (5, 5),
+        );
+        let test_portal = rfov.top_down_portals().iter().next().unwrap().clone();
+
+        let visible_absolute_squares = rfov.visible_absolute_squares();
+        let correct_local_square =
+            rfov.relative_square_to_absolute_square(test_portal.relative_position);
+        assert_eq!(correct_local_square, test_portal.target_square()); // test data validation
+        assert_eq!(visible_absolute_squares.len(), 1);
+        assert!(visible_absolute_squares.contains(&test_portal.target_square()));
+    }
+    #[test]
+    fn test_visible_absolute_squares_only_counts_target_side_of_portal__local_connection_and_portal_sharing_square(
+    ) {
+        /// Because the local side might be hidden behind a portal
+        let test_portal = get_generic_partial_square_top_down_portal();
+        let mut rfov =
+            RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
+
+        // TODO: make this a function in RasterizedFieldOfView
+        let direct_local_connection = TopDownPortal::new(
+            test_portal.relative_position,
+            TopDownPortalTarget::new_local(
+                rfov.relative_square_to_absolute_square(test_portal.relative_position),
+            ),
+            test_portal.shape_in_entrance_frame().complement().unwrap(),
+        );
+        rfov.add_top_down_portal(direct_local_connection);
+
+        let visible_absolute_squares = rfov.visible_absolute_squares();
+        let correct_local_square =
+            rfov.relative_square_to_absolute_square(test_portal.relative_position);
+        assert_ne!(correct_local_square, test_portal.target_square()); // test data validation
+        assert_eq!(visible_absolute_squares.len(), 2);
+        assert!(visible_absolute_squares.contains(&correct_local_square));
+        assert!(visible_absolute_squares.contains(&test_portal.target_square()));
     }
 }

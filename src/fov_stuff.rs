@@ -773,8 +773,11 @@ mod tests {
         assert!(fov_result
             .only_partially_visible_local_relative_squares()
             .is_empty());
-        assert!(fov_result.relative_square_is_fully_visible(STEP_ZERO));
-        let square_area = (fov_radius * 2 + 1).pow(2);
+        assert_false!(fov_result.relative_square_is_fully_visible(STEP_ZERO));
+        assert_false!(fov_result.relative_square_is_visible(STEP_ZERO));
+
+        // Does not include center
+        let square_area = (fov_radius * 2 + 1).pow(2) - 1;
         assert_eq!(
             fov_result.fully_visible_local_relative_squares().len(),
             square_area as usize
@@ -1387,9 +1390,9 @@ mod tests {
 
         let combined = fov_1.combined_with(&fov_2).rasterized();
 
-        // includes the two added squares, and the center (which is fully visible by default)
-        assert_eq!(combined.fully_visible_relative_squares().len(), 3);
-        assert_eq!(combined.fully_visible_local_relative_squares().len(), 3);
+        // includes the two added squares, and not the center
+        assert_eq!(combined.fully_visible_relative_squares().len(), 2);
+        assert_eq!(combined.fully_visible_local_relative_squares().len(), 2);
     }
     #[test]
     fn test_combine_fovs_to_make_full_circle() {
@@ -1409,7 +1412,8 @@ mod tests {
         let combined_fov = fov_1.combined_with(&fov_2);
         let combined_and_rasterized = combined_fov.rasterized();
 
-        let expected_area = (radius * 2 + 1).pow(2);
+        // the "-1" is because it does not include the center
+        let expected_area = (radius * 2 + 1).pow(2) - 1;
 
         assert_eq!(combined_fov.visible_segments_in_main_view_only.len(), 1);
         let lone_segment = combined_fov
@@ -1701,7 +1705,7 @@ mod tests {
     }
 
     #[test]
-    fn test_center_of_fov_is_visible() {
+    fn test_center_of_fov_is_not_visible() {
         let square = point2(4, 5);
         let rasterized_fov = portal_aware_field_of_view_from_square(
             square,
@@ -1710,8 +1714,9 @@ mod tests {
             &Default::default(),
         )
         .rasterized();
-        assert_eq!(rasterized_fov.visible_local_relative_squares().len(), 1);
-        assert!(rasterized_fov.relative_square_is_fully_visible(STEP_ZERO));
+        assert_eq!(rasterized_fov.visible_local_relative_squares().len(), 0);
+        assert_false!(rasterized_fov.relative_square_is_fully_visible(STEP_ZERO));
+        assert_false!(rasterized_fov.relative_square_is_visible(STEP_ZERO));
     }
 
     #[ignore = "not a priority for the time being"]
@@ -1940,9 +1945,9 @@ mod tests {
         assert_eq!(fov.visible_segments_in_main_view_only.len(), 1);
         assert!(fov.transformed_sub_fovs.is_empty());
         let rasterized = fov.rasterized();
-        assert_eq!(rasterized.number_of_visible_relative_squares(), 4);
-        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 1);
-        assert!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
+        assert_eq!(rasterized.number_of_visible_relative_squares(), 3);
+        assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 0);
+        assert_false!(rasterized.relative_square_is_fully_visible(STEP_ZERO));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(1, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
