@@ -1597,9 +1597,9 @@ mod tests {
         // .vvv
         // vvv.
         // xv..
-        // 10 visible squares
+        // 9 visible squares (not counting start)
 
-        assert_eq!(fov.rasterized().visible_relative_squares().len(), 10);
+        assert_eq!(fov.rasterized().visible_relative_squares().len(), 9);
     }
 
     #[test]
