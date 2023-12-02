@@ -163,7 +163,7 @@ impl Piece {
     pub fn turned_versions(&self) -> HashSet<Piece> {
         assert!(self.can_turn());
 
-        [-1, 1].into_iter().map(|i| self.rotated(i)).collect()
+        [-1, 1].into_iter().map(|i| self.rotated_ccw(i)).collect()
     }
 
     pub fn random_subordinate_type() -> PieceType {
@@ -247,12 +247,12 @@ impl Piece {
 }
 
 impl QuarterTurnRotatable for Piece {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Piece {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Piece {
         assert!(self.can_turn());
         Piece {
             piece_type: self.piece_type,
             faction: self.faction,
-            faced_direction: Some(self.faced_direction().rotated(quarter_turns_ccw)),
+            faced_direction: Some(self.faced_direction().rotated_ccw(quarter_turns_ccw)),
         }
     }
 }

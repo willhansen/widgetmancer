@@ -281,7 +281,7 @@ impl Graphics {
             );
 
             if let Some(unrotated) = maybe_unrotated {
-                let rotated: DrawableEnum = unrotated.rotated(-self.screen.rotation());
+                let rotated: DrawableEnum = unrotated.rotated_ccw(-self.screen.rotation());
                 self.screen.draw_drawable(&rotated, screen_square);
             }
         }
@@ -687,7 +687,7 @@ impl Graphics {
                     drawable_map
                         .get(&top_down_portal.target_square())
                         .unwrap()
-                        .rotated(-top_down_portal.portal_rotation_to_target())
+                        .rotated_ccw(-top_down_portal.portal_rotation_to_target())
                 } else {
                     // SolidColorDrawable::new(GREY).to_enum()
                     // SolidColorDrawable::new(number_to_hue_rotation(

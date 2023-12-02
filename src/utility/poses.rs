@@ -104,8 +104,8 @@ where
     pub fn revolved(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         (
-            self.square.rotated(quarter_turns_ccw),
-            self.dir.rotated(quarter_turns_ccw),
+            self.square.rotated_ccw(quarter_turns_ccw),
+            self.dir.rotated_ccw(quarter_turns_ccw),
         )
             .into()
     }
@@ -124,16 +124,19 @@ where
         Self::from_square_and_step(self.square, self.right())
     }
     fn left(&self) -> OrthogonalWorldStep {
-        self.direction().rotated(1)
+        self.direction().rotated_ccw(1)
     }
     fn right(&self) -> OrthogonalWorldStep {
-        self.direction().rotated(3)
+        self.direction().rotated_ccw(3)
     }
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_step(self.square, -self.direction().step())
     }
     pub fn with_offset(&self, offset: WorldStep) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
+    }
+    pub fn at_square(&self, position: impl Into<SquareType>) -> Self {
+        Self::from_square_and_step(position, self.dir())
     }
     pub fn with_direction(&self, dir: WorldStep) -> Self {
         Self::from_square_and_step(self.square, dir)
@@ -225,12 +228,12 @@ impl<T: WorldGridCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 }
 
 impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         (
             self.square,
             self.dir
                 .step()
-                .rotated(quarter_turns_ccw.into().quarter_turns()),
+                .rotated_ccw(quarter_turns_ccw.into().quarter_turns()),
         )
             .into()
     }
@@ -247,8 +250,8 @@ impl SquareWithOrthogonalDir {
         let naive_translation = other.square - self.square;
         let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
         Self::from_square_and_step(
-            naive_translation.to_point().rotated(rotation),
-            other.dir.rotated(rotation),
+            naive_translation.to_point().rotated_ccw(rotation),
+            other.dir.rotated_ccw(rotation),
         )
     }
     pub fn other_square_as_seen_from_self(&self, other: impl Into<WorldSquare>) -> WorldStep {
@@ -428,7 +431,7 @@ where
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::from_square_and_step(
             self.square().apply_rigid_transform(tf),
-            self.dir().rotated(tf.rotation()),
+            self.dir().rotated_ccw(tf.rotation()),
         )
     }
 }
@@ -579,16 +582,16 @@ mod tests {
     fn test_rotate_vs_revolve_a_face() {
         let rel_face: RelativeFace = (3, 5, STEP_UP).into();
 
-        assert_eq!(rel_face.rotated(1), (3, 5, STEP_LEFT).into());
+        assert_eq!(rel_face.rotated_ccw(1), (3, 5, STEP_LEFT).into());
         assert_eq!(rel_face.revolved(1), (-5, 3, STEP_LEFT).into());
-        assert_eq!(rel_face.rotated(2), (3, 5, STEP_DOWN).into());
+        assert_eq!(rel_face.rotated_ccw(2), (3, 5, STEP_DOWN).into());
         assert_eq!(rel_face.revolved(2), (-3, -5, STEP_DOWN).into());
 
         let abs_face: Face = (5, 1, STEP_LEFT).into();
 
-        assert_eq!(abs_face.rotated(-1), (5, 1, STEP_UP).into());
+        assert_eq!(abs_face.rotated_ccw(-1), (5, 1, STEP_UP).into());
         assert_eq!(abs_face.revolved(-1), (1, -5, STEP_UP).into());
-        assert_eq!(abs_face.rotated(2), (5, 1, STEP_RIGHT).into());
+        assert_eq!(abs_face.rotated_ccw(2), (5, 1, STEP_RIGHT).into());
         assert_eq!(abs_face.revolved(2), (-5, -1, STEP_RIGHT).into());
     }
     #[test]

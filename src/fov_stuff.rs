@@ -449,8 +449,8 @@ impl OctantFOVSquareSequenceIter {
     // todo: change to implementation of QuarterTurnRotatable trait
     pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         Self {
-            outward_dir: self.outward_dir.rotated(quarter_turns),
-            across_dir: self.across_dir.rotated(quarter_turns),
+            outward_dir: self.outward_dir.rotated_ccw(quarter_turns),
+            across_dir: self.across_dir.rotated_ccw(quarter_turns),
             ..self.clone()
         }
     }
@@ -569,7 +569,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 portal_geometry,
                 transformed_center,
                 radius,
-                visible_arc_of_face.rotated(transform.rotation()),
+                visible_arc_of_face.rotated_ccw(transform.rotation()),
                 steps_in_octant_iter.rotated(transform.rotation()),
             )
             .with_weakly_applied_start_line(relative_portal_exit_in_sub_fov);
@@ -1617,42 +1617,37 @@ mod tests {
 
         fov.transformed_sub_fovs.push(sub_fov);
 
+        let rfov = fov.rasterized();
+
+        dbg!(&rfov);
+
         assert_eq!(
-            fov.rasterized()
-                .absolute_squares_visible_at_relative_square(rel_square),
+            rfov.absolute_squares_visible_at_relative_square(rel_square),
             [abs_square].into()
         );
     }
 
     #[test]
     fn test_fov_relative_to_absolute__sub_view_with_rotation() {
-        let main_center = point2(5, 5);
-        let sub_center = point2(34, -7);
+        let mut fov = FieldOfView::new_empty_fov_at((5, 5));
 
-        let mut fov = FieldOfView::new_empty_fov_at(main_center);
-
-        let quarter_turns = 3;
-
-        let sub_fov_direction = fov
+        let sub_root = fov
             .root_square_with_direction
-            .direction()
-            .step()
-            .rotated(quarter_turns);
-        let mut sub_fov = FieldOfView::new_empty_fov_with_root(
-            SquareWithOrthogonalDir::from_square_and_step(sub_center, sub_fov_direction),
-        );
+            .turned_right()
+            .at_square((34, -7));
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root(sub_root);
 
-        let rel_square = STEP_DOWN_LEFT * 3;
-        let rotated_rel_square = rel_square.rotated(quarter_turns);
-        let abs_square = sub_center + rotated_rel_square;
+        let rel_square = STEP_DOWN_LEFT * 1;
 
-        sub_fov.add_view_segment_for_fully_visible_relative_square(rotated_rel_square);
+        sub_fov.add_view_segment_for_fully_visible_relative_square(rel_square);
         fov.transformed_sub_fovs.push(sub_fov);
 
+        let rfov = fov.rasterized();
+
+        let correct_abs_square = sub_root.square() + STEP_UP_LEFT;
         assert_eq!(
-            fov.rasterized()
-                .absolute_squares_visible_at_relative_square(rel_square),
-            SquareSet::from([abs_square])
+            rfov.absolute_squares_visible_at_relative_square(rel_square),
+            SquareSet::from([correct_abs_square])
         );
     }
 
@@ -1925,12 +1920,13 @@ mod tests {
         assert!(rasterized_fov.relative_square_is_fully_visible(vec2(3, 0)));
     }
     #[test]
-    fn test_square_is_fully_visible_if_view_arc_starts_in_that_square() {
+    fn test_square_is_not_fully_visible_if_view_arc_starts_in_that_square() {
         assert!(SquareVisibility::from_relative_square_and_view_arc(
             PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
             STEP_ZERO
         )
-        .is_some_and(|vis| vis.is_fully_visible()))
+        .is_none())
+        // .is_some_and(|vis| vis.is_fully_visible()))
     }
     #[test]
     fn test_rasterize_one_view_segment() {

@@ -56,7 +56,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
-        let border_line: Line<f32, U> = Line::new(p, p + v.rotated(1));
+        let border_line: Line<f32, U> = Line::new(p, p + v.rotated_ccw(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::from_line_and_point_on_half_plane(border_line, point_on_half_plane)
@@ -283,12 +283,12 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 }
 
 impl<U: Copy + Debug> QuarterTurnRotatable for HalfPlane<f32, U> {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
         let point = self.point_on_half_plane();
-        let new_point = point.rotated(quarter_turns_ccw);
-        let new_line = line.rotated(quarter_turns_ccw);
+        let new_point = point.rotated_ccw(quarter_turns_ccw);
+        let new_line = line.rotated_ccw(quarter_turns_ccw);
         Self::from_line_and_point_on_half_plane(new_line, new_point)
     }
 }

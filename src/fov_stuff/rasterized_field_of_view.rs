@@ -862,7 +862,7 @@ impl TopDownPortal {
     }
     pub fn shape_in_entrance_frame(&self) -> SquareVisibility {
         self.shape_in_exit_frame
-            .rotated(-self.target.portal_rotation_to_target)
+            .rotated_ccw(-self.target.portal_rotation_to_target)
     }
     pub fn shape_rotated_to_absolute_frame(&self) -> SquareVisibility {
         self.shape_in_exit_frame

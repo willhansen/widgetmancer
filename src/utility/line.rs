@@ -77,9 +77,9 @@ impl<T, U> QuarterTurnRotatable for Line<T, U>
 where
     T: Clone + Debug + PartialEq + Signed + Copy,
 {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
-        let new_points = self.to_array().map(|p| p.rotated(quarter_turns_ccw));
+        let new_points = self.to_array().map(|p| p.rotated_ccw(quarter_turns_ccw));
         Self::from_array(new_points)
         // let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_ccw));
         // Self::new(new_points[0].clone(), new_points[1].clone())
@@ -503,7 +503,7 @@ pub fn first_inside_square_face_hit_by_ray(
 pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
     let square_center = square.to_f32();
     let face_center = square_center + face_direction.step().to_f32() * 0.5;
-    let p1_direction = face_direction.step().rotated(1);
+    let p1_direction = face_direction.step().rotated_ccw(1);
     let p2_direction = -p1_direction;
     WorldLine::new(
         face_center + p1_direction.to_f32() * 0.5,

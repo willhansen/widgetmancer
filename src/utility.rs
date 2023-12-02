@@ -234,7 +234,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
 pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
 
 impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let rotation_function = match quarter_turns_ccw.into().quarter_turns() {
             0 => |x, y| (x, y),
             1 => |x, y| (SIZE - 1 - y, x),
@@ -292,7 +292,7 @@ impl RigidTransform {
         &self,
         pose: RelativeSquareWithOrthogonalDir,
     ) -> RelativeSquareWithOrthogonalDir {
-        let end_square = pose.square().rotated(self.rotation().quarter_turns());
+        let end_square = pose.square().rotated_ccw(self.rotation().quarter_turns());
 
         let end_direction = self.rotation().rotate_vector(pose.direction().step());
 

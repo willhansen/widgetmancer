@@ -609,7 +609,9 @@ mod tests {
         for t in turns_xys {
             for p in t.1 {
                 assert_eq!(
-                    array.rotated(QuarterTurnsCcw::new(t.0)).get_xy(p.0, p.1),
+                    array
+                        .rotated_ccw(QuarterTurnsCcw::new(t.0))
+                        .get_xy(p.0, p.1),
                     true
                 );
             }

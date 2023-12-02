@@ -165,7 +165,7 @@ impl<V: Coordinate> QuarterTurnRotatable for V
 // where
 //     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
 {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
         Self::new(
             self.x() * int_to_T(int_cos(quarter_turns))
@@ -354,7 +354,7 @@ pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].rotated(QuarterTurnsCcw::new(1)) {
+    if faces[0] == faces[1].rotated_ccw(QuarterTurnsCcw::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -377,8 +377,8 @@ impl KingWorldStep {
 }
 
 impl QuarterTurnRotatable for KingWorldStep {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self.step().rotated(quarter_turns_ccw).into()
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        self.step().rotated_ccw(quarter_turns_ccw).into()
     }
 }
 
@@ -419,8 +419,8 @@ impl OrthogonalWorldStep {
 }
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self.step().rotated(quarter_turns_ccw).into()
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        self.step().rotated_ccw(quarter_turns_ccw).into()
     }
 }
 
@@ -507,7 +507,7 @@ impl QuarterTurnsCcw {
         }
     }
     pub fn to_vector(&self) -> WorldStep {
-        STEP_RIGHT.rotated(self.quarter_turns)
+        STEP_RIGHT.rotated_ccw(self.quarter_turns)
     }
     pub fn from_vector(dir: WorldStep) -> Self {
         assert!(is_orthogonal(dir));
@@ -551,7 +551,7 @@ impl QuarterTurnsCcw {
     where
         T: Signed + Copy + Debug,
     {
-        v.rotated(self.quarter_turns)
+        v.rotated_ccw(self.quarter_turns)
     }
 }
 
@@ -593,14 +593,14 @@ impl RigidlyTransformable for QuarterTurnsCcw {
 
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self;
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self;
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
         Self: Sized + Debug,
     {
         (0..4)
             .into_iter()
-            .map(|i| self.rotated(i))
+            .map(|i| self.rotated_ccw(i))
             .collect_vec()
             .try_into()
             .unwrap()
@@ -608,7 +608,7 @@ pub trait QuarterTurnRotatable {
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn rotated(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
         ))

@@ -164,8 +164,8 @@ impl PartialAngleInterval {
             rel_face.into().into();
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.step().to_f32() / 2.0;
-        let face_corners =
-            [1, -1].map(|sign| face_center + (face_direction.step().to_f32() / 2.0).rotated(sign));
+        let face_corners = [1, -1]
+            .map(|sign| face_center + (face_direction.step().to_f32() / 2.0).rotated_ccw(sign));
 
         let center_angle = better_angle_from_x_axis(face_center);
         let face_corner_angles = face_corners.map(better_angle_from_x_axis);
