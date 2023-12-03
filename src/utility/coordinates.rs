@@ -406,7 +406,8 @@ pub struct OrthogonalWorldStep {
 }
 
 impl OrthogonalWorldStep {
-    pub fn new(dir: WorldStep) -> Self {
+    pub fn new(dir: impl Into<WorldStep>) -> Self {
+        let dir = dir.into();
         assert!(is_orthogonal_king_step(dir));
         OrthogonalWorldStep { step: dir }
     }
@@ -426,6 +427,14 @@ impl QuarterTurnRotatable for OrthogonalWorldStep {
 
 impl From<WorldStep> for OrthogonalWorldStep {
     fn from(value: WorldStep) -> Self {
+        OrthogonalWorldStep::new(value)
+    }
+}
+impl<T> From<(T, T)> for OrthogonalWorldStep
+where
+    (T, T): Into<WorldStep>,
+{
+    fn from(value: (T, T)) -> Self {
         OrthogonalWorldStep::new(value)
     }
 }

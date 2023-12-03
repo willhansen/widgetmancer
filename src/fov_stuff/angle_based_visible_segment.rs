@@ -16,6 +16,7 @@ use std::fmt::{Debug, Formatter};
 
 use super::fence::{Fence, RelativeFenceFullyVisibleFromOriginGoingCcw};
 use super::square_visibility::RelativeSquareVisibilityFunctions;
+use super::NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES;
 
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
@@ -132,6 +133,20 @@ impl AngleBasedVisibleSegment {
     }
     pub fn from_arc_and_fence_radius(arc: AngleInterval, fence_radius: u32) -> Self {
         Self::new(arc, Fence::from_radius_of_square_and_arc(fence_radius, arc))
+    }
+    pub fn narrow_segment_to_right(first_square: u32, last_square: u32) -> Self {
+        let segment = Self::from_arc_and_fence_radius(
+            AngleInterval::from_degrees(
+                -NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES,
+                NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES,
+            ),
+            last_square,
+        );
+        return if first_square == 0 {
+            segment
+        } else {
+            segment.with_start_face((first_square as i32, 0, (-1, 0)))
+        };
     }
     pub fn with_weakly_applied_start_face(
         &self,
@@ -296,6 +311,7 @@ mod tests {
         utility::{
             coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
             coordinates::FVector,
+            general_utility::{as_set, set_of_keys},
         },
     };
 
@@ -485,5 +501,12 @@ mod tests {
         let map = segment.to_local_square_visibility_map();
 
         assert_false!(map.contains_key(&(0, 0).into()));
+    }
+    #[test]
+    fn test_local_square_visibility_map_respects_start_line() {
+        let view_segment: AngleBasedVisibleSegment =
+            AngleBasedVisibleSegment::narrow_segment_to_right(4, 5);
+        let map = view_segment.to_local_square_visibility_map();
+        assert_eq!(set_of_keys(&map), as_set([(4, 0), (5, 0)]));
     }
 }

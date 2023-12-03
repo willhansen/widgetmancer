@@ -109,6 +109,11 @@ where
 {
     hashmap.keys().cloned().collect::<HashSet<K>>()
 }
+pub fn as_set<TT: Into<T>, T: std::hash::Hash + std::cmp::Eq>(
+    v: impl IntoIterator<Item = TT>,
+) -> HashSet<T> {
+    v.into_iter().map_into().collect()
+}
 
 pub fn union<T: Clone + Hash + Eq>(a: &HashSet<T>, b: &HashSet<T>) -> HashSet<T> {
     a.union(b).cloned().collect()

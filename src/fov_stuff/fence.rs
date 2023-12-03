@@ -396,7 +396,7 @@ impl Debug for Fence {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "edges: {:?}\nspanned angle: {}",
+            "edges: {:?}\n\tspanned angle: {}",
             self.edges,
             self.spanned_angle_from_origin()
         )

@@ -696,7 +696,7 @@ impl RasterizedFieldOfView {
 
         assert!(
             top_down_portals_with_conflicting_entrances.is_empty(),
-            "{:#?}",
+            "Failed to create rasterized field of view because of conflicting portal entrances: {:#?}",
             top_down_portals_with_conflicting_entrances
         );
         Self {

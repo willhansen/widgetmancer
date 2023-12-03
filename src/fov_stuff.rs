@@ -48,6 +48,8 @@ use crate::utility::*;
 
 use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 
+type Pose = SquareWithOrthogonalDir;
+
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 #[derive(PartialEq, Debug, Clone, Constructor)]
@@ -371,6 +373,7 @@ impl FieldOfView {
     pub fn rasterized(&self) -> RasterizedFieldOfView {
         // rasterize top level
         let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
+        dbg!(&self.visible_segments_in_main_view_only, &combined);
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let portal_transform = self.view_transform_to(sub_fov);
@@ -384,6 +387,7 @@ impl FieldOfView {
             //     // rasterized_and_relocalized_sub_fov.visible_relative_squares()
             // );
             // combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
+            dbg!(&sub_fov, &rasterized_sub_fov);
             combined = combined.combined_with(&rasterized_sub_fov);
         });
         combined
@@ -662,13 +666,14 @@ fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
 
 fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: bool) {
     let center_drawable = TextDrawable::new("@@", WHITE, GREY, true);
+    let rfov = fov.rasterized();
     let r = radius as i32;
     (-r..=r).for_each(|neg_y| {
         let y = -neg_y;
         (-r..=r).for_each(|x| {
             let rel_square: WorldStep = vec2(x, y);
             let maybe_drawable = Graphics::drawable_at_relative_square(
-                &fov.rasterized(),
+                &rfov,
                 rel_square,
                 None,
                 true,
@@ -1139,13 +1144,10 @@ mod tests {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(10, 20);
         let dx_to_portal_square = 3;
-        let entrance_square = center + STEP_RIGHT * dx_to_portal_square;
-        let exit_square = center + STEP_LEFT * 5;
+        let entrance_pose: Pose = (center + STEP_RIGHT * dx_to_portal_square, STEP_RIGHT).into();
+        let exit_pose: Pose = (center + STEP_UP * 5, STEP_RIGHT).into();
 
-        portal_geometry.create_portal(
-            SquareWithOrthogonalDir::from_square_and_step(entrance_square, STEP_RIGHT),
-            SquareWithOrthogonalDir::from_square_and_step(exit_square, STEP_DOWN),
-        );
+        portal_geometry.create_portal(entrance_pose, exit_pose);
 
         let clockwise_end_in_degrees = 0.1;
         let view_arc = AngleInterval::from_degrees(
@@ -1154,15 +1156,18 @@ mod tests {
         );
 
         let radius = 10;
-        let fov_result = field_of_view_within_arc_in_single_octant(
+        let fov = field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portal_geometry,
             SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP),
             radius,
             view_arc,
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
-        )
-        .rasterized();
+        );
+        dbg!(&fov);
+        // print_fov_as_relative(&fov, 10);
+        // print_fov_as_absolute(&fov, 10);
+        let rfov = fov.rasterized();
 
         let should_be_visible_relative_squares: StepSet =
             (1..=10).into_iter().map(|dx| STEP_RIGHT * dx).collect();
@@ -1173,28 +1178,31 @@ mod tests {
         let squares_after_portal = radius - (dx_to_portal_square.abs() as u32 + 1);
         let should_be_visible_after_portal: SquareSet = (0..squares_after_portal as i32)
             .into_iter()
-            .map(|dy| exit_square + STEP_DOWN * dy)
+            .map(|dy| exit_pose.square() + STEP_DOWN * dy)
             .collect();
 
-        assert_eq!(fov_result.fully_visible_local_relative_squares().len(), 1);
-        assert_eq!(fov_result.fully_visible_relative_squares().len(), 1);
-        assert_eq!(
-            fov_result.visible_relative_squares().len(),
-            radius as usize + 1
+        dbg!(
+            rfov.visible_relative_squares(),
+            rfov.visible_local_relative_squares(),
+            rfov.visible_absolute_squares()
         );
+
+        assert_eq!(rfov.fully_visible_local_relative_squares().len(), 1);
+        assert_eq!(rfov.fully_visible_relative_squares().len(), 1);
+        assert_eq!(rfov.visible_relative_squares().len(), radius as usize + 1);
         should_be_visible_relative_squares.iter().for_each(|step| {
-            assert!(fov_result.relative_square_is_visible(*step));
+            assert!(rfov.relative_square_is_visible(*step));
         });
         should_be_visible_before_portal.iter().for_each(|square| {
             assert!(
-                fov_result.absolute_square_is_visible(*square),
+                rfov.absolute_square_is_visible(*square),
                 "square: {}",
                 square.to_string()
             );
         });
         should_be_visible_after_portal.iter().for_each(|square| {
             assert!(
-                fov_result.absolute_square_is_visible(*square),
+                rfov.absolute_square_is_visible(*square),
                 "square: {}",
                 square.to_string()
             );
@@ -1963,5 +1971,26 @@ mod tests {
         assert_eq!(rasterized.number_of_visible_relative_squares(), 0);
         assert_eq!(rasterized.number_of_fully_visible_relative_squares(), 0);
         assert_false!(rasterized.relative_square_is_fully_visible(vec2(0, 0)));
+    }
+
+    fn as_set<TT: Into<T>, T: std::hash::Hash + std::cmp::Eq>(
+        v: impl IntoIterator<Item = TT>,
+    ) -> HashSet<T> {
+        v.into_iter().map_into().collect()
+    }
+
+    #[test]
+    fn test_rasterize_fov_with_narrow_view_segment__with_start_line() {
+        let view_segment: AngleBasedVisibleSegment =
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(
+                AngleInterval::from_degrees(0.0, 0.001),
+                5,
+            )
+            .with_start_face((3, 0, STEP_RIGHT));
+        let mut fov = FieldOfView::new_empty_fov_at((5, 7));
+        fov.visible_segments_in_main_view_only.push(view_segment);
+        let rfov = fov.rasterized();
+        dbg!(&fov, &rfov);
+        assert_eq!(rfov.visible_relative_squares(), as_set([(4, 0), (5, 0)]));
     }
 }
