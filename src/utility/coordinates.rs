@@ -116,7 +116,8 @@ macro_rules! coordinatify {
 coordinatify!(Vector2D);
 coordinatify!(Point2D);
 
-trait_alias_macro!(pub trait WorldGridCoordinate = Coordinate<DataType = i32, UnitType = SquareGridInWorldFrame>);
+trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32>);
+trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {

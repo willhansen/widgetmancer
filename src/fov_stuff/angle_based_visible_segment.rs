@@ -1,7 +1,7 @@
 use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep};
+use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep, STEP_LEFT};
 use crate::utility::coordinates::FAngle;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
@@ -145,7 +145,7 @@ impl AngleBasedVisibleSegment {
         return if first_square == 0 {
             segment
         } else {
-            segment.with_start_face((first_square as i32, 0, (-1, 0)))
+            segment.with_start_face((first_square as i32, 0, STEP_LEFT))
         };
     }
     pub fn with_weakly_applied_start_face(
@@ -227,13 +227,14 @@ impl AngleBasedVisibleSegment {
             common_start_line,
         ))
     }
-    fn rel_square_is_after_start_line(&self, rel_square: WorldStep) -> bool {
+    fn rel_square_is_after_start_line(&self, rel_square: impl Into<WorldStep>) -> bool {
+        let rel_square = rel_square.into();
         if let Some(line) = self
             .start_internal_relative_face
             .map(|face| face.face_line_segment())
         {
             // TODO: generalize to allow passing in the relative squares, not needing absolute points
-            line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0, 0.0))
+            !line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0, 0.0))
         } else {
             true
         }
@@ -261,7 +262,7 @@ impl AngleBasedVisibleSegment {
         // A visible segment has two edges to its view arc, and those are the only things that can split one of these squares.
         // Watch out for the wraparound case.
         self.touched_squares_going_outwards_and_ccw()
-            .skip(1)
+            .filter(|rel_square| rel_square.square_length() > 0) // skip the center square
             .map(|rel_square| {
                 (
                     rel_square,
@@ -304,7 +305,7 @@ impl RigidlyTransformable for AngleBasedVisibleSegment {
 #[cfg(test)]
 mod tests {
     use euclid::vec2;
-    use ntest::{assert_about_eq, assert_false};
+    use ntest::{assert_about_eq, assert_false, assert_true};
 
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
@@ -508,5 +509,35 @@ mod tests {
             AngleBasedVisibleSegment::narrow_segment_to_right(4, 5);
         let map = view_segment.to_local_square_visibility_map();
         assert_eq!(set_of_keys(&map), as_set([(4, 0), (5, 0)]));
+    }
+    #[test]
+    fn test_outward_going_square_iteration_respects_start_line() {
+        let view_segment: AngleBasedVisibleSegment =
+            AngleBasedVisibleSegment::narrow_segment_to_right(4, 5);
+        let mut iter = view_segment.touched_squares_going_outwards_and_ccw();
+        assert_eq!(iter.next(), Some((4, 0).into()));
+        assert_eq!(iter.next(), Some((5, 0).into()));
+        assert_eq!(iter.next(), None);
+    }
+    #[test]
+    fn test_check_if_rel_square_is_after_start_line() {
+        let view_segment: AngleBasedVisibleSegment =
+            AngleBasedVisibleSegment::narrow_segment_to_right(4, 5);
+        assert_true!(view_segment.rel_square_is_after_start_line((4, 0)));
+        assert_true!(view_segment.rel_square_is_after_start_line((5, 0)));
+        assert_false!(view_segment.rel_square_is_after_start_line((0, 0)));
+        assert_false!(view_segment.rel_square_is_after_start_line((1, 0)));
+        assert_false!(view_segment.rel_square_is_after_start_line((2, 0)));
+        assert_false!(view_segment.rel_square_is_after_start_line((3, 0)));
+    }
+    #[test]
+    fn test_start_line_orientation_does_not_matter() {
+        let seg = AngleBasedVisibleSegment::narrow_segment_to_right(0, 5);
+        let seg1 = seg.with_start_face((3, 0, STEP_RIGHT));
+        let seg2 = seg.with_start_face((4, 0, STEP_LEFT));
+        assert_eq!(
+            seg1.to_local_square_visibility_map(),
+            seg2.to_local_square_visibility_map()
+        );
     }
 }

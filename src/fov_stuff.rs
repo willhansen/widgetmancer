@@ -373,7 +373,7 @@ impl FieldOfView {
     pub fn rasterized(&self) -> RasterizedFieldOfView {
         // rasterize top level
         let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
-        dbg!(&self.visible_segments_in_main_view_only, &combined);
+        // dbg!(&self.visible_segments_in_main_view_only, &combined);
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let portal_transform = self.view_transform_to(sub_fov);
@@ -387,7 +387,7 @@ impl FieldOfView {
             //     // rasterized_and_relocalized_sub_fov.visible_relative_squares()
             // );
             // combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
-            dbg!(&sub_fov, &rasterized_sub_fov);
+            // dbg!(&sub_fov, &rasterized_sub_fov);
             combined = combined.combined_with(&rasterized_sub_fov);
         });
         combined
@@ -706,6 +706,25 @@ pub fn print_fov_as_relative(fov: &FieldOfView, radius: u32) {
 
 pub fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, false)
+}
+
+pub fn print_square_set(squares: &HashSet<impl GridCoordinate>) {
+    let xmax = squares.iter().map(|c| c.x()).max().unwrap();
+    let xmin = squares.iter().map(|c| c.x()).min().unwrap();
+    let ymax = squares.iter().map(|c| c.y()).max().unwrap();
+    let ymin = squares.iter().map(|c| c.y()).min().unwrap();
+
+    (ymin..=ymax).for_each(|y| {
+        // using `with_capacity` instead of `new` probably isn't worth it...
+        let string: String = String::with_capacity((xmax - xmin + 1) as usize);
+        (xmin..=xmax).for_each(|x| {
+            if squares.contains((x, y).into().as_ref()) {
+                todo!();
+            }
+
+            todo!();
+        })
+    })
 }
 
 #[cfg(test)]
@@ -1146,6 +1165,7 @@ mod tests {
         let dx_to_portal_square = 3;
         let entrance_pose: Pose = (center + STEP_RIGHT * dx_to_portal_square, STEP_RIGHT).into();
         let exit_pose: Pose = (center + STEP_UP * 5, STEP_RIGHT).into();
+        assert_eq!(exit_pose.square(), (10, 25).into());
 
         portal_geometry.create_portal(entrance_pose, exit_pose);
 
@@ -1164,9 +1184,9 @@ mod tests {
             view_arc,
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
         );
-        dbg!(&fov);
-        // print_fov_as_relative(&fov, 10);
-        // print_fov_as_absolute(&fov, 10);
+        // dbg!(&fov);
+        print_fov_as_relative(&fov, 10);
+        print_fov_as_absolute(&fov, 10);
         let rfov = fov.rasterized();
 
         let should_be_visible_relative_squares: StepSet =
@@ -1187,9 +1207,9 @@ mod tests {
             rfov.visible_absolute_squares()
         );
 
-        assert_eq!(rfov.fully_visible_local_relative_squares().len(), 1);
-        assert_eq!(rfov.fully_visible_relative_squares().len(), 1);
-        assert_eq!(rfov.visible_relative_squares().len(), radius as usize + 1);
+        assert_eq!(rfov.fully_visible_local_relative_squares().len(), 0);
+        assert_eq!(rfov.fully_visible_relative_squares().len(), 0);
+        assert_eq!(rfov.visible_relative_squares().len(), radius as usize);
         should_be_visible_relative_squares.iter().for_each(|step| {
             assert!(rfov.relative_square_is_visible(*step));
         });
