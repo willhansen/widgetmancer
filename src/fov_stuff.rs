@@ -695,19 +695,26 @@ fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: 
     });
 }
 
-pub fn print_fov_as_relative(fov: &FieldOfView, radius: u32) {
+pub fn debug_print_fov_as_relative(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, true)
 }
 
-pub fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
+pub fn debug_print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, false)
 }
 
-pub fn print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
-    let xmax = squares.iter().map(|c| c.x()).max().unwrap();
-    let xmin = squares.iter().map(|c| c.x()).min().unwrap();
-    let ymax = squares.iter().map(|c| c.y()).max().unwrap();
-    let ymin = squares.iter().map(|c| c.y()).min().unwrap();
+pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
+    let xmax = squares.iter().map(|c| c.x()).max().unwrap() + 1;
+    let xmin = squares.iter().map(|c| c.x()).min().unwrap() - 1;
+    let ymax = squares.iter().map(|c| c.y()).max().unwrap() + 1;
+    let ymin = squares.iter().map(|c| c.y()).min().unwrap() - 1;
+
+    let y_prefix_width = ymax.to_string().len().max(ymin.to_string().len());
+    let x_prefix_width = xmax.to_string().len().max(xmin.to_string().len());
+    let x_prefix_lines = (xmin..=xmax)
+        .into_iter()
+        .map(|x| format!("{x:>x_prefix_width$}"))
+        .transpose();
 
     (ymin..=ymax).for_each(|y| {
         let line_string: String = (xmin..=xmax)
@@ -729,7 +736,8 @@ pub fn print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
                 }
             })
             .collect();
-        println!("{}", line_string);
+        let prefix_string: String = format!("{y:>prefix_width$}");
+        println!("{}{}{}", prefix_string, line_string, y);
     })
 }
 
@@ -1276,6 +1284,8 @@ mod tests {
         );
         let fov_result = angle_based_fov_result.rasterized();
 
+        debug_print_square_set(&fov_result.visible_relative_squares());
+
         assert_eq!(angle_based_fov_result.transformed_sub_fovs.len(), 1);
         // Not fully visible because only one octant
         assert!(fov_result.relative_square_is_visible(STEP_RIGHT * 2));
@@ -1739,7 +1749,7 @@ mod tests {
         let fov =
             portal_aware_field_of_view_from_square(player_square, 5, &blocks, &Default::default());
 
-        print_fov_as_relative(&fov, 5);
+        debug_print_fov_as_relative(&fov, 5);
         rel_blocks.iter().for_each(|rel_block| {
             assert!(
                 fov.rasterized()
@@ -1761,7 +1771,7 @@ mod tests {
             &Default::default(),
             &Default::default(),
         );
-        print_fov_as_relative(&new_fov_result, 2);
+        debug_print_fov_as_relative(&new_fov_result, 2);
         let rasterized_fov = new_fov_result.rasterized();
         let test_step = STEP_RIGHT;
         let visibilities_of_one_right = rasterized_fov
@@ -1833,7 +1843,7 @@ mod tests {
             &portal_geometry,
         );
 
-        print_fov_as_relative(&new_fov_result, 7);
+        debug_print_fov_as_relative(&new_fov_result, 7);
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
         let test_square = STEP_UP_RIGHT;
@@ -1884,8 +1894,8 @@ mod tests {
         //     &portal_geometry,
         // );
 
-        print_fov_as_relative(&new_fov_result, 10);
-        print_fov_as_absolute(&new_fov_result, 10);
+        debug_print_fov_as_relative(&new_fov_result, 10);
+        debug_print_fov_as_absolute(&new_fov_result, 10);
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
 

@@ -2400,7 +2400,7 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::print_fov_as_absolute;
+    use crate::fov_stuff::debug_print_fov_as_absolute;
     use crate::fov_stuff::rasterized_field_of_view::TopDownPortal;
     use crate::fov_stuff::square_visibility::SquareVisibility;
     use ::num::integer::Roots;
@@ -3973,7 +3973,7 @@ mod tests {
 
         let fov = game.player_field_of_view();
 
-        print_fov_as_absolute(&fov, 5);
+        debug_print_fov_as_absolute(&fov, 5);
 
         test_steps_in_world_top_to_bottom
             .iter()
