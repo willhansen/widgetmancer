@@ -116,7 +116,7 @@ macro_rules! coordinatify {
 coordinatify!(Vector2D);
 coordinatify!(Point2D);
 
-trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32>);
+trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 

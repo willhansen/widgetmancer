@@ -373,7 +373,6 @@ impl FieldOfView {
     pub fn rasterized(&self) -> RasterizedFieldOfView {
         // rasterize top level
         let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
-        // dbg!(&self.visible_segments_in_main_view_only, &combined);
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let portal_transform = self.view_transform_to(sub_fov);
@@ -381,13 +380,9 @@ impl FieldOfView {
 
             // let rasterized_and_relocalized_sub_fov = rasterized_sub_fov
             //     .as_seen_through_portal_from_other_view_root(combined.view_root, portal_transform);
-            // dbg!(
-            //     "asdf",
-            //     rasterized_sub_fov.visible_relative_squares(),
             //     // rasterized_and_relocalized_sub_fov.visible_relative_squares()
             // );
             // combined = combined.combined_with(&rasterized_and_relocalized_sub_fov);
-            // dbg!(&sub_fov, &rasterized_sub_fov);
             combined = combined.combined_with(&rasterized_sub_fov);
         });
         combined
@@ -708,22 +703,33 @@ pub fn print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, false)
 }
 
-pub fn print_square_set(squares: &HashSet<impl GridCoordinate>) {
+pub fn print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
     let xmax = squares.iter().map(|c| c.x()).max().unwrap();
     let xmin = squares.iter().map(|c| c.x()).min().unwrap();
     let ymax = squares.iter().map(|c| c.y()).max().unwrap();
     let ymin = squares.iter().map(|c| c.y()).min().unwrap();
 
     (ymin..=ymax).for_each(|y| {
-        // using `with_capacity` instead of `new` probably isn't worth it...
-        let string: String = String::with_capacity((xmax - xmin + 1) as usize);
-        (xmin..=xmax).for_each(|x| {
-            if squares.contains((x, y).into().as_ref()) {
-                todo!();
-            }
-
-            todo!();
-        })
+        let line_string: String = (xmin..=xmax)
+            .map(|x| {
+                if squares.contains(&T::new(x, y)) {
+                    String::from_iter([FULL_BLOCK].repeat(2))
+                } else if x % 5 == 0 {
+                    if y % 5 == 0 {
+                        "+-".to_string()
+                    } else {
+                        "| ".to_string()
+                    }
+                } else {
+                    if y % 5 == 0 {
+                        "--".to_string()
+                    } else {
+                        "  ".to_string()
+                    }
+                }
+            })
+            .collect();
+        println!("{}", line_string);
     })
 }
 
@@ -1184,9 +1190,6 @@ mod tests {
             view_arc,
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
         );
-        // dbg!(&fov);
-        print_fov_as_relative(&fov, 10);
-        print_fov_as_absolute(&fov, 10);
         let rfov = fov.rasterized();
 
         let should_be_visible_relative_squares: StepSet =
@@ -1198,14 +1201,8 @@ mod tests {
         let squares_after_portal = radius - (dx_to_portal_square.abs() as u32 + 1);
         let should_be_visible_after_portal: SquareSet = (0..squares_after_portal as i32)
             .into_iter()
-            .map(|dy| exit_pose.square() + STEP_DOWN * dy)
+            .map(|dx| exit_pose.square() + STEP_RIGHT * dx)
             .collect();
-
-        dbg!(
-            rfov.visible_relative_squares(),
-            rfov.visible_local_relative_squares(),
-            rfov.visible_absolute_squares()
-        );
 
         assert_eq!(rfov.fully_visible_local_relative_squares().len(), 0);
         assert_eq!(rfov.fully_visible_relative_squares().len(), 0);
@@ -1462,7 +1459,6 @@ mod tests {
         // Non-deterministic test
         // TODO: remove outer loop when deterministic
         (0..100).foreach(|i| {
-            // dbg!(i);
             (0..5).for_each(|dy| {
                 let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
                 let absolute_fov_center_square = point2(5, 5);
@@ -1479,7 +1475,6 @@ mod tests {
                     .iter()
                     .map(FieldOfView::rasterized)
                     .for_each(|rasterized_fov| {
-                        // dbg!(&rasterized_fov);
                         assert!(rasterized_fov.relative_square_is_only_partially_visible(
                             relative_fully_visible_square
                         ));
@@ -1646,8 +1641,6 @@ mod tests {
         fov.transformed_sub_fovs.push(sub_fov);
 
         let rfov = fov.rasterized();
-
-        dbg!(&rfov);
 
         assert_eq!(
             rfov.absolute_squares_visible_at_relative_square(rel_square),
@@ -2010,7 +2003,6 @@ mod tests {
         let mut fov = FieldOfView::new_empty_fov_at((5, 7));
         fov.visible_segments_in_main_view_only.push(view_segment);
         let rfov = fov.rasterized();
-        dbg!(&fov, &rfov);
         assert_eq!(rfov.visible_relative_squares(), as_set([(4, 0), (5, 0)]));
     }
 }
