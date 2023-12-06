@@ -181,6 +181,11 @@ pub fn get_column<const ROWS: usize, const COLS: usize, T: Copy>(
 ) -> [T; ROWS] {
     a.map(|row| row[col])
 }
+pub fn transpose<T: Copy>(a: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    (0..a[0].len())
+        .map(|col| (0..a.len()).map(|row| a[row][col]).collect())
+        .collect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -236,5 +241,12 @@ mod tests {
     #[test]
     fn test_get_column() {
         assert_eq!(get_column(&[[1, 2, 3], [4, 5, 6],], 1), [2, 5]);
+    }
+    #[test]
+    fn test_transposed() {
+        let v = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let vt = vec![vec![1, 4], vec![2, 5], vec![3, 6]];
+        assert_eq!(transpose(v.clone()), vt);
+        assert_eq!(transpose(vt), v);
     }
 }

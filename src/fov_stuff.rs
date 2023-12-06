@@ -711,10 +711,40 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
 
     let y_prefix_width = ymax.to_string().len().max(ymin.to_string().len());
     let x_prefix_width = xmax.to_string().len().max(xmin.to_string().len());
-    let x_prefix_lines = (xmin..=xmax)
+    let top_bottom_x_marker_columns = [true, false].map(|is_top| {
+        intersperse(
+            (xmin..=xmax).into_iter().map(|x| {
+                if is_top {
+                    format!("{x:>x_prefix_width$}")
+                } else {
+                    format!("{x:<x_prefix_width$}")
+                }
+                .chars()
+                .collect_vec()
+            }),
+            vec![' '; x_prefix_width],
+        )
+        .collect_vec()
+    });
+
+    let top_bottom_x_lines: [Vec<Vec<char>>; 2] =
+        top_bottom_x_marker_columns
+            .map(transpose)
+            .map(|label_group| {
+                label_group
+                    .into_iter()
+                    .map(|row| {
+                        let mut v = vec![' '; y_prefix_width];
+                        v.extend(row);
+                        v
+                    })
+                    .collect_vec()
+            });
+
+    let [x_prefix_lines, x_postfix_lines] = top_bottom_x_lines;
+    x_prefix_lines
         .into_iter()
-        .map(|x| format!("{x:>x_prefix_width$}"))
-        .transpose();
+        .for_each(|x_line| println!("{:>y_prefix_width$}", String::from_iter(x_line)));
 
     (ymin..=ymax).for_each(|y| {
         let line_string: String = (xmin..=xmax)
@@ -736,9 +766,12 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
                 }
             })
             .collect();
-        let prefix_string: String = format!("{y:>prefix_width$}");
+        let prefix_string: String = format!("{y:>y_prefix_width$}");
         println!("{}{}{}", prefix_string, line_string, y);
-    })
+    });
+    x_postfix_lines
+        .into_iter()
+        .for_each(|x_line| println!("{:>y_prefix_width$}", String::from_iter(x_line)));
 }
 
 #[cfg(test)]
