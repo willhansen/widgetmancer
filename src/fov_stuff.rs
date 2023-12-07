@@ -708,6 +708,8 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
     let xmin = squares.iter().map(|c| c.x()).min().unwrap() - 1;
     let ymax = squares.iter().map(|c| c.y()).max().unwrap() + 1;
     let ymin = squares.iter().map(|c| c.y()).min().unwrap() - 1;
+    assert!(xmax - xmin < 500);
+    assert!(ymax - ymin < 500);
 
     let y_prefix_width = ymax.to_string().len().max(ymin.to_string().len());
     let x_prefix_width = xmax.to_string().len().max(xmin.to_string().len());
@@ -746,7 +748,7 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
         .into_iter()
         .for_each(|x_line| println!("{:>y_prefix_width$}", String::from_iter(x_line)));
 
-    (ymin..=ymax).for_each(|y| {
+    (ymin..=ymax).map(|y| (y - ymin) * -1 + ymax).for_each(|y| {
         let line_string: String = (xmin..=xmax)
             .map(|x| {
                 if squares.contains(&T::new(x, y)) {
@@ -1317,7 +1319,10 @@ mod tests {
         );
         let fov_result = angle_based_fov_result.rasterized();
 
+        debug_print_fov_as_absolute(&angle_based_fov_result, 5);
+        debug_print_fov_as_relative(&angle_based_fov_result, 5);
         debug_print_square_set(&fov_result.visible_relative_squares());
+        debug_print_square_set(&fov_result.visible_absolute_squares());
 
         assert_eq!(angle_based_fov_result.transformed_sub_fovs.len(), 1);
         // Not fully visible because only one octant
