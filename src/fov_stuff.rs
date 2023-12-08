@@ -1207,7 +1207,7 @@ mod tests {
     }
 
     #[test]
-    fn test_really_narrow_fov_through_a_portal() {
+    fn test_narrow_fov_through_portal__no_turn() {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(10, 20);
         let dx_to_portal_square = 3;
@@ -1217,19 +1217,13 @@ mod tests {
 
         portal_geometry.create_portal(entrance_pose, exit_pose);
 
-        let clockwise_end_in_degrees = 0.1;
-        let view_arc = AngleInterval::from_degrees(
-            clockwise_end_in_degrees,
-            clockwise_end_in_degrees + NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES * 2.0,
-        );
-
         let radius = 10;
         let fov = field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portal_geometry,
             SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP),
             radius,
-            view_arc,
+            narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
         );
         let rfov = fov.rasterized();
@@ -1266,6 +1260,43 @@ mod tests {
                 square.to_string()
             );
         });
+    }
+    fn narrow_arc_to_right() -> AngleInterval {
+        AngleInterval::from_degrees(
+            -NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES,
+            NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES,
+        )
+    }
+    fn narrow_arc_to_right_in_first_octant() -> AngleInterval {
+        let clockwise_end_in_degrees = 0.1;
+        AngleInterval::from_degrees(
+            clockwise_end_in_degrees,
+            clockwise_end_in_degrees + NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES * 2.0,
+        )
+    }
+
+    #[test]
+    fn test_narrow_fov_through_portal__with_turn() {
+        let portals = PortalGeometry::new().with_portal((3, 2, STEP_RIGHT), (5, 1, STEP_DOWN));
+        let fov = field_of_view_within_arc_in_single_octant(
+            &Default::default(),
+            &portals,
+            SquareWithOrthogonalDir::from_square_and_step((0, 2), DEFAULT_FOV_ROOT_DIRECTION),
+            5,
+            narrow_arc_to_right_in_first_octant(),
+            OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
+        );
+        let rfov = fov.rasterized();
+        debug_print_square_set(&rfov.visible_relative_squares());
+        debug_print_square_set(&rfov.visible_absolute_squares());
+        assert_eq!(
+            rfov.visible_relative_squares(),
+            as_set([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)])
+        );
+        assert_eq!(
+            rfov.visible_absolute_squares(),
+            as_set([(1, 2), (2, 2), (3, 2), (5, 1), (5, 0)])
+        );
     }
 
     #[test]

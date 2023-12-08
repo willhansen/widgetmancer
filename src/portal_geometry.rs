@@ -42,17 +42,32 @@ impl Portal {
     }
 }
 
-#[derive(Constructor, Default, Debug)]
+#[derive(Default, Debug)]
 pub struct PortalGeometry {
     portal_exits_by_entrance: HashMap<SquareWithOrthogonalDir, SquareWithOrthogonalDir>,
 }
 
 impl PortalGeometry {
+    pub fn new() -> Self {
+        PortalGeometry {
+            portal_exits_by_entrance: Default::default(),
+        }
+    }
+    pub fn with_portal(
+        mut self,
+        entrance_step: impl Into<SquareWithOrthogonalDir>,
+        exit_step: impl Into<SquareWithOrthogonalDir>,
+    ) -> Self {
+        self.create_portal(entrance_step, exit_step);
+        self
+    }
     pub fn create_portal(
         &mut self,
-        entrance_step: SquareWithOrthogonalDir,
-        exit_step: SquareWithOrthogonalDir,
+        entrance_step: impl Into<SquareWithOrthogonalDir>,
+        exit_step: impl Into<SquareWithOrthogonalDir>,
     ) {
+        let entrance_step = entrance_step.into();
+        let exit_step = exit_step.into();
         assert_false!(self.portal_exits_by_entrance.contains_key(&entrance_step));
         self.portal_exits_by_entrance
             .insert(entrance_step, exit_step);
@@ -317,10 +332,7 @@ mod tests {
     #[test]
     fn test_ray_through_portal() {
         let mut portal_geometry = PortalGeometry::default();
-        portal_geometry.create_portal(
-            (WorldSquare::new(3, 3), STEP_UP).into(),
-            (WorldSquare::new(6, 5), STEP_RIGHT).into(),
-        );
+        portal_geometry.create_portal((3, 3, STEP_UP), (6, 5, STEP_RIGHT));
         let ray_segments =
             portal_geometry.ray_to_naive_line_segments(point2(3.0, 2.0), Angle::degrees(90.0), 5.0);
         let correct_points = vec![
@@ -372,10 +384,7 @@ mod tests {
     #[test]
     fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
         let mut portal_geometry = PortalGeometry::default();
-        portal_geometry.create_portal(
-            (WorldSquare::new(3, 3), STEP_UP).into(),
-            (WorldSquare::new(6, 5), STEP_RIGHT).into(),
-        );
+        portal_geometry.create_portal((3, 3, STEP_UP), (6, 5, STEP_RIGHT));
         let segments =
             portal_geometry.ray_to_naive_line_segments(point2(3.0, 3.0), Angle::degrees(90.0), 1.0);
         let squares = segments
