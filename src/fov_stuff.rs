@@ -52,6 +52,8 @@ type Pose = SquareWithOrthogonalDir;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
+const DEFAULT_FOV_ROOT_DIRECTION: WorldStep = STEP_UP;
+
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
@@ -626,7 +628,7 @@ pub fn single_octant_field_of_view(
     let fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP),
+        SquareWithOrthogonalDir::from_square_and_step(center_square, DEFAULT_FOV_ROOT_DIRECTION),
         radius,
         AngleInterval::from_octant(octant),
         OctantFOVSquareSequenceIter::new_from_center(octant),
@@ -753,18 +755,15 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
             .map(|x| {
                 if squares.contains(&T::new(x, y)) {
                     String::from_iter([FULL_BLOCK].repeat(2))
-                } else if x % 5 == 0 {
-                    if y % 5 == 0 {
-                        "+-".to_string()
-                    } else {
-                        "| ".to_string()
-                    }
                 } else {
-                    if y % 5 == 0 {
-                        "--".to_string()
-                    } else {
-                        "  ".to_string()
+                    match (x.rem_euclid(5), y.rem_euclid(5)) {
+                        (0, 0) => "┼╴",
+                        // (2, 2) => ". ",
+                        (0, _) => "| ",
+                        (_, 0) => "╶╴", //─
+                        (_, _) => "  ",
                     }
+                    .to_string()
                 }
             })
             .collect();
@@ -1317,6 +1316,7 @@ mod tests {
             &Default::default(),
             &portal_geometry,
         );
+        dbg!(&angle_based_fov_result);
         let fov_result = angle_based_fov_result.rasterized();
 
         debug_print_fov_as_absolute(&angle_based_fov_result, 5);
