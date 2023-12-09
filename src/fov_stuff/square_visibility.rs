@@ -78,7 +78,7 @@ impl SquareVisibilityFromOneLargeShadow {
             Line::new(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
-                    .rotated_ccw(1)
+                    .quarter_rotated_ccw(1)
                     .to_point()
                     .cast_unit(),
             ),
@@ -291,11 +291,11 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         Self {
             visible_portion: self
                 .visible_portion
-                .map(|half_plane| half_plane.rotated_ccw(quarter_turns_ccw)),
+                .map(|half_plane| half_plane.quarter_rotated_ccw(quarter_turns_ccw)),
         }
     }
 }
@@ -338,13 +338,13 @@ impl PartialSquareVisibilityFromPointSource {
 }
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
             .visibility_switch_angles_going_ccw
             .iter()
-            .map(|angle: &Angle<f32>| angle.rotated_ccw(quarter_turns_ccw))
+            .map(|angle: &Angle<f32>| angle.quarter_rotated_ccw(quarter_turns_ccw))
             .collect_vec();
         the_clone
     }

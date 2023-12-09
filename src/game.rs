@@ -4241,7 +4241,7 @@ mod tests {
     fn test_player_diagonal_step_around_adjacent_portal() {
         for orthodir in ORTHOGONAL_STEPS {
             [-1, 1].into_iter().for_each(|i| {
-                let otherdir = orthodir.rotated_ccw(i);
+                let otherdir = orthodir.quarter_rotated_ccw(i);
                 let diagdir = orthodir + otherdir;
 
                 let mut game = set_up_nxm_game(10, 25);
@@ -4265,7 +4265,7 @@ mod tests {
     fn test_player_diagonal_step_into_off_adjacent_portal() {
         for orthodir in ORTHOGONAL_STEPS {
             for i in [-1, 1] {
-                let strafedir = orthodir.rotated_ccw(i);
+                let strafedir = orthodir.quarter_rotated_ccw(i);
                 let diagdir = orthodir + strafedir;
 
                 let mut game = set_up_nxm_game(10, 25);
@@ -4289,7 +4289,7 @@ mod tests {
 
     fn test_player_diagonal_step_into_matching_convex_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
-            let right_orthodir = left_orthodir.rotated_ccw(-1);
+            let right_orthodir = left_orthodir.quarter_rotated_ccw(-1);
             let diagonaldir = left_orthodir + right_orthodir;
             let mut game = set_up_10x10_game();
             let start_square = point2(5, 5);
@@ -4319,7 +4319,7 @@ mod tests {
 
     fn test_player_diagonal_step_into_mismatched_convex_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
-            let right_orthodir = left_orthodir.rotated_ccw(-1);
+            let right_orthodir = left_orthodir.quarter_rotated_ccw(-1);
             let diagonaldir = left_orthodir + right_orthodir;
             let mut game = set_up_10x10_game();
             let start_square = point2(5, 5);
@@ -4350,7 +4350,7 @@ mod tests {
 
     fn test_player_diagonal_step_into_matching_concave_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
-            let right_orthodir = left_orthodir.rotated_ccw(-1);
+            let right_orthodir = left_orthodir.quarter_rotated_ccw(-1);
             let diagonaldir = left_orthodir + right_orthodir;
             let mut game = set_up_10x10_game();
             let start_square = point2(5, 5);
@@ -4376,7 +4376,7 @@ mod tests {
 
     fn test_player_diagonal_step_into_mismatched_concave_corner_portal() {
         for left_orthodir in ORTHOGONAL_STEPS {
-            let right_orthodir = left_orthodir.rotated_ccw(-1);
+            let right_orthodir = left_orthodir.quarter_rotated_ccw(-1);
             let diagonaldir = left_orthodir + right_orthodir;
             let mut game = set_up_10x10_game();
             let start_square = point2(5, 5);

@@ -180,7 +180,7 @@ impl PortalGeometry {
                     let second_x_portal = maybe_second_x_portal.unwrap();
                     // if the second portal is only on the x side, the player steps in the y direction to go through it, but then they need to go left or right on the other side to get to the real destination.
                     // step through, but turn left or right?
-                    let y_dir_to_x_dir_is_left = y_step.rotated_ccw(1) == x_step;
+                    let y_dir_to_x_dir_is_left = y_step.quarter_rotated_ccw(1) == x_step;
 
                     let turn_after_portal = if y_dir_to_x_dir_is_left { 1 } else { -1 };
 
@@ -188,7 +188,7 @@ impl PortalGeometry {
                         .exit
                         .direction()
                         .step()
-                        .rotated_ccw(turn_after_portal);
+                        .quarter_rotated_ccw(turn_after_portal);
 
                     let dest_square = second_x_portal.exit.square();
                     let dest_dir =
@@ -200,7 +200,7 @@ impl PortalGeometry {
                     ))
                 } else if maybe_second_y_portal.is_some() && maybe_second_x_portal.is_none() {
                     let second_y_portal = maybe_second_y_portal.unwrap();
-                    let x_dir_to_y_dir_is_left = x_step.rotated_ccw(1) == y_step;
+                    let x_dir_to_y_dir_is_left = x_step.quarter_rotated_ccw(1) == y_step;
 
                     let turn_after_portal = if x_dir_to_y_dir_is_left { 1 } else { -1 };
 
@@ -208,7 +208,7 @@ impl PortalGeometry {
                         .exit
                         .direction()
                         .step()
-                        .rotated_ccw(turn_after_portal);
+                        .quarter_rotated_ccw(turn_after_portal);
 
                     let dest_square = second_y_portal.exit.square();
                     let dest_dir =

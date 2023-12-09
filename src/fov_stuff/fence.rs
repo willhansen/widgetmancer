@@ -7,7 +7,7 @@ use ordered_float::OrderedFloat;
 use crate::rotated_to_have_split_at_max;
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinates::{about_eq_2d, FAngle};
+use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
 use crate::utility::general_utility::all_true;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};

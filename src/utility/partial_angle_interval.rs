@@ -52,6 +52,7 @@ impl DirectionalAngularEdge {
     }
 }
 
+#[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialAngleInterval {
@@ -74,6 +75,17 @@ impl RigidlyTransformable for PartialAngleInterval {
         self.rotated_quarter_turns(tf.rotation())
     }
 }
+
+// TODO: remove this if portrait works
+// impl QuarterTurnRotatable for PartialAngleInterval {
+//     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+//         let quarter_turns = quarter_turns.into();
+//         PartialAngleInterval {
+//             clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
+//             anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),
+//         }
+//     }
+// }
 
 impl PartialAngleInterval {
     #[deprecated(note = "don't use defaults in utility module")]
@@ -164,8 +176,9 @@ impl PartialAngleInterval {
             rel_face.into().into();
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.step().to_f32() / 2.0;
-        let face_corners = [1, -1]
-            .map(|sign| face_center + (face_direction.step().to_f32() / 2.0).rotated_ccw(sign));
+        let face_corners = [1, -1].map(|sign| {
+            face_center + (face_direction.step().to_f32() / 2.0).quarter_rotated_ccw(sign)
+        });
 
         let center_angle = better_angle_from_x_axis(face_center);
         let face_corner_angles = face_corners.map(better_angle_from_x_axis);
@@ -427,11 +440,7 @@ impl PartialAngleInterval {
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
     pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<QuarterTurnsCcw>) -> Self {
-        let quarter_turns = quarter_turns.into();
-        PartialAngleInterval {
-            clockwise_end: quarter_turns.rotate_angle(self.clockwise_end),
-            anticlockwise_end: quarter_turns.rotate_angle(self.anticlockwise_end),
-        }
+        self.quarter_rotated_ccw(quarter_turns)
     }
     pub fn rotated_ccw(&self, d_angle: Angle<f32>) -> Self {
         PartialAngleInterval::from_angles(

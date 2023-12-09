@@ -54,6 +54,7 @@ const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 const DEFAULT_FOV_ROOT_DIRECTION: WorldStep = STEP_UP;
 
+#[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
@@ -450,8 +451,8 @@ impl OctantFOVSquareSequenceIter {
     // todo: change to implementation of QuarterTurnRotatable trait
     pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         Self {
-            outward_dir: self.outward_dir.rotated_ccw(quarter_turns),
-            across_dir: self.across_dir.rotated_ccw(quarter_turns),
+            outward_dir: self.outward_dir.quarter_rotated_ccw(quarter_turns),
+            across_dir: self.across_dir.quarter_rotated_ccw(quarter_turns),
             ..self.clone()
         }
     }
@@ -563,7 +564,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 view_root_pose.apply_rigid_transform(portal_transform_to_sub_fov);
             // need to rotate back to standard for compatibility with the sight blockers and portal geometry.
             let sub_fov_view_root_with_standardized_orientation =
-                sub_fov_view_root.rotated_ccw(-portal_transform_to_sub_fov.rotation());
+                sub_fov_view_root.quarter_rotated_ccw(-portal_transform_to_sub_fov.rotation());
             // in a relative view, the portal exit is the same line as the portal entrance
             let back_of_portal_entrance_in_local_frame: RelativeSquareWithOrthogonalDir =
                 relative_face.stepped().turned_back();
@@ -577,7 +578,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                     portal_geometry,
                     sub_fov_view_root_with_standardized_orientation,
                     radius,
-                    visible_arc_of_face.rotated_ccw(portal_transform_to_sub_fov.rotation()),
+                    visible_arc_of_face.quarter_rotated_ccw(portal_transform_to_sub_fov.rotation()),
                     steps_in_octant_iter.rotated(portal_transform_to_sub_fov.rotation()),
                 )
                 .with_weakly_applied_start_line(relative_portal_exit_in_local_frame);
