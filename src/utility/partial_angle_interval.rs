@@ -485,7 +485,7 @@ impl PartialAngleInterval {
     ) -> impl Iterator<Item = Option<WorldStep>> {
         assert!(self.is_in_one_octant(), "self: {:?}", self);
         let squares_in_octant_iter =
-            OctantFOVSquareSequenceIter::new_from_center(self.lone_containing_octant().unwrap());
+            OctantFOVSquareSequenceIter::new_from_center(self.octant().unwrap());
         let cloned_arc = self.clone();
         let squares_in_arc_iter = squares_in_octant_iter.map(move |step| {
             if step == STEP_ZERO {
@@ -506,9 +506,9 @@ impl PartialAngleInterval {
         is_smaller_than_octant && both_ends_near_boundaries
     }
     pub fn is_in_one_octant(&self) -> bool {
-        self.lone_containing_octant().is_some()
+        self.octant().is_some()
     }
-    fn lone_containing_octant(&self) -> Option<Octant> {
+    pub fn octant(&self) -> Option<Octant> {
         Octant::all_octants_going_ccw().find(|octant| {
             Self::from_octant(*octant)
                 .contains_partial_arc(*self, Self::default_tolerance())
@@ -625,7 +625,7 @@ mod tests {
     fn test_get_containing_octant__exact_octant() {
         assert_eq!(
             PartialAngleInterval::from_degrees(0.0, 45.0)
-                .lone_containing_octant()
+                .octant()
                 .unwrap()
                 .number(),
             0
@@ -635,7 +635,7 @@ mod tests {
     fn test_get_containing_octant__in_one() {
         assert_eq!(
             PartialAngleInterval::from_degrees(100.0, 120.0)
-                .lone_containing_octant()
+                .octant()
                 .unwrap()
                 .number(),
             2
@@ -644,13 +644,13 @@ mod tests {
     #[test]
     fn test_get_containing_octant__not_in_an_octant() {
         assert!(PartialAngleInterval::from_degrees(0.0, 120.0)
-            .lone_containing_octant()
+            .octant()
             .is_none());
     }
     #[test]
     fn test_get_containing_octant__wraparound_case() {
         assert!(PartialAngleInterval::from_degrees(-10.0, -20.0)
-            .lone_containing_octant()
+            .octant()
             .is_none());
     }
     #[test]

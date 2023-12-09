@@ -478,15 +478,15 @@ impl Iterator for OctantFOVSquareSequenceIter {
 pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
-    oriented_center_square: SquareWithOrthogonalDir,
+    view_root_pose: SquareWithOrthogonalDir,
     radius: u32,
     view_arc: AngleInterval,
     mut steps_in_octant_iter: OctantFOVSquareSequenceIter,
 ) -> FieldOfView {
     let tolerance = FAngle::degrees(0.001); // TODO: standardize
     assert!(view_arc.is_in_one_octant());
-    let mut fov_result = FieldOfView::new_empty_fov_with_root(oriented_center_square);
-    let octant = steps_in_octant_iter.octant();
+    let mut fov_result = FieldOfView::new_empty_fov_with_root(view_root_pose);
+    assert_eq!(steps_in_octant_iter.octant(), view_arc.octant().unwrap());
 
     loop {
         let relative_square = steps_in_octant_iter.next().unwrap();
@@ -500,7 +500,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             steps_in_octant_iter.outward_dir,
             steps_in_octant_iter.across_dir,
         ];
-        let absolute_square = oriented_center_square.square() + relative_square;
+        let absolute_square = view_root_pose.square() + relative_square;
 
         let mut view_blocking_arc_for_this_square: AngleInterval = AngleInterval::Empty;
         for face_direction in face_directions {
@@ -558,22 +558,31 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .get_portal_by_entrance(absolute_face)
                 .unwrap();
 
-            let transform = portal.get_transform();
-            let transformed_center = oriented_center_square.apply_rigid_transform(transform);
+            let portal_transform_to_sub_fov = portal.get_transform();
+            let sub_fov_view_root =
+                view_root_pose.apply_rigid_transform(portal_transform_to_sub_fov);
+            // need to rotate back to standard for compatibility with the sight blockers and portal geometry.
+            let sub_fov_view_root_with_standardized_orientation =
+                sub_fov_view_root.rotated_ccw(-portal_transform_to_sub_fov.rotation());
             // in a relative view, the portal exit is the same line as the portal entrance
-            let relative_portal_exit: RelativeSquareWithOrthogonalDir =
+            let back_of_portal_entrance_in_local_frame: RelativeSquareWithOrthogonalDir =
                 relative_face.stepped().turned_back();
-            let relative_portal_exit_in_sub_fov =
-                transform.transform_relative_pose(relative_portal_exit);
-            let sub_arc_fov = field_of_view_within_arc_in_single_octant(
-                sight_blockers,
-                portal_geometry,
-                transformed_center,
-                radius,
-                visible_arc_of_face.rotated_ccw(transform.rotation()),
-                steps_in_octant_iter.rotated(transform.rotation()),
-            )
-            .with_weakly_applied_start_line(relative_portal_exit_in_sub_fov);
+            let portal_exit_in_sub_fov_frame = back_of_portal_entrance_in_local_frame;
+            let relative_portal_exit_in_local_frame = portal_transform_to_sub_fov
+                .transform_relative_pose(back_of_portal_entrance_in_local_frame);
+            //todo!("sort out sub_fov rotations");
+            let sub_arc_fov_with_standardized_orientation =
+                field_of_view_within_arc_in_single_octant(
+                    sight_blockers,
+                    portal_geometry,
+                    sub_fov_view_root_with_standardized_orientation,
+                    radius,
+                    visible_arc_of_face.rotated_ccw(portal_transform_to_sub_fov.rotation()),
+                    steps_in_octant_iter.rotated(portal_transform_to_sub_fov.rotation()),
+                )
+                .with_weakly_applied_start_line(relative_portal_exit_in_local_frame);
+            let sub_arc_fov = sub_arc_fov_with_standardized_orientation
+                .rotated_ccw(-portal_transform_to_sub_fov.rotation());
             fov_result.transformed_sub_fovs.push(sub_arc_fov);
         }
         if view_blocking_arc_for_this_square.is_empty() {
@@ -591,7 +600,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                     sight_blockers,
                     portal_geometry,
-                    oriented_center_square,
+                    view_root_pose,
                     radius,
                     new_sub_arc,
                     steps_in_octant_iter,

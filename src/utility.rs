@@ -365,7 +365,7 @@ impl Default for RigidTransform {
     }
 }
 
-pub trait RigidlyTransformable {
+pub trait RigidlyTransformable: QuarterTurnRotatable {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
 }
 

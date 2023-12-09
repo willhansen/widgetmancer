@@ -98,9 +98,12 @@ impl AngleInterval {
     }
     // TODO: make a new type with this guarantee instead of checking
     pub fn is_in_one_octant(&self) -> bool {
+        self.octant().is_some()
+    }
+    pub fn octant(&self) -> Option<Octant> {
         match self {
-            AngleInterval::PartialArc(p) => p.is_in_one_octant(),
-            _ => false,
+            AngleInterval::PartialArc(p) => p.octant(),
+            _ => None,
         }
     }
     pub fn cw(&self) -> FAngle {
