@@ -278,7 +278,7 @@ impl RigidTransform {
 
         Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_as_seen_from_self(end))
     }
-    pub fn from_rotation(r: impl Into<QuarterTurnsCcw>) -> Self {
+    pub fn from_rotation(r: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         let p = ORIGIN_POSE();
         Self::from_start_and_end_poses(p, p.quarter_rotated_ccw(r))
     }

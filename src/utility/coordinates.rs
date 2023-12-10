@@ -380,7 +380,7 @@ impl KingWorldStep {
 }
 
 impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -423,7 +423,7 @@ impl OrthogonalWorldStep {
 }
 
 impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -598,7 +598,7 @@ impl From<i32> for QuarterTurnsCcw {
 }
 
 impl QuarterTurnRotatable for QuarterTurnsCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         *self + quarter_turns_ccw.into()
     }
 }
@@ -625,9 +625,9 @@ impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.iter()
-            .map(|&t| t.quarter_rotated_ccw(quarter_turns_ccw))
+            .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
     }
 }
@@ -636,13 +636,14 @@ impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self.map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+        self.as_ref()
+            .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
         ))
