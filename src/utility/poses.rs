@@ -230,7 +230,7 @@ impl<T: WorldGridCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
 impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         (
-            self.square,
+            self.square.quarter_rotated_ccw(quarter_turns_ccw),
             self.dir
                 .step()
                 .quarter_rotated_ccw(quarter_turns_ccw.into().quarter_turns()),

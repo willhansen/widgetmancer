@@ -71,6 +71,7 @@ where
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
+    fn is_relative(&self) -> bool;
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
@@ -83,7 +84,7 @@ where
 }
 
 macro_rules! coordinatify {
-    ($class:ident) => {
+    ($class:ident, $is_relative:ident) => {
         impl<T, U> Coordinate for $class<T, U>
         where
             // TODO: trait alias
@@ -110,12 +111,16 @@ macro_rules! coordinatify {
             fn new(x: T, y: T) -> Self {
                 Self::new(x, y)
             }
+
+            fn is_relative(&self) -> bool {
+                $is_relative
+            }
         }
     };
 }
 
-coordinatify!(Vector2D);
-coordinatify!(Point2D);
+coordinatify!(Vector2D, true);
+coordinatify!(Point2D, false);
 
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
@@ -379,6 +384,7 @@ impl KingWorldStep {
     }
 }
 
+// TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
@@ -422,6 +428,7 @@ impl OrthogonalWorldStep {
     }
 }
 
+// TODO: generate with macro
 impl QuarterTurnRotatable for OrthogonalWorldStep {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
@@ -621,6 +628,7 @@ pub trait QuarterTurnRotatable {
     }
 }
 
+// TODO: generate with macro
 impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
@@ -632,6 +640,7 @@ where
     }
 }
 
+// TODO: generate with macro
 impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
