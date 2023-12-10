@@ -52,7 +52,7 @@ impl DirectionalAngularEdge {
     }
 }
 
-#[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
+// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialAngleInterval {
@@ -70,6 +70,17 @@ impl Display for PartialAngleInterval {
         )
     }
 }
+// TODO: have a macro make this code
+impl QuarterTurnRotatable for PartialAngleInterval {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        Self::from_angles(
+            self.clockwise_end.quarter_rotated_ccw(quarter_turns_ccw),
+            self.anticlockwise_end
+                .quarter_rotated_ccw(quarter_turns_ccw),
+        )
+    }
+}
+// TODO: have a macro make this code
 impl RigidlyTransformable for PartialAngleInterval {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         self.rotated_quarter_turns(tf.rotation())

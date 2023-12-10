@@ -54,12 +54,26 @@ const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
 const DEFAULT_FOV_ROOT_DIRECTION: WorldStep = STEP_UP;
 
-#[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
+// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     root_square_with_direction: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
     transformed_sub_fovs: Vec<FieldOfView>,
+}
+
+// TODO: derive_delegate with portrait
+impl QuarterTurnRotatable for FieldOfView {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        FieldOfView::new(
+            self.root_square_with_direction
+                .quarter_rotated_ccw(quarter_turns_ccw),
+            self.visible_segments_in_main_view_only
+                .quarter_rotated_ccw(quarter_turns_ccw),
+            self.transformed_sub_fovs
+                .quarter_rotated_ccw(quarter_turns_ccw),
+        )
+    }
 }
 
 impl FieldOfView {
@@ -583,7 +597,7 @@ pub fn field_of_view_within_arc_in_single_octant(
                 )
                 .with_weakly_applied_start_line(relative_portal_exit_in_local_frame);
             let sub_arc_fov = sub_arc_fov_with_standardized_orientation
-                .rotated_ccw(-portal_transform_to_sub_fov.rotation());
+                .quarter_rotated_ccw(-portal_transform_to_sub_fov.rotation());
             fov_result.transformed_sub_fovs.push(sub_arc_fov);
         }
         if view_blocking_arc_for_this_square.is_empty() {

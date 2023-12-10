@@ -599,15 +599,15 @@ impl From<i32> for QuarterTurnsCcw {
 
 impl QuarterTurnRotatable for QuarterTurnsCcw {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self + quarter_turns_ccw.into()
+        *self + quarter_turns_ccw.into()
     }
 }
 
-#[portrait::make]
+#[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self;
-    #[portrait(derive_delegate(reduce = |x|x))]
+    #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
         Self: Sized + Debug,
@@ -637,7 +637,7 @@ where
     T: QuarterTurnRotatable,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        self.map(|&x| x.quarter_rotated_ccw(quarter_turns_ccw))
+        self.map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 

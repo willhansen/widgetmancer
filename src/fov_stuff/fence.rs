@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use portrait;
 
 use crate::rotated_to_have_split_at_max;
 
@@ -22,12 +23,20 @@ use crate::utility::{
     two_in_ccw_order, CoordToString, Quadrant, SimpleResult, STEP_ZERO,
 };
 
+// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,
 }
 
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
+
+// TODO: have a macro make this code
+impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        Self::from_faces_in_ccw_order(self.edges.quarter_rotated_ccw(quarter_turns_ccw))
+    }
+}
 
 impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<RelativeFace> {

@@ -10,7 +10,7 @@ extern crate std;
 extern crate termion;
 
 use std::io::{stdin, stdout, Write};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 

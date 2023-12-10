@@ -250,8 +250,8 @@ impl SquareWithOrthogonalDir {
         let naive_translation = other.square - self.square;
         let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
         Self::from_square_and_step(
-            naive_translation.to_point().rotated_ccw(rotation),
-            other.dir.rotated_ccw(rotation),
+            naive_translation.to_point().quarter_rotated_ccw(rotation),
+            other.dir.quarter_rotated_ccw(rotation),
         )
     }
     pub fn other_square_as_seen_from_self(&self, other: impl Into<WorldSquare>) -> WorldStep {

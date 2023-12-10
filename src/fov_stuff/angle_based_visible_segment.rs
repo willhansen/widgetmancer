@@ -18,12 +18,22 @@ use super::fence::{Fence, RelativeFenceFullyVisibleFromOriginGoingCcw};
 use super::square_visibility::RelativeSquareVisibilityFunctions;
 use super::NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES;
 
-#[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
+// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
     arc: AngleInterval,
     end_fence: RelativeFenceFullyVisibleFromOriginGoingCcw,
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
+}
+impl QuarterTurnRotatable for AngleBasedVisibleSegment {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        Self::new_with_optional_start_face(
+            self.arc.quarter_rotated_ccw(quarter_turns_ccw),
+            self.end_fence.quarter_rotated_ccw(quarter_turns_ccw),
+            self.start_internal_relative_face
+                .quarter_rotated_ccw(quarter_turns_ccw),
+        )
+    }
 }
 impl AngleBasedVisibleSegment {
     pub fn new(arc: impl Into<AngleInterval>, end_fence: impl Into<Fence>) -> Self {

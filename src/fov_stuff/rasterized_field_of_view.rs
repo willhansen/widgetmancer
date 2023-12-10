@@ -855,7 +855,7 @@ impl TopDownPortal {
         the_copy.target.portal_rotation_to_target = self
             .target
             .portal_rotation_to_target
-            .apply_rigid_transform(tf);
+            .quarter_rotated_ccw(tf.rotation());
         // the_copy.relative_position = self.relative_position + tf.translation();
         the_copy.relative_position = self.relative_position.apply_rigid_transform(tf);
         the_copy
