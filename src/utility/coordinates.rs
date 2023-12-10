@@ -67,11 +67,15 @@ where
 {
     type DataType;
     type UnitType;
+    const IS_RELATIVE: bool;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
     fn is_relative(&self) -> bool;
+    fn is_absolute(&self) -> bool {
+        !self.is_relative()
+    }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
@@ -87,7 +91,7 @@ macro_rules! coordinatify {
     ($class:ident, $is_relative:ident) => {
         impl<T, U> Coordinate for $class<T, U>
         where
-            // TODO: trait alias
+            // TODO: trait alias (note the template variables that complicate things)
             T: Copy
                 + PartialEq
                 + Add<Output = T>
@@ -99,6 +103,7 @@ macro_rules! coordinatify {
         {
             type DataType = T;
             type UnitType = U;
+            const IS_RELATIVE: bool = $is_relative;
 
             fn x(&self) -> T {
                 self.x
@@ -174,6 +179,10 @@ where
                    //     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        // TODO: do this with a trait bound on an associated constant instead of an "if"
+        if self.is_absolute() {
+            return *self;
+        }
         let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
         Self::new(
             self.x() * int_to_T(int_cos(quarter_turns))
