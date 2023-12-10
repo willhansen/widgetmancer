@@ -52,7 +52,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn quarter_rotated_ccw(&self, b: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, b: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         match self {
             Self::Text(a) => a.quarter_rotated_ccw(b).into(),
             Self::PartialVisibility(a) => a.quarter_rotated_ccw(b).into(),
@@ -86,7 +86,10 @@ impl TextDrawable {
 }
 
 impl QuarterTurnRotatable for TextDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         // lmao no
         self.clone().into()
     }
@@ -148,7 +151,10 @@ impl PartialVisibilityDrawable {
 }
 
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self
             .visibility
@@ -240,7 +246,10 @@ impl BrailleDrawable {
 }
 
 impl QuarterTurnRotatable for BrailleDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         let r = self
             .braille_array
             .quarter_rotated_ccw(quarter_turns_anticlockwise);
@@ -295,7 +304,10 @@ impl SolidColorDrawable {
 }
 
 impl QuarterTurnRotatable for SolidColorDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         self.clone().into()
     }
 }
@@ -352,7 +364,10 @@ impl ArrowDrawable {
 }
 
 impl QuarterTurnRotatable for ArrowDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         ArrowDrawable {
             direction: self
                 .direction
@@ -418,7 +433,10 @@ impl ConveyorBeltDrawable {
 }
 
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         ConveyorBeltDrawable {
             direction: self
                 .direction
@@ -506,7 +524,10 @@ impl OffsetSquareDrawable {
 }
 
 impl QuarterTurnRotatable for OffsetSquareDrawable {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.quarter_rotated_ccw(quarter_turns_anticlockwise),
             ..self.clone()

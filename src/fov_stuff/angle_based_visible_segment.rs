@@ -26,7 +26,7 @@ pub struct AngleBasedVisibleSegment {
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl QuarterTurnRotatable for AngleBasedVisibleSegment {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         Self::new_with_optional_start_face(
             self.arc.quarter_rotated_ccw(quarter_turns_ccw),
             self.end_fence.quarter_rotated_ccw(quarter_turns_ccw),

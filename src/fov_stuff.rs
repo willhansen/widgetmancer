@@ -64,7 +64,7 @@ pub struct FieldOfView {
 
 // TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         FieldOfView::new(
             self.root_square_with_direction
                 .quarter_rotated_ccw(quarter_turns_ccw),

@@ -606,7 +606,7 @@ impl QuarterTurnRotatable for QuarterTurnsCcw {
 #[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self;
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self;
     #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where

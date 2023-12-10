@@ -419,7 +419,10 @@ impl RigidlyTransformable for AngleInterval {
     }
 }
 impl QuarterTurnRotatable for AngleInterval {
-    fn quarter_rotated_ccw(&self, quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         match self {
             AngleInterval::PartialArc(partial_arc) => partial_arc
                 .rotated_quarter_turns(quarter_turns_anticlockwise)
