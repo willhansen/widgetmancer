@@ -591,7 +591,7 @@ impl RasterizedFieldOfView {
 
         // tf is relative to the new view root
         let tf_new_to_old =
-            RigidTransform::relative_transform_from_start_to_end(new_view_root, self.view_root);
+            RigidTransform::new_relative_transform_from_start_to_end(new_view_root, self.view_root);
 
         Self::from_top_down_portals(
             new_view_root,
