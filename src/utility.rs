@@ -253,6 +253,7 @@ impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
     }
 }
 
+// TODO: create a relative version of a rigid transform
 #[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
     start_pose: SquareWithOrthogonalDir,
@@ -269,7 +270,9 @@ impl RigidTransform {
             end_pose: end.into(),
         }
     }
-    pub fn relative_transform_from_start_to_end(
+    // Treats the start pose as the origin
+    // TODO: move to a relative version of a rigidtransform
+    pub fn new_relative_transform_from_start_to_end(
         start: impl Into<SquareWithOrthogonalDir>,
         end: impl Into<SquareWithOrthogonalDir>,
     ) -> Self {
@@ -371,7 +374,7 @@ impl Default for RigidTransform {
     }
 }
 
-pub trait RigidlyTransformable: QuarterTurnRotatable {
+pub trait RigidlyTransformable {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
 }
 
@@ -461,7 +464,7 @@ mod tests {
     fn test_relative_rigid_transform() {
         let start = (4, 3, STEP_LEFT);
         let end = (2, 2, STEP_RIGHT);
-        let rel_tf = RigidTransform::relative_transform_from_start_to_end(start, end);
+        let rel_tf = RigidTransform::new_relative_transform_from_start_to_end(start, end);
         assert_eq!(rel_tf.translation(), (-1, 2).into());
         assert_eq!(rel_tf.rotation(), 2.into());
     }

@@ -56,9 +56,14 @@ pub type FAngle = Angle<f32>;
 pub trait Coordinate:
     Copy
     + PartialEq
+    // + Add<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self, Output = Self::RelativeVersionOfSelf>
+
     + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
+
     + Mul<Self::DataType, Output = Self>
     + Zero
 //+ Debug
@@ -67,13 +72,34 @@ where
 {
     type DataType;
     type UnitType;
+    const IS_RELATIVE: bool;
+    type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
-    fn is_relative(&self) -> bool;
+    fn is_relative(&self) -> bool {
+        Self::IS_RELATIVE
+    }
+    fn is_absolute(&self) -> bool {
+        !self.is_relative()
+    }
+    fn as_relative(&self) -> Self::RelativeVersionOfSelf {
+        Self::RelativeVersionOfSelf::new(self.x(), self.y())
+    }
+    fn as_absolute(&self) -> Self::AbsoluteVersionOfSelf {
+        Self::AbsoluteVersionOfSelf::new(self.x(), self.y())
+    }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
+    }
+    // TODO: somehow shorten long parameter type
+    fn from_any_relativity(
+        other: impl Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>,
+    ) -> Self {
+        Self::new(other.x(), other.y())
     }
     fn is_vertical(&self) -> bool {
         self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
@@ -84,10 +110,10 @@ where
 }
 
 macro_rules! coordinatify {
-    ($class:ident, $is_relative:ident) => {
+    ($class:ident, $is_relative:ident, $relativity_complement:ident) => {
         impl<T, U> Coordinate for $class<T, U>
         where
-            // TODO: trait alias
+            // TODO: trait alias (note the template variables that complicate things)
             T: Copy
                 + PartialEq
                 + Add<Output = T>
@@ -99,6 +125,10 @@ macro_rules! coordinatify {
         {
             type DataType = T;
             type UnitType = U;
+            const IS_RELATIVE: bool = $is_relative;
+            type AbsoluteVersionOfSelf = Point2D<T, U>;
+            type RelativeVersionOfSelf = Vector2D<T, U>;
+            type RelativityComplement = $relativity_complement<T, U>;
 
             fn x(&self) -> T {
                 self.x
@@ -111,17 +141,28 @@ macro_rules! coordinatify {
             fn new(x: T, y: T) -> Self {
                 Self::new(x, y)
             }
-
-            fn is_relative(&self) -> bool {
-                $is_relative
-            }
         }
     };
 }
 
-coordinatify!(Vector2D, true);
-coordinatify!(Point2D, false);
+// TODO: clean this up
+coordinatify!(Vector2D, true, Point2D);
+coordinatify!(Point2D, false, Vector2D);
 
+// TODO: clean these up (with the trait alias macro?)
+pub trait AbsoluteCoordinate: Coordinate {}
+impl<COORD> AbsoluteCoordinate for COORD where
+    COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
+{
+}
+
+pub trait RelativeCoordinate: Coordinate {}
+impl<COORD> RelativeCoordinate for COORD where
+    COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
+{
+}
+
+trait_alias_macro!(pub trait FloatCoordinate = Coordinate<DataType = f32>);
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
@@ -174,6 +215,9 @@ where
                    //     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        // if self.is_absolute() {
+        //     return *self;
+        // }
         let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
         Self::new(
             self.x() * int_to_T(int_cos(quarter_turns))
@@ -950,5 +994,32 @@ mod tests {
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
                 .is_partial()
         )
+    }
+    #[test]
+    fn test_relative_and_absolute() {
+        let point = WorldPoint::new(4.0, 5.0);
+        let moov = WorldMove::new(4.0, 5.0);
+        let square = WorldSquare::new(4, 5);
+        let step = WorldStep::new(4, 5);
+
+        assert_true!(point.is_absolute());
+        assert_false!(point.is_relative());
+        assert_true!(moov.is_relative());
+        assert_false!(moov.is_absolute());
+
+        assert_true!(square.is_absolute());
+        assert_false!(square.is_relative());
+        assert_true!(step.is_relative());
+        assert_false!(step.is_absolute());
+
+        assert_eq!(point.as_relative(), moov);
+        assert_eq!(point.as_absolute(), point);
+        assert_eq!(moov.as_absolute(), point);
+        assert_eq!(moov.as_relative(), moov);
+
+        assert_eq!(square.as_relative(), step);
+        assert_eq!(square.as_absolute(), square);
+        assert_eq!(step.as_absolute(), square);
+        assert_eq!(step.as_relative(), step);
     }
 }

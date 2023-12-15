@@ -101,17 +101,30 @@ where
         self.strafed_right_n(-n)
     }
 
-    pub fn revolved(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    pub fn quarter_revolved_ccw_around_origin(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw>,
+    ) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         (
-            self.square.quarter_rotated_ccw(quarter_turns_ccw),
+            SquareType::from_any_relativity(
+                self.square
+                    .as_relative()
+                    .quarter_rotated_ccw(quarter_turns_ccw),
+            ),
             self.dir.quarter_rotated_ccw(quarter_turns_ccw),
         )
             .into()
     }
+    pub fn quarter_rotated_ccw_in_place(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
+        (self.square, self.dir.quarter_rotated_ccw(quarter_turns_ccw)).into()
+    }
     pub fn quadrant_revolutions_in_ccw_order(&self) -> [Self; 4] {
         (0..4)
-            .map(|i| self.revolved(i))
+            .map(|i| self.quarter_revolved_ccw_around_origin(i))
             .collect_vec()
             .try_into()
             .unwrap()
@@ -244,13 +257,16 @@ impl SquareWithOrthogonalDir {
         self.square.to_f32() + self.direction().step().to_f32() * 0.5
     }
 
+    // TODO: replace with just subtraction, returning whatever a relative pose is
     pub fn other_pose_as_seen_from_self(&self, other: impl Into<Self>) -> Self {
         let other = other.into();
 
-        let naive_translation = other.square - self.square;
+        let naive_translation: WorldStep = other.square - self.square;
         let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
         Self::from_square_and_step(
-            naive_translation.to_point().quarter_rotated_ccw(rotation),
+            naive_translation
+                .quarter_rotated_ccw(rotation)
+                .as_absolute(),
             other.dir.quarter_rotated_ccw(rotation),
         )
     }
@@ -582,17 +598,41 @@ mod tests {
     fn test_rotate_vs_revolve_a_face() {
         let rel_face: RelativeFace = (3, 5, STEP_UP).into();
 
-        assert_eq!(rel_face.quarter_rotated_ccw(1), (3, 5, STEP_LEFT).into());
-        assert_eq!(rel_face.revolved(1), (-5, 3, STEP_LEFT).into());
-        assert_eq!(rel_face.quarter_rotated_ccw(2), (3, 5, STEP_DOWN).into());
-        assert_eq!(rel_face.revolved(2), (-3, -5, STEP_DOWN).into());
+        assert_eq!(
+            rel_face.quarter_rotated_ccw_in_place(1),
+            (3, 5, STEP_LEFT).into()
+        );
+        assert_eq!(
+            rel_face.quarter_revolved_ccw_around_origin(1),
+            (-5, 3, STEP_LEFT).into()
+        );
+        assert_eq!(
+            rel_face.quarter_rotated_ccw_in_place(2),
+            (3, 5, STEP_DOWN).into()
+        );
+        assert_eq!(
+            rel_face.quarter_revolved_ccw_around_origin(2),
+            (-3, -5, STEP_DOWN).into()
+        );
 
         let abs_face: Face = (5, 1, STEP_LEFT).into();
 
-        assert_eq!(abs_face.quarter_rotated_ccw(-1), (5, 1, STEP_UP).into());
-        assert_eq!(abs_face.revolved(-1), (1, -5, STEP_UP).into());
-        assert_eq!(abs_face.quarter_rotated_ccw(2), (5, 1, STEP_RIGHT).into());
-        assert_eq!(abs_face.revolved(2), (-5, -1, STEP_RIGHT).into());
+        assert_eq!(
+            abs_face.quarter_rotated_ccw_in_place(-1),
+            (5, 1, STEP_UP).into()
+        );
+        assert_eq!(
+            abs_face.quarter_revolved_ccw_around_origin(-1),
+            (1, -5, STEP_UP).into()
+        );
+        assert_eq!(
+            abs_face.quarter_rotated_ccw_in_place(2),
+            (5, 1, STEP_RIGHT).into()
+        );
+        assert_eq!(
+            abs_face.quarter_revolved_ccw_around_origin(2),
+            (-5, -1, STEP_RIGHT).into()
+        );
     }
     #[test]
     fn test_square_relative_to_pose() {
@@ -609,12 +649,30 @@ mod tests {
             correct_rel_square
         );
     }
+
     #[test]
-    fn test_rotation_of_relative_versus_absolute_square_with_direction() {
-        let rel_pose: RelativeSquareWithOrthogonalDir = (4, 3, STEP_RIGHT).into();
-        let abs_pose: SquareWithOrthogonalDir = (4, 3, STEP_RIGHT).into();
+    fn test_rotation_of_relative_versus_absolute_square_with_direction__should_be_same() {
+        let base_tuple = (4, 3, STEP_RIGHT);
+        let abs_pose: SquareWithOrthogonalDir = base_tuple.into();
+        let rel_pose: RelativeSquareWithOrthogonalDir = base_tuple.into();
 
         assert_eq!(rel_pose.quarter_rotated_ccw(1), (-3, 4, STEP_UP).into());
-        assert_eq!(abs_pose.quarter_rotated_ccw(1), (4, 3, STEP_UP).into());
+        assert_eq!(
+            abs_pose.quarter_rotated_ccw(1),
+            rel_pose.quarter_rotated_ccw(1).as_absolute_face()
+        );
+    }
+    #[test]
+    fn test_rigid_transform_of_relative_versus_absolute_pose() {
+        let base_tuple = (4, 3, STEP_RIGHT);
+        let abs_pose: SquareWithOrthogonalDir = base_tuple.into();
+        let rel_pose: RelativeSquareWithOrthogonalDir = base_tuple.into();
+        let tf = RigidTransform::from_start_and_end_poses((5, 4, STEP_UP), (7, 4, STEP_RIGHT));
+
+        assert_eq!(abs_pose.apply_rigid_transform(tf), (6, 5, STEP_DOWN).into());
+        assert_eq!(
+            rel_pose.apply_rigid_transform(tf),
+            abs_pose.apply_rigid_transform(tf).as_relative_face()
+        );
     }
 }
