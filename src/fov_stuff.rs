@@ -780,12 +780,22 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
                 if squares.contains(&T::new(x, y)) {
                     String::from_iter([FULL_BLOCK].repeat(2))
                 } else {
-                    match (x.rem_euclid(5), y.rem_euclid(5)) {
-                        (0, 0) => "┼╴",
-                        // (2, 2) => ". ",
-                        (0, _) => "| ",
-                        (_, 0) => "╶╴", //─
-                        (_, _) => "  ",
+                    match (x == 0, y == 0) {
+                        // (true, true) => "00",
+                        // (true, false) => "╺╸",
+                        // (false, true) => "╏ ",
+                        (true, true) => "╬═",
+                        (true, false) => "╫╴",
+                        (false, true) => "╪═",
+                        (false, false) => {
+                            match (x.rem_euclid(5), y.rem_euclid(5)) {
+                                (0, 0) => "┼╴",
+                                // (2, 2) => ". ",
+                                (0, _) => "| ",
+                                (_, 0) => "╶╴", //─
+                                (_, _) => "  ",
+                            }
+                        }
                     }
                     .to_string()
                 }

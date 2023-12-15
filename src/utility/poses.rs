@@ -649,13 +649,18 @@ mod tests {
             correct_rel_square
         );
     }
+
     #[test]
-    fn test_rotation_of_relative_versus_absolute_square_with_direction() {
-        let rel_pose: RelativeSquareWithOrthogonalDir = (4, 3, STEP_RIGHT).into();
-        let abs_pose: SquareWithOrthogonalDir = (4, 3, STEP_RIGHT).into();
+    fn test_rotation_of_relative_versus_absolute_square_with_direction__should_be_same() {
+        let base_tuple = (4, 3, STEP_RIGHT);
+        let abs_pose: SquareWithOrthogonalDir = base_tuple.into();
+        let rel_pose: RelativeSquareWithOrthogonalDir = base_tuple.into();
 
         assert_eq!(rel_pose.quarter_rotated_ccw(1), (-3, 4, STEP_UP).into());
-        assert_eq!(abs_pose.quarter_rotated_ccw(1), (4, 3, STEP_UP).into());
+        assert_eq!(
+            abs_pose.quarter_rotated_ccw(1),
+            rel_pose.quarter_rotated_ccw(1).as_absolute_face()
+        );
     }
     #[test]
     fn test_rigid_transform_of_relative_versus_absolute_pose() {

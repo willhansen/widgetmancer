@@ -56,9 +56,14 @@ pub type FAngle = Angle<f32>;
 pub trait Coordinate:
     Copy
     + PartialEq
+    // + Add<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self, Output = Self::RelativeVersionOfSelf>
+
     + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
+
     + Mul<Self::DataType, Output = Self>
     + Zero
 //+ Debug
@@ -105,7 +110,7 @@ where
 }
 
 macro_rules! coordinatify {
-    ($class:ident, $is_relative:ident, $absolute_version_of_self:ident, $relative_version_of_self:ident, $relativity_complement:ident) => {
+    ($class:ident, $is_relative:ident, $relativity_complement:ident) => {
         impl<T, U> Coordinate for $class<T, U>
         where
             // TODO: trait alias (note the template variables that complicate things)
@@ -121,8 +126,8 @@ macro_rules! coordinatify {
             type DataType = T;
             type UnitType = U;
             const IS_RELATIVE: bool = $is_relative;
-            type AbsoluteVersionOfSelf = $absolute_version_of_self<T, U>;
-            type RelativeVersionOfSelf = $relative_version_of_self<T, U>;
+            type AbsoluteVersionOfSelf = Point2D<T, U>;
+            type RelativeVersionOfSelf = Vector2D<T, U>;
             type RelativityComplement = $relativity_complement<T, U>;
 
             fn x(&self) -> T {
@@ -141,8 +146,21 @@ macro_rules! coordinatify {
 }
 
 // TODO: clean this up
-coordinatify!(Vector2D, true, Point2D, Vector2D, Point2D);
-coordinatify!(Point2D, false, Point2D, Vector2D, Vector2D);
+coordinatify!(Vector2D, true, Point2D);
+coordinatify!(Point2D, false, Vector2D);
+
+// TODO: clean these up (with the trait alias macro?)
+pub trait AbsoluteCoordinate: Coordinate {}
+impl<COORD> AbsoluteCoordinate for COORD where
+    COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
+{
+}
+
+pub trait RelativeCoordinate: Coordinate {}
+impl<COORD> RelativeCoordinate for COORD where
+    COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
+{
+}
 
 trait_alias_macro!(pub trait FloatCoordinate = Coordinate<DataType = f32>);
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
@@ -197,9 +215,9 @@ where
                    //     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        if self.is_absolute() {
-            return *self;
-        }
+        // if self.is_absolute() {
+        //     return *self;
+        // }
         let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
         Self::new(
             self.x() * int_to_T(int_cos(quarter_turns))
