@@ -747,6 +747,7 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
                 } else {
                     format!("{x:<x_prefix_width$}")
                 }
+                .replace("-", "╷")
                 .chars()
                 .collect_vec()
             }),
@@ -793,7 +794,8 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
                                 // (2, 2) => ". ",
                                 (0, _) => "| ",
                                 (_, 0) => "╶╴", //─
-                                (_, _) => "  ",
+                                // (_, _) => "  ",
+                                (_, _) => "· ",
                             }
                         }
                     }
