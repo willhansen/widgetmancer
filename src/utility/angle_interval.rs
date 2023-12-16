@@ -323,7 +323,7 @@ impl AngleInterval {
             Empty => False,
             FullCircle => match other {
                 Empty => False,
-                FullCircle => Partial, // TODO: doucle check this
+                FullCircle => Partial, // TODO: double check this
                 PartialArc(_) => True,
             },
             PartialArc(self_partial_arc) => match other {

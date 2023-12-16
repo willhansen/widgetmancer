@@ -168,7 +168,7 @@ impl FieldOfView {
         self.visible_segments_in_main_view_only = self
             .visible_segments_in_main_view_only
             .iter()
-            .map(|x| x.apply_rigid_transform(tf_to_new_view_root.inverse()))
+            .map(|x| x.quarter_rotated_ccw(tf_to_new_view_root.inverse().rotation()))
             .collect();
         self.transformed_sub_fovs
             .iter()
@@ -447,7 +447,7 @@ impl RigidlyTransformable for FieldOfView {
             self.root_square_with_direction().apply_rigid_transform(tf),
             self.visible_segments_in_main_view_only()
                 .iter()
-                .map(|seg| seg.apply_rigid_transform(tf))
+                .map(|seg| seg.quarter_rotated_ccw(tf.rotation()))
                 .collect_vec(),
             self.transformed_sub_fovs()
                 .iter()
@@ -603,13 +603,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             //     .transform_relative_pose(back_of_portal_entrance_in_local_frame);
             let relative_portal_line = relative_face; // in relative frame, entrance and exit are the same square face border
                                                       //todo!("sort out sub_fov rotations");
-            dbg!(
-                &portal,
-                &relative_portal_line,
-                &sub_fov_view_root,                               // correct
-                &sub_fov_view_root_with_standardized_orientation  // correct
-            );
-            // TODO: simplify the rotation nastiness
+                                                      // TODO: simplify the rotation nastiness
             let sub_arc_fov_with_standardized_orientation =
                 field_of_view_within_arc_in_single_octant(
                     sight_blockers,
@@ -625,16 +619,11 @@ pub fn field_of_view_within_arc_in_single_octant(
                         forward_portal_transform_to_sub_fov.rotation(),
                     ),
                 );
-            dbg!(
-                &sub_arc_fov_with_standardized_orientation, // correct
-                &forward_portal_transform_to_sub_fov        // correct
-            );
             let corrected_view_root = sub_arc_fov_with_standardized_orientation
                 .root_square_with_direction()
-                .quarter_rotated_ccw_in_place(-forward_portal_transform_to_sub_fov.rotation());
+                .quarter_rotated_ccw_in_place(forward_portal_transform_to_sub_fov.rotation());
             let sub_arc_fov = sub_arc_fov_with_standardized_orientation
                 .with_smoothly_replaced_view_root(corrected_view_root);
-            dbg!(&sub_arc_fov); // not correct
             fov_result.transformed_sub_fovs.push(sub_arc_fov);
         }
         if view_blocking_arc_for_this_square.is_empty() {
@@ -767,6 +756,11 @@ pub fn debug_print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
 }
 
 pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
+    if T::IS_RELATIVE {
+        println!("Relative Squares:");
+    } else {
+        println!("Absolute Squares:");
+    }
     let xmax = squares.iter().map(|c| c.x()).max().unwrap() + 1;
     let xmin = squares.iter().map(|c| c.x()).min().unwrap() - 1;
     let ymax = squares.iter().map(|c| c.y()).max().unwrap() + 1;
@@ -1364,7 +1358,6 @@ mod tests {
         let rfov = fov.rasterized();
         debug_print_square_set(&rfov.visible_relative_squares());
         debug_print_square_set(&rfov.visible_absolute_squares());
-        // dbg!(&portals, &fov);
         assert_eq!(
             rfov.visible_relative_squares(),
             as_set([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)])
@@ -1423,7 +1416,6 @@ mod tests {
             &Default::default(),
             &portal_geometry,
         );
-        dbg!(&angle_based_fov_result);
         let fov_result = angle_based_fov_result.rasterized();
 
         debug_print_fov_as_absolute(&angle_based_fov_result, 5);

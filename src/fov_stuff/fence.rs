@@ -31,7 +31,6 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
-// TODO: have a macro make this code
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         Self::from_faces_in_ccw_order(

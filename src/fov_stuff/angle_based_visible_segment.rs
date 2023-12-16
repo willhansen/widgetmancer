@@ -302,17 +302,7 @@ impl Debug for AngleBasedVisibleSegment {
         )
     }
 }
-// TODO: Applying a trait by simply calling the functions on every component member of a struct should be automated.
-impl RigidlyTransformable for AngleBasedVisibleSegment {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        Self::new_with_optional_start_face(
-            self.arc.apply_rigid_transform(tf),
-            self.end_fence.apply_rigid_transform(tf),
-            self.start_internal_relative_face
-                .map(|face| face.apply_rigid_transform(tf)),
-        )
-    }
-}
+
 #[cfg(test)]
 mod tests {
     use euclid::vec2;
