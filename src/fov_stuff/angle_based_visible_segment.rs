@@ -31,7 +31,7 @@ impl QuarterTurnRotatable for AngleBasedVisibleSegment {
             self.arc.quarter_rotated_ccw(quarter_turns_ccw),
             self.end_fence.quarter_rotated_ccw(quarter_turns_ccw),
             self.start_internal_relative_face
-                .quarter_rotated_ccw(quarter_turns_ccw),
+                .map(|x| x.quarter_revolved_ccw_around_origin(quarter_turns_ccw)),
         )
     }
 }

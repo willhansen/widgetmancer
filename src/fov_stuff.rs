@@ -67,7 +67,7 @@ impl QuarterTurnRotatable for FieldOfView {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         FieldOfView::new(
             self.root_square_with_direction
-                .quarter_rotated_ccw(quarter_turns_ccw),
+                .quarter_revolved_ccw_around_origin(quarter_turns_ccw),
             self.visible_segments_in_main_view_only
                 .quarter_rotated_ccw(quarter_turns_ccw),
             self.transformed_sub_fovs
@@ -154,6 +154,25 @@ impl FieldOfView {
         segment: impl Into<AngleBasedVisibleSegment>,
     ) -> Self {
         self.visible_segments_in_main_view_only.push(segment.into());
+        self
+    }
+    pub fn with_smoothly_replaced_view_root(
+        mut self,
+        view_root: impl Into<SquareWithOrthogonalDir>,
+    ) -> Self {
+        let view_root = view_root.into();
+        let tf_to_new_view_root =
+            RigidTransform::from_start_and_end_poses(self.root_square_with_direction, view_root);
+
+        self.root_square_with_direction = view_root;
+        self.visible_segments_in_main_view_only = self
+            .visible_segments_in_main_view_only
+            .iter()
+            .map(|x| x.apply_rigid_transform(tf_to_new_view_root.inverse()))
+            .collect();
+        self.transformed_sub_fovs
+            .iter()
+            .map(|x| x.apply_rigid_transform(tf_to_new_view_root.inverse()));
         self
     }
 
@@ -573,31 +592,49 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .get_portal_by_entrance(absolute_face)
                 .unwrap();
 
-            let portal_transform_to_sub_fov = portal.get_transform();
+            let forward_portal_transform_to_sub_fov = portal.get_transform();
             let sub_fov_view_root =
-                view_root_pose.apply_rigid_transform(portal_transform_to_sub_fov);
+                view_root_pose.apply_rigid_transform(forward_portal_transform_to_sub_fov);
             // need to rotate back to standard for compatibility with the sight blockers and portal geometry.
-            let sub_fov_view_root_with_standardized_orientation =
-                sub_fov_view_root.quarter_rotated_ccw(-portal_transform_to_sub_fov.rotation());
+            let sub_fov_view_root_with_standardized_orientation = sub_fov_view_root
+                .quarter_rotated_ccw_in_place(-forward_portal_transform_to_sub_fov.rotation());
             // in a relative view, the portal exit is the same line as the portal entrance
-            let back_of_portal_entrance_in_local_frame: RelativeSquareWithOrthogonalDir =
-                relative_face.stepped().turned_back();
-            let portal_exit_in_sub_fov_frame = back_of_portal_entrance_in_local_frame;
-            let relative_portal_exit_in_local_frame = portal_transform_to_sub_fov
-                .transform_relative_pose(back_of_portal_entrance_in_local_frame);
-            //todo!("sort out sub_fov rotations");
+            // let relative_portal_exit_in_local_frame = forward_portal_transform_to_sub_fov
+            //     .transform_relative_pose(back_of_portal_entrance_in_local_frame);
+            let relative_portal_line = relative_face; // in relative frame, entrance and exit are the same square face border
+                                                      //todo!("sort out sub_fov rotations");
+            dbg!(
+                &portal,
+                &relative_portal_line,
+                &sub_fov_view_root,                               // correct
+                &sub_fov_view_root_with_standardized_orientation  // correct
+            );
+            // TODO: simplify the rotation nastiness
             let sub_arc_fov_with_standardized_orientation =
                 field_of_view_within_arc_in_single_octant(
                     sight_blockers,
                     portal_geometry,
                     sub_fov_view_root_with_standardized_orientation,
                     radius,
-                    visible_arc_of_face.quarter_rotated_ccw(portal_transform_to_sub_fov.rotation()),
-                    steps_in_octant_iter.rotated(portal_transform_to_sub_fov.rotation()),
+                    visible_arc_of_face
+                        .quarter_rotated_ccw(forward_portal_transform_to_sub_fov.rotation()),
+                    steps_in_octant_iter.rotated(forward_portal_transform_to_sub_fov.rotation()),
                 )
-                .with_weakly_applied_start_line(relative_portal_exit_in_local_frame);
+                .with_weakly_applied_start_line(
+                    relative_portal_line.quarter_revolved_ccw_around_origin(
+                        forward_portal_transform_to_sub_fov.rotation(),
+                    ),
+                );
+            dbg!(
+                &sub_arc_fov_with_standardized_orientation, // correct
+                &forward_portal_transform_to_sub_fov        // correct
+            );
+            let corrected_view_root = sub_arc_fov_with_standardized_orientation
+                .root_square_with_direction()
+                .quarter_rotated_ccw_in_place(-forward_portal_transform_to_sub_fov.rotation());
             let sub_arc_fov = sub_arc_fov_with_standardized_orientation
-                .quarter_rotated_ccw(-portal_transform_to_sub_fov.rotation());
+                .with_smoothly_replaced_view_root(corrected_view_root);
+            dbg!(&sub_arc_fov); // not correct
             fov_result.transformed_sub_fovs.push(sub_arc_fov);
         }
         if view_blocking_arc_for_this_square.is_empty() {
@@ -1322,9 +1359,12 @@ mod tests {
             narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
         );
+        // debug_print_fov_as_relative(&fov, 10);
+        // debug_print_fov_as_absolute(&fov, 10);
         let rfov = fov.rasterized();
         debug_print_square_set(&rfov.visible_relative_squares());
         debug_print_square_set(&rfov.visible_absolute_squares());
+        // dbg!(&portals, &fov);
         assert_eq!(
             rfov.visible_relative_squares(),
             as_set([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)])

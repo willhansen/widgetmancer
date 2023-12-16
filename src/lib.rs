@@ -6,6 +6,7 @@ extern crate core;
 extern crate line_drawing;
 extern crate num;
 extern crate shrinkwraprs;
+extern crate static_assertions as static_assertions;
 extern crate std;
 extern crate termion;
 

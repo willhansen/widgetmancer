@@ -240,17 +240,22 @@ impl<T: WorldGridCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     }
 }
 
-impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
-        (
-            self.square.quarter_rotated_ccw(quarter_turns_ccw),
-            self.dir
-                .step()
-                .quarter_rotated_ccw(quarter_turns_ccw.into().quarter_turns()),
-        )
-            .into()
-    }
-}
+// ambiguous.  use the revolve or rotate in place functions instead
+// impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {
+//     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+//         (
+//             self.square.quarter_rotated_ccw(quarter_turns_ccw),
+//             self.dir
+//                 .step()
+//                 .quarter_rotated_ccw(quarter_turns_ccw.into().quarter_turns()),
+//         )
+//             .into()
+//     }
+// }
+
+static_assertions::assert_not_impl_any!(SquareWithOrthogonalDir: QuarterTurnRotatable);
+static_assertions::assert_not_impl_any!(RelativeSquareWithOrthogonalDir: QuarterTurnRotatable);
+static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable);
 
 impl SquareWithOrthogonalDir {
     pub fn middle_point_of_face(&self) -> WorldPoint {
@@ -650,18 +655,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_rotation_of_relative_versus_absolute_square_with_direction__should_be_same() {
-        let base_tuple = (4, 3, STEP_RIGHT);
-        let abs_pose: SquareWithOrthogonalDir = base_tuple.into();
-        let rel_pose: RelativeSquareWithOrthogonalDir = base_tuple.into();
-
-        assert_eq!(rel_pose.quarter_rotated_ccw(1), (-3, 4, STEP_UP).into());
-        assert_eq!(
-            abs_pose.quarter_rotated_ccw(1),
-            rel_pose.quarter_rotated_ccw(1).as_absolute_face()
-        );
-    }
     #[test]
     fn test_rigid_transform_of_relative_versus_absolute_pose() {
         let base_tuple = (4, 3, STEP_RIGHT);

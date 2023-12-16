@@ -34,7 +34,11 @@ pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 // TODO: have a macro make this code
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
-        Self::from_faces_in_ccw_order(self.edges.quarter_rotated_ccw(quarter_turns_ccw))
+        Self::from_faces_in_ccw_order(
+            self.edges
+                .iter()
+                .map(|x| x.quarter_revolved_ccw_around_origin(quarter_turns_ccw)),
+        )
     }
 }
 
@@ -388,7 +392,13 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 }
 impl RigidlyTransformable for RelativeFenceFullyVisibleFromOriginGoingCcw {
     fn apply_rigid_transform(&self, tf: crate::utility::RigidTransform) -> Self {
-        todo!()
+        RelativeFenceFullyVisibleFromOriginGoingCcw {
+            edges: self
+                .edges
+                .iter()
+                .map(|x| x.apply_rigid_transform(tf))
+                .collect(),
+        }
     }
 }
 
