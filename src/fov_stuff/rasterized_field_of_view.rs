@@ -111,7 +111,7 @@ pub trait RasterizedFieldOfViewFunctions {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility;
-    fn shapes_of_visibilities_of_relative_square_rotated_to_local_frame(
+    fn top_down_portal_entrance_shapes_at_relative_square(
         &self,
         relative_square: WorldStep,
     ) -> Vec<TopDownPortalShape>;
@@ -456,7 +456,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         todo!()
     }
 
-    fn shapes_of_visibilities_of_relative_square_rotated_to_local_frame(
+    fn top_down_portal_entrance_shapes_at_relative_square(
         &self,
         relative_square: WorldStep,
     ) -> Vec<TopDownPortalShape> {
