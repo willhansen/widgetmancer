@@ -47,6 +47,12 @@ impl AngleBasedVisibleSegment {
         self.arc
     }
 
+    pub fn contains_angle_degrees(&self, degrees: f32) -> bool {
+        self.arc
+            .contains_angle(FAngle::degrees(degrees), FAngle::degrees(0.0))
+            .is_true()
+    }
+
     pub fn new_with_start_face(
         arc: impl Into<AngleInterval>,
         end_fence: Fence,

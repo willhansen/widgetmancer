@@ -96,7 +96,7 @@ impl FieldOfView {
     ) -> Self {
         Self::new_empty_fov_at(center.into()).with_fully_visible_relative_face(face)
     }
-    pub fn new_with_visible_square(
+    pub fn new_with_fully_visible_relative_square(
         center: impl Into<WorldSquare>,
         square: impl Into<WorldStep>,
     ) -> Self {
@@ -304,7 +304,7 @@ impl FieldOfView {
     ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────    
     ///              b             b         
     ///                                      
-    /// One case that needs to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
+    /// One case that needs (?) to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
     ///                                            
     ///                                            
     ///                                            
@@ -407,12 +407,17 @@ impl FieldOfView {
     }
 
     pub fn rasterized(&self) -> RasterizedFieldOfView {
+        self.rasterized_from_top_depth(0)
+    }
+
+    fn rasterized_from_top_depth(&self, top_level_portal_depth: u32) -> RasterizedFieldOfView {
         // rasterize top level
-        let mut combined: RasterizedFieldOfView = self.rasterized_main_view_only();
+        let mut combined: RasterizedFieldOfView =
+            self.rasterized_main_view_at_single_depth(top_level_portal_depth);
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let portal_transform = self.view_transform_to(sub_fov);
-            let rasterized_sub_fov = sub_fov.rasterized();
+            let rasterized_sub_fov = sub_fov.rasterized_from_top_depth(top_level_portal_depth + 1);
 
             // let rasterized_and_relocalized_sub_fov = rasterized_sub_fov
             //     .as_seen_through_portal_from_other_view_root(combined.view_root, portal_transform);
@@ -423,9 +428,15 @@ impl FieldOfView {
         });
         combined
     }
-
     fn rasterized_main_view_only(&self) -> RasterizedFieldOfView {
-        RasterizedFieldOfView::from_local_visibility_map(
+        self.rasterized_main_view_at_single_depth(0)
+    }
+
+    fn rasterized_main_view_at_single_depth(
+        &self,
+        top_level_portal_depth: u32,
+    ) -> RasterizedFieldOfView {
+        RasterizedFieldOfView::from_visibility_map_at_single_depth(
             self.root_square_with_direction,
             &self
                 .visible_segments_in_main_view_only
@@ -433,6 +444,7 @@ impl FieldOfView {
                 .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
                 .reduce(|a, b| a.combined_while_increasing_visibility(&b))
                 .unwrap_or(LocalSquareVisibilityMap::new_empty()),
+            top_level_portal_depth,
         )
     }
 
@@ -1551,8 +1563,9 @@ mod tests {
     #[test]
     fn test_simple_fov_combination() {
         let main_center = point2(5, 5);
-        let mut fov_1 = FieldOfView::new_with_visible_square(main_center, STEP_RIGHT);
-        let mut fov_2 = FieldOfView::new_with_visible_square(main_center, STEP_UP);
+        let mut fov_1 =
+            FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_RIGHT);
+        let mut fov_2 = FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_UP);
 
         let combined = fov_1.combined_with(&fov_2).rasterized();
 
@@ -1994,6 +2007,7 @@ mod tests {
         );
 
         debug_print_fov_as_relative(&new_fov_result, 7);
+        debug_print_fov_as_absolute(&new_fov_result, 7);
 
         assert_eq!(new_fov_result.transformed_sub_fovs.len(), 1);
         let test_square = STEP_UP_RIGHT;
@@ -2164,5 +2178,22 @@ mod tests {
         fov.visible_segments_in_main_view_only.push(view_segment);
         let rfov = fov.rasterized();
         assert_eq!(rfov.visible_relative_squares(), as_set([(4, 0), (5, 0)]));
+    }
+    #[test]
+    fn test_rasterize_fov_with_sub_view__should_have_correct_portal_depths() {
+        let mut main_fov = FieldOfView::new_with_fully_visible_relative_square((0, 0), (5, 0));
+        let mut sub_fov = FieldOfView::new_with_fully_visible_relative_square((20, 20), (0, 5))
+            .with_fully_visible_relative_square((5, 0));
+        main_fov.transformed_sub_fovs.push(sub_fov);
+        let rfov = main_fov.rasterized();
+
+        assert_eq!(
+            rfov.lone_portal_depth_for_relative_square_or_panic((1, 0)),
+            0
+        );
+        assert_eq!(
+            rfov.lone_portal_depth_for_relative_square_or_panic((0, 1)),
+            1
+        );
     }
 }
