@@ -115,8 +115,8 @@ impl FloatingHunterDrone {
     }
 }
 
-pub const CONVEYOR_BELT_MOVEMENT_PERIOD: Duration = Duration::from_secs_f32(2.0);
-pub const CONVEYOR_BELT_VISUAL_PERIOD: Duration = CONVEYOR_BELT_MOVEMENT_PERIOD.mul_f32(2.0);
+pub const CONVEYOR_BELT_MOVEMENT_PERIOD: Duration = Duration::new(2, 0);
+pub const CONVEYOR_BELT_VISUAL_PERIOD: Duration = CONVEYOR_BELT_MOVEMENT_PERIOD.saturating_mul(2);
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum GridEntity {
@@ -427,14 +427,12 @@ impl Game {
     ) -> Vec<FloatingEntityEnum> {
         let hunter_drones_from_square = self
             .floating_hunter_drones
-            .drain_filter(|drone| world_point_to_world_square(drone.position) == square)
+            .extract_if(|drone| world_point_to_world_square(drone.position) == square)
             .map(|drone| FloatingEntityEnum::FloatingHunterDrone(drone))
             .collect_vec();
         let death_cubes_from_square = self
             .death_cubes
-            .drain_filter(|cube: &mut DeathCube| {
-                world_point_to_world_square(cube.position) == square
-            })
+            .extract_if(|cube: &mut DeathCube| world_point_to_world_square(cube.position) == square)
             .map(|cube| FloatingEntityEnum::DeathCube(cube))
             .collect_vec();
 

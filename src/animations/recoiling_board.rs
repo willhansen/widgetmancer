@@ -26,13 +26,10 @@ pub struct RecoilingBoardAnimation {
 }
 
 impl RecoilingBoardAnimation {
-    pub(crate) const TIME_TO_PEAK: Duration = Duration::from_secs_f32(0.1);
-    const RECOIL_RELAX_DURATION: Duration =
-        Duration::from_secs_f32(RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32() * 3.0);
-    pub(crate) const RECOIL_DURATION: Duration = Duration::from_secs_f32(
-        RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
-            + RecoilingBoardAnimation::RECOIL_RELAX_DURATION.as_secs_f32(),
-    );
+    pub(crate) const TIME_TO_PEAK: Duration = Duration::from_millis(100);
+    const RECOIL_RELAX_DURATION: Duration = Self::TIME_TO_PEAK.saturating_mul(3);
+    pub(crate) const RECOIL_DURATION: Duration =
+        Self::TIME_TO_PEAK.saturating_add(Self::RECOIL_RELAX_DURATION);
     pub(crate) const RECOIL_DISTANCE: Length<f32, WorldSquare> = Length::new(1.0);
 
     pub fn new(
