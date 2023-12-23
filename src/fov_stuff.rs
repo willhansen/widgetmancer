@@ -2183,7 +2183,7 @@ mod tests {
     fn test_rasterize_fov_with_sub_view__should_have_correct_portal_depths() {
         let mut main_fov = FieldOfView::new_with_fully_visible_relative_square((0, 0), (5, 0));
         let mut sub_fov = FieldOfView::new_with_fully_visible_relative_square((20, 20), (0, 5))
-            .with_fully_visible_relative_square((5, 0));
+            .with_fully_visible_relative_square((0, 5));
         main_fov.transformed_sub_fovs.push(sub_fov);
         let rfov = main_fov.rasterized();
 
