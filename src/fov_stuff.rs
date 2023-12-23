@@ -1704,12 +1704,12 @@ mod tests {
     #[test]
     fn test_sub_fovs_in_combining_fovs_might_also_combine() {
         let main_center = point2(5, 5);
-        let other_center = point2(15, 5);
+        let sub_center = point2(15, 5);
 
-        let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
-        let mut fov_2 = FieldOfView::new_empty_fov_at(main_center);
-        let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
-        let mut sub_fov_2 = FieldOfView::new_empty_fov_at(other_center);
+        let mut main_fov_1 = FieldOfView::new_empty_fov_at(main_center);
+        let mut main_fov_2 = FieldOfView::new_empty_fov_at(main_center);
+        let mut sub_fov_1 = FieldOfView::new_empty_fov_at(sub_center);
+        let mut sub_fov_2 = FieldOfView::new_empty_fov_at(sub_center);
 
         let rel_square = STEP_UP_RIGHT * 3;
         let faces = faces_away_from_center_at_rel_square(rel_square)
@@ -1718,20 +1718,30 @@ mod tests {
         sub_fov_1.add_fully_visible_relative_face(faces[0]);
         sub_fov_2.add_fully_visible_relative_face(faces[1]);
 
-        fov_1.transformed_sub_fovs.push(sub_fov_1);
-        fov_2.transformed_sub_fovs.push(sub_fov_2);
+        main_fov_1.transformed_sub_fovs.push(sub_fov_1);
+        main_fov_2.transformed_sub_fovs.push(sub_fov_2);
 
-        let combined_fov = fov_1.combined_with(&fov_2);
+        let combined_fov = main_fov_1.combined_with(&main_fov_2);
+
+        assert_true!(main_fov_1
+            .rasterized()
+            .relative_square_is_only_partially_visible(rel_square));
+        assert_true!(main_fov_2
+            .rasterized()
+            .relative_square_is_only_partially_visible(rel_square));
 
         assert_eq!(combined_fov.transformed_sub_fovs.len(), 1);
         // should be the rel_square and the origin
         let combined_rasterized = combined_fov.rasterized();
         assert_eq!(
             combined_rasterized.fully_visible_relative_squares().len(),
-            2
+            1
+        );
+        assert_eq!(
+            combined_rasterized.fully_visible_relative_squares(),
+            as_set([rel_square])
         );
         assert!(combined_rasterized.relative_square_is_fully_visible(rel_square));
-        assert!(combined_rasterized.relative_square_is_fully_visible(STEP_ZERO));
     }
 
     #[test]
