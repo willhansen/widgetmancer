@@ -747,8 +747,8 @@ impl Game {
             .map(|(&square, _)| square)
             .collect();
 
-        let CUBES_PER_SECOND = 10.0;
-        let CUBE_SPEED = 5.0;
+        let CUBES_PER_SECOND = 1.0;
+        let CUBE_SPEED = 4.0;
 
         let chance_to_fire_this_tick = clamp(CUBES_PER_SECOND * delta.as_secs_f32(), 0.0, 1.0);
 
@@ -2224,6 +2224,37 @@ impl Game {
 
         let bars_top_right_root_square = base_square + STEP_LEFT * 20 + STEP_UP * 5;
         self.place_dotted_thin_walls(bars_top_right_root_square);
+    }
+
+    pub fn set_up_demo_map(&mut self) {
+        let base_square: WorldSquare = self.player_square();
+
+        let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
+            base_square + STEP_RIGHT * 3 + STEP_UP * 3,
+            STEP_RIGHT.into(),
+        );
+        let left_exit = SquareWithOrthogonalDir::from_square_and_worldstep(
+            left_entrance.square() + STEP_UP * 2 + STEP_RIGHT * 2,
+            STEP_UP.into(),
+        );
+        (0..6).for_each(|i| {
+            let entrance = left_entrance.strafed_right_n(i);
+            let exit = left_exit.strafed_right_n(i);
+            self.place_double_sided_two_way_portal(entrance, exit);
+        });
+
+        (0..5).for_each(|dx| {
+            let top_left: WorldSquare = base_square + WorldStep::new(-3, -5);
+            let dy = 4;
+            let left_entrance: SquareWithOrthogonalDir = (top_left, STEP_DOWN).into();
+            let left_exit = left_entrance.stepped_n(dy).strafed_left();
+            self.place_double_sided_two_way_portal(
+                left_entrance.strafed_left_n(dx),
+                left_exit.strafed_left_n(dx),
+            );
+        });
+
+        self.place_death_turret(base_square + STEP_LEFT * 14);
     }
 
     fn place_dotted_thin_walls(&mut self, bars_top_left_root_square: WorldSquare) {

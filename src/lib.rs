@@ -98,24 +98,25 @@ pub fn do_everything() {
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
     let mut rng = rand::rngs::StdRng::seed_from_u64(5);
-    game.set_up_test_map();
+    //game.set_up_test_map();
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
     //game.set_up_labyrinth(&mut rng);
-    //game.set_up_columns();
-    //game.set_up_simple_portal_map();
-    //game.set_up_portal_across_wall_map(2, 0);
-    //game.set_up_simple_freestanding_portal();
+    // game.set_up_columns();
+    // game.set_up_simple_portal_map();
+    game.set_up_demo_map();
+    // game.set_up_portal_across_wall_map(2, 0);
+    // game.set_up_simple_freestanding_portal();
     // game.place_dense_horizontal_portals(
     //     game.player_square() + STEP_RIGHT * 10 + STEP_DOWN_RIGHT * 5,
     //     3,
     //     6,
     // );
-    //game.set_up_vs_mini_factions();
-    //game.set_up_vs_red_pawns();
+    // game.set_up_vs_mini_factions();
+    // game.set_up_vs_red_pawns();
     //game.set_up_upgrades_galore();
     //game.set_up_homogeneous_army(PieceType::OmniDirectionalSoldier);
-    //game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
+    // game.set_up_vs_weak_with_pillars_and_turret_and_upgrades();
     //game.set_up_vs_arrows();
 
     let mut prev_tick_start_time = Instant::now();
