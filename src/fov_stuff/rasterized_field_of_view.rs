@@ -110,19 +110,23 @@ pub trait RasterizedFieldOfViewFunctions {
     fn relative_square_is_only_partially_visible(&self, step: impl Into<WorldStep>) -> bool;
     fn relative_square_is_only_locally_visible(&self, step: impl Into<WorldStep>) -> bool;
     fn relative_square_is_visible(&self, relative_square: impl Into<WorldStep>) -> bool;
+    fn lone_top_down_portal_for_relative_square_or_panic(
+        &self,
+        relative_square: impl Into<WorldStep>,
+    ) -> TopDownPortal;
     fn lone_portal_depth_for_relative_square_or_panic(
         &self,
         relative_square: impl Into<WorldStep>,
     ) -> u32;
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
-        relative_square: WorldStep,
+        relative_square: impl Into<WorldStep>,
     ) -> QuarterTurnsCcw;
-    fn lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
+    fn lone_square_visibility_in_exit_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility;
-    fn lone_square_visibility_rotated_to_relative_frame_for_relative_square_or_panic(
+    fn lone_square_visibility_in_entrance_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility;
@@ -476,32 +480,33 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         &self,
         relative_square: impl Into<WorldStep>,
     ) -> u32 {
+        self.lone_top_down_portal_for_relative_square_or_panic(relative_square)
+            .portal_depth()
+    }
+    fn lone_top_down_portal_for_relative_square_or_panic(
+        &self,
+        relative_square: impl Into<WorldStep>,
+    ) -> TopDownPortal {
         let portals = self.top_down_portals_for_relative_square(relative_square);
         assert!(portals.len() == 1);
-        portals[0].portal_depth()
+        portals[0]
     }
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
-        relative_square: WorldStep,
+        relative_square: impl Into<WorldStep>,
     ) -> QuarterTurnsCcw {
-        todo!()
+        self.lone_top_down_portal_for_relative_square_or_panic(relative_square)
+            .portal_rotation_to_target()
     }
-    fn lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
+    fn lone_square_visibility_in_exit_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
-        let views = self.top_down_portals_for_relative_square(relative_square);
-        if views.len() != 1 {
-            panic!(
-                "Relative square {} has {} views, not 1",
-                relative_square.to_string(),
-                views.len()
-            );
-        }
-        views[0].shape_rotated_to_absolute_frame()
+        self.lone_top_down_portal_for_relative_square_or_panic(relative_square)
+            .shape_in_exit_frame()
     }
 
-    fn lone_square_visibility_rotated_to_relative_frame_for_relative_square_or_panic(
+    fn lone_square_visibility_in_entrance_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility {
@@ -921,7 +926,7 @@ impl TopDownPortal {
         self.shape_in_exit_frame
             .quarter_rotated_ccw(-self.target.portal_rotation_to_target)
     }
-    pub fn shape_rotated_to_absolute_frame(&self) -> SquareVisibility {
+    pub fn shape_in_exit_frame(&self) -> SquareVisibility {
         self.shape_in_exit_frame
     }
     pub fn portal_depth(&self) -> u32 {

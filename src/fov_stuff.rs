@@ -1354,30 +1354,65 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_narrow_fov_through_portal__with_turn() {
-        let portals = PortalGeometry::new().with_portal((3, 2, STEP_RIGHT), (5, 1, STEP_DOWN));
-        let fov = field_of_view_within_arc_in_single_octant(
+    fn narrow_fov_right_with_portal_turn_at_distance(
+        start: impl Into<WorldSquare>,
+        quarter_turns_left: i32,
+        turn_at_dist: u32,
+        fov_range: u32,
+    ) -> FieldOfView {
+        let start = start.into();
+        let turn_square = start + STEP_RIGHT * turn_at_dist as i32;
+        let exit_dir = STEP_RIGHT.quarter_rotated_ccw(quarter_turns_left);
+        let portals = PortalGeometry::new().with_portal(
+            (turn_square + STEP_LEFT, STEP_RIGHT),
+            (turn_square + exit_dir, exit_dir),
+        );
+        field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portals,
-            SquareWithOrthogonalDir::from_square_and_step((0, 2), DEFAULT_FOV_ROOT_DIRECTION),
-            5,
+            SquareWithOrthogonalDir::from_square_and_step(start, DEFAULT_FOV_ROOT_DIRECTION),
+            fov_range,
             narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
-        );
+        )
+    }
+
+    #[test]
+    fn test_narrow_fov_through_portal__with_turn__correct_squares_are_visible() {
+        let fov = narrow_fov_right_with_portal_turn_at_distance((0, 2), -1, 4, 5);
         // debug_print_fov_as_relative(&fov, 10);
         // debug_print_fov_as_absolute(&fov, 10);
         let rfov = fov.rasterized();
-        debug_print_square_set(&rfov.visible_relative_squares());
-        debug_print_square_set(&rfov.visible_absolute_squares());
+        // debug_print_square_set(&rfov.visible_relative_squares());
+        // debug_print_square_set(&rfov.visible_absolute_squares());
         assert_eq!(
             rfov.visible_relative_squares(),
             as_set([(1, 0), (2, 0), (3, 0), (4, 0), (5, 0)])
         );
         assert_eq!(
             rfov.visible_absolute_squares(),
-            as_set([(1, 2), (2, 2), (3, 2), (5, 1), (5, 0)])
+            as_set([(1, 2), (2, 2), (3, 2), (4, 1), (4, 0)])
         );
+    }
+    #[test]
+    fn test_narrow_fov_through_portal__with_turn__correct_rotation_from_portal() {
+        let fov = narrow_fov_right_with_portal_turn_at_distance((0, 2), -1, 4, 5);
+        // debug_print_fov_as_relative(&fov, 10);
+        // debug_print_fov_as_absolute(&fov, 10);
+        let rfov = fov.rasterized();
+        // debug_print_square_set(&rfov.visible_relative_squares());
+        // debug_print_square_set(&rfov.visible_absolute_squares());
+        let range_and_turns = vec![((1..=3), 0), ((4..=5), -1)];
+        range_and_turns.into_iter().for_each(|(range, turns)| {
+            dbg!(&range, &turns);
+            range.for_each(|dx| {
+                dbg!(dx);
+                assert_eq!(
+                    rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
+                    QuarterTurnsCcw::new(turns)
+                );
+            });
+        });
     }
 
     #[test]
@@ -1952,9 +1987,7 @@ mod tests {
         assert!(rasterized_fov.relative_square_is_only_locally_visible(test_step));
 
         let the_square_visibility = rasterized_fov
-            .lone_square_visibility_rotated_to_absolute_frame_for_relative_square_or_panic(
-                test_step,
-            );
+            .lone_square_visibility_in_exit_frame_for_relative_square_or_panic(test_step);
         // check the visibility of the relative square
         assert_about_eq!(
             the_square_visibility
@@ -2033,7 +2066,7 @@ mod tests {
             STEP_RIGHT,
         );
         let exit = SquareWithOrthogonalDir::from_square_and_step(
-            entrance.square() + STEP_UP_LEFT * 50,
+            entrance.square() + STEP_UP_LEFT * 5,
             STEP_UP,
         );
 
@@ -2085,9 +2118,7 @@ mod tests {
             QuarterTurnsCcw::new(1)
         );
         let the_square_visibility = rasterized_fov
-            .lone_square_visibility_rotated_to_relative_frame_for_relative_square_or_panic(
-                test_square,
-            );
+            .lone_square_visibility_in_entrance_frame_for_relative_square_or_panic(test_square);
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),
