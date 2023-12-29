@@ -53,15 +53,11 @@ pub struct RasterizedFieldOfView {
 // TODO: Why was this a trait?
 pub trait RasterizedFieldOfViewFunctions {
     // creation
-    fn from_local_visibility_map(
+    // TODO: return an iterator
+    fn visibility_map_to_top_down_portals(
         root: impl Into<SquareWithOrthogonalDir>,
         vis_map: &LocalSquareVisibilityMap,
-    ) -> Self;
-    fn from_visibility_map_at_single_depth(
-        root: impl Into<SquareWithOrthogonalDir>,
-        vis_map: &LocalSquareVisibilityMap,
-        portal_depth: u32,
-    ) -> Self;
+    ) -> Vec<TopDownPortal>;
 
     // adding
     fn add_fully_visible_local_relative_square(&mut self, relative_square: impl Into<WorldStep>);
@@ -163,7 +159,7 @@ pub trait RasterizedFieldOfViewFunctions {
         new_view_root: SquareWithOrthogonalDir,
         portal_transform_from_other_to_self: RigidTransform,
     ) -> Self;
-    fn combined_with(&self, other: &Self) -> Self;
+    fn absorb(&self, other: &Self) -> Self;
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self;
 }
 type TopDownPortalShape = SquareVisibility;
@@ -285,7 +281,7 @@ impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
 
     fn try_from(value: RasterizedFieldOfView) -> Result<Self, Self::Error> {
         if value
-            .top_down_portals()
+            .top_down_portals_vec()
             .into_iter()
             .map(|x| x.relative_position())
             .all_equal()
@@ -320,26 +316,27 @@ impl ViewRoundable for SquareOfTopDownPortals {
 }
 
 impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
-    fn from_local_visibility_map(
+    fn visibility_map_to_top_down_portals(
         root: impl Into<SquareWithOrthogonalDir>,
         vis_map: &LocalSquareVisibilityMap,
-    ) -> Self {
-        Self::from_visibility_map_at_single_depth(root, vis_map, 0)
-    }
-    fn from_visibility_map_at_single_depth(
-        root: impl Into<SquareWithOrthogonalDir>,
-        vis_map: &LocalSquareVisibilityMap,
-        portal_depth: u32,
-    ) -> Self {
+    ) -> Vec<TopDownPortal> {
+        let root = root.into();
         let mut new_rfov = Self::new_empty_with_view_root(root);
-        vis_map.iter().for_each(|(rel_square, visibility)| {
-            new_rfov.try_add_visible_relative_square_with_depth_but_no_rotation(
-                *rel_square,
-                visibility,
-                portal_depth,
-            );
-        });
-        new_rfov
+
+        vis_map
+            .iter()
+            .map(|(&rel_square, &visibility)| {
+                TopDownPortal::new(
+                    rel_square,
+                    TopDownPortalTarget::new(
+                        root.other_square_relative_to_absolute(rel_square),
+                        0,
+                        0,
+                    ),
+                    visibility.to_owned(),
+                )
+            })
+            .collect_vec()
     }
     fn add_fully_visible_local_relative_square(&mut self, relative_square: impl Into<WorldStep>) {
         self.add_top_down_portal(
@@ -604,23 +601,26 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         //     .as_seen_from_other_local_view_root(new_view_root)
     }
 
-    fn combined_with(&self, other: &Self) -> Self {
+    fn absorb(&self, other: &Self) -> Self {
         // This check is skipped because everything but the view root is relative to the view root.
         // The other view root is discarded, and the other relative top-down portals are absorbed.
         // assert_eq!(self.view_root, other.view_root);
 
+        // need to account for portal rotations if view roots have different rotations
+        // assert_eq!(self.view_root.direction(), other.view_root.direction());
+
         Self::from_top_down_portals(
             self.view_root,
-            self.top_down_portals()
+            self.top_down_portals_vec()
                 .into_iter()
-                .chain(other.top_down_portals()),
+                .chain(other.top_down_portals_vec()),
         )
     }
 
     fn rounded_towards_full_visibility(&self, tolerance: f32) -> Self {
         Self::from_top_down_portals(
             self.view_root,
-            self.top_down_portals()
+            self.top_down_portals_vec()
                 .into_iter()
                 .map(|x| x.rounded_towards_full_visibility(tolerance)),
         )
@@ -637,7 +637,7 @@ impl RasterizedFieldOfView {
 
         Self::from_top_down_portals(
             self.view_root.apply_rigid_transform(tf_self_to_other),
-            self.top_down_portals()
+            self.top_down_portals_vec()
                 .into_iter()
                 .map(|top_down_portal| top_down_portal.one_portal_deeper()),
         )
@@ -654,9 +654,11 @@ impl RasterizedFieldOfView {
 
         Self::from_top_down_portals(
             new_view_root,
-            self.top_down_portals().into_iter().map(|top_down_portal| {
-                top_down_portal.with_rigidly_transformed_entrance(tf_new_to_old)
-            }),
+            self.top_down_portals_vec()
+                .into_iter()
+                .map(|top_down_portal| {
+                    top_down_portal.with_rigidly_transformed_entrance(tf_new_to_old)
+                }),
         )
     }
     fn as_seen_from_oriented_origin(&self) -> Self {
@@ -747,9 +749,9 @@ impl RasterizedFieldOfView {
                 )
             })
     }
-    fn from_top_down_portals(
+    pub fn from_top_down_portals(
         view_root: impl Into<SquareWithOrthogonalDir>,
-        iter: impl IntoIterator<Item = TopDownPortal> + Clone,
+        iter: impl IntoIterator<Item = TopDownPortal> + Clone, // TODO: get rid of this clone requirement
     ) -> Self {
         let view_root = view_root.into();
 
@@ -880,11 +882,14 @@ impl RasterizedFieldOfView {
             .to_vector()
     }
 
-    fn top_down_portals(&self) -> Vec<TopDownPortal> {
+    fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
         self.map_of_top_down_portal_shapes_by_coordinates
             .iter()
             .map(Into::<TopDownPortal>::into)
-            .collect()
+    }
+
+    fn top_down_portals_vec(&self) -> Vec<TopDownPortal> {
+        self.top_down_portals().collect()
     }
 }
 
@@ -911,6 +916,17 @@ impl TopDownPortal {
             target: self.target.one_portal_deeper(),
             ..self.clone()
         }
+    }
+    pub fn with_portal_depth(mut self, depth: u32) -> Self {
+        self.target.portal_depth = depth;
+        self
+    }
+    pub fn with_forward_portal_rotation(
+        mut self,
+        forward_portal_rotation: impl Into<QuarterTurnsCcw>,
+    ) -> Self {
+        self.target.portal_rotation_to_target = forward_portal_rotation.into();
+        self
     }
     pub fn with_rigidly_transformed_entrance(&self, tf: RigidTransform) -> Self {
         let mut the_copy = self.clone();
@@ -1350,9 +1366,9 @@ mod tests {
             forward_tf_through_portal,
         );
 
-        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+        assert_eq!(new_rasterized_fov.top_down_portals_vec().len(), 1);
 
-        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals_vec()[0];
 
         assert_eq!(
             deeper_top_down_portal.target.absolute_square,
@@ -1398,9 +1414,9 @@ mod tests {
             forward_tf_through_portal,
         );
 
-        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+        assert_eq!(new_rasterized_fov.top_down_portals_vec().len(), 1);
 
-        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals_vec()[0];
         assert_eq!(
             deeper_top_down_portal.relative_position,
             top_down_portal.relative_position + STEP_LEFT * 2
@@ -1445,17 +1461,17 @@ mod tests {
         // absolute position of test square after transform = (0, 8, face left)
         // relative position of test square to new root after transform (-2, 7), and it faces left
 
-        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+        assert_eq!(new_rasterized_fov.top_down_portals_vec().len(), 1);
 
         let absolute_deeper_top_down_portal = new_rasterized_fov
             .as_seen_from_oriented_origin()
-            .top_down_portals()[0];
+            .top_down_portals_vec()[0];
         assert_eq!(
             absolute_deeper_top_down_portal.relative_position,
             (0, 8).into()
         );
 
-        let relative_deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        let relative_deeper_top_down_portal = new_rasterized_fov.top_down_portals_vec()[0];
         assert_eq!(
             relative_deeper_top_down_portal.relative_position,
             (-2, 7).into()
@@ -1488,9 +1504,9 @@ mod tests {
             forward_tf_through_portal_new_to_old,
         );
 
-        assert_eq!(new_rasterized_fov.top_down_portals().len(), 1);
+        assert_eq!(new_rasterized_fov.top_down_portals_vec().len(), 1);
 
-        let deeper_top_down_portal = new_rasterized_fov.top_down_portals()[0];
+        let deeper_top_down_portal = new_rasterized_fov.top_down_portals_vec()[0];
         assert_eq!(deeper_top_down_portal.relative_position, (-8, -3).into());
     }
 
@@ -1557,7 +1573,7 @@ mod tests {
         );
 
         assert_eq!(
-            rfov.top_down_portals().first().unwrap().target_square(),
+            rfov.top_down_portals_vec().first().unwrap().target_square(),
             (6, 2).into()
         );
     }
@@ -1570,7 +1586,7 @@ mod tests {
 
         assert_eq!(
             rfov.as_seen_from_oriented_origin()
-                .top_down_portals()
+                .top_down_portals_vec()
                 .first()
                 .unwrap()
                 .relative_position(),
@@ -1586,7 +1602,7 @@ mod tests {
         let new_rfov = rfov.as_seen_from_other_local_view_root((5, 5, STEP_LEFT));
         assert_eq!(
             new_rfov
-                .top_down_portals()
+                .top_down_portals_vec()
                 .first()
                 .unwrap()
                 .relative_position(),
@@ -1595,7 +1611,7 @@ mod tests {
         assert_eq!(
             new_rfov
                 .as_seen_from_oriented_origin()
-                .top_down_portals()
+                .top_down_portals_vec()
                 .first()
                 .unwrap()
                 .relative_position(),
@@ -1624,7 +1640,7 @@ mod tests {
             (3, 4, STEP_RIGHT),
             (5, 5),
         );
-        let test_portal = rfov.top_down_portals().iter().next().unwrap().clone();
+        let test_portal = rfov.top_down_portals_vec().iter().next().unwrap().clone();
 
         let visible_absolute_squares = rfov.visible_absolute_squares();
         let correct_local_square =
