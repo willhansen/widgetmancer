@@ -3,8 +3,31 @@ use super::{
     line::*, relative_interval_location::*,
 };
 
-// TODO: make this a newtype with restricted points
-pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
+#[derive(PartialEq, Clone, Debug, Copy)]
+pub struct LocalSquareHalfPlane {
+    half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
+}
+impl From<HalfPlane<f32, SquareGridInLocalSquareFrame>> for LocalSquareHalfPlane {
+    fn from(value: HalfPlane<f32, SquareGridInLocalSquareFrame>) -> Self {
+        assert!(value
+            .dividing_line
+            .line_intersects_with_centered_unit_square());
+        let intersections_with_unit_square = value
+            .dividing_line
+            .line_intersections_with_centered_unit_square();
+        LocalSquareHalfPlane {
+            half_plane: HalfPlane::from_line_and_point_on_half_plane(
+                intersections_with_unit_square,
+                value.point_on_half_plane(),
+            ),
+        }
+    }
+}
+impl From<LocalSquareHalfPlane> for HalfPlane<f32, SquareGridInLocalSquareFrame> {
+    fn from(value: LocalSquareHalfPlane) -> Self {
+        value.half_plane
+    }
+}
 
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T = f32, U = euclid::UnknownUnit>
@@ -81,12 +104,16 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .reflect_point_over_line(self.point_on_half_plane())
     }
 
-    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+    pub fn equivalent_representation(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line
             .approx_on_same_line(other.dividing_line, tolerance)
-            && !self
+            && self
                 .dividing_line
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
+    }
+
+    pub fn about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+        self.equivalent_representation(other.complement(), tolerance)
     }
 
     pub fn covers_point(&self, point: Point2D<f32, U>) -> BoolWithPartial {
@@ -315,11 +342,11 @@ mod tests {
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         let half_plane_3 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
-        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
+        assert!(half_plane_1.about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.about_complementary_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.about_complementary_to(half_plane_3, 1e-6));
     }
 
     #[test]
@@ -333,7 +360,7 @@ mod tests {
         let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_1.about_complementary_to(half_plane_2, 1e-6));
     }
 
     #[test]
@@ -418,7 +445,7 @@ mod tests {
         let g = (-0.6, 0.4);
 
         let up: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0)).into();
         let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
         let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
         let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
@@ -690,5 +717,26 @@ mod tests {
         assert_eq!(f(-0.51, 0.1), Start);
         // not even close
         assert_eq!(f(-50.0, 0.1), Before);
+    }
+
+    #[test]
+    fn test_standardize_half_plane_on_square__simple__horizontal_on_axis() {
+        let p1 = vec2(-0.5, 0);
+        let p2 = vec2(0.4, 0);
+        let hp = HalfPlane::from_line_and_point_on_half_plane((p1, p2), (0, 1));
+        let local_hp = LocalSquareHalfPlane::from(hp);
+        let full_circled_hp = HalfPlane::from(local_hp);
+
+        assert!(hp.equivalent_representation(full_circled_hp, 0.01));
+    }
+    #[test]
+    fn test_standardize_half_plane_on_square__vertical() {
+        let p1 = vec2(-0.3, 0);
+        let p2 = vec2(-0.3, 0.4);
+        let hp = HalfPlane::from_line_and_point_on_half_plane((p1, p2), (0, 1));
+        let local_hp = LocalSquareHalfPlane::from(hp);
+        let full_circled_hp = HalfPlane::from(local_hp);
+
+        assert!(hp.equivalent_representation(full_circled_hp, 0.01));
     }
 }
