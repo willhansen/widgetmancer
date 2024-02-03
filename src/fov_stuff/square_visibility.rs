@@ -237,7 +237,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         } else if self
             .visible_portion
             .unwrap()
-            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+            .about_complementary_to(other.visible_portion.unwrap(), 1e-6)
         {
             Self::new_fully_visible()
         } else {
@@ -279,7 +279,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         } else {
             self.visible_portion
                 .unwrap()
-                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+                .about_complementary_to(other.visible_portion.unwrap(), 1e-6)
         };
     }
 

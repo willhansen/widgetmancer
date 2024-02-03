@@ -3,31 +3,7 @@ use super::{
     line::*, relative_interval_location::*,
 };
 
-#[derive(PartialEq, Clone, Debug, Copy)]
-pub struct LocalSquareHalfPlane {
-    half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
-}
-impl From<HalfPlane<f32, SquareGridInLocalSquareFrame>> for LocalSquareHalfPlane {
-    fn from(value: HalfPlane<f32, SquareGridInLocalSquareFrame>) -> Self {
-        assert!(value
-            .dividing_line
-            .line_intersects_with_centered_unit_square());
-        let intersections_with_unit_square = value
-            .dividing_line
-            .line_intersections_with_centered_unit_square();
-        LocalSquareHalfPlane {
-            half_plane: HalfPlane::from_line_and_point_on_half_plane(
-                intersections_with_unit_square,
-                value.point_on_half_plane(),
-            ),
-        }
-    }
-}
-impl From<LocalSquareHalfPlane> for HalfPlane<f32, SquareGridInLocalSquareFrame> {
-    fn from(value: LocalSquareHalfPlane) -> Self {
-        value.half_plane
-    }
-}
+pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T = f32, U = euclid::UnknownUnit>
@@ -446,10 +422,10 @@ mod tests {
 
         let up: LocalSquareHalfPlane =
             HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0)).into();
-        let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
-        let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
-        let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
-        let left = HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
+        let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0)).into();
+        let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0)).into();
+        let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0)).into();
+        let left = HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0)).into();
 
         let tolerance = 1e-5;
 
@@ -465,7 +441,10 @@ mod tests {
         ];
         let actual_boolean_matrix: [[i32; 5]; 5] = from_fn(|row| {
             from_fn(|col| {
-                if f(&vars[row], &vars[col], tolerance).try_into().unwrap() {
+                if f(&vars[row].into(), &vars[col], tolerance)
+                    .try_into()
+                    .unwrap()
+                {
                     1
                 } else {
                     0
@@ -478,9 +457,9 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__horizontal_up() {
         let a: LocalSquareHalfPlane =
-            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3)).into();
         let b: LocalSquareHalfPlane =
-            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4));
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4)).into();
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
             .is_true())
@@ -717,26 +696,5 @@ mod tests {
         assert_eq!(f(-0.51, 0.1), Start);
         // not even close
         assert_eq!(f(-50.0, 0.1), Before);
-    }
-
-    #[test]
-    fn test_standardize_half_plane_on_square__simple__horizontal_on_axis() {
-        let p1 = vec2(-0.5, 0);
-        let p2 = vec2(0.4, 0);
-        let hp = HalfPlane::from_line_and_point_on_half_plane((p1, p2), (0, 1));
-        let local_hp = LocalSquareHalfPlane::from(hp);
-        let full_circled_hp = HalfPlane::from(local_hp);
-
-        assert!(hp.equivalent_representation(full_circled_hp, 0.01));
-    }
-    #[test]
-    fn test_standardize_half_plane_on_square__vertical() {
-        let p1 = vec2(-0.3, 0);
-        let p2 = vec2(-0.3, 0.4);
-        let hp = HalfPlane::from_line_and_point_on_half_plane((p1, p2), (0, 1));
-        let local_hp = LocalSquareHalfPlane::from(hp);
-        let full_circled_hp = HalfPlane::from(local_hp);
-
-        assert!(hp.equivalent_representation(full_circled_hp, 0.01));
     }
 }
