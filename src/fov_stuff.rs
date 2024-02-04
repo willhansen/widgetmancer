@@ -1506,33 +1506,35 @@ mod tests {
         let x_entrance_pose: SquareWithOrthogonalDir = (1, 0, STEP_UP).into();
         let y_entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
 
-        (0..4).cartesian_product(0..4).for_each(|(i, j)| {
-            dbg!(i, j);
-            let fov = portal_aware_field_of_view_from_square(
-                base_square,
-                1,
-                &Default::default(),
-                &PortalGeometry::new()
-                    .with_portal(
-                        x_entrance_pose,
-                        x_entrance_pose
-                            .stepped()
-                            .strafed_right_n(5)
-                            .quarter_rotated_ccw_in_place(i),
-                    )
-                    .with_portal(
-                        y_entrance_pose,
-                        y_entrance_pose
-                            .stepped()
-                            .strafed_left_n(5)
-                            .quarter_rotated_ccw_in_place(j),
-                    ),
-            );
-            let rfov = fov.rasterized();
-            debug_print_fov_as_absolute(&fov, 7);
-            debug_print_fov_as_relative(&fov, 2);
-            // TODO: test for correct number of visible squares, etc?
-        })
+        (0..4)
+            .cartesian_product(0..4)
+            .for_each(|(x_exit_quarter_turns, y_exit_quarter_turns)| {
+                dbg!(x_exit_quarter_turns, y_exit_quarter_turns);
+                let fov = portal_aware_field_of_view_from_square(
+                    base_square,
+                    1,
+                    &Default::default(),
+                    &PortalGeometry::new()
+                        .with_portal(
+                            x_entrance_pose,
+                            x_entrance_pose
+                                .stepped()
+                                .strafed_right_n(5)
+                                .quarter_rotated_ccw_in_place(x_exit_quarter_turns),
+                        )
+                        .with_portal(
+                            y_entrance_pose,
+                            y_entrance_pose
+                                .stepped()
+                                .strafed_left_n(5)
+                                .quarter_rotated_ccw_in_place(y_exit_quarter_turns),
+                        ),
+                );
+                let rfov = fov.rasterized();
+                debug_print_fov_as_absolute(&fov, 7);
+                debug_print_fov_as_relative(&fov, 2);
+                // TODO: test for correct number of visible squares, etc?
+            })
     }
 
     #[test]

@@ -6,7 +6,9 @@ use crate::graphics::drawable::{
 };
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::{Coordinate, FAngle};
+use crate::utility::coordinates::{
+    better_angle_from_x_axis, Coordinate, FAngle, OrthogonalWorldStep,
+};
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -69,6 +71,18 @@ impl SquareVisibilityFromOneLargeShadow {
                 visible_portion: Some(self.visible_portion.unwrap().complement()),
             })
         }
+    }
+    pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        self.visible_portion()
+            .unwrap()
+            .dividing_line()
+            .line_intersections_with_centered_unit_square()
+    }
+
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
+        Self::half_visible(better_angle_from_x_axis(
+            (-which_half_visible.into()).step().to_f32(),
+        ))
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
