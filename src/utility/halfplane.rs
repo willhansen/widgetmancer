@@ -88,7 +88,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
-    pub fn about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
         self.equivalent_representation(other.complement(), tolerance)
     }
 
@@ -318,11 +318,11 @@ mod tests {
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
         let half_plane_3 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.about_complementary_to(half_plane_2, 1e-6));
-        assert!(half_plane_2.about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.about_complementary_to(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.about_complementary_to(half_plane_3, 1e-6));
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
     }
 
     #[test]
@@ -336,7 +336,7 @@ mod tests {
         let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
     }
 
     #[test]

@@ -26,6 +26,7 @@ pub trait ViewRoundable {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
 }
 
+// TODO: should this be a trait?
 pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundable {
     // visibility checks
     fn is_fully_visible(&self) -> bool;
@@ -49,6 +50,8 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn overlaps(&self, other: Self, tolerance: f32) -> bool;
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
     fn as_string(&self) -> String;
+    // TODO: add tolerance to these two?
+    fn is_about_equal_to(&self, other: Self) -> bool;
     fn is_about_complementary_to(&self, other: Self) -> bool;
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
@@ -251,7 +254,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         } else if self
             .visible_portion
             .unwrap()
-            .about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+            .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
         {
             Self::new_fully_visible()
         } else {
@@ -285,6 +288,12 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         }
     }
 
+    fn is_about_equal_to(&self, other: Self) -> bool {
+        (self.is_fully_visible() && other.is_fully_visible())
+            || self
+                .complement()
+                .is_some_and(|complement| complement.is_about_complementary_to(other))
+    }
     fn is_about_complementary_to(&self, other: Self) -> bool {
         return if self.is_fully_visible() {
             !other.is_at_least_partially_visible()
@@ -293,7 +302,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         } else {
             self.visible_portion
                 .unwrap()
-                .about_complementary_to(other.visible_portion.unwrap(), 1e-6)
+                .is_about_complementary_to(other.visible_portion.unwrap(), 1e-6)
         };
     }
 
@@ -453,7 +462,7 @@ mod tests {
 
         let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
         let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
-        assert!(half_plane_1.about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
         let partial_1 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1);
         let partial_2 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2);
