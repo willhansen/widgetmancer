@@ -422,7 +422,6 @@ impl FieldOfView {
         // rasterize each sub-level
         self.transformed_sub_fovs.iter().for_each(|sub_fov| {
             let next_step_of_portal_rotation = self.view_transform_to(sub_fov).rotation();
-            dbg!(&next_step_of_portal_rotation);
 
             let rasterized_sub_fov = sub_fov.rasterized_at_depth(
                 starting_portal_depth + 1,
@@ -462,12 +461,10 @@ impl FieldOfView {
                 .with_forward_portal_rotation(forward_portal_rotation_to_this_depth)
         })
         .collect_vec();
-        let out = RasterizedFieldOfView::from_top_down_portals(
+        RasterizedFieldOfView::from_top_down_portals(
             self.root_square_with_direction,
             top_down_portals,
-        );
-        dbg!(&self, &out);
-        out
+        )
     }
 
     fn other_converted_to_this_frame(&self, other: &Self) -> Self {
@@ -1425,9 +1422,7 @@ mod tests {
         // debug_print_square_set(&rfov.visible_absolute_squares());
         let range_and_turns = vec![((1..=3), 0), ((4..=5), -1)];
         range_and_turns.into_iter().for_each(|(range, turns)| {
-            dbg!(&range, turns);
             range.for_each(|dx| {
-                dbg!(dx);
                 assert_eq!(
                     rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
                     QuarterTurnsCcw::new(turns)
@@ -1529,7 +1524,6 @@ mod tests {
                             .strafed_left_n(5)
                             .quarter_rotated_ccw_in_place(y_exit_quarter_turns),
                     );
-                dbg!(&portal_geometry);
                 let fov = portal_aware_field_of_view_from_square(
                     base_square,
                     1,
@@ -2288,5 +2282,81 @@ mod tests {
             rfov.lone_portal_depth_for_relative_square_or_panic((0, 1)),
             1
         );
+    }
+    #[test]
+    fn test_observed_entrance_collision_from_rotated_portal() {
+        let base_square = WorldSquare::new(0, 0);
+        let target_rel_square = WorldStep::new(1, 1);
+
+        let x_entrance_pose: SquareWithOrthogonalDir = (1, 0, STEP_UP).into();
+        let y_entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+
+        let portal_geometry = PortalGeometry::new()
+            .with_portal(
+                x_entrance_pose,
+                x_entrance_pose
+                    .stepped()
+                    .strafed_right_n(5)
+                    .quarter_rotated_ccw_in_place(0),
+            )
+            .with_portal(
+                y_entrance_pose,
+                y_entrance_pose
+                    .stepped()
+                    .strafed_left_n(5)
+                    .quarter_rotated_ccw_in_place(1),
+            );
+        let fov = portal_aware_field_of_view_from_square(
+            base_square,
+            1,
+            &Default::default(),
+            &portal_geometry,
+        );
+        dbg!(&fov);
+        let rfov = fov.rasterized();
+        debug_print_fov_as_absolute(&fov, 7);
+        debug_print_fov_as_relative(&fov, 2);
+
+        // No asserts, just make sure it doesn't crash
+    }
+    #[test]
+    fn test_observed_angle_interval_related_failure() {
+        let base_square = WorldSquare::new(0, 0);
+        let target_rel_square = WorldStep::new(1, 1);
+
+        let entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let portal_geometry = PortalGeometry::new().with_portal(
+            entrance_pose,
+            entrance_pose
+                .stepped()
+                .strafed_left_n(5)
+                .quarter_rotated_ccw_in_place(1),
+        );
+        let fov = portal_aware_field_of_view_from_square(
+            base_square,
+            1,
+            &Default::default(),
+            &portal_geometry,
+        );
+        let rfov = fov.rasterized();
+        debug_print_fov_as_absolute(&fov, 7);
+        debug_print_fov_as_relative(&fov, 2);
+
+        // No asserts, just make sure it doesn't crash
+    }
+    #[test]
+    fn test_rasterize_one_rotated_view() {
+        let mut base_fov = FieldOfView::new_empty_fov_at((0, 0));
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, STEP_LEFT));
+        sub_fov
+            .visible_segments_in_main_view_only
+            .push(AngleBasedVisibleSegment::from_relative_square((3, 0)));
+        base_fov.transformed_sub_fovs.push(sub_fov);
+        let rfov = base_fov.rasterized();
+        debug_print_fov_as_absolute(&base_fov, 6);
+        debug_print_fov_as_relative(&base_fov, 4);
+        dbg!(&rfov, rfov.top_down_portals_for_relative_square((1, 0)));
+        assert!(rfov.absolute_square_is_fully_visible((5, 3)));
+        assert!(false);
     }
 }
