@@ -7,7 +7,8 @@ use crate::graphics::drawable::{
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::coordinates::{
-    better_angle_from_x_axis, Coordinate, FAngle, OrthogonalWorldStep,
+    better_angle_from_x_axis, point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle,
+    OrthogonalWorldStep,
 };
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
@@ -26,7 +27,7 @@ pub trait ViewRoundable {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
 }
 
-// TODO: should this be a trait?
+// TODO: should this be a trait? (yes, because the halfplane square visibility is going to be swapped out, with these functions being common between the two)
 pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundable {
     // visibility checks
     fn is_fully_visible(&self) -> bool;
@@ -34,6 +35,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_just_barely_fully_visible(&self, tolerance_length: f32) -> bool;
+    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool; // should return bool with partial for being on edge?
 
     // creators
     fn new_fully_visible() -> Self;
@@ -311,6 +313,16 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             .chars()
             .zip(other.as_string().chars())
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
+    }
+
+    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
+        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial());
+        if self.is_fully_visible() {
+            return true;
+        }
+        self.visible_portion
+            .unwrap()
+            .at_least_partially_covers_point(point)
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {

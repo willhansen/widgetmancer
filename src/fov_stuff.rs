@@ -2348,15 +2348,31 @@ mod tests {
     fn test_rasterize_one_rotated_view() {
         let mut base_fov = FieldOfView::new_empty_fov_at((0, 0));
         let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, STEP_LEFT));
-        sub_fov
-            .visible_segments_in_main_view_only
-            .push(AngleBasedVisibleSegment::from_relative_square((3, 0)));
+        sub_fov.visible_segments_in_main_view_only.push(
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(
+                AngleInterval::from_degrees(0.0, 45.0),
+                5,
+            ),
+        );
         base_fov.transformed_sub_fovs.push(sub_fov);
         let rfov = base_fov.rasterized();
         debug_print_fov_as_absolute(&base_fov, 6);
         debug_print_fov_as_relative(&base_fov, 4);
-        dbg!(&rfov, rfov.top_down_portals_for_relative_square((1, 0)));
-        assert!(rfov.absolute_square_is_fully_visible((5, 3)));
-        assert!(false);
+        let test_square = (2, 0);
+        let top_down_portal = rfov.lone_top_down_portal_for_relative_square_or_panic(test_square);
+        dbg!(&top_down_portal);
+        let entrance = top_down_portal.shape_in_entrance_frame();
+        let exit = top_down_portal.shape_in_exit_frame();
+        let l = 0.4;
+        let v = |vector: WorldStep| vector.to_f32().to_point().cast_unit() * l;
+        assert_true!(entrance.point_is_visible(v(STEP_UP_LEFT)));
+        assert_true!(entrance.point_is_visible(v(STEP_UP_RIGHT)));
+        assert_false!(entrance.point_is_visible(v(STEP_DOWN_LEFT)));
+        assert_false!(entrance.point_is_visible(v(STEP_DOWN_RIGHT)));
+
+        assert_true!(exit.point_is_visible(v(STEP_UP_LEFT)));
+        assert_false!(exit.point_is_visible(v(STEP_UP_RIGHT)));
+        assert_true!(exit.point_is_visible(v(STEP_DOWN_LEFT)));
+        assert_false!(exit.point_is_visible(v(STEP_DOWN_RIGHT)));
     }
 }

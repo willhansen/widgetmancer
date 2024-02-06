@@ -92,20 +92,23 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         self.equivalent_representation(other.complement(), tolerance)
     }
 
-    pub fn covers_point(&self, point: Point2D<f32, U>) -> BoolWithPartial {
+    pub fn covers_point(&self, point: impl Into<Point2D<f32, U>> + Copy) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
     pub fn covers_point_with_tolerance(
         &self,
-        point: Point2D<f32, U>,
+        point: impl Into<Point2D<f32, U>> + Copy,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
         let depth = self.depth_of_point_in_half_plane(point);
         BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
-    pub fn at_least_partially_covers_point(&self, point: Point2D<f32, U>) -> bool {
-        self.covers_point(point).is_true()
+    pub fn at_least_partially_covers_point(
+        &self,
+        point: impl Into<Point2D<f32, U>> + Copy,
+    ) -> bool {
+        self.covers_point(point).is_at_least_partial()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
         self.covers_point(point2(0.0, 0.0))
@@ -185,7 +188,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             Point2D::<f32, U>::new(0.0, 1.0),
         )
     }
-    pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
+    pub fn depth_of_point_in_half_plane(&self, point: impl Into<Point2D<f32, U>> + Copy) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
@@ -696,5 +699,12 @@ mod tests {
         assert_eq!(f(-0.51, 0.1), Start);
         // not even close
         assert_eq!(f(-50.0, 0.1), Before);
+    }
+    #[test]
+    fn test_halfplane_at_least_partially_covers_point() {
+        let hp: LocalSquareHalfPlane = HalfPlane::down(0.0);
+        assert!(hp.at_least_partially_covers_point((0.0, 0.0)));
+        assert!(hp.at_least_partially_covers_point((0.0, -0.1)));
+        assert_false!(hp.at_least_partially_covers_point((0.0, 0.1)));
     }
 }

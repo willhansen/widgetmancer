@@ -64,7 +64,6 @@ impl Debug for TopDownPortal {
 #[derive(PartialEq, Clone, Debug)]
 pub struct RasterizedFieldOfView {
     pub view_root: SquareWithOrthogonalDir,
-    // TODO: entrance or exit shapes?
     map_of_top_down_portal_exit_shapes_by_coordinates: UniqueTopDownPortals,
 }
 

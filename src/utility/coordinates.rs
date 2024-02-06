@@ -716,10 +716,13 @@ pub fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U
 }
 
 pub fn three_points_are_clockwise<U>(
-    a: Point2D<f32, U>,
-    b: Point2D<f32, U>,
-    c: Point2D<f32, U>,
+    a: impl Into<Point2D<f32, U>>,
+    b: impl Into<Point2D<f32, U>>,
+    c: impl Into<Point2D<f32, U>>,
 ) -> bool {
+    let a = a.into();
+    let b = b.into();
+    let c = c.into();
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < 0.0
@@ -772,11 +775,11 @@ pub fn on_line_in_this_order<U>(
 }
 
 pub fn point_is_in_centered_unit_square_with_tolerance<U>(
-    point: Point2D<f32, U>,
+    point: impl Into<Point2D<f32, U>>,
     tolerance: f32,
 ) -> BoolWithPartial {
     assert!(tolerance >= 0.0);
-    let vec = point.to_vector();
+    let vec = point.into().to_vector();
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
 
