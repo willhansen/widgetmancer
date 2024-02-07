@@ -6,7 +6,10 @@ use crate::graphics::drawable::{
 };
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::{Coordinate, FAngle};
+use crate::utility::coordinates::{
+    better_angle_from_x_axis, point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle,
+    OrthogonalWorldStep,
+};
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -24,6 +27,7 @@ pub trait ViewRoundable {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
 }
 
+// TODO: should this be a trait? (yes, because the halfplane square visibility is going to be swapped out, with these functions being common between the two)
 pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundable {
     // visibility checks
     fn is_fully_visible(&self) -> bool;
@@ -31,6 +35,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_just_barely_fully_visible(&self, tolerance_length: f32) -> bool;
+    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool; // should return bool with partial for being on edge?
 
     // creators
     fn new_fully_visible() -> Self;
@@ -47,6 +52,8 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn overlaps(&self, other: Self, tolerance: f32) -> bool;
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
     fn as_string(&self) -> String;
+    // TODO: add tolerance to these two?
+    fn is_about_equal_to(&self, other: Self) -> bool;
     fn is_about_complementary_to(&self, other: Self) -> bool;
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
@@ -69,6 +76,18 @@ impl SquareVisibilityFromOneLargeShadow {
                 visible_portion: Some(self.visible_portion.unwrap().complement()),
             })
         }
+    }
+    pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        self.visible_portion()
+            .unwrap()
+            .dividing_line()
+            .line_intersections_with_centered_unit_square()
+    }
+
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
+        Self::half_visible(better_angle_from_x_axis(
+            (-which_half_visible.into()).step().to_f32(),
+        ))
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
@@ -271,6 +290,12 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         }
     }
 
+    fn is_about_equal_to(&self, other: Self) -> bool {
+        (self.is_fully_visible() && other.is_fully_visible())
+            || self
+                .complement()
+                .is_some_and(|complement| complement.is_about_complementary_to(other))
+    }
     fn is_about_complementary_to(&self, other: Self) -> bool {
         return if self.is_fully_visible() {
             !other.is_at_least_partially_visible()
@@ -288,6 +313,16 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             .chars()
             .zip(other.as_string().chars())
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
+    }
+
+    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
+        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial());
+        if self.is_fully_visible() {
+            return true;
+        }
+        self.visible_portion
+            .unwrap()
+            .at_least_partially_covers_point(point)
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {

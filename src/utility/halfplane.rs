@@ -3,7 +3,6 @@ use super::{
     line::*, relative_interval_location::*,
 };
 
-// TODO: make this a newtype with restricted points
 pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 
 #[derive(PartialEq, Clone, Debug, Copy)]
@@ -81,28 +80,35 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .reflect_point_over_line(self.point_on_half_plane())
     }
 
-    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+    pub fn equivalent_representation(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line
             .approx_on_same_line(other.dividing_line, tolerance)
-            && !self
+            && self
                 .dividing_line
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
-    pub fn covers_point(&self, point: Point2D<f32, U>) -> BoolWithPartial {
+    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
+        self.equivalent_representation(other.complement(), tolerance)
+    }
+
+    pub fn covers_point(&self, point: impl Into<Point2D<f32, U>> + Copy) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
     pub fn covers_point_with_tolerance(
         &self,
-        point: Point2D<f32, U>,
+        point: impl Into<Point2D<f32, U>> + Copy,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
         let depth = self.depth_of_point_in_half_plane(point);
         BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
-    pub fn at_least_partially_covers_point(&self, point: Point2D<f32, U>) -> bool {
-        self.covers_point(point).is_true()
+    pub fn at_least_partially_covers_point(
+        &self,
+        point: impl Into<Point2D<f32, U>> + Copy,
+    ) -> bool {
+        self.covers_point(point).is_at_least_partial()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
         self.covers_point(point2(0.0, 0.0))
@@ -182,7 +188,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             Point2D::<f32, U>::new(0.0, 1.0),
         )
     }
-    pub fn depth_of_point_in_half_plane(&self, point: Point2D<f32, U>) -> f32 {
+    pub fn depth_of_point_in_half_plane(&self, point: impl Into<Point2D<f32, U>> + Copy) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
@@ -418,11 +424,11 @@ mod tests {
         let g = (-0.6, 0.4);
 
         let up: LocalSquareHalfPlane =
-            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
-        let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0));
-        let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0));
-        let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0));
-        let left = HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0));
+            HalfPlane::from_line_and_point_on_half_plane((a, b), (0.0, 5.0)).into();
+        let up_right = HalfPlane::from_line_and_point_on_half_plane((b, c), (1.0, 1.0)).into();
+        let down_right = HalfPlane::from_line_and_point_on_half_plane((c, d), (1.0, -1.0)).into();
+        let down = HalfPlane::from_line_and_point_on_half_plane((d, e), (0.0, -5.0)).into();
+        let left = HalfPlane::from_line_and_point_on_half_plane((f, g), (-5.0, 0.0)).into();
 
         let tolerance = 1e-5;
 
@@ -438,7 +444,10 @@ mod tests {
         ];
         let actual_boolean_matrix: [[i32; 5]; 5] = from_fn(|row| {
             from_fn(|col| {
-                if f(&vars[row], &vars[col], tolerance).try_into().unwrap() {
+                if f(&vars[row].into(), &vars[col], tolerance)
+                    .try_into()
+                    .unwrap()
+                {
                     1
                 } else {
                     0
@@ -451,9 +460,9 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__horizontal_up() {
         let a: LocalSquareHalfPlane =
-            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3));
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.3)).into();
         let b: LocalSquareHalfPlane =
-            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4));
+            HalfPlane::new_away_from_origin_from_border_line(Line::new_horizontal(0.4)).into();
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
             .is_true())
@@ -690,5 +699,12 @@ mod tests {
         assert_eq!(f(-0.51, 0.1), Start);
         // not even close
         assert_eq!(f(-50.0, 0.1), Before);
+    }
+    #[test]
+    fn test_halfplane_at_least_partially_covers_point() {
+        let hp: LocalSquareHalfPlane = HalfPlane::down(0.0);
+        assert!(hp.at_least_partially_covers_point((0.0, 0.0)));
+        assert!(hp.at_least_partially_covers_point((0.0, -0.1)));
+        assert_false!(hp.at_least_partially_covers_point((0.0, 0.1)));
     }
 }

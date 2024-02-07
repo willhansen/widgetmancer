@@ -120,7 +120,7 @@ impl<U: Copy> Line<f32, U> {
     pub fn normal_vector_from_origin(&self) -> Vector2D<f32, U> {
         -self.normal_vector_to_point((0.0, 0.0))
     }
-    pub fn normal_distance_to_point(&self, point: Point2D<f32, U>) -> f32 {
+    pub fn normal_distance_to_point(&self, point: impl Into<Point2D<f32, U>>) -> f32 {
         self.normal_vector_to_point(point).length()
     }
     pub fn a_point_clockwise_of_line(&self) -> Point2D<f32, U> {
@@ -209,7 +209,11 @@ impl<U: Copy> Line<f32, U> {
         assert!(length > 0.0);
         Self::new(start, naive_ray_endpoint(start, angle, length))
     }
-    pub fn same_side_of_line(&self, point_c: Point2D<f32, U>, point_d: Point2D<f32, U>) -> bool {
+    pub fn same_side_of_line(
+        &self,
+        point_c: impl Into<Point2D<f32, U>> + Copy,
+        point_d: impl Into<Point2D<f32, U>> + Copy,
+    ) -> bool {
         let point_a = self.p1;
         let point_b = self.p2;
         let c_on_line = self.point_is_on_line(point_c);

@@ -279,7 +279,7 @@ impl RigidTransform {
         let start = start.into();
         let end = end.into();
 
-        Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_as_seen_from_self(end))
+        Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_absolute_to_relative(end))
     }
     pub fn from_rotation(r: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         let p = ORIGIN_POSE();

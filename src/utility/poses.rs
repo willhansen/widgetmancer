@@ -262,8 +262,8 @@ impl SquareWithOrthogonalDir {
         self.square.to_f32() + self.direction().step().to_f32() * 0.5
     }
 
-    // TODO: replace with just subtraction, returning whatever a relative pose is
-    pub fn other_pose_as_seen_from_self(&self, other: impl Into<Self>) -> Self {
+    // TODO: replace with just subtraction, returning whatever a relative pose is (probably a translation and rotation)
+    pub fn other_pose_absolute_to_relative(&self, other: impl Into<Self>) -> Self {
         let other = other.into();
 
         let naive_translation: WorldStep = other.square - self.square;
@@ -275,10 +275,24 @@ impl SquareWithOrthogonalDir {
             other.dir.quarter_rotated_ccw(rotation),
         )
     }
-    pub fn other_square_as_seen_from_self(&self, other: impl Into<WorldSquare>) -> WorldStep {
-        self.other_pose_as_seen_from_self((other.into(), STEP_UP))
+    pub fn other_pose_relative_to_absolute(&self, other: impl Into<Self>) -> Self {
+        let other: Self = other.into();
+
+        let relative_translation: WorldStep = other.square.to_vector();
+        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
+        Self::from_square_and_step(
+            self.square + relative_translation.quarter_rotated_ccw(-rotation),
+            other.dir.quarter_rotated_ccw(-rotation),
+        )
+    }
+    pub fn other_square_absolute_to_relative(&self, other: impl Into<WorldSquare>) -> WorldStep {
+        self.other_pose_absolute_to_relative((other.into(), STEP_UP))
             .square()
             .to_vector()
+    }
+    pub fn other_square_relative_to_absolute(&self, other: impl Into<WorldStep>) -> WorldSquare {
+        self.other_pose_relative_to_absolute((other.into().to_point(), STEP_UP))
+            .square()
     }
 }
 
@@ -640,7 +654,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_square_relative_to_pose() {
+    fn test_square_relative_to_pose__absolute_to_relative() {
         // |
         // |.....x
         // |..>  .
@@ -650,9 +664,31 @@ mod tests {
         let observer_pose = SquareWithOrthogonalDir::from_square_and_step((3, 2), STEP_RIGHT);
         let correct_rel_square = WorldStep::new(-1, 3);
         assert_eq!(
-            observer_pose.other_square_as_seen_from_self(abs_square),
+            observer_pose.other_square_absolute_to_relative(abs_square),
             correct_rel_square
         );
+    }
+
+    #[test]
+    fn test_square_relative_to_pose__reversibility() {
+        // pretty arbitrary
+        let pose_square = vec![
+            ((0, 0, STEP_UP), (0, 0)),    // origin
+            ((0, 0, STEP_UP), (5, 0)),    // pure x
+            ((0, 0, STEP_LEFT), (5, 0)),  // rotation
+            ((3, 4, STEP_UP), (5, 7)),    // translation
+            ((3, 4, STEP_RIGHT), (5, 7)), // rotation and translation
+        ];
+        pose_square.into_iter().for_each(|(p, s)| {
+            let pose: SquareWithOrthogonalDir = p.into();
+            let square: WorldSquare = s.into();
+            assert_eq!(
+                pose.other_square_relative_to_absolute(
+                    pose.other_square_absolute_to_relative(square)
+                ),
+                square
+            );
+        })
     }
 
     #[test]
