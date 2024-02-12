@@ -17,6 +17,7 @@ use crate::fov_stuff::square_visibility::{
 use crate::utility::coordinates::{
     king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
 };
+use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
@@ -52,14 +53,18 @@ type Pose = SquareWithOrthogonalDir;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-const DEFAULT_FOV_ROOT_DIRECTION_STEP: WorldStep = STEP_UP;
-
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     view_root: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
     transformed_sub_fovs: Vec<FieldOfView>,
+}
+
+impl HasOriginPose for FieldOfView {
+    fn origin_pose(&self) -> SquareWithOrthogonalDir {
+        self.view_root
+    }
 }
 
 // TODO: derive_delegate with portrait
@@ -83,10 +88,6 @@ impl FieldOfView {
             visible_segments_in_main_view_only: Vec::new(),
             transformed_sub_fovs: Vec::new(),
         }
-    }
-    fn view_root_orientation_relative_to_default(&self) -> QuarterTurnsCcw {
-        self.view_root.direction_in_quarter_turns()
-            - QuarterTurnsCcw::from_vector(DEFAULT_FOV_ROOT_DIRECTION_STEP)
     }
     pub fn new_empty_fov_at(new_center: impl Into<WorldSquare>) -> Self {
         Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
@@ -707,7 +708,7 @@ pub fn single_octant_field_of_view(
         portal_geometry,
         SquareWithOrthogonalDir::from_square_and_step(
             center_square,
-            DEFAULT_FOV_ROOT_DIRECTION_STEP,
+            FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
         ),
         radius,
         AngleInterval::from_octant(octant),
@@ -1388,7 +1389,10 @@ mod tests {
         sub_octant_field_of_view(
             &Default::default(),
             &portals,
-            SquareWithOrthogonalDir::from_square_and_step(start, DEFAULT_FOV_ROOT_DIRECTION_STEP),
+            SquareWithOrthogonalDir::from_square_and_step(
+                start,
+                FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+            ),
             fov_range,
             narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),

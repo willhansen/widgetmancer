@@ -11,6 +11,7 @@ use crate::utility::coordinate_frame_conversions::STEP_LEFT;
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
 use crate::utility::general_utility::union;
+use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::poses::SquareWithOrthogonalDir;
 use crate::utility::poses::StepWithQuarterRotations;
 use crate::utility::trait_alias_macro::function_short_name;
@@ -25,8 +26,6 @@ use derive_more::{Constructor, Display};
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-
-use super::DEFAULT_FOV_ROOT_DIRECTION_STEP;
 
 // TODO: rename?  Should it be "target" as in "target a thing to draw", or "source" as in "the source of what to draw"?
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
@@ -78,6 +77,12 @@ impl QuarterTurnRotatable for TopDownPortal {
 pub struct RasterizedFieldOfView {
     pub view_root: SquareWithOrthogonalDir,
     map_of_top_down_portal_exit_shapes_by_coordinates: UniqueTopDownPortals,
+}
+
+impl HasOriginPose for RasterizedFieldOfView {
+    fn origin_pose(&self) -> SquareWithOrthogonalDir {
+        self.view_root
+    }
 }
 
 // these are the public functions.
@@ -671,10 +676,6 @@ impl RasterizedFieldOfView {
                 }),
         )
     }
-    fn view_root_orientation_relative_to_default(&self) -> QuarterTurnsCcw {
-        self.view_root.direction_in_quarter_turns()
-            - QuarterTurnsCcw::from_vector(DEFAULT_FOV_ROOT_DIRECTION_STEP)
-    }
     fn as_seen_from_oriented_origin(&self) -> Self {
         self.as_seen_from_other_local_view_root(ORIGIN_POSE())
     }
@@ -847,7 +848,10 @@ impl RasterizedFieldOfView {
         self.filtered(true, true, true)
     }
     fn new_centered_at(new_root: impl Into<WorldSquare>) -> Self {
-        RasterizedFieldOfView::new_empty_with_view_root((new_root, DEFAULT_FOV_ROOT_DIRECTION_STEP))
+        RasterizedFieldOfView::new_empty_with_view_root((
+            new_root,
+            Self::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+        ))
     }
 
     fn new_direct_connection_to_local_square(
@@ -1860,7 +1864,8 @@ mod tests {
                 let rfov = RasterizedFieldOfView::from_top_down_portals(
                     (
                         view_root_square,
-                        DEFAULT_FOV_ROOT_DIRECTION_STEP.quarter_rotated_ccw(root_rotation),
+                        RasterizedFieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP
+                            .quarter_rotated_ccw(root_rotation),
                     ),
                     [top_down_portal],
                 );
