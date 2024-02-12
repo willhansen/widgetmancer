@@ -706,14 +706,14 @@ impl Graphics {
                     ))
                     .to_enum()
                 };
-                if !top_down_portal.shape_in_exit_frame().is_fully_visible() {
+                if !top_down_portal.absolute_exit_shape().is_fully_visible() {
                     drawable = DrawableEnum::PartialVisibility(
                         PartialVisibilityDrawable::from_shadowed_drawable(
                             &drawable,
                             if render_portals_with_line_of_sight {
-                                top_down_portal.shape_in_entrance_frame()
+                                top_down_portal.absolute_entrance_shape()
                             } else {
-                                top_down_portal.shape_in_exit_frame()
+                                top_down_portal.absolute_exit_shape()
                             },
                         ),
                     )

@@ -52,7 +52,7 @@ type Pose = SquareWithOrthogonalDir;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-const DEFAULT_FOV_ROOT_DIRECTION: WorldStep = STEP_UP;
+const DEFAULT_FOV_ROOT_DIRECTION_STEP: WorldStep = STEP_UP;
 
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
@@ -708,7 +708,10 @@ pub fn single_octant_field_of_view(
     let fov_result = sub_octant_field_of_view(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_step(center_square, DEFAULT_FOV_ROOT_DIRECTION),
+        SquareWithOrthogonalDir::from_square_and_step(
+            center_square,
+            DEFAULT_FOV_ROOT_DIRECTION_STEP,
+        ),
         radius,
         AngleInterval::from_octant(octant),
         OctantFOVSquareSequenceIter::new_from_center(octant),
@@ -1054,7 +1057,7 @@ mod tests {
         )
         .rasterized();
         let visibilities_of_test_square =
-            fov_result.top_down_portal_entrance_shapes_at_relative_square(test_rel_square);
+            fov_result.absolute_top_down_portal_entrance_shapes_at_relative_square(test_rel_square);
         assert_eq!(visibilities_of_test_square.len(), 1);
         assert_eq!(
             PartialVisibilityDrawable::from_square_visibility(visibilities_of_test_square[0])
@@ -1388,7 +1391,7 @@ mod tests {
         sub_octant_field_of_view(
             &Default::default(),
             &portals,
-            SquareWithOrthogonalDir::from_square_and_step(start, DEFAULT_FOV_ROOT_DIRECTION),
+            SquareWithOrthogonalDir::from_square_and_step(start, DEFAULT_FOV_ROOT_DIRECTION_STEP),
             fov_range,
             narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
@@ -1870,7 +1873,7 @@ mod tests {
             1
         );
         let visibility = rasterized_fov
-            .top_down_portal_entrance_shapes_at_relative_square(rel_square)[0]
+            .absolute_top_down_portal_entrance_shapes_at_relative_square(rel_square)[0]
             .clone();
         assert_eq!(
             rasterized_fov.absolute_squares_visible_at_relative_square(rel_square),
@@ -1966,13 +1969,13 @@ mod tests {
         let sub_rfov = sub_fov_1.rasterized();
 
         assert_eq!(
-            rfov.top_down_portal_entrance_shapes_at_relative_square(rel_square)
+            rfov.absolute_top_down_portal_entrance_shapes_at_relative_square(rel_square)
                 .len(),
             2
         );
         assert_eq!(
             sub_rfov
-                .top_down_portal_entrance_shapes_at_relative_square(rel_square)
+                .absolute_top_down_portal_entrance_shapes_at_relative_square(rel_square)
                 .len(),
             1
         );
@@ -2029,7 +2032,7 @@ mod tests {
         let rasterized_fov = new_fov_result.rasterized();
         let test_step = STEP_RIGHT;
         let visibilities_of_one_right =
-            rasterized_fov.top_down_portal_entrance_shapes_at_relative_square(test_step);
+            rasterized_fov.absolute_top_down_portal_entrance_shapes_at_relative_square(test_step);
 
         // check that the relative square corresponds to exactly one absolute square
         assert_eq!(
@@ -2156,7 +2159,7 @@ mod tests {
 
         let visibilities_of_test_square = new_fov_result
             .rasterized()
-            .top_down_portal_entrance_shapes_at_relative_square(test_square);
+            .absolute_top_down_portal_entrance_shapes_at_relative_square(test_square);
         let rasterized_fov = new_fov_result.rasterized();
         assert_eq!(
             rasterized_fov
@@ -2173,8 +2176,8 @@ mod tests {
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
             QuarterTurnsCcw::new(1)
         );
-        let the_square_visibility = rasterized_fov
-            .lone_square_visibility_in_entrance_frame_for_relative_square_or_panic(test_square);
+        let the_square_visibility =
+            rasterized_fov.lone_portal_entrance_shape_for_relative_square_or_panic(test_square);
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),
@@ -2361,8 +2364,8 @@ mod tests {
         let test_square = (2, 0);
         let top_down_portal = rfov.lone_top_down_portal_for_relative_square_or_panic(test_square);
         dbg!(&top_down_portal);
-        let entrance = top_down_portal.shape_in_entrance_frame();
-        let exit = top_down_portal.shape_in_exit_frame();
+        let entrance = top_down_portal.absolute_entrance_shape();
+        let exit = top_down_portal.absolute_exit_shape();
         let l = 0.4;
         let v = |vector: WorldStep| vector.to_f32().to_point().cast_unit() * l;
         assert_true!(entrance.point_is_visible(v(STEP_UP_LEFT)));

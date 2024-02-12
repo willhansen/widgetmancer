@@ -569,8 +569,11 @@ impl QuarterTurnsCcw {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
-    pub fn to_vector(&self) -> WorldStep {
+    pub fn to_orthogonal_direction(&self) -> WorldStep {
         STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
+    }
+    pub fn all_4() -> impl Iterator<Item = Self> + Clone {
+        (0..4).map(|x| x.into())
     }
     pub fn from_vector(dir: WorldStep) -> Self {
         assert!(is_orthogonal(dir));

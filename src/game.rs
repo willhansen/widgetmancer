@@ -3979,7 +3979,7 @@ mod tests {
             .iter()
             .map(|&world_step| {
                 fov.rasterized()
-                    .top_down_portal_entrance_shapes_at_relative_square(world_step)
+                    .absolute_top_down_portal_entrance_shapes_at_relative_square(world_step)
             })
             .for_each(|visibilities_of_rel_square: Vec<SquareVisibility>| {
                 let vis1: SquareVisibility = visibilities_of_rel_square[0];

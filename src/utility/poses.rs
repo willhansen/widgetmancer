@@ -74,7 +74,7 @@ where
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
-        Self::from_square_and_step(square, quarter_turns.to_vector())
+        Self::from_square_and_step(square, quarter_turns.to_orthogonal_direction())
     }
     pub fn direction(&self) -> OrthogonalWorldStep {
         self.dir()
