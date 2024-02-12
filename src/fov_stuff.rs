@@ -57,7 +57,7 @@ const DEFAULT_FOV_ROOT_DIRECTION_STEP: WorldStep = STEP_UP;
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
-    root_square_with_direction: SquareWithOrthogonalDir,
+    view_root: SquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
     transformed_sub_fovs: Vec<FieldOfView>,
 }
@@ -66,7 +66,7 @@ pub struct FieldOfView {
 impl QuarterTurnRotatable for FieldOfView {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         FieldOfView::new(
-            self.root_square_with_direction
+            self.view_root
                 .quarter_revolved_ccw_around_origin(quarter_turns_ccw),
             self.visible_segments_in_main_view_only
                 .quarter_rotated_ccw(quarter_turns_ccw),
@@ -79,10 +79,14 @@ impl QuarterTurnRotatable for FieldOfView {
 impl FieldOfView {
     pub fn new_empty_fov_with_root(root: impl Into<SquareWithOrthogonalDir>) -> Self {
         FieldOfView {
-            root_square_with_direction: root.into(),
+            view_root: root.into(),
             visible_segments_in_main_view_only: Vec::new(),
             transformed_sub_fovs: Vec::new(),
         }
+    }
+    fn view_root_orientation_relative_to_default(&self) -> QuarterTurnsCcw {
+        self.view_root.direction_in_quarter_turns()
+            - QuarterTurnsCcw::from_vector(DEFAULT_FOV_ROOT_DIRECTION_STEP)
     }
     pub fn new_empty_fov_at(new_center: impl Into<WorldSquare>) -> Self {
         Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
@@ -112,14 +116,14 @@ impl FieldOfView {
         )
     }
     pub fn root_square(&self) -> WorldSquare {
-        self.root_square_with_direction.square()
+        self.view_root.square()
     }
     pub fn root_square_with_direction(&self) -> SquareWithOrthogonalDir {
-        self.root_square_with_direction
+        self.view_root
     }
     pub fn view_transform_to(&self, other: &FieldOfView) -> RigidTransform {
-        let start = self.root_square_with_direction;
-        let end = other.root_square_with_direction;
+        let start = self.view_root;
+        let end = other.view_root;
         RigidTransform::from_start_and_end_poses(start, end)
     }
     pub fn transformed_sub_fovs(&self) -> &Vec<FieldOfView> {
@@ -162,9 +166,9 @@ impl FieldOfView {
     ) -> Self {
         let view_root = view_root.into();
         let tf_to_new_view_root =
-            RigidTransform::from_start_and_end_poses(self.root_square_with_direction, view_root);
+            RigidTransform::from_start_and_end_poses(self.view_root, view_root);
 
-        self.root_square_with_direction = view_root;
+        self.view_root = view_root;
         self.visible_segments_in_main_view_only = self
             .visible_segments_in_main_view_only
             .iter()
@@ -181,10 +185,7 @@ impl FieldOfView {
     }
 
     fn combined_main_view_only(&self, other: &Self) -> Self {
-        assert_eq!(
-            self.root_square_with_direction,
-            other.root_square_with_direction
-        );
+        assert_eq!(self.view_root, other.view_root);
 
         // TODO: combine visible segments where possible
         // TODO: delete this commented code
@@ -251,7 +252,7 @@ impl FieldOfView {
         let combined_view_segments = AngleBasedVisibleSegment::combine_multiple(segments);
 
         FieldOfView {
-            root_square_with_direction: self.root_square_with_direction,
+            view_root: self.view_root,
             visible_segments_in_main_view_only: combined_view_segments,
             transformed_sub_fovs: vec![],
         }
@@ -361,7 +362,7 @@ impl FieldOfView {
 
         let grouped_by_root = combined_sub_fovs
             .into_iter()
-            .into_group_map_by(|fov: &FieldOfView| fov.root_square_with_direction);
+            .into_group_map_by(|fov: &FieldOfView| fov.view_root);
 
         let combined_by_root: Vec<FieldOfView> = grouped_by_root
             .into_iter()
@@ -386,10 +387,7 @@ impl FieldOfView {
     }
 
     pub fn combined_with(&self, other: &Self) -> Self {
-        assert_eq!(
-            self.root_square_with_direction,
-            other.root_square_with_direction
-        );
+        assert_eq!(self.view_root, other.view_root);
 
         let mut top_view_combined_fov = self.combined_main_view_only(other);
 
@@ -445,7 +443,7 @@ impl FieldOfView {
         forward_portal_rotation_to_this_depth: impl Into<QuarterTurnsCcw> + Copy,
     ) -> RasterizedFieldOfView {
         let top_down_portals = RasterizedFieldOfView::visibility_map_to_top_down_portals(
-            self.root_square_with_direction,
+            self.view_root,
             &self
                 .visible_segments_in_main_view_only
                 .iter()
@@ -459,12 +457,11 @@ impl FieldOfView {
             td_portal
                 .with_portal_depth(top_level_portal_depth)
                 .with_forward_portal_rotation(forward_portal_rotation_to_this_depth)
+                .quarter_rotated_ccw(self.view_root_orientation_relative_to_default())
+            // Compensate for rotated view root, because portal exit is in absolute frame
         })
         .collect_vec();
-        RasterizedFieldOfView::from_top_down_portals(
-            self.root_square_with_direction,
-            top_down_portals,
-        )
+        RasterizedFieldOfView::from_top_down_portals(self.view_root, top_down_portals)
     }
 
     fn other_converted_to_this_frame(&self, other: &Self) -> Self {
@@ -1458,9 +1455,7 @@ mod tests {
             RigidTransform::from_start_and_end_poses(portal_entrance, portal_exit.stepped_back())
         );
         assert_eq!(
-            fov_result.transformed_sub_fovs[0]
-                .root_square_with_direction
-                .square(),
+            fov_result.transformed_sub_fovs[0].view_root.square(),
             portal_exit.square() + STEP_UP * 2
         );
     }
@@ -1511,7 +1506,6 @@ mod tests {
         (0..4)
             .cartesian_product(0..4)
             .for_each(|(x_exit_quarter_turns, y_exit_quarter_turns)| {
-                dbg!(x_exit_quarter_turns, y_exit_quarter_turns);
                 let portal_geometry = PortalGeometry::new()
                     .with_portal(
                         x_entrance_pose,
@@ -1550,7 +1544,7 @@ mod tests {
 
         let absolute_test_square: WorldSquare = point2(1, 4);
         let test_square_relative_to_sub_fov = sub_fov
-            .root_square_with_direction
+            .view_root
             .other_square_absolute_to_relative(absolute_test_square);
         assert_eq!(test_square_relative_to_sub_fov, WorldStep::new(-3, -2));
 
@@ -1916,10 +1910,7 @@ mod tests {
     fn test_fov_relative_to_absolute__sub_view_with_rotation() {
         let mut fov = FieldOfView::new_empty_fov_at((5, 5));
 
-        let sub_root = fov
-            .root_square_with_direction
-            .turned_right()
-            .at_square((34, -7));
+        let sub_root = fov.view_root.turned_right().at_square((34, -7));
         let mut sub_fov = FieldOfView::new_empty_fov_with_root(sub_root);
 
         let rel_square = STEP_DOWN_LEFT * 1;
@@ -2315,7 +2306,6 @@ mod tests {
             &Default::default(),
             &portal_geometry,
         );
-        dbg!(&fov);
         let rfov = fov.rasterized();
         debug_print_fov_as_absolute(&fov, 7);
         debug_print_fov_as_relative(&fov, 2);
@@ -2359,11 +2349,10 @@ mod tests {
         );
         base_fov.transformed_sub_fovs.push(sub_fov);
         let rfov = base_fov.rasterized();
-        debug_print_fov_as_absolute(&base_fov, 6);
-        debug_print_fov_as_relative(&base_fov, 4);
+        // debug_print_fov_as_absolute(&base_fov, 6);
+        // debug_print_fov_as_relative(&base_fov, 4);
         let test_square = (2, 0);
         let top_down_portal = rfov.lone_top_down_portal_for_relative_square_or_panic(test_square);
-        dbg!(&top_down_portal);
         let entrance = top_down_portal.absolute_entrance_shape();
         let exit = top_down_portal.absolute_exit_shape();
         let l = 0.4;

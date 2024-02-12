@@ -61,6 +61,17 @@ impl Debug for TopDownPortal {
     }
 }
 
+impl QuarterTurnRotatable for TopDownPortal {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+        Self {
+            shape_in_exit_frame: self
+                .shape_in_exit_frame
+                .quarter_rotated_ccw(quarter_turns_ccw),
+            ..*self
+        }
+    }
+}
+
 /// Key metaphor is that the portal is no longer from player to square, it is now screen to square, in a top-down fashion, so it can be rendered correctly.
 /// TODO: maybe precalculate indexes(?)
 #[derive(PartialEq, Clone, Debug)]
