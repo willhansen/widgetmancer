@@ -151,6 +151,10 @@ impl AngleBasedVisibleSegment {
     pub fn from_arc_and_fence_radius(arc: AngleInterval, fence_radius: u32) -> Self {
         Self::new(arc, Fence::from_radius_of_square_and_arc(fence_radius, arc))
     }
+    pub fn new_full_circle(fence_radius: u32) -> Self {
+        let arc = AngleInterval::FullCircle;
+        Self::new(arc, Fence::from_radius_of_square_and_arc(fence_radius, arc))
+    }
     pub fn narrow_segment_to_right(first_square: u32, last_square: u32) -> Self {
         let segment = Self::from_arc_and_fence_radius(
             AngleInterval::from_degrees(
@@ -192,12 +196,18 @@ impl AngleBasedVisibleSegment {
         todo!()
     }
     pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
-        let sorted_ccw = unsorted_segments.into_iter().sorted_by_key(|segment| {
-            OrderedFloat(match segment.arc {
-                AngleInterval::PartialArc(partial_arc) => partial_arc.center_angle().radians,
-                _ => 0.0,
+        dbg!("================================================================================================");
+        let sorted_ccw = unsorted_segments
+            .into_iter()
+            .inspect(|x| {
+                dbg!(x); // asdfasdf
             })
-        });
+            .sorted_by_key(|segment| {
+                OrderedFloat(match segment.arc {
+                    AngleInterval::PartialArc(partial_arc) => partial_arc.center_angle().radians,
+                    _ => 0.0,
+                })
+            });
 
         let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
 
@@ -546,5 +556,18 @@ mod tests {
             seg1.to_local_square_visibility_map(),
             seg2.to_local_square_visibility_map()
         );
+    }
+    #[test]
+    fn test_combine_multiple__full_circle__out_of_order() {
+        let radius = 3;
+        let segments = [(45.0, -45.0), (0.0, 45.0), (-45.0, 0.0)].map(|deg| {
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(
+                AngleInterval::from_degrees(deg.0, deg.1),
+                radius,
+            )
+        });
+        let result = AngleBasedVisibleSegment::combine_multiple(segments);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], AngleBasedVisibleSegment::new_full_circle(radius));
     }
 }
