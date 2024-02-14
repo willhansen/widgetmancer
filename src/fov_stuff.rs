@@ -584,14 +584,21 @@ pub fn sub_octant_field_of_view(
 
             let visible_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
 
-            let visible_arc_of_face = view_arc.intersection(
+            let visible_arc_of_face_intersection_result = view_arc.intersection(
                 visible_arc_of_face,
                 Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
             );
 
-            if visible_arc_of_face.is_empty() {
-                continue;
+            match visible_arc_of_face_intersection_result.len() {
+                0 => continue,
+                1 => (),
+                _ => panic!(
+                    "face should not have wraparound visibility: {:?}",
+                    visible_arc_of_face_intersection_result
+                ),
             }
+
+            let visible_arc_of_face = visible_arc_of_face_intersection_result[0];
 
             if !face_blocks_sight {
                 continue;

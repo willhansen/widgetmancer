@@ -81,14 +81,14 @@ impl AngleInterval {
             _ => panic!("Angle interval is not partial: {}", self),
         }
     }
-    pub fn intersection(&self, other: Self, tolerance: FAngle) -> Self {
+    pub fn intersection(&self, other: Self, tolerance: FAngle) -> Vec<Self> {
         use AngleInterval::*;
         match self {
-            Empty => Empty,
-            FullCircle => other,
+            Empty => vec![Empty],
+            FullCircle => vec![other],
             PartialArc(self_partial_arc) => match other {
-                Empty => Empty,
-                FullCircle => *self,
+                Empty => vec![Empty],
+                FullCircle => vec![*self],
                 PartialArc(other_partial_arc) => {
                     Self::intersect_partial_arcs(*self_partial_arc, other_partial_arc, tolerance)
                         .into()
@@ -200,12 +200,12 @@ impl AngleInterval {
         a: PartialAngleInterval,
         b: PartialAngleInterval,
         tolerance: FAngle,
-    ) -> Self {
+    ) -> Vec<Self> {
         if a.has_wraparound_double_overlap(b, tolerance).is_true() {
-            panic!("Wraparound double overlap:\n{}\n{}", a, b);
+            todo!("Wraparound double overlap:\n{}\n{}", a, b);
         }
 
-        if a.overlaps_partial_arc(b, tolerance).is_true() {
+        vec![if a.overlaps_partial_arc(b, tolerance).is_true() {
             AngleInterval::from_angles(
                 if b.contains_angle(a.cw(), tolerance).is_true() {
                     a.cw()
@@ -220,7 +220,7 @@ impl AngleInterval {
             )
         } else {
             AngleInterval::Empty
-        }
+        }]
     }
     // TODO: Does this need a tolerance?
     pub fn subtract(&self, other: impl Into<Self>) -> Vec<Self> {
@@ -721,7 +721,10 @@ mod tests {
         let b = AngleInterval::from_degrees(40.0, 90.0);
         let c = AngleInterval::from_degrees(80.0, 90.0);
 
-        assert_eq!(a.intersection(b, default_angle_tolerance_for_tests()), c);
+        assert_eq!(
+            a.intersection(b, default_angle_tolerance_for_tests()),
+            vec![c]
+        );
     }
 
     #[test]
@@ -730,7 +733,7 @@ mod tests {
         let b = AngleInterval::from_degrees(40.0, 90.0);
         assert_eq!(
             a.intersection(b, default_angle_tolerance_for_tests()),
-            AngleInterval::Empty,
+            vec![],
         );
     }
 
@@ -740,20 +743,30 @@ mod tests {
         let big = AngleInterval::from_degrees(60.0, 120.0);
         assert_eq!(
             big.intersection(small, default_angle_tolerance_for_tests()),
-            small
+            vec![small]
         );
         assert_eq!(
             small.intersection(big, default_angle_tolerance_for_tests()),
-            small
+            vec![small]
         );
     }
 
     #[test]
-    #[should_panic]
     fn test_angle_interval_intersection__wraparound_double_overlap() {
-        let small = AngleInterval::from_degrees(80.0, 100.0);
         let big = AngleInterval::from_degrees(60.0, 120.0);
-        big.intersection(small.complement(), default_angle_tolerance_for_tests());
+        let really_big = AngleInterval::from_degrees(100.0, 80.0);
+        let result: Vec<AngleInterval> =
+            big.intersection(really_big, default_angle_tolerance_for_tests());
+        assert_eq!(result.len(), 2);
+        let expected = [
+            AngleInterval::from_degrees(60.0, 80.0),
+            AngleInterval::from_degrees(100.0, 120.0),
+        ];
+        expected.into_iter().for_each(|expected_interval| {
+            assert!(result.iter().any(|result_interval| {
+                result_interval.about_eq(expected_interval, FAngle::degrees(0.001))
+            }));
+        });
     }
 
     #[test]

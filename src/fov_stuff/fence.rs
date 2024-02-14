@@ -9,7 +9,7 @@ use crate::rotated_to_have_split_at_max;
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
-use crate::utility::general_utility::all_true;
+use crate::utility::general_utility::{all_true, union};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
 use crate::utility::{
@@ -250,93 +250,12 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
     }
 
-    fn number_of_consecutive_points_of_overlap_with_other_fence_at_ccw_end(&self, second_fence: &Self, max_overlap_allowed: usize) -> Option<usize> {
-        let start_fence = self;
-        let end_fence = second_fence;
-
-
-        let point_index_of_first_point_in_start_fence_that_touches_start_of_end_fence: Option<usize> = (0..=max_overlap_allowed)
-                .find_position(|&depth| {
-                    let point_index = start_fence.num_points() - depth;
-                    let point_from_start_fence = start_fence.point_by_index(point_index as i32);
-                    let is_match = point_from_start_fence == end_fence.point_by_index(0);
-                    if is_match {
-                        let all_points_on_start_fence_after_match_point_do_match =  (0..=depth as u32).all(|end_fence_point_index| {
-                            let start_fence_point_index = 
-                        todo!()
-                            
-                        });
-                        todo!()
-                    };
-                    todo!();
-                })
-                .map(|(position, value)| position);
-        todo!()
-    }
-
-    pub fn try_concatenate_allowing_n_edges_of_overlap(
-        &self,
-        other: &Self,
-        n: usize,
-    ) -> Result<Self, String> {
-        // TODO: refactor this function a bunch
-
-        let fences = [&self, &other];
-        let number_of_overlapping_points_at_end_of_each_fence: [Option<usize>; 2] = [0, 1].map(|i| {
-            let start_fence = fences[i];
-            let end_fence = fences[1 - i];
-            start_fence.number_of_consecutive_points_of_overlap_with_other_fence_at_ccw_end(&end_fence, n)
-        });
-        
-            todo!();
-            let endpoints_touch = start_fence.point_by_index(-1) == end_fence.point_by_index(0);
-            if !endpoints_touch {
-                return None;
-            }
-
-            todo!();
-
-        let a_cw_touching_b_ccw =
-            |a: &Fence, b: &Fence| a.point_by_index(0) == b.point_by_index(-1);
-        let a_cw_overlapping_b_ccw = |a: &Fence, b: &Fence| {
-            a.point_by_index(1) == b.point_by_index(-1)
-                && a.point_by_index(0) == b.point_by_index(-2)
-        };
-
-        let touch_at_self_cw_ccw = [
-            a_cw_touching_b_ccw(self, other),
-            a_cw_touching_b_ccw(other, self),
-        ];
-        let overlap_at_self_cw_ccw = [
-            a_cw_overlapping_b_ccw(self, other),
-            a_cw_overlapping_b_ccw(other, self),
-        ];
-
-        let connect_at_self_cw_ccw =
-            [0, 1].map(|i| touch_at_self_cw_ccw[i] || overlap_at_self_cw_ccw[i]);
-
-        let both_ends_connect = all_true(&connect_at_self_cw_ccw);
-
-        let num_to_skip_at_start_of_self = if overlap_at_self_cw_ccw[0] { 1 } else { 0 };
-        let num_to_skip_at_start_of_other = if overlap_at_self_cw_ccw[1] { 1 } else { 0 };
-
-        let self_iter = self.edges.iter().skip(num_to_skip_at_start_of_self);
-        let other_iter = other.edges.iter().skip(num_to_skip_at_start_of_other);
-
-        let (first_iter, second_iter) = if connect_at_self_cw_ccw[1] {
-            (self_iter, other_iter)
-        } else {
-            (other_iter, self_iter)
-        };
-
-        Self::try_from_faces_in_ccw_order(first_iter.cloned().chain(second_iter.cloned()))
-    }
-
-    pub fn try_concatenate_allowing_one_edge_of_overlap(
-        &self,
-        other: &Self,
-    ) -> Result<Self, String> {
-        self.try_concatenate_allowing_n_edges_of_overlap(other, 1)
+    pub fn union(&self, other: &Self) -> Result<Self, String> {
+        let combined_set: HashSet<RelativeFace> = union(
+            &HashSet::from_iter(self.edges.clone()),
+            &HashSet::from_iter(other.edges.clone()),
+        );
+        Ok(Self::from_unordered_relative_edges(combined_set))
     }
 
     fn has_angle_overlap_with_edge(&self, edge: RelativeFace) -> bool {
@@ -783,11 +702,8 @@ mod tests {
             ((3, 2), STEP_RIGHT),
             ((3, 3), STEP_RIGHT),
         ]);
-        assert_eq!(
-            a.try_concatenate_allowing_one_edge_of_overlap(&b),
-            Ok(ab.clone())
-        );
-        assert_eq!(b.try_concatenate_allowing_one_edge_of_overlap(&a), Ok(ab));
+        assert_eq!(a.union(&b), Ok(ab.clone()));
+        assert_eq!(b.union(&a), Ok(ab));
     }
     #[test]
     fn test_try_concatenate__pass__sum_to_full_surround__no_overlap() {
@@ -817,11 +733,8 @@ mod tests {
         ]);
         let ab =
             Fence::from_faces_in_ccw_order(a.edges.iter().cloned().chain(b.edges.iter().cloned()));
-        assert_eq!(
-            a.try_concatenate_allowing_one_edge_of_overlap(&b),
-            Ok(ab.clone())
-        );
-        assert!(b.try_concatenate_allowing_one_edge_of_overlap(&a).is_ok());
+        assert_eq!(a.union(&b), Ok(ab.clone()));
+        assert!(b.union(&a).is_ok());
     }
     #[ignore = "Turns out having a canonical representation is convenient"]
     #[test]
@@ -851,28 +764,25 @@ mod tests {
             ((3, -1), STEP_RIGHT),
         ]);
         // No standard representation for full circle fences
-        assert_ne!(
-            b.try_concatenate_allowing_one_edge_of_overlap(&a),
-            a.try_concatenate_allowing_one_edge_of_overlap(&b)
-        );
+        assert_ne!(b.union(&a), a.union(&b));
     }
     #[test]
     fn test_try_concatenate__fail__not_touching() {
         let a = Fence::from_faces_in_ccw_order([((3, 0), STEP_RIGHT), ((3, 1), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((3, 3), STEP_RIGHT), ((3, 4), STEP_RIGHT)]);
-        assert!(a.try_concatenate_allowing_one_edge_of_overlap(&b).is_err());
+        assert!(a.union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__radial_distance() {
         let a = Fence::from_faces_in_ccw_order([((3, 0), STEP_RIGHT), ((3, 1), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((2, 3), STEP_DOWN), ((1, 3), STEP_DOWN)]);
-        assert!(a.try_concatenate_allowing_one_edge_of_overlap(&b).is_err());
+        assert!(a.union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__visual_overlap() {
         let a = Fence::from_faces_in_ccw_order([((3, 2), STEP_RIGHT), ((3, 3), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((4, 2), STEP_RIGHT), ((4, 3), STEP_RIGHT)]);
-        assert!(a.try_concatenate_allowing_one_edge_of_overlap(&b).is_err());
+        assert!(a.union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__attempted_unilateral_shortcut() {
@@ -882,7 +792,7 @@ mod tests {
             ((3, 1), STEP_RIGHT),
         ]);
         let b = Fence::from_faces_in_ccw_order([((3, -2), STEP_RIGHT), ((3, -1), STEP_RIGHT)]);
-        assert!(a.try_concatenate_allowing_one_edge_of_overlap(&b).is_err());
+        assert!(a.union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__pass__one_common_end_face_is_allowed() {
@@ -898,7 +808,7 @@ mod tests {
             ((3, 1), STEP_RIGHT),
             ((3, 2), STEP_RIGHT),
         ]);
-        assert_eq!(a.try_concatenate_allowing_one_edge_of_overlap(&b), Ok(ab));
+        assert_eq!(a.union(&b), Ok(ab));
     }
     #[test]
     fn test_try_concatenate__fail__identical_edges_overlapping_too_much() {
@@ -912,7 +822,7 @@ mod tests {
             ((3, 1), STEP_RIGHT),
             ((3, 2), STEP_RIGHT),
         ]);
-        assert!(a.try_concatenate_allowing_one_edge_of_overlap(&b).is_err());
+        assert!(a.union(&b).is_err());
     }
     #[test]
     fn test_point_by_index() {
