@@ -240,7 +240,7 @@ impl AngleBasedVisibleSegment {
         }
         let combined_arc = maybe_combined_arc.unwrap();
 
-        let maybe_combined_fence: Option<Fence> = self.end_fence.union(&other.end_fence).ok();
+        let maybe_combined_fence: Option<Fence> = self.end_fence.try_union(&other.end_fence).ok();
 
         dbg!(&self.end_fence, &other.end_fence, &maybe_combined_fence); // asdfasdf
 

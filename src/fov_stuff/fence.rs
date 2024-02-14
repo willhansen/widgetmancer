@@ -250,12 +250,12 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
     }
 
-    pub fn union(&self, other: &Self) -> Result<Self, String> {
+    pub fn try_union(&self, other: &Self) -> Result<Self, String> {
         let combined_set: HashSet<RelativeFace> = union(
             &HashSet::from_iter(self.edges.clone()),
             &HashSet::from_iter(other.edges.clone()),
         );
-        Ok(Self::from_unordered_relative_edges(combined_set))
+        Self::try_from_unordered_relative_edges(combined_set)
     }
 
     fn has_angle_overlap_with_edge(&self, edge: RelativeFace) -> bool {
@@ -302,7 +302,13 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn from_unordered_relative_edges(
         edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
     ) -> Self {
-        Self::from_faces_in_ccw_order(Self::edges_sorted_going_ccw(edges))
+        Self::try_from_unordered_relative_edges(edges).expect("failed to make fence")
+    }
+
+    pub fn try_from_unordered_relative_edges(
+        edges: HashSet<impl Into<RelativeSquareWithOrthogonalDir>>,
+    ) -> Result<Self, String> {
+        Self::try_from_faces_in_ccw_order(Self::edges_sorted_going_ccw(edges))
     }
 
     pub fn spanned_angle_from_origin(&self) -> AngleInterval {
@@ -702,8 +708,8 @@ mod tests {
             ((3, 2), STEP_RIGHT),
             ((3, 3), STEP_RIGHT),
         ]);
-        assert_eq!(a.union(&b), Ok(ab.clone()));
-        assert_eq!(b.union(&a), Ok(ab));
+        assert_eq!(a.try_union(&b), Ok(ab.clone()));
+        assert_eq!(b.try_union(&a), Ok(ab));
     }
     #[test]
     fn test_try_concatenate__pass__sum_to_full_surround__no_overlap() {
@@ -733,8 +739,8 @@ mod tests {
         ]);
         let ab =
             Fence::from_faces_in_ccw_order(a.edges.iter().cloned().chain(b.edges.iter().cloned()));
-        assert_eq!(a.union(&b), Ok(ab.clone()));
-        assert!(b.union(&a).is_ok());
+        assert_eq!(a.try_union(&b), Ok(ab.clone()));
+        assert!(b.try_union(&a).is_ok());
     }
     #[ignore = "Turns out having a canonical representation is convenient"]
     #[test]
@@ -764,25 +770,25 @@ mod tests {
             ((3, -1), STEP_RIGHT),
         ]);
         // No standard representation for full circle fences
-        assert_ne!(b.union(&a), a.union(&b));
+        assert_ne!(b.try_union(&a), a.try_union(&b));
     }
     #[test]
     fn test_try_concatenate__fail__not_touching() {
         let a = Fence::from_faces_in_ccw_order([((3, 0), STEP_RIGHT), ((3, 1), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((3, 3), STEP_RIGHT), ((3, 4), STEP_RIGHT)]);
-        assert!(a.union(&b).is_err());
+        assert!(a.try_union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__radial_distance() {
         let a = Fence::from_faces_in_ccw_order([((3, 0), STEP_RIGHT), ((3, 1), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((2, 3), STEP_DOWN), ((1, 3), STEP_DOWN)]);
-        assert!(a.union(&b).is_err());
+        assert!(a.try_union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__visual_overlap() {
         let a = Fence::from_faces_in_ccw_order([((3, 2), STEP_RIGHT), ((3, 3), STEP_RIGHT)]);
         let b = Fence::from_faces_in_ccw_order([((4, 2), STEP_RIGHT), ((4, 3), STEP_RIGHT)]);
-        assert!(a.union(&b).is_err());
+        assert!(a.try_union(&b).is_err());
     }
     #[test]
     fn test_try_concatenate__fail__attempted_unilateral_shortcut() {
@@ -792,10 +798,10 @@ mod tests {
             ((3, 1), STEP_RIGHT),
         ]);
         let b = Fence::from_faces_in_ccw_order([((3, -2), STEP_RIGHT), ((3, -1), STEP_RIGHT)]);
-        assert!(a.union(&b).is_err());
+        assert!(a.try_union(&b).is_err());
     }
     #[test]
-    fn test_try_concatenate__pass__one_common_end_face_is_allowed() {
+    fn test_try_concatenate__pass__slight_overlap() {
         let a = Fence::from_faces_in_ccw_order([
             ((3, -1), STEP_RIGHT),
             ((3, 0), STEP_RIGHT),
@@ -808,8 +814,9 @@ mod tests {
             ((3, 1), STEP_RIGHT),
             ((3, 2), STEP_RIGHT),
         ]);
-        assert_eq!(a.union(&b), Ok(ab));
+        assert_eq!(a.try_union(&b), Ok(ab));
     }
+    #[ignore = "Overlap limits aren't good, actually"]
     #[test]
     fn test_try_concatenate__fail__identical_edges_overlapping_too_much() {
         let a = Fence::from_faces_in_ccw_order([
@@ -822,7 +829,7 @@ mod tests {
             ((3, 1), STEP_RIGHT),
             ((3, 2), STEP_RIGHT),
         ]);
-        assert!(a.union(&b).is_err());
+        assert!(a.try_union(&b).is_err());
     }
     #[test]
     fn test_point_by_index() {
@@ -928,5 +935,17 @@ mod tests {
         assert_eq!(sub_fence.num_edges(), 12);
         assert_eq!(sub_fence.cw_edge(), start_segment);
         assert_eq!(sub_fence.ccw_edge(), end_segment);
+    }
+    #[test]
+    fn test_union_of_fences__identical() {
+        let f1 = Fence::from_radius_of_square_and_arc(3, AngleInterval::from_degrees(0.0, 100.0));
+        let f2 = f1.clone();
+        assert_eq!(f2.try_union(&f1), Ok(f1))
+    }
+    #[test]
+    fn test_union_of_fences__no_overlap() {
+        let f1 = Fence::from_radius_of_square_and_arc(3, AngleInterval::from_degrees(0.0, 100.0));
+        let f2 = Fence::from_radius_of_square_and_arc(4, AngleInterval::from_degrees(110.0, 120.0));
+        assert!(f2.try_union(&f1).is_err())
     }
 }
