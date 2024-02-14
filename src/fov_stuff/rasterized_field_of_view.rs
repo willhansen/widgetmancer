@@ -158,7 +158,7 @@ pub trait RasterizedFieldOfViewFunctions {
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility;
-    fn lone_portal_entrance_shape_for_relative_square_or_panic(
+    fn lone_absolute_portal_entrance_shape_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> SquareVisibility;
@@ -517,11 +517,15 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
             .absolute_exit_shape()
     }
 
-    fn lone_portal_entrance_shape_for_relative_square_or_panic(
+    fn lone_absolute_portal_entrance_shape_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
     ) -> TopDownPortalShape {
-        todo!()
+        let portals = self.top_down_portals_for_relative_square(relative_square);
+        if portals.len() != 1 {
+            panic!("no lone top-down portal");
+        }
+        return portals[0].absolute_entrance_shape();
     }
 
     fn absolute_top_down_portal_entrance_shapes_at_relative_square(
