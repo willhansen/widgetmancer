@@ -84,10 +84,10 @@ impl AngleInterval {
     pub fn intersection(&self, other: Self, tolerance: FAngle) -> Vec<Self> {
         use AngleInterval::*;
         match self {
-            Empty => vec![Empty],
+            Empty => vec![],
             FullCircle => vec![other],
             PartialArc(self_partial_arc) => match other {
-                Empty => vec![Empty],
+                Empty => vec![],
                 FullCircle => vec![*self],
                 PartialArc(other_partial_arc) => {
                     Self::intersect_partial_arcs(*self_partial_arc, other_partial_arc, tolerance)
@@ -202,11 +202,13 @@ impl AngleInterval {
         tolerance: FAngle,
     ) -> Vec<Self> {
         if a.has_wraparound_double_overlap(b, tolerance).is_true() {
-            todo!("Wraparound double overlap:\n{}\n{}", a, b);
+            return [(b.cw(), a.ccw()), (a.cw(), b.ccw())]
+                .map(|x| AngleInterval::from_angles(x.0, x.1))
+                .to_vec();
         }
 
-        vec![if a.overlaps_partial_arc(b, tolerance).is_true() {
-            AngleInterval::from_angles(
+        if a.overlaps_partial_arc(b, tolerance).is_true() {
+            vec![AngleInterval::from_angles(
                 if b.contains_angle(a.cw(), tolerance).is_true() {
                     a.cw()
                 } else {
@@ -217,10 +219,10 @@ impl AngleInterval {
                 } else {
                     b.ccw()
                 },
-            )
+            )]
         } else {
-            AngleInterval::Empty
-        }]
+            vec![]
+        }
     }
     // TODO: Does this need a tolerance?
     pub fn subtract(&self, other: impl Into<Self>) -> Vec<Self> {
