@@ -90,7 +90,7 @@ impl AngleBasedVisibleSegment {
     }
 
     fn end_fence_has_extra_segments(&self) -> bool {
-        if self.end_fence.len() < 2 {
+        if self.end_fence.num_edges() < 2 {
             return false;
         }
 
@@ -199,17 +199,19 @@ impl AngleBasedVisibleSegment {
         dbg!("================================================================================================");
         let sorted_ccw = unsorted_segments
             .into_iter()
-            .inspect(|x| {
-                dbg!(x); // asdfasdf
-            })
             .sorted_by_key(|segment| {
                 OrderedFloat(match segment.arc {
                     AngleInterval::PartialArc(partial_arc) => partial_arc.center_angle().radians,
                     _ => 0.0,
                 })
-            });
+            })
+            .inspect(|x| {
+                dbg!(x.arc); // asdfasdf
+            })
+            .collect_vec();
 
         let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
+        dbg!(reduction_function(&sorted_ccw[0], &sorted_ccw[1])); // asdfasdf
 
         circular_merging(sorted_ccw, reduction_function)
     }
@@ -242,6 +244,8 @@ impl AngleBasedVisibleSegment {
             .end_fence
             .try_concatenate_allowing_one_edge_of_overlap(&other.end_fence)
             .ok();
+
+        dbg!(&self.end_fence, &other.end_fence, &maybe_combined_fence); // asdfasdf
 
         if maybe_combined_fence.is_none() {
             return None;
@@ -450,6 +454,17 @@ mod tests {
         );
     }
     #[test]
+    fn test_combine_two__full_circle() {
+        let segments = [(45.0, -45.0), (-45.0, 45.0)].map(|deg| {
+            AngleBasedVisibleSegment::from_arc_and_fence_radius(
+                AngleInterval::from_degrees(deg.0, deg.1),
+                5,
+            )
+        });
+        let result = segments[0].combined_with(&segments[1]).unwrap();
+        assert!(result.arc == AngleInterval::FullCircle);
+    }
+    #[test]
     #[should_panic]
     fn test_combine_two__fail_because_overlap() {
         let a = AngleBasedVisibleSegment::from_relative_square((5, 0));
@@ -558,16 +573,23 @@ mod tests {
         );
     }
     #[test]
-    fn test_combine_multiple__full_circle__out_of_order() {
+    fn test_combine_multiple__full_circle() {
         let radius = 3;
-        let segments = [(45.0, -45.0), (0.0, 45.0), (-45.0, 0.0)].map(|deg| {
-            AngleBasedVisibleSegment::from_arc_and_fence_radius(
-                AngleInterval::from_degrees(deg.0, deg.1),
-                radius,
-            )
+        vec![
+            vec![(45.0, -45.0), (-45.0, 45.0)],
+            vec![(45.0, -45.0), (0.0, 45.0), (-45.0, 0.0)],
+        ]
+        .into_iter()
+        .for_each(|ranges| {
+            let segments = ranges.into_iter().map(|deg| {
+                AngleBasedVisibleSegment::from_arc_and_fence_radius(
+                    AngleInterval::from_degrees(deg.0, deg.1),
+                    radius,
+                )
+            });
+            let result = AngleBasedVisibleSegment::combine_multiple(segments);
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0], AngleBasedVisibleSegment::new_full_circle(radius));
         });
-        let result = AngleBasedVisibleSegment::combine_multiple(segments);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0], AngleBasedVisibleSegment::new_full_circle(radius));
     }
 }

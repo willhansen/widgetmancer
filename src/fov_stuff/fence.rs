@@ -45,8 +45,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
     pub fn edges(&self) -> &Vec<RelativeFace> {
         &self.edges
     }
-    pub fn len(&self) -> usize {
+    pub fn num_edges(&self) -> usize {
         self.edges.len()
+    }
+    pub fn num_points(&self) -> usize {
+        self.num_edges() + 1
     }
     pub fn from_faces_in_ccw_order(
         faces: impl IntoIterator<Item = impl Into<RelativeFace>> + Clone,
@@ -247,11 +250,51 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
     }
 
-    pub fn try_concatenate_allowing_one_edge_of_overlap(
+    fn number_of_consecutive_points_of_overlap_with_other_fence_at_ccw_end(&self, second_fence: &Self, max_overlap_allowed: usize) -> Option<usize> {
+        let start_fence = self;
+        let end_fence = second_fence;
+
+
+        let point_index_of_first_point_in_start_fence_that_touches_start_of_end_fence: Option<usize> = (0..=max_overlap_allowed)
+                .find_position(|&depth| {
+                    let point_index = start_fence.num_points() - depth;
+                    let point_from_start_fence = start_fence.point_by_index(point_index as i32);
+                    let is_match = point_from_start_fence == end_fence.point_by_index(0);
+                    if is_match {
+                        let all_points_on_start_fence_after_match_point_do_match =  (0..=depth as u32).all(|end_fence_point_index| {
+                            let start_fence_point_index = 
+                        todo!()
+                            
+                        });
+                        todo!()
+                    };
+                    todo!();
+                })
+                .map(|(position, value)| position);
+        todo!()
+    }
+
+    pub fn try_concatenate_allowing_n_edges_of_overlap(
         &self,
         other: &Self,
+        n: usize,
     ) -> Result<Self, String> {
         // TODO: refactor this function a bunch
+
+        let fences = [&self, &other];
+        let number_of_overlapping_points_at_end_of_each_fence: [Option<usize>; 2] = [0, 1].map(|i| {
+            let start_fence = fences[i];
+            let end_fence = fences[1 - i];
+            start_fence.number_of_consecutive_points_of_overlap_with_other_fence_at_ccw_end(&end_fence, n)
+        });
+        
+            todo!();
+            let endpoints_touch = start_fence.point_by_index(-1) == end_fence.point_by_index(0);
+            if !endpoints_touch {
+                return None;
+            }
+
+            todo!();
 
         let a_cw_touching_b_ccw =
             |a: &Fence, b: &Fence| a.point_by_index(0) == b.point_by_index(-1);
@@ -288,6 +331,14 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
 
         Self::try_from_faces_in_ccw_order(first_iter.cloned().chain(second_iter.cloned()))
     }
+
+    pub fn try_concatenate_allowing_one_edge_of_overlap(
+        &self,
+        other: &Self,
+    ) -> Result<Self, String> {
+        self.try_concatenate_allowing_n_edges_of_overlap(other, 1)
+    }
+
     fn has_angle_overlap_with_edge(&self, edge: RelativeFace) -> bool {
         self.spanned_angle_from_origin()
             .overlapping_but_not_exactly_touching(PartialAngleInterval::from_relative_square_face(
@@ -964,7 +1015,7 @@ mod tests {
         let sub_fence = fence.sub_fence_in_arc(arc, default_test_angle_tolerance());
 
         // start at 4, end at 15
-        assert_eq!(sub_fence.len(), 12);
+        assert_eq!(sub_fence.num_edges(), 12);
         assert_eq!(sub_fence.cw_edge(), start_segment);
         assert_eq!(sub_fence.ccw_edge(), end_segment);
     }
