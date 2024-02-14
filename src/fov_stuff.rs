@@ -2178,8 +2178,8 @@ mod tests {
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
             QuarterTurnsCcw::new(1)
         );
-        let the_square_visibility =
-            rasterized_fov.lone_portal_entrance_shape_for_relative_square_or_panic(test_square);
+        let the_square_visibility = rasterized_fov
+            .lone_absolute_portal_entrance_shape_for_relative_square_or_panic(test_square);
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_shadowed_drawable(
             &SolidColorDrawable::new(RED),

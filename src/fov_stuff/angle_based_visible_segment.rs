@@ -196,7 +196,7 @@ impl AngleBasedVisibleSegment {
         todo!()
     }
     pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
-        dbg!("================================================================================================");
+        // dbg!("================================================================================================");
         let sorted_ccw = unsorted_segments
             .into_iter()
             .sorted_by_key(|segment| {
@@ -206,12 +206,12 @@ impl AngleBasedVisibleSegment {
                 })
             })
             .inspect(|x| {
-                dbg!(x.arc); // asdfasdf
+                // dbg!(x.arc); // asdfasdf
             })
             .collect_vec();
 
         let reduction_function = |a: &Self, b: &Self| -> Option<Self> { a.combined_with(b) };
-        dbg!(reduction_function(&sorted_ccw[0], &sorted_ccw[1])); // asdfasdf
+        // dbg!(reduction_function(&sorted_ccw[0], &sorted_ccw[1])); // asdfasdf
 
         circular_merging(sorted_ccw, reduction_function)
     }
@@ -240,9 +240,9 @@ impl AngleBasedVisibleSegment {
         }
         let combined_arc = maybe_combined_arc.unwrap();
 
-        let maybe_combined_fence: Option<Fence> = self.end_fence.union(&other.end_fence).ok();
+        let maybe_combined_fence: Option<Fence> = self.end_fence.try_union(&other.end_fence).ok();
 
-        dbg!(&self.end_fence, &other.end_fence, &maybe_combined_fence); // asdfasdf
+        // dbg!(&self.end_fence, &other.end_fence, &maybe_combined_fence); // asdfasdf
 
         if maybe_combined_fence.is_none() {
             return None;
