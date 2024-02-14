@@ -339,9 +339,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .iter()
             .filter(|&&fence_edge| {
                 PartialAngleInterval::from_relative_square_face(fence_edge)
-                    .overlapping_but_not_exactly_touching(
+                    .overlaps_partial_arc(
                         PartialAngleInterval::from_relative_square(rel_square),
+                        FAngle::degrees(0.001),
                     )
+                    .is_true()
             })
             .collect_vec();
         if fence_edges_with_angle_overlap.is_empty() {

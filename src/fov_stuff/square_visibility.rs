@@ -78,6 +78,9 @@ impl SquareVisibilityFromOneLargeShadow {
         }
     }
     pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        if self.is_fully_visible() {
+            return vec![];
+        }
         self.visible_portion()
             .unwrap()
             .dividing_line()
