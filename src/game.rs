@@ -1872,7 +1872,7 @@ impl Game {
                 )
                 .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
-            let line = WorldLine::new(line_start.to_f32(), line_end);
+            let line = WorldLine::new_from_two_points(line_start.to_f32(), line_end);
 
             for square in line.touched_squares() {
                 if self.is_non_player_piece_at(square) {

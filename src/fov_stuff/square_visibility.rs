@@ -97,7 +97,7 @@ impl SquareVisibilityFromOneLargeShadow {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
         Self::new_partially_visible(HalfPlane::from_line_and_point_on_half_plane(
-            Line::new(
+            Line::new_from_two_points(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)
@@ -471,7 +471,7 @@ mod tests {
     }
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line = Line::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 

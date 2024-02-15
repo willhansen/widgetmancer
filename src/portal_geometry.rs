@@ -279,7 +279,8 @@ impl PortalGeometry {
                 let stepped_back_intersection_point =
                     naive_ray_endpoint(intersection_point, angle, -STEP_BACK_DISTANCE);
 
-                let new_line = WorldLine::new(start, stepped_back_intersection_point);
+                let new_line =
+                    WorldLine::new_from_two_points(start, stepped_back_intersection_point);
                 naive_line_segments.push(new_line);
                 range -= new_line.length();
 
