@@ -2355,7 +2355,7 @@ impl Game {
         self.rasterized_player_field_of_view()
             .relative_square_is_fully_visible(target_square_relative_to_player)
     }
-    pub fn square_is_not_visible_to_player(&self, square: WorldSquare) -> bool {
+    pub fn square_is_visible_to_player(&self, square: WorldSquare) -> bool {
         let target_square_relative_to_player = square - self.player_square();
         self.rasterized_player_field_of_view()
             .relative_square_is_visible(target_square_relative_to_player)
@@ -2449,7 +2449,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_fov_mask_non_partials() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(5, 5));
@@ -2470,6 +2469,17 @@ mod tests {
             STEP_DOWN * 2 + STEP_RIGHT * 2,
             STEP_DOWN * 2 + STEP_RIGHT * 3,
         ];
+
+        //   OOooOO
+        //   oo@@ooOO
+        //     ##%%##%%
+        //     xxXXxxXX
+        //
+        //   ooo
+        //   o@oo
+        //    ####
+        //    xxxx
+
         for step in relative_squares_that_should_be_fully_visible {
             let square = game.player_square() + step;
             assert!(
@@ -2481,7 +2491,7 @@ mod tests {
         for step in relative_squares_that_should_be_fully_blocked {
             let square = game.player_square() + step;
             assert!(
-                game.square_is_not_visible_to_player(square),
+                !game.square_is_visible_to_player(square),
                 "should be fully blocked.  square: {}",
                 square.to_string()
             );
@@ -2489,7 +2499,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_faction_moves_closest_piece_to_player() {
         let mut game = set_up_game_with_player();
         let king_square = game.player_square() + STEP_UP_RIGHT * 3;
