@@ -8,7 +8,7 @@ pub type LocalSquareHalfPlane = HalfPlane<f32, SquareGridInLocalSquareFrame>;
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub struct HalfPlane<T = f32, U = euclid::UnknownUnit>
 where
-    T: Display + Copy,
+    T: CoordinateDataTypeTrait,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     dividing_line: Line<T, U>,

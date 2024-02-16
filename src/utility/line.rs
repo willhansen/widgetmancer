@@ -13,9 +13,6 @@ pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
 pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
 pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
 
-// TODO: this trait is probably also defined in coordinates somewhere
-trait_alias_macro!(pub trait LineDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd);
-
 #[derive(Clone, PartialEq, Copy)]
 pub struct Line<T, U = euclid::UnknownUnit> {
     pub p1: Point2D<T, U>,
@@ -24,7 +21,7 @@ pub struct Line<T, U = euclid::UnknownUnit> {
 
 impl<T, U> Line<T, U>
 where
-    T: LineDataTypeTrait,
+    T: CoordinateDataTypeTrait,
 {
     pub fn new_from_two_points(
         p1: impl Into<Point2D<T, U>>,
@@ -124,7 +121,7 @@ where
 }
 impl<T, U> QuarterTurnRotatable for Line<T, U>
 where
-    T: LineDataTypeTrait,
+    T: CoordinateDataTypeTrait,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
@@ -141,7 +138,7 @@ impl<Datatype, UnitType, CanBePointType> From<(CanBePointType, CanBePointType)>
     for Line<Datatype, UnitType>
 where
     CanBePointType: Into<Point2D<Datatype, UnitType>>,
-    Datatype: LineDataTypeTrait,
+    Datatype: CoordinateDataTypeTrait,
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
         Self::new_from_two_points(value.0, value.1)
@@ -474,20 +471,25 @@ impl WorldLine {
 
 impl<T, U> Debug for Line<T, U>
 where
-    T: Display + Copy,
+    T: CoordinateDataTypeTrait,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "p1: {}, p2: {}",
+            "p1: {}, p2: {}\n\tx-intercept: {}\n\ty-intercept: {}\n\tslope: {}",
             self.p1.to_string(),
             self.p2.to_string(),
+            self.x_intercept()
+                .map_or("N/A".to_owned(), |v| v.to_string()),
+            self.y_intercept()
+                .map_or("N/A".to_owned(), |v| v.to_string()),
+            self.slope().map_or("inf".to_owned(), |v| v.to_string()),
         )
     }
 }
 impl<T, U> Display for Line<T, U>
 where
-    T: Display + Copy,
+    T: CoordinateDataTypeTrait,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
