@@ -1965,8 +1965,8 @@ impl Game {
 
     pub fn place_single_sided_one_way_portal(
         &mut self,
-        entrance_step: SquareWithOrthogonalDir,
-        exit_step: SquareWithOrthogonalDir,
+        entrance_step: impl Into<SquareWithOrthogonalDir>,
+        exit_step: impl Into<SquareWithOrthogonalDir>,
     ) {
         self.portal_geometry.create_portal(entrance_step, exit_step);
     }
@@ -2273,7 +2273,7 @@ impl Game {
         common_exit: SquareWithOrthogonalDir,
     ) {
         (0..num_portals).for_each(|i| {
-            let entrance = (
+            let entrance: SquareWithOrthogonalDir = (
                 first_entrance.square() + step * i as i32,
                 first_entrance.direction(),
             )
@@ -4473,9 +4473,28 @@ mod tests {
         game.tick_game_logic();
         assert!(game.widgets.contains_key(&(widget_square + STEP_UP)));
     }
+    #[test]
+    fn test_observed_fov_failure() {
+        let mut game = set_up_10x10_game();
+        let start_square = point2(0, 0);
+        game.place_player(start_square);
+        // let widget_square = start_square + STEP_RIGHT * 2 + STEP_UP;
+        game.place_single_sided_one_way_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP));
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+    }
+    #[test]
+    fn test_observed_fov_failure__2() {
+        let mut game = set_up_10x10_game();
+        let start_square = point2(0, 0);
+        game.place_player(start_square);
+        // let widget_square = start_square + STEP_RIGHT * 2 + STEP_UP;
+        game.place_single_sided_one_way_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP));
+        game.draw_headless_now();
+        game.graphics.screen.print_screen_buffer();
+    }
 
     #[test]
-
     fn test_widget_visible_next_to_turning_portal() {
         let mut game = set_up_10x10_game();
         let start_square = point2(2, 2);
@@ -4994,10 +5013,7 @@ mod tests {
             Angle::degrees(90.0),
         );
         let test_square = drone_square + STEP_RIGHT * 5;
-        game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP).into(),
-            (test_square, STEP_DOWN).into(),
-        );
+        game.place_single_sided_one_way_portal((drone_square, STEP_UP), (test_square, STEP_DOWN));
         game.place_player(drone_square + STEP_DOWN);
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
@@ -5021,10 +5037,7 @@ mod tests {
             Angle::degrees(90.0),
         );
         let test_square = drone_square + STEP_RIGHT * 5;
-        game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP).into(),
-            (test_square, STEP_DOWN).into(),
-        );
+        game.place_single_sided_one_way_portal((drone_square, STEP_UP), (test_square, STEP_DOWN));
         game.tick_realtime_effects(Duration::from_secs_f32(0.5));
         let drone = game.floating_hunter_drones[0];
         assert!(drone.position.x > drone_square.x as f32 + 2.0);
@@ -5040,10 +5053,7 @@ mod tests {
             Angle::degrees(180.0),
         );
         let test_square = drone_square + STEP_RIGHT * 5;
-        game.place_single_sided_one_way_portal(
-            (drone_square, STEP_UP).into(),
-            (test_square, STEP_DOWN).into(),
-        );
+        game.place_single_sided_one_way_portal((drone_square, STEP_UP), (test_square, STEP_DOWN));
         game.place_player(drone_square + STEP_DOWN);
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();

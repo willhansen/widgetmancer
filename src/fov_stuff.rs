@@ -702,7 +702,7 @@ pub fn sub_octant_field_of_view(
 }
 
 pub fn single_octant_field_of_view(
-    center_square: WorldSquare,
+    center_square: impl Into<WorldSquare>,
     radius: u32,
     octant: Octant,
     sight_blockers: &HashSet<WorldSquare>,
@@ -725,11 +725,12 @@ pub fn single_octant_field_of_view(
 }
 
 pub fn portal_aware_field_of_view_from_square(
-    center_square: WorldSquare,
+    center_square: impl Into<WorldSquare>,
     radius: u32,
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfView {
+    let center_square = center_square.into();
     (0..8).fold(
         FieldOfView::new_empty_fov_at(center_square),
         |fov_result_accumulator: FieldOfView, octant_number: i32| {
@@ -2377,5 +2378,25 @@ mod tests {
         assert_false!(exit.point_is_visible(v(STEP_UP_RIGHT)));
         assert_true!(exit.point_is_visible(v(STEP_DOWN_LEFT)));
         assert_false!(exit.point_is_visible(v(STEP_DOWN_RIGHT)));
+    }
+    #[test]
+    fn test_observed_rasterized_fov_with_portal_failure() {
+        portal_aware_field_of_view_from_square(
+            (0, 0),
+            16,
+            &Default::default(),
+            &PortalGeometry::new().with_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+        )
+        .rasterized();
+    }
+    #[test]
+    fn test_observed_rasterized_fov_with_portal_failure__2() {
+        portal_aware_field_of_view_from_square(
+            (0, 0),
+            16,
+            &Default::default(),
+            &PortalGeometry::new().with_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+        )
+        .rasterized();
     }
 }
