@@ -61,6 +61,12 @@ impl PortalGeometry {
         self.create_portal(entrance_step, exit_step);
         self
     }
+    pub fn new_with_portal(
+        entrance_step: impl Into<SquareWithOrthogonalDir>,
+        exit_step: impl Into<SquareWithOrthogonalDir>,
+    ) -> Self {
+        Self::new().with_portal(entrance_step, exit_step)
+    }
     pub fn create_portal(
         &mut self,
         entrance_step: impl Into<SquareWithOrthogonalDir>,

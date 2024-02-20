@@ -2380,12 +2380,12 @@ mod tests {
         assert_false!(exit.point_is_visible(v(STEP_DOWN_RIGHT)));
     }
     #[test]
-    fn test_observed_rasterized_fov_with_portal_failure() {
+    fn test_observed_rasterized_fov_with_portal_failure__1() {
         portal_aware_field_of_view_from_square(
             (0, 0),
-            16,
+            3,
             &Default::default(),
-            &PortalGeometry::new().with_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP)),
         )
         .rasterized();
     }
@@ -2393,9 +2393,9 @@ mod tests {
     fn test_observed_rasterized_fov_with_portal_failure__2() {
         portal_aware_field_of_view_from_square(
             (0, 0),
-            16,
+            5,
             &Default::default(),
-            &PortalGeometry::new().with_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP)),
         )
         .rasterized();
     }
