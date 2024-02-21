@@ -97,7 +97,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .reflect_point_over_line(self.point_on_half_plane())
     }
 
-    pub fn equivalent_representation(&self, other: Self, tolerance: f32) -> bool {
+    pub fn about_equal(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line
             .approx_on_same_line(other.dividing_line, tolerance)
             && self
@@ -105,8 +105,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
                 .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
     }
 
-    pub fn is_about_complementary_to(&self, other: Self, tolerance: f32) -> bool {
-        self.equivalent_representation(other.complement(), tolerance)
+    pub fn about_complementary(&self, other: Self, tolerance: f32) -> bool {
+        self.about_equal(other.complement(), tolerance)
     }
 
     pub fn covers_point(&self, point: impl Into<Point2D<f32, U>> + Copy) -> BoolWithPartial {
@@ -339,11 +339,11 @@ mod tests {
         let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
         let half_plane_3 = HalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
-        assert!(half_plane_2.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.is_about_complementary_to(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.is_about_complementary_to(half_plane_3, 1e-6));
+        assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
+        assert!(half_plane_2.about_complementary(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.about_complementary(half_plane_1, 1e-6));
+        assert_false!(half_plane_1.about_complementary(half_plane_3, 1e-6));
+        assert_false!(half_plane_2.about_complementary(half_plane_3, 1e-6));
     }
 
     #[test]
@@ -358,7 +358,7 @@ mod tests {
         let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
         let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
 
-        assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
+        assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
     }
 
     #[test]

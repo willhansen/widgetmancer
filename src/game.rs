@@ -3993,7 +3993,7 @@ mod tests {
             .for_each(|visibilities_of_rel_square: Vec<SquareVisibility>| {
                 let vis1: SquareVisibility = visibilities_of_rel_square[0];
                 let vis2: SquareVisibility = visibilities_of_rel_square[1];
-                assert!(vis1.is_about_complementary_to(vis2));
+                assert!(vis1.about_complementary(vis2));
                 assert!(vis1.is_visually_complementary_to(vis2));
             });
 

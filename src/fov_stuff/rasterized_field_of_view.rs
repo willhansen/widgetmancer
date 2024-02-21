@@ -1067,7 +1067,7 @@ impl TopDownPortal {
             && self.target == other.target
             && self
                 .shape_in_exit_frame
-                .is_about_equal_to(other.absolute_exit_shape())
+                .about_equal(other.absolute_exit_shape())
     }
 }
 
@@ -1752,7 +1752,7 @@ mod tests {
             TopDownPortalTarget::new_local(
                 rfov.relative_square_to_absolute_square(test_portal.relative_position),
             ),
-            test_portal.absolute_entrance_shape().complement().unwrap(),
+            test_portal.absolute_entrance_shape().complement(),
         );
         rfov.add_top_down_portal(direct_local_connection);
 
@@ -1795,7 +1795,7 @@ mod tests {
 
         assert!(entrance_shape
             .quarter_rotated_ccw(forward_portal_rotation)
-            .is_about_equal_to(exit_shape));
+            .about_equal(exit_shape));
 
         let top_down_portal_from_exit =
             TopDownPortal::new_with_exit_shape(rel_square, target, exit_shape);
@@ -1903,19 +1903,17 @@ mod tests {
                     )[0];
 
                 assert!(
-                    retrieved_absolute_entrance_shape
-                        .is_about_equal_to(expected_absolute_entrance_shape),
+                    retrieved_absolute_entrance_shape.about_equal(expected_absolute_entrance_shape),
                     "{:?}",
                     test_params
                 );
                 assert!(
-                    retrieved_relative_entrance_shape
-                        .is_about_equal_to(expected_relative_entrance_shape),
+                    retrieved_relative_entrance_shape.about_equal(expected_relative_entrance_shape),
                     "{:?}",
                     test_params
                 );
                 assert!(
-                    retrieved_absolute_exit_shape.is_about_equal_to(absolute_exit_shape),
+                    retrieved_absolute_exit_shape.about_equal(absolute_exit_shape),
                     "{:?}",
                     test_params
                 );
