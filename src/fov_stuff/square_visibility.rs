@@ -40,7 +40,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     // creators
     fn new_fully_visible() -> Self;
     fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
-    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
+    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
     fn new_top_half_visible() -> Self;
     fn new_bottom_half_visible() -> Self;
     fn from_relative_square_and_view_arc(
@@ -96,7 +96,7 @@ impl SquareVisibilityFromOneLargeShadow {
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
-        Self::new_partially_visible(HalfPlane::from_line_and_point_on_half_plane(
+        Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
             Line::new_from_two_points(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
@@ -157,7 +157,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         }
     }
 
-    fn from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
+    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
         if visible_portion
             .fully_covers_centered_unit_square()
             .is_true()
@@ -216,7 +216,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 .to_point()
                 .cast_unit();
 
-            let shadow_half_plane = HalfPlane::from_line_and_point_on_half_plane(
+            let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
                 shadow_line_from_center,
                 point_in_shadow,
             );
@@ -445,8 +445,8 @@ mod tests {
 
     #[test]
     fn test_square_visibility_knows_if_its_fully_visible() {
-        let partial = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(
-            HalfPlane::from_line_and_point_on_half_plane(
+        let partial = SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(
+            HalfPlane::new_from_line_and_point_on_half_plane(
                 Line {
                     p1: point2(-5.0, 2.0),
                     p2: point2(5.0, 2.2928933),
@@ -475,12 +475,14 @@ mod tests {
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
+        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
         assert!(half_plane_1.is_about_complementary_to(half_plane_2, 1e-6));
 
-        let partial_1 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_1);
-        let partial_2 = SquareVisibilityFromOneLargeShadow::from_visible_half_plane(half_plane_2);
+        let partial_1 =
+            SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(half_plane_1);
+        let partial_2 =
+            SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(half_plane_2);
 
         let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
         assert!(combined_partial.is_fully_visible());
@@ -535,13 +537,13 @@ mod tests {
     #[test]
     fn test_square_visibility_overlap__simple_non_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
                 Line::new_horizontal(0.4),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
                 Line::new_horizontal(0.3),
                 (0.0, -1.0),
             ),
@@ -553,13 +555,13 @@ mod tests {
     #[test]
     fn test_square_visibility_overlap__simple_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
                 Line::new_horizontal(-0.3),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
                 Line::new_horizontal(0.2),
                 (0.0, -1.0),
             ),
@@ -576,5 +578,15 @@ mod tests {
             ),
             None
         );
+    }
+    // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
+    #[test]
+    fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
+        let hp =
+            LocalSquareHalfPlane::new_from_vector_from_origin_to_normal_to_edge_with_origin_inside_and_the_vector_pointing_outside((1.0, 1.0)).extended(-0.1);
+        let vis = SquareVisibility::new_from_visible_half_plane(hp);
+        let unit_square_intersections = vis.where_border_touches_unit_square();
+        assert!(vis.is_nearly_or_fully_visible(0.01));
+        assert!(vis.where_border_touches_unit_square().len() > 0);
     }
 }

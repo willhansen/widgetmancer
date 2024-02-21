@@ -616,7 +616,7 @@ mod tests {
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
-            LocalSquareHalfPlane::from_line_and_point_on_half_plane(
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
                 Line::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
                 point2(0.0, 25.0),
             ),
