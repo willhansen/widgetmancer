@@ -6,9 +6,9 @@ use std::{
 };
 
 use derive_more::{AddAssign, Neg};
-pub use euclid::{num::Zero, point2, vec2, Angle, Point2D, Vector2D};
+pub use euclid::{point2, vec2, Angle, Point2D, Vector2D};
 use itertools::Itertools;
-use num::Signed;
+use num::{One, Signed, Zero};
 use ordered_float::OrderedFloat;
 use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
@@ -56,7 +56,7 @@ pub type FAngle = Angle<f32>;
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 // TODO: is this just a scalar?
-trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display);
+trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One);
 
 pub trait Coordinate:
     Copy
@@ -70,7 +70,7 @@ pub trait Coordinate:
     + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
 
     + Mul<Self::DataType, Output = Self>
-    + Zero
+    + euclid::num::Zero
 //+ Debug
 where
     Self::DataType: CoordinateDataTypeTrait,
@@ -85,9 +85,10 @@ where
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
-    fn zero() -> Self {
-        Self::new(Self::DataType::zero(), Self::DataType::zero())
-    }
+    // TODO: delete when compiling
+    // fn zero() -> Self {
+    //     Self::new(Self::DataType::zero(), Self::DataType::zero())
+    // }
     fn is_relative(&self) -> bool {
         Self::IS_RELATIVE
     }
@@ -113,7 +114,7 @@ where
         self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
     }
     fn is_zero(&self) -> bool {
-        self == Self::zero()
+        *self == Self::zero()
     }
     fn king_length(&self) -> Self::DataType {
         self.x().abs().max(self.y().abs())
@@ -130,7 +131,7 @@ macro_rules! coordinatify {
                 + Add<Output = T>
                 + Sub<Output = T>
                 + Mul<Output = T>
-                + Zero
+                + euclid::num::Zero
                 + Signed
                 + Debug,
         {

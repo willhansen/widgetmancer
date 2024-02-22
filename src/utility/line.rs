@@ -17,15 +17,22 @@ pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
 pub trait LineTrait {
     type PointType: Coordinate;
+    // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
     fn points_in_random_order(&self) -> [Self::PointType; 2];
 
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Line::new_from_two_points((Self::DATA_TYPE::zero(), y), (Self::DATA_TYPE::one(), y))
+        Line::new_from_two_points(
+            (<Self::PointType as Coordinate>::DataType::zero(), y),
+            (<Self::PointType as Coordinate>::DataType::one(), y),
+        )
     }
     fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Line::new_from_two_points((x, Self::DATA_TYPE::zero()), (x, Self::DATA_TYPE::one()))
+        Line::new_from_two_points(
+            (x, <Self::PointType as Coordinate>::DataType::zero()),
+            (x, <Self::PointType as Coordinate>::DataType::one()),
+        )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
         Self::new_from_two_points(
@@ -86,6 +93,9 @@ pub trait LineTrait {
         } else {
             self.p2
         }
+    }
+    fn length(&self) -> f32 {
+        (self.p1() - self.p2()).length()
     }
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
         (self.p1 - self.p2).square_length()
@@ -191,9 +201,6 @@ where
 }
 
 impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {
-    pub fn length(&self) -> f32 {
-        (self.p1 - self.p2).length()
-    }
     pub fn point_is_on_line(&self, point: impl Into<POINT_TYPE>) -> bool {
         on_line(self.p1, self.p2, point.into())
     }
