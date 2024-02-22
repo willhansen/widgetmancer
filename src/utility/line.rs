@@ -15,26 +15,30 @@ pub type LocalSquareLine = Line<Point2D<f32, SquareGridInLocalSquareFrame>>;
 pub type LocalCharacterLine = Line<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait<POINT_TYPE: Coordinate> {
-    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self;
+pub trait LineTrait {
+    type PointType: Coordinate;
+    fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
-    fn points_in_random_order(&self) -> [POINT_TYPE; 2];
+    fn points_in_random_order(&self) -> [Self::PointType; 2];
 
-    fn new_horizontal(y: POINT_TYPE::DataType) -> Self {
+    fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
         Line::new_from_two_points((Self::DATA_TYPE::zero(), y), (Self::DATA_TYPE::one(), y))
     }
-    fn new_vertical(x: POINT_TYPE::DataType) -> Self {
+    fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
         Line::new_from_two_points((x, Self::DATA_TYPE::zero()), (x, Self::DATA_TYPE::one()))
     }
-    fn new_through_origin(second_point: impl Into<POINT_TYPE>) -> Self {
+    fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
         Self::new_from_two_points(
-            (POINT_TYPE::DataType::zero(), POINT_TYPE::DataType::zero()),
+            (
+                Self::PointType::DataType::zero(),
+                Self::PointType::DataType::zero(),
+            ),
             second_point,
         )
     }
     fn from_point_and_direction(
-        point: impl Into<POINT_TYPE>,
-        direction: impl Into<POINT_TYPE::RelativeVersionOfSelf>,
+        point: impl Into<Self::PointType>,
+        direction: impl Into<<Self::PointType as Coordinate>::RelativeVersionOfSelf>,
     ) -> Self {
         let p = point.into();
         Self::new_from_two_points(p, p + direction.into())
@@ -42,10 +46,10 @@ pub trait LineTrait<POINT_TYPE: Coordinate> {
     fn is_orthogonal(&self) -> bool {
         self.p1.x == self.p2.x || self.p1.y == self.p2.y
     }
-    fn from_array(a: [POINT_TYPE; 2]) -> Self {
+    fn from_array(a: [Self::PointType; 2]) -> Self {
         Self::new_from_two_points(a[0], a[1])
     }
-    fn x_intercept(&self) -> Option<POINT_TYPE::DataType> {
+    fn x_intercept(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
             return Some(self.p1.x);
         }
@@ -54,7 +58,7 @@ pub trait LineTrait<POINT_TYPE: Coordinate> {
         }
         Some(-self.y_intercept().unwrap() / self.slope().unwrap())
     }
-    fn y_intercept(&self) -> Option<POINT_TYPE::DataType> {
+    fn y_intercept(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
             return None;
         }
@@ -66,8 +70,8 @@ pub trait LineTrait<POINT_TYPE: Coordinate> {
     fn is_horizontal(&self) -> bool {
         self.p1.y == self.p2.y
     }
-    fn left_point(&self) -> POINT_TYPE {
-        // TODO: return Option<POINT_TYPE> instead of asserting?
+    fn left_point(&self) -> Self::PointType {
+        // TODO: return Option<Self::POINT_TYPE> instead of asserting?
         assert_false!(self.is_vertical());
         if self.p1.x < self.p2.x {
             self.p1
@@ -75,7 +79,7 @@ pub trait LineTrait<POINT_TYPE: Coordinate> {
             self.p2
         }
     }
-    fn right_point(&self) -> POINT_TYPE {
+    fn right_point(&self) -> Self::PointType {
         assert_false!(self.is_vertical());
         if self.p1.x > self.p2.x {
             self.p1
@@ -83,20 +87,20 @@ pub trait LineTrait<POINT_TYPE: Coordinate> {
             self.p2
         }
     }
-    fn square_length(&self) -> POINT_TYPE::DataType {
+    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
         (self.p1 - self.p2).square_length()
     }
-    fn slope(&self) -> Option<POINT_TYPE::DataType> {
+    fn slope(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
             return None;
         }
-        let l: POINT_TYPE = self.left_point();
-        let r: POINT_TYPE = self.right_point();
+        let l: Self::PointType = self.left_point();
+        let r: Self::PointType = self.right_point();
         Some((r.y - l.y) / (r.x - l.x))
     }
 }
 
-pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<POINT_TYPE> {
+pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> {
     fn p1(&self) -> POINT_TYPE;
     fn p2(&self) -> POINT_TYPE;
     fn reverse(&mut self) {
@@ -118,12 +122,13 @@ pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<POINT_TYPE> {
 }
 
 #[derive(Clone, PartialEq, Copy)]
-pub struct Line<POINT_TYPE> {
+pub struct Line<POINT_TYPE: Coordinate> {
     p1: POINT_TYPE,
     p2: POINT_TYPE,
 }
 
-impl<POINT_TYPE> LineTrait<POINT_TYPE> for Line<POINT_TYPE> {
+impl<POINT_TYPE: Coordinate> LineTrait for Line<POINT_TYPE> {
+    type PointType = POINT_TYPE;
     fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
@@ -135,7 +140,7 @@ impl<POINT_TYPE> LineTrait<POINT_TYPE> for Line<POINT_TYPE> {
     }
 }
 // TODO: Default line struct should not have direction
-impl<POINT_TYPE> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_TYPE> {
+impl<POINT_TYPE: Coordinate> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_TYPE> {
     fn p1(&self) -> POINT_TYPE {
         self.p1
     }
@@ -144,9 +149,11 @@ impl<POINT_TYPE> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_TYPE> {
     }
 }
 
+#[derive(Clone, PartialEq, Copy)]
 pub struct LineThroughUnitSquare<POINT_TYPE: Coordinate>(Line<POINT_TYPE>);
 
-impl<POINT_TYPE: Coordinate> LineTrait<POINT_TYPE> for LineThroughUnitSquare<POINT_TYPE> {
+impl<POINT_TYPE: Coordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
+    type PointType = POINT_TYPE;
     fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();

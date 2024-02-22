@@ -6,18 +6,19 @@ use super::{
 pub type LocalSquareHalfPlane = HalfPlane<LineThroughUnitSquare<LocalSquarePoint>>;
 
 #[derive(PartialEq, Clone, Debug, Copy)]
-pub struct HalfPlane<LINE_TYPE = FloatingPointLine>
-where
-    LINE_TYPE: LineWithDirectionTrait,
-{
+pub struct HalfPlane<LINE_TYPE = FloatingPointLine> {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     dividing_line: LINE_TYPE,
 }
 
-impl<U: Copy + Debug> HalfPlane<f32, U> {
+impl<LINE_TYPE> HalfPlane<LINE_TYPE>
+where
+    LINE_TYPE: LineTrait, //<POINT_TYPE>,
+                          //     POINT_TYPE: FloatCoordinate, // LINE_TYPE::PointType = POINT_TYPE,
+{
     pub fn new_from_line_and_point_on_half_plane(
-        can_be_dividing_line: impl Into<Line<f32, U>>,
-        point_on_half_plane: impl Into<Point2D<f32, U>>,
+        can_be_dividing_line: impl Into<LINE_TYPE>,
+        point_on_half_plane: impl Into<LINE_TYPE::PointType>,
     ) -> Self {
         let dividing_line = can_be_dividing_line.into();
         HalfPlane {
@@ -33,8 +34,8 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         }
     }
     pub fn new_from_line_and_point_off_half_plane(
-        can_be_dividing_line: impl Into<Line<f32, U>>,
-        point_on_half_plane: impl Into<Point2D<f32, U>>,
+        can_be_dividing_line: impl Into<LINE_TYPE>,
+        point_on_half_plane: impl Into<LINE_TYPE::PointType>,
     ) -> Self {
         let line = can_be_dividing_line.into();
         let point_off = point_on_half_plane.into();
@@ -44,35 +45,37 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
     }
     pub fn new_from_border_line_with_origin_outside(
-        can_be_dividing_line: impl Into<Line<f32, U>>,
+        can_be_dividing_line: impl Into<LINE_TYPE>,
     ) -> Self {
-        let line: Line<f32, U> = can_be_dividing_line.into();
+        let line: LINE_TYPE = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     pub fn new_from_vector_from_origin_to_normal_to_edge_with_origin_inside_and_the_vector_pointing_outside(
-        vector_to_outside: impl Into<Vector2D<f32, U>>,
+        vector_to_outside: impl Into<<LINE_TYPE::PointType as Coordinate>::RelativeVersionOfSelf>,
     ) -> Self {
         let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
-            Point2D::<f32, U>::zero() + vector_to_outside,
+            LINE_TYPE::PointType::zero() + vector_to_outside,
             -vector_to_outside,
         )
     }
     pub fn new_from_border_line_with_origin_inside(
-        can_be_dividing_line: impl Into<Line<f32, U>>,
+        can_be_dividing_line: impl Into<LINE_TYPE>,
     ) -> Self {
-        let line: Line<f32, U> = can_be_dividing_line.into();
+        let line: LINE_TYPE = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, (0.0, 0.0))
     }
     pub fn new_from_point_on_border_and_vector_pointing_inside(
-        point_on_border: impl Into<Point2D<f32, U>>,
-        normal_direction_into_plane: impl Into<Vector2D<f32, U>>,
+        point_on_border: impl Into<LINE_TYPE::PointType>,
+        normal_direction_into_plane: impl Into<
+            <LINE_TYPE::PointType as Coordinate>::RelativeVersionOfSelf,
+        >,
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
-        let border_line: Line<f32, U> = Line::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
+        let border_line: LINE_TYPE = Line::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
@@ -84,15 +87,15 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             self.point_off_half_plane(),
         )
     }
-    pub fn dividing_line(&self) -> Line<f32, U> {
+    pub fn dividing_line(&self) -> LINE_TYPE {
         self.dividing_line
     }
 
-    pub fn point_on_half_plane(&self) -> Point2D<f32, U> {
+    pub fn point_on_half_plane(&self) -> LINE_TYPE::PointType {
         self.dividing_line.a_point_right_of_line()
     }
 
-    pub fn point_off_half_plane(&self) -> Point2D<f32, U> {
+    pub fn point_off_half_plane(&self) -> LINE_TYPE::PointType {
         self.dividing_line
             .reflect_point_over_line(self.point_on_half_plane())
     }
@@ -109,12 +112,12 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
         self.about_equal(other.complement(), tolerance)
     }
 
-    pub fn covers_point(&self, point: impl Into<Point2D<f32, U>> + Copy) -> BoolWithPartial {
+    pub fn covers_point(&self, point: impl Into<LINE_TYPE::PointType> + Copy) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
     pub fn covers_point_with_tolerance(
         &self,
-        point: impl Into<Point2D<f32, U>> + Copy,
+        point: impl Into<LINE_TYPE::PointType> + Copy,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -123,7 +126,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     pub fn at_least_partially_covers_point(
         &self,
-        point: impl Into<Point2D<f32, U>> + Copy,
+        point: impl Into<LINE_TYPE::PointType> + Copy,
     ) -> bool {
         self.covers_point(point).is_at_least_partial()
     }
@@ -181,31 +184,34 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             .not()
     }
 
-    //Fn(Point2D<f32, U>) -> Point2D<f32, V>,
-    //fun: Box<dyn Fn<Point2D<f32, U>, Output = Point2D<f32, V>>>,
-    pub fn with_transformed_points<F, V>(&self, point_transform_function: F) -> HalfPlane<f32, V>
+    //Fn(LINE_TYPE::PointType) -> Point2D<f32, V>,
+    //fun: Box<dyn Fn<LINE_TYPE::PointType, Output = Point2D<f32, V>>>,
+    pub fn with_transformed_points<F, V>(
+        &self,
+        point_transform_function: F,
+    ) -> HalfPlane<Line<Point2D<f32, V>>>
     where
         V: Copy + Debug,
-        F: Fn(Point2D<f32, U>) -> Point2D<f32, V>,
+        F: Fn(LINE_TYPE::PointType) -> Point2D<f32, V>,
     {
         HalfPlane::new_from_line_and_point_on_half_plane(
-            Line {
-                p1: point_transform_function(self.dividing_line.p1),
-                p2: point_transform_function(self.dividing_line.p2),
-            },
+            Line::new_from_two_points(
+                point_transform_function(self.dividing_line.p1()),
+                point_transform_function(self.dividing_line.p2()),
+            ),
             point_transform_function(self.point_on_half_plane()),
         )
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            Line::<f32, U> {
-                p1: Point2D::new(1.0, 0.0),
-                p2: Point2D::new(-1.0, 0.0),
-            },
-            Point2D::<f32, U>::new(0.0, 1.0),
+            LINE_TYPE::new_from_two_points(Point2D::new(1.0, 0.0), Point2D::new(-1.0, 0.0)),
+            LINE_TYPE::PointType::new(0.0, 1.0),
         )
     }
-    pub fn depth_of_point_in_half_plane(&self, point: impl Into<Point2D<f32, U>> + Copy) -> f32 {
+    pub fn depth_of_point_in_half_plane(
+        &self,
+        point: impl Into<LINE_TYPE::PointType> + Copy,
+    ) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
@@ -216,7 +222,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             -dist
         }
     }
-    pub fn distance_of_point_from_half_plane(&self, point: Point2D<f32, U>) -> f32 {
+    pub fn distance_of_point_from_half_plane(&self, point: LINE_TYPE::PointType) -> f32 {
         -self.depth_of_point_in_half_plane(point)
     }
     pub fn coverage_of_centered_unit_square_with_tolerance(
@@ -273,7 +279,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
         tolerance: f32,
-    ) -> Vec<Point2D<f32, U>> {
+    ) -> Vec<LINE_TYPE::PointType> {
         corner_points_of_centered_unit_square()
             .into_iter()
             .filter(|&p| self.covers_point(p).is_at_least_partial())
@@ -281,7 +287,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     fn covers_any_of_these_points_with_tolerance(
         &self,
-        points: Vec<Point2D<f32, U>>,
+        points: Vec<LINE_TYPE::PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -293,7 +299,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
     fn covers_all_of_these_points_with_tolerance(
         &self,
-        points: Vec<Point2D<f32, U>>,
+        points: Vec<LINE_TYPE::PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -305,7 +311,7 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
     }
 }
 
-impl<U: Copy + Debug> QuarterTurnRotatable for HalfPlane<f32, U> {
+impl<POINT_TYPE: FloatCoordinate> QuarterTurnRotatable for HalfPlane<Line<POINT_TYPE>> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
