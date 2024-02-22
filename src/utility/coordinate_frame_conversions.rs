@@ -171,25 +171,25 @@ pub fn local_square_point_to_local_character_point(
 
 // TODO: make this more general
 pub fn world_half_plane_to_local_square_half_plane(
-    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
+    world_half_plane: HalfPlane<WorldLine>,
     ref_square: WorldSquare,
-) -> HalfPlane<f32, SquareGridInLocalSquareFrame> {
+) -> HalfPlane<LocalSquareLine> {
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
 pub fn local_square_half_plane_to_local_character_half_plane(
-    square_half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
+    square_half_plane: HalfPlane<WorldLine>,
     character_index_in_square: usize,
-) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+) -> HalfPlane<LocalCharacterLine> {
     square_half_plane.with_transformed_points(|p| {
         local_square_point_to_local_character_point(p, character_index_in_square)
     })
 }
 
 pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
+    world_half_plane: HalfPlane<WorldLine>,
     ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
+) -> HalfPlane<LocalCharacterLine> {
     world_half_plane
         .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }

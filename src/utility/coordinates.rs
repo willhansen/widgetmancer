@@ -53,6 +53,11 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
+trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
+
+// TODO: is this just a scalar?
+trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display);
+
 pub trait Coordinate:
     Copy
     + PartialEq
@@ -68,7 +73,7 @@ pub trait Coordinate:
     + Zero
 //+ Debug
 where
-    Self::DataType: Mul<Output = Self::DataType> + Signed,
+    Self::DataType: CoordinateDataTypeTrait,
 {
     type DataType;
     type UnitType;
@@ -80,6 +85,9 @@ where
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
+    fn zero() -> Self {
+        Self::new(Self::DataType::zero(), Self::DataType::zero())
+    }
     fn is_relative(&self) -> bool {
         Self::IS_RELATIVE
     }
@@ -105,7 +113,10 @@ where
         self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
     }
     fn is_zero(&self) -> bool {
-        self.x() == Self::DataType::zero() && self.y() == Self::DataType::zero()
+        self == Self::zero()
+    }
+    fn king_length(&self) -> Self::DataType {
+        self.x().abs().max(self.y().abs())
     }
 }
 
@@ -150,25 +161,36 @@ coordinatify!(Vector2D, true, Point2D);
 coordinatify!(Point2D, false, Vector2D);
 
 // TODO: clean these up (with the trait alias macro?)
+// TODO: convert to auto trait when stable
 pub trait AbsoluteCoordinate: Coordinate {}
 impl<COORD> AbsoluteCoordinate for COORD where
     COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
 {
 }
 
+// TODO: convert to auto trait when stable
 pub trait RelativeCoordinate: Coordinate {}
 impl<COORD> RelativeCoordinate for COORD where
     COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
 {
 }
 
-trait_alias_macro!(pub trait FloatCoordinate = Coordinate<DataType = f32>);
+pub trait FloatCoordinate: Coordinate<DataType = f32> {
+    // TODO: Add tolerance?
+    fn on_centered_unit_square(&self) -> bool {
+        // NOTE: 0.5 can be exactly represented by floating point numbers
+        self.king_length() == 0.5
+    }
+}
+
+// TODO: convert to auto trait when stable
+impl<COORDINATE_TYPE> FloatCoordinate for COORDINATE_TYPE where
+    COORDINATE_TYPE: Coordinate<DataType = f32>
+{
+}
+
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
-trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
-
-// TODO: is this just a scalar?
-trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display);
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x), sign(point.y))

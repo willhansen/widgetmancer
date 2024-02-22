@@ -180,7 +180,9 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
     block_map
 }
 
-fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame>) -> char {
+fn get_character_from_snap_points(
+    line: Line<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
+) -> char {
     let pointA = line.p1;
     let pointB = line.p2;
 
@@ -232,7 +234,7 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
 }
 
 pub fn half_plane_to_angled_block_character(
-    half_plane: HalfPlane<f32, CharacterGridInLocalCharacterFrame>,
+    half_plane: HalfPlane<Point2D<f32, CharacterGridInLocalCharacterFrame>>,
     bias_direction: Angle<f32>,
 ) -> char {
     // angle blocks have important edge points

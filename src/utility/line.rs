@@ -9,71 +9,43 @@ use super::{
     trait_alias_macro::trait_alias_macro,
 };
 
-pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
-pub type WorldSquareLine = Line<i32, SquareGridInWorldFrame>;
-pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
+pub type WorldLine = Line<WorldPoint>;
+pub type WorldSquareLine = Line<WorldSquare>;
+pub type LocalSquareLine = Line<Point2D<f32, SquareGridInLocalSquareFrame>>;
+pub type LocalCharacterLine = Line<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
+pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
-#[derive(Clone, PartialEq, Copy)]
-pub struct Line<T, U = euclid::UnknownUnit> {
-    pub p1: Point2D<T, U>,
-    pub p2: Point2D<T, U>,
-}
+pub trait LineTrait<POINT_TYPE: Coordinate> {
+    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self;
 
-impl<T, U> Line<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
-    pub fn new_from_two_points(
-        p1: impl Into<Point2D<T, U>>,
-        p2: impl Into<Point2D<T, U>>,
-    ) -> Line<T, U> {
-        let p1 = p1.into();
-        let p2 = p2.into();
-        assert_ne!(p1, p2);
-        Line { p1, p2 }
+    fn points_in_random_order(&self) -> [POINT_TYPE; 2];
+
+    fn new_horizontal(y: POINT_TYPE::DataType) -> Self {
+        Line::new_from_two_points((Self::DATA_TYPE::zero(), y), (Self::DATA_TYPE::one(), y))
     }
-    pub fn new_horizontal(y: T) -> Self {
-        Line::new_from_two_points((T::zero(), y), (T::one(), y))
+    fn new_vertical(x: POINT_TYPE::DataType) -> Self {
+        Line::new_from_two_points((x, Self::DATA_TYPE::zero()), (x, Self::DATA_TYPE::one()))
     }
-    pub fn new_vertical(x: T) -> Self {
-        Line::new_from_two_points((x, T::zero()), (x, T::one()))
+    fn new_through_origin(second_point: impl Into<POINT_TYPE>) -> Self {
+        Self::new_from_two_points(
+            (POINT_TYPE::DataType::zero(), POINT_TYPE::DataType::zero()),
+            second_point,
+        )
     }
-    pub fn new_through_origin(second_point: impl Into<Point2D<T, U>>) -> Self {
-        Self::new_from_two_points((T::zero(), T::zero()), second_point)
-    }
-    pub fn from_point_and_direction(
-        point: impl Into<Point2D<T, U>>,
-        direction: impl Into<Vector2D<T, U>>,
+    fn from_point_and_direction(
+        point: impl Into<POINT_TYPE>,
+        direction: impl Into<POINT_TYPE::RelativeVersionOfSelf>,
     ) -> Self {
         let p = point.into();
         Self::new_from_two_points(p, p + direction.into())
     }
-    pub fn reverse(&mut self) {
-        mem::swap(&mut self.p2, &mut self.p1);
-    }
-    pub fn reversed(&self) -> Self {
-        Self::new_from_two_points(self.p2.clone(), self.p1.clone())
-    }
-    pub fn get(&self, index: u32) -> Point2D<T, U> {
-        match index {
-            0 => self.p1.clone(),
-            1 => self.p2.clone(),
-            _ => panic!("only two points defining the line"),
-        }
-    }
-    pub fn square_length(&self) -> T {
-        (self.p1 - self.p2).square_length()
-    }
-    pub fn is_orthogonal(&self) -> bool {
+    fn is_orthogonal(&self) -> bool {
         self.p1.x == self.p2.x || self.p1.y == self.p2.y
     }
-    pub fn to_array(&self) -> [Point2D<T, U>; 2] {
-        [self.p1, self.p2]
-    }
-    pub fn from_array(a: [Point2D<T, U>; 2]) -> Self {
+    fn from_array(a: [POINT_TYPE; 2]) -> Self {
         Self::new_from_two_points(a[0], a[1])
     }
-    pub fn x_intercept(&self) -> Option<T> {
+    fn x_intercept(&self) -> Option<POINT_TYPE::DataType> {
         if self.is_vertical() {
             return Some(self.p1.x);
         }
@@ -82,19 +54,20 @@ where
         }
         Some(-self.y_intercept().unwrap() / self.slope().unwrap())
     }
-    pub fn y_intercept(&self) -> Option<T> {
+    fn y_intercept(&self) -> Option<POINT_TYPE::DataType> {
         if self.is_vertical() {
             return None;
         }
         Some(self.p1.y - self.slope().unwrap() * self.p1.x)
     }
-    pub fn is_vertical(&self) -> bool {
+    fn is_vertical(&self) -> bool {
         self.p1.x == self.p2.x
     }
-    pub fn is_horizontal(&self) -> bool {
+    fn is_horizontal(&self) -> bool {
         self.p1.y == self.p2.y
     }
-    fn left_point(&self) -> Point2D<T, U> {
+    fn left_point(&self) -> POINT_TYPE {
+        // TODO: return Option<POINT_TYPE> instead of asserting?
         assert_false!(self.is_vertical());
         if self.p1.x < self.p2.x {
             self.p1
@@ -102,7 +75,7 @@ where
             self.p2
         }
     }
-    fn right_point(&self) -> Point2D<T, U> {
+    fn right_point(&self) -> POINT_TYPE {
         assert_false!(self.is_vertical());
         if self.p1.x > self.p2.x {
             self.p1
@@ -110,19 +83,85 @@ where
             self.p2
         }
     }
-    pub fn slope(&self) -> Option<T> {
+    fn square_length(&self) -> POINT_TYPE::DataType {
+        (self.p1 - self.p2).square_length()
+    }
+    fn slope(&self) -> Option<POINT_TYPE::DataType> {
         if self.is_vertical() {
             return None;
         }
-        let l: Point2D<T, U> = self.left_point();
-        let r: Point2D<T, U> = self.right_point();
+        let l: POINT_TYPE = self.left_point();
+        let r: POINT_TYPE = self.right_point();
         Some((r.y - l.y) / (r.x - l.x))
     }
 }
-impl<T, U> QuarterTurnRotatable for Line<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
+
+pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<POINT_TYPE> {
+    fn p1(&self) -> POINT_TYPE;
+    fn p2(&self) -> POINT_TYPE;
+    fn reverse(&mut self) {
+        mem::swap(&mut self.p2, &mut self.p1);
+    }
+    fn get_point_by_index(&self, index: u32) -> POINT_TYPE {
+        match index {
+            0 => self.p1.clone(),
+            1 => self.p2.clone(),
+            _ => panic!("only two points defining the line"),
+        }
+    }
+    fn reversed(&self) -> Self {
+        Self::new_from_two_points(self.p2.clone(), self.p1.clone())
+    }
+    fn to_array(&self) -> [POINT_TYPE; 2] {
+        [self.p1, self.p2]
+    }
+}
+
+#[derive(Clone, PartialEq, Copy)]
+pub struct Line<POINT_TYPE> {
+    p1: POINT_TYPE,
+    p2: POINT_TYPE,
+}
+
+impl<POINT_TYPE> LineTrait<POINT_TYPE> for Line<POINT_TYPE> {
+    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
+        let p1 = p1.into();
+        let p2 = p2.into();
+        assert_ne!(p1, p2);
+        Line { p1, p2 }
+    }
+    fn points_in_random_order(&self) -> [POINT_TYPE; 2] {
+        [self.p2, self.p1] // order chosen by coin flip
+    }
+}
+// TODO: Default line struct should not have direction
+impl<POINT_TYPE> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_TYPE> {
+    fn p1(&self) -> POINT_TYPE {
+        self.p1
+    }
+    fn p2(&self) -> POINT_TYPE {
+        self.p2
+    }
+}
+
+pub struct LineThroughUnitSquare<POINT_TYPE: Coordinate>(Line<POINT_TYPE>);
+
+impl<POINT_TYPE: Coordinate> LineTrait<POINT_TYPE> for LineThroughUnitSquare<POINT_TYPE> {
+    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
+        let p1 = p1.into();
+        let p2 = p2.into();
+        assert!(p1.on_centered_unit_square());
+        assert!(p2.on_centered_unit_square());
+        Self(Line::new_from_two_points(p1, p2))
+    }
+
+    fn points_in_random_order(&self) -> [POINT_TYPE; 2] {
+        self.0.points_in_random_order()
+    }
+}
+
+impl<POINT_TYPE: Coordinate> Line<POINT_TYPE> {}
+impl<POINT_TYPE: Coordinate> QuarterTurnRotatable for Line<POINT_TYPE> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let new_points = self
@@ -134,28 +173,30 @@ where
     }
 }
 
-impl<Datatype, UnitType, CanBePointType> From<(CanBePointType, CanBePointType)>
-    for Line<Datatype, UnitType>
+impl<POINT_TYPE: Coordinate, CAN_BE_POINT_TYPE> From<(CAN_BE_POINT_TYPE, CAN_BE_POINT_TYPE)>
+    for Line<POINT_TYPE>
 where
-    CanBePointType: Into<Point2D<Datatype, UnitType>>,
-    Datatype: CoordinateDataTypeTrait,
+    CAN_BE_POINT_TYPE: Into<POINT_TYPE>,
 {
-    fn from(value: (CanBePointType, CanBePointType)) -> Self {
+    fn from(value: (CAN_BE_POINT_TYPE, CAN_BE_POINT_TYPE)) -> Self {
         Self::new_from_two_points(value.0, value.1)
     }
 }
 
-impl<U: Copy> Line<f32, U> {
+impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {
     pub fn length(&self) -> f32 {
         (self.p1 - self.p2).length()
     }
-    pub fn point_is_on_line(&self, point: impl Into<Point2D<f32, U>>) -> bool {
+    pub fn point_is_on_line(&self, point: impl Into<POINT_TYPE>) -> bool {
         on_line(self.p1, self.p2, point.into())
     }
-    pub fn point_is_approx_on_line(&self, point: Point2D<f32, U>, tolerance: f32) -> bool {
+    pub fn point_is_approx_on_line(&self, point: POINT_TYPE, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
-    pub fn normal_vector_to_point(&self, point: impl Into<Point2D<f32, U>>) -> Vector2D<f32, U> {
+    pub fn normal_vector_to_point(
+        &self,
+        point: impl Into<POINT_TYPE>,
+    ) -> POINT_TYPE::RelativeVersionOfSelf {
         let point = point.into();
         let p1_to_point = point - self.p1;
         let p1_to_p2 = self.p2 - self.p1;
@@ -163,28 +204,28 @@ impl<U: Copy> Line<f32, U> {
         let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
         perpendicular_part_of_p1_to_point
     }
-    pub fn normal_vector_from_origin(&self) -> Vector2D<f32, U> {
+    pub fn normal_vector_from_origin(&self) -> POINT_TYPE::RelativeVersionOfSelf {
         -self.normal_vector_to_point((0.0, 0.0))
     }
-    pub fn normal_distance_to_point(&self, point: impl Into<Point2D<f32, U>>) -> f32 {
+    pub fn normal_distance_to_point(&self, point: impl Into<POINT_TYPE>) -> f32 {
         self.normal_vector_to_point(point).length()
     }
-    pub fn a_point_clockwise_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_clockwise_of_line(&self) -> POINT_TYPE {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
     }
-    pub fn a_point_anticlockwise_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_anticlockwise_of_line(&self) -> POINT_TYPE {
         rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
     }
-    pub fn a_point_right_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_right_of_line(&self) -> POINT_TYPE {
         self.a_point_clockwise_of_line()
     }
-    pub fn a_point_left_of_line(&self) -> Point2D<f32, U> {
+    pub fn a_point_left_of_line(&self) -> POINT_TYPE {
         self.a_point_anticlockwise_of_line()
     }
-    pub fn lerp(&self, t: f32) -> Point2D<f32, U> {
+    pub fn lerp(&self, t: f32) -> POINT_TYPE {
         lerp2d(self.p1, self.p2, t)
     }
-    pub fn point_is_on_or_normal_to_line_segment(&self, point: Point2D<f32, U>) -> bool {
+    pub fn point_is_on_or_normal_to_line_segment(&self, point: POINT_TYPE) -> bool {
         let start_point = self.p1;
         let end_point = self.p2;
 
@@ -233,7 +274,7 @@ impl<U: Copy> Line<f32, U> {
         }
     }
 
-    pub fn reflect_point_over_line(&self, point: impl Into<Point2D<f32, U>>) -> Point2D<f32, U> {
+    pub fn reflect_point_over_line(&self, point: impl Into<POINT_TYPE>) -> POINT_TYPE {
         let p1_to_p = point.into() - self.p1;
         let p1_to_p2 = self.p2 - self.p1;
         let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
@@ -251,14 +292,14 @@ impl<U: Copy> Line<f32, U> {
             better_angle_from_x_axis(self.p1 - self.p2),
         ]
     }
-    pub fn from_ray(start: Point2D<f32, U>, angle: Angle<f32>, length: f32) -> Self {
+    pub fn from_ray(start: POINT_TYPE, angle: Angle<f32>, length: f32) -> Self {
         assert!(length > 0.0);
         Self::new_from_two_points(start, naive_ray_endpoint(start, angle, length))
     }
     pub fn same_side_of_line(
         &self,
-        point_c: impl Into<Point2D<f32, U>> + Copy,
-        point_d: impl Into<Point2D<f32, U>> + Copy,
+        point_c: impl Into<POINT_TYPE> + Copy,
+        point_d: impl Into<POINT_TYPE> + Copy,
     ) -> bool {
         let point_a = self.p1;
         let point_b = self.p2;
@@ -277,7 +318,7 @@ impl<U: Copy> Line<f32, U> {
     pub fn line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
-    ) -> Vec<Point2D<f32, U>> {
+    ) -> Vec<POINT_TYPE> {
         let regular_intersections = self.line_intersections_with_centered_unit_square();
         if !regular_intersections.is_empty() {
             return regular_intersections;
@@ -312,7 +353,7 @@ impl<U: Copy> Line<f32, U> {
     pub fn line_intersections_with_expanded_centered_unit_square(
         &self,
         expansion_length: f32,
-    ) -> Vec<Point2D<f32, U>> {
+    ) -> Vec<POINT_TYPE> {
         let line_point_a = self.p1;
         let line_point_b = self.p2;
         let half_side_length = 0.5 + expansion_length;
@@ -350,7 +391,7 @@ impl<U: Copy> Line<f32, U> {
 
             let side_positions = vec![half_side_length, -half_side_length];
 
-            let mut candidate_intersections: Vec<Point2D<f32, U>> = vec![];
+            let mut candidate_intersections: Vec<POINT_TYPE> = vec![];
             for &x in &side_positions {
                 let y = m * x + b;
                 if y.abs() <= half_side_length {
@@ -380,7 +421,7 @@ impl<U: Copy> Line<f32, U> {
             }
         }
     }
-    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<Point2D<f32, U>> {
+    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<POINT_TYPE> {
         self.line_intersections_with_expanded_centered_unit_square(0.0)
     }
     pub fn line_intersects_with_centered_unit_square(&self) -> bool {
@@ -391,29 +432,26 @@ impl<U: Copy> Line<f32, U> {
             .line_intersections_with_expanded_centered_unit_square(per_face_extension)
             .is_empty()
     }
-    fn points_in_line_order(&self, mut points: Vec<Point2D<f32, U>>) -> Vec<Point2D<f32, U>> {
+    fn points_in_line_order(&self, mut points: Vec<POINT_TYPE>) -> Vec<POINT_TYPE> {
         let normalized_line_direction = (self.p2 - self.p1).normalize();
         points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
         points
     }
 
-    pub fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Point2D<f32, U> {
+    pub fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> POINT_TYPE {
         let t = rng.gen_range(0.0..=1.0);
         self.lerp(t)
     }
 
-    pub fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Point2D<f32, U> {
+    pub fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> POINT_TYPE {
         // TODO: make more uniform
         self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
     }
 
-    pub fn random_point_near_line(&self, radius: f32) -> Point2D<f32, U> {
+    pub fn random_point_near_line(&self, radius: f32) -> POINT_TYPE {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
-    pub fn intersection_point_with_other_extended_line(
-        &self,
-        other: &Self,
-    ) -> Option<Point2D<f32, U>> {
+    pub fn intersection_point_with_other_extended_line(&self, other: &Self) -> Option<POINT_TYPE> {
         // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
         let (x1, y1) = self.p1.to_tuple();
         let (x2, y2) = self.p2.to_tuple();
@@ -431,10 +469,7 @@ impl<U: Copy> Line<f32, U> {
         return Some(point2(final_x, final_y));
     }
 
-    pub fn intersection_point_with_other_line_segment(
-        &self,
-        other: &Self,
-    ) -> Option<Point2D<f32, U>> {
+    pub fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<POINT_TYPE> {
         if self.same_side_of_line(other.p1, other.p2) || other.same_side_of_line(self.p1, self.p2) {
             let on_same_line = self.point_is_on_line(other.p1);
             if !on_same_line {
@@ -469,10 +504,7 @@ impl WorldLine {
     }
 }
 
-impl<T, U> Debug for Line<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
+impl<POINT_TYPE: Coordinate> Debug for Line<POINT_TYPE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -487,19 +519,16 @@ where
         )
     }
 }
-impl<T, U> Display for Line<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
+impl<POINT_TYPE: Coordinate> Display for Line<POINT_TYPE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
     }
 }
 
-impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
-    type Output = Line<f32, U>;
+impl<POINT_TYPE: Coordinate> Add<POINT_TYPE::RelativeVersionOfSelf> for Line<POINT_TYPE> {
+    type Output = Line<POINT_TYPE>;
 
-    fn add(self, rhs: Vector2D<f32, U>) -> Self::Output {
+    fn add(self, rhs: POINT_TYPE::RelativeVersionOfSelf) -> Self::Output {
         Line {
             p1: self.p1 + rhs,
             p2: self.p2 + rhs,
