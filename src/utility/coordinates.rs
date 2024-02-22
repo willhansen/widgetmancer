@@ -71,6 +71,8 @@ pub trait Coordinate:
 
     + Mul<Self::DataType, Output = Self>
     + euclid::num::Zero
+    + Sized
+    // + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
 //+ Debug
 where
     Self::DataType: CoordinateDataTypeTrait,
@@ -117,7 +119,14 @@ where
         *self == Self::zero()
     }
     fn king_length(&self) -> Self::DataType {
-        self.x().abs().max(self.y().abs())
+        // TODO: There's got to be a simpler replacement for `Ord`'s `max` in `PartialOrd`
+        let a = self.x().abs();
+        let b = self.y().abs(); 
+        if a>=b {
+            a
+        } else {
+            b
+        }
     }
 }
 
@@ -133,7 +142,9 @@ macro_rules! coordinatify {
                 + Mul<Output = T>
                 + euclid::num::Zero
                 + Signed
-                + Debug,
+                + Debug 
+                + PartialOrd 
+                + Display,
         {
             type DataType = T;
             type UnitType = U;
@@ -510,6 +521,8 @@ impl From<WorldStep> for OrthogonalWorldStep {
         OrthogonalWorldStep::new(value)
     }
 }
+
+
 impl<T> From<(T, T)> for OrthogonalWorldStep
 where
     (T, T): Into<WorldStep>,
@@ -789,17 +802,23 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-
-pub fn on_line<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, c: Point2D<f32, U>) -> bool {
+pub fn on_line<P: FloatCoordinate>(a: impl Into<P>, b: impl Into<P>, c: impl Into<P>) -> bool {
+    let a = a.into();
+    let b = b.into();
+    let c = c.into();
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == 0.0
 }
-pub fn on_line_in_this_order<U>(
-    a: Point2D<f32, U>,
-    b: Point2D<f32, U>,
-    c: Point2D<f32, U>,
+
+pub fn on_line_in_this_order<P: FloatCoordinate>(
+    a: impl Into<P>,
+    b: impl Into<P>,
+    c: impl Into<P>,
 ) -> bool {
+    let a = a.into();
+    let b = b.into();
+    let c = c.into();
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
@@ -1053,5 +1072,12 @@ mod tests {
         assert_eq!(square.as_absolute(), square);
         assert_eq!(step.as_absolute(), square);
         assert_eq!(step.as_relative(), step);
+    }
+    #[test]
+    fn test_king_length() {
+        assert_eq!(WorldStep::new(2, 3).king_length(), 3);
+        assert_eq!(WorldMove::new(2.0, -3.0).king_length(), 3.0);
+        assert_eq!(WorldSquare::new(-2, 200).king_length(), 200);
+        assert_eq!(WorldPoint::new(1.5, 3.3).king_length(), 3.3);
     }
 }

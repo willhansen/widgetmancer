@@ -2,6 +2,7 @@ use std::ops::Add;
 
 use euclid::approxeq::ApproxEq;
 use line_drawing::Supercover;
+use num::{One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
 use super::{
@@ -15,7 +16,7 @@ pub type LocalSquareLine = Line<Point2D<f32, SquareGridInLocalSquareFrame>>;
 pub type LocalCharacterLine = Line<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait {
+pub trait LineTrait: Sized {
     type PointType: Coordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -23,22 +24,22 @@ pub trait LineTrait {
     fn points_in_random_order(&self) -> [Self::PointType; 2];
 
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Line::new_from_two_points(
-            (<Self::PointType as Coordinate>::DataType::zero(), y),
-            (<Self::PointType as Coordinate>::DataType::one(), y),
+        Self::new_from_two_points(
+            Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
+            Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
         )
     }
     fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Line::new_from_two_points(
-            (x, <Self::PointType as Coordinate>::DataType::zero()),
-            (x, <Self::PointType as Coordinate>::DataType::one()),
+        Self::new_from_two_points(
+            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
+            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
         )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
         Self::new_from_two_points(
-            (
-                Self::PointType::DataType::zero(),
-                Self::PointType::DataType::zero(),
+            Self::PointType::new(
+                <Self::PointType as Coordinate>::DataType::zero(),
+                <Self::PointType as Coordinate>::DataType::zero(),
             ),
             second_point,
         )
@@ -110,6 +111,20 @@ pub trait LineTrait {
     }
 }
 
+// TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
+pub trait FloatLineTrait: LineTrait {
+    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
+        let [p1, p2] = self.points_in_random_order();
+        on_line(p1, p2, point.into())
+    }
+}
+impl<L> FloatLineTrait for L
+where
+    L: LineTrait,
+    <L as LineTrait>::PointType: FloatCoordinate,
+{
+}
+
 pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> {
     fn p1(&self) -> POINT_TYPE;
     fn p2(&self) -> POINT_TYPE;
@@ -124,7 +139,7 @@ pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> 
         }
     }
     fn reversed(&self) -> Self {
-        Self::new_from_two_points(self.p2.clone(), self.p1.clone())
+        Self::new_from_two_points(self.p2, self.p1)
     }
     fn to_array(&self) -> [POINT_TYPE; 2] {
         [self.p1, self.p2]
@@ -160,9 +175,9 @@ impl<POINT_TYPE: Coordinate> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_T
 }
 
 #[derive(Clone, PartialEq, Copy)]
-pub struct LineThroughUnitSquare<POINT_TYPE: Coordinate>(Line<POINT_TYPE>);
+pub struct LineThroughUnitSquare<POINT_TYPE: FloatCoordinate>(Line<POINT_TYPE>);
 
-impl<POINT_TYPE: Coordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
+impl<POINT_TYPE: FloatCoordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
     type PointType = POINT_TYPE;
     fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
         let p1 = p1.into();
@@ -177,7 +192,6 @@ impl<POINT_TYPE: Coordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
     }
 }
 
-impl<POINT_TYPE: Coordinate> Line<POINT_TYPE> {}
 impl<POINT_TYPE: Coordinate> QuarterTurnRotatable for Line<POINT_TYPE> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
@@ -200,10 +214,8 @@ where
     }
 }
 
+// TODO: move to the FloatLineTrait trait
 impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {
-    pub fn point_is_on_line(&self, point: impl Into<POINT_TYPE>) -> bool {
-        on_line(self.p1, self.p2, point.into())
-    }
     pub fn point_is_approx_on_line(&self, point: POINT_TYPE, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
