@@ -3,6 +3,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep, STEP_LEFT};
 use crate::utility::coordinates::*;
+use crate::utility::line::FloatLineTrait;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,

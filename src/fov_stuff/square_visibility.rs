@@ -12,7 +12,7 @@ use crate::utility::coordinates::{
 };
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
-use crate::utility::line::LineTrait;
+use crate::utility::line::{FloatLineTrait, LineTrait};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,

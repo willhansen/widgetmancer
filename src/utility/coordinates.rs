@@ -59,28 +59,20 @@ trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output
 // TODO: is this just a scalar?
 trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One);
 
-pub trait LadderAdd<RIGHT_TYPE = Self> {
-    type Output;
-    fn ladder_add(&self, rhs: RIGHT_TYPE) -> Self::Output;
-}
-pub trait LadderSub<RIGHT_TYPE = Self> {
-    type Output;
-    fn ladder_sub(&self, rhs: RIGHT_TYPE) -> Self::Output;
-}
-
 pub trait Coordinate:
     Copy
     + PartialEq
-    + LadderAdd<Self::RelativeVersionOfSelf, Output = Self>
-    + LadderSub<Self::RelativeVersionOfSelf, Output = Self>
-    + LadderSub<Self, Output = Self::RelativeVersionOfSelf>
-    + LadderAdd<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    + LadderSub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    + LadderSub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
+    + Add<Self::RelativeVersionOfSelf, Output = Self>
+    + Sub<Self::RelativeVersionOfSelf, Output = Self>
+    + Sub<Self, Output = Self::RelativeVersionOfSelf>
+    // + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    // + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    // + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
     + Mul<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
     + Debug
+    + Neg
 // + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
 where
     Self::DataType: CoordinateDataTypeTrait,
@@ -126,8 +118,11 @@ where
     fn is_zero(&self) -> bool {
         *self == Self::zero()
     }
+    fn square_length(&self) -> Self::DataType {
+        self.x() * self.x() + self.y() * self.y()
+    }
     fn king_length(&self) -> Self::DataType {
-        // TODO: There's got to be a simpler replacement for `Ord`'s `max` in `PartialOrd`
+        // TODO: Why isn't there a `PartialOrd::max`?
         let a = self.x().abs();
         let b = self.y().abs();
         if a >= b {
@@ -136,8 +131,18 @@ where
             b
         }
     }
+    fn dot(self, other: impl Into<Self>) -> Self::DataType
+    {
+        let other = other.into();
+        self.x() * other.x() + self.y() * other.y()
+    }
     fn cross(&self, other: Self) -> Self::DataType {
         self.x() * other.y() - self.y() * other.x()
+    }
+    fn project_onto_vector(self, onto: impl Into<Self>) -> Self
+    {
+        let onto = onto.into();
+        onto * (self.dot(onto) / onto.square_length())
     }
 }
 
@@ -204,6 +209,9 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
         // NOTE: 0.5 can be exactly represented by floating point numbers
         self.king_length() == 0.5
     }
+    fn length(&self) -> Self::DataType {
+        self.square_length().sqrt()
+    }
 }
 
 // TODO: convert to auto trait when stable
@@ -220,14 +228,6 @@ assert_not_impl_any!(Vector2D<i32, euclid::UnknownUnit>: FloatCoordinate);
 
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
-
-impl<COORD_TYPE: Coordinate> LadderAdd<COORD_TYPE> for COORD_TYPE {
-    type Output = COORD_TYPE;
-
-    fn ladder_add(&self, rhs: COORD_TYPE) -> Self::Output {
-        todo!()
-    }
-}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x), sign(point.y))

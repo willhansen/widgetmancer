@@ -121,8 +121,9 @@ pub trait FloatLineTrait: LineTrait {
         point: impl Into<Self::PointType>,
     ) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
         let point = point.into();
-        let p1_to_point = point - self.p1;
-        let p1_to_p2 = self.p2 - self.p1;
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let p1_to_point = point - p1;
+        let p1_to_p2 = p2 - p1;
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
         let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
         perpendicular_part_of_p1_to_point
