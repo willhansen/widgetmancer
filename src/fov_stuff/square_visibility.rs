@@ -188,29 +188,29 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
-    ) -> Option<Self> {
-        let tolerance = FAngle::degrees(0.01); // TODO: double check this
+    ) -> Self {
+        let tolerance = FAngle::degrees(0.01); // TODO: double check this, maybe standardize
         let rel_square = rel_square.into(); // TODO: tired of writing this out a bunch
         let partial_view_arc = match view_arc.into() {
-            AngleInterval::Empty => return None,
-            AngleInterval::FullCircle => return Some(SquareVisibility::new_fully_visible()),
+            AngleInterval::Empty => return Self::NotVisible,
+            AngleInterval::FullCircle => return Self::FullyVisible,
             AngleInterval::PartialArc(partial) => partial,
         };
         if rel_square == STEP_ZERO {
             // return Some(SquareVisibility::new_fully_visible());
-            return None;
+            return Self::NotVisible;
         }
         let square_arc = PartialAngleInterval::from_relative_square(rel_square);
         if partial_view_arc
             .contains_partial_arc(square_arc, tolerance)
             .is_at_least_partial()
         {
-            Some(SquareVisibility::new_fully_visible())
+            Self::FullyVisible
         } else if partial_view_arc
             .overlaps_partial_arc(square_arc, tolerance)
             .is_at_least_partial()
         {
-            // TODO: double check tolerance choice on this if
+            // TODO: double check tolerance choice on this "if"
 
             let shadow_arc = partial_view_arc.complement();
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
@@ -234,22 +234,26 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 rel_square.to_point(),
             );
 
+            let coverage_of_unit_square =
+                square_shadow.coverage_of_centered_unit_square_with_tolerance(tolerance);
+
             if square_shadow
                 .fully_covers_centered_unit_square()
                 .is_at_least_partial()
             {
-                None
+                Self::NotVisible
             } else if square_shadow.at_least_partially_covers_unit_square() {
-                Some(SquareVisibilityFromOneLargeShadow::new_partially_visible(
+                SquareVisibilityFromOneLargeShadow::new_partially_visible(
                     square_shadow.complement(),
-                ))
+                )
             } else {
-                Some(SquareVisibilityFromOneLargeShadow::new_fully_visible())
+                Self::FullyVisible
             }
         } else {
-            None
+            Self::NotVisible
         }
     }
+
     fn overlaps(&self, other: Self, tolerance: f32) -> bool {
         match self {
             SquareVisibilityFromOneLargeShadow::FullyVisible => match other {
