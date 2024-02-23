@@ -12,6 +12,7 @@ use num::{One, Signed, Zero};
 use ordered_float::OrderedFloat;
 use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
+use static_assertions::{assert_impl_all, assert_not_impl_any};
 
 // TODO: get rid of this section
 use super::{
@@ -61,19 +62,17 @@ trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq
 pub trait Coordinate:
     Copy
     + PartialEq
-    // + Add<Self::RelativeVersionOfSelf, Output = Self>
-    // + Sub<Self::RelativeVersionOfSelf, Output = Self>
-    // + Sub<Self, Output = Self::RelativeVersionOfSelf>
-
+    + Add<Self::RelativeVersionOfSelf, Output = Self>
+    + Sub<Self::RelativeVersionOfSelf, Output = Self>
+    + Sub<Self, Output = Self::RelativeVersionOfSelf>
     + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
-
     + Mul<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
-    // + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
-//+ Debug
+    + Debug
+// + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
@@ -121,12 +120,15 @@ where
     fn king_length(&self) -> Self::DataType {
         // TODO: There's got to be a simpler replacement for `Ord`'s `max` in `PartialOrd`
         let a = self.x().abs();
-        let b = self.y().abs(); 
-        if a>=b {
+        let b = self.y().abs();
+        if a >= b {
             a
         } else {
             b
         }
+    }
+    fn cross(&self, other: Self) -> Self::DataType {
+        self.x() * other.y() - self.y() * other.x()
     }
 }
 
@@ -142,8 +144,8 @@ macro_rules! coordinatify {
                 + Mul<Output = T>
                 + euclid::num::Zero
                 + Signed
-                + Debug 
-                + PartialOrd 
+                + Debug
+                + PartialOrd
                 + Display,
         {
             type DataType = T;
@@ -201,6 +203,12 @@ impl<COORDINATE_TYPE> FloatCoordinate for COORDINATE_TYPE where
 {
 }
 
+// TODO: Move to tests?
+assert_impl_all!(Point2D<f32, euclid::UnknownUnit>: FloatCoordinate);
+assert_impl_all!(Vector2D<f32, euclid::UnknownUnit>: FloatCoordinate);
+assert_not_impl_any!(Point2D<i32, euclid::UnknownUnit>: FloatCoordinate);
+assert_not_impl_any!(Vector2D<i32, euclid::UnknownUnit>: FloatCoordinate);
+
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 
@@ -219,10 +227,8 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
         .unwrap()
 }
 
-pub fn get_8_octant_transforms_of<T: Signed + Copy + Debug, U>(
-    v: Vector2D<T, U>,
-) -> Vec<Vector2D<T, U>> {
-    let transpose = Vector2D::<T, U>::new(v.y, v.x);
+pub fn get_8_octant_transforms_of<POINT_TYPE: Coordinate>(v: POINT_TYPE) -> Vec<POINT_TYPE> {
+    let transpose = POINT_TYPE::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
         .map(|x| x.quadrant_rotations_going_ccw())
@@ -522,7 +528,6 @@ impl From<WorldStep> for OrthogonalWorldStep {
     }
 }
 
-
 impl<T> From<(T, T)> for OrthogonalWorldStep
 where
     (T, T): Into<WorldStep>,
@@ -652,10 +657,7 @@ impl QuarterTurnsCcw {
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
-    pub fn rotate_vector<T, U>(&self, v: Vector2D<T, U>) -> Vector2D<T, U>
-    where
-        T: Signed + Copy + Debug,
-    {
+    pub fn rotate_vector<POINT_TYPE: Coordinate>(&self, v: POINT_TYPE) -> POINT_TYPE {
         v.quarter_rotated_ccw(self.quarter_turns)
     }
 }
@@ -802,12 +804,16 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<P: FloatCoordinate>(a: impl Into<P>, b: impl Into<P>, c: impl Into<P>) -> bool {
-    let a = a.into();
-    let b = b.into();
-    let c = c.into();
-    let ab = b - a;
-    let ac = c - a;
+pub fn on_line<POINT_TYPE: FloatCoordinate>(
+    a: impl Into<POINT_TYPE>,
+    b: impl Into<POINT_TYPE>,
+    c: impl Into<POINT_TYPE>,
+) -> bool {
+    let a: POINT_TYPE = a.into();
+    let b: POINT_TYPE = b.into();
+    let c: POINT_TYPE = c.into();
+    let ab: POINT_TYPE::RelativeVersionOfSelf = b - a;
+    let ac: POINT_TYPE::RelativeVersionOfSelf = c - a;
     ab.cross(ac) == 0.0
 }
 
@@ -816,9 +822,9 @@ pub fn on_line_in_this_order<P: FloatCoordinate>(
     b: impl Into<P>,
     c: impl Into<P>,
 ) -> bool {
-    let a = a.into();
-    let b = b.into();
-    let c = c.into();
+    let a: P = a.into();
+    let b: P = b.into();
+    let c: P = c.into();
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 

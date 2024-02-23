@@ -21,7 +21,11 @@ pub trait LineTrait: Sized {
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
-    fn points_in_random_order(&self) -> [Self::PointType; 2];
+    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
+
+    fn arbitrary_point_on_line(&self) -> Self::PointType {
+        self.two_different_arbitrary_points_on_line()[0]
+    }
 
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
         Self::new_from_two_points(
@@ -48,18 +52,23 @@ pub trait LineTrait: Sized {
         point: impl Into<Self::PointType>,
         direction: impl Into<<Self::PointType as Coordinate>::RelativeVersionOfSelf>,
     ) -> Self {
-        let p = point.into();
-        Self::new_from_two_points(p, p + direction.into())
+        let p1: Self::PointType = point.into();
+        let v: <Self::PointType as Coordinate>::RelativeVersionOfSelf = direction.into();
+        let p2: Self::PointType = p1 + v;
+        Self::new_from_two_points(p1, p2)
     }
     fn is_orthogonal(&self) -> bool {
-        self.p1.x == self.p2.x || self.p1.y == self.p2.y
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        p1.x() == p2.x() || p1.y() == p2.y()
     }
     fn from_array(a: [Self::PointType; 2]) -> Self {
         Self::new_from_two_points(a[0], a[1])
     }
+    // TODO: These three functions would probably need to return floating points even on int-based lines
     fn x_intercept(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
-            return Some(self.p1.x);
+            let p = self.arbitrary_point_on_line();
+            return Some(p.x());
         }
         if self.is_horizontal() {
             return None;
@@ -70,52 +79,341 @@ pub trait LineTrait: Sized {
         if self.is_vertical() {
             return None;
         }
-        Some(self.p1.y - self.slope().unwrap() * self.p1.x)
+        let p = self.arbitrary_point_on_line();
+        Some(p.y() - self.slope().unwrap() * p.x())
     }
     fn is_vertical(&self) -> bool {
-        self.p1.x == self.p2.x
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        p1.x() == p2.x()
     }
     fn is_horizontal(&self) -> bool {
-        self.p1.y == self.p2.y
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        p1.y() == p2.y()
     }
-    fn left_point(&self) -> Self::PointType {
-        // TODO: return Option<Self::POINT_TYPE> instead of asserting?
-        assert_false!(self.is_vertical());
-        if self.p1.x < self.p2.x {
-            self.p1
-        } else {
-            self.p2
-        }
-    }
-    fn right_point(&self) -> Self::PointType {
-        assert_false!(self.is_vertical());
-        if self.p1.x > self.p2.x {
-            self.p1
-        } else {
-            self.p2
-        }
-    }
-    fn length(&self) -> f32 {
-        (self.p1() - self.p2()).length()
-    }
-    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
-        (self.p1 - self.p2).square_length()
-    }
+    // TODO: delete comment when confirmed not in use.  These functions are more suited for a `LineSegment` trait
+    // fn length(&self) -> f32 {
+    //     (self.p1() - self.p2()).length()
+    // }
+    // fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
+    //     (self.p1 - self.p2).square_length()
+    // }
     fn slope(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
             return None;
         }
-        let l: Self::PointType = self.left_point();
-        let r: Self::PointType = self.right_point();
-        Some((r.y - l.y) / (r.x - l.x))
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let (l, r) = if p1.x() < p2.x() { (p1, p2) } else { (p2, p1) };
+        Some((r.y() - l.y()) / (r.x() - l.x()))
     }
 }
 
 // TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
 pub trait FloatLineTrait: LineTrait {
     fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
-        let [p1, p2] = self.points_in_random_order();
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
         on_line(p1, p2, point.into())
+    }
+    fn point_is_approx_on_line(&self, point: Self::PointType, tolerance: f32) -> bool {
+        self.normal_distance_to_point(point) < tolerance
+    }
+    fn normal_vector_to_point(
+        &self,
+        point: impl Into<Self::PointType>,
+    ) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+        let point = point.into();
+        let p1_to_point = point - self.p1;
+        let p1_to_p2 = self.p2 - self.p1;
+        let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
+        let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
+        perpendicular_part_of_p1_to_point
+    }
+    fn normal_vector_from_origin(&self) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+        -self.normal_vector_to_point((0.0, 0.0))
+    }
+    fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
+        self.normal_vector_to_point(point).length()
+    }
+    fn a_point_clockwise_of_line(&self) -> Self::PointType {
+        rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
+    }
+    fn a_point_anticlockwise_of_line(&self) -> Self::PointType {
+        rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
+    }
+    fn a_point_right_of_line(&self) -> Self::PointType {
+        self.a_point_clockwise_of_line()
+    }
+    fn a_point_left_of_line(&self) -> Self::PointType {
+        self.a_point_anticlockwise_of_line()
+    }
+    fn lerp(&self, t: f32) -> Self::PointType {
+        lerp2d(self.p1, self.p2, t)
+    }
+    fn point_is_on_or_normal_to_line_segment(&self, point: Self::PointType) -> bool {
+        let start_point = self.p1;
+        let end_point = self.p2;
+
+        let point_relative_to_start_point = point - start_point;
+        let end_point_relative_to_start_point = end_point - start_point;
+        let point_is_on_end_side_of_start_point =
+            point_relative_to_start_point.dot(end_point_relative_to_start_point) > 0.0;
+
+        let point_relative_to_end_point = point - end_point;
+        let point_is_on_start_side_of_end_point =
+            point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
+
+        point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
+    }
+
+    fn approx_eq_eps(&self, other: Self, tolerance: f32) -> bool {
+        let p11 = self
+            .p1
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+        let p22 = self
+            .p2
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p12 = self
+            .p1
+            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
+        let p21 = self
+            .p2
+            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
+
+        // don't care about point order
+        (p11 && p22) || (p12 && p21)
+    }
+
+    fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
+        self.point_is_approx_on_line(other.p1, tolerance)
+            && self.point_is_approx_on_line(other.p2, tolerance)
+    }
+
+    fn angle_with_positive_x_axis(&self) -> Angle<f32> {
+        let angle_a = better_angle_from_x_axis(self.p1 - self.p2);
+        let angle_b = better_angle_from_x_axis(self.p2 - self.p1);
+        if angle_a.radians.cos() < 0.0 {
+            angle_b
+        } else {
+            angle_a
+        }
+    }
+
+    fn reflect_point_over_line(&self, point: impl Into<Self::PointType>) -> Self::PointType {
+        let p1_to_p = point.into() - self.p1;
+        let p1_to_p2 = self.p2 - self.p1;
+        let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
+        let perpendicular_part = p1_to_p - parallel_part;
+        let p1_to_reflected_p = parallel_part - perpendicular_part;
+        self.p1 + p1_to_reflected_p
+    }
+
+    fn direction(&self) -> Angle<f32> {
+        better_angle_from_x_axis(self.p2 - self.p1)
+    }
+    fn parallel_directions(&self) -> [Angle<f32>; 2] {
+        [
+            better_angle_from_x_axis(self.p2 - self.p1),
+            better_angle_from_x_axis(self.p1 - self.p2),
+        ]
+    }
+    fn from_ray(start: Self::PointType, angle: Angle<f32>, length: f32) -> Self {
+        assert!(length > 0.0);
+        Self::new_from_two_points(start, naive_ray_endpoint(start, angle, length))
+    }
+    fn same_side_of_line(
+        &self,
+        point_c: impl Into<Self::PointType> + Copy,
+        point_d: impl Into<Self::PointType> + Copy,
+    ) -> bool {
+        let point_a = self.p1;
+        let point_b = self.p2;
+        let c_on_line = self.point_is_on_line(point_c);
+        let d_on_line = self.point_is_on_line(point_d);
+
+        if c_on_line {
+            return if d_on_line { true } else { false };
+        } else if d_on_line {
+            return false;
+        }
+
+        three_points_are_clockwise(point_a, point_b, point_c)
+            == three_points_are_clockwise(point_a, point_b, point_d)
+    }
+    fn line_intersections_with_centered_unit_square_with_tolerance(
+        &self,
+        tolerance: f32,
+    ) -> Vec<Self::PointType> {
+        let regular_intersections = self.line_intersections_with_centered_unit_square();
+        if !regular_intersections.is_empty() {
+            return regular_intersections;
+        }
+
+        let square_corners_and_distances = corner_points_of_centered_unit_square()
+            .iter()
+            .map(|&p| (p, self.normal_distance_to_point(p)))
+            .collect_vec();
+        let filtered_by_distance = square_corners_and_distances
+            .iter()
+            .filter(|(point, dist)| *dist <= tolerance)
+            .collect_vec();
+
+        if filtered_by_distance.is_empty() {
+            return vec![];
+        }
+
+        let grouped_by_distance = filtered_by_distance
+            .iter()
+            .sorted_by_key(|(point, distance)| OrderedFloat(*distance))
+            .group_by(|(point, distance)| distance);
+        let closest_points = grouped_by_distance
+            .into_iter()
+            .next()
+            .unwrap()
+            .1
+            .map(|(point, distance)| *point)
+            .collect_vec();
+        closest_points
+    }
+    fn line_intersections_with_expanded_centered_unit_square(
+        &self,
+        expansion_length: f32,
+    ) -> Vec<Self::PointType> {
+        let line_point_a = self.p1;
+        let line_point_b = self.p2;
+        let half_side_length = 0.5 + expansion_length;
+
+        let is_vertical_line = line_point_a.x == line_point_b.x;
+        let is_horizontal_line = line_point_a.y == line_point_b.y;
+
+        if is_vertical_line {
+            let x = line_point_a.x;
+            if x.abs() <= half_side_length {
+                self.points_in_line_order(vec![
+                    point2(x, half_side_length),
+                    point2(x, -half_side_length),
+                ])
+            } else {
+                vec![]
+            }
+        } else if is_horizontal_line {
+            let y = line_point_a.y;
+            if y.abs() <= half_side_length {
+                self.points_in_line_order(vec![
+                    point2(half_side_length, y),
+                    point2(-half_side_length, y),
+                ])
+            } else {
+                vec![]
+            }
+        } else {
+            // y = mx + b
+            let dy = line_point_b.y - line_point_a.y;
+            let dx = line_point_b.x - line_point_a.x;
+            let m = dy / dx;
+            // b = y - m*x
+            let b = line_point_a.y - m * line_point_a.x;
+
+            let side_positions = vec![half_side_length, -half_side_length];
+
+            let mut candidate_intersections: Vec<Self::PointType> = vec![];
+            for &x in &side_positions {
+                let y = m * x + b;
+                if y.abs() <= half_side_length {
+                    candidate_intersections.push(point2(x, y));
+                }
+            }
+            for y in side_positions {
+                let x = (y - b) / m;
+                // top and bottom don't catch corners, sides do
+                if x.abs() < half_side_length {
+                    candidate_intersections.push(point2(x, y));
+                }
+            }
+            // this captures the edge case of corners
+            // remove duplicates
+            match candidate_intersections.len() {
+                2 => {
+                    if candidate_intersections[0] == candidate_intersections[1] {
+                        vec![candidate_intersections[0]]
+                    } else {
+                        self.points_in_line_order(candidate_intersections)
+                    }
+                }
+                1 => candidate_intersections,
+                0 => vec![],
+                _ => furthest_apart_points(candidate_intersections).into(),
+            }
+        }
+    }
+    fn line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
+        self.line_intersections_with_expanded_centered_unit_square(0.0)
+    }
+    fn line_intersects_with_centered_unit_square(&self) -> bool {
+        self.intersects_with_expanded_centered_unit_square(0.0)
+    }
+    fn intersects_with_expanded_centered_unit_square(&self, per_face_extension: f32) -> bool {
+        !self
+            .line_intersections_with_expanded_centered_unit_square(per_face_extension)
+            .is_empty()
+    }
+    fn points_in_line_order(&self, mut points: Vec<Self::PointType>) -> Vec<Self::PointType> {
+        let normalized_line_direction = (self.p2 - self.p1).normalize();
+        points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
+        points
+    }
+
+    fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Self::PointType {
+        let t = rng.gen_range(0.0..=1.0);
+        self.lerp(t)
+    }
+
+    fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Self::PointType {
+        // TODO: make more uniform
+        self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
+    }
+
+    fn random_point_near_line(&self, radius: f32) -> Self::PointType {
+        self.seeded_random_point_near_line(&mut get_new_rng(), radius)
+    }
+    fn intersection_point_with_other_extended_line(&self, other: &Self) -> Option<Self::PointType> {
+        // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+        let (x1, y1) = self.p1.to_tuple();
+        let (x2, y2) = self.p2.to_tuple();
+        let (x3, y3) = other.p1.to_tuple();
+        let (x4, y4) = other.p2.to_tuple();
+
+        let a = x1 * y2 - y1 * x2;
+        let b = x3 * y4 - y3 * x4;
+        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if denominator == 0.0 {
+            return None;
+        }
+        let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
+        let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
+        return Some(point2(final_x, final_y));
+    }
+
+    fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<Self::PointType> {
+        if self.same_side_of_line(other.p1, other.p2) || other.same_side_of_line(self.p1, self.p2) {
+            let on_same_line = self.point_is_on_line(other.p1);
+            if !on_same_line {
+                return None;
+            }
+            return if self.p2 == other.p1 && on_line_in_this_order(self.p1, self.p2, other.p2) {
+                Some(self.p2)
+            } else if self.p2 == other.p2 && on_line_in_this_order(self.p1, self.p2, other.p1) {
+                Some(self.p2)
+            } else if self.p1 == other.p1 && on_line_in_this_order(self.p2, self.p1, other.p2) {
+                Some(self.p1)
+            } else if self.p1 == other.p2 && on_line_in_this_order(self.p2, self.p1, other.p1) {
+                Some(self.p1)
+            } else {
+                None
+            };
+        }
+        // from here, we know the line segments are overlapping, including the case of exactly touching
+        // A simple line intersection check is all that's left
+
+        self.intersection_point_with_other_extended_line(&other)
     }
 }
 impl<L> FloatLineTrait for L
@@ -160,7 +458,7 @@ impl<POINT_TYPE: Coordinate> LineTrait for Line<POINT_TYPE> {
         assert_ne!(p1, p2);
         Line { p1, p2 }
     }
-    fn points_in_random_order(&self) -> [POINT_TYPE; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [POINT_TYPE; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
@@ -187,8 +485,8 @@ impl<POINT_TYPE: FloatCoordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE
         Self(Line::new_from_two_points(p1, p2))
     }
 
-    fn points_in_random_order(&self) -> [POINT_TYPE; 2] {
-        self.0.points_in_random_order()
+    fn two_different_arbitrary_points_on_line(&self) -> [POINT_TYPE; 2] {
+        self.0.two_different_arbitrary_points_on_line()
     }
 }
 
@@ -215,310 +513,7 @@ where
 }
 
 // TODO: move to the FloatLineTrait trait
-impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {
-    pub fn point_is_approx_on_line(&self, point: POINT_TYPE, tolerance: f32) -> bool {
-        self.normal_distance_to_point(point) < tolerance
-    }
-    pub fn normal_vector_to_point(
-        &self,
-        point: impl Into<POINT_TYPE>,
-    ) -> POINT_TYPE::RelativeVersionOfSelf {
-        let point = point.into();
-        let p1_to_point = point - self.p1;
-        let p1_to_p2 = self.p2 - self.p1;
-        let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
-        let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
-        perpendicular_part_of_p1_to_point
-    }
-    pub fn normal_vector_from_origin(&self) -> POINT_TYPE::RelativeVersionOfSelf {
-        -self.normal_vector_to_point((0.0, 0.0))
-    }
-    pub fn normal_distance_to_point(&self, point: impl Into<POINT_TYPE>) -> f32 {
-        self.normal_vector_to_point(point).length()
-    }
-    pub fn a_point_clockwise_of_line(&self) -> POINT_TYPE {
-        rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
-    }
-    pub fn a_point_anticlockwise_of_line(&self) -> POINT_TYPE {
-        rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
-    }
-    pub fn a_point_right_of_line(&self) -> POINT_TYPE {
-        self.a_point_clockwise_of_line()
-    }
-    pub fn a_point_left_of_line(&self) -> POINT_TYPE {
-        self.a_point_anticlockwise_of_line()
-    }
-    pub fn lerp(&self, t: f32) -> POINT_TYPE {
-        lerp2d(self.p1, self.p2, t)
-    }
-    pub fn point_is_on_or_normal_to_line_segment(&self, point: POINT_TYPE) -> bool {
-        let start_point = self.p1;
-        let end_point = self.p2;
-
-        let point_relative_to_start_point = point - start_point;
-        let end_point_relative_to_start_point = end_point - start_point;
-        let point_is_on_end_side_of_start_point =
-            point_relative_to_start_point.dot(end_point_relative_to_start_point) > 0.0;
-
-        let point_relative_to_end_point = point - end_point;
-        let point_is_on_start_side_of_end_point =
-            point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
-
-        point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
-    }
-
-    pub fn approx_eq_eps(&self, other: Self, tolerance: f32) -> bool {
-        let p11 = self
-            .p1
-            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
-        let p22 = self
-            .p2
-            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
-        let p12 = self
-            .p1
-            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
-        let p21 = self
-            .p2
-            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
-
-        // don't care about point order
-        (p11 && p22) || (p12 && p21)
-    }
-
-    pub fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
-        self.point_is_approx_on_line(other.p1, tolerance)
-            && self.point_is_approx_on_line(other.p2, tolerance)
-    }
-
-    pub fn angle_with_positive_x_axis(&self) -> Angle<f32> {
-        let angle_a = better_angle_from_x_axis(self.p1 - self.p2);
-        let angle_b = better_angle_from_x_axis(self.p2 - self.p1);
-        if angle_a.radians.cos() < 0.0 {
-            angle_b
-        } else {
-            angle_a
-        }
-    }
-
-    pub fn reflect_point_over_line(&self, point: impl Into<POINT_TYPE>) -> POINT_TYPE {
-        let p1_to_p = point.into() - self.p1;
-        let p1_to_p2 = self.p2 - self.p1;
-        let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
-        let perpendicular_part = p1_to_p - parallel_part;
-        let p1_to_reflected_p = parallel_part - perpendicular_part;
-        self.p1 + p1_to_reflected_p
-    }
-
-    pub fn direction(&self) -> Angle<f32> {
-        better_angle_from_x_axis(self.p2 - self.p1)
-    }
-    pub fn parallel_directions(&self) -> [Angle<f32>; 2] {
-        [
-            better_angle_from_x_axis(self.p2 - self.p1),
-            better_angle_from_x_axis(self.p1 - self.p2),
-        ]
-    }
-    pub fn from_ray(start: POINT_TYPE, angle: Angle<f32>, length: f32) -> Self {
-        assert!(length > 0.0);
-        Self::new_from_two_points(start, naive_ray_endpoint(start, angle, length))
-    }
-    pub fn same_side_of_line(
-        &self,
-        point_c: impl Into<POINT_TYPE> + Copy,
-        point_d: impl Into<POINT_TYPE> + Copy,
-    ) -> bool {
-        let point_a = self.p1;
-        let point_b = self.p2;
-        let c_on_line = self.point_is_on_line(point_c);
-        let d_on_line = self.point_is_on_line(point_d);
-
-        if c_on_line {
-            return if d_on_line { true } else { false };
-        } else if d_on_line {
-            return false;
-        }
-
-        three_points_are_clockwise(point_a, point_b, point_c)
-            == three_points_are_clockwise(point_a, point_b, point_d)
-    }
-    pub fn line_intersections_with_centered_unit_square_with_tolerance(
-        &self,
-        tolerance: f32,
-    ) -> Vec<POINT_TYPE> {
-        let regular_intersections = self.line_intersections_with_centered_unit_square();
-        if !regular_intersections.is_empty() {
-            return regular_intersections;
-        }
-
-        let square_corners_and_distances = corner_points_of_centered_unit_square()
-            .iter()
-            .map(|&p| (p, self.normal_distance_to_point(p)))
-            .collect_vec();
-        let filtered_by_distance = square_corners_and_distances
-            .iter()
-            .filter(|(point, dist)| *dist <= tolerance)
-            .collect_vec();
-
-        if filtered_by_distance.is_empty() {
-            return vec![];
-        }
-
-        let grouped_by_distance = filtered_by_distance
-            .iter()
-            .sorted_by_key(|(point, distance)| OrderedFloat(*distance))
-            .group_by(|(point, distance)| distance);
-        let closest_points = grouped_by_distance
-            .into_iter()
-            .next()
-            .unwrap()
-            .1
-            .map(|(point, distance)| *point)
-            .collect_vec();
-        closest_points
-    }
-    pub fn line_intersections_with_expanded_centered_unit_square(
-        &self,
-        expansion_length: f32,
-    ) -> Vec<POINT_TYPE> {
-        let line_point_a = self.p1;
-        let line_point_b = self.p2;
-        let half_side_length = 0.5 + expansion_length;
-
-        let is_vertical_line = line_point_a.x == line_point_b.x;
-        let is_horizontal_line = line_point_a.y == line_point_b.y;
-
-        if is_vertical_line {
-            let x = line_point_a.x;
-            if x.abs() <= half_side_length {
-                self.points_in_line_order(vec![
-                    point2(x, half_side_length),
-                    point2(x, -half_side_length),
-                ])
-            } else {
-                vec![]
-            }
-        } else if is_horizontal_line {
-            let y = line_point_a.y;
-            if y.abs() <= half_side_length {
-                self.points_in_line_order(vec![
-                    point2(half_side_length, y),
-                    point2(-half_side_length, y),
-                ])
-            } else {
-                vec![]
-            }
-        } else {
-            // y = mx + b
-            let dy = line_point_b.y - line_point_a.y;
-            let dx = line_point_b.x - line_point_a.x;
-            let m = dy / dx;
-            // b = y - m*x
-            let b = line_point_a.y - m * line_point_a.x;
-
-            let side_positions = vec![half_side_length, -half_side_length];
-
-            let mut candidate_intersections: Vec<POINT_TYPE> = vec![];
-            for &x in &side_positions {
-                let y = m * x + b;
-                if y.abs() <= half_side_length {
-                    candidate_intersections.push(point2(x, y));
-                }
-            }
-            for y in side_positions {
-                let x = (y - b) / m;
-                // top and bottom don't catch corners, sides do
-                if x.abs() < half_side_length {
-                    candidate_intersections.push(point2(x, y));
-                }
-            }
-            // this captures the edge case of corners
-            // remove duplicates
-            match candidate_intersections.len() {
-                2 => {
-                    if candidate_intersections[0] == candidate_intersections[1] {
-                        vec![candidate_intersections[0]]
-                    } else {
-                        self.points_in_line_order(candidate_intersections)
-                    }
-                }
-                1 => candidate_intersections,
-                0 => vec![],
-                _ => furthest_apart_points(candidate_intersections).into(),
-            }
-        }
-    }
-    pub fn line_intersections_with_centered_unit_square(&self) -> Vec<POINT_TYPE> {
-        self.line_intersections_with_expanded_centered_unit_square(0.0)
-    }
-    pub fn line_intersects_with_centered_unit_square(&self) -> bool {
-        self.intersects_with_expanded_centered_unit_square(0.0)
-    }
-    pub fn intersects_with_expanded_centered_unit_square(&self, per_face_extension: f32) -> bool {
-        !self
-            .line_intersections_with_expanded_centered_unit_square(per_face_extension)
-            .is_empty()
-    }
-    fn points_in_line_order(&self, mut points: Vec<POINT_TYPE>) -> Vec<POINT_TYPE> {
-        let normalized_line_direction = (self.p2 - self.p1).normalize();
-        points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
-        points
-    }
-
-    pub fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> POINT_TYPE {
-        let t = rng.gen_range(0.0..=1.0);
-        self.lerp(t)
-    }
-
-    pub fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> POINT_TYPE {
-        // TODO: make more uniform
-        self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
-    }
-
-    pub fn random_point_near_line(&self, radius: f32) -> POINT_TYPE {
-        self.seeded_random_point_near_line(&mut get_new_rng(), radius)
-    }
-    pub fn intersection_point_with_other_extended_line(&self, other: &Self) -> Option<POINT_TYPE> {
-        // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
-        let (x1, y1) = self.p1.to_tuple();
-        let (x2, y2) = self.p2.to_tuple();
-        let (x3, y3) = other.p1.to_tuple();
-        let (x4, y4) = other.p2.to_tuple();
-
-        let a = x1 * y2 - y1 * x2;
-        let b = x3 * y4 - y3 * x4;
-        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-        if denominator == 0.0 {
-            return None;
-        }
-        let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
-        let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
-        return Some(point2(final_x, final_y));
-    }
-
-    pub fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<POINT_TYPE> {
-        if self.same_side_of_line(other.p1, other.p2) || other.same_side_of_line(self.p1, self.p2) {
-            let on_same_line = self.point_is_on_line(other.p1);
-            if !on_same_line {
-                return None;
-            }
-            return if self.p2 == other.p1 && on_line_in_this_order(self.p1, self.p2, other.p2) {
-                Some(self.p2)
-            } else if self.p2 == other.p2 && on_line_in_this_order(self.p1, self.p2, other.p1) {
-                Some(self.p2)
-            } else if self.p1 == other.p1 && on_line_in_this_order(self.p2, self.p1, other.p2) {
-                Some(self.p1)
-            } else if self.p1 == other.p2 && on_line_in_this_order(self.p2, self.p1, other.p1) {
-                Some(self.p1)
-            } else {
-                None
-            };
-        }
-        // from here, we know the line segments are overlapping, including the case of exactly touching
-        // A simple line intersection check is all that's left
-
-        self.intersection_point_with_other_extended_line(&other)
-    }
-}
+impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {}
 impl WorldLine {
     pub fn touched_squares(&self) -> Vec<WorldSquare> {
         let start_square = world_point_to_world_square(self.p1);
