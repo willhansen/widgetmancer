@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
     fmt::Display,
-    ops::{Add, Mul, Neg, Sub},
+    ops::{Mul, Neg},
 };
 
 use derive_more::{AddAssign, Neg};
@@ -59,15 +59,24 @@ trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output
 // TODO: is this just a scalar?
 trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One);
 
+pub trait LadderAdd<RIGHT_TYPE = Self> {
+    type Output;
+    fn ladder_add(&self, rhs: RIGHT_TYPE) -> Self::Output;
+}
+pub trait LadderSub<RIGHT_TYPE = Self> {
+    type Output;
+    fn ladder_sub(&self, rhs: RIGHT_TYPE) -> Self::Output;
+}
+
 pub trait Coordinate:
     Copy
     + PartialEq
-    + Add<Self::RelativeVersionOfSelf, Output = Self>
-    + Sub<Self::RelativeVersionOfSelf, Output = Self>
-    + Sub<Self, Output = Self::RelativeVersionOfSelf>
-    + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
+    + LadderAdd<Self::RelativeVersionOfSelf, Output = Self>
+    + LadderSub<Self::RelativeVersionOfSelf, Output = Self>
+    + LadderSub<Self, Output = Self::RelativeVersionOfSelf>
+    + LadderAdd<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    + LadderSub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
+    + LadderSub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
     + Mul<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
@@ -211,6 +220,14 @@ assert_not_impl_any!(Vector2D<i32, euclid::UnknownUnit>: FloatCoordinate);
 
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
+
+impl<COORD_TYPE: Coordinate> LadderAdd<COORD_TYPE> for COORD_TYPE {
+    type Output = COORD_TYPE;
+
+    fn ladder_add(&self, rhs: COORD_TYPE) -> Self::Output {
+        todo!()
+    }
+}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x), sign(point.y))
