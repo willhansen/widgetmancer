@@ -6,7 +6,10 @@ use super::{
 pub type LocalSquareHalfPlane = HalfPlane<LineThroughUnitSquare<LocalSquarePoint>>;
 
 #[derive(PartialEq, Clone, Debug, Copy)]
-pub struct HalfPlane<LINE_TYPE = FloatingPointLine> {
+pub struct HalfPlane<LINE_TYPE = FloatingPointLine>
+where
+    LINE_TYPE: Copy,
+{
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     dividing_line: LINE_TYPE,
 }

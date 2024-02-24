@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
-use euclid::{point2, vec2, Angle, Point2D};
+use euclid::Angle;
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::{

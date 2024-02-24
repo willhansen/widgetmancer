@@ -8,7 +8,7 @@ use std::{
 use typenum;
 
 use derive_more::{AddAssign, Neg};
-pub use euclid::{point2, vec2, Angle, Point2D, Vector2D};
+pub use euclid::Angle;
 use itertools::Itertools;
 use num::{One, Signed, Zero};
 use ordered_float::OrderedFloat;
@@ -58,6 +58,22 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
+pub type Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, RELATIVITY_LEVEL> =
+    ThingWithRelativity<euclid::Vector2D<DATA_TYPE, UNIT_TYPE>, RELATIVITY_LEVEL>;
+
+// These two aliases meant to be a drop-in replacement for the `euclid` equivalents
+pub type Point2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U0>;
+pub type Vector2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U1>;
+
+// TODO: is this the right place for these two functions?
+// These two functions meant to be a drop-in replacement for the `euclid` equivalents
+fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE> {
+    Point2D::new(x, y)
+}
+fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE> {
+    Vector2D::new(x, y)
+}
+
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 // TODO: is this just a scalar?
@@ -83,10 +99,10 @@ where
 {
     type DataType;
     type UnitType;
-    type RelativityLevel: typenum::marker_traits::Unsigned + std::ops::Add<typenum::B1>;
+    type RelativityLevel: typenum::Unsigned + std::ops::Add<typenum::B1>;
 
     const IS_RELATIVE: bool;
-    // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
     type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
     // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
 
@@ -152,7 +168,7 @@ where
     }
 }
 
-impl<T, U, R> Coordinate for ThingWithRelativity<Vector2D<T, U>, R>
+impl<T, U, R> Coordinate for ThingWithRelativity<euclid::Vector2D<T, U>, R>
 where
     // TODO: trait alias (note the template variables that complicate things)
     T: Copy
@@ -165,13 +181,14 @@ where
         + Debug
         + PartialOrd
         + Display,
+    R: typenum::Unsigned + std::ops::Add<typenum::B1>,
 {
     type DataType = T;
     type UnitType = U;
-    type RelativityLevel: typenum::marker_traits::Unsigned + std::ops::Add<typenum::B1>;
-    // type AbsoluteVersionOfSelf = Point2D<T, U>;
-    type RelativeVersionOfSelf = Vector2D<T, U>; // Feels like this should involve R
-                                                 // type RelativityComplement = $relativity_complement<T, U>;
+    type RelativityLevel = R;
+    // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
+    type RelativeVersionOfSelf = ThingWithRelativity<euclid::Vector2D<T, U>, typenum::Add1<R>>;
+    // type RelativityComplement = $relativity_complement<T, U>;
 
     fn x(&self) -> T {
         self.x

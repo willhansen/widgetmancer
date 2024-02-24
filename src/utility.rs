@@ -16,7 +16,6 @@ use approx::AbsDiffEq;
 use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::num::Zero;
-use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
 use line_drawing::{Bresenham, Point, Supercover};

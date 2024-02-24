@@ -4,8 +4,6 @@ use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use ::num::clamp;
-use euclid::*;
-use euclid::{point2, vec2};
 use line_drawing::Point;
 use ordered_float::OrderedFloat;
 use rgb::*;
@@ -600,7 +598,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__up() {
         // offset up
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
@@ -613,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__150_up() {
         // offset up
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
@@ -626,7 +624,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__50_down() {
         // offset down
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
@@ -641,7 +639,7 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    
+
     fn test_double_glyph_square_offset__1_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
@@ -650,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__14_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
@@ -664,7 +662,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__25_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
@@ -675,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__75_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
@@ -686,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__25_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
@@ -697,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__50_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
@@ -706,7 +704,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__75_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
@@ -719,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__slightly_past_full_square_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
@@ -736,7 +734,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
@@ -749,7 +747,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__zeros() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.0),
@@ -758,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_4_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.25),
@@ -767,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_4_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.25),
@@ -776,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_2_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.5),
@@ -785,7 +783,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_2_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.5),
@@ -794,7 +792,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-1.0),
@@ -803,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_square_offset_to_character_offsets__1_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(1.0),
@@ -812,7 +810,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_get_solid_color_if_there_is_one() {
         let glyph = Glyph::new(' ', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), Some(RED));
@@ -821,14 +819,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_can_not_get_solid_color_if_there_is_not_one() {
         let glyph = Glyph::new('a', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), None);
     }
 
     #[test]
-    
+
     fn test_braille_line_has_transparent_background() {
         let glyph_map =
             Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
@@ -836,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_basic_drawn_over_case() {
         let bottom_glyphs = [Glyph {
             character: 'b',
@@ -865,7 +863,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_hextant_drawn_over_hextant_combines() {
         let bottom_glyphs = [Glyph::fg_only('🬀', GREEN); 2];
         let top_glyphs = [Glyph::fg_only('🬑', RED); 2];
@@ -877,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_space_drawn_over_hextant_does_nothing() {
         let the_char = '🬒';
         let bottom_glyphs = [Glyph::fg_only(the_char, RED); 2];
@@ -889,7 +887,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_braille_drawn_over_braille_combines() {
         let bottom_glyphs = [Glyph::fg_only('⠎', BLUE); 2];
         let top_glyphs = [Glyph::fg_only('⠁', RED); 2];
@@ -901,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_halfwidth_char_drawn_over_right_side_of_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -924,7 +922,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_fullwidth_char_drawn_over_two_halfwidth_chars() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -943,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_two_halfwidth_chars_drawn_over_fullwidth_char() {
         let halfwidth_char = 'a';
         let fullwidth_char = '🢃';
@@ -963,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_fullwidth_char_drawn_over_fullwidth_char() {
         let fullwidth_char = '🢃';
         let top_color = RED;
@@ -981,7 +979,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_width_detection() {
         assert!(Glyph::char_is_fullwidth('🢂'));
         assert_false!(Glyph::char_is_fullwidth('>'));

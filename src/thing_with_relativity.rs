@@ -1,3 +1,4 @@
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL = typenum::U0>
 where
     RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
@@ -11,7 +12,7 @@ impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::ops::Add<RHS_THING_TYPE>,
-    // THING_RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
+    RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
 {
     type Output = ThingWithRelativity<
         <THING_TYPE as std::ops::Add<RHS_THING_TYPE>>::Output,
@@ -31,7 +32,8 @@ impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::ops::Sub<RHS_THING_TYPE>,
-    // THING_RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
+    RELATIVITY_LEVEL: typenum::Unsigned + std::ops::Add<typenum::B1>,
+    <RELATIVITY_LEVEL as std::ops::Add<typenum::B1>>::Output: typenum::Unsigned,
 {
     type Output = ThingWithRelativity<
         <THING_TYPE as std::ops::Sub<RHS_THING_TYPE>>::Output,
@@ -41,6 +43,22 @@ where
     fn sub(self, rhs: RHS_THING_TYPE) -> Self::Output {
         ThingWithRelativity {
             thing: self - rhs,
+            _level_of_relativity: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<THING_TYPE, RELATIVITY_LEVEL> std::ops::Neg
+    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+where
+    THING_TYPE: std::ops::Neg,
+    RELATIVITY_LEVEL: typenum::Unsigned,
+{
+    type Output = ThingWithRelativity<<THING_TYPE as std::ops::Neg>::Output, RELATIVITY_LEVEL>;
+
+    fn neg(self) -> Self::Output {
+        ThingWithRelativity {
+            thing: -self,
             _level_of_relativity: std::marker::PhantomData,
         }
     }
