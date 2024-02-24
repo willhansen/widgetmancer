@@ -19,9 +19,9 @@ where
         RELATIVITY_LEVEL,
     >;
 
-    fn add(self, rhs: RHS_THING_TYPE) -> Self::Output {
+    fn add(self, rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> Self::Output {
         ThingWithRelativity {
-            thing: self + rhs,
+            thing: self.thing + rhs.thing,
             _level_of_relativity: std::marker::PhantomData,
         }
     }
@@ -40,9 +40,9 @@ where
         typenum::Add1<RELATIVITY_LEVEL>,
     >;
 
-    fn sub(self, rhs: RHS_THING_TYPE) -> Self::Output {
+    fn sub(self, rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> Self::Output {
         ThingWithRelativity {
-            thing: self - rhs,
+            thing: self.thing - rhs.thing,
             _level_of_relativity: std::marker::PhantomData,
         }
     }
@@ -59,6 +59,23 @@ where
     fn neg(self) -> Self::Output {
         ThingWithRelativity {
             thing: -self,
+            _level_of_relativity: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<THING_TYPE, RHS_TYPE, RELATIVITY_LEVEL> std::ops::Mul<RHS_TYPE>
+    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+where
+    THING_TYPE: std::ops::Mul<RHS_TYPE>,
+    RELATIVITY_LEVEL: typenum::Unsigned,
+{
+    type Output =
+        ThingWithRelativity<<THING_TYPE as std::ops::Mul<RHS_TYPE>>::Output, RELATIVITY_LEVEL>;
+
+    fn mul(self, rhs: RHS_TYPE) -> Self::Output {
+        ThingWithRelativity {
+            thing: self.thing * rhs,
             _level_of_relativity: std::marker::PhantomData,
         }
     }

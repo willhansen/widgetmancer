@@ -349,10 +349,10 @@ mod tests {
             point2(9.0, 5.0),
         ];
         let actual_points = vec![
-            ray_segments[0].p1,
-            ray_segments[0].p2,
-            ray_segments[1].p1,
-            ray_segments[1].p2,
+            ray_segments[0].p1(),
+            ray_segments[0].p2(),
+            ray_segments[1].p1(),
+            ray_segments[1].p2(),
         ];
         for i in 0..correct_points.len() {
             // Note that the line segments don't end exactly on the portal, they are stepped back slightly

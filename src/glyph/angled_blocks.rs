@@ -11,10 +11,7 @@ use crate::glyph::glyph_constants::{
     UPPER_TWO_THIRD_BLOCK,
 };
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    snap_angle_to_diagonal, three_points_are_clockwise, unit_vector_from_angle, CoordToString,
-    HalfPlane, Line,
-};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct AngleBlockSnapGridInLocalFrame;
@@ -183,8 +180,8 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
 fn get_character_from_snap_points(
     line: Line<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
 ) -> char {
-    let pointA = line.p1;
-    let pointB = line.p2;
+    let pointA = line.p1();
+    let pointB = line.p2();
 
     let block_map = points_to_angled_block_mapping();
 
@@ -355,10 +352,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(-0.5, -0.5),
-                        p2: point2(-0.5, 0.5),
-                    },
+                    (point2(-0.5, -0.5), point2(-0.5, 0.5),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -373,10 +367,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(-0.5, -0.5),
-                        p2: point2(-0.5, 0.5)
-                    },
+                    (point2(-0.5, -0.5), point2(-0.5, 0.5)),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -391,10 +382,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(-0.5, -0.5),
-                        p2: point2(-0.4, -0.4)
-                    },
+                    (point2(-0.5, -0.5), point2(-0.4, -0.4)),
                     point2(2.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -409,10 +397,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(0.0, -0.5),
-                        p2: point2(0.5, -0.15),
-                    },
+                    (point2(0.0, -0.5), point2(0.5, -0.15),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -478,10 +463,7 @@ mod tests {
 
     fn test_half_plane_to_character__from_failure_data() {
         let half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
-            Line {
-                p1: point2(-1.5, -1.0),
-                p2: point2(-0.08, -0.3),
-            },
+            (point2(-1.5, -1.0), point2(-0.08, -0.3)),
             point2(-0.06, -0.3),
         );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
@@ -508,10 +490,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(0.5, 0.0),
-                        p2: point2(-1.5, 0.0),
-                    },
+                    (point2(0.5, 0.0), point2(-1.5, 0.0),),
                     point2(0.0, 25.0),
                 ),
                 Angle::degrees(-90.0)
@@ -525,10 +504,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    Line {
-                        p1: point2(0.0, 0.5),
-                        p2: point2(0.0, -1.5),
-                    },
+                    (point2(0.0, 0.5), point2(0.0, -1.5),),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(0.0)

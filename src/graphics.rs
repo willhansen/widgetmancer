@@ -9,7 +9,6 @@ use std::mem::swap;
 use std::ptr::hash;
 use std::time::{Duration, Instant};
 
-use euclid::*;
 use itertools::Itertools;
 use line_drawing::Point;
 use rand::{Rng, SeedableRng};
@@ -56,12 +55,7 @@ use crate::graphics::screen::{
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, king_step_distance,
-    number_to_color, number_to_hue_rotation, reversed, square_is_odd, squares_on_board,
-    unit_vector_from_angle, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, WorldLine,
-    STEP_RIGHT,
-};
+use crate::utility::*;
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,
     PieceType, RIGHT_I,
@@ -447,7 +441,7 @@ impl Graphics {
         sight_line_segments: &Vec<WorldLine>,
     ) {
         for line in sight_line_segments {
-            self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
+            self.draw_naive_braille_line(line.p1(), line.p2(), SIGHT_LINE_SEEKING_COLOR);
         }
         self.draw_floating_square(drone.position(), HUNTER_DRONE_COLOR);
     }

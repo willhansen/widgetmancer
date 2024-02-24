@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 use ::num::clamp;
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::{Constructor, From};
-use euclid::*;
 use getset::{CopyGetters, Setters};
 use itertools::Itertools;
 use line_drawing::Point;
@@ -811,7 +810,7 @@ impl Game {
 
         let mut result = RaycastResult {
             grid_entities: vec![],
-            endpoint: line_segments_after_portal_awareness.last().unwrap().p2,
+            endpoint: line_segments_after_portal_awareness.last().unwrap().p2(),
         };
 
         let squares_on_ray_path = line_segments_after_portal_awareness

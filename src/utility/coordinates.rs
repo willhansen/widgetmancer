@@ -61,16 +61,18 @@ pub type FAngle = Angle<f32>;
 pub type Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, RELATIVITY_LEVEL> =
     ThingWithRelativity<euclid::Vector2D<DATA_TYPE, UNIT_TYPE>, RELATIVITY_LEVEL>;
 
-// These two aliases meant to be a drop-in replacement for the `euclid` equivalents
+/// Intended to be a drop-in replacement for the `euclid` equivalent
 pub type Point2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U0>;
+/// Intended to be a drop-in replacement for the `euclid` equivalent
 pub type Vector2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U1>;
 
 // TODO: is this the right place for these two functions?
-// These two functions meant to be a drop-in replacement for the `euclid` equivalents
-fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE> {
+/// Intended to be a drop-in replacement for the `euclid` equivalent
+pub fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE> {
     Point2D::new(x, y)
 }
-fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE> {
+/// Intended to be a drop-in replacement for the `euclid` equivalent
+pub fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE> {
     Vector2D::new(x, y)
 }
 
@@ -173,9 +175,10 @@ where
     // TODO: trait alias (note the template variables that complicate things)
     T: Copy
         + PartialEq
-        + Add<Output = T>
-        + Sub<Output = T>
-        + Mul<Output = T>
+        // These operations should be covered by NumOps from Num from Signed
+        // + Add<Output = T>
+        // + Sub<Output = T>
+        // + Mul<Output = T>
         + euclid::num::Zero
         + Signed
         + Debug
