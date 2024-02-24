@@ -1,10 +1,26 @@
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
+#[derive(Clone, Hash, Eq, PartialEq, Copy)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL = typenum::U0>
 where
     RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
 {
     thing: THING_TYPE,
     _level_of_relativity: std::marker::PhantomData<RELATIVITY_LEVEL>,
+}
+
+impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
+    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+where
+    THING_TYPE: std::fmt::Debug,
+    RELATIVITY_LEVEL: typenum::marker_traits::Unsigned,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ThingWithRelativity: \n\tThing: {:#?}\n\tLevel of relativity: {}",
+            self.thing,
+            RELATIVITY_LEVEL::to_u32()
+        )
+    }
 }
 
 impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
