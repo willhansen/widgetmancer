@@ -14,6 +14,7 @@ use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
 use crate::utility::line::{FloatLineTrait, LineTrait};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
+use crate::utility::relative_interval_location::RelativeIntervalLocation;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,
     HalfPlane, Line, QuarterTurnRotatable, QuarterTurnsCcw, WorldLine, STEP_ZERO,
@@ -189,8 +190,9 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
     ) -> Self {
-        let tolerance = FAngle::degrees(0.01); // TODO: double check this, maybe standardize
-        let rel_square = rel_square.into(); // TODO: tired of writing this out a bunch
+        let rel_square: WorldStep = rel_square.into(); // TODO: tired of writing this out a bunch
+        let angle_tolerance = FAngle::degrees(0.01); // TODO: double check this, maybe standardize
+        let length_tolerance = rel_square.to_f32().length() * angle_tolerance.radians;
         let partial_view_arc = match view_arc.into() {
             AngleInterval::Empty => return Self::NotVisible,
             AngleInterval::FullCircle => return Self::FullyVisible,
@@ -202,12 +204,12 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         }
         let square_arc = PartialAngleInterval::from_relative_square(rel_square);
         if partial_view_arc
-            .contains_partial_arc(square_arc, tolerance)
+            .contains_partial_arc(square_arc, angle_tolerance)
             .is_at_least_partial()
         {
             Self::FullyVisible
         } else if partial_view_arc
-            .overlaps_partial_arc(square_arc, tolerance)
+            .overlaps_partial_arc(square_arc, angle_tolerance)
             .is_at_least_partial()
         {
             // TODO: double check tolerance choice on this "if"
@@ -234,20 +236,17 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 rel_square.to_point(),
             );
 
-            let coverage_of_unit_square =
-                square_shadow.coverage_of_centered_unit_square_with_tolerance(tolerance);
+            let shadow_coverage_of_unit_square =
+                square_shadow.coverage_of_centered_unit_square_with_tolerance(length_tolerance);
 
-            if square_shadow
-                .fully_covers_centered_unit_square()
-                .is_at_least_partial()
-            {
-                Self::NotVisible
-            } else if square_shadow.at_least_partially_covers_unit_square() {
-                SquareVisibilityFromOneLargeShadow::new_partially_visible(
-                    square_shadow.complement(),
-                )
-            } else {
-                Self::FullyVisible
+            match shadow_coverage_of_unit_square {
+                RelativeIntervalLocation::MORE_THAN_FULL
+                | RelativeIntervalLocation::EXACTLY_FULL => Self::NotVisible,
+                RelativeIntervalLocation::PARTIALLY_FULL => {
+                    Self::PartiallyVisible(square_shadow.complement().try_into().unwrap())
+                }
+                RelativeIntervalLocation::EXACTLY_EMPTY
+                | RelativeIntervalLocation::LESS_THAN_EMPTY => Self::FullyVisible,
             }
         } else {
             Self::NotVisible

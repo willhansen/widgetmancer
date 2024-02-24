@@ -109,9 +109,12 @@ pub trait LineTrait: Sized {
 
 // TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
 pub trait FloatLineTrait: LineTrait {
-    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
+    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool
+    where
+        Self::PointType: FloatCoordinate,
+    {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        on_line(p1, p2, point.into())
+        on_line(p1, p2, point)
     }
     fn point_is_approx_on_line(&self, point: Self::PointType, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance

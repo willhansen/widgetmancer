@@ -5,6 +5,8 @@ use std::{
     ops::{Mul, Neg},
 };
 
+use typenum;
+
 use derive_more::{AddAssign, Neg};
 pub use euclid::{point2, vec2, Angle, Point2D, Vector2D};
 use itertools::Itertools;
@@ -13,6 +15,8 @@ use ordered_float::OrderedFloat;
 use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
+
+use crate::thing_with_relativity::ThingWithRelativity;
 
 // TODO: get rid of this section
 use super::{
@@ -79,10 +83,12 @@ where
 {
     type DataType;
     type UnitType;
+    type RelativityLevel: typenum::marker_traits::Unsigned + std::ops::Add<typenum::B1>;
+
     const IS_RELATIVE: bool;
-    type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
-    type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
-    type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+    // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
@@ -100,9 +106,9 @@ where
     fn as_relative(&self) -> Self::RelativeVersionOfSelf {
         Self::RelativeVersionOfSelf::new(self.x(), self.y())
     }
-    fn as_absolute(&self) -> Self::AbsoluteVersionOfSelf {
-        Self::AbsoluteVersionOfSelf::new(self.x(), self.y())
-    }
+    // fn as_absolute(&self) -> Self::AbsoluteVersionOfSelf {
+    //     Self::AbsoluteVersionOfSelf::new(self.x(), self.y())
+    // }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
@@ -146,62 +152,55 @@ where
     }
 }
 
-macro_rules! coordinatify {
-    ($class:ident, $is_relative:ident, $relativity_complement:ident) => {
-        impl<T, U> Coordinate for $class<T, U>
-        where
-            // TODO: trait alias (note the template variables that complicate things)
-            T: Copy
-                + PartialEq
-                + Add<Output = T>
-                + Sub<Output = T>
-                + Mul<Output = T>
-                + euclid::num::Zero
-                + Signed
-                + Debug
-                + PartialOrd
-                + Display,
-        {
-            type DataType = T;
-            type UnitType = U;
-            const IS_RELATIVE: bool = $is_relative;
-            type AbsoluteVersionOfSelf = Point2D<T, U>;
-            type RelativeVersionOfSelf = Vector2D<T, U>;
-            type RelativityComplement = $relativity_complement<T, U>;
+impl<T, U, R> Coordinate for ThingWithRelativity<Vector2D<T, U>, R>
+where
+    // TODO: trait alias (note the template variables that complicate things)
+    T: Copy
+        + PartialEq
+        + Add<Output = T>
+        + Sub<Output = T>
+        + Mul<Output = T>
+        + euclid::num::Zero
+        + Signed
+        + Debug
+        + PartialOrd
+        + Display,
+{
+    type DataType = T;
+    type UnitType = U;
+    type RelativityLevel: typenum::marker_traits::Unsigned + std::ops::Add<typenum::B1>;
+    // type AbsoluteVersionOfSelf = Point2D<T, U>;
+    type RelativeVersionOfSelf = Vector2D<T, U>; // Feels like this should involve R
+                                                 // type RelativityComplement = $relativity_complement<T, U>;
 
-            fn x(&self) -> T {
-                self.x
-            }
+    fn x(&self) -> T {
+        self.x
+    }
 
-            fn y(&self) -> T {
-                self.y
-            }
+    fn y(&self) -> T {
+        self.y
+    }
 
-            fn new(x: T, y: T) -> Self {
-                Self::new(x, y)
-            }
-        }
-    };
+    fn new(x: T, y: T) -> Self {
+        Self::new(x, y)
+    }
 }
 
-// TODO: clean this up
-coordinatify!(Vector2D, true, Point2D);
-coordinatify!(Point2D, false, Vector2D);
-
+// TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
 // TODO: convert to auto trait when stable
-pub trait AbsoluteCoordinate: Coordinate {}
-impl<COORD> AbsoluteCoordinate for COORD where
-    COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
-{
-}
+// pub trait AbsoluteCoordinate: Coordinate {}
+// impl<COORD> AbsoluteCoordinate for COORD where
+//     COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
+// {
+// }
 
-// TODO: convert to auto trait when stable
-pub trait RelativeCoordinate: Coordinate {}
-impl<COORD> RelativeCoordinate for COORD where
-    COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
-{
-}
+// // TODO: convert to auto trait when stable
+// pub trait RelativeCoordinate: Coordinate {}
+// impl<COORD> RelativeCoordinate for COORD where
+//     COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
+// {
+// }
 
 pub trait FloatCoordinate: Coordinate<DataType = f32> {
     // TODO: Add tolerance?

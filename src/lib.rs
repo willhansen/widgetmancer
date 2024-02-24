@@ -40,6 +40,7 @@ mod graphics;
 mod inputmap;
 pub mod piece;
 pub mod portal_geometry;
+pub mod thing_with_relativity;
 pub mod utility;
 pub mod utils_for_tests;
 

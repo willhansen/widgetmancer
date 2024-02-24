@@ -15,6 +15,18 @@ pub enum RelativeIntervalLocation {
     Before,
 }
 impl RelativeIntervalLocation {
+    pub const VERY_TRUE: Self = Self::After;
+    pub const EXACTLY_TRUE: Self = Self::End;
+    pub const PARTIAL: Self = Self::Inside;
+    pub const EXACTLY_FALSE: Self = Self::Start;
+    pub const VERY_FALSE: Self = Self::Before;
+
+    pub const MORE_THAN_FULL: Self = Self::After;
+    pub const EXACTLY_FULL: Self = Self::End;
+    pub const PARTIALLY_FULL: Self = Self::Inside;
+    pub const EXACTLY_EMPTY: Self = Self::Start;
+    pub const LESS_THAN_EMPTY: Self = Self::Before;
+
     pub fn in_interval(&self) -> BoolWithPartial {
         match self {
             RelativeIntervalLocation::After => false.into(),
