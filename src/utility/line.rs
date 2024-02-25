@@ -16,7 +16,7 @@ pub type LocalSquareLine = Line<Point2D<f32, SquareGridInLocalSquareFrame>>;
 pub type LocalCharacterLine = Line<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait: Sized {
+pub trait LineTrait: Sized + Copy {
     type PointType: Coordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -119,17 +119,23 @@ pub trait FloatLineTrait: LineTrait {
     fn point_is_approx_on_line(&self, point: Self::PointType, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
-    fn normal_vector_to_point(
+    fn closest_point_on_extended_line_to_point(
         &self,
         point: impl Into<Self::PointType>,
-    ) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+    ) -> Self::PointType {
         let point = point.into();
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_point = point - p1;
         let p1_to_p2 = p2 - p1;
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
-        let perpendicular_part_of_p1_to_point = p1_to_point - parallel_part_of_p1_to_point;
-        perpendicular_part_of_p1_to_point
+        p1 + parallel_part_of_p1_to_point
+    }
+    fn normal_vector_to_point(
+        &self,
+        point: impl Into<Self::PointType>,
+    ) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+        let point = point.into();
+        point - self.closest_point_on_extended_line_to_point(point)
     }
     fn normal_vector_from_origin(&self) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
         -self.normal_vector_to_point((0.0, 0.0))

@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
     fmt::Display,
+    marker::PhantomData,
     ops::{Mul, Neg},
 };
 
@@ -46,10 +47,10 @@ use super::{
     STEP_UP,
 };
 
-pub type IPoint = euclid::default::Point2D<i32>;
-pub type FPoint = euclid::default::Point2D<f32>;
-pub type IVector = euclid::default::Vector2D<i32>;
-pub type FVector = euclid::default::Vector2D<f32>;
+pub type IPoint = Point2D<i32, euclid::UnknownUnit>;
+pub type FPoint = Point2D<f32, euclid::UnknownUnit>;
+pub type IVector = Vector2D<i32, euclid::UnknownUnit>;
+pub type FVector = Vector2D<f32, euclid::UnknownUnit>;
 
 pub const DOWN_I: IVector = vec2(0, -1);
 pub const UP_I: IVector = vec2(0, 1);
@@ -94,8 +95,8 @@ pub trait Coordinate:
     + euclid::num::Zero
     + Sized
     + Debug
-    + Neg
-// + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
+    + Neg<Output = Self>
+    + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
@@ -103,7 +104,7 @@ where
     type UnitType;
     type RelativityLevel: typenum::Unsigned + std::ops::Add<typenum::B1>;
 
-    const IS_RELATIVE: bool;
+    // const IS_RELATIVE: bool;
     // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
     type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
     // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
@@ -116,10 +117,10 @@ where
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
     fn is_relative(&self) -> bool {
-        Self::IS_RELATIVE
+        !self.is_absolute()
     }
     fn is_absolute(&self) -> bool {
-        !self.is_relative()
+        Self::RelativityLevel::to_u32() == 0
     }
     fn as_relative(&self) -> Self::RelativeVersionOfSelf {
         Self::RelativeVersionOfSelf::new(self.x(), self.y())
@@ -145,6 +146,11 @@ where
     fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
+    fn cast_data_type<C, T>(&self) -> C where C: Coordinate<DataType=T, UnitType=Self::UnitType, RelativityLevel = Self::RelativityLevel>, T: num::NumCast{self.cast()}
+    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
+    fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
+    fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
+
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
         let a = self.x().abs();
@@ -172,19 +178,10 @@ where
 
 impl<T, U, R> Coordinate for ThingWithRelativity<euclid::Vector2D<T, U>, R>
 where
-    // TODO: trait alias (note the template variables that complicate things)
-    T: Copy
-        + PartialEq
-        // These operations should be covered by NumOps from Num from Signed
-        // + Add<Output = T>
-        // + Sub<Output = T>
-        // + Mul<Output = T>
-        + euclid::num::Zero
-        + Signed
-        + Debug
-        + PartialOrd
-        + Display,
+    // TODO: trait alias
+    T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
     R: typenum::Unsigned + std::ops::Add<typenum::B1>,
+    typenum::Add1<R>: typenum::Unsigned,
 {
     type DataType = T;
     type UnitType = U;
@@ -194,15 +191,26 @@ where
     // type RelativityComplement = $relativity_complement<T, U>;
 
     fn x(&self) -> T {
-        self.x
+        self.thing.x
     }
 
     fn y(&self) -> T {
-        self.y
+        self.thing.y
     }
 
     fn new(x: T, y: T) -> Self {
-        Self::new(x, y)
+        ThingWithRelativity::new_thing(euclid::Vector2D::new(x, y))
+    }
+
+    fn cast<C, NEW_DATA_TYPE, NEW_UNIT_TYPE, NEW_RELATIVITY_LEVEL>(&self) -> C
+    where
+        C: Coordinate<
+            DataType = NEW_DATA_TYPE,
+            UnitType = NEW_UNIT_TYPE,
+            RelativityLevel = NEW_RELATIVITY_LEVEL,
+        >,
+    {
+        todo!()
     }
 }
 

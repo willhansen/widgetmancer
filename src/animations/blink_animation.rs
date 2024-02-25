@@ -11,6 +11,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
 };
+use crate::utility::coordinates::Coordinate;
 use crate::utility::line::{FloatLineTrait, Line, LineTrait};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -41,9 +42,9 @@ impl Animation for BlinkAnimation {
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         // pretty arbitrary
-        let hash = ((self.start_square.x as f32 * PI + self.start_square.y as f32) * 1000.0
-            + self.end_square.x as f32 * 4.23746287
-            + self.end_square.y as f32 * 87.4736)
+        let hash = ((self.start_square.x() as f32 * PI + self.start_square.y() as f32) * 1000.0
+            + self.end_square.x() as f32 * 4.23746287
+            + self.end_square.y() as f32 * 87.4736)
             .abs()
             .floor()
             .to_u64()
