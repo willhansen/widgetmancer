@@ -1,3 +1,4 @@
+use paste::paste;
 use std::marker::PhantomData;
 use typenum::*;
 
@@ -22,58 +23,55 @@ where
     }
 }
 
-macro_rules! impl_binary_op_with_relative {
-    ($trait:ident, $function:ident) => {
-        // Add one to zero case
-        impl<T: $trait<T>> $trait<ThingWithRelativity<T, U1>> for ThingWithRelativity<T, U0> {
-            type Output = Self;
-            fn $function(self, rhs: ThingWithRelativity<T, U1>) -> Self::Output {
-                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
+macro_rules! create_binop_with_relativity {
+    ($op_trait:ident, $function:ident) => {
+        paste!{
+            // TODO: maybe don't use the paste macro, just pass in the new names?
+            trait [<$op_trait ButWithRelativity>]<THING_TYPE: $op_trait<THING_TYPE>, RELATIVITY_DIFFERENCE: Unsigned> {
+                type Output;
+                fn [<$function _but_with_relativity>](self, rhs: THING_TYPE) -> Self::Output {
+                    ThingWithRelativity::new(self.thing.$function(rhs.thing))
+                }
             }
         }
-        // Add one to non-zero even case
-        impl<L, T> $trait<ThingWithRelativity<T, UInt<L, B1>>>
-            for ThingWithRelativity<T, UInt<L, B0>>
+    }
+}
+// TODO: how pass full path directly to macro?
+use std::ops::{Add, Sub};
+create_binop_with_relativity!(Add, add);
+create_binop_with_relativity!(Sub, sub);
+
+macro_rules! impl_bin_op_with_relativity {
+    ($op_trait:ident, $function:ident, $relative_relativity_of_rhs:ty, $relative_relativity_of_output:ty) => {
+        impl<T, LEFT_REL, RIGHT_REL> $op_trait<T, RIGHT_REL> for ThingWithRelativity<T, LEFT_REL>
         where
-            L: Unsigned,
-            T: $trait<T>,
+            T: $op_trait<T>,
+            LEFT_REL: Unsigned + Add<T, $relative_relativity_of_rhs>,
+            // RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = $relative_relativity_of_output>,
         {
-            type Output = Self;
-            fn $function(self, rhs: ThingWithRelativity<T, UInt<L, B1>>) -> Self::Output {
-                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
-            }
-        }
-        // Add one to odd case
-        impl<L, T> $trait<ThingWithRelativity<T, UInt<Add1<L>, B0>>>
-            for ThingWithRelativity<T, UInt<L, B1>>
-        where
-            L: Unsigned + Add<B1>,
-            Add1<L>: Unsigned,
-            T: $trait<T>,
-        {
-            type Output = Self;
-            fn $function(self, rhs: ThingWithRelativity<T, UInt<Add1<L>, B0>>) -> Self::Output {
-                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
+            type Output =
+                ThingWithRelativity<T, Sum<LEFT_REL, $relative_relativity_of_output>>;
+            fn $function(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
+                <LEFT_REL as $op_trait>::$function(self, rhs)
             }
         }
     };
 }
 
-use std::ops::{Add, Sub};
-// TODO: how pass full path directly to macro?
-impl_binary_op_with_relative!(Add, add);
-impl_binary_op_with_relative!(Sub, sub);
+impl_bin_op_with_relativity!(AddButWithRelativity, add_but_with_relativity, U1, U0);
+impl_bin_op_with_relativity!(SubButWithRelativity, sub_but_with_relativity, U0, U1);
+impl_bin_op_with_relativity!(SubButWithRelativity, sub_but_witEFT_RELh_rIGHT_RELelativity, U1, UIGHT_REL0);
 
-impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
-    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-where
-    THING_TYPE: std::fmt::Debug,
-    RELATIVITY_LEVEL: typenum::Unsigned,
+impl<THING_TYPE, RELATIVIEFT_RELTY_EFT_RELLEVIGHT_RELEL> std::fmt::DeIGHT_RELbug
+    for ThingWithRelativitEFT_RELy<THING_TYPE, RELATIVITY_LEVEL>
+EFT_RELwhere
+IGHT_REL    THING_TYPE: EFT_RELstd::EFT_RELfmt::Debug,
+    RELATIVITY_LIGHT_RELEVEL: typenum::EFT_RELUnsigned,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "ThingWithRelativity: \n\tThing: {:#?}\n\tLevel of relativity: {}",
+    fn fmt(&self, f: &mut std::fmt::FoEFT_RELrmatter<'_>) -> std::fmt::Result {
+        wrEFT_RELite!(
+          EFT_REL IGHT_REL f,
+           IGHT_REL "ThingWithRelativity: \n\tThing: {:#?}\n\tLevel of relativity:EFT_REL {}",
             self.thing,
             RELATIVITY_LEVEL::to_u32()
         )
@@ -91,19 +89,21 @@ where
     }
 }
 
-impl<T, RELATIVITY_LEVEL> std::ops::Sub<ThingWithRelativity<T, RELATIVITY_LEVEL>>
-    for ThingWithRelativity<T, RELATIVITY_LEVEL>
-where
-    T: std::ops::Sub<T>,
-    RELATIVITY_LEVEL: typenum::Unsigned + std::ops::Add<typenum::B1>,
-    typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
-{
-    type Output = ThingWithRelativity<T, typenum::Add1<RELATIVITY_LEVEL>>;
+// impl<T, REL_SELF, REL_RHS> std::ops::Sub<ThingWithRelativity<T, REL_RHS>>
+//     for ThingWithRelativity<T, REL_SELF>
+// where
+//     T: std::ops::Sub<T>,
+//     REL_SELF: Unsigned + std::ops::Add<B1>,
+//     REL_RHS: Unsigned + std::ops::Add<B1>,
+//     Add1<REL_SELF>: Unsigned,
+//     REL_RHS: Unsigned + Sub<REL_SELF, Output = U0>,
+// {
+//     type Output = ThingWithRelativity<T, Add1<REL_SELF>>;
 
-    fn sub(self, rhs: ThingWithRelativity<T, RELATIVITY_LEVEL>) -> Self::Output {
-        ThingWithRelativity::new_thing(Self::sub(self.thing, rhs.thing))
-    }
-}
+//     fn sub(self, rhs: ThingWithRelativity<T, REL_SELF>) -> Self::Output {
+//         ThingWithRelativity::new_thing(Self::sub(self.thing, rhs.thing))
+//     }
+// }
 
 impl<THING_TYPE, RELATIVITY_LEVEL> std::ops::Neg
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
