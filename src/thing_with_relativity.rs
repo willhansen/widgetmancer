@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use typenum::*;
 
 #[derive(Hash, Copy, Clone, Eq)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL = typenum::U0>
@@ -21,34 +22,47 @@ where
     }
 }
 
-// macro_rules! binary_op_delegate {
-//     ($trait:ty, $trait_function:ident) => {
-//         impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
-//             $trait<ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>>
-//             for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-//         where
-//             THING_TYPE: $trait<RHS_THING_TYPE>,
-//             RELATIVITY_LEVEL: typenum::Unsigned,
-//         {
-//             type Output = ThingWithRelativity<
-//                 <THING_TYPE as $trait<RHS_THING_TYPE>>::Output,
-//                 RELATIVITY_LEVEL,
-//             >;
+macro_rules! impl_binary_op_with_relative {
+    ($trait:ident, $function:ident) => {
+        // Add one to zero case
+        impl<T: $trait<T>> $trait<ThingWithRelativity<T, U1>> for ThingWithRelativity<T, U0> {
+            type Output = Self;
+            fn $function(self, rhs: ThingWithRelativity<T, U1>) -> Self::Output {
+                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
+            }
+        }
+        // Add one to non-zero even case
+        impl<L, T> $trait<ThingWithRelativity<T, UInt<L, B1>>>
+            for ThingWithRelativity<T, UInt<L, B0>>
+        where
+            L: Unsigned,
+            T: $trait<T>,
+        {
+            type Output = Self;
+            fn $function(self, rhs: ThingWithRelativity<T, UInt<L, B1>>) -> Self::Output {
+                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
+            }
+        }
+        // Add one to odd case
+        impl<L, T> $trait<ThingWithRelativity<T, UInt<Add1<L>, B0>>>
+            for ThingWithRelativity<T, UInt<L, B1>>
+        where
+            L: Unsigned + Add<B1>,
+            Add1<L>: Unsigned,
+            T: $trait<T>,
+        {
+            type Output = Self;
+            fn $function(self, rhs: ThingWithRelativity<T, UInt<Add1<L>, B0>>) -> Self::Output {
+                ThingWithRelativity::new_thing(self.thing.$function(rhs.thing))
+            }
+        }
+    };
+}
 
-//             fn $trait_function(
-//                 self,
-//                 rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>,
-//             ) -> Self::Output {
-//                 ThingWithRelativity {
-//                     thing: $trait_function(self.thing, rhs.thing),
-//                     _level_of_relativity: std::marker::PhantomData,
-//                 }
-//             }
-//         }
-//     };
-// }
-
-// binary_op_delegate!(std::ops::Add, add);
+use std::ops::{Add, Sub};
+// TODO: how pass full path directly to macro?
+impl_binary_op_with_relative!(Add, add);
+impl_binary_op_with_relative!(Sub, sub);
 
 impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
@@ -77,55 +91,16 @@ where
     }
 }
 
-impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
-    std::ops::Add<ThingWithRelativity<RHS_THING_TYPE, typenum::Add1<RELATIVITY_LEVEL>>>
-    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+impl<T, RELATIVITY_LEVEL> std::ops::Sub<ThingWithRelativity<T, RELATIVITY_LEVEL>>
+    for ThingWithRelativity<T, RELATIVITY_LEVEL>
 where
-    THING_TYPE: std::ops::Add<RHS_THING_TYPE>,
-    RELATIVITY_LEVEL: typenum::marker_traits::Unsigned + std::ops::Add<typenum::B1>,
-    typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
-{
-    type Output = ThingWithRelativity<
-        <THING_TYPE as std::ops::Add<RHS_THING_TYPE>>::Output,
-        RELATIVITY_LEVEL,
-    >;
-
-    fn add(self, rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> Self::Output {
-        ThingWithRelativity::new_thing(std::ops::Add::add(self.thing, rhs.thing))
-    }
-}
-
-impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
-    std::ops::Sub<ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>>
-    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-where
-    THING_TYPE: std::ops::Sub<RHS_THING_TYPE>,
+    T: std::ops::Sub<T>,
     RELATIVITY_LEVEL: typenum::Unsigned + std::ops::Add<typenum::B1>,
     typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
 {
-    type Output = ThingWithRelativity<
-        <THING_TYPE as std::ops::Sub<RHS_THING_TYPE>>::Output,
-        typenum::Add1<RELATIVITY_LEVEL>,
-    >;
+    type Output = ThingWithRelativity<T, typenum::Add1<RELATIVITY_LEVEL>>;
 
-    fn sub(self, rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> Self::Output {
-        ThingWithRelativity::new_thing(Self::sub(self.thing, rhs.thing))
-    }
-}
-impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
-    std::ops::Sub<ThingWithRelativity<RHS_THING_TYPE, typenum::Add1<RELATIVITY_LEVEL>>>
-    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-where
-    THING_TYPE: std::ops::Sub<RHS_THING_TYPE>,
-    RELATIVITY_LEVEL: typenum::Unsigned + std::ops::Add<typenum::B1>,
-    typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
-{
-    type Output = ThingWithRelativity<
-        <THING_TYPE as std::ops::Sub<RHS_THING_TYPE>>::Output,
-        RELATIVITY_LEVEL,
-    >;
-
-    fn sub(self, rhs: ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> Self::Output {
+    fn sub(self, rhs: ThingWithRelativity<T, RELATIVITY_LEVEL>) -> Self::Output {
         ThingWithRelativity::new_thing(Self::sub(self.thing, rhs.thing))
     }
 }
@@ -142,27 +117,6 @@ where
         ThingWithRelativity::new_thing(Self::neg(self.thing))
     }
 }
-// impl<THING_TYPE, RELATIVITY_LEVEL> std::marker::Copy
-//     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-// where
-//     THING_TYPE: std::marker::Copy,
-//     RELATIVITY_LEVEL: typenum::Unsigned,
-// {
-// }
-
-// impl<THING_TYPE, RELATIVITY_LEVEL> std::clone::Clone
-//     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-// where
-//     THING_TYPE: std::clone::Clone,
-//     RELATIVITY_LEVEL: typenum::Unsigned,
-// {
-//     fn clone(&self) -> Self {
-//         ThingWithRelativity {
-//             thing: self.thing.clone(),
-//             _level_of_relativity: std::marker::PhantomData,
-//         }
-//     }
-// }
 
 impl<THING_TYPE, RHS_TYPE, RELATIVITY_LEVEL> std::ops::Mul<RHS_TYPE>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
@@ -180,14 +134,6 @@ where
         }
     }
 }
-
-// impl<THING_TYPE, RELATIVITY_LEVEL> std::cmp::Eq
-//     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-// where
-//     THING_TYPE: std::cmp::Eq,
-//     RELATIVITY_LEVEL: typenum::Unsigned,
-// {
-// }
 
 // TODO: Can derive? (is the phantomdata the problem?)
 impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>

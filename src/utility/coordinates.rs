@@ -179,9 +179,12 @@ where
 impl<T, U, R> Coordinate for ThingWithRelativity<euclid::Vector2D<T, U>, R>
 where
     // TODO: trait alias
-    T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
+    // T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
+    T: CoordinateDataTypeTrait,
     R: typenum::Unsigned + std::ops::Add<typenum::B1>,
     typenum::Add1<R>: typenum::Unsigned,
+    Self: std::ops::Add<Self::RelativeVersionOfSelf, Output = Self>
+        + std::ops::Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {
     type DataType = T;
     type UnitType = U;
