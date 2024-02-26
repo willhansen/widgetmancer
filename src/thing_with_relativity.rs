@@ -25,16 +25,20 @@ where
 
 macro_rules! create_binop_with_relativity {
     ($op_trait:ident, $function:ident) => {
-        paste!{
-            // TODO: maybe don't use the paste macro, just pass in the new names?
-            trait [<$op_trait ButWithRelativity>]<THING_TYPE: $op_trait<THING_TYPE>, RELATIVITY_DIFFERENCE: Unsigned> {
+        paste! {
+            // TODO: maybe don't use the paste macro, just pass in the new names? (for greppability reasons)
+            trait [<$op_trait ButWithRelativity>]<T, RELATIVITY_DIFFERENCE>
+            where T: $op_trait<T>, RELATIVITY_DIFFERENCE: Unsigned
+             {
                 type Output;
-                fn [<$function _but_with_relativity>](self, rhs: THING_TYPE) -> Self::Output {
-                    ThingWithRelativity::new(self.thing.$function(rhs.thing))
+                fn [<$function _but_with_relativity>](self, rhs: T) -> Self::Output;
+                // { ThingWithRelativity::new(self.thing.$function(rhs)) }
+                fn base_op(self, rhs: T) -> T {
+                    self.$function(rhs)
                 }
             }
         }
-    }
+    };
 }
 // TODO: how pass full path directly to macro?
 use std::ops::{Add, Sub};
@@ -43,14 +47,14 @@ create_binop_with_relativity!(Sub, sub);
 
 macro_rules! impl_bin_op_with_relativity {
     ($op_trait:ident, $function:ident, $relative_relativity_of_rhs:ty, $relative_relativity_of_output:ty) => {
-        impl<T, LEFT_REL, RIGHT_REL> $op_trait<T, RIGHT_REL> for ThingWithRelativity<T, LEFT_REL>
+        impl<T, LEFT_REL, RIGHT_REL> $op_trait<T, $relative_relativity_of_rhs>
+            for ThingWithRelativity<T, LEFT_REL>
         where
             T: $op_trait<T>,
-            LEFT_REL: Unsigned + Add<T, $relative_relativity_of_rhs>,
+            LEFT_REL: Unsigned + Add<$relative_relativity_of_rhs>,
             // RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = $relative_relativity_of_output>,
         {
-            type Output =
-                ThingWithRelativity<T, Sum<LEFT_REL, $relative_relativity_of_output>>;
+            type Output = ThingWithRelativity<T, Sum<LEFT_REL, $relative_relativity_of_output>>;
             fn $function(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
                 <LEFT_REL as $op_trait>::$function(self, rhs)
             }
@@ -58,20 +62,31 @@ macro_rules! impl_bin_op_with_relativity {
     };
 }
 
+impl<T, LEFT_REL, RIGHT_REL> AddButWithRelativity<T, U1> for ThingWithRelativity<T, LEFT_REL>
+where
+    T: Add<T, Output = T>,
+    LEFT_REL: Unsigned + Add<U1>,
+    // RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = $relative_relativity_of_output>,
+{
+    type Output = ThingWithRelativity<T, LEFT_REL>;
+    fn add_but_with_relativity(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
+        Self::Output::new(self.base_op(rhs.thing))
+    }
+}
 impl_bin_op_with_relativity!(AddButWithRelativity, add_but_with_relativity, U1, U0);
 impl_bin_op_with_relativity!(SubButWithRelativity, sub_but_with_relativity, U0, U1);
-impl_bin_op_with_relativity!(SubButWithRelativity, sub_but_witEFT_RELh_rIGHT_RELelativity, U1, UIGHT_REL0);
+impl_bin_op_with_relativity!(SubButWithRelativity, sub_but_with_relativity, U1, U0);
 
-impl<THING_TYPE, RELATIVIEFT_RELTY_EFT_RELLEVIGHT_RELEL> std::fmt::DeIGHT_RELbug
-    for ThingWithRelativitEFT_RELy<THING_TYPE, RELATIVITY_LEVEL>
-EFT_RELwhere
-IGHT_REL    THING_TYPE: EFT_RELstd::EFT_RELfmt::Debug,
-    RELATIVITY_LIGHT_RELEVEL: typenum::EFT_RELUnsigned,
+impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
+    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+where
+    THING_TYPE: std::fmt::Debug,
+    RELATIVITY_LEVEL: typenum::Unsigned,
 {
-    fn fmt(&self, f: &mut std::fmt::FoEFT_RELrmatter<'_>) -> std::fmt::Result {
-        wrEFT_RELite!(
-          EFT_REL IGHT_REL f,
-           IGHT_REL "ThingWithRelativity: \n\tThing: {:#?}\n\tLevel of relativity:EFT_REL {}",
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ThingWithRelativity: \n\tThing: {:#?}\n\tLevel of relativity: {}",
             self.thing,
             RELATIVITY_LEVEL::to_u32()
         )
