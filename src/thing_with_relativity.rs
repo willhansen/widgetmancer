@@ -32,34 +32,33 @@ impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LE
 }
 
 use std::ops::{Add, Sub};
-trait AddWithRelativity<T, REL_DIFF>
-where
-    REL_DIFF: Unsigned,
-{
-    type Output;
-    fn add_with_relativity(self, rhs: T) -> Self::Output;
+macro_rules! op_with_relativity {
+    ($trait:ident, $func:ident, $rel_trait:ident, $rel_func:ident) => {
+        trait $rel_trait<T, REL_DIFF>
+        where
+            REL_DIFF: Unsigned,
+        {
+            type Output;
+            fn $rel_func(self, rhs: T) -> Self::Output;
+        }
+        impl<T, L_REL, R_REL, DIFF_REL> $trait<ThingWithRelativity<T, R_REL>>
+            for ThingWithRelativity<T, L_REL>
+        where
+            T: $trait<T>,
+            L_REL: Unsigned, // + Add<DIFF_REL, Output = R_REL>,
+            R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
+            DIFF_REL: Unsigned,
+            Self: $rel_trait<T, DIFF_REL>,
+        {
+            type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
+            fn $func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+                self.$rel_func(rhs)
+            }
+        }
+    };
 }
-trait SubWithRelativity<T, REL_DIFF>
-where
-    REL_DIFF: Unsigned,
-{
-    type Output;
-    fn sub_with_relativity(self, rhs: T) -> Self::Output;
-}
-
-impl<T, L_REL, R_REL, DIFF_REL> Add<ThingWithRelativity<T, R_REL>> for ThingWithRelativity<T, L_REL>
-where
-    T: Add<T>,
-    L_REL: Unsigned + Add<DIFF_REL, Output = R_REL>,
-    R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
-    DIFF_REL: Unsigned,
-    Self: AddWithRelativity<T, DIFF_REL>,
-{
-    type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
-    fn add(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-        self.add_with_relativity(rhs)
-    }
-}
+op_with_relativity!(Add, add, AddWithRelativity, add_with_relativity);
+op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity);
 
 impl<T, L_REL, R_REL> AddWithRelativity<ThingWithRelativity<T, R_REL>, U1>
     for ThingWithRelativity<T, L_REL>
