@@ -23,111 +23,67 @@ where
     }
 }
 
-macro_rules! create_binop_with_relativity {
-    ($op_trait:ident, $function:ident, $new_op_trait:ident, $new_function:ident) => {
-        trait $new_op_trait<T, RELATIVITY_DIFFERENCE>
-        where
-            T: $op_trait<T>,
-            RELATIVITY_DIFFERENCE: Unsigned,
-        {
-            type Output;
-            fn $new_function(self, rhs: T) -> Self::Output;
-        }
-    };
+pub trait HasRelativity {
+    type RelativityLevel: Unsigned;
 }
+
+impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL> {
+    type RelativityLevel = RELATIVITY_LEVEL;
+}
+
 use std::ops::{Add, Sub};
-create_binop_with_relativity!(Add, add, AddButWithRelativity, add_but_with_relativity);
-create_binop_with_relativity!(Sub, sub, SubButWithRelativity, sub_but_with_relativity);
-
-macro_rules! impl_bin_op_with_relativity {
-    ($op_trait:ident, $function:ident, $new_op_trait:ident, $new_function:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
-        impl<T, LEFT_REL, RIGHT_REL> $new_op_trait<T, $rhs_rel_diff>
-            for ThingWithRelativity<T, LEFT_REL>
-        where
-            T: $op_trait<T>,
-            LEFT_REL: Unsigned + Add<$rhs_rel_diff, Output = RIGHT_REL>,
-            RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = $out_rel_diff>,
-        {
-            type Output = ThingWithRelativity<T, Sum<LEFT_REL, $out_rel_diff>>;
-            fn $new_function(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
-                Self::Output::new(self.thing.$function(rhs.thing))
-            }
-        }
-        // impl<T, LEFT_REL, RIGHT_REL> $op_trait<ThingWithRelativity<T, RIGHT_REL>>
-        //     for ThingWithRelativity<T, LEFT_REL>
-        // where
-        //     T: $op_trait<T>,
-        //     ThingWithRelativity<T, LEFT_REL>: $new_op_trait<T, $rhs_drel>,
-        //     RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = $out_drel>,
-        // {
-        //     type Output = ThingWithRelativity<T, Sum<LEFT_REL, $out_drel>>;
-        //     fn $function(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
-        //         self.$new_function(rhs)
-        //     }
-        // }
-    };
+trait AddWithRelativity<T, REL_DIFF>
+where
+    REL_DIFF: Unsigned,
+{
+    type Output;
+    fn add_with_relativity(self, rhs: T) -> Self::Output;
+}
+trait SubWithRelativity<T, REL_DIFF>
+where
+    REL_DIFF: Unsigned,
+{
+    type Output;
+    fn sub_with_relativity(self, rhs: T) -> Self::Output;
 }
 
-// TODO: how pass full path directly to macro?
-// impl_bin_op_with_relativity!(
-//     Add,
-//     add,
-//     AddButWithRelativity,
-//     add_but_with_relativity,
-//     U1,
-//     U0
-// );
-// impl_bin_op_with_relativity!(
-//     Sub,
-//     sub,
-//     SubButWithRelativity,
-//     sub_but_with_relativity,
-//     U0,
-//     U1
-// );
-// impl_bin_op_with_relativity!(
-//     Sub,
-//     sub,
-//     SubButWithRelativity,
-//     sub_but_with_relativity,
-//     U1,
-//     U0
-// );
-
-impl<T, LEFT_REL, RIGHT_REL> Add<ThingWithRelativity<T, RIGHT_REL>>
-    for ThingWithRelativity<T, LEFT_REL>
+impl<T, L_REL, R_REL, DIFF_REL> Add<ThingWithRelativity<T, R_REL>> for ThingWithRelativity<T, L_REL>
 where
     T: Add<T>,
-    ThingWithRelativity<T, LEFT_REL>: AddButWithRelativity<T, U1>,
-    RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = U0>,
+    L_REL: Unsigned + Add<DIFF_REL, Output = R_REL>,
+    R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
+    DIFF_REL: Unsigned,
+    Self: AddWithRelativity<T, DIFF_REL>,
 {
-    type Output = ThingWithRelativity<T, Sum<LEFT_REL, U0>>;
-    fn add(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
-        self.add_but_with_relativity(rhs)
+    type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
+    fn add(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+        self.add_with_relativity(rhs)
     }
 }
-impl<T, LEFT_REL, RIGHT_REL, DREL> Sub<ThingWithRelativity<T, RIGHT_REL>>
-    for ThingWithRelativity<T, LEFT_REL>
-where
-    T: Sub<T>,
-    ThingWithRelativity<T, LEFT_REL>: SubButWithRelativity<T, DREL>,
-    RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = DREL>,
+
+impl<T, L_REL, R_REL> AddWithRelativity<ThingWithRelativity<T, R_REL>, U1>
+    for ThingWithRelativity<T, L_REL>
 {
-    type Output = ThingWithRelativity<T, Sum<LEFT_REL, U0>>;
-    fn sub(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
-        self.sub_but_with_relativity(rhs)
+    type Output = Self;
+    fn add_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+        self.thing.add(rhs.thing())
     }
 }
-impl<T, LEFT_REL, RIGHT_REL> Sub<ThingWithRelativity<T, RIGHT_REL>>
-    for ThingWithRelativity<T, LEFT_REL>
-where
-    T: Sub<T>,
-    ThingWithRelativity<T, LEFT_REL>: SubButWithRelativity<T, U0>,
-    RIGHT_REL: Unsigned + Sub<LEFT_REL, Output = U1>,
+impl<T, L_REL, R_REL> SubWithRelativity<ThingWithRelativity<T, R_REL>, U1>
+    for ThingWithRelativity<T, L_REL>
 {
-    type Output = ThingWithRelativity<T, Sum<LEFT_REL, U1>>;
-    fn sub(self, rhs: ThingWithRelativity<T, RIGHT_REL>) -> Self::Output {
-        self.sub_but_with_relativity(rhs)
+    type Output = Self;
+    fn sub_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+        self.thing.sub(rhs.thing())
+    }
+}
+
+impl<T, L_REL, R_REL> SubWithRelativity<ThingWithRelativity<T, R_REL>, U0>
+    for ThingWithRelativity<T, L_REL>
+{
+    type Output = ThingWithRelativity<T, Add1<L_REL>>;
+    fn sub_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+        self.thing.sub(rhs.thing())
     }
 }
 
