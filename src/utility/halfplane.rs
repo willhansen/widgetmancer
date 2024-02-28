@@ -5,14 +5,14 @@ use super::{
 
 pub type LocalSquareHalfPlane = HalfPlane<LineThroughUnitSquare<LocalSquarePoint>>;
 
-#[derive(PartialEq, Clone, Debug, Copy)]
-pub struct HalfPlane<LINE_TYPE = FloatingPointLine>
-where
-    LINE_TYPE: Copy,
-{
+#[derive(PartialEq, Clone, Debug)]
+pub struct HalfPlane<LINE_TYPE = FloatingPointLine> {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     dividing_line: LINE_TYPE,
 }
+
+// TODO: Why not derive?
+impl<T: Copy> Copy for HalfPlane<T> {}
 
 impl<LINE_TYPE> HalfPlane<LINE_TYPE>
 where

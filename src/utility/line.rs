@@ -454,11 +454,13 @@ pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> 
     }
 }
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq)]
 pub struct Line<POINT_TYPE: Coordinate> {
     p1: POINT_TYPE,
     p2: POINT_TYPE,
 }
+
+impl<T: Copy + Coordinate> Copy for Line<T> {}
 
 impl<POINT_TYPE: Coordinate> LineTrait for Line<POINT_TYPE> {
     type PointType = POINT_TYPE;
@@ -482,8 +484,10 @@ impl<POINT_TYPE: Coordinate> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_T
     }
 }
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq)]
 pub struct LineThroughUnitSquare<POINT_TYPE: FloatCoordinate>(Line<POINT_TYPE>);
+
+impl<T: Copy + Coordinate> Copy for LineThroughUnitSquare<T> {}
 
 impl<POINT_TYPE: FloatCoordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
     type PointType = POINT_TYPE;

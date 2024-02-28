@@ -24,19 +24,15 @@ where
     }
 }
 
+// TODO: why not derive?
+impl<T: Copy, R> Copy for ThingWithRelativity<T, R> {}
+
 pub trait HasRelativity {
     type RelativityLevel: Unsigned;
 }
 
 impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL> {
     type RelativityLevel = RELATIVITY_LEVEL;
-}
-
-impl<T, R> Copy for ThingWithRelativity<T, R>
-where
-    T: Copy,
-    R: Unsigned,
-{
 }
 
 macro_rules! make_op_with_relativity {

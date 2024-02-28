@@ -3,10 +3,11 @@ use std::{
     f32::consts::{PI, TAU},
     fmt::Display,
     marker::PhantomData,
-    ops::{Mul, Neg},
+    ops::{Add, Mul, Neg, Sub},
 };
 
-use typenum;
+use typenum::Add1;
+use typenum::{self};
 
 use derive_more::{AddAssign, Neg};
 pub use euclid::Angle;
@@ -102,11 +103,11 @@ where
 {
     type DataType;
     type UnitType;
-    type RelativityLevel: typenum::Unsigned + std::ops::Add<typenum::B1>;
+    type RelativityLevel: typenum::Unsigned;// + std::ops::Add<typenum::B1>;
 
     // const IS_RELATIVE: bool;
     // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
-    type RelativeVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+    type RelativeVersionOfSelf;//: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
     // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
@@ -176,21 +177,22 @@ where
     }
 }
 
-impl<T, U, R> Coordinate for ThingWithRelativity<euclid::Vector2D<T, U>, R>
+impl<T, U, RELATIVITY_LEVEL> Coordinate
+    for ThingWithRelativity<euclid::Vector2D<T, U>, RELATIVITY_LEVEL>
 where
     // TODO: trait alias
     // T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
     T: CoordinateDataTypeTrait,
-    R: typenum::Unsigned + std::ops::Add<typenum::B1>,
-    typenum::Add1<R>: typenum::Unsigned,
-    Self: std::ops::Add<Self::RelativeVersionOfSelf, Output = Self>
-        + std::ops::Sub<Self::RelativeVersionOfSelf, Output = Self>,
+    RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1>,
+    Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
+    Self: Add<Self::RelativeVersionOfSelf, Output = Self>
+        + Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {
     type DataType = T;
     type UnitType = U;
-    type RelativityLevel = R;
+    // type RelativityLevel = RELATIVITY_LEVEL;
     // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
-    type RelativeVersionOfSelf = ThingWithRelativity<euclid::Vector2D<T, U>, typenum::Add1<R>>;
+    // type RelativeVersionOfSelf = ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
     // type RelativityComplement = $relativity_complement<T, U>;
 
     fn x(&self) -> T {
