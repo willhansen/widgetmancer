@@ -86,6 +86,7 @@ trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq
 pub trait Coordinate:
     Copy
     + PartialEq
+    // + AddWithRelativity<
     + Add<Self::RelativeVersionOfSelf, Output = Self>
     + Sub<Self::RelativeVersionOfSelf, Output = Self>
     + Sub<Self, Output = Self::RelativeVersionOfSelf>

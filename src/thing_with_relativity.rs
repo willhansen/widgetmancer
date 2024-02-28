@@ -36,39 +36,39 @@ impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LE
 }
 
 macro_rules! make_op_with_relativity {
-    ($trait:ident, $func:ident, $rel_trait:ident, $rel_func:ident) => {
-        trait $rel_trait<T, REL_DIFF>
+    ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident) => {
+        trait $OpTraitWithRelativity<T, REL_DIFF>
         where
             REL_DIFF: Unsigned,
         {
             type Output;
-            fn $rel_func(self, rhs: T) -> Self::Output;
+            fn $op_func_with_relativity(self, rhs: T) -> Self::Output;
         }
 
-        impl<T, L_REL, R_REL, DIFF_REL> $trait<ThingWithRelativity<T, R_REL>>
+        impl<T, L_REL, R_REL, DIFF_REL> $OpTrait<ThingWithRelativity<T, R_REL>>
             for ThingWithRelativity<T, L_REL>
         where
-            T: $trait<T>,
+            T: $OpTrait<T>,
             L_REL: Unsigned, // + Add<DIFF_REL, Output = R_REL>,
             R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
             DIFF_REL: Unsigned,
-            Self: $rel_trait<T, DIFF_REL>,
+            Self: $OpTraitWithRelativity<T, DIFF_REL>,
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
-            fn $func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-                self.$rel_func(rhs)
+            fn $op_func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+                self.$op_func_with_relativity(rhs)
             }
         }
     };
 }
 macro_rules! impl_op_with_relativity {
-    ($trait:ident, $func:ident, $rel_trait:ident, $rel_func:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
-        impl<T, L_REL, R_REL> $rel_trait<ThingWithRelativity<T, R_REL>, $rhs_rel_diff>
+    ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
+        impl<T, L_REL, R_REL> $OpTraitWithRelativity<ThingWithRelativity<T, R_REL>, $rhs_rel_diff>
             for ThingWithRelativity<T, L_REL>
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
-            fn $rel_func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-                self.thing.$func(rhs.thing())
+            fn $op_func_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+                self.thing.$op_func(rhs.thing())
             }
         }
     };
