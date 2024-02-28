@@ -62,7 +62,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum SquareVisibilityFromOneLargeShadow {
     FullyVisible,
     // TODO: have more than one half plane (two?)
@@ -70,8 +70,6 @@ pub enum SquareVisibilityFromOneLargeShadow {
     // PartiallyVisible(LocalSquareHalfPlaneWithBorderOnUnitSquare), // TODO
     NotVisible,
 }
-
-impl Copy for SquareVisibilityFromOneLargeShadow {}
 
 impl SquareVisibilityFromOneLargeShadow {
     pub(crate) fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
