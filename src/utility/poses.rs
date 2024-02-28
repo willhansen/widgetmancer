@@ -42,7 +42,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, getset::CopyGetters)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, getset::CopyGetters)]
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
@@ -51,9 +51,6 @@ where
     square: SquareType,
     dir: OrthogonalWorldStep,
 }
-
-// TODO: Why not derive
-impl<T: Copy> Copy for AbsOrRelSquareWithOrthogonalDir<T> {}
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
 pub type Face = SquareWithOrthogonalDir;

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::{Add, Sub};
 use typenum::*;
 
-#[derive(Hash, Clone, Eq)]
+#[derive(Hash, Clone, Copy, Eq)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     RELATIVITY_LEVEL: Unsigned,
@@ -23,9 +23,6 @@ where
         }
     }
 }
-
-// TODO: why not derive?
-impl<T: Copy, R> Copy for ThingWithRelativity<T, R> {}
 
 pub trait HasRelativity {
     type RelativityLevel: Unsigned;
