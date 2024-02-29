@@ -28,80 +28,88 @@ pub trait HasRelativity {
     type RelativityLevel: Unsigned;
 }
 
-impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL> {
+impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL>
+where
+    RELATIVITY_LEVEL: typenum::Unsigned,
+{
     type RelativityLevel = RELATIVITY_LEVEL;
 }
 
 // TODO: uncomment this for general relativity levels once the other bugs are worked out
-// macro_rules! make_op_with_relativity {
-//     ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident) => {
-//         trait $OpTraitWithRelativity<T, REL_DIFF>
-//         where
-//             REL_DIFF: Unsigned,
-//         {
-//             type Output;
-//             fn $op_func_with_relativity(self, rhs: T) -> Self::Output;
-//         }
+macro_rules! make_op_with_relativity {
+    ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident) => {
+        trait $OpTraitWithRelativity<Rhs, REL_DIFF>
+        where
+            REL_DIFF: Unsigned,
+        {
+            type Output;
+            fn $op_func_with_relativity(self, rhs: Rhs) -> Self::Output;
+        }
 
-//         impl<T, L_REL, R_REL, DIFF_REL> $OpTrait<ThingWithRelativity<T, R_REL>>
-//             for ThingWithRelativity<T, L_REL>
-//         where
-//             T: $OpTrait<T>,
-//             L_REL: Unsigned, // + Add<DIFF_REL, Output = R_REL>,
-//             R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
-//             DIFF_REL: Unsigned,
-//             Self: $OpTraitWithRelativity<T, DIFF_REL>,
-//         {
-//             type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
-//             fn $op_func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-//                 self.$op_func_with_relativity(rhs)
-//             }
-//         }
-//     };
-// }
-// macro_rules! impl_op_with_relativity {
-//     ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
-//         impl<T, L_REL, R_REL> $OpTraitWithRelativity<ThingWithRelativity<T, R_REL>, $rhs_rel_diff>
-//             for ThingWithRelativity<T, L_REL>
-//         {
-//             type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
-//             fn $op_func_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-//                 self.thing.$op_func(rhs.thing())
-//             }
-//         }
-//     };
-// }
-// make_op_with_relativity!(Add, add, AddWithRelativity, add_with_relativity);
-// make_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity);
-// impl_op_with_relativity!(Add, add, AddWithRelativity, add_with_relativity, U1, U0);
-// impl_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity, U1, U0);
-// impl_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity, U0, U1);
-macro_rules! impl_op_with_naive_relativity {
-    ($OpTrait:ident, $op_func:ident, $lhs_rel:ty, $rhs_rel:ty, $out_rel:ty) => {
-        impl<T> $OpTrait<ThingWithRelativity<T, $rhs_rel>> for ThingWithRelativity<T, $lhs_rel>
+        impl<T, L_REL, R_REL, DIFF_REL> $OpTrait<ThingWithRelativity<T, R_REL>>
+            for ThingWithRelativity<T, L_REL>
         where
             T: $OpTrait<T>,
+            L_REL: Unsigned + Add<DIFF_REL, Output = R_REL>,
+            R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
+            DIFF_REL: Unsigned,
+            Self: $OpTraitWithRelativity<T, DIFF_REL>,
         {
-            type Output = ThingWithRelativity<T, $out_rel>;
-            fn $op_func(self, rhs: ThingWithRelativity<T, $rhs_rel>) -> Self::Output {
-                self.thing.$op_func(rhs.thing)
+            type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
+            fn $op_func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+                self.$op_func_with_relativity(rhs)
             }
         }
     };
 }
+macro_rules! impl_op_with_relativity {
+    ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
+        impl<T, L_REL, R_REL> $OpTraitWithRelativity<ThingWithRelativity<T, R_REL>, $rhs_rel_diff>
+            for ThingWithRelativity<T, L_REL>
+        where
+            L_REL: typenum::Unsigned + Add<U0, Output = L_REL> + Add<$out_rel_diff,
+            R_REL: typenum::Unsigned,
+            ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>: typenum::Unsigned,
+        {
+            type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
+            fn $op_func_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
+                self.thing.$op_func(rhs.thing())
+            }
+        }
+    };
+}
+make_op_with_relativity!(Add, add, AddWithRelativity, add_with_relativity);
+make_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity);
+impl_op_with_relativity!(Add, add, AddWithRelativity, add_with_relativity, U1, U0);
+impl_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity, U1, U0);
+impl_op_with_relativity!(Sub, sub, SubWithRelativity, sub_with_relativity, U0, U1);
 
-// TODO: generalize
-impl_op_with_naive_relativity!(Add, add, U0, U1, U0);
-impl_op_with_naive_relativity!(Add, add, U1, U2, U1);
-impl_op_with_naive_relativity!(Add, add, U2, U3, U2);
+// macro_rules! impl_op_with_naive_relativity {
+//     ($OpTrait:ident, $op_func:ident, $lhs_rel:ty, $rhs_rel:ty, $out_rel:ty) => {
+//         impl<T> $OpTrait<ThingWithRelativity<T, $rhs_rel>> for ThingWithRelativity<T, $lhs_rel>
+//         where
+//             T: $OpTrait<T>,
+//         {
+//             type Output = ThingWithRelativity<T, $out_rel>;
+//             fn $op_func(self, rhs: ThingWithRelativity<T, $rhs_rel>) -> Self::Output {
+//                 self.thing.$op_func(rhs.thing)
+//             }
+//         }
+//     };
+// }
 
-impl_op_with_naive_relativity!(Sub, sub, U0, U1, U0);
-impl_op_with_naive_relativity!(Sub, sub, U1, U2, U1);
-impl_op_with_naive_relativity!(Sub, sub, U2, U3, U2);
+// // TODO: generalize
+// impl_op_with_naive_relativity!(Add, add, U0, U1, U0);
+// impl_op_with_naive_relativity!(Add, add, U1, U2, U1);
+// impl_op_with_naive_relativity!(Add, add, U2, U3, U2);
 
-impl_op_with_naive_relativity!(Sub, sub, U0, U0, U1);
-impl_op_with_naive_relativity!(Sub, sub, U1, U1, U2);
-impl_op_with_naive_relativity!(Sub, sub, U2, U2, U3);
+// impl_op_with_naive_relativity!(Sub, sub, U0, U1, U0);
+// impl_op_with_naive_relativity!(Sub, sub, U1, U2, U1);
+// impl_op_with_naive_relativity!(Sub, sub, U2, U3, U2);
+
+// impl_op_with_naive_relativity!(Sub, sub, U0, U0, U1);
+// impl_op_with_naive_relativity!(Sub, sub, U1, U1, U2);
+// impl_op_with_naive_relativity!(Sub, sub, U2, U2, U3);
 
 impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>

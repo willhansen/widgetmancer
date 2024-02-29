@@ -186,14 +186,14 @@ where
     T: CoordinateDataTypeTrait,
     RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1>,
     Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
-    Self: Add<Self::RelativeVersionOfSelf, Output = Self>
-        + Sub<Self::RelativeVersionOfSelf, Output = Self>,
+    // Self: Add<Self::RelativeVersionOfSelf, Output = Self> + Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {
     type DataType = T;
     type UnitType = U;
     // type RelativityLevel = RELATIVITY_LEVEL;
     // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
-    // type RelativeVersionOfSelf = ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
+    type RelativeVersionOfSelf =
+        ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
     // type RelativityComplement = $relativity_complement<T, U>;
 
     fn x(&self) -> T {
