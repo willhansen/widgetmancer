@@ -18,7 +18,7 @@ use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-use crate::thing_with_relativity::ThingWithRelativity;
+use crate::thing_with_relativity::{HasRelativity, ThingWithRelativity};
 
 // TODO: get rid of this section
 use super::{
@@ -86,10 +86,9 @@ trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq
 pub trait Coordinate:
     Copy
     + PartialEq
-    // + AddWithRelativity<
-    + Add<Self::RelativeVersionOfSelf, Output = Self>
-    + Sub<Self::RelativeVersionOfSelf, Output = Self>
-    + Sub<Self, Output = Self::RelativeVersionOfSelf>
+    // + Add<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self::RelativeVersionOfSelf, Output = Self>
+    // + Sub<Self, Output = Self::RelativeVersionOfSelf>
     // + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     // + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     // + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
@@ -99,6 +98,7 @@ pub trait Coordinate:
     + Debug
     + Neg<Output = Self>
     + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
+    // + HasRelativity
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
@@ -108,7 +108,7 @@ where
 
     // const IS_RELATIVE: bool;
     // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
-    type RelativeVersionOfSelf;//: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+    // type RelativeVersionOfSelf;//: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
     // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
@@ -124,9 +124,10 @@ where
     fn is_absolute(&self) -> bool {
         Self::RelativityLevel::to_u32() == 0
     }
-    fn as_relative(&self) -> Self::RelativeVersionOfSelf {
-        Self::RelativeVersionOfSelf::new(self.x(), self.y())
-    }
+    // fn as_relative(&self) -> Self::RelativeVersionOfSelf {
+
+    //     Self::RelativeVersionOfSelf::new(self.x(), self.y())
+    // }
     // fn as_absolute(&self) -> Self::AbsoluteVersionOfSelf {
     //     Self::AbsoluteVersionOfSelf::new(self.x(), self.y())
     // }
@@ -184,16 +185,16 @@ where
     // TODO: trait alias
     // T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
     T: CoordinateDataTypeTrait,
-    RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1>,
-    Add1<RELATIVITY_LEVEL>: typenum::Unsigned,
+    RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1> + Add<typenum::U1>,
+    typenum::Sum<RELATIVITY_LEVEL, typenum::U1>: typenum::Unsigned,
     // Self: Add<Self::RelativeVersionOfSelf, Output = Self> + Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {
     type DataType = T;
     type UnitType = U;
-    // type RelativityLevel = RELATIVITY_LEVEL;
+    type RelativityLevel = RELATIVITY_LEVEL;
     // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
-    type RelativeVersionOfSelf =
-        ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
+    // type RelativeVersionOfSelf =
+    //     ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
     // type RelativityComplement = $relativity_complement<T, U>;
 
     fn x(&self) -> T {

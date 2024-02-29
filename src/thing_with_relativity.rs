@@ -6,7 +6,7 @@ use typenum::*;
 #[derive(Hash, Clone, Copy, Eq)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: Unsigned + Add<B1>,
 {
     pub thing: THING_TYPE,
     pub _level_of_relativity: std::marker::PhantomData<RELATIVITY_LEVEL>,
@@ -14,7 +14,7 @@ where
 
 impl<THING_TYPE, RELATIVITY_LEVEL> ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: Unsigned + Add<B1>,
 {
     pub fn new_thing(new_thing: THING_TYPE) -> Self {
         ThingWithRelativity {
@@ -38,42 +38,39 @@ where
 // TODO: uncomment this for general relativity levels once the other bugs are worked out
 macro_rules! make_op_with_relativity {
     ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident) => {
-        trait $OpTraitWithRelativity<Rhs, REL_DIFF>
-        where
-            REL_DIFF: Unsigned,
-        {
+        trait $OpTraitWithRelativity<WrappedType, REL_DIFF> {
             type Output;
-            fn $op_func_with_relativity(self, rhs: Rhs) -> Self::Output;
+            fn $op_func_with_relativity(self, rhs: WrappedType) -> Self::Output;
         }
 
         impl<T, L_REL, R_REL, DIFF_REL> $OpTrait<ThingWithRelativity<T, R_REL>>
             for ThingWithRelativity<T, L_REL>
         where
             T: $OpTrait<T>,
-            L_REL: Unsigned + Add<DIFF_REL, Output = R_REL>,
-            R_REL: Unsigned + Sub<L_REL, Output = DIFF_REL>,
+            L_REL: Unsigned + Add<B1>,
+            R_REL: Unsigned + Add<B1> + Sub<L_REL, Output = DIFF_REL>,
             DIFF_REL: Unsigned,
             Self: $OpTraitWithRelativity<T, DIFF_REL>,
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, DIFF_REL>>;
             fn $op_func(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-                self.$op_func_with_relativity(rhs)
+                self.$op_func_with_relativity(rhs.thing)
             }
         }
     };
 }
 macro_rules! impl_op_with_relativity {
     ($OpTrait:ident, $op_func:ident, $OpTraitWithRelativity:ident, $op_func_with_relativity:ident, $rhs_rel_diff:ty, $out_rel_diff:ty) => {
-        impl<T, L_REL, R_REL> $OpTraitWithRelativity<ThingWithRelativity<T, R_REL>, $rhs_rel_diff>
+        impl<T, L_REL, R_REL> $OpTraitWithRelativity<T, $rhs_rel_diff>
             for ThingWithRelativity<T, L_REL>
         where
-            L_REL: typenum::Unsigned + Add<U0, Output = L_REL> + Add<$out_rel_diff,
+            L_REL: typenum::Unsigned + Add<$rhs_rel_diff, Output = R_REL> + Add<typenum::B1>,
             R_REL: typenum::Unsigned,
-            ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>: typenum::Unsigned,
+            // ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>: typenum::Unsigned,
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
-            fn $op_func_with_relativity(self, rhs: ThingWithRelativity<T, R_REL>) -> Self::Output {
-                self.thing.$op_func(rhs.thing())
+            fn $op_func_with_relativity(self, rhs: T) -> Self::Output {
+                Self::Output::new(self.thing.$op_func(rhs))
             }
         }
     };
