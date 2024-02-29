@@ -1,3 +1,5 @@
+use crate::thing_with_relativity::HasRelativity;
+
 use super::{
     bool_with_partial::*, coordinate_frame_conversions::*, coordinates::*, general_utility::*,
     line::*, relative_interval_location::*,
@@ -55,7 +57,7 @@ where
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     pub fn new_from_vector_from_origin_to_normal_to_edge_with_origin_inside_and_the_vector_pointing_outside(
-        vector_to_outside: impl Into<<LINE_TYPE::PointType as Coordinate>::RelativeVersionOfSelf>,
+        vector_to_outside: impl Into<<LINE_TYPE::PointType as HasRelativity>::RelativeVersionOfSelf>,
     ) -> Self {
         let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
@@ -73,7 +75,7 @@ where
     pub fn new_from_point_on_border_and_vector_pointing_inside(
         point_on_border: impl Into<LINE_TYPE::PointType>,
         normal_direction_into_plane: impl Into<
-            <LINE_TYPE::PointType as Coordinate>::RelativeVersionOfSelf,
+            <LINE_TYPE::PointType as HasRelativity>::RelativeVersionOfSelf,
         >,
     ) -> Self {
         let p = point_on_border.into();

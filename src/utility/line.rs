@@ -5,6 +5,8 @@ use line_drawing::Supercover;
 use num::{One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
+use crate::thing_with_relativity::HasRelativity;
+
 use super::{
     coordinate_frame_conversions::*, coordinates::*, general_utility::*, get_new_rng, poses::*,
     trait_alias_macro::trait_alias_macro,
@@ -50,10 +52,10 @@ pub trait LineTrait: Sized + Copy {
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,
-        direction: impl Into<<Self::PointType as Coordinate>::RelativeVersionOfSelf>,
+        direction: impl Into<<Self::PointType as HasRelativity>::RelativeVersionOfSelf>,
     ) -> Self {
         let p1: Self::PointType = point.into();
-        let v: <Self::PointType as Coordinate>::RelativeVersionOfSelf = direction.into();
+        let v: <Self::PointType as HasRelativity>::RelativeVersionOfSelf = direction.into();
         let p2: Self::PointType = p1 + v;
         Self::new_from_two_points(p1, p2)
     }
@@ -133,11 +135,13 @@ pub trait FloatLineTrait: LineTrait {
     fn normal_vector_to_point(
         &self,
         point: impl Into<Self::PointType>,
-    ) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+    ) -> <Self::PointType as HasRelativity>::RelativeVersionOfSelf {
         let point = point.into();
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn normal_vector_from_origin(&self) -> <Self::PointType as Coordinate>::RelativeVersionOfSelf {
+    fn normal_vector_from_origin(
+        &self,
+    ) -> <Self::PointType as HasRelativity>::RelativeVersionOfSelf {
         -self.normal_vector_to_point((0.0, 0.0))
     }
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {

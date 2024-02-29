@@ -98,7 +98,7 @@ pub trait Coordinate:
     + Debug
     + Neg<Output = Self>
     + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
-    // + HasRelativity
+    + HasRelativity
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
@@ -149,8 +149,8 @@ where
     fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
-    fn cast_data_type<C, T>(&self) -> C where C: Coordinate<DataType=T, UnitType=Self::UnitType, RelativityLevel = Self::RelativityLevel>, T: num::NumCast{self.cast()}
-    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
+    fn cast_data_type<C, T>(&self) -> C where C: Coordinate<DataType=T, UnitType=Self::UnitType, RelativityLevel = <Self as HasRelativity>::RelativityLevel>, T: num::NumCast{self.cast()}
+    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = <Self as HasRelativity>::RelativityLevel>{self.cast()}
     fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
 

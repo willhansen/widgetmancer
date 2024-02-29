@@ -26,13 +26,19 @@ where
 
 pub trait HasRelativity {
     type RelativityLevel: Unsigned;
+    type RelativeVersionOfSelf;
+    fn relative_version_of_self(&self) -> Self::RelativeVersionOfSelf;
 }
 
 impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: typenum::Unsigned,
+    RELATIVITY_LEVEL: typenum::Unsigned + Add<B1>,
 {
     type RelativityLevel = RELATIVITY_LEVEL;
+    type RelativeVersionOfSelf = ThingWithRelativity<T, Add1<Self::RelativityLevel>>;
+    fn relative_version_of_self(&self) -> Self::RelativeVersionOfSelf {
+        Self::RelativeVersionOfSelf::new(self.thing)
+    }
 }
 
 // TODO: uncomment this for general relativity levels once the other bugs are worked out
