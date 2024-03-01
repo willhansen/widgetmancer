@@ -3,7 +3,7 @@ use std::{
     f32::consts::{PI, TAU},
     fmt::Display,
     marker::PhantomData,
-    ops::{Add, Mul, Neg, Sub},
+    ops::{Add, Div, Mul, Neg, Sub},
 };
 
 use typenum::Add1;
@@ -19,6 +19,20 @@ use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
 use crate::thing_with_relativity::{HasRelativity, ThingWithRelativity};
+macro_rules! make_to_type_function {
+    ($the_type:ty, $func_name:ident) => {
+        fn $func_name<C>(&self) -> C
+        where
+            C: Coordinate<
+                DataType = $the_type,
+                UnitType = Self::UnitType,
+                RelativityLevel = Self::RelativityLevel,
+            >,
+        {
+            self.cast_type()
+        }
+    };
+}
 
 // TODO: get rid of this section
 use super::{
@@ -70,11 +84,17 @@ pub type Vector2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE> {
+pub fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE>
+where
+    DATA_TYPE: CoordinateDataTypeTrait,
+{
     Point2D::new(x, y)
 }
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE> {
+pub fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE>
+where
+    DATA_TYPE: CoordinateDataTypeTrait,
+{
     Vector2D::new(x, y)
 }
 
@@ -93,6 +113,7 @@ pub trait Coordinate:
     // + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     // + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
     + Mul<Self::DataType, Output = Self>
+    + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
     + Debug
@@ -104,7 +125,7 @@ where
 {
     type DataType;
     type UnitType;
-    type RelativityLevel: typenum::Unsigned;// + std::ops::Add<typenum::B1>;
+    // type RelativityLevel: typenum::Unsigned;// + std::ops::Add<typenum::B1>;
 
     // const IS_RELATIVE: bool;
     // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
@@ -154,6 +175,10 @@ where
     fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
 
+
+    make_to_type_function!(f32, to_f32);
+    make_to_type_function!(u32, to_u32);
+
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
         let a = self.x().abs();
@@ -192,7 +217,7 @@ where
 {
     type DataType = T;
     type UnitType = U;
-    type RelativityLevel = RELATIVITY_LEVEL;
+    // type RelativityLevel = RELATIVITY_LEVEL;
     // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
     // type RelativeVersionOfSelf =
     //     ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
@@ -246,6 +271,9 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
     }
     fn length(&self) -> Self::DataType {
         self.square_length().sqrt()
+    }
+    fn normalize(&self) -> Self {
+        self / self.length()
     }
 }
 

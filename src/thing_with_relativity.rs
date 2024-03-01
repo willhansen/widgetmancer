@@ -1,6 +1,6 @@
 use paste::paste;
 use std::marker::PhantomData;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 use typenum::*;
 
 use crate::utility::trait_alias_macro::trait_alias_macro;
@@ -162,19 +162,26 @@ where
     }
 }
 
-impl<THING_TYPE, RHS_TYPE, RELATIVITY_LEVEL> std::ops::Mul<RHS_TYPE>
-    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
-where
-    THING_TYPE: std::ops::Mul<RHS_TYPE>,
-    RELATIVITY_LEVEL: RelativityLevelTrait,
-{
-    type Output =
-        ThingWithRelativity<<THING_TYPE as std::ops::Mul<RHS_TYPE>>::Output, RELATIVITY_LEVEL>;
+macro_rules! impl_binary_op {
+    ($OpTrait:ident, $OpFunc:ident) => {
+        impl<THING_TYPE, RHS_TYPE, RELATIVITY_LEVEL> $OpTrait<RHS_TYPE>
+            for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
+        where
+            THING_TYPE: $OpTrait<RHS_TYPE>,
+            RELATIVITY_LEVEL: RelativityLevelTrait,
+        {
+            type Output =
+                ThingWithRelativity<<THING_TYPE as $OpTrait<RHS_TYPE>>::Output, RELATIVITY_LEVEL>;
 
-    fn mul(self, rhs: RHS_TYPE) -> Self::Output {
-        Self::Output::new(self.thing * rhs)
-    }
+            fn $OpFunc(self, rhs: RHS_TYPE) -> Self::Output {
+                Self::Output::new(self.thing.$OpFunc(rhs))
+            }
+        }
+    };
 }
+
+impl_binary_op!(Mul, mul);
+impl_binary_op!(Div, div);
 
 // TODO: Can derive? (is the phantomdata the problem?)
 impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>

@@ -290,8 +290,8 @@ pub fn half_plane_to_angled_block_character(
             snap_to_grid(snapped_points[1]),
         );
         if !three_points_are_clockwise(
-            half_plane.dividing_line().p1,
-            half_plane.dividing_line().p2,
+            half_plane.dividing_line().p1(),
+            half_plane.dividing_line().p2(),
             half_plane.point_on_half_plane(),
         ) {
             grid_line.reverse();
