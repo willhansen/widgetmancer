@@ -6,8 +6,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use typenum::Add1;
-use typenum::{self};
+use typenum::{Add1, Unsigned};
 
 use derive_more::{AddAssign, Neg};
 pub use euclid::Angle;

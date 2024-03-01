@@ -9,7 +9,7 @@ use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
+    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
 use crate::utility::coordinates::Coordinate;
 use crate::utility::line::{FloatLineTrait, Line, LineTrait};
@@ -84,7 +84,7 @@ impl Animation for BlinkAnimation {
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
         let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
-        let displacement = blink_vector * (1.0 - (-spent_seconds / time_constant).exp());
+        let displacement: WorldMove = blink_vector * (1.0 - (-spent_seconds / time_constant).exp());
 
         let distance_blinked = (start_point - end_point).length();
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
