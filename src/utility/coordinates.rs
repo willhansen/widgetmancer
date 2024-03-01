@@ -186,6 +186,7 @@ where
     // T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
     T: CoordinateDataTypeTrait,
     RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1> + Add<typenum::U1>,
+    typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned + Add<typenum::B1>,
     typenum::Sum<RELATIVITY_LEVEL, typenum::U1>: typenum::Unsigned,
     // Self: Add<Self::RelativeVersionOfSelf, Output = Self> + Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {

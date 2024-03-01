@@ -3,10 +3,14 @@ use std::marker::PhantomData;
 use std::ops::{Add, Sub};
 use typenum::*;
 
+use crate::utility::trait_alias_macro::trait_alias_macro;
+
+trait_alias_macro!(trait RelativityLevelTrait = Unsigned + Add<B1>);
+
 #[derive(Hash, Clone, Copy, Eq)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: Unsigned + Add<B1>,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     pub thing: THING_TYPE,
     pub _level_of_relativity: std::marker::PhantomData<RELATIVITY_LEVEL>,
@@ -14,7 +18,7 @@ where
 
 impl<THING_TYPE, RELATIVITY_LEVEL> ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: Unsigned + Add<B1>,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     pub fn new_thing(new_thing: THING_TYPE) -> Self {
         ThingWithRelativity {
@@ -32,7 +36,8 @@ pub trait HasRelativity {
 
 impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: typenum::Unsigned + Add<B1>,
+    RELATIVITY_LEVEL: Unsigned + Add<B1>,
+    Add1<RELATIVITY_LEVEL>: Unsigned + Add<B1>,
 {
     type RelativityLevel = RELATIVITY_LEVEL;
     type RelativeVersionOfSelf = ThingWithRelativity<T, Add1<Self::RelativityLevel>>;
@@ -53,7 +58,7 @@ macro_rules! make_op_with_relativity {
             for ThingWithRelativity<T, L_REL>
         where
             T: $OpTrait<T>,
-            L_REL: Unsigned + Add<B1>,
+            L_REL: Unsigned + Add<B1> + Add<DIFF_REL, Output = R_REL>,
             R_REL: Unsigned + Add<B1> + Sub<L_REL, Output = DIFF_REL>,
             DIFF_REL: Unsigned,
             Self: $OpTraitWithRelativity<T, DIFF_REL>,
@@ -70,9 +75,12 @@ macro_rules! impl_op_with_relativity {
         impl<T, L_REL, R_REL> $OpTraitWithRelativity<T, $rhs_rel_diff>
             for ThingWithRelativity<T, L_REL>
         where
-            L_REL: typenum::Unsigned + Add<$rhs_rel_diff, Output = R_REL> + Add<typenum::B1>,
-            R_REL: typenum::Unsigned,
-            // ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>: typenum::Unsigned,
+            L_REL: Unsigned + Add<$rhs_rel_diff, Output = R_REL> + Add<B1> + Add<U1> + Add<U0>,
+            // TODO: use meta variables for U0 and U1 here?
+            Sum<L_REL, U1>: Unsigned + Add<B1>,
+            Sum<L_REL, U0>: Unsigned + Add<B1>,
+            R_REL: Unsigned,
+            // ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>: Unsigned,
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
             fn $op_func_with_relativity(self, rhs: T) -> Self::Output {
@@ -118,7 +126,7 @@ impl<THING_TYPE, RELATIVITY_LEVEL> std::fmt::Debug
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::fmt::Debug,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -134,7 +142,7 @@ impl<THING_TYPE, RELATIVITY_LEVEL> euclid::num::Zero
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: euclid::num::Zero,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     fn zero() -> Self {
         ThingWithRelativity::new_thing(THING_TYPE::zero())
@@ -145,7 +153,7 @@ impl<THING_TYPE, RELATIVITY_LEVEL> std::ops::Neg
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::ops::Neg,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     type Output = ThingWithRelativity<<THING_TYPE as std::ops::Neg>::Output, RELATIVITY_LEVEL>;
 
@@ -158,7 +166,7 @@ impl<THING_TYPE, RHS_TYPE, RELATIVITY_LEVEL> std::ops::Mul<RHS_TYPE>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::ops::Mul<RHS_TYPE>,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     type Output =
         ThingWithRelativity<<THING_TYPE as std::ops::Mul<RHS_TYPE>>::Output, RELATIVITY_LEVEL>;
@@ -174,7 +182,7 @@ impl<THING_TYPE, RHS_THING_TYPE, RELATIVITY_LEVEL>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: std::cmp::PartialEq<RHS_THING_TYPE>,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     fn eq(&self, other: &ThingWithRelativity<RHS_THING_TYPE, RELATIVITY_LEVEL>) -> bool {
         self.thing == other.thing
@@ -184,7 +192,7 @@ impl<THING_TYPE, T, RELATIVITY_LEVEL> From<(T, T)>
     for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     THING_TYPE: From<(T, T)>,
-    RELATIVITY_LEVEL: Unsigned,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
 {
     fn from(value: (T, T)) -> Self {
         ThingWithRelativity::new(THING_TYPE::from(value))
