@@ -20,11 +20,9 @@ pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
 pub trait LineTrait: Sized + Copy {
     type PointType: Coordinate;
-    // TODO: make this more concise somehow
     type VectorType: Coordinate<
         DataType = <Self::PointType as Coordinate>::DataType,
         UnitType = <Self::PointType as Coordinate>::UnitType,
-        RelativityLevel = typenum::Add1<<Self::PointType as HasRelativity>::RelativityLevel>,
     >;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -567,7 +565,6 @@ where
     VECTOR_TYPE: Coordinate<
         DataType = <POINT_TYPE as Coordinate>::DataType,
         UnitType = <POINT_TYPE as Coordinate>::UnitType,
-        RelativityLevel = typenum::Add1<<POINT_TYPE as HasRelativity>::RelativityLevel>,
     >,
 {
     type Output = Line<POINT_TYPE>;

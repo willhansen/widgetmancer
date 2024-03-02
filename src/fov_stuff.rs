@@ -795,7 +795,7 @@ pub fn debug_print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
 }
 
 pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
-    if T::IS_RELATIVE {
+    if T::is_relative() {
         println!("Relative Squares:");
     } else {
         println!("Absolute Squares:");

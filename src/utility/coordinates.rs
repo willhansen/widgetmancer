@@ -6,7 +6,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use typenum::{Add1, Unsigned};
+use typenum::{Sum, Unsigned};
 
 use derive_more::{AddAssign, Neg};
 pub use euclid::Angle;
@@ -16,8 +16,6 @@ use ordered_float::OrderedFloat;
 use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
-
-use crate::thing_with_relativity::{HasRelativity, ThingWithRelativity};
 
 // TODO: get rid of this section
 use super::{
@@ -59,13 +57,9 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
-pub type Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, RELATIVITY_LEVEL> =
-    ThingWithRelativity<euclid::Vector2D<DATA_TYPE, UNIT_TYPE>, RELATIVITY_LEVEL>;
-
-/// Intended to be a drop-in replacement for the `euclid` equivalent
-pub type Point2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U0>;
-/// Intended to be a drop-in replacement for the `euclid` equivalent
-pub type Vector2D<DATA_TYPE, UNIT_TYPE> = Vector2DWithRelativity<DATA_TYPE, UNIT_TYPE, typenum::U1>;
+// TODO: replace these with versions that properly incorporate addition and subtraction relativity
+pub type Point2D<DATA_TYPE, UNIT_TYPE> = euclid::Point2D<DATA_TYPE, UNIT_TYPE>;
+pub type Vector2D<DATA_TYPE, UNIT_TYPE> = euclid::Vector2D<DATA_TYPE, UNIT_TYPE>;
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
@@ -86,19 +80,15 @@ where
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 // TODO: is this just a scalar?
-trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One);
+trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
-macro_rules! make_to_type_function {
-    ($the_type:ty, $func_name:ident) => {
-        fn $func_name<C>(&self) -> C
-        where
-            C: Coordinate<
-                DataType = $the_type,
-                UnitType = Self::UnitType,
-                RelativityLevel = Self::RelativityLevel,
-            >,
-        {
-            self.cast_data_type()
+macro_rules! make_cast_function {
+    ($name:ident, $data_type:ty, $coord_type:ty) => {
+        fn $name(&self) -> $coord_type {
+            <$coord_type>::new(
+                num::NumCast::from(self.x()).unwrap(),
+                num::NumCast::from(self.y()).unwrap(),
+            )
         }
     };
 }
@@ -106,9 +96,9 @@ macro_rules! make_to_type_function {
 pub trait Coordinate:
     Copy
     + PartialEq
-    // + Add<Self::RelativeVersionOfSelf, Output = Self>
-    // + Sub<Self::RelativeVersionOfSelf, Output = Self>
-    // + Sub<Self, Output = Self::RelativeVersionOfSelf>
+    + Add<Self::Relative, Output = Self>
+    + Sub<Self::Relative, Output = Self>
+    + Sub<Self, Output = Self::Relative>
     // + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     // + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
     // + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
@@ -119,18 +109,24 @@ pub trait Coordinate:
     + Debug
     + Neg<Output = Self>
     + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
-    + HasRelativity
+    // + IntoIterator + FromIterator // TODO
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
     type DataType;
     type UnitType;
-    // type RelativityLevel: typenum::Unsigned;// + std::ops::Add<typenum::B1>;
 
     // const IS_RELATIVE: bool;
     // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
-    // type RelativeVersionOfSelf;//: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+
+    // TODO: make actually relative
+    type Relative: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;//, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+    // TODO: make actually relative
+    type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;//, RelativityLevel = typenum::U0>;
     // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+
+    type Floating: Coordinate<DataType = f32, UnitType = Self::UnitType>;
+    type OnGrid: Coordinate<DataType = i32, UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
@@ -139,10 +135,8 @@ where
     // fn zero() -> Self {
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
-    fn to_point<C>(&self) -> 
-     C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = typenum::U0>
-    {
-        self.as_absolute()
+    fn to_point(&self) -> Self::Absolute {
+        Self::Absolute::new(self.x(), self.y())
     }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
@@ -162,14 +156,15 @@ where
     fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
-    fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
-    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
-    fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
-    fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
+    // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
+    // fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
+    // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
+    // fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
 
 
-    make_to_type_function!(f32, to_f32);
-    make_to_type_function!(u32, to_u32);
+    make_cast_function!(to_f32, f32, Self::Floating);
+    make_cast_function!(to_i32, i32, Self::OnGrid);
+
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
@@ -196,46 +191,50 @@ where
     }
 }
 
-impl<T, U, RELATIVITY_LEVEL> Coordinate
-    for ThingWithRelativity<euclid::Vector2D<T, U>, RELATIVITY_LEVEL>
+impl<T, U> Coordinate for Point2D<T, U>
 where
-    // TODO: trait alias
-    // T: Copy + PartialEq + euclid::num::Zero + Signed + Debug + PartialOrd + Display,
     T: CoordinateDataTypeTrait,
-    RELATIVITY_LEVEL: typenum::Unsigned + Add<typenum::B1> + Add<typenum::U1>,
-    typenum::Add1<RELATIVITY_LEVEL>: typenum::Unsigned + Add<typenum::B1>,
-    typenum::Sum<RELATIVITY_LEVEL, typenum::U1>: typenum::Unsigned,
-    // Self: Add<Self::RelativeVersionOfSelf, Output = Self> + Sub<Self::RelativeVersionOfSelf, Output = Self>,
 {
     type DataType = T;
     type UnitType = U;
-    // type RelativityLevel = RELATIVITY_LEVEL;
-    // type AbsoluteVersionOfSelf = ThingWithRelativity<Vector2D<T, U>, typenum::U0>;
-    // type RelativeVersionOfSelf =
-    //     ThingWithRelativity<euclid::Vector2D<T, U>, Add1<RELATIVITY_LEVEL>>;
-    // type RelativityComplement = $relativity_complement<T, U>;
+    type Relative = Vector2D<T, U>;
+    type Absolute = Self;
+    type Floating = Point2D<f32, U>;
+    type OnGrid = Point2D<i32, U>;
 
     fn x(&self) -> T {
-        self.thing.x
+        self.x
     }
 
     fn y(&self) -> T {
-        self.thing.y
+        self.y
     }
 
     fn new(x: T, y: T) -> Self {
-        ThingWithRelativity::new_thing(euclid::Vector2D::new(x, y))
+        point2(x, y)
+    }
+}
+impl<T, U> Coordinate for Vector2D<T, U>
+where
+    T: CoordinateDataTypeTrait,
+{
+    type DataType = T;
+    type UnitType = U;
+    type Relative = Self;
+    type Absolute = Point2D<T, U>;
+    type Floating = Vector2D<f32, U>;
+    type OnGrid = Vector2D<i32, U>;
+
+    fn x(&self) -> T {
+        self.x
     }
 
-    fn cast<C, NEW_DATA_TYPE, NEW_UNIT_TYPE, NEW_RELATIVITY_LEVEL>(&self) -> C
-    where
-        C: Coordinate<
-            DataType = NEW_DATA_TYPE,
-            UnitType = NEW_UNIT_TYPE,
-            RelativityLevel = NEW_RELATIVITY_LEVEL,
-        >,
-    {
-        todo!()
+    fn y(&self) -> T {
+        self.y
+    }
+
+    fn new(x: T, y: T) -> Self {
+        vec2(x, y)
     }
 }
 
@@ -472,16 +471,18 @@ pub fn revolve_square(
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
 }
+// TODO: convert to Coordinate::flip_y
 pub fn flip_y<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
 where
-    T: Signed,
+    T: CoordinateDataTypeTrait,
 {
     vec2(v.x, -v.y)
 }
 
+// TODO: convert to Coordinate::flip_x
 pub fn flip_x<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
 where
-    T: Signed,
+    T: CoordinateDataTypeTrait,
 {
     vec2(-v.x, v.y)
 }
@@ -880,16 +881,12 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<POINT_TYPE: FloatCoordinate>(
-    a: impl Into<POINT_TYPE>,
-    b: impl Into<POINT_TYPE>,
-    c: impl Into<POINT_TYPE>,
-) -> bool {
-    let a: POINT_TYPE = a.into();
-    let b: POINT_TYPE = b.into();
-    let c: POINT_TYPE = c.into();
-    let ab: POINT_TYPE::RelativeVersionOfSelf = b - a;
-    let ac: POINT_TYPE::RelativeVersionOfSelf = c - a;
+pub fn on_line<P: FloatCoordinate>(a: impl Into<P>, b: impl Into<P>, c: impl Into<P>) -> bool {
+    let a = a.into();
+    let b = b.into();
+    let c = c.into();
+    let ab = b - a;
+    let ac = c - a;
     ab.cross(ac) == 0.0
 }
 
@@ -898,9 +895,9 @@ pub fn on_line_in_this_order<P: FloatCoordinate>(
     b: impl Into<P>,
     c: impl Into<P>,
 ) -> bool {
-    let a: P = a.into();
-    let b: P = b.into();
-    let c: P = c.into();
+    let a = a.into();
+    let b = b.into();
+    let c = c.into();
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
