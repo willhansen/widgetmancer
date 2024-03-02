@@ -20,6 +20,12 @@ pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
 pub trait LineTrait: Sized + Copy {
     type PointType: Coordinate;
+    // TODO: make this more concise somehow
+    type VectorType: Coordinate<
+        DataType = <Self::PointType as Coordinate>::DataType,
+        UnitType = <Self::PointType as Coordinate>::UnitType,
+        RelativityLevel = typenum::Add1<<Self::PointType as HasRelativity>::RelativityLevel>,
+    >;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
@@ -52,10 +58,10 @@ pub trait LineTrait: Sized + Copy {
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,
-        direction: impl Into<<Self::PointType as HasRelativity>::RelativeVersionOfSelf>,
+        direction: impl Into<Self::VectorType>,
     ) -> Self {
         let p1: Self::PointType = point.into();
-        let v: <Self::PointType as HasRelativity>::RelativeVersionOfSelf = direction.into();
+        let v: Self::VectorType = direction.into();
         let p2: Self::PointType = p1 + v;
         Self::new_from_two_points(p1, p2)
     }
@@ -132,16 +138,11 @@ pub trait FloatLineTrait: LineTrait {
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
-    fn normal_vector_to_point(
-        &self,
-        point: impl Into<Self::PointType>,
-    ) -> <Self::PointType as HasRelativity>::RelativeVersionOfSelf {
+    fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::VectorType {
         let point = point.into();
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn normal_vector_from_origin(
-        &self,
-    ) -> <Self::PointType as HasRelativity>::RelativeVersionOfSelf {
+    fn normal_vector_from_origin(&self) -> Self::VectorType {
         -self.normal_vector_to_point((0.0, 0.0))
     }
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
@@ -560,10 +561,18 @@ impl<POINT_TYPE: Coordinate> Display for Line<POINT_TYPE> {
     }
 }
 
-impl<POINT_TYPE: Coordinate> Add<POINT_TYPE::RelativeVersionOfSelf> for Line<POINT_TYPE> {
+impl<POINT_TYPE, VECTOR_TYPE> Add<VECTOR_TYPE> for Line<POINT_TYPE>
+where
+    POINT_TYPE: Coordinate,
+    VECTOR_TYPE: Coordinate<
+        DataType = <POINT_TYPE as Coordinate>::DataType,
+        UnitType = <POINT_TYPE as Coordinate>::UnitType,
+        RelativityLevel = typenum::Add1<<POINT_TYPE as HasRelativity>::RelativityLevel>,
+    >,
+{
     type Output = Line<POINT_TYPE>;
 
-    fn add(self, rhs: POINT_TYPE::RelativeVersionOfSelf) -> Self::Output {
+    fn add(self, rhs: VECTOR_TYPE) -> Self::Output {
         Line {
             p1: self.p1 + rhs,
             p2: self.p2 + rhs,

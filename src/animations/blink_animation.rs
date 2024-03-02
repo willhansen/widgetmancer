@@ -11,7 +11,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
-use crate::utility::coordinates::Coordinate;
+use crate::utility::coordinates::{Coordinate, FloatCoordinate};
 use crate::utility::line::{FloatLineTrait, Line, LineTrait};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -60,7 +60,7 @@ impl Animation for BlinkAnimation {
         let points_per_square_blinked = 1.0;
         let point_spread_radius = 0.5;
 
-        let motion_vector = self.end_square.to_f32() - self.start_square.to_f32();
+        let motion_vector: WorldMove = self.end_square.to_f32() - self.start_square.to_f32();
         let motion_direction = motion_vector.normalize();
         let motion_distance = motion_vector.length();
 
@@ -84,7 +84,7 @@ impl Animation for BlinkAnimation {
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
         let blink_vector = self.end_square.to_f32() - self.start_square.to_f32();
-        let displacement: WorldMove = blink_vector * (1.0 - (-spent_seconds / time_constant).exp());
+        let displacement = blink_vector * (1.0 - (-spent_seconds / time_constant).exp());
 
         let distance_blinked = (start_point - end_point).length();
         let num_points = (points_per_square_blinked * distance_blinked) as u32;

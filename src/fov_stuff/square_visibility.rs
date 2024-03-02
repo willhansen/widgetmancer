@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
         let hp =
-            LocalSquareHalfPlane::new_from_vector_from_origin_to_normal_to_edge_with_origin_inside_and_the_vector_pointing_outside((1.0, 1.0)).extended(-0.1);
+            LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((1.0, 1.0)).extended(-0.1);
         let vis = SquareVisibility::new_from_visible_half_plane(hp);
         let unit_square_intersections = vis.where_border_touches_unit_square();
         assert!(vis.is_nearly_or_fully_visible(0.01));

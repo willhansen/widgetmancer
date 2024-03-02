@@ -19,6 +19,7 @@ where
 impl<THING_TYPE, RELATIVITY_LEVEL> ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
     RELATIVITY_LEVEL: RelativityLevelTrait,
+    Add1<RELATIVITY_LEVEL>: RelativityLevelTrait,
 {
     pub fn new_thing(new_thing: THING_TYPE) -> Self {
         ThingWithRelativity {
@@ -29,20 +30,35 @@ where
 }
 
 pub trait HasRelativity {
-    type RelativityLevel: Unsigned;
-    type RelativeVersionOfSelf;
-    fn relative_version_of_self(&self) -> Self::RelativeVersionOfSelf;
+    type RelativityLevel: RelativityLevelTrait;
+
+    fn is_absolute(&self) -> bool {
+        Self::RelativityLevel::to_u32() == 0
+    }
+
+    fn is_relative(&self) -> bool {
+        !self.is_absolute()
+    }
+    fn as_absolute<T>(&self) -> T
+    where
+        T: HasRelativity<RelativityLevel = U0>;
+    fn as_relative<T>(&self) -> T
+    where
+        T: HasRelativity<RelativityLevel = Add1<Self::RelativityLevel>>;
 }
 
-impl<T, RELATIVITY_LEVEL> HasRelativity for ThingWithRelativity<T, RELATIVITY_LEVEL>
+impl<THING_TYPE, RELATIVITY_LEVEL> HasRelativity
+    for ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>
 where
-    RELATIVITY_LEVEL: Unsigned + Add<B1>,
-    Add1<RELATIVITY_LEVEL>: Unsigned + Add<B1>,
+    RELATIVITY_LEVEL: RelativityLevelTrait,
+    Add1<RELATIVITY_LEVEL>: RelativityLevelTrait,
 {
     type RelativityLevel = RELATIVITY_LEVEL;
-    type RelativeVersionOfSelf = ThingWithRelativity<T, Add1<Self::RelativityLevel>>;
-    fn relative_version_of_self(&self) -> Self::RelativeVersionOfSelf {
-        Self::RelativeVersionOfSelf::new(self.thing)
+    fn as_relative(&self) -> ThingWithRelativity<THING_TYPE, Add1<RELATIVITY_LEVEL>> {
+        ThingWithRelativity::new_thing(self.thing)
+    }
+    fn as_absolute(&self) -> ThingWithRelativity<THING_TYPE, U0> {
+        ThingWithRelativity::new_thing(self.thing)
     }
 }
 
@@ -84,7 +100,7 @@ macro_rules! impl_op_with_relativity {
         {
             type Output = ThingWithRelativity<T, Sum<L_REL, $out_rel_diff>>;
             fn $op_func_with_relativity(self, rhs: T) -> Self::Output {
-                Self::Output::new(self.thing.$op_func(rhs))
+                Self::Output::new_thing(self.thing.$op_func(rhs))
             }
         }
     };

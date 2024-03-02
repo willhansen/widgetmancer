@@ -18,20 +18,6 @@ use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
 use crate::thing_with_relativity::{HasRelativity, ThingWithRelativity};
-macro_rules! make_to_type_function {
-    ($the_type:ty, $func_name:ident) => {
-        fn $func_name<C>(&self) -> C
-        where
-            C: Coordinate<
-                DataType = $the_type,
-                UnitType = Self::UnitType,
-                RelativityLevel = Self::RelativityLevel,
-            >,
-        {
-            self.cast_type()
-        }
-    };
-}
 
 // TODO: get rid of this section
 use super::{
@@ -102,6 +88,21 @@ trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output
 // TODO: is this just a scalar?
 trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One);
 
+macro_rules! make_to_type_function {
+    ($the_type:ty, $func_name:ident) => {
+        fn $func_name<C>(&self) -> C
+        where
+            C: Coordinate<
+                DataType = $the_type,
+                UnitType = Self::UnitType,
+                RelativityLevel = Self::RelativityLevel,
+            >,
+        {
+            self.cast_data_type()
+        }
+    };
+}
+
 pub trait Coordinate:
     Copy
     + PartialEq
@@ -138,19 +139,11 @@ where
     // fn zero() -> Self {
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
-    fn is_relative(&self) -> bool {
-        !self.is_absolute()
+    fn to_point<C>(&self) -> 
+     C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = typenum::U0>
+    {
+        self.as_absolute()
     }
-    fn is_absolute(&self) -> bool {
-        Self::RelativityLevel::to_u32() == 0
-    }
-    // fn as_relative(&self) -> Self::RelativeVersionOfSelf {
-
-    //     Self::RelativeVersionOfSelf::new(self.x(), self.y())
-    // }
-    // fn as_absolute(&self) -> Self::AbsoluteVersionOfSelf {
-    //     Self::AbsoluteVersionOfSelf::new(self.x(), self.y())
-    // }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
@@ -169,8 +162,8 @@ where
     fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
-    fn cast_data_type<C, T>(&self) -> C where C: Coordinate<DataType=T, UnitType=Self::UnitType, RelativityLevel = <Self as HasRelativity>::RelativityLevel>, T: num::NumCast{self.cast()}
-    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = <Self as HasRelativity>::RelativityLevel>{self.cast()}
+    fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
+    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
     fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
 
@@ -272,7 +265,10 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
         self.square_length().sqrt()
     }
     fn normalize(&self) -> Self {
-        self / self.length()
+        *self / self.length()
+    }
+    fn round(&self) -> Self {
+        Self::new(self.x().round(), self.y().round())
     }
 }
 
@@ -292,7 +288,7 @@ trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash 
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    point2(sign(point.x), sign(point.y))
+    point2(sign(point.x()), sign(point.y()))
 }
 
 pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
@@ -355,12 +351,13 @@ pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     new_v.reverse();
     new_v
 }
-// TODO: remove use of specific world square units
+#[deprecated(note = "Coordinate::king_length instead")]
 pub fn king_step_distance<U>(step: Vector2D<i32, U>) -> u32 {
-    step.x.abs().max(step.y.abs()) as u32
+    step.x().abs().max(step.y().abs()) as u32
 }
+#[deprecated(note = "Coordinate::king_length instead")]
 pub fn king_move_distance<U>(step: Vector2D<f32, U>) -> f32 {
-    step.x.abs().max(step.y.abs())
+    step.x().abs().max(step.y().abs())
 }
 
 pub fn round_to_king_step(step: WorldStep) -> WorldStep {

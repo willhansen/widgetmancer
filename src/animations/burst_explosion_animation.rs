@@ -4,6 +4,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
 };
+use crate::utility::coordinates::Coordinate;
 use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
@@ -35,7 +36,7 @@ impl Animation for BurstExplosionAnimation {
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         // rather arbitrary
-        let hash = ((self.position.x * PI + self.position.y) * 1000.0)
+        let hash = ((self.position.x() * PI + self.position.y()) * 1000.0)
             .abs()
             .floor()
             .to_u64()
