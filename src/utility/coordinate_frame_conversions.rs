@@ -3,17 +3,17 @@ use crate::piece::NStep;
 use crate::utility::*;
 
 // empty enums for euclid typing
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInWorldFrame;
 
-#[deprecated(note = "Obselete since screen rotation")]
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[deprecated(note = "Obsolete since screen rotation")]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct CharacterGridInWorldFrame;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct CharacterGridInLocalCharacterFrame;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInLocalSquareFrame;
 
 pub type RelativeWorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;

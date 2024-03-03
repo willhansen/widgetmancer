@@ -257,15 +257,34 @@ where
     }
 }
 
-impl<T, U> From<(T, T)> for Vector2D<T, U>
-where
-    Vector2D<T, U>: Coordinate,
-    T: CoordinateDataTypeTrait,
-{
-    fn from(value: (T, T)) -> Self {
-        Vector2D::new(value.0, value.1)
+macro_rules! impl_from_tuple {
+    ($type:ident) => {
+        
+        impl<T, U> From<(T, T)> for $type<T, U>
+        where
+            $type<T,U>: Coordinate<DataType = T>,
+        {
+            fn from(value: (T, T)) -> Self {
+                <$type<T,U>>::new(value.0, value.1)
+            }
+        }
     }
 }
+impl_from_tuple!(Point2D);
+impl_from_tuple!(Vector2D);
+
+macro_rules! delegate_unary{
+    ($type:ident, $trait:ident, $func:ident) => {
+        impl<T,U> $trait for $type<T,U> {
+            type Output = Self;
+            fn $func(&self) -> Self {
+                Self(self.0.$func())
+            }
+        }
+    }
+}
+delegate_unary!(Point2D, Neg, neg);
+delegate_unary!(Vector2D, Neg, neg);
 
 // TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
