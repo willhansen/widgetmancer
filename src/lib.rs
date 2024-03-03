@@ -1,6 +1,7 @@
 // #![allow(warnings)]
-// #![allow(non_snake_case)]
-#![allow(deprecated)]
+#![allow(non_snake_case)] // TODO: later
+#![allow(unused_imports)] // TODO: later
+#![allow(deprecated)] // TODO: later
 
 extern crate approx;
 extern crate core;

@@ -467,8 +467,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     fn relative_square_is_fully_visible(&self, step: impl Into<WorldStep>) -> bool {
         let step = step.into();
         let top_down_portals = self.top_down_portals_for_relative_square(step);
-        return top_down_portals.len() == 1
-            && top_down_portals[0].shape_in_exit_frame.is_fully_visible();
+        top_down_portals.len() == 1 && top_down_portals[0].shape_in_exit_frame.is_fully_visible()
     }
 
     fn relative_square_is_only_partially_visible(&self, step: impl Into<WorldStep>) -> bool {
@@ -526,7 +525,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         if portals.len() != 1 {
             panic!("no lone top-down portal");
         }
-        return portals[0].absolute_entrance_shape();
+        portals[0].absolute_entrance_shape()
     }
 
     fn absolute_top_down_portal_entrance_shapes_at_relative_square(
@@ -739,7 +738,7 @@ impl RasterizedFieldOfView {
                 &SquareVisibility::new_fully_visible(),
             )
             .unwrap();
-        return thing;
+        thing
     }
 
     fn can_see_local_relative_square(&self, rel_square: WorldStep) -> bool {
@@ -1708,8 +1707,8 @@ mod tests {
         );
     }
     #[test]
+    /// Because the local side might be hidden behind a portal
     fn test_visible_absolute_squares_only_counts_target_side_of_portal__actual_portal() {
-        /// Because the local side might be hidden behind a portal
         let test_portal = get_generic_partial_square_top_down_portal();
         let rfov =
             RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
@@ -1723,8 +1722,8 @@ mod tests {
         assert!(visible_absolute_squares.contains(&test_portal.target_square()));
     }
     #[test]
+    /// Because the local side might be hidden behind a portal
     fn test_visible_absolute_squares_only_counts_target_side_of_portal__direct_local_connection() {
-        /// Because the local side might be hidden behind a portal
         let rfov = RasterizedFieldOfView::new_with_one_fully_visible_local_square(
             (3, 4, STEP_RIGHT),
             (5, 5),
@@ -1739,9 +1738,9 @@ mod tests {
         assert!(visible_absolute_squares.contains(&test_portal.target_square()));
     }
     #[test]
+    /// Because the local side might be hidden behind a portal
     fn test_visible_absolute_squares_only_counts_target_side_of_portal__local_connection_and_portal_sharing_square(
     ) {
-        /// Because the local side might be hidden behind a portal
         let test_portal = get_generic_partial_square_top_down_portal();
         let mut rfov =
             RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);

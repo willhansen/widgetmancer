@@ -22,12 +22,10 @@ use euclid::{vec2, Angle};
 use itertools::*;
 
 use crate::glyph::glyph_constants::{FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, WHITE};
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
-use crate::graphics::drawable::{
-    Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
-};
+use crate::glyph::DoubleGlyphFunctions;
+use crate::graphics::drawable::{Drawable, DrawableEnum, SolidColorDrawable, TextDrawable};
 use crate::graphics::Graphics;
-use crate::portal_geometry::{Portal, PortalGeometry};
+use crate::portal_geometry::PortalGeometry;
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -864,19 +862,22 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph_constants::{RED, SPACE};
     #[allow(non_snake_case)]
+    use crate::glyph_constants::{RED, SPACE};
+    use crate::graphics::drawable::PartialVisibilityDrawable;
+    use crate::portal_geometry::Portal;
     use crate::utility::poses::faces_away_from_center_at_rel_square;
+    use crate::DoubleGlyph;
     use euclid::point2;
     use itertools::Itertools;
-    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
-    use pretty_assertions::{assert_eq, assert_ne};
-    use rgb::RGB8;
+    use ntest::{assert_about_eq, assert_false, assert_true};
+    use pretty_assertions::assert_eq;
+
     use std::f32::consts::PI;
 
     use crate::glyph::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
-        angled_block_char_to_snap_points_map, angled_block_flip_y, SnapGridPoint,
+        angled_block_flip_y,
     };
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
@@ -885,7 +886,9 @@ mod tests {
         STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
-    use self::square_visibility::SquareVisibilityFromOneLargeShadow;
+    use self::square_visibility::{
+        RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,
+    };
 
     use super::*;
 
@@ -1094,7 +1097,7 @@ mod tests {
         )
         .rasterized();
         let visible_rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
-        assert!(fov_result.relative_square_is_fully_visible((visible_rel_square + STEP_LEFT)));
+        assert!(fov_result.relative_square_is_fully_visible(visible_rel_square + STEP_LEFT));
         assert!(fov_result.relative_square_is_fully_visible(visible_rel_square));
     }
 
