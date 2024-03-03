@@ -59,12 +59,12 @@ pub type FAngle = Angle<f32>;
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket?
 // TODO: replace these with versions that properly incorporate addition and subtraction relativity
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
-// pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
-// pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
+// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+// pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
+// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+// pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
+pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
+pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
@@ -257,49 +257,49 @@ where
     }
 }
 
-macro_rules! impl_from_tuple {
-    ($type:ident) => {
-        
-        impl<T, U> From<(T, T)> for $type<T, U>
-        where
-            $type<T,U>: Coordinate<DataType = T>,
-        {
-            fn from(value: (T, T)) -> Self {
-                <$type<T,U>>::new(value.0, value.1)
-            }
-        }
-    }
-}
-impl_from_tuple!(Point2D);
-impl_from_tuple!(Vector2D);
+// TODO: uncomment when newtyping Vector2D and Point2D
+// macro_rules! impl_from_tuple {
+//     ($type:ident) => {
+//         impl<T, U> From<(T, T)> for $type<T, U>
+//         where
+//             $type<T,U>: Coordinate<DataType = T>,
+//         {
+//             fn from(value: (T, T)) -> Self {
+//                 <$type<T,U>>::new(value.0, value.1)
+//             }
+//         }
+//     }
+// }
+// impl_from_tuple!(Point2D);
+// impl_from_tuple!(Vector2D);
 
-macro_rules! delegate_unary{
-    ($type:ident, $trait:ident, $func:ident) => {
-        impl<T,U> $trait for $type<T,U> {
-            type Output = Self;
-            fn $func(&self) -> Self {
-                Self(self.0.$func())
-            }
-        }
-    }
-}
-delegate_unary!(Point2D, Neg, neg);
-delegate_unary!(Vector2D, Neg, neg);
+// macro_rules! delegate_unary{
+//     ($type:ident, $trait:ident, $func:ident) => {
+//         impl<T,U> $trait for $type<T,U> {
+//             type Output = Self;
+//             fn $func(&self) -> Self {
+//                 Self(self.0.$func())
+//             }
+//         }
+//     }
+// }
+// delegate_unary!(Point2D, Neg, neg);
+// delegate_unary!(Vector2D, Neg, neg);
 
-macro_rules! delegate_asymmetric_binary{
-    ($type:ident, $trait:ident, $func:ident) => {
-        impl<T,U> $trait<T> for $type<T,U> {
-            type Output = Self;
-            fn $func(&self, rhs: T) -> Self {
-                Self($func(self.0, rhs))
-            }
-        }
-    }
-}
-delegate_asymmetric_binary!(Point2D, Mul, mul);
-delegate_asymmetric_binary!(Vector2D, Mul, mul);
-delegate_asymmetric_binary!(Point2D, Div, div);
-delegate_asymmetric_binary!(Vector2D, Div, div);
+// macro_rules! delegate_asymmetric_binary{
+//     ($type:ident, $trait:ident, $func:ident) => {
+//         impl<T,U> $trait<T> for $type<T,U> {
+//             type Output = Self;
+//             fn $func(&self, rhs: T) -> Self {
+//                 Self($func(self.0, rhs))
+//             }
+//         }
+//     }
+// }
+// delegate_asymmetric_binary!(Point2D, Mul, mul);
+// delegate_asymmetric_binary!(Vector2D, Mul, mul);
+// delegate_asymmetric_binary!(Point2D, Div, div);
+// delegate_asymmetric_binary!(Vector2D, Div, div);
 
 // TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
@@ -331,6 +331,9 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
     }
     fn round(&self) -> Self {
         Self::new(self.x().round(), self.y().round())
+    }
+    fn from_angle_and_length(angle: Angle<f32>, length: f32) -> Self {
+        Self::new(length * angle.radians.cos(), length * angle.radians.sin())
     }
 }
 
@@ -466,7 +469,10 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> Vector2D<f32, euclid::UnknownUnit> {
+pub fn seeded_rand_radial_offset(
+    rng: &mut StdRng,
+    radius: f32,
+) -> Vector2D<f32, euclid::UnknownUnit> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
         v.x = rng.gen_range(-1.0..=1.0);
@@ -487,22 +493,22 @@ pub fn unit_vector_from_angle(angle: Angle<f32>) -> FVector {
     vec2(angle.radians.cos(), angle.radians.sin())
 }
 
-pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
+// TODO: convert to FloatCoordinate method
+pub fn rotate_vect<V: FloatCoordinate>(vector: V, delta_angle: Angle<f32>) -> V {
     if vector.length() == 0.0 {
         return vector;
     }
     let start_angle = better_angle_from_x_axis(vector);
     let new_angle = start_angle + delta_angle;
-    Vector2D::<f32, U>::from_angle_and_length(new_angle, vector.length())
+    V::from_angle_and_length(new_angle, vector.length())
 }
 pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32, U> {
     point2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
 }
 // TODO: remember the reason for this existing (there IS a good reason)
 // related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
-pub fn better_angle_from_x_axis<U>(v: impl Into<Vector2D<f32, U>>) -> Angle<f32> {
-    let v = v.into();
-    Angle::radians(v.y.atan2(v.x))
+pub fn better_angle_from_x_axis<V: FloatCoordinate>(v: V) -> Angle<f32> {
+    Angle::radians(v.y().atan2(v.x()))
 }
 
 pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
@@ -936,23 +942,13 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<P: FloatCoordinate>(a: impl Into<P>, b: impl Into<P>, c: impl Into<P>) -> bool {
-    let a = a.into();
-    let b = b.into();
-    let c = c.into();
+pub fn on_line<P: FloatCoordinate>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == 0.0
 }
 
-pub fn on_line_in_this_order<P: FloatCoordinate>(
-    a: impl Into<P>,
-    b: impl Into<P>,
-    c: impl Into<P>,
-) -> bool {
-    let a = a.into();
-    let b = b.into();
-    let c = c.into();
+pub fn on_line_in_this_order<P: FloatCoordinate>(a: P, b: P, c: P) -> bool {
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 

@@ -1153,7 +1153,7 @@ mod tests {
     fn square_visibility_from_block_and_square(
         block_square: WorldStep,
         shadowed_square: WorldStep,
-    ) -> Option<SquareVisibilityFromOneLargeShadow> {
+    ) -> SquareVisibilityFromOneLargeShadow {
         SquareVisibility::from_relative_square_and_view_arc(
             PartialAngleInterval::from_relative_square(block_square).complement(),
             shadowed_square,
@@ -1164,7 +1164,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_1() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)),
             )
             .to_glyphs(),
         );
@@ -1174,7 +1174,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_2() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)),
             )
             .to_glyphs(),
         );
@@ -1184,7 +1184,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_3() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)).unwrap(),
+                square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)),
             )
             .to_glyphs(),
         );
@@ -1194,13 +1194,13 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_4() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)),
             )
             .to_glyphs(),
         );
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, -3)),
             )
             .to_glyphs(),
         );
@@ -1212,7 +1212,7 @@ mod tests {
         for i in 0..30 {
             assert_shadow_is_horizontally_continuous(
                 PartialVisibilityDrawable::from_square_visibility(
-                    square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)).unwrap(),
+                    square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)),
                 )
                 .to_glyphs(),
             );
@@ -1223,12 +1223,11 @@ mod tests {
     fn test_vertical_shadow_symmetry() {
         let block_square = STEP_RIGHT * 3;
         let above_glyphs = PartialVisibilityDrawable::from_square_visibility(
-            square_visibility_from_block_and_square(block_square, block_square + STEP_UP).unwrap(),
+            square_visibility_from_block_and_square(block_square, block_square + STEP_UP),
         )
         .to_glyphs();
         let below_glyphs = PartialVisibilityDrawable::from_square_visibility(
-            square_visibility_from_block_and_square(block_square, block_square + STEP_DOWN)
-                .unwrap(),
+            square_visibility_from_block_and_square(block_square, block_square + STEP_DOWN),
         )
         .to_glyphs();
         assert_eq!(
@@ -1275,7 +1274,6 @@ mod tests {
                 assert_eq!(
                     PartialVisibilityDrawable::from_square_visibility(
                         square_visibility_from_block_and_square(block_square, shadow_square)
-                            .unwrap()
                     )
                     .to_glyphs()
                     .to_clean_string(),
@@ -1584,7 +1582,7 @@ mod tests {
 
         let visibility =
             SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
-        assert!(visibility.unwrap().is_fully_visible());
+        assert!(visibility.is_fully_visible());
     }
 
     #[test]
@@ -1595,7 +1593,7 @@ mod tests {
 
         let visibility =
             SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
-        assert!(visibility.is_none());
+        assert!(visibility.is_not_visible());
     }
 
     #[test]
@@ -1603,9 +1601,7 @@ mod tests {
         let square = vec2(1, -2);
         let arc = PartialAngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
         assert!(
-            SquareVisibility::from_relative_square_and_view_arc(arc, square)
-                .unwrap()
-                .is_fully_visible()
+            SquareVisibility::from_relative_square_and_view_arc(arc, square).is_fully_visible()
         );
     }
 
@@ -2044,7 +2040,7 @@ mod tests {
             the_square_visibility
                 .visible_portion()
                 .unwrap()
-                .dividing_line()
+                .dividing_line
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0
@@ -2202,8 +2198,7 @@ mod tests {
             PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
             STEP_ZERO
         )
-        .is_none())
-        // .is_some_and(|vis| vis.is_fully_visible()))
+        .is_not_visible())
     }
     #[test]
     fn test_rasterize_one_view_segment() {

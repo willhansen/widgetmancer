@@ -12,12 +12,12 @@ use crate::utility::coordinates::{
 };
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
-use crate::utility::line::{FloatLineTrait, LineTrait};
+use crate::utility::line::{UndirectedFloatLineTrait, UndirectedLineTrait};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::relative_interval_location::RelativeIntervalLocation;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,
-    HalfPlane, Line, QuarterTurnRotatable, QuarterTurnsCcw, WorldLine, STEP_ZERO,
+    HalfPlane, QuarterTurnRotatable, QuarterTurnsCcw, TwoDifferentPoints, WorldLine, STEP_ZERO,
 };
 use derive_more::Constructor;
 use euclid::{point2, Angle};
@@ -50,7 +50,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
-    ) -> Option<SquareVisibility>;
+    ) -> SquareVisibility;
 
     // other
     fn overlaps(&self, other: Self, tolerance: f32) -> bool;
@@ -107,7 +107,7 @@ impl SquareVisibilityFromOneLargeShadow {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
         Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
-            Line::new_from_two_points(
+            TwoDifferentPoints::new_from_two_points(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)
@@ -217,7 +217,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             let shadow_arc = partial_view_arc.complement();
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
-            let shadow_line_from_center: WorldLine = Line::new_from_two_points(
+            let shadow_line_from_center: WorldLine = TwoDifferentPoints::new_from_two_points(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(overlapped_shadow_edge.angle())
                     .to_point()
@@ -466,7 +466,7 @@ mod tests {
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(
             HalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                TwoDifferentPoints::new_from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
                 point2(-12.061038, -1.3054879),
             ),
         );
@@ -487,7 +487,7 @@ mod tests {
     }
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = Line::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line = TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
@@ -554,13 +554,13 @@ mod tests {
     fn test_square_visibility_overlap__simple_non_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.4),
+                TwoDifferentPoints::new_horizontal(0.4),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.3),
+                TwoDifferentPoints::new_horizontal(0.3),
                 (0.0, -1.0),
             ),
         );
@@ -572,13 +572,13 @@ mod tests {
     fn test_square_visibility_overlap__simple_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(-0.3),
+                TwoDifferentPoints::new_horizontal(-0.3),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.2),
+                TwoDifferentPoints::new_horizontal(0.2),
                 (0.0, -1.0),
             ),
         );

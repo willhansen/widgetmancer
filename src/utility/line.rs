@@ -10,13 +10,13 @@ use super::{
     trait_alias_macro::trait_alias_macro,
 };
 
-pub type WorldLine = Line<WorldPoint>;
-pub type WorldSquareLine = Line<WorldSquare>;
-pub type LocalSquareLine = Line<Point2D<f32, SquareGridInLocalSquareFrame>>;
-pub type LocalCharacterLine = Line<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
-pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
+pub type WorldLine = TwoDifferentPoints<WorldPoint>;
+pub type WorldSquareLine = TwoDifferentPoints<WorldSquare>;
+pub type LocalSquareLine = TwoDifferentPoints<Point2D<f32, SquareGridInLocalSquareFrame>>;
+pub type LocalCharacterLine = TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
+pub type FloatingPointLine = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait: Sized + Copy {
+pub trait UndirectedLineTrait: Sized + Copy {
     type PointType: Coordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -29,7 +29,7 @@ pub trait LineTrait: Sized + Copy {
 
     fn from_other_line<OtherLine>(other_line: OtherLine) -> Self
     where
-        OtherLine: LineTrait<PointType = Self::PointType>,
+        OtherLine: UndirectedLineTrait<PointType = Self::PointType>,
     {
         let [p1, p2] = other_line.two_different_arbitrary_points_on_line();
         Self::new_from_two_points(p1, p2)
@@ -116,13 +116,13 @@ pub trait LineTrait: Sized + Copy {
 }
 
 // TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
-pub trait FloatLineTrait: LineTrait {
-    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool
-    where
-        Self::PointType: FloatCoordinate,
-    {
+pub trait UndirectedFloatLineTrait: UndirectedLineTrait
+where
+    Self::PointType: FloatCoordinate,
+{
+    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        on_line(p1, p2, point)
+        on_line(p1, p2, point.into())
     }
     fn point_is_approx_on_line(&self, point: Self::PointType, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
@@ -435,20 +435,20 @@ pub trait FloatLineTrait: LineTrait {
         self.intersection_point_with_other_extended_line(&other)
     }
 }
-impl<L> FloatLineTrait for L
+impl<L> UndirectedFloatLineTrait for L
 where
-    L: LineTrait,
-    <L as LineTrait>::PointType: FloatCoordinate,
+    L: UndirectedLineTrait,
+    <L as UndirectedLineTrait>::PointType: FloatCoordinate,
 {
 }
 
-pub trait LineWithDirectionTrait<PointType>: LineTrait<PointType = PointType> {
-    fn p1(&self) -> PointType;
-    fn p2(&self) -> PointType;
+pub trait DirectedLineTrait: UndirectedLineTrait {
+    fn p1(&self) -> Self::PointType;
+    fn p2(&self) -> Self::PointType;
     fn reverse(&mut self) {
         mem::swap(&mut self.p2, &mut self.p1);
     }
-    fn get_point_by_index(&self, index: u32) -> PointType {
+    fn get_point_by_index(&self, index: u32) -> Self::PointType {
         match index {
             0 => self.p1.clone(),
             1 => self.p2.clone(),
@@ -458,31 +458,37 @@ pub trait LineWithDirectionTrait<PointType>: LineTrait<PointType = PointType> {
     fn reversed(&self) -> Self {
         Self::new_from_two_points(self.p2, self.p1)
     }
-    fn to_array(&self) -> [PointType; 2] {
+    fn to_array(&self) -> [Self::PointType; 2] {
         [self.p1, self.p2]
     }
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct Line<PointType: Coordinate> {
+pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
     p2: PointType,
 }
 
-impl<PointType: Coordinate> LineTrait for Line<PointType> {
-    type PointType = PointType;
-    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
+impl<P: Coordinate> TwoDifferentPoints<P> {
+    fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert_ne!(p1, p2);
-        Line { p1, p2 }
+        TwoDifferentPoints { p1, p2 }
+    }
+}
+
+impl<PointType: Coordinate> UndirectedLineTrait for TwoDifferentPoints<PointType> {
+    type PointType = PointType;
+    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
+        TwoDifferentPoints::new(p1, p2)
     }
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
 // TODO: Default line struct should not have direction
-impl<PointType: Coordinate> LineWithDirectionTrait<PointType> for Line<PointType> {
+impl<PointType: Coordinate> DirectedLineTrait for TwoDifferentPoints<PointType> {
     fn p1(&self) -> PointType {
         self.p1
     }
@@ -492,16 +498,16 @@ impl<PointType: Coordinate> LineWithDirectionTrait<PointType> for Line<PointType
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct LineThroughUnitSquare<PointType: FloatCoordinate>(Line<PointType>);
+pub struct LineThroughUnitSquare<PointType: FloatCoordinate>(TwoDifferentPoints<PointType>);
 
-impl<PointType: FloatCoordinate> LineTrait for LineThroughUnitSquare<PointType> {
+impl<PointType: FloatCoordinate> UndirectedLineTrait for LineThroughUnitSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert!(p1.on_centered_unit_square());
         assert!(p2.on_centered_unit_square());
-        Self(Line::new_from_two_points(p1, p2))
+        Self(TwoDifferentPoints::new_from_two_points(p1, p2))
     }
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
@@ -509,7 +515,7 @@ impl<PointType: FloatCoordinate> LineTrait for LineThroughUnitSquare<PointType> 
     }
 }
 
-impl<PointType: Coordinate> QuarterTurnRotatable for Line<PointType> {
+impl<PointType: Coordinate> QuarterTurnRotatable for TwoDifferentPoints<PointType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let new_points = self
@@ -522,7 +528,7 @@ impl<PointType: Coordinate> QuarterTurnRotatable for Line<PointType> {
 }
 
 impl<PointType: Coordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
-    for Line<PointType>
+    for TwoDifferentPoints<PointType>
 where
     CanBePointType: Into<PointType>,
 {
@@ -531,14 +537,20 @@ where
     }
 }
 
-impl<P: FloatCoordinate> From<LineThroughUnitSquare<P>> for Line<P> {
+// TODO: Can generalize to any line from any line?
+impl<P: FloatCoordinate> From<LineThroughUnitSquare<P>> for TwoDifferentPoints<P> {
     fn from(value: LineThroughUnitSquare<P>) -> Self {
+        Self::from_other_line(value)
+    }
+}
+impl<P: FloatCoordinate> From<TwoDifferentPoints<P>> for LineThroughUnitSquare<P> {
+    fn from(value: TwoDifferentPoints<P>) -> Self {
         Self::from_other_line(value)
     }
 }
 
 // TODO: move to the FloatLineTrait trait
-impl<PointType: FloatCoordinate> Line<PointType> {}
+impl<PointType: FloatCoordinate> TwoDifferentPoints<PointType> {}
 impl WorldLine {
     pub fn touched_squares(&self) -> Vec<WorldSquare> {
         let start_square = world_point_to_world_square(self.p1);
@@ -550,7 +562,7 @@ impl WorldLine {
     }
 }
 
-impl<PointType: Coordinate> Debug for Line<PointType> {
+impl<PointType: Coordinate> Debug for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -565,20 +577,20 @@ impl<PointType: Coordinate> Debug for Line<PointType> {
         )
     }
 }
-impl<PointType: Coordinate> Display for Line<PointType> {
+impl<PointType: Coordinate> Display for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
     }
 }
 
-impl<PointType> Add<<PointType as Coordinate>::Relative> for Line<PointType>
+impl<PointType> Add<<PointType as Coordinate>::Relative> for TwoDifferentPoints<PointType>
 where
     PointType: Coordinate,
 {
-    type Output = Line<PointType>;
+    type Output = TwoDifferentPoints<PointType>;
 
     fn add(self, rhs: <PointType as Coordinate>::Relative) -> Self::Output {
-        Line {
+        TwoDifferentPoints {
             p1: self.p1 + rhs,
             p2: self.p2 + rhs,
         }
@@ -685,10 +697,11 @@ mod tests {
     use super::*;
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new_from_two_points(point2(-1.5, -1.0), point2(0.0, 0.0));
+        let input_line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            TwoDifferentPoints::new_from_two_points(point2(-1.5, -1.0), point2(0.0, 0.0));
         let output_points = input_line.line_intersections_with_centered_unit_square();
-        let output_line = Line::new_from_two_points(output_points[0], output_points[1]);
+        let output_line =
+            TwoDifferentPoints::new_from_two_points(output_points[0], output_points[1]);
         let in_vec = input_line.p2 - input_line.p1;
         let out_vec = output_line.p2 - output_line.p1;
 
@@ -699,8 +712,8 @@ mod tests {
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
     ) {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new_from_two_points(point2(-0.5, -0.5), point2(-0.5, 0.5));
+        let input_line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            TwoDifferentPoints::new_from_two_points(point2(-0.5, -0.5), point2(-0.5, 0.5));
         let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(input_line.p1, output_points[0]);
         assert_eq!(input_line.p2, output_points[1]);
@@ -708,19 +721,20 @@ mod tests {
 
     #[test]
     fn test_same_side_of_line__vertical_line() {
-        let line = Line::new_from_two_points(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
+        let line =
+            TwoDifferentPoints::new_from_two_points(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
         assert_false!(line.same_side_of_line(neg_point, origin))
     }
     #[test]
     fn test_check_line_intersection_with_standard_square() {
-        let line: WorldLine = Line::new_horizontal(5.0);
+        let line: WorldLine = TwoDifferentPoints::new_horizontal(5.0);
         assert_false!(line.line_intersects_with_centered_unit_square());
     }
     #[test]
     fn test_line_intersections__observed_3_intersections() {
-        Line::new_from_two_points(
+        TwoDifferentPoints::new_from_two_points(
             WorldPoint::new(-29.5, 5.0),
             WorldPoint::new(-27.589872, 4.703601),
         )
@@ -728,7 +742,10 @@ mod tests {
     }
     #[test]
     fn test_line_point_reflection() {
-        let line = Line::new_from_two_points(WorldPoint::new(1.0, 5.0), WorldPoint::new(2.4, 5.0));
+        let line = TwoDifferentPoints::new_from_two_points(
+            WorldPoint::new(1.0, 5.0),
+            WorldPoint::new(2.4, 5.0),
+        );
 
         assert_about_eq!(
             line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
@@ -741,7 +758,10 @@ mod tests {
     }
     #[test]
     fn test_same_side_of_line() {
-        let line = Line::<_, WorldPoint>::new_from_two_points(point2(1.0, 1.0), point2(2.0, 1.0));
+        let line = TwoDifferentPoints::<_, WorldPoint>::new_from_two_points(
+            point2(1.0, 1.0),
+            point2(2.0, 1.0),
+        );
         let low = point2(0.0, 0.0);
         let low2 = point2(9.0, 0.3);
         let high = point2(0.0, 10.0);
@@ -763,15 +783,18 @@ mod tests {
     }
     #[test]
     fn test_horizontal_line_intersection_with_square() {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new_from_two_points(point2(0.5, 0.0), point2(-1.5, 0.0));
+        let input_line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            TwoDifferentPoints::new_from_two_points(point2(0.5, 0.0), point2(-1.5, 0.0));
         let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
     }
     #[test]
     fn test_orthogonal_line_intersects_with_expanded_square() {
         let per_side_extension = 0.01;
-        let fs: [fn(f32) -> Line<f32>; 2] = [Line::new_horizontal, Line::new_vertical];
+        let fs: [fn(f32) -> TwoDifferentPoints<f32>; 2] = [
+            TwoDifferentPoints::new_horizontal,
+            TwoDifferentPoints::new_vertical,
+        ];
         fs.into_iter().for_each(|f| {
             let exact_line = f(0.5);
             let closer_line = f(0.5 - per_side_extension / 2.0);
@@ -797,8 +820,8 @@ mod tests {
 
     #[test]
     fn test_vertical_line_intersection_with_square() {
-        let input_line: Line<f32, SquareGridInWorldFrame> =
-            Line::new_from_two_points(point2(0.0, 0.5), point2(0.0, -1.5));
+        let input_line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.5), point2(0.0, -1.5));
         let output_points = input_line.line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
     }
@@ -1131,7 +1154,7 @@ mod tests {
         let y = 0.2;
 
         let expected_points = [(0.5, y), (-0.5, y)];
-        let intersections = Line::<f32>::new_horizontal(y)
+        let intersections = TwoDifferentPoints::<f32>::new_horizontal(y)
             .line_intersections_with_centered_unit_square_with_tolerance(0.1);
         assert_eq!(intersections.len(), expected_points.len());
         expected_points
@@ -1145,7 +1168,7 @@ mod tests {
         let tolerance = 0.1;
 
         let expected_points = [(0.5, y), (-0.5, y)];
-        let intersections = Line::<f32>::new_horizontal(y)
+        let intersections = TwoDifferentPoints::<f32>::new_horizontal(y)
             .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
         assert_eq!(intersections.len(), expected_points.len());
         expected_points
@@ -1158,7 +1181,7 @@ mod tests {
         let tolerance = 0.0;
 
         let expected_points = [(0.5, y), (-0.5, y)];
-        let intersections = Line::<f32>::new_horizontal(y)
+        let intersections = TwoDifferentPoints::<f32>::new_horizontal(y)
             .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
         assert_eq!(intersections.len(), expected_points.len());
         expected_points
@@ -1172,7 +1195,7 @@ mod tests {
         let tolerance = 0.1;
 
         let expected_points = [(0.5, 0.5), (-0.5, 0.5)];
-        let intersections = Line::<f32>::new_horizontal(y)
+        let intersections = TwoDifferentPoints::<f32>::new_horizontal(y)
             .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
         assert_eq!(intersections.len(), expected_points.len());
         expected_points
@@ -1185,14 +1208,15 @@ mod tests {
         let y = 0.7;
         let tolerance = 0.1;
 
-        let intersections = Line::<f32>::new_horizontal(y)
+        let intersections = TwoDifferentPoints::<f32>::new_horizontal(y)
             .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
         assert!(intersections.is_empty());
     }
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner__within_tolerance(
     ) {
-        let line: Line<f32> = Line::new_from_two_points((0.49, 0.5), (0.5, 0.49));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::new_from_two_points((0.49, 0.5), (0.5, 0.49));
         let tolerance = 0.1;
 
         let expected_points = [(0.49, 0.5), (0.5, 0.49)];
@@ -1205,7 +1229,8 @@ mod tests {
     }
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner_exact() {
-        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.5), (1.0, -1.0));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::from_point_and_direction((0.5, 0.5), (1.0, -1.0));
         let tolerance = 0.1;
 
         let expected_points = [(0.5, 0.5)];
@@ -1219,7 +1244,8 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__within_tolerance(
     ) {
-        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
         let tolerance = 0.1;
         let expected_points = [(0.5, 0.5)];
 
@@ -1233,7 +1259,8 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__outside_tolerance(
     ) {
-        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
         let tolerance = 0.0001;
 
         let intersections =
@@ -1243,7 +1270,8 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__all_corners_within_tolerance(
     ) {
-        let line: Line<f32> = Line::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
         let tolerance = 100.0;
         let expected_points = [(0.5, 0.5)];
 
@@ -1257,7 +1285,7 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_parallel__all_corners_within_tolerance(
     ) {
-        let line: Line<f32> = Line::new_horizontal(0.7);
+        let line: TwoDifferentPoints<f32> = TwoDifferentPoints::new_horizontal(0.7);
         let tolerance = 100.0;
         let expected_points = [(-0.5, 0.5), (0.5, 0.5)];
 
@@ -1271,7 +1299,8 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_almost_parallel__all_corners_within_tolerance(
     ) {
-        let line: Line<f32> = Line::from_point_and_direction((0.0, 0.52), (1.0, 0.0001));
+        let line: TwoDifferentPoints<f32> =
+            TwoDifferentPoints::from_point_and_direction((0.0, 0.52), (1.0, 0.0001));
         let tolerance = 100.0;
         let expected_points = [(-0.5, 0.5)];
 

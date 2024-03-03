@@ -3,7 +3,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::circular_interval::circular_merging;
 use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep, STEP_LEFT};
 use crate::utility::coordinates::*;
-use crate::utility::line::FloatLineTrait;
+use crate::utility::line::UndirectedFloatLineTrait;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
     better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
@@ -164,11 +164,11 @@ impl AngleBasedVisibleSegment {
             ),
             last_square,
         );
-        return if first_square == 0 {
+        if first_square == 0 {
             segment
         } else {
             segment.with_start_face((first_square as i32, 0, STEP_LEFT))
-        };
+        }
     }
     pub fn with_weakly_applied_start_face(
         &self,
@@ -295,8 +295,7 @@ impl AngleBasedVisibleSegment {
             .map(|rel_square| {
                 (
                     rel_square,
-                    SquareVisibility::from_relative_square_and_view_arc(self.arc, rel_square)
-                        .unwrap(),
+                    SquareVisibility::from_relative_square_and_view_arc(self.arc, rel_square),
                 )
                 //TODO: change shadow type
                 // SquareVisibilityFromPointSource::from_single_visible_arc(

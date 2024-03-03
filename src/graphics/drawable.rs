@@ -130,7 +130,7 @@ impl PartialVisibilityDrawable {
         note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
     )]
     pub fn from_square_visibility(square_viz: SquareVisibility) -> Self {
-        assert!(!square_viz.is_fully_visible());
+        assert!(square_viz.is_only_partially_visible());
         PartialVisibilityDrawable {
             visibility: square_viz,
             fg_color: GREEN,              // TODO: no default color
@@ -574,7 +574,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use crate::utility::{TwoDifferentPoints, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -617,7 +617,7 @@ mod tests {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
+                TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
                 point2(0.0, 25.0),
             ),
         );
