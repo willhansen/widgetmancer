@@ -1,22 +1,15 @@
-use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
-use euclid::{point2, vec2, Angle};
+use euclid::vec2;
 use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
 
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    WorldStep,
 };
-use crate::utility::coordinates::{
-    better_angle_from_x_axis, is_king_step, is_orthodiagonal, rotate_vect, KingWorldStep,
-};
-
-use crate::utility::KING_STEPS;
+use crate::utility::coordinates::{better_angle_from_x_axis, rotate_vect, KingWorldStep};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -96,7 +89,6 @@ impl Animation for SpearAttackAnimation {
 #[cfg(test)]
 mod tests {
     use euclid::point2;
-    use ntest::timeout;
 
     use crate::utility::STEP_RIGHT;
 

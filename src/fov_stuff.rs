@@ -3,8 +3,7 @@ pub mod fence;
 pub mod rasterized_field_of_view;
 pub mod square_visibility;
 
-use std::backtrace::Backtrace;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 

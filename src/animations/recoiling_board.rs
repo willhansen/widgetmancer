@@ -1,21 +1,16 @@
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
-
-use euclid::Length;
-use rgb::RGB8;
-
-use crate::animations::static_board::StaticBoard;
 use crate::animations::Animation;
 use crate::glyph::Glyph;
-use crate::graphics::{FloorColorEnum, Graphics};
+use crate::graphics::FloorColorEnum;
 use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
 use crate::utility::coordinates::{
-    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, OrthogonalWorldStep,
-    RIGHT_I,
+    is_diagonal_king_step, round_to_king_step, OrthogonalWorldStep, RIGHT_I,
 };
+use euclid::Length;
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
@@ -73,7 +68,7 @@ impl RecoilingBoardAnimation {
         }
 
         let duration = end_time - start_time;
-        normalized_cos_ease_in_and_out(((age - start_time) / duration)) * start_height
+        normalized_cos_ease_in_and_out((age - start_time) / duration) * start_height
     }
 
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {

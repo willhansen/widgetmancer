@@ -1,14 +1,12 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::BLACK;
 use crate::glyph::Glyph;
-use crate::graphics::{FloorColorEnum, Graphics};
+use crate::graphics::FloorColorEnum;
 use crate::utility::coordinate_frame_conversions::{
     world_square_to_left_world_character_square, BoardSize, WorldCharacterSquareGlyphMap,
     WorldSquare,
 };
 use euclid::vec2;
-use rgb::RGB8;
-use std::time;
 use std::time::{Duration, Instant};
 
 #[derive(Clone)]
