@@ -5,8 +5,6 @@ use line_drawing::Supercover;
 use num::{One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
-use crate::thing_with_relativity::HasRelativity;
-
 use super::{
     coordinate_frame_conversions::*, coordinates::*, general_utility::*, get_new_rng, poses::*,
     trait_alias_macro::trait_alias_macro,
@@ -20,10 +18,6 @@ pub type FloatingPointLine = Line<Point2D<f32, euclid::UnknownUnit>>;
 
 pub trait LineTrait: Sized + Copy {
     type PointType: Coordinate;
-    type VectorType: Coordinate<
-        DataType = <Self::PointType as Coordinate>::DataType,
-        UnitType = <Self::PointType as Coordinate>::UnitType,
-    >;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
@@ -56,11 +50,11 @@ pub trait LineTrait: Sized + Copy {
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,
-        direction: impl Into<Self::VectorType>,
+        direction: impl Into<<Self::PointType as Coordinate>::Relative>,
     ) -> Self {
-        let p1: Self::PointType = point.into();
-        let v: Self::VectorType = direction.into();
-        let p2: Self::PointType = p1 + v;
+        let p1 = point.into();
+        let v = direction.into();
+        let p2 = p1 + v;
         Self::new_from_two_points(p1, p2)
     }
     fn is_orthogonal(&self) -> bool {
@@ -136,11 +130,14 @@ pub trait FloatLineTrait: LineTrait {
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
-    fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::VectorType {
+    fn normal_vector_to_point(
+        &self,
+        point: impl Into<Self::PointType>,
+    ) -> <Self::PointType as Coordinate>::Relative {
         let point = point.into();
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn normal_vector_from_origin(&self) -> Self::VectorType {
+    fn normal_vector_from_origin(&self) -> <Self::PointType as Coordinate>::Relative {
         -self.normal_vector_to_point((0.0, 0.0))
     }
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
@@ -244,7 +241,8 @@ pub trait FloatLineTrait: LineTrait {
 
         if c_on_line {
             return if d_on_line { true } else { false };
-        } else if d_on_line {
+        }
+        if d_on_line {
             return false;
         }
 
@@ -402,7 +400,7 @@ pub trait FloatLineTrait: LineTrait {
         }
         let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
         let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
-        return Some(point2(final_x, final_y));
+        Some(point2(final_x, final_y))
     }
 
     fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<Self::PointType> {
@@ -436,13 +434,13 @@ where
 {
 }
 
-pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> {
-    fn p1(&self) -> POINT_TYPE;
-    fn p2(&self) -> POINT_TYPE;
+pub trait LineWithDirectionTrait<PointType>: LineTrait<PointType = PointType> {
+    fn p1(&self) -> PointType;
+    fn p2(&self) -> PointType;
     fn reverse(&mut self) {
         mem::swap(&mut self.p2, &mut self.p1);
     }
-    fn get_point_by_index(&self, index: u32) -> POINT_TYPE {
+    fn get_point_by_index(&self, index: u32) -> PointType {
         match index {
             0 => self.p1.clone(),
             1 => self.p2.clone(),
@@ -452,45 +450,45 @@ pub trait LineWithDirectionTrait<POINT_TYPE>: LineTrait<PointType = POINT_TYPE> 
     fn reversed(&self) -> Self {
         Self::new_from_two_points(self.p2, self.p1)
     }
-    fn to_array(&self) -> [POINT_TYPE; 2] {
+    fn to_array(&self) -> [PointType; 2] {
         [self.p1, self.p2]
     }
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct Line<POINT_TYPE: Coordinate> {
-    p1: POINT_TYPE,
-    p2: POINT_TYPE,
+pub struct Line<PointType: Coordinate> {
+    p1: PointType,
+    p2: PointType,
 }
 
-impl<POINT_TYPE: Coordinate> LineTrait for Line<POINT_TYPE> {
-    type PointType = POINT_TYPE;
-    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
+impl<PointType: Coordinate> LineTrait for Line<PointType> {
+    type PointType = PointType;
+    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert_ne!(p1, p2);
         Line { p1, p2 }
     }
-    fn two_different_arbitrary_points_on_line(&self) -> [POINT_TYPE; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
 // TODO: Default line struct should not have direction
-impl<POINT_TYPE: Coordinate> LineWithDirectionTrait<POINT_TYPE> for Line<POINT_TYPE> {
-    fn p1(&self) -> POINT_TYPE {
+impl<PointType: Coordinate> LineWithDirectionTrait<PointType> for Line<PointType> {
+    fn p1(&self) -> PointType {
         self.p1
     }
-    fn p2(&self) -> POINT_TYPE {
+    fn p2(&self) -> PointType {
         self.p2
     }
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct LineThroughUnitSquare<POINT_TYPE: FloatCoordinate>(Line<POINT_TYPE>);
+pub struct LineThroughUnitSquare<PointType: FloatCoordinate>(Line<PointType>);
 
-impl<POINT_TYPE: FloatCoordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE> {
-    type PointType = POINT_TYPE;
-    fn new_from_two_points(p1: impl Into<POINT_TYPE>, p2: impl Into<POINT_TYPE>) -> Self {
+impl<PointType: FloatCoordinate> LineTrait for LineThroughUnitSquare<PointType> {
+    type PointType = PointType;
+    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert!(p1.on_centered_unit_square());
@@ -498,12 +496,12 @@ impl<POINT_TYPE: FloatCoordinate> LineTrait for LineThroughUnitSquare<POINT_TYPE
         Self(Line::new_from_two_points(p1, p2))
     }
 
-    fn two_different_arbitrary_points_on_line(&self) -> [POINT_TYPE; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         self.0.two_different_arbitrary_points_on_line()
     }
 }
 
-impl<POINT_TYPE: Coordinate> QuarterTurnRotatable for Line<POINT_TYPE> {
+impl<PointType: Coordinate> QuarterTurnRotatable for Line<PointType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let new_points = self
@@ -515,18 +513,18 @@ impl<POINT_TYPE: Coordinate> QuarterTurnRotatable for Line<POINT_TYPE> {
     }
 }
 
-impl<POINT_TYPE: Coordinate, CAN_BE_POINT_TYPE> From<(CAN_BE_POINT_TYPE, CAN_BE_POINT_TYPE)>
-    for Line<POINT_TYPE>
+impl<PointType: Coordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
+    for Line<PointType>
 where
-    CAN_BE_POINT_TYPE: Into<POINT_TYPE>,
+    CanBePointType: Into<PointType>,
 {
-    fn from(value: (CAN_BE_POINT_TYPE, CAN_BE_POINT_TYPE)) -> Self {
+    fn from(value: (CanBePointType, CanBePointType)) -> Self {
         Self::new_from_two_points(value.0, value.1)
     }
 }
 
 // TODO: move to the FloatLineTrait trait
-impl<POINT_TYPE: FloatCoordinate> Line<POINT_TYPE> {}
+impl<PointType: FloatCoordinate> Line<PointType> {}
 impl WorldLine {
     pub fn touched_squares(&self) -> Vec<WorldSquare> {
         let start_square = world_point_to_world_square(self.p1);
@@ -538,7 +536,7 @@ impl WorldLine {
     }
 }
 
-impl<POINT_TYPE: Coordinate> Debug for Line<POINT_TYPE> {
+impl<PointType: Coordinate> Debug for Line<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -553,23 +551,19 @@ impl<POINT_TYPE: Coordinate> Debug for Line<POINT_TYPE> {
         )
     }
 }
-impl<POINT_TYPE: Coordinate> Display for Line<POINT_TYPE> {
+impl<PointType: Coordinate> Display for Line<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
     }
 }
 
-impl<POINT_TYPE, VECTOR_TYPE> Add<VECTOR_TYPE> for Line<POINT_TYPE>
+impl<PointType> Add<<PointType as Coordinate>::Relative> for Line<PointType>
 where
-    POINT_TYPE: Coordinate,
-    VECTOR_TYPE: Coordinate<
-        DataType = <POINT_TYPE as Coordinate>::DataType,
-        UnitType = <POINT_TYPE as Coordinate>::UnitType,
-    >,
+    PointType: Coordinate,
 {
-    type Output = Line<POINT_TYPE>;
+    type Output = Line<PointType>;
 
-    fn add(self, rhs: VECTOR_TYPE) -> Self::Output {
+    fn add(self, rhs: <PointType as Coordinate>::Relative) -> Self::Output {
         Line {
             p1: self.p1 + rhs,
             p2: self.p2 + rhs,
