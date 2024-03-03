@@ -58,19 +58,27 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 pub type FAngle = Angle<f32>;
 
 // TODO: replace these with versions that properly incorporate addition and subtraction relativity
-pub type Point2D<DATA_TYPE, UNIT_TYPE> = euclid::Point2D<DATA_TYPE, UNIT_TYPE>;
-pub type Vector2D<DATA_TYPE, UNIT_TYPE> = euclid::Vector2D<DATA_TYPE, UNIT_TYPE>;
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+pub struct Point2D<DATA_TYPE, UNIT_TYPE>(euclid::Point2D<DATA_TYPE, UNIT_TYPE>);
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+pub struct Vector2D<DATA_TYPE, UNIT_TYPE>(euclid::Vector2D<DATA_TYPE, UNIT_TYPE>);
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub fn point2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Point2D<DATA_TYPE, UNIT_TYPE>
+pub const fn point2<DATA_TYPE, UNIT_TYPE>(
+    x: DATA_TYPE,
+    y: DATA_TYPE,
+) -> Point2D<DATA_TYPE, UNIT_TYPE>
 where
     DATA_TYPE: CoordinateDataTypeTrait,
 {
     Point2D::new(x, y)
 }
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub fn vec2<DATA_TYPE, UNIT_TYPE>(x: DATA_TYPE, y: DATA_TYPE) -> Vector2D<DATA_TYPE, UNIT_TYPE>
+pub const fn vec2<DATA_TYPE, UNIT_TYPE>(
+    x: DATA_TYPE,
+    y: DATA_TYPE,
+) -> Vector2D<DATA_TYPE, UNIT_TYPE>
 where
     DATA_TYPE: CoordinateDataTypeTrait,
 {
@@ -116,14 +124,11 @@ where
     type DataType;
     type UnitType;
 
-    // const IS_RELATIVE: bool;
-    // type AbsoluteVersionOfSelf: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType, RelativityLevel = typenum::U0>;
-
     // TODO: make actually relative
-    type Relative: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;//, RelativityLevel = typenum::Add1<Self::RelativityLevel>>;
+    type Relative: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
     // TODO: make actually relative
-    type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;//, RelativityLevel = typenum::U0>;
-    // type RelativityComplement: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    const IS_ABSOLUTE: bool;
 
     type Floating: Coordinate<DataType = f32, UnitType = Self::UnitType>;
     type OnGrid: Coordinate<DataType = i32, UnitType = Self::UnitType>;
@@ -165,6 +170,13 @@ where
     make_cast_function!(to_f32, f32, Self::Floating);
     make_cast_function!(to_i32, i32, Self::OnGrid);
 
+    fn is_absolute() -> bool {
+        Self::IS_ABSOLUTE;
+    }
+    fn is_relative(&self) -> bool {
+        !self.is_absolute()
+    }
+
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
@@ -201,6 +213,7 @@ where
     type Absolute = Self;
     type Floating = Point2D<f32, U>;
     type OnGrid = Point2D<i32, U>;
+    const IS_ABSOLUTE: bool = true;
 
     fn x(&self) -> T {
         self.x
@@ -213,6 +226,7 @@ where
     fn new(x: T, y: T) -> Self {
         point2(x, y)
     }
+
 }
 impl<T, U> Coordinate for Vector2D<T, U>
 where
@@ -224,6 +238,7 @@ where
     type Absolute = Point2D<T, U>;
     type Floating = Vector2D<f32, U>;
     type OnGrid = Vector2D<i32, U>;
+    const IS_ABSOLUTE: bool = false;
 
     fn x(&self) -> T {
         self.x

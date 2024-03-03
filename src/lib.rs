@@ -1,5 +1,6 @@
-#![allow(warnings)]
-#![allow(non_snake_case)]
+// #![allow(warnings)]
+// #![allow(non_snake_case)]
+#![allow(deprecated)]
 
 extern crate approx;
 extern crate core;
