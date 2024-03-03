@@ -174,6 +174,13 @@ where
         !self.is_absolute()
     }
 
+    fn as_absolute(&self) -> Self::Absolute {
+        Self::Absolute::new(self.x(), self.y())
+    }
+    fn as_relative(&self) -> Self::Relative {
+        Self::Relative::new(self.x(), self.y())
+    }
+
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
@@ -334,6 +341,10 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
     }
     fn from_angle_and_length(angle: Angle<f32>, length: f32) -> Self {
         Self::new(length * angle.radians.cos(), length * angle.radians.sin())
+    }
+
+    fn rotate_around_point(&self, axis_point: Self, angle: Angle<f32>) -> Self {
+        axis_point + rotate_vect(*self - axis_point, angle)
     }
 }
 
@@ -685,13 +696,6 @@ impl From<KingWorldStep> for OrthogonalWorldStep {
     fn from(value: KingWorldStep) -> Self {
         OrthogonalWorldStep::new(value.step)
     }
-}
-pub fn rotate_point_around_point<U>(
-    axis_point: Point2D<f32, U>,
-    moving_point: Point2D<f32, U>,
-    angle: Angle<f32>,
-) -> Point2D<f32, U> {
-    axis_point + rotate_vect(moving_point - axis_point, angle)
 }
 
 pub fn cross_correlate_squares_with_steps(

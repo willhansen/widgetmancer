@@ -151,24 +151,8 @@ where
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
         self.normal_vector_to_point(point).length()
     }
-    fn a_point_clockwise_of_line(&self) -> Self::PointType {
-        rotate_point_around_point(self.p1, self.p2, Angle::radians(-PI / 2.0))
-    }
-    fn a_point_anticlockwise_of_line(&self) -> Self::PointType {
-        rotate_point_around_point(self.p1, self.p2, Angle::radians(PI / 2.0))
-    }
-    fn a_point_right_of_line(&self) -> Self::PointType {
-        self.a_point_clockwise_of_line()
-    }
-    fn a_point_left_of_line(&self) -> Self::PointType {
-        self.a_point_anticlockwise_of_line()
-    }
-    fn lerp(&self, t: f32) -> Self::PointType {
-        lerp2d(self.p1, self.p2, t)
-    }
     fn point_is_on_or_normal_to_line_segment(&self, point: Self::PointType) -> bool {
-        let start_point = self.p1;
-        let end_point = self.p2;
+        let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
         let point_relative_to_start_point = point - start_point;
         let end_point_relative_to_start_point = end_point - start_point;
@@ -180,24 +164,6 @@ where
             point_relative_to_end_point.dot(-end_point_relative_to_start_point) > 0.0;
 
         point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
-    }
-
-    fn approx_eq_eps(&self, other: Self, tolerance: f32) -> bool {
-        let p11 = self
-            .p1
-            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
-        let p22 = self
-            .p2
-            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
-        let p12 = self
-            .p1
-            .approx_eq_eps(&other.p2, &point2(tolerance, tolerance));
-        let p21 = self
-            .p2
-            .approx_eq_eps(&other.p1, &point2(tolerance, tolerance));
-
-        // don't care about point order
-        (p11 && p22) || (p12 && p21)
     }
 
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
@@ -455,11 +421,34 @@ pub trait DirectedLineTrait: UndirectedLineTrait {
             _ => panic!("only two points defining the line"),
         }
     }
+    fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
+    where
+        OtherLine: DirectedLineTrait<PointType = Self::PointType>,
+    {
+        Self::new_from_two_points(other.p1(), other.p2())
+    }
     fn reversed(&self) -> Self {
         Self::new_from_two_points(self.p2, self.p1)
     }
     fn to_array(&self) -> [Self::PointType; 2] {
         [self.p1, self.p2]
+    }
+    fn a_point_clockwise_of_line(&self) -> Self::PointType {
+        self.p2()
+            .rotate_around_point(self.p1(), Angle::radians(-PI / 2.0))
+    }
+    fn a_point_anticlockwise_of_line(&self) -> Self::PointType {
+        self.p2()
+            .rotate_around_point(self.p1(), Angle::radians(PI / 2.0))
+    }
+    fn a_point_right_of_line(&self) -> Self::PointType {
+        self.a_point_clockwise_of_line()
+    }
+    fn a_point_left_of_line(&self) -> Self::PointType {
+        self.a_point_anticlockwise_of_line()
+    }
+    fn lerp(&self, t: f32) -> Self::PointType {
+        lerp2d(self.p1(), self.p2(), t)
     }
 }
 
@@ -480,6 +469,16 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
 #[derive(Clone, Copy, PartialEq)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
 impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Option<Self> {
+        let p1 = p1.into();
+        let p2 = p2.into();
+        let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
+        if points_are_valid {
+            Some(Self::new(p1, p2))
+        } else {
+            None
+        }
+    }
     fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
@@ -498,7 +497,6 @@ impl<PointType: Coordinate> UndirectedLineTrait for TwoDifferentPoints<PointType
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
-// TODO: Default line struct should not have direction
 impl<PointType: Coordinate> DirectedLineTrait for TwoDifferentPoints<PointType> {
     fn p1(&self) -> PointType {
         self.p1
@@ -557,12 +555,17 @@ where
 // TODO: Can generalize to any line from any line?
 impl<P: FloatCoordinate> From<TwoDifferentPointsOnCenteredUnitSquare<P>> for TwoDifferentPoints<P> {
     fn from(value: TwoDifferentPointsOnCenteredUnitSquare<P>) -> Self {
-        Self::from_other_line(value)
+        value.0
     }
 }
-impl<P: FloatCoordinate> From<TwoDifferentPoints<P>> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn from(value: TwoDifferentPoints<P>) -> Self {
-        Self::from_other_line(value)
+
+impl<P: FloatCoordinate> TryFrom<TwoDifferentPoints<P>>
+    for TwoDifferentPointsOnCenteredUnitSquare<P>
+{
+    type Error = ();
+
+    fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
+        Self::try_new(value.p1, value.p2).ok_or(())
     }
 }
 

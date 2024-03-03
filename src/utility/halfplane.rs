@@ -18,6 +18,11 @@ impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedLineTrait,
 {
+    pub fn new_from_directed_line(line: impl DirectedLineTrait) -> Self {
+        Self {
+            dividing_line: LineType::from_other_directed_line(line),
+        }
+    }
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl UndirectedLineTrait,
         point_on_half_plane: impl Into<LineType::PointType>,
@@ -314,6 +319,18 @@ where
     }
 }
 
+impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>>
+    for HalfPlane<TwoDifferentPoints<P>>
+{
+    type Error = ();
+
+    fn try_from(
+        value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>,
+    ) -> Result<Self, Self::Error> {
+        Self::new_from_directed_line(value.dividing_line.try_into()?)
+    }
+}
+
 impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferentPoints<PointType>> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
@@ -322,6 +339,19 @@ impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferent
         let new_point = point.quarter_rotated_ccw(quarter_turns_ccw);
         let new_line = line.quarter_rotated_ccw(quarter_turns_ccw);
         Self::new_from_line_and_point_on_half_plane(new_line, new_point)
+    }
+
+    #[cfg(all())]
+    fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
+    where
+        Self: Sized + Debug,
+    {
+        (0..4)
+            .into_iter()
+            .map(|i| self.quarter_rotated_ccw(i))
+            .collect_vec()
+            .try_into()
+            .unwrap()
     }
 }
 #[cfg(test)]
