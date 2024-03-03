@@ -167,13 +167,14 @@ where
     }
 
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
-        self.point_is_approx_on_line(other.p1, tolerance)
-            && self.point_is_approx_on_line(other.p2, tolerance)
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)
     }
 
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
-        let angle_a = better_angle_from_x_axis(self.p1 - self.p2);
-        let angle_b = better_angle_from_x_axis(self.p2 - self.p1);
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let angle_a = better_angle_from_x_axis(p1 - p2);
+        let angle_b = better_angle_from_x_axis(p2 - p1);
         if angle_a.radians.cos() < 0.0 {
             angle_b
         } else {
@@ -182,17 +183,15 @@ where
     }
 
     fn reflect_point_over_line(&self, point: impl Into<Self::PointType>) -> Self::PointType {
-        let p1_to_p = point.into() - self.p1;
-        let p1_to_p2 = self.p2 - self.p1;
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let p1_to_p = point.into() - p1;
+        let p1_to_p2 = p2 - p1;
         let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
         let perpendicular_part = p1_to_p - parallel_part;
         let p1_to_reflected_p = parallel_part - perpendicular_part;
-        self.p1 + p1_to_reflected_p
+        p1 + p1_to_reflected_p
     }
 
-    fn direction(&self) -> Angle<f32> {
-        better_angle_from_x_axis(self.p2 - self.p1)
-    }
     fn parallel_directions(&self) -> [Angle<f32>; 2] {
         [
             better_angle_from_x_axis(self.p2 - self.p1),
@@ -412,12 +411,12 @@ pub trait DirectedLineTrait: UndirectedLineTrait {
     fn p1(&self) -> Self::PointType;
     fn p2(&self) -> Self::PointType;
     fn reverse(&mut self) {
-        mem::swap(&mut self.p2, &mut self.p1);
+        mem::swap(&mut self.p2(), &mut self.p1());
     }
     fn get_point_by_index(&self, index: u32) -> Self::PointType {
         match index {
-            0 => self.p1.clone(),
-            1 => self.p2.clone(),
+            0 => self.p1(),
+            1 => self.p2(),
             _ => panic!("only two points defining the line"),
         }
     }
@@ -449,6 +448,9 @@ pub trait DirectedLineTrait: UndirectedLineTrait {
     }
     fn lerp(&self, t: f32) -> Self::PointType {
         lerp2d(self.p1(), self.p2(), t)
+    }
+    fn direction(&self) -> Angle<f32> {
+        better_angle_from_x_axis(self.p2() - self.p1())
     }
 }
 

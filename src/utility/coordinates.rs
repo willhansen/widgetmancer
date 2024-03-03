@@ -513,8 +513,8 @@ pub fn rotate_vect<V: FloatCoordinate>(vector: V, delta_angle: Angle<f32>) -> V 
     let new_angle = start_angle + delta_angle;
     V::from_angle_and_length(new_angle, vector.length())
 }
-pub fn lerp2d<U>(a: Point2D<f32, U>, b: Point2D<f32, U>, t: f32) -> Point2D<f32, U> {
-    point2(lerp(a.x, b.x, t), lerp(a.y, b.y, t))
+pub fn lerp2d<P: FloatCoordinate>(a: P, b: P, t: f32) -> P {
+    P::new(lerp(a.x(), b.x(), t), lerp(a.y(), b.y(), t))
 }
 // TODO: remember the reason for this existing (there IS a good reason)
 // related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
