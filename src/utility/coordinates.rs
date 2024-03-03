@@ -286,6 +286,21 @@ macro_rules! delegate_unary{
 delegate_unary!(Point2D, Neg, neg);
 delegate_unary!(Vector2D, Neg, neg);
 
+macro_rules! delegate_asymmetric_binary{
+    ($type:ident, $trait:ident, $func:ident) => {
+        impl<T,U> $trait<T> for $type<T,U> {
+            type Output = Self;
+            fn $func(&self, rhs: T) -> Self {
+                Self($func(self.0, rhs))
+            }
+        }
+    }
+}
+delegate_asymmetric_binary!(Point2D, Mul, mul);
+delegate_asymmetric_binary!(Vector2D, Mul, mul);
+delegate_asymmetric_binary!(Point2D, Div, div);
+delegate_asymmetric_binary!(Vector2D, Div, div);
+
 // TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
 // TODO: convert to auto trait when stable
