@@ -59,12 +59,12 @@ pub type FAngle = Angle<f32>;
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket?
 // TODO: replace these with versions that properly incorporate addition and subtraction relativity
-// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-// pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
-// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-// pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
-pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
-pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
+// pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
+// pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
@@ -249,6 +249,15 @@ where
     }
 }
 
+impl<T, C> From<(T, T)> for C
+where
+    C: Coordinate<DataType = T>,
+{
+    fn from(value: (T, T)) -> Self {
+        C::new(value.0, value.1)
+    }
+}
+
 // TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
 // TODO: convert to auto trait when stable
@@ -414,7 +423,7 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> euclid::default::Vector2D<f32> {
+pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> Vector2D<f32, UnknownUnit> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
         v.x = rng.gen_range(-1.0..=1.0);
@@ -625,6 +634,7 @@ where
         OrthogonalWorldStep::new(value)
     }
 }
+
 
 impl From<OrthogonalWorldStep> for WorldStep {
     fn from(value: OrthogonalWorldStep) -> Self {

@@ -312,7 +312,7 @@ where
     }
 }
 
-impl<POINT_TYPE: FloatCoordinate> QuarterTurnRotatable for HalfPlane<Line<POINT_TYPE>> {
+impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<Line<PointType>> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
