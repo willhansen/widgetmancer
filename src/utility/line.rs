@@ -27,6 +27,14 @@ pub trait LineTrait: Sized + Copy {
         self.two_different_arbitrary_points_on_line()[0]
     }
 
+    fn from_other_line<OtherLine>(other_line: OtherLine) -> Self
+    where
+        OtherLine: LineTrait<PointType = Self::PointType>,
+    {
+        let [p1, p2] = other_line.two_different_arbitrary_points_on_line();
+        Self::new_from_two_points(p1, p2)
+    }
+
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
         Self::new_from_two_points(
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
@@ -520,6 +528,12 @@ where
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
         Self::new_from_two_points(value.0, value.1)
+    }
+}
+
+impl<P: FloatCoordinate> From<LineThroughUnitSquare<P>> for Line<P> {
+    fn from(value: LineThroughUnitSquare<P>) -> Self {
+        Self::from_other_line(value)
     }
 }
 

@@ -60,30 +60,24 @@ pub type FAngle = Angle<f32>;
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket?
 // TODO: replace these with versions that properly incorporate addition and subtraction relativity
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-// pub struct Point2D<DATA_TYPE, UNIT_TYPE>(euclid::Point2D<DATA_TYPE, UNIT_TYPE>);
+// pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-// pub struct Vector2D<DATA_TYPE, UNIT_TYPE>(euclid::Vector2D<DATA_TYPE, UNIT_TYPE>);
-pub type Point2D<DATA_TYPE, UNIT_TYPE> = euclid::Point2D<DATA_TYPE, UNIT_TYPE>;
-pub type Vector2D<DATA_TYPE, UNIT_TYPE> = euclid::Vector2D<DATA_TYPE, UNIT_TYPE>;
+// pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
+pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
+pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub const fn point2<DATA_TYPE, UNIT_TYPE>(
-    x: DATA_TYPE,
-    y: DATA_TYPE,
-) -> Point2D<DATA_TYPE, UNIT_TYPE>
+pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>
 where
-    DATA_TYPE: CoordinateDataTypeTrait,
+    DataType: CoordinateDataTypeTrait,
 {
     Point2D::new(x, y)
 }
 /// Intended to be a drop-in replacement for the `euclid` equivalent
-pub const fn vec2<DATA_TYPE, UNIT_TYPE>(
-    x: DATA_TYPE,
-    y: DATA_TYPE,
-) -> Vector2D<DATA_TYPE, UNIT_TYPE>
+pub const fn vec2<DataType, UnitType>(x: DataType, y: DataType) -> Vector2D<DataType, UnitType>
 where
-    DATA_TYPE: CoordinateDataTypeTrait,
+    DataType: CoordinateDataTypeTrait,
 {
     Vector2D::new(x, y)
 }
@@ -173,8 +167,8 @@ where
     make_cast_function!(to_f32, f32, Self::Floating);
     make_cast_function!(to_i32, i32, Self::OnGrid);
 
-    fn is_absolute() -> bool {
-        Self::IS_ABSOLUTE;
+    fn is_absolute(&self) -> bool {
+        Self::IS_ABSOLUTE
     }
     fn is_relative(&self) -> bool {
         !self.is_absolute()
@@ -289,8 +283,8 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
 }
 
 // TODO: convert to auto trait when stable
-impl<COORDINATE_TYPE> FloatCoordinate for COORDINATE_TYPE where
-    COORDINATE_TYPE: Coordinate<DataType = f32>
+impl<CoordinateType> FloatCoordinate for CoordinateType where
+    CoordinateType: Coordinate<DataType = f32>
 {
 }
 
@@ -318,8 +312,9 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
         .unwrap()
 }
 
-pub fn get_8_octant_transforms_of<POINT_TYPE: Coordinate>(v: POINT_TYPE) -> Vec<POINT_TYPE> {
-    let transpose = POINT_TYPE::new(v.y(), v.x());
+// TODO: make a coordinate method
+pub fn get_8_octant_transforms_of<PointType: Coordinate>(v: PointType) -> Vec<PointType> {
+    let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
         .map(|x| x.quadrant_rotations_going_ccw())
@@ -751,7 +746,7 @@ impl QuarterTurnsCcw {
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
-    pub fn rotate_vector<POINT_TYPE: Coordinate>(&self, v: POINT_TYPE) -> POINT_TYPE {
+    pub fn rotate_vector<PointType: Coordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns)
     }
 }

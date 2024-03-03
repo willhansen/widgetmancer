@@ -61,7 +61,7 @@ pub fn get_smooth_horizontal_chars_for_floating_square(pos: FPoint) -> Vec<Vec<O
         }
     }
 
-    return output;
+    output
 }
 pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
     let width = 3;
@@ -81,7 +81,7 @@ pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Opt
             ));
         }
     }
-    return output;
+    output
 }
 
 pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
@@ -96,14 +96,14 @@ pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<ch
             let y = j as i32 - 1;
             let square = point2(x, y);
             if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                let character = square_with_half_step_offset((grid_offset - square.to_f32()));
+                let character = square_with_half_step_offset(grid_offset - square.to_f32());
                 if character != ' ' {
                     output[i][j] = Some(character);
                 }
             }
         }
     }
-    return output;
+    output
 }
 
 pub fn square_with_half_step_offset(offset: FVector) -> char {
@@ -321,7 +321,7 @@ mod tests {
     use ntest::timeout;
 
     #[test]
-    
+
     fn test_colored_square_with_half_step_offsets() {
         assert_eq!(
             square_with_half_step_offset(vec2(0.0, 0.0)),
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_glyph_when_rounding_to_zero_for_both_axes() {
         let test_pos = point2(-0.24, 0.01);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_half_step_up_for_y() {
         let test_pos = point2(0.24, 0.26);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -414,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_up_for_y() {
         let test_pos = point2(0.24, 0.25);
 
@@ -431,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_down_for_y() {
         let test_pos = point2(-0.2, -0.25);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -447,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_right_for_x() {
         let test_pos = point2(0.3, 0.1);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_left_for_x() {
         let test_pos = point2(-0.3, 0.2);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -481,7 +481,7 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    
+
     fn test_character_square_horizontal_offset__base_case() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, 0.0),
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__round_to_zero() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.001),
@@ -504,14 +504,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__out_of_range() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.5), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.5), SPACE);
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__halfway() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.5),
@@ -524,14 +524,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__match_opposite_ends() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.0), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.0), SPACE);
     }
 
     #[test]
-    
+
     fn test_eighths_1d_offset() {
         assert_eq!(
             character_for_half_square_with_1d_eighths_offset(false, 0),
@@ -556,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_2d_square_offset() {
         assert_eq!(
             character_for_half_square_with_2d_offset(vec2(0.0, 0.0)),
@@ -583,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_chars_for_floating_square__at_origin() {
         let chars = character_map_for_full_square_at_point(point2(0.0, 0.0));
         assert_eq!(chars.len(), 3);
@@ -592,7 +592,7 @@ mod tests {
         assert_eq!(chars.get(&point2(1, 0)), Some(&LEFT_HALF_BLOCK));
     }
     #[test]
-    
+
     fn test_chars_for_floating_square__at_square_center() {
         let chars = character_map_for_full_square_at_point(point2(0.5, 0.0));
         assert_eq!(chars.len(), 2);
@@ -600,7 +600,7 @@ mod tests {
         assert_eq!(chars.get(&point2(1, 0)), Some(&FULL_BLOCK));
     }
     #[test]
-    
+
     fn test_offset_full_square() {
         let f = characters_for_full_square_with_1d_offset;
         assert_eq!(f(STEP_UP.into(), 0.5), [UPPER_HALF_BLOCK; 2], "Basic up");
@@ -655,7 +655,7 @@ mod tests {
         );
     }
     #[test]
-    
+
     fn test_one_third_height_single_character() {
         assert_eq!(
             character_for_half_square_with_1d_offset(true, 2.0 / 3.0),
@@ -675,7 +675,7 @@ mod tests {
         );
     }
     #[test]
-    
+
     fn test_offset_full_square_looping() {
         let f = characters_for_full_square_with_looping_1d_offset;
         for i in 0..20 {
@@ -702,7 +702,7 @@ mod tests {
         assert_eq!(f(STEP_LEFT.into(), 1.25), [SPACE, RIGHT_HALF_BLOCK]);
     }
     #[test]
-    
+
     fn test_characters_for_full_square_with_2d_offset() {
         let f = characters_for_full_square_with_2d_offset;
         KING_STEPS

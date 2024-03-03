@@ -1,5 +1,3 @@
-use crate::thing_with_relativity::HasRelativity;
-
 use super::{
     bool_with_partial::*, coordinate_frame_conversions::*, coordinates::*, general_utility::*,
     line::*, relative_interval_location::*,
@@ -8,22 +6,22 @@ use super::{
 pub type LocalSquareHalfPlane = HalfPlane<LineThroughUnitSquare<LocalSquarePoint>>;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<LINE_TYPE = FloatingPointLine>
+pub struct HalfPlane<LineType = FloatingPointLine>
 where
-    LINE_TYPE: LineTrait,
+    LineType: LineTrait,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
-    dividing_line: LINE_TYPE,
+    dividing_line: LineType,
 }
 
-impl<LINE_TYPE> HalfPlane<LINE_TYPE>
+impl<LineType> HalfPlane<LineType>
 where
-    LINE_TYPE: LineTrait, //<POINT_TYPE>,
-                          //     POINT_TYPE: FloatCoordinate, // LINE_TYPE::PointType = POINT_TYPE,
+    LineType: LineTrait, //<POINT_TYPE>,
+                         //     POINT_TYPE: FloatCoordinate, // LineType::PointType = POINT_TYPE,
 {
     pub fn new_from_line_and_point_on_half_plane(
-        can_be_dividing_line: impl Into<LINE_TYPE>,
-        point_on_half_plane: impl Into<LINE_TYPE::PointType>,
+        can_be_dividing_line: impl Into<LineType>,
+        point_on_half_plane: impl Into<LineType::PointType>,
     ) -> Self {
         let dividing_line = can_be_dividing_line.into();
         HalfPlane {
@@ -39,8 +37,8 @@ where
         }
     }
     pub fn new_from_line_and_point_off_half_plane(
-        can_be_dividing_line: impl Into<LINE_TYPE>,
-        point_on_half_plane: impl Into<LINE_TYPE::PointType>,
+        can_be_dividing_line: impl Into<LineType>,
+        point_on_half_plane: impl Into<LineType::PointType>,
     ) -> Self {
         let line = can_be_dividing_line.into();
         let point_off = point_on_half_plane.into();
@@ -50,35 +48,35 @@ where
         Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
     }
     pub fn new_from_border_line_with_origin_outside(
-        can_be_dividing_line: impl Into<LINE_TYPE>,
+        can_be_dividing_line: impl Into<LineType>,
     ) -> Self {
-        let line: LINE_TYPE = can_be_dividing_line.into();
+        let line: LineType = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     pub fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
-        vector_to_outside: impl Into<LINE_TYPE::VectorType>,
+        vector_to_outside: impl Into<<LineType::PointType as Coordinate>::Relative>,
     ) -> Self {
         let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
-            LINE_TYPE::PointType::zero() + vector_to_outside,
+            LineType::PointType::zero() + vector_to_outside,
             -vector_to_outside,
         )
     }
     pub fn new_from_border_line_with_origin_inside(
-        can_be_dividing_line: impl Into<LINE_TYPE>,
+        can_be_dividing_line: impl Into<LineType>,
     ) -> Self {
-        let line: LINE_TYPE = can_be_dividing_line.into();
+        let line: LineType = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, (0.0, 0.0))
     }
     pub fn new_from_point_on_border_and_vector_pointing_inside(
-        point_on_border: impl Into<LINE_TYPE::PointType>,
-        normal_direction_into_plane: impl Into<LINE_TYPE::VectorType>,
+        point_on_border: impl Into<LineType::PointType>,
+        normal_direction_into_plane: impl Into<<LineType::PointType as Coordinate>::Relative>,
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
-        let border_line: LINE_TYPE = Line::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
+        let border_line: LineType = Line::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
@@ -90,15 +88,15 @@ where
             self.point_off_half_plane(),
         )
     }
-    pub fn dividing_line(&self) -> LINE_TYPE {
+    pub fn dividing_line(&self) -> LineType {
         self.dividing_line
     }
 
-    pub fn point_on_half_plane(&self) -> LINE_TYPE::PointType {
+    pub fn point_on_half_plane(&self) -> LineType::PointType {
         self.dividing_line.a_point_right_of_line()
     }
 
-    pub fn point_off_half_plane(&self) -> LINE_TYPE::PointType {
+    pub fn point_off_half_plane(&self) -> LineType::PointType {
         self.dividing_line
             .reflect_point_over_line(self.point_on_half_plane())
     }
@@ -115,12 +113,12 @@ where
         self.about_equal(other.complement(), tolerance)
     }
 
-    pub fn covers_point(&self, point: impl Into<LINE_TYPE::PointType> + Copy) -> BoolWithPartial {
+    pub fn covers_point(&self, point: impl Into<LineType::PointType> + Copy) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
     pub fn covers_point_with_tolerance(
         &self,
-        point: impl Into<LINE_TYPE::PointType> + Copy,
+        point: impl Into<LineType::PointType> + Copy,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -129,7 +127,7 @@ where
     }
     pub fn at_least_partially_covers_point(
         &self,
-        point: impl Into<LINE_TYPE::PointType> + Copy,
+        point: impl Into<LineType::PointType> + Copy,
     ) -> bool {
         self.covers_point(point).is_at_least_partial()
     }
@@ -187,15 +185,15 @@ where
             .not()
     }
 
-    //Fn(LINE_TYPE::PointType) -> Point2D<f32, V>,
-    //fun: Box<dyn Fn<LINE_TYPE::PointType, Output = Point2D<f32, V>>>,
+    //Fn(LineType::PointType) -> Point2D<f32, V>,
+    //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
     pub fn with_transformed_points<F, V>(
         &self,
         point_transform_function: F,
     ) -> HalfPlane<Line<Point2D<f32, V>>>
     where
         V: Copy + Debug,
-        F: Fn(LINE_TYPE::PointType) -> Point2D<f32, V>,
+        F: Fn(LineType::PointType) -> Point2D<f32, V>,
     {
         HalfPlane::new_from_line_and_point_on_half_plane(
             Line::new_from_two_points(
@@ -207,13 +205,13 @@ where
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            LINE_TYPE::new_from_two_points(Point2D::new(1.0, 0.0), Point2D::new(-1.0, 0.0)),
-            LINE_TYPE::PointType::new(0.0, 1.0),
+            LineType::new_from_two_points(Point2D::new(1.0, 0.0), Point2D::new(-1.0, 0.0)),
+            LineType::PointType::new(0.0, 1.0),
         )
     }
     pub fn depth_of_point_in_half_plane(
         &self,
-        point: impl Into<LINE_TYPE::PointType> + Copy,
+        point: impl Into<LineType::PointType> + Copy,
     ) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
@@ -225,7 +223,7 @@ where
             -dist
         }
     }
-    pub fn distance_of_point_from_half_plane(&self, point: LINE_TYPE::PointType) -> f32 {
+    pub fn distance_of_point_from_half_plane(&self, point: LineType::PointType) -> f32 {
         -self.depth_of_point_in_half_plane(point)
     }
     pub fn coverage_of_centered_unit_square_with_tolerance(
@@ -282,7 +280,7 @@ where
     fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
         tolerance: f32,
-    ) -> Vec<LINE_TYPE::PointType> {
+    ) -> Vec<LineType::PointType> {
         corner_points_of_centered_unit_square()
             .into_iter()
             .filter(|&p| self.covers_point(p).is_at_least_partial())
@@ -290,7 +288,7 @@ where
     }
     fn covers_any_of_these_points_with_tolerance(
         &self,
-        points: Vec<LINE_TYPE::PointType>,
+        points: Vec<LineType::PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -302,7 +300,7 @@ where
     }
     fn covers_all_of_these_points_with_tolerance(
         &self,
-        points: Vec<LINE_TYPE::PointType>,
+        points: Vec<LineType::PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);

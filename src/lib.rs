@@ -61,7 +61,7 @@ fn set_up_input_thread() -> Receiver<Event> {
             tx.send(evt).unwrap();
         }
     });
-    return rx;
+    rx
 }
 
 pub fn do_everything() {

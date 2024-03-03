@@ -1,28 +1,16 @@
 extern crate num;
 
-#[feature(unboxed_closures)]
-use std::collections::{HashMap, HashSet};
-use std::f32::consts::{PI, TAU};
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
 use std::iter::zip;
-use std::mem;
-use std::ops::{Add, AddAssign, Neg, Sub};
 use std::string::ToString;
 
 use ambassador::delegatable_trait;
 
 use approx::AbsDiffEq;
-use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::num::Zero;
-use getset::CopyGetters;
-use itertools::Itertools;
 use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;
-use num::traits::{Euclid, Signed};
-use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
