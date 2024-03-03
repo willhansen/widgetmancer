@@ -57,11 +57,14 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
+// TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket?
 // TODO: replace these with versions that properly incorporate addition and subtraction relativity
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-pub struct Point2D<DATA_TYPE, UNIT_TYPE>(euclid::Point2D<DATA_TYPE, UNIT_TYPE>);
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-pub struct Vector2D<DATA_TYPE, UNIT_TYPE>(euclid::Vector2D<DATA_TYPE, UNIT_TYPE>);
+// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+// pub struct Point2D<DATA_TYPE, UNIT_TYPE>(euclid::Point2D<DATA_TYPE, UNIT_TYPE>);
+// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+// pub struct Vector2D<DATA_TYPE, UNIT_TYPE>(euclid::Vector2D<DATA_TYPE, UNIT_TYPE>);
+pub type Point2D<DATA_TYPE, UNIT_TYPE> = euclid::Point2D<DATA_TYPE, UNIT_TYPE>;
+pub type Vector2D<DATA_TYPE, UNIT_TYPE> = euclid::Vector2D<DATA_TYPE, UNIT_TYPE>;
 
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
@@ -226,7 +229,6 @@ where
     fn new(x: T, y: T) -> Self {
         point2(x, y)
     }
-
 }
 impl<T, U> Coordinate for Vector2D<T, U>
 where

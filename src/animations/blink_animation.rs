@@ -11,7 +11,7 @@ use crate::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
-use crate::utility::coordinates::{Coordinate, FloatCoordinate};
+use crate::utility::coordinates::Coordinate;
 use crate::utility::line::{FloatLineTrait, Line, LineTrait};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

@@ -4,14 +4,11 @@ pub mod rasterized_field_of_view;
 pub mod square_visibility;
 
 use std::collections::HashSet;
-use std::f32::consts::PI;
-use std::fmt::{Debug, Formatter};
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
-    LocalSquareVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
-    SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
+    LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
 use crate::utility::coordinates::{
     king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
@@ -21,26 +18,15 @@ use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
-use euclid::{point2, vec2, Angle};
-use getset::CopyGetters;
+use euclid::{vec2, Angle};
 use itertools::*;
-use num::abs;
-use ordered_float::OrderedFloat;
 
-use crate::glyph::angled_blocks::{
-    angle_block_char_complement, half_plane_to_angled_block_character,
-};
-use crate::glyph::glyph_constants::{
-    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
-};
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::graphics;
-use crate::graphics::drawable::DrawableEnum::SolidColor;
+use crate::glyph::glyph_constants::{FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, WHITE};
+use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::Graphics;
-use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry};
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
@@ -878,12 +864,15 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
 
 #[cfg(test)]
 mod tests {
+    use crate::glyph_constants::{RED, SPACE};
+    #[allow(non_snake_case)]
     use crate::utility::poses::faces_away_from_center_at_rel_square;
     use euclid::point2;
     use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
+    use std::f32::consts::PI;
 
     use crate::glyph::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
@@ -895,6 +884,8 @@ mod tests {
         better_angle_from_x_axis, QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir,
         STEP_DOWN, STEP_LEFT, STEP_UP,
     };
+
+    use self::square_visibility::SquareVisibilityFromOneLargeShadow;
 
     use super::*;
 

@@ -5,7 +5,6 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldSquare,
 };
 use euclid::Angle;
-use num::Float;
 use std::f32::consts::TAU;
 use std::time::{Duration, Instant};
 
