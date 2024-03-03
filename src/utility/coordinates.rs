@@ -248,13 +248,22 @@ where
         vec2(x, y)
     }
 }
-
-impl<T, C> From<(T, T)> for C
+impl<T> From<(T, T)> for OrthogonalWorldStep
 where
-    C: Coordinate<DataType = T>,
+    (T, T): Into<WorldStep>,
 {
     fn from(value: (T, T)) -> Self {
-        C::new(value.0, value.1)
+        OrthogonalWorldStep::new(value)
+    }
+}
+
+impl<T, U> From<(T, T)> for Vector2D<T, U>
+where
+    Vector2D<T, U>: Coordinate,
+    T: CoordinateDataTypeTrait,
+{
+    fn from(value: (T, T)) -> Self {
+        Vector2D::new(value.0, value.1)
     }
 }
 
@@ -423,7 +432,7 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> Vector2D<f32, UnknownUnit> {
+pub fn seeded_rand_radial_offset(rng: &mut StdRng, radius: f32) -> Vector2D<f32, euclid::UnknownUnit> {
     let mut v = vec2(10.0, 10.0);
     while v.square_length() > 1.0 {
         v.x = rng.gen_range(-1.0..=1.0);
@@ -625,16 +634,6 @@ impl From<WorldStep> for OrthogonalWorldStep {
         OrthogonalWorldStep::new(value)
     }
 }
-
-impl<T> From<(T, T)> for OrthogonalWorldStep
-where
-    (T, T): Into<WorldStep>,
-{
-    fn from(value: (T, T)) -> Self {
-        OrthogonalWorldStep::new(value)
-    }
-}
-
 
 impl From<OrthogonalWorldStep> for WorldStep {
     fn from(value: OrthogonalWorldStep) -> Self {

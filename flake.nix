@@ -21,6 +21,7 @@
 			      clippy
 			      lldb
 			      gdb
+            bacon
 					];
           shellHook = "zsh";
         };
