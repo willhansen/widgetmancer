@@ -477,6 +477,17 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
         TwoDifferentPoints { p1, p2 }
     }
 }
+#[derive(Clone, Copy, PartialEq)]
+pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
+impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+        let p1 = p1.into();
+        let p2 = p2.into();
+        assert!(p1.on_centered_unit_square());
+        assert!(p2.on_centered_unit_square());
+        Self(TwoDifferentPoints::new(p1, p2))
+    }
+}
 
 impl<PointType: Coordinate> UndirectedLineTrait for TwoDifferentPoints<PointType> {
     type PointType = PointType;
@@ -497,21 +508,27 @@ impl<PointType: Coordinate> DirectedLineTrait for TwoDifferentPoints<PointType> 
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub struct LineThroughUnitSquare<PointType: FloatCoordinate>(TwoDifferentPoints<PointType>);
-
-impl<PointType: FloatCoordinate> UndirectedLineTrait for LineThroughUnitSquare<PointType> {
+impl<PointType: FloatCoordinate> UndirectedLineTrait
+    for TwoDifferentPointsOnCenteredUnitSquare<PointType>
+{
     type PointType = PointType;
     fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
-        let p1 = p1.into();
-        let p2 = p2.into();
-        assert!(p1.on_centered_unit_square());
-        assert!(p2.on_centered_unit_square());
-        Self(TwoDifferentPoints::new_from_two_points(p1, p2))
+        Self::new(p1, p2)
     }
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         self.0.two_different_arbitrary_points_on_line()
+    }
+}
+impl<PointType: FloatCoordinate> DirectedLineTrait
+    for TwoDifferentPointsOnCenteredUnitSquare<PointType>
+{
+    fn p1(&self) -> Self::PointType {
+        self.0.p1()
+    }
+
+    fn p2(&self) -> Self::PointType {
+        self.0.p2()
     }
 }
 
@@ -538,12 +555,12 @@ where
 }
 
 // TODO: Can generalize to any line from any line?
-impl<P: FloatCoordinate> From<LineThroughUnitSquare<P>> for TwoDifferentPoints<P> {
-    fn from(value: LineThroughUnitSquare<P>) -> Self {
+impl<P: FloatCoordinate> From<TwoDifferentPointsOnCenteredUnitSquare<P>> for TwoDifferentPoints<P> {
+    fn from(value: TwoDifferentPointsOnCenteredUnitSquare<P>) -> Self {
         Self::from_other_line(value)
     }
 }
-impl<P: FloatCoordinate> From<TwoDifferentPoints<P>> for LineThroughUnitSquare<P> {
+impl<P: FloatCoordinate> From<TwoDifferentPoints<P>> for TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn from(value: TwoDifferentPoints<P>) -> Self {
         Self::from_other_line(value)
     }

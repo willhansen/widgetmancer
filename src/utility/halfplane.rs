@@ -3,7 +3,7 @@ use super::{
     line::*, relative_interval_location::*,
 };
 
-pub type LocalSquareHalfPlane = HalfPlane<LineThroughUnitSquare<LocalSquarePoint>>;
+pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType = FloatingPointLine>
@@ -235,7 +235,8 @@ where
         let fully_covers = self.fully_covers_centered_unit_square_with_tolerance(tolerance);
         if fully_covers.is_true() {
             return RelativeIntervalLocation::After;
-        } else if fully_covers.is_partial() {
+        }
+        if fully_covers.is_partial() {
             return RelativeIntervalLocation::End;
         }
 

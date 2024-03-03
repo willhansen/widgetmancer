@@ -63,7 +63,10 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
 }
 
 #[derive(PartialEq, Clone, Copy)]
-pub enum SquareVisibilityFromOneLargeShadow {
+pub enum SquareVisibilityFromOneLargeShadow
+where
+    LocalSquareHalfPlane: Copy,
+{
     FullyVisible,
     // TODO: have more than one half plane (two?)
     PartiallyVisible(LocalSquareHalfPlane),
@@ -107,7 +110,7 @@ impl SquareVisibilityFromOneLargeShadow {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
         Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(
+            TwoDifferentPoints::<LocalSquarePoint>::new_from_two_points(
                 point2(0.0, 0.0),
                 unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)

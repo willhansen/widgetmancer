@@ -797,7 +797,7 @@ mod tests {
                 ccw_end_of_other: FAngle,
                 correct_overlap_result: BoolWithPartial,
                 case_name: String,
-            };
+            }
 
             let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; 4] = [
                 TestData {

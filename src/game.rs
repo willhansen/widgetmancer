@@ -3862,8 +3862,8 @@ mod tests {
             .screen
             .get_screen_glyphs_at_visual_offset_from_center(test_square);
 
-        todo!();
         assert_eq!(test_glyphs.to_clean_string(), "🬹🭑");
+        todo!();
     }
 
     #[test]

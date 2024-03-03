@@ -15,7 +15,6 @@ use crate::utility::general_utility::union;
 use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::poses::SquareWithOrthogonalDir;
 use crate::utility::poses::StepWithQuarterRotations;
-use crate::utility::trait_alias_macro::function_short_name;
 use crate::utility::RigidTransform;
 use crate::utility::RigidlyTransformable;
 use crate::utility::{
@@ -38,7 +37,10 @@ struct TopDownPortalTarget {
 type LocallyPositionedTopDownPortalTarget = (WorldStep, TopDownPortalTarget);
 
 #[derive(Clone, Copy)]
-pub struct TopDownPortal {
+pub struct TopDownPortal
+where
+    TopDownPortalShape: Copy,
+{
     relative_position: WorldStep,
     target: TopDownPortalTarget,
     shape_in_exit_frame: TopDownPortalShape,
