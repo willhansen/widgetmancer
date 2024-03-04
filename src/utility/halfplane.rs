@@ -18,7 +18,10 @@ impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedLineTrait,
 {
-    pub fn new_from_directed_line(line: impl DirectedLineTrait) -> Self {
+    pub fn new_from_directed_line<P>(line: P) -> Self
+    where
+        P: DirectedLineTrait<PointType = LineType::PointType>,
+    {
         Self {
             dividing_line: LineType::from_other_directed_line(line),
         }
@@ -162,10 +165,8 @@ where
         let point = self.point_on_half_plane();
 
         let shifted_point = point + move_vector;
-        let shifted_line = TwoDifferentPoints::new_from_two_points(
-            line.p1 + move_vector,
-            line.p2 + move_vector,
-        );
+        let shifted_line =
+            TwoDifferentPoints::new_from_two_points(line.p1 + move_vector, line.p2 + move_vector);
 
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
@@ -321,21 +322,22 @@ where
     }
 }
 
-impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>>
-    for HalfPlane<TwoDifferentPoints<P>>
+impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
+    for HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>
 {
     type Error = ();
 
-    fn try_from(
-        value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>,
-    ) -> Result<Self, Self::Error> {
-        Self::new_from_directed_line(value.dividing_line.try_into()?)
+    fn try_from(value: HalfPlane<TwoDifferentPoints<P>>) -> Result<Self, Self::Error> {
+        let points: Result<TwoDifferentPointsOnCenteredUnitSquare<P>, _> =
+            value.dividing_line.try_into();
+        match points {
+            Ok(x) => Ok(Self::new_from_directed_line(x)),
+            _ => Err(()),
+        }
     }
 }
 
-impl<PointType: FloatCoordinate> QuarterTurnRotatable
-    for HalfPlane<TwoDifferentPoints<PointType>>
-{
+impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferentPoints<PointType>> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -437,10 +439,7 @@ mod tests {
     #[test]
     fn test_depth_of_point_in_half_plane() {
         let horizontal = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(
-                WorldPoint::new(0.0, 0.0),
-                point2(1.0, 0.0),
-            ),
+            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
             point2(0.0, 5.0),
         );
 
@@ -460,10 +459,7 @@ mod tests {
         );
 
         let diag = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(
-                WorldPoint::new(0.0, 0.0),
-                point2(-1.0, 1.0),
-            ),
+            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(-1.0, 1.0)),
             point2(0.0, 5.0),
         );
         assert_about_eq!(
