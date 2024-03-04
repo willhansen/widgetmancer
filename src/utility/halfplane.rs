@@ -81,7 +81,7 @@ where
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
         let border_line: LineType =
-            TwoDifferentPoints::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
+            modname::TwoDifferentPoints::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
@@ -162,8 +162,10 @@ where
         let point = self.point_on_half_plane();
 
         let shifted_point = point + move_vector;
-        let shifted_line =
-            TwoDifferentPoints::new_from_two_points(line.p1 + move_vector, line.p2 + move_vector);
+        let shifted_line = modname::TwoDifferentPoints::new_from_two_points(
+            line.p1 + move_vector,
+            line.p2 + move_vector,
+        );
 
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
@@ -196,13 +198,13 @@ where
     pub fn with_transformed_points<F, V>(
         &self,
         point_transform_function: F,
-    ) -> HalfPlane<TwoDifferentPoints<Point2D<f32, V>>>
+    ) -> HalfPlane<modname::TwoDifferentPoints<Point2D<f32, V>>>
     where
         V: Copy + Debug,
         F: Fn(LineType::PointType) -> Point2D<f32, V>,
     {
         HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(
+            modname::TwoDifferentPoints::new_from_two_points(
                 point_transform_function(self.dividing_line.p1()),
                 point_transform_function(self.dividing_line.p2()),
             ),
@@ -320,7 +322,7 @@ where
 }
 
 impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>>
-    for HalfPlane<TwoDifferentPoints<P>>
+    for HalfPlane<modname::TwoDifferentPoints<P>>
 {
     type Error = ();
 
@@ -331,7 +333,9 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPointsOnCenteredUnitSquar
     }
 }
 
-impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferentPoints<PointType>> {
+impl<PointType: FloatCoordinate> QuarterTurnRotatable
+    for HalfPlane<modname::TwoDifferentPoints<PointType>>
+{
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -367,10 +371,10 @@ mod tests {
     use super::*;
     #[test]
     fn test_half_plane_complementary_check__different_lines() {
-        let line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.1, 0.0), point2(1.0, 1.0));
+        let line: modname::TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            modname::TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: modname::TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            modname::TwoDifferentPoints::new_from_two_points(point2(0.1, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
@@ -387,10 +391,10 @@ mod tests {
 
     #[test]
     fn test_half_plane_complementary_check__equivalent_lines() {
-        let line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(2.0, 2.0), point2(5.0, 5.0));
+        let line: modname::TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            modname::TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line2: modname::TwoDifferentPoints<f32, SquareGridInWorldFrame> =
+            modname::TwoDifferentPoints::new_from_two_points(point2(2.0, 2.0), point2(5.0, 5.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
@@ -433,7 +437,10 @@ mod tests {
     #[test]
     fn test_depth_of_point_in_half_plane() {
         let horizontal = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
+            modname::TwoDifferentPoints::new_from_two_points(
+                WorldPoint::new(0.0, 0.0),
+                point2(1.0, 0.0),
+            ),
             point2(0.0, 5.0),
         );
 
@@ -453,7 +460,10 @@ mod tests {
         );
 
         let diag = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(-1.0, 1.0)),
+            modname::TwoDifferentPoints::new_from_two_points(
+                WorldPoint::new(0.0, 0.0),
+                point2(-1.0, 1.0),
+            ),
             point2(0.0, 5.0),
         );
         assert_about_eq!(
@@ -522,11 +532,11 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__horizontal_up() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.3),
+            modname::TwoDifferentPoints::new_horizontal(0.3),
         )
         .into();
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.4),
+            modname::TwoDifferentPoints::new_horizontal(0.4),
         )
         .into();
         assert!(a
@@ -536,10 +546,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__vertical_left() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(-0.3),
+            modname::TwoDifferentPoints::new_vertical(-0.3),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(-0.4),
+            modname::TwoDifferentPoints::new_vertical(-0.4),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -549,10 +559,10 @@ mod tests {
     fn test_halfplane_overlap_within_unit_square__false__horizontal__both_partially_covering_square(
     ) {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.3),
+            modname::TwoDifferentPoints::new_horizontal(0.3),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(-0.4),
+            modname::TwoDifferentPoints::new_horizontal(-0.4),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -561,10 +571,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(5.0),
+            modname::TwoDifferentPoints::new_horizontal(5.0),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(-0.7),
+            modname::TwoDifferentPoints::new_horizontal(-0.7),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -573,7 +583,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__both_fully_cover__identical() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(5.0),
+            modname::TwoDifferentPoints::new_horizontal(5.0),
         );
         let b: LocalSquareHalfPlane = a.clone();
         assert!(a
@@ -583,10 +593,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__one_full_cover_one_partial_cover() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(0.3),
+            modname::TwoDifferentPoints::new_horizontal(0.3),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(5.0),
+            modname::TwoDifferentPoints::new_horizontal(5.0),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -595,10 +605,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__orthogonal() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(0.3),
+            modname::TwoDifferentPoints::new_vertical(0.3),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.1),
+            modname::TwoDifferentPoints::new_horizontal(0.1),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -607,10 +617,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(0.6),
+            modname::TwoDifferentPoints::new_vertical(0.6),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.1),
+            modname::TwoDifferentPoints::new_horizontal(0.1),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -619,10 +629,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal__one_fully_covers() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(0.6),
+            modname::TwoDifferentPoints::new_vertical(0.6),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(5.0),
+            modname::TwoDifferentPoints::new_horizontal(5.0),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -631,10 +641,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__orthogonal__neither_fully_covers() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(0.6),
+            modname::TwoDifferentPoints::new_vertical(0.6),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(5.0),
+            modname::TwoDifferentPoints::new_horizontal(5.0),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -645,10 +655,10 @@ mod tests {
     ) {
         let tolerance = 0.01;
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_vertical(0.5 + tolerance / 2.0),
+            modname::TwoDifferentPoints::new_vertical(0.5 + tolerance / 2.0),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5 + tolerance / 2.0),
+            modname::TwoDifferentPoints::new_horizontal(0.5 + tolerance / 2.0),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, tolerance)
@@ -657,10 +667,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__angled() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(-0.2),
+            modname::TwoDifferentPoints::new_horizontal(-0.2),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points((0.0, 0.5), (0.5, -0.3)),
+            modname::TwoDifferentPoints::new_from_two_points((0.0, 0.5), (0.5, -0.3)),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -669,10 +679,10 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__false__angled() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(-0.2),
+            modname::TwoDifferentPoints::new_horizontal(-0.2),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points((0.0, 0.5), (0.5, -0.1)),
+            modname::TwoDifferentPoints::new_from_two_points((0.0, 0.5), (0.5, -0.1)),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -681,7 +691,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__identical_on_edge() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         let b: LocalSquareHalfPlane = a.clone();
         assert!(a
@@ -691,7 +701,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__identical_on_corner() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points((0.5, 0.5), (0.0, 1.0)),
+            modname::TwoDifferentPoints::new_from_two_points((0.5, 0.5), (0.0, 1.0)),
         );
         let b: LocalSquareHalfPlane = a.clone();
         assert!(a
@@ -702,7 +712,7 @@ mod tests {
     fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exactly_touching_square(
     ) {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         let b: LocalSquareHalfPlane = a.complement();
         assert!(a
@@ -713,7 +723,7 @@ mod tests {
     fn test_halfplane_overlap_within_unit_square__false__opposing_parallel_half_planes_exactly_touching_each_other_within_square(
     ) {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.2),
+            modname::TwoDifferentPoints::new_horizontal(0.2),
         );
         let b: LocalSquareHalfPlane = a.complement();
         assert!(a
@@ -724,10 +734,10 @@ mod tests {
     fn test_halfplane_overlap_within_unit_square__opposing_parallel_half_planes_exactly_touching_each_other_is_consistent(
     ) {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.2),
+            modname::TwoDifferentPoints::new_horizontal(0.2),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         assert_eq!(
             a.overlaps_other_inside_centered_unit_square_with_tolerance(&a.complement(), 0.0),
@@ -739,7 +749,7 @@ mod tests {
     ) {
         let tolerance = 0.01;
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         let b: LocalSquareHalfPlane = a.complement().extended(tolerance / 2.0);
         assert!(a
@@ -751,7 +761,7 @@ mod tests {
     ) {
         let tolerance = 0.01;
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         let b: LocalSquareHalfPlane = a.complement().retracted(tolerance / 2.0);
         assert!(a
@@ -762,10 +772,10 @@ mod tests {
     fn test_halfplane_overlap_inside_unit_square__partial__exact__one_fully_covers__one_just_touches_corner(
     ) {
         let just_fully_covering: HalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(0.5),
+            modname::TwoDifferentPoints::new_horizontal(0.5),
         );
         let just_touching_corner: HalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points((0.0, 1.0), (0.5, 0.5)),
+            modname::TwoDifferentPoints::new_from_two_points((0.0, 1.0), (0.5, 0.5)),
         );
         assert!(just_fully_covering
             .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)

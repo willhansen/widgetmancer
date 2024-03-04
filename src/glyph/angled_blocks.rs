@@ -178,7 +178,7 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
 }
 
 fn get_character_from_snap_points(
-    line: TwoDifferentPoints<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
+    line: modname::TwoDifferentPoints<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
 ) -> char {
     let pointA = line.p1();
     let pointB = line.p2();
@@ -285,7 +285,7 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        let mut grid_line = TwoDifferentPoints::new_from_two_points(
+        let mut grid_line = modname::TwoDifferentPoints::new_from_two_points(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
@@ -339,7 +339,7 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
-    use crate::utility::TwoDifferentPoints;
+    use crate::utility::modname::TwoDifferentPoints;
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 

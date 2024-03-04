@@ -193,9 +193,10 @@ where
     }
 
     fn parallel_directions(&self) -> [Angle<f32>; 2] {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
         [
-            better_angle_from_x_axis(self.p2 - self.p1),
-            better_angle_from_x_axis(self.p1 - self.p2),
+            better_angle_from_x_axis(p2 - p1),
+            better_angle_from_x_axis(p1 - p2),
         ]
     }
     fn from_ray(start: Self::PointType, angle: Angle<f32>, length: f32) -> Self {
@@ -427,10 +428,10 @@ pub trait DirectedLineTrait: UndirectedLineTrait {
         Self::new_from_two_points(other.p1(), other.p2())
     }
     fn reversed(&self) -> Self {
-        Self::new_from_two_points(self.p2, self.p1)
+        Self::new_from_two_points(self.p2(), self.p1())
     }
     fn to_array(&self) -> [Self::PointType; 2] {
-        [self.p1, self.p2]
+        [self.p1(), self.p2()]
     }
     fn a_point_clockwise_of_line(&self) -> Self::PointType {
         self.p2()
