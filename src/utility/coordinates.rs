@@ -349,10 +349,7 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
 }
 
 // TODO: convert to auto trait when stable
-impl<CoordinateType> FloatCoordinate for CoordinateType where
-    CoordinateType: Coordinate<DataType = f32>
-{
-}
+impl<T> FloatCoordinate for T where T: Coordinate<DataType = f32> {}
 
 // TODO: Move to tests?
 assert_impl_all!(Point2D<f32, euclid::UnknownUnit>: FloatCoordinate);

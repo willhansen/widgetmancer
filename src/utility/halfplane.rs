@@ -8,7 +8,8 @@ pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPointsOnCenteredUnitSquare
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType = FloatingPointLine>
 where
-    LineType: DirectedLineTrait,
+    LineType: DirectedFloatLineTrait,
+    LineType::PointType: FloatCoordinate, // TODO: Why do I need this line?
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
@@ -17,6 +18,7 @@ where
 impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedFloatLineTrait,
+    LineType::PointType: FloatCoordinate, // TODO: Why do I need this line?
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
     where

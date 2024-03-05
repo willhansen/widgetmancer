@@ -115,7 +115,6 @@ pub trait LineTrait: Sized + Copy {
     }
 }
 
-// TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
 pub trait FloatLineTrait: LineTrait
 where
     Self::PointType: FloatCoordinate,
@@ -404,7 +403,7 @@ where
 impl<L> FloatLineTrait for L
 where
     L: LineTrait,
-    <L as LineTrait>::PointType: FloatCoordinate,
+    L::PointType: FloatCoordinate,
 {
 }
 
@@ -455,15 +454,16 @@ pub trait DirectedLineTrait: LineTrait {
     }
 }
 
-pub trait DirectedFloatLineTrait: FloatLineTrait
+// TODO: Just use trait alias?
+pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait
 where
     Self::PointType: FloatCoordinate,
 {
 }
 impl<L> DirectedFloatLineTrait for L
 where
-    L: DirectedLineTrait,
-    <L as LineTrait>::PointType: FloatCoordinate,
+    L: DirectedLineTrait + FloatLineTrait,
+    L::PointType: FloatCoordinate,
 {
 }
 
