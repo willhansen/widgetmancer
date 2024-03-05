@@ -12,7 +12,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
 use crate::utility::coordinates::Coordinate;
-use crate::utility::line::{TwoDifferentPoints, UndirectedFloatLineTrait, UndirectedLineTrait};
+use crate::utility::line::{FloatLineTrait, LineTrait, TwoDifferentPoints};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -71,10 +71,8 @@ impl Animation for BlinkAnimation {
         let end_point = self.end_square.to_f32();
         let start_point = self.start_square.to_f32();
         let end_point_mirrored_over_start_point = start_point - (end_point - start_point);
-        let float_line_centered_on_start = TwoDifferentPoints::new_from_two_points(
-            end_point_mirrored_over_start_point,
-            end_point,
-        );
+        let float_line_centered_on_start =
+            TwoDifferentPoints::new_from_two_points(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
         let total_seconds = self.duration().as_secs_f32();

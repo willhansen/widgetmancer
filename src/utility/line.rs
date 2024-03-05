@@ -16,7 +16,7 @@ pub type LocalSquareLine = TwoDifferentPoints<Point2D<f32, SquareGridInLocalSqua
 pub type LocalCharacterLine = TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 pub type FloatingPointLine = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait UndirectedLineTrait: Sized + Copy {
+pub trait LineTrait: Sized + Copy {
     type PointType: Coordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -29,7 +29,7 @@ pub trait UndirectedLineTrait: Sized + Copy {
 
     fn from_other_line<OtherLine>(other_line: OtherLine) -> Self
     where
-        OtherLine: UndirectedLineTrait<PointType = Self::PointType>,
+        OtherLine: LineTrait<PointType = Self::PointType>,
     {
         let [p1, p2] = other_line.two_different_arbitrary_points_on_line();
         Self::new_from_two_points(p1, p2)
@@ -116,7 +116,7 @@ pub trait UndirectedLineTrait: Sized + Copy {
 }
 
 // TODO: bind LineTrait<PointType: FloatCoordinate> when associated trait bindings are stable
-pub trait UndirectedFloatLineTrait: UndirectedLineTrait
+pub trait FloatLineTrait: LineTrait
 where
     Self::PointType: FloatCoordinate,
 {
@@ -401,14 +401,14 @@ where
         self.intersection_point_with_other_extended_line(&other)
     }
 }
-impl<L> UndirectedFloatLineTrait for L
+impl<L> FloatLineTrait for L
 where
-    L: UndirectedLineTrait,
-    <L as UndirectedLineTrait>::PointType: FloatCoordinate,
+    L: LineTrait,
+    <L as LineTrait>::PointType: FloatCoordinate,
 {
 }
 
-pub trait DirectedLineTrait: UndirectedLineTrait {
+pub trait DirectedLineTrait: LineTrait {
     fn p1(&self) -> Self::PointType;
     fn p2(&self) -> Self::PointType;
     fn reverse(&mut self) {
@@ -455,6 +455,18 @@ pub trait DirectedLineTrait: UndirectedLineTrait {
     }
 }
 
+pub trait DirectedFloatLineTrait: FloatLineTrait
+where
+    Self::PointType: FloatCoordinate,
+{
+}
+impl<L> DirectedFloatLineTrait for L
+where
+    L: DirectedLineTrait,
+    <L as LineTrait>::PointType: FloatCoordinate,
+{
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
@@ -491,7 +503,7 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
     }
 }
 
-impl<PointType: Coordinate> UndirectedLineTrait for TwoDifferentPoints<PointType> {
+impl<PointType: Coordinate> LineTrait for TwoDifferentPoints<PointType> {
     type PointType = PointType;
     fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         TwoDifferentPoints::new(p1, p2)
@@ -509,9 +521,7 @@ impl<PointType: Coordinate> DirectedLineTrait for TwoDifferentPoints<PointType> 
     }
 }
 
-impl<PointType: FloatCoordinate> UndirectedLineTrait
-    for TwoDifferentPointsOnCenteredUnitSquare<PointType>
-{
+impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         Self::new(p1, p2)

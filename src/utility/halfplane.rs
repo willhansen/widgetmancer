@@ -16,7 +16,7 @@ where
 
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedLineTrait,
+    LineType: DirectedFloatLineTrait,
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
     where
@@ -27,10 +27,10 @@ where
         }
     }
     pub fn new_from_line_and_point_on_half_plane(
-        dividing_line: impl UndirectedLineTrait,
+        dividing_line: impl LineTrait<PointType = LineType::PointType>,
         point_on_half_plane: impl Into<LineType::PointType>,
     ) -> Self {
-        let dividing_line = DirectedLineTrait::from_other_line(dividing_line);
+        let dividing_line = TwoDifferentPoints::from_other_line(dividing_line);
         HalfPlane {
             dividing_line: if three_points_are_clockwise(
                 dividing_line.p1(),
