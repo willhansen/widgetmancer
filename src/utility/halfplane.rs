@@ -5,6 +5,7 @@ use super::{
 
 pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
 
+// TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType = FloatingPointLine>
 where
@@ -339,7 +340,10 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
     }
 }
 
-impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferentPoints<PointType>> {
+impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineType>
+where
+    LineType::PointType: FloatCoordinate, // TODO: why do I need this line?
+{
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -349,18 +353,18 @@ impl<PointType: FloatCoordinate> QuarterTurnRotatable for HalfPlane<TwoDifferent
         Self::new_from_line_and_point_on_half_plane(new_line, new_point)
     }
 
-    #[cfg(all())]
-    fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
-    where
-        Self: Sized + Debug,
-    {
-        (0..4)
-            .into_iter()
-            .map(|i| self.quarter_rotated_ccw(i))
-            .collect_vec()
-            .try_into()
-            .unwrap()
-    }
+    // #[cfg(all())]
+    // fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
+    // where
+    //     Self: Sized + Debug,
+    // {
+    //     (0..4)
+    //         .into_iter()
+    //         .map(|i| self.quarter_rotated_ccw(i))
+    //         .collect_vec()
+    //         .try_into()
+    //         .unwrap()
+    // }
 }
 #[cfg(test)]
 mod tests {

@@ -898,17 +898,17 @@ pub fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U
     furthest_values.try_into().unwrap()
 }
 
-pub fn three_points_are_clockwise<U>(
-    a: impl Into<Point2D<f32, U>>,
-    b: impl Into<Point2D<f32, U>>,
-    c: impl Into<Point2D<f32, U>>,
+pub fn three_points_are_clockwise<P: Coordinate>(
+    a: impl Into<P>,
+    b: impl Into<P>,
+    c: impl Into<P>,
 ) -> bool {
     let a = a.into();
     let b = b.into();
     let c = c.into();
     let ab = b - a;
     let ac = c - a;
-    ab.cross(ac) < 0.0
+    ab.cross(ac) < P::DataType::zero()
 }
 
 pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
