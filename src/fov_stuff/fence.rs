@@ -5,7 +5,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use portrait;
 
-use crate::rotated_to_have_split_at_max;
+use crate::{rotated_to_have_split_at_max, FloatCoordinate};
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
@@ -14,7 +14,6 @@ use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
 use crate::utility::{
     angle_interval::AngleInterval,
-    better_angle_from_x_axis,
     coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
     RelativeSquareWithOrthogonalDir, RigidlyTransformable,
 };
@@ -285,7 +284,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .into_iter()
             .map(Into::<RelativeSquareWithOrthogonalDir>::into)
             .sorted_by_key(|edge| {
-                OrderedFloat(better_angle_from_x_axis(edge.center_point_of_face()).radians)
+                OrderedFloat(
+                    edge.center_point_of_face()
+                        .better_angle_from_x_axis()
+                        .radians,
+                )
             })
             .collect_vec();
 
@@ -316,8 +319,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             AngleInterval::FullCircle
         } else {
             AngleInterval::PartialArc(PartialAngleInterval::from_angles(
-                better_angle_from_x_axis(self.cw_end_point()),
-                better_angle_from_x_axis(self.ccw_end_point()),
+                self.cw_end_point().better_angle_from_x_axis(),
+                self.ccw_end_point().better_angle_from_x_axis(),
             ))
         }
     }
@@ -926,8 +929,12 @@ mod tests {
 
         let start_segment = fence.edges[4];
         let end_segment = fence.edges[15];
-        let start_angle = better_angle_from_x_axis(start_segment.middle_point_of_face());
-        let end_angle = better_angle_from_x_axis(end_segment.middle_point_of_face());
+        let start_angle = start_segment
+            .middle_point_of_face()
+            .better_angle_from_x_axis();
+        let end_angle = end_segment
+            .middle_point_of_face()
+            .better_angle_from_x_axis();
 
         let arc = AngleInterval::from_angles(start_angle, end_angle);
 

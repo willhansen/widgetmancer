@@ -2,15 +2,22 @@ use super::{
     bool_with_partial::*, coordinate_frame_conversions::*, coordinates::*, general_utility::*,
     line::*, relative_interval_location::*,
 };
+use euclid::num::Zero;
 
-pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
+pub type WorldHalfPlane = HalfPlane<WorldLine>;
+
+pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
+pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
+pub type LocalSquareHalfPlaneSplittingUnitSquare =
+    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
+pub type LocalCharacterHalfPlaneSplittingUnitSquare =
+    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
 
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType = FloatingPointLine>
 where
     LineType: DirectedFloatLineTrait,
-    LineType::PointType: FloatCoordinate, // TODO: Why do I need this line?
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
@@ -19,7 +26,6 @@ where
 impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedFloatLineTrait,
-    LineType::PointType: FloatCoordinate, // TODO: Why do I need this line?
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
     where
@@ -30,10 +36,11 @@ where
         }
     }
     pub fn new_from_line_and_point_on_half_plane(
-        dividing_line: impl LineTrait<PointType = LineType::PointType>,
+        dividing_line: impl Into<LineType>,
         point_on_half_plane: impl Into<LineType::PointType>,
     ) -> Self {
-        let dividing_line = TwoDifferentPoints::from_other_line(dividing_line);
+        // let dividing_line = LineType::from_other_line(dividing_line);
+        let dividing_line = dividing_line.into();
         HalfPlane {
             dividing_line: if three_points_are_clockwise(
                 dividing_line.p1(),
@@ -86,8 +93,7 @@ where
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
-        let border_line: LineType =
-            TwoDifferentPoints::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
+        let border_line = LineType::new_from_two_points(p, p + v.quarter_rotated_ccw(1));
         let point_on_half_plane = p + v;
         assert_ne!(v.square_length(), 0.0);
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
@@ -143,7 +149,7 @@ where
         self.covers_point(point).is_at_least_partial()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
-        self.covers_point(point2(0.0, 0.0))
+        self.covers_point((0.0, 0.0))
     }
     pub fn fully_covers_centered_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_centered_unit_square_with_tolerance(0.0)
@@ -162,14 +168,17 @@ where
     }
     pub fn extended(&self, extended_distance: f32) -> Self {
         let direction = self.direction_away_from_plane();
-        let move_vector = Vector2D::from_angle_and_length(direction, extended_distance);
+        let move_vector = <LineType::PointType as Coordinate>::Relative::from_angle_and_length(
+            direction,
+            extended_distance,
+        );
 
         let line = self.dividing_line();
         let point = self.point_on_half_plane();
 
         let shifted_point = point + move_vector;
         let shifted_line =
-            TwoDifferentPoints::new_from_two_points(line.p1 + move_vector, line.p2 + move_vector);
+            LineType::new_from_two_points(line.p1() + move_vector, line.p2() + move_vector);
 
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
@@ -217,7 +226,7 @@ where
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            LineType::new_from_two_points(Point2D::new(1.0, 0.0), Point2D::new(-1.0, 0.0)),
+            LineType::new_from_two_points((1.0, 0.0), (-1.0, 0.0)),
             LineType::PointType::new(0.0, 1.0),
         )
     }
@@ -339,11 +348,15 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
         }
     }
 }
-
-impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineType>
-where
-    LineType::PointType: FloatCoordinate, // TODO: why do I need this line?
+impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>>
+    for HalfPlane<TwoDifferentPoints<P>>
 {
+    fn from(value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>) -> Self {
+        Self::new_from_directed_line(value.dividing_line)
+    }
+}
+
+impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -379,16 +392,16 @@ mod tests {
     use super::*;
     #[test]
     fn test_half_plane_complementary_check__different_lines() {
-        let line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.1, 0.0), point2(1.0, 1.0));
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
+        let line: TwoDifferentPoints<WorldPoint> =
+            TwoDifferentPoints::new_from_two_points((0.0, 0.0), (1.0, 1.0));
+        let line2: TwoDifferentPoints<WorldPoint> =
+            TwoDifferentPoints::new_from_two_points((0.1, 0.0), (1.0, 1.0));
+        let p1 = WorldPoint::new(0.0, 1.0);
+        let p2 = WorldPoint::new(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
-        let half_plane_3 = HalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
+        let half_plane_1 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p2);
+        let half_plane_3 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
 
         assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
         assert!(half_plane_2.about_complementary(half_plane_1, 1e-6));
@@ -399,15 +412,15 @@ mod tests {
 
     #[test]
     fn test_half_plane_complementary_check__equivalent_lines() {
-        let line: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
-        let line2: TwoDifferentPoints<f32, SquareGridInWorldFrame> =
-            TwoDifferentPoints::new_from_two_points(point2(2.0, 2.0), point2(5.0, 5.0));
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
+        let line: TwoDifferentPoints<WorldPoint> =
+            TwoDifferentPoints::new_from_two_points((0.0, 0.0), (1.0, 1.0));
+        let line2: TwoDifferentPoints<WorldPoint> =
+            TwoDifferentPoints::new_from_two_points((2.0, 2.0), (5.0, 5.0));
+        let p1 = WorldPoint::new(0.0, 1.0);
+        let p2 = WorldPoint::new(1.0, 0.0);
 
-        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
+        let half_plane_1 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
 
         assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
     }
@@ -415,11 +428,10 @@ mod tests {
     #[test]
     fn test_halfplane_fully_covers_centered_unit_square_with_tolerance() {
         let f = |x, tolerance| {
-            let the_plane: HalfPlane<f32> =
-                HalfPlane::new_from_point_on_border_and_vector_pointing_inside(
-                    (x, 0.0),
-                    (-1.0, 0.0),
-                );
+            let the_plane = WorldHalfPlane::new_from_point_on_border_and_vector_pointing_inside(
+                (x, 0.0),
+                (-1.0, 0.0),
+            );
 
             the_plane.fully_covers_centered_unit_square_with_tolerance(tolerance)
         };
@@ -444,9 +456,9 @@ mod tests {
     }
     #[test]
     fn test_depth_of_point_in_half_plane() {
-        let horizontal = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(1.0, 0.0)),
-            point2(0.0, 5.0),
+        let horizontal = WorldHalfPlane::new_from_line_and_point_on_half_plane(
+            ((0.0, 0.0), (1.0, 0.0)),
+            (0.0, 5.0),
         );
 
         assert_about_eq!(
@@ -464,9 +476,9 @@ mod tests {
             -1.0
         );
 
-        let diag = HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points(WorldPoint::new(0.0, 0.0), point2(-1.0, 1.0)),
-            point2(0.0, 5.0),
+        let diag = WorldHalfPlane::new_from_line_and_point_on_half_plane(
+            ((0.0, 0.0), (-1.0, 1.0)),
+            (0.0, 5.0),
         );
         assert_about_eq!(
             diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),

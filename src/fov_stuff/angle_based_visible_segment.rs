@@ -6,8 +6,8 @@ use crate::utility::coordinates::*;
 use crate::utility::line::FloatLineTrait;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
-    better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
-    RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
+    faces_away_from_center_at_rel_square, CoordToString, RelativeSquareWithOrthogonalDir,
+    RigidTransform, RigidlyTransformable, STEP_ZERO,
 };
 use euclid::{point2, Angle};
 use itertools::{all, Itertools};
@@ -99,7 +99,7 @@ impl AngleBasedVisibleSegment {
         all(points_that_should_be_in_arc, |point| {
             self.arc
                 .contains_angle(
-                    better_angle_from_x_axis(point),
+                    point.better_angle_from_x_axis(),
                     Self::default_angle_tolerance(),
                 )
                 .is_false()
@@ -124,7 +124,7 @@ impl AngleBasedVisibleSegment {
         }
 
         let angle_span_of_extended_line_as_seen_from_origin = AngleInterval::from_center_and_width(
-            better_angle_from_x_axis(vector_to_line_from_origin),
+            vector_to_line_from_origin.better_angle_from_x_axis(),
             FAngle::degrees(180.0),
         );
 
@@ -503,12 +503,12 @@ mod tests {
         let segment = AngleBasedVisibleSegment::from_relative_square((5, 2));
         assert_about_eq!(
             segment.arc.cw().radians,
-            better_angle_from_x_axis(FVector::new(5.5, 1.5)).radians,
+            FVector::new(5.5, 1.5).better_angle_from_x_axis().radians,
             1e-4
         );
         assert_about_eq!(
             segment.arc.ccw().radians,
-            better_angle_from_x_axis(FVector::new(4.5, 2.5)).radians,
+            FVector::new(4.5, 2.5).better_angle_from_x_axis().radians,
             1e-4
         );
         assert_eq!(segment.start_internal_relative_face, None);

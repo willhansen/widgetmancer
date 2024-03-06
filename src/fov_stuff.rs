@@ -10,9 +10,7 @@ use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
-use crate::utility::coordinates::{
-    king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
-};
+use crate::utility::coordinates::{king_step_distance, OrthogonalWorldStep};
 use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -730,7 +728,7 @@ pub fn portal_aware_field_of_view_from_square(
 }
 
 fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
-    unit_vector_from_angle(view_arc.center_angle()).cast_unit()
+    WorldMove::unit_vector_from_angle(view_arc.center_angle()).cast_unit()
 }
 
 fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: bool) {
@@ -882,8 +880,7 @@ mod tests {
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::{
-        better_angle_from_x_axis, QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir,
-        STEP_DOWN, STEP_LEFT, STEP_UP,
+        QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
     };
 
     use self::square_visibility::{
@@ -897,8 +894,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__horizontal() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(3, 0));
-        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
-        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
+        let correct_start_angle = WorldMove::new(2.5, 0.5).better_angle_from_x_axis();
+        let correct_end_angle = WorldMove::new(2.5, -0.5).better_angle_from_x_axis();
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,
@@ -913,8 +910,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__diagonalish() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(5, 3));
-        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
-        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
+        let correct_start_angle = WorldMove::new(4.5, 3.5).better_angle_from_x_axis();
+        let correct_end_angle = WorldMove::new(5.5, 2.5).better_angle_from_x_axis();
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,

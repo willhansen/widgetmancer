@@ -192,7 +192,7 @@ fn get_character_from_snap_points(
         let same_y = pointA.y == pointB.y;
         let both_on_same_edge =
             (same_x && [0, 2].contains(&pointA.x)) || (same_y && [0, 3].contains(&pointA.y));
-        let center_is_clockwise = three_points_are_clockwise(
+        let center_is_clockwise = three_points_are_clockwise::<LocalCharacterPoint>(
             local_snap_grid_to_local_character_frame(pointA),
             local_snap_grid_to_local_character_frame(pointB),
             point2(0.0, 0.0),
@@ -261,7 +261,10 @@ pub fn half_plane_to_angled_block_character(
     let biased_intersection_points: Vec<_> = raw_intersection_points
         .into_iter()
         .map(|point| {
-            point + unit_vector_from_angle(snapped_bias_direction).cast_unit() * (PI / 1000.0)
+            point
+                + <LocalCharacterPoint as Coordinate>::Relative::unit_vector_from_angle(
+                    snapped_bias_direction,
+                ) * (PI / 1000.0)
         })
         .collect();
 
@@ -352,7 +355,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.5, 0.5),),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.5, 0.5),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -367,7 +370,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.5, 0.5)),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.5, 0.5)),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -382,7 +385,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.4, -0.4)),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.4, -0.4)),
                     point2(2.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -397,7 +400,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.0, -0.5), point2(0.5, -0.15),),
+                    TwoDifferentPoints::new(point2(0.0, -0.5), point2(0.5, -0.15),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -481,7 +484,7 @@ mod tests {
 
     fn test_half_plane_to_character__from_failure_data() {
         let half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
-            (point2(-1.5, -1.0), point2(-0.08, -0.3)),
+            TwoDifferentPoints::new(point2(-1.5, -1.0), point2(-0.08, -0.3)),
             point2(-0.06, -0.3),
         );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
@@ -508,7 +511,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.5, 0.0), point2(-1.5, 0.0),),
+                    TwoDifferentPoints::new(point2(0.5, 0.0), point2(-1.5, 0.0),),
                     point2(0.0, 25.0),
                 ),
                 Angle::degrees(-90.0)
@@ -522,7 +525,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.0, 0.5), point2(0.0, -1.5),),
+                    TwoDifferentPoints::new(point2(0.0, 0.5), point2(0.0, -1.5),),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(0.0)

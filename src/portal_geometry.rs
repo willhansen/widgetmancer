@@ -14,12 +14,12 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{
-    better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
-    ith_projection_of_step, naive_ray_endpoint, revolve_square, unit_vector_from_angle,
-    AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw, RelativeSquareWithOrthogonalDir,
-    RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations,
-    WorldLine, STEP_RIGHT, STEP_ZERO,
+    first_inside_square_face_hit_by_ray, is_orthogonal, ith_projection_of_step, naive_ray_endpoint,
+    revolve_square, AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw,
+    RelativeSquareWithOrthogonalDir, RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir,
+    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
+use crate::{FloatLineSegment, FloatLineTrait, LineTrait};
 
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, CopyGetters)]
 #[get_copy = "pub"]
@@ -318,9 +318,12 @@ impl PortalGeometry {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::{
-        assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
-        STEP_UP_RIGHT,
+    use crate::{
+        utility::{
+            assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
+            STEP_UP_RIGHT,
+        },
+        DirectedLineTrait,
     };
     use ntest::{assert_about_eq, timeout};
 

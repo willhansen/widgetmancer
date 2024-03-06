@@ -178,9 +178,9 @@ pub fn world_half_plane_to_local_square_half_plane(
 }
 
 pub fn local_square_half_plane_to_local_character_half_plane(
-    square_half_plane: HalfPlane<WorldLine>,
+    square_half_plane: LocalSquareHalfPlane,
     character_index_in_square: usize,
-) -> HalfPlane<LocalCharacterLine> {
+) -> LocalCharacterHalfPlane {
     square_half_plane.with_transformed_points(|p| {
         local_square_point_to_local_character_point(p, character_index_in_square)
     })

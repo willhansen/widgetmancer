@@ -320,10 +320,20 @@ impl RigidTransform {
     ) -> (WorldPoint, Angle<f32>) {
         let ray_start_relative_to_tf_start = ray_start - self.start_pose.square().to_f32();
         let dist_from_tf_start = ray_start_relative_to_tf_start.length();
-        let start_tf_angle = better_angle_from_x_axis(self.start_pose.direction().step().to_f32());
+        let start_tf_angle = self
+            .start_pose
+            .direction()
+            .step()
+            .to_f32()
+            .better_angle_from_x_axis();
 
         let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
-        let end_tf_angle = better_angle_from_x_axis(self.end_pose.direction().step().to_f32());
+        let end_tf_angle = self
+            .end_pose
+            .direction()
+            .step()
+            .to_f32()
+            .better_angle_from_x_axis();
 
         let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
 
@@ -337,8 +347,7 @@ impl RigidTransform {
             let position_angle_from_tf_end = end_tf_angle + position_angle_from_tf_start;
 
             self.end_pose.square().to_f32()
-                + unit_vector_from_angle(position_angle_from_tf_end).cast_unit()
-                    * dist_from_tf_start
+                + WorldMove::unit_vector_from_angle(position_angle_from_tf_end) * dist_from_tf_start
         };
 
         (new_ray_start, new_ray_direction)

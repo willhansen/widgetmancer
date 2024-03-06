@@ -98,13 +98,6 @@ pub trait LineTrait: Sized + Copy {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         p1.y() == p2.y()
     }
-    // TODO: delete comment when confirmed not in use.  These functions are more suited for a `LineSegment` trait
-    // fn length(&self) -> f32 {
-    //     (self.p1() - self.p2()).length()
-    // }
-    // fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
-    //     (self.p1 - self.p2).square_length()
-    // }
     fn slope(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
         if self.is_vertical() {
             return None;
@@ -115,10 +108,28 @@ pub trait LineTrait: Sized + Copy {
     }
 }
 
-pub trait FloatLineTrait: LineTrait
-where
-    Self::PointType: FloatCoordinate,
-{
+pub trait LineSegment: LineTrait {
+    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        (p1 - p2).square_length()
+    }
+}
+impl<T> LineSegment for T where T: LineTrait {}
+
+pub trait FloatLineSegment: FloatLineTrait + LineSegment {
+    fn length(&self) -> f32 {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        (p1 - p2).length()
+    }
+}
+impl<T> FloatLineSegment for T where T: FloatLineTrait + LineSegment {}
+
+pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {}
+impl<T> DirectedLineSegment for T where T: DirectedLineTrait + LineSegment {}
+
+pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
+    type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
+
     fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         on_line(p1, p2, point.into())
@@ -172,8 +183,8 @@ where
 
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let angle_a = better_angle_from_x_axis(p1 - p2);
-        let angle_b = better_angle_from_x_axis(p2 - p1);
+        let angle_a = (p1 - p2).better_angle_from_x_axis();
+        let angle_b = (p2 - p1).better_angle_from_x_axis();
         if angle_a.radians.cos() < 0.0 {
             angle_b
         } else {
@@ -194,8 +205,8 @@ where
     fn parallel_directions(&self) -> [Angle<f32>; 2] {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         [
-            better_angle_from_x_axis(p2 - p1),
-            better_angle_from_x_axis(p1 - p2),
+            (p2 - p1).better_angle_from_x_axis(),
+            (p1 - p2).better_angle_from_x_axis(),
         ]
     }
     fn from_ray(start: Self::PointType, angle: Angle<f32>, length: f32) -> Self {
@@ -207,8 +218,9 @@ where
         point_c: impl Into<Self::PointType> + Copy,
         point_d: impl Into<Self::PointType> + Copy,
     ) -> bool {
-        let point_a = self.p1;
-        let point_b = self.p2;
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let point_a = p1;
+        let point_b = p2;
         let c_on_line = self.point_is_on_line(point_c);
         let d_on_line = self.point_is_on_line(point_d);
 
@@ -405,9 +417,10 @@ where
     L: LineTrait,
     L::PointType: FloatCoordinate,
 {
+    type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
 }
 
-pub trait DirectedLineTrait: LineTrait {
+pub trait DirectedLineTrait: LineTrait + QuarterTurnRotatable {
     fn p1(&self) -> Self::PointType;
     fn p2(&self) -> Self::PointType;
     fn reverse(&mut self) {
@@ -455,17 +468,8 @@ pub trait DirectedLineTrait: LineTrait {
 }
 
 // TODO: Just use trait alias?
-pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait
-where
-    Self::PointType: FloatCoordinate,
-{
-}
-impl<L> DirectedFloatLineTrait for L
-where
-    L: DirectedLineTrait + FloatLineTrait,
-    L::PointType: FloatCoordinate,
-{
-}
+pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {}
+impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait {}
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
@@ -474,14 +478,14 @@ pub struct TwoDifferentPoints<PointType: Coordinate> {
 }
 
 impl<P: Coordinate> TwoDifferentPoints<P> {
-    fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+    pub fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert_ne!(p1, p2);
         TwoDifferentPoints { p1, p2 }
     }
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
 impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Option<Self> {
@@ -543,17 +547,22 @@ impl<PointType: FloatCoordinate> DirectedLineTrait
     }
 }
 
-impl<PointType: Coordinate> QuarterTurnRotatable for TwoDifferentPoints<PointType> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        let quarter_turns_ccw = quarter_turns_ccw.into();
-        let new_points = self
-            .to_array()
-            .map(|p| p.quarter_rotated_ccw(quarter_turns_ccw));
-        Self::from_array(new_points)
-        // let new_points = [0, 1].map(|i| self.get(i).rotated(quarter_turns_ccw));
-        // Self::new(new_points[0].clone(), new_points[1].clone())
-    }
+macro_rules! make_point_grouping_rotatable {
+    ($grouping_type:ident, $point_trait:ident) => {
+        impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
+            fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+                let quarter_turns_ccw = quarter_turns_ccw.into();
+                let new_points = self
+                    .to_array()
+                    .map(|p| p.quarter_rotated_ccw(quarter_turns_ccw));
+                Self::from_array(new_points)
+            }
+        }
+    };
 }
+
+make_point_grouping_rotatable!(TwoDifferentPoints, Coordinate);
+make_point_grouping_rotatable!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 
 impl<PointType: Coordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
     for TwoDifferentPoints<PointType>
@@ -713,12 +722,8 @@ pub fn does_ray_hit_oriented_square_face(
 ) -> bool {
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
-pub fn naive_ray_endpoint<U>(
-    start: Point2D<f32, U>,
-    angle: Angle<f32>,
-    length: f32,
-) -> Point2D<f32, U> {
-    start + unit_vector_from_angle(angle).cast_unit() * length
+pub fn naive_ray_endpoint<P: FloatCoordinate>(start: P, angle: Angle<f32>, length: f32) -> P {
+    start + P::Relative::unit_vector_from_angle(angle).cast_unit() * length
 }
 
 #[cfg(test)]

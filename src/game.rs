@@ -40,9 +40,7 @@ use crate::piece::*;
 use crate::portal_geometry::PortalGeometry;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
-use crate::{
-    lerp, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint, IVector, LEFT_I,
-};
+use crate::{lerp, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector, LEFT_I};
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
@@ -475,7 +473,8 @@ impl Game {
             let next_square = point2(x, y);
             if next_square == start_square {
                 continue;
-            } else if !self.square_is_on_board(next_square) || !self.square_is_empty(next_square) {
+            }
+            if !self.square_is_on_board(next_square) || !self.square_is_empty(next_square) {
                 break;
             }
             candidate_square = next_square;
@@ -531,7 +530,7 @@ impl Game {
 
         self.raw_set_player_position(square);
 
-        return Ok(());
+        Ok(())
     }
 
     fn raw_set_player_position(&mut self, square: WorldSquare) {
@@ -572,13 +571,13 @@ impl Game {
     }
 
     pub fn borrow_graphics_mut(&mut self) -> &mut Graphics {
-        return &mut self.graphics;
+        &mut self.graphics
     }
     pub fn graphics(&self) -> &Graphics {
-        return &self.graphics;
+        &self.graphics
     }
     pub fn pieces(&mut self) -> &mut HashMap<WorldSquare, Piece> {
-        return &mut self.pieces;
+        &mut self.pieces
     }
 
     fn find_pieces(&self, target_piece: Piece) -> SquareSet {
@@ -1187,7 +1186,7 @@ impl Game {
             .random_empty_square(rng)
             .expect("failed to get random square");
         self.place_piece(piece, rand_pos);
-        return rand_pos;
+        rand_pos
     }
 
     pub fn place_block_randomly(&mut self, rng: &mut StdRng) {
@@ -1609,7 +1608,8 @@ impl Game {
 
         if piece.faction == self.red_pawn_faction {
             return self.move_red_pawn_at(piece_square);
-        } else if self.player_is_alive() {
+        }
+        if self.player_is_alive() {
             if piece.piece_type == King {
                 if let Some(path_to_player) =
                     self.find_king_path(piece_square, self.player_square())
@@ -1625,10 +1625,11 @@ impl Game {
                 self.square_to_move_toward_player_for_piece_at(piece_square)
             {
                 end_square = Some(square);
-            } else if piece.can_turn() {
-                self.turn_piece_toward_player(piece_square);
-                return Some(piece_square);
             } else {
+                if piece.can_turn() {
+                    self.turn_piece_toward_player(piece_square);
+                    return Some(piece_square);
+                }
                 end_square = None;
             }
         } else if let optional_square =
@@ -1865,11 +1866,9 @@ impl Game {
                 i as f32 / num_lasers as f32,
             );
             let line_end: WorldPoint = line_start.to_f32()
-                + rotate_vect(
-                    self.player_faced_direction().step().to_f32() * range,
-                    Angle::radians(rotation_if_uniform),
-                )
-                .cast_unit()
+                + (self.player_faced_direction().step().to_f32() * range)
+                    .rotate_vect(Angle::radians(rotation_if_uniform))
+                    .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
             let line = WorldLine::new_from_two_points(line_start.to_f32(), line_end);
 

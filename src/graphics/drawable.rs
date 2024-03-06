@@ -25,8 +25,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
-    rotate_vect, tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable,
-    QuarterTurnsCcw,
+    tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
 };
 
 #[delegatable_trait]
@@ -181,7 +180,8 @@ impl Drawable for PartialVisibilityDrawable {
         let glyphs = character_visible_portions
             .iter()
             .map(|vis_portion| {
-                let angle_char = half_plane_to_angled_block_character(*vis_portion, bias_direction);
+                let angle_char =
+                    half_plane_to_angled_block_character((*vis_portion).into(), bias_direction);
                 Glyph::new(angle_char, self.fg_color, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
@@ -569,6 +569,7 @@ mod tests {
     use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
     use crate::utility::halfplane::LocalSquareHalfPlane;
+    use crate::LineTrait;
     use euclid::point2;
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
@@ -617,10 +618,7 @@ mod tests {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_from_two_points(
-                    point2(0.0, 0.0),
-                    point2(-1.0, 0.0),
-                ),
+                TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
                 point2(0.0, 25.0),
             ),
         );

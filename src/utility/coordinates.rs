@@ -192,7 +192,7 @@ where
             b
         }
     }
-    fn dot(self, other: impl Into<Self>) -> Self::DataType
+    fn dot(&self, other: impl Into<Self>) -> Self::DataType
     {
         let other = other.into();
         self.x() * other.x() + self.y() * other.y()
@@ -344,18 +344,30 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
     }
 
     fn rotate_around_point(&self, axis_point: Self, angle: Angle<f32>) -> Self {
-        axis_point + rotate_vect(*self - axis_point, angle)
+        axis_point + (*self - axis_point).rotate_vect(angle)
+    }
+
+    fn unit_vector_from_angle(angle: Angle<f32>) -> Self {
+        Self::new(angle.radians.cos(), angle.radians.sin())
+    }
+
+    fn rotate_vect(&self, delta_angle: Angle<f32>) -> Self {
+        let start_angle = self.better_angle_from_x_axis();
+        let new_angle = start_angle + delta_angle;
+        Self::from_angle_and_length(new_angle, self.length())
+    }
+    fn lerp2d(&self, target: Self, t: f32) -> Self {
+        Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
+    }
+    // TODO: remember the reason for this existing (there IS a good reason)
+    // related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
+    fn better_angle_from_x_axis(&self) -> Angle<f32> {
+        Angle::radians(self.y().atan2(self.x()))
     }
 }
 
 // TODO: convert to auto trait when stable
 impl<T> FloatCoordinate for T where T: Coordinate<DataType = f32> {}
-
-// TODO: Move to tests?
-assert_impl_all!(Point2D<f32, euclid::UnknownUnit>: FloatCoordinate);
-assert_impl_all!(Vector2D<f32, euclid::UnknownUnit>: FloatCoordinate);
-assert_not_impl_any!(Point2D<i32, euclid::UnknownUnit>: FloatCoordinate);
-assert_not_impl_any!(Vector2D<i32, euclid::UnknownUnit>: FloatCoordinate);
 
 trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
 trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
@@ -402,9 +414,7 @@ impl<T: Display, U> CoordToString for Vector2D<T, U> {
 
 impl<V> QuarterTurnRotatable for V
 where
-    V: Coordinate, // impl<T, U> QuarterTurnRotatable for Vector2D<T, U>
-                   // where
-                   //     T: Copy + PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Zero + Signed, //+ Debug,
+    V: Coordinate,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         // if self.is_absolute() {
@@ -438,7 +448,7 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
     if step.square_length() == 0 {
         return step;
     }
-    let radians_from_plus_x = better_angle_from_x_axis(step.to_f32());
+    let radians_from_plus_x = step.to_f32().better_angle_from_x_axis();
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
     let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
 
@@ -494,29 +504,7 @@ pub fn rand_radial_offset(radius: f32) -> euclid::default::Vector2D<f32> {
 }
 pub fn random_unit_vector() -> FVector {
     let angle = random_angle();
-    unit_vector_from_angle(angle)
-}
-
-pub fn unit_vector_from_angle(angle: Angle<f32>) -> FVector {
-    vec2(angle.radians.cos(), angle.radians.sin())
-}
-
-// TODO: convert to FloatCoordinate method
-pub fn rotate_vect<V: FloatCoordinate>(vector: V, delta_angle: Angle<f32>) -> V {
-    if vector.length() == 0.0 {
-        return vector;
-    }
-    let start_angle = better_angle_from_x_axis(vector);
-    let new_angle = start_angle + delta_angle;
-    V::from_angle_and_length(new_angle, vector.length())
-}
-pub fn lerp2d<P: FloatCoordinate>(a: P, b: P, t: f32) -> P {
-    P::new(lerp(a.x(), b.x(), t), lerp(a.y(), b.y(), t))
-}
-// TODO: remember the reason for this existing (there IS a good reason)
-// related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
-pub fn better_angle_from_x_axis<V: FloatCoordinate>(v: V) -> Angle<f32> {
-    Angle::radians(v.y().atan2(v.x()))
+    FVector::unit_vector_from_angle(angle)
 }
 
 pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
@@ -898,14 +886,7 @@ pub fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U
     furthest_values.try_into().unwrap()
 }
 
-pub fn three_points_are_clockwise<P: Coordinate>(
-    a: impl Into<P>,
-    b: impl Into<P>,
-    c: impl Into<P>,
-) -> bool {
-    let a = a.into();
-    let b = b.into();
-    let c = c.into();
+pub fn three_points_are_clockwise<P: Coordinate>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < P::DataType::zero()
@@ -962,11 +943,11 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
 
-pub fn corner_points_of_centered_unit_square<U>() -> Vec<Point2D<f32, U>> {
-    vec2::<f32, U>(0.5, 0.5)
+pub fn corner_points_of_centered_unit_square<P: FloatCoordinate>() -> Vec<P> {
+    P::Relative::new(0.5, 0.5)
         .quadrant_rotations_going_ccw()
         .into_iter()
-        .map(Vector2D::to_point)
+        .map(|v| P::zero() + v)
         .collect()
 }
 
@@ -1034,30 +1015,40 @@ mod tests {
     #[test]
     fn test_rotate_zero_vector() {
         assert_eq!(
-            rotate_vect(WorldMove::new(0.0, 0.0), Angle::radians(PI)),
+            WorldMove::new(0.0, 0.0).rotate_vect(Angle::radians(PI)),
             vec2(0.0, 0.0)
         );
     }
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            better_angle_from_x_axis(euclid::default::Vector2D::new(0.5, 0.5)).to_degrees(),
+            euclid::default::Vector2D::new(0.5, 0.5)
+                .better_angle_from_x_axis()
+                .to_degrees(),
             45.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(euclid::default::Vector2D::new(0.0, 0.5)).to_degrees(),
+            euclid::default::Vector2D::new(0.0, 0.5)
+                .better_angle_from_x_axis()
+                .to_degrees(),
             90.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(euclid::default::Vector2D::new(0.0, -0.5)).to_degrees(),
+            euclid::default::Vector2D::new(0.0, -0.5)
+                .better_angle_from_x_axis()
+                .to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(euclid::default::Vector2D::new(1.0, 0.0)).to_degrees(),
+            euclid::default::Vector2D::new(1.0, 0.0)
+                .better_angle_from_x_axis()
+                .to_degrees(),
             0.0
         );
         assert_about_eq!(
-            better_angle_from_x_axis(euclid::default::Vector2D::new(-1.0, 0.0)).to_degrees(),
+            euclid::default::Vector2D::new(-1.0, 0.0)
+                .better_angle_from_x_axis()
+                .to_degrees(),
             180.0
         );
     }

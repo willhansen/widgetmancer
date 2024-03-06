@@ -16,10 +16,11 @@ use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, standardize_angle, Octant, OrthogonalWorldStep,
-    QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
-    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
+    abs_angle_distance, standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsCcw,
+    RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
+use crate::FloatCoordinate;
 
 use super::bool_with_partial::BoolWithPartial;
 use super::coordinates::QuarterTurnRotatable;
@@ -191,8 +192,8 @@ impl PartialAngleInterval {
             face_center + (face_direction.step().to_f32() / 2.0).quarter_rotated_ccw(sign)
         });
 
-        let center_angle = better_angle_from_x_axis(face_center);
-        let face_corner_angles = face_corners.map(better_angle_from_x_axis);
+        let center_angle = face_center.better_angle_from_x_axis();
+        let face_corner_angles = face_corners.map(|x| x.better_angle_from_x_axis());
 
         let first_corner_angle_is_more_clockwise =
             center_angle.angle_to(face_corner_angles[0]).radians < 0.0;

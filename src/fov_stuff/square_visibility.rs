@@ -7,7 +7,7 @@ use crate::graphics::drawable::{
 use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::coordinates::{
-    better_angle_from_x_axis, point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle,
+    point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle, FloatCoordinate,
     OrthogonalWorldStep,
 };
 use crate::utility::general_utility::*;
@@ -16,8 +16,8 @@ use crate::utility::line::{FloatLineTrait, LineTrait};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::relative_interval_location::RelativeIntervalLocation;
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,
-    HalfPlane, QuarterTurnRotatable, QuarterTurnsCcw, TwoDifferentPoints, WorldLine, STEP_ZERO,
+    king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
+    QuarterTurnsCcw, TwoDifferentPoints, WorldLine, STEP_ZERO,
 };
 use derive_more::Constructor;
 use euclid::{point2, Angle};
@@ -101,9 +101,12 @@ impl SquareVisibilityFromOneLargeShadow {
     }
 
     pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
-        Self::half_visible(better_angle_from_x_axis(
-            (-which_half_visible.into()).step().to_f32(),
-        ))
+        Self::half_visible(
+            (-which_half_visible.into())
+                .step()
+                .to_f32()
+                .better_angle_from_x_axis(),
+        )
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
@@ -112,12 +115,12 @@ impl SquareVisibilityFromOneLargeShadow {
         Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
             TwoDifferentPoints::<LocalSquarePoint>::new_from_two_points(
                 point2(0.0, 0.0),
-                unit_vector_from_angle(shadow_direction)
+                LocalSquarePoint::unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)
                     .to_point()
                     .cast_unit(),
             ),
-            unit_vector_from_angle(shadow_direction)
+            LocalSquarePoint::unit_vector_from_angle(shadow_direction)
                 .to_point()
                 .cast_unit(),
         ))
@@ -222,13 +225,14 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
 
             let shadow_line_from_center: WorldLine = TwoDifferentPoints::new_from_two_points(
                 point2(0.0, 0.0),
-                unit_vector_from_angle(overlapped_shadow_edge.angle())
+                WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle())
                     .to_point()
                     .cast_unit(),
             );
-            let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
-                .to_point()
-                .cast_unit();
+            let point_in_shadow: WorldPoint =
+                WorldPoint::unit_vector_from_angle(shadow_arc.center_angle())
+                    .to_point()
+                    .cast_unit();
 
             let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
                 shadow_line_from_center,
@@ -483,7 +487,7 @@ mod tests {
             interval,
             square_relative_to_center,
         );
-        let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
+        let string = PartialVisibilityDrawable::from_square_visibility(visibility)
             .to_glyphs()
             .to_clean_string();
         assert_eq!(&string, "🭞🭚");
@@ -511,9 +515,9 @@ mod tests {
         let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
         let partial = SquareVisibility::from_relative_square_and_view_arc(arc, square);
-        assert!(!partial.unwrap().is_fully_visible());
+        assert!(!partial.is_fully_visible());
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
+            PartialVisibilityDrawable::from_square_visibility(partial)
                 .to_glyphs()
                 .to_clean_string(),
             [FULL_BLOCK, SPACE].into_iter().collect::<String>()
@@ -590,13 +594,11 @@ mod tests {
     }
     #[test]
     fn test_view_arc_source_is_not_visible_by_default() {
-        assert_eq!(
-            SquareVisibility::from_relative_square_and_view_arc(
-                AngleInterval::from_degrees(0.0, 45.0),
-                (0, 0)
-            ),
-            None
-        );
+        assert!(SquareVisibility::from_relative_square_and_view_arc(
+            AngleInterval::from_degrees(0.0, 45.0),
+            (0, 0)
+        )
+        .is_not_visible());
     }
     // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
     #[test]
