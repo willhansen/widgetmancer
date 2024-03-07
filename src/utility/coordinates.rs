@@ -873,16 +873,14 @@ impl QuarterTurnRotatable for Angle<f32> {
         ))
     }
 }
-pub fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
+pub fn furthest_apart_points<P: FloatCoordinate>(points: Vec<P>) -> [P; 2] {
     assert!(points.len() >= 2);
     let furthest = points
         .iter()
         .combinations(2)
-        .max_by_key(|two_points: &Vec<&Point2D<f32, U>>| {
-            OrderedFloat((*two_points[0] - *two_points[1]).length())
-        })
+        .max_by_key(|two_points: &Vec<&P>| OrderedFloat((*two_points[0] - *two_points[1]).length()))
         .unwrap();
-    let furthest_values: Vec<Point2D<f32, U>> = furthest.into_iter().copied().collect();
+    let furthest_values: Vec<P> = furthest.into_iter().copied().collect();
     furthest_values.try_into().unwrap()
 }
 

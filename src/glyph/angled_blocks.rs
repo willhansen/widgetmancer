@@ -253,7 +253,7 @@ pub fn half_plane_to_angled_block_character(
 
     let raw_intersection_points = half_plane
         .dividing_line()
-        .line_intersections_with_centered_unit_square();
+        .ordered_line_intersections_with_centered_unit_square();
     assert!(raw_intersection_points.len() <= 2);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points

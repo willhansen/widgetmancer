@@ -108,25 +108,6 @@ pub trait LineTrait: Sized + Copy {
     }
 }
 
-pub trait LineSegment: LineTrait {
-    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        (p1 - p2).square_length()
-    }
-}
-impl<T> LineSegment for T where T: LineTrait {}
-
-pub trait FloatLineSegment: FloatLineTrait + LineSegment {
-    fn length(&self) -> f32 {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        (p1 - p2).length()
-    }
-}
-impl<T> FloatLineSegment for T where T: FloatLineTrait + LineSegment {}
-
-pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {}
-impl<T> DirectedLineSegment for T where T: DirectedLineTrait + LineSegment {}
-
 pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
     type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
 
@@ -231,14 +212,14 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
             return false;
         }
 
-        three_points_are_clockwise(point_a, point_b, point_c)
-            == three_points_are_clockwise(point_a, point_b, point_d)
+        three_points_are_clockwise(point_a, point_b, point_c.into())
+            == three_points_are_clockwise(point_a, point_b, point_d.into())
     }
-    fn line_intersections_with_centered_unit_square_with_tolerance(
+    fn unordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
     ) -> Vec<Self::PointType> {
-        let regular_intersections = self.line_intersections_with_centered_unit_square();
+        let regular_intersections = self.unordered_line_intersections_with_centered_unit_square();
         if !regular_intersections.is_empty() {
             return regular_intersections;
         }
@@ -269,44 +250,37 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
             .collect_vec();
         closest_points
     }
-    fn line_intersections_with_expanded_centered_unit_square(
+    fn unordered_line_intersections_with_expanded_centered_unit_square(
         &self,
         expansion_length: f32,
     ) -> Vec<Self::PointType> {
-        let line_point_a = self.p1;
-        let line_point_b = self.p2;
+        let [line_point_a, line_point_b] = self.two_different_arbitrary_points_on_line();
         let half_side_length = 0.5 + expansion_length;
 
-        let is_vertical_line = line_point_a.x == line_point_b.x;
-        let is_horizontal_line = line_point_a.y == line_point_b.y;
+        let is_vertical_line = line_point_a.x() == line_point_b.x();
+        let is_horizontal_line = line_point_a.y() == line_point_b.y();
 
         if is_vertical_line {
-            let x = line_point_a.x;
+            let x = line_point_a.x();
             if x.abs() <= half_side_length {
-                self.points_in_line_order(vec![
-                    point2(x, half_side_length),
-                    point2(x, -half_side_length),
-                ])
+                vec![(x, half_side_length).into(), (x, -half_side_length).into()]
             } else {
                 vec![]
             }
         } else if is_horizontal_line {
-            let y = line_point_a.y;
+            let y = line_point_a.y();
             if y.abs() <= half_side_length {
-                self.points_in_line_order(vec![
-                    point2(half_side_length, y),
-                    point2(-half_side_length, y),
-                ])
+                vec![(half_side_length, y).into(), (-half_side_length, y).into()]
             } else {
                 vec![]
             }
         } else {
             // y = mx + b
-            let dy = line_point_b.y - line_point_a.y;
-            let dx = line_point_b.x - line_point_a.x;
+            let dy = line_point_b.y() - line_point_a.y();
+            let dx = line_point_b.x() - line_point_a.x();
             let m = dy / dx;
             // b = y - m*x
-            let b = line_point_a.y - m * line_point_a.x;
+            let b = line_point_a.y() - m * line_point_a.x();
 
             let side_positions = vec![half_side_length, -half_side_length];
 
@@ -314,14 +288,14 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
             for &x in &side_positions {
                 let y = m * x + b;
                 if y.abs() <= half_side_length {
-                    candidate_intersections.push(point2(x, y));
+                    candidate_intersections.push((x, y).into());
                 }
             }
             for y in side_positions {
                 let x = (y - b) / m;
                 // top and bottom don't catch corners, sides do
                 if x.abs() < half_side_length {
-                    candidate_intersections.push(point2(x, y));
+                    candidate_intersections.push((x, y).into());
                 }
             }
             // this captures the edge case of corners
@@ -331,7 +305,7 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
                     if candidate_intersections[0] == candidate_intersections[1] {
                         vec![candidate_intersections[0]]
                     } else {
-                        self.points_in_line_order(candidate_intersections)
+                        candidate_intersections
                     }
                 }
                 1 => candidate_intersections,
@@ -340,36 +314,18 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
             }
         }
     }
-    fn line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
-        self.line_intersections_with_expanded_centered_unit_square(0.0)
+    fn unordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
+        self.unordered_line_intersections_with_expanded_centered_unit_square(0.0)
     }
     fn line_intersects_with_centered_unit_square(&self) -> bool {
         self.intersects_with_expanded_centered_unit_square(0.0)
     }
     fn intersects_with_expanded_centered_unit_square(&self, per_face_extension: f32) -> bool {
         !self
-            .line_intersections_with_expanded_centered_unit_square(per_face_extension)
+            .unordered_line_intersections_with_expanded_centered_unit_square(per_face_extension)
             .is_empty()
     }
-    fn points_in_line_order(&self, mut points: Vec<Self::PointType>) -> Vec<Self::PointType> {
-        let normalized_line_direction = (self.p2 - self.p1).normalize();
-        points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.to_vector())));
-        points
-    }
 
-    fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Self::PointType {
-        let t = rng.gen_range(0.0..=1.0);
-        self.lerp(t)
-    }
-
-    fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Self::PointType {
-        // TODO: make more uniform
-        self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset(rng, radius).cast_unit()
-    }
-
-    fn random_point_near_line(&self, radius: f32) -> Self::PointType {
-        self.seeded_random_point_near_line(&mut get_new_rng(), radius)
-    }
     fn intersection_point_with_other_extended_line(&self, other: &Self) -> Option<Self::PointType> {
         // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
         let (x1, y1) = self.p1.to_tuple();
@@ -459,16 +415,31 @@ pub trait DirectedLineTrait: LineTrait + QuarterTurnRotatable {
     fn a_point_left_of_line(&self) -> Self::PointType {
         self.a_point_anticlockwise_of_line()
     }
-    fn lerp(&self, t: f32) -> Self::PointType {
-        lerp2d(self.p1(), self.p2(), t)
-    }
     fn direction(&self) -> Angle<f32> {
         better_angle_from_x_axis(self.p2() - self.p1())
     }
 }
 
 // TODO: Just use trait alias?
-pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {}
+pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
+    fn points_in_line_order(&self, mut points: Vec<Self::PointType>) -> Vec<Self::PointType> {
+        let normalized_line_direction = (self.p2() - self.p1()).normalize();
+        points
+            .sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.as_relative())));
+        points
+    }
+    fn ordered_line_intersections_with_expanded_centered_unit_square(
+        &self,
+        expansion_length: f32,
+    ) -> Vec<Self::PointType> {
+        self.points_in_line_order(
+            self.unordered_line_intersections_with_expanded_centered_unit_square(expansion_length),
+        )
+    }
+    fn ordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
+        self.ordered_line_intersections_with_expanded_centered_unit_square(0.0)
+    }
+}
 impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait {}
 
 #[derive(Clone, Copy, PartialEq)]
@@ -776,7 +747,7 @@ mod tests {
             WorldPoint::new(-29.5, 5.0),
             WorldPoint::new(-27.589872, 4.703601),
         )
-        .line_intersections_with_centered_unit_square();
+        .ordered_line_intersections_with_centered_unit_square();
     }
     #[test]
     fn test_line_point_reflection() {

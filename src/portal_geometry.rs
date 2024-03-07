@@ -19,7 +19,9 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir,
     StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
 };
-use crate::{FloatLineSegment, FloatLineTrait, LineTrait};
+use crate::FloatLineSegment;
+use crate::FloatLineTrait;
+use crate::LineTrait;
 
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, CopyGetters)]
 #[get_copy = "pub"]

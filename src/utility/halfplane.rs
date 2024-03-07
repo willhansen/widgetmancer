@@ -284,7 +284,7 @@ where
 
         let other_border_cut_points = other
             .dividing_line
-            .line_intersections_with_centered_unit_square_with_tolerance(tolerance);
+            .unordered_line_intersections_with_centered_unit_square_with_tolerance(tolerance);
 
         let other_covered_square_corner_points =
             other.at_least_partially_covered_corner_points_of_centered_unit_square(tolerance);
@@ -509,12 +509,15 @@ mod tests {
         let g = (-0.6, 0.4);
 
         let up: LocalSquareHalfPlane =
-            HalfPlane::new_from_line_and_point_on_half_plane((a, b), (0.0, 5.0)).into();
-        let up_right = HalfPlane::new_from_line_and_point_on_half_plane((b, c), (1.0, 1.0)).into();
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+        let up_right =
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((b, c), (1.0, 1.0)).into();
         let down_right =
-            HalfPlane::new_from_line_and_point_on_half_plane((c, d), (1.0, -1.0)).into();
-        let down = HalfPlane::new_from_line_and_point_on_half_plane((d, e), (0.0, -5.0)).into();
-        let left = HalfPlane::new_from_line_and_point_on_half_plane((f, g), (-5.0, 0.0)).into();
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((c, d), (1.0, -1.0)).into();
+        let down =
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((d, e), (0.0, -5.0)).into();
+        let left =
+            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((f, g), (-5.0, 0.0)).into();
 
         let tolerance = 1e-5;
 
@@ -545,14 +548,12 @@ mod tests {
     }
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__horizontal_up() {
-        let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
+        let a = LocalSquareHalfPlane::new_from_border_line_with_origin_outside(
             TwoDifferentPoints::new_horizontal(0.3),
-        )
-        .into();
-        let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
+        );
+        let b = LocalSquareHalfPlane::new_from_border_line_with_origin_outside(
             TwoDifferentPoints::new_horizontal(0.4),
-        )
-        .into();
+        );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
             .is_true())
@@ -798,7 +799,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_unit_square() {
         let f = |top_y: f32, tolerance: f32| {
-            HalfPlane::<f32>::new_with_inside_down(top_y)
+            HalfPlane::<WorldLine>::new_with_inside_down(top_y)
                 .coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
         use RelativeIntervalLocation::*;

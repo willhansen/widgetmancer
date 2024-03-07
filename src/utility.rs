@@ -30,8 +30,9 @@ pub mod general_utility;
 pub mod halfplane;
 pub mod has_origin_pose;
 pub mod line;
+pub mod line_segment;
 pub mod octant;
-pub mod partial_angle_interval; // TODO: make private and contained within angle_interval
+pub mod partial_angle_interval; // TODO: make private and contained within angle_interval?
 pub mod poses;
 pub mod quadrant;
 pub mod relative_interval_location;

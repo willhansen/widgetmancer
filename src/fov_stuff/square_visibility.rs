@@ -19,6 +19,7 @@ use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
     QuarterTurnsCcw, TwoDifferentPoints, WorldLine, STEP_ZERO,
 };
+use crate::DirectedFloatLineTrait;
 use derive_more::Constructor;
 use euclid::{point2, Angle};
 use itertools::Itertools;
@@ -97,7 +98,7 @@ impl SquareVisibilityFromOneLargeShadow {
         self.visible_portion()
             .unwrap()
             .dividing_line()
-            .line_intersections_with_centered_unit_square()
+            .ordered_line_intersections_with_centered_unit_square()
     }
 
     pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
