@@ -5,7 +5,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use portrait;
 
-use crate::{rotated_to_have_split_at_max, FloatCoordinate};
+use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate};
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
@@ -19,7 +19,7 @@ use crate::utility::{
 };
 use crate::utility::{
     check_vectors_in_ccw_order, get_by_index, quadrants_of_rel_square, squares_sharing_face,
-    two_in_ccw_order, CoordToString, Quadrant, SimpleResult, STEP_ZERO,
+    two_in_ccw_order, Quadrant, SimpleResult, STEP_ZERO,
 };
 
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]

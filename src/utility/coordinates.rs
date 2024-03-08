@@ -104,17 +104,16 @@ pub trait Coordinate:
     + Add<Self::Relative, Output = Self>
     + Sub<Self::Relative, Output = Self>
     + Sub<Self, Output = Self::Relative>
-    // + Add<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    // + Sub<Vector2D<Self::DataType, Self::UnitType>, Output = Self>
-    // + Sub<Self, Output = Vector2D<Self::DataType, Self::UnitType>>
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
     + Debug
+    // + Display // TODO
     + Neg<Output = Self>
-    + From<(Self::DataType, Self::DataType)> // TODO: find out why this one isn't working
-    // + IntoIterator + FromIterator // TODO
+    + From<(Self::DataType, Self::DataType)>
+// TODO: find out why this one isn't working
+// + IntoIterator + FromIterator // TODO
 where
     Self::DataType: CoordinateDataTypeTrait,
 {
@@ -140,8 +139,18 @@ where
     fn to_point(&self) -> Self::Absolute {
         Self::Absolute::new(self.x(), self.y())
     }
+    fn tuple(&self) -> (Self::DataType, Self::DataType) {
+        (self.x(), self.y())
+    }
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
+    }
+    fn to_string(&self) -> String {
+        if self.is_absolute() {
+            format!("(x: {}, y: {})", self.x(), self.y())
+        }else {
+            format!("(dx: {}, dy: {})", self.x(), self.y())
+        }
     }
     // TODO: somehow shorten long parameter type
     fn from_any_relativity(
@@ -159,10 +168,11 @@ where
         self.x() * self.x() + self.y() * self.y()
     }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
-    // fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U, RelativityLevel = Self::RelativityLevel>{self.cast()}
+    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U>{
+        C::new(self.x(), self.y())
+    }
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
-    // fn cast<C,T,U,R>(&self) -> C where C: Coordinate<DataType=T, UnitType=U, RelativityLevel = R>;
-
+    // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
 
     make_cast_function!(to_f32, f32, Self::Floating);
     make_cast_function!(to_i32, i32, Self::OnGrid);
@@ -181,7 +191,6 @@ where
         Self::Relative::new(self.x(), self.y())
     }
 
-
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
         let a = self.x().abs();
@@ -192,16 +201,14 @@ where
             b
         }
     }
-    fn dot(&self, other: impl Into<Self>) -> Self::DataType
-    {
+    fn dot(&self, other: impl Into<Self>) -> Self::DataType {
         let other = other.into();
         self.x() * other.x() + self.y() * other.y()
     }
     fn cross(&self, other: Self) -> Self::DataType {
         self.x() * other.y() - self.y() * other.x()
     }
-    fn project_onto_vector(self, onto: impl Into<Self>) -> Self
-    {
+    fn project_onto_vector(self, onto: impl Into<Self>) -> Self {
         let onto = onto.into();
         onto * (self.dot(onto) / onto.square_length())
     }
@@ -397,21 +404,6 @@ pub fn get_8_octant_transforms_of<PointType: Coordinate>(v: PointType) -> Vec<Po
         .collect()
 }
 
-pub trait CoordToString {
-    fn to_string(&self) -> String;
-}
-impl<T: Display, U> CoordToString for Point2D<T, U> {
-    fn to_string(&self) -> String {
-        format!("(x: {}, y: {})", self.x, self.y)
-    }
-}
-
-impl<T: Display, U> CoordToString for Vector2D<T, U> {
-    fn to_string(&self) -> String {
-        format!("(dx: {}, dy: {})", self.x, self.y)
-    }
-}
-
 impl<V> QuarterTurnRotatable for V
 where
     V: Coordinate,
@@ -487,14 +479,10 @@ pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
     is_orthogonal(v) || is_diagonal(v)
 }
 
-pub fn seeded_rand_radial_offset(
-    rng: &mut StdRng,
-    radius: f32,
-) -> Vector2D<f32, euclid::UnknownUnit> {
-    let mut v = vec2(10.0, 10.0);
+pub fn seeded_rand_radial_offset<P: FloatCoordinate>(rng: &mut StdRng, radius: f32) -> P {
+    let mut v = P::new(10.0, 10.0);
     while v.square_length() > 1.0 {
-        v.x = rng.gen_range(-1.0..=1.0);
-        v.y = rng.gen_range(-1.0..=1.0);
+        v = P::new(rng.gen_range(-1.0..=1.0), rng.gen_range(-1.0..=1.0));
     }
     v * radius
 }

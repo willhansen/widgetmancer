@@ -12,8 +12,8 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
-use crate::utility::CoordToString;
 use crate::utility::{flip_y, get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
+use crate::Coordinate;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -182,10 +182,10 @@ impl Screen {
         &self,
         buffer_char_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> bool {
-        return buffer_char_pos.x >= 0
+        buffer_char_pos.x >= 0
             && buffer_char_pos.x < self.terminal_width as i32
             && buffer_char_pos.y >= 0
-            && buffer_char_pos.y < self.terminal_height as i32;
+            && buffer_char_pos.y < self.terminal_height as i32
     }
 
     pub fn rotate(&mut self, rotation: QuarterTurnsCcw) {
@@ -354,7 +354,7 @@ impl Screen {
     }
 
     pub fn get_screen_buffered_glyph(&self, pos: ScreenBufferCharacterSquare) -> &Glyph {
-        return &self.screen_buffer[pos.x as usize][pos.y as usize];
+        &self.screen_buffer[pos.x as usize][pos.y as usize]
     }
     pub fn get_glyphs_at_screen_square(&self, square: ScreenBufferSquare) -> DoubleGlyph {
         self.screen_buffer_square_to_both_screen_buffer_character_squares(square)

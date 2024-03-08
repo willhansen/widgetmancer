@@ -17,7 +17,7 @@ use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::relative_interval_location::RelativeIntervalLocation;
 use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
-    QuarterTurnsCcw, TwoDifferentPoints, WorldLine, STEP_ZERO,
+    QuarterTurnsCcw, TwoDifferentPoints, TwoDifferentWorldPoints, STEP_ZERO,
 };
 use crate::DirectedFloatLineTrait;
 use derive_more::Constructor;
@@ -224,12 +224,13 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             let shadow_arc = partial_view_arc.complement();
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
-            let shadow_line_from_center: WorldLine = TwoDifferentPoints::new_from_two_points(
-                point2(0.0, 0.0),
-                WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle())
-                    .to_point()
-                    .cast_unit(),
-            );
+            let shadow_line_from_center: TwoDifferentWorldPoints =
+                TwoDifferentPoints::new_from_two_points(
+                    point2(0.0, 0.0),
+                    WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle())
+                        .to_point()
+                        .cast_unit(),
+                );
             let point_in_shadow: WorldPoint =
                 WorldPoint::unit_vector_from_angle(shadow_arc.center_angle())
                     .to_point()

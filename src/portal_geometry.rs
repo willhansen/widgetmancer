@@ -8,6 +8,7 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
+use crate::line_segment::FloatLineSegment;
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::{
     AbsoluteWorldCoordinate, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
@@ -17,9 +18,8 @@ use crate::utility::{
     first_inside_square_face_hit_by_ray, is_orthogonal, ith_projection_of_step, naive_ray_endpoint,
     revolve_square, AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw,
     RelativeSquareWithOrthogonalDir, RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir,
-    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    StepWithQuarterRotations, TwoDifferentWorldPoints, STEP_RIGHT, STEP_ZERO,
 };
-use crate::FloatLineSegment;
 use crate::FloatLineTrait;
 use crate::LineTrait;
 
@@ -275,7 +275,7 @@ impl PortalGeometry {
         mut start: WorldPoint,
         mut angle: Angle<f32>,
         mut range: f32,
-    ) -> Vec<WorldLine> {
+    ) -> Vec<TwoDifferentWorldPoints> {
         assert!(range > 0.0);
         let mut naive_line_segments = vec![];
         let STEP_BACK_DISTANCE = 0.001;
@@ -287,8 +287,10 @@ impl PortalGeometry {
                 let stepped_back_intersection_point =
                     naive_ray_endpoint(intersection_point, angle, -STEP_BACK_DISTANCE);
 
-                let new_line =
-                    WorldLine::new_from_two_points(start, stepped_back_intersection_point);
+                let new_line = TwoDifferentWorldPoints::new_from_two_points(
+                    start,
+                    stepped_back_intersection_point,
+                );
                 naive_line_segments.push(new_line);
                 range -= new_line.length();
 
@@ -300,7 +302,7 @@ impl PortalGeometry {
                 let stepped_forward_start = naive_ray_endpoint(start, angle, STEP_BACK_DISTANCE);
                 start = stepped_forward_start;
             } else {
-                naive_line_segments.push(WorldLine::from_ray(start, angle, range));
+                naive_line_segments.push(TwoDifferentWorldPoints::from_ray(start, angle, range));
                 range = 0.0;
             }
         }
@@ -401,7 +403,7 @@ mod tests {
             portal_geometry.ray_to_naive_line_segments(point2(3.0, 3.0), Angle::degrees(90.0), 1.0);
         let squares = segments
             .iter()
-            .flat_map(WorldLine::touched_squares)
+            .flat_map(TwoDifferentWorldPoints::touched_squares)
             .collect_vec();
         assert_eq!(squares.len(), 2);
     }

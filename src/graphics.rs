@@ -438,7 +438,7 @@ impl Graphics {
     pub fn draw_floating_hunter_drone(
         &mut self,
         drone: &FloatingHunterDrone,
-        sight_line_segments: &Vec<WorldLine>,
+        sight_line_segments: &Vec<TwoDifferentWorldPoints>,
     ) {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1(), line.p2(), SIGHT_LINE_SEEKING_COLOR);

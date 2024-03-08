@@ -171,9 +171,9 @@ pub fn local_square_point_to_local_character_point(
 
 // TODO: make this more general
 pub fn world_half_plane_to_local_square_half_plane(
-    world_half_plane: HalfPlane<WorldLine>,
+    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
     ref_square: WorldSquare,
-) -> HalfPlane<LocalSquareLine> {
+) -> HalfPlane<TwoDifferentLocalSquarePoints> {
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
@@ -187,9 +187,9 @@ pub fn local_square_half_plane_to_local_character_half_plane(
 }
 
 pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<WorldLine>,
+    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
     ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<LocalCharacterLine> {
+) -> HalfPlane<TwoDifferentLocalCharacterPoints> {
     world_half_plane
         .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }

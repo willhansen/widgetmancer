@@ -231,7 +231,7 @@ fn get_character_from_snap_points(
 }
 
 pub fn half_plane_to_angled_block_character(
-    half_plane: HalfPlane<LocalCharacterLine>,
+    half_plane: HalfPlane<TwoDifferentLocalCharacterPoints>,
     bias_direction: Angle<f32>,
 ) -> char {
     // angle blocks have important edge points
@@ -297,7 +297,7 @@ pub fn half_plane_to_angled_block_character(
             half_plane.dividing_line().p2(),
             half_plane.point_on_half_plane(),
         ) {
-            grid_line.reverse();
+            grid_line = grid_line.reversed();
         }
         get_character_from_snap_points(grid_line)
     }

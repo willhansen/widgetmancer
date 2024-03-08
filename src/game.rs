@@ -801,9 +801,9 @@ impl Game {
     }
 
     fn raycast(&self, start_point: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
-        let naive_line = WorldLine::from_ray(start_point, direction, range);
+        let naive_line = TwoDifferentWorldPoints::from_ray(start_point, direction, range);
 
-        let line_segments_after_portal_awareness: Vec<WorldLine> = self
+        let line_segments_after_portal_awareness: Vec<TwoDifferentWorldPoints> = self
             .portal_geometry
             .ray_to_naive_line_segments(start_point, direction, range);
 
@@ -1870,7 +1870,7 @@ impl Game {
                     .rotate_vect(Angle::radians(rotation_if_uniform))
                     .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
-            let line = WorldLine::new_from_two_points(line_start.to_f32(), line_end);
+            let line = TwoDifferentWorldPoints::new_from_two_points(line_start.to_f32(), line_end);
 
             for square in line.touched_squares() {
                 if self.is_non_player_piece_at(square) {

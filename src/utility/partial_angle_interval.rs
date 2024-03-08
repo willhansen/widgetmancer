@@ -163,10 +163,10 @@ impl PartialAngleInterval {
             rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
         ];
 
-        let center_angle = better_angle_from_x_axis(rel_square_center);
+        let center_angle = rel_square_center.better_angle_from_x_axis();
         let corner_angles: Vec<Angle<f32>> = rel_square_corners
             .iter()
-            .map(|rel_corner_point| better_angle_from_x_axis(*rel_corner_point))
+            .map(|rel_corner_point| rel_corner_point.better_angle_from_x_axis())
             .collect();
 
         let most_clockwise = corner_angles

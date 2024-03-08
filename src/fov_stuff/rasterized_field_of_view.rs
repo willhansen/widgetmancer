@@ -18,9 +18,10 @@ use crate::utility::poses::StepWithQuarterRotations;
 use crate::utility::RigidTransform;
 use crate::utility::RigidlyTransformable;
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, CoordToString, QuarterTurnRotatable,
-    QuarterTurnsCcw, SimpleResult, TupleClone, STEP_ZERO,
+    king_step_distance, number_to_hue_rotation, QuarterTurnRotatable, QuarterTurnsCcw,
+    SimpleResult, TupleClone, STEP_ZERO,
 };
+use crate::Coordinate;
 use ambassador::delegatable_trait;
 use derive_more::{Constructor, Display};
 use itertools::Itertools;

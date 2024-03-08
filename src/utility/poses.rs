@@ -4,7 +4,7 @@ use super::{
     coordinate_frame_conversions::*,
     coordinates::*,
     general_utility::*,
-    line::{square_face_as_line, WorldLine},
+    line::{square_face_as_line, TwoDifferentWorldPoints},
     RigidTransform, RigidlyTransformable,
 };
 
@@ -201,7 +201,7 @@ where
     }
     // TODO: make return type relative to Self::UnitType?
     // TODO: return AbsOrRelWorldLine
-    pub fn face_line_segment(&self) -> WorldLine {
+    pub fn face_line_segment(&self) -> TwoDifferentWorldPoints {
         let abs_face = self.as_absolute_face();
         square_face_as_line(abs_face.square, abs_face.dir)
     }

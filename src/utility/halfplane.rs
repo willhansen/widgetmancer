@@ -4,7 +4,7 @@ use super::{
 };
 use euclid::num::Zero;
 
-pub type WorldHalfPlane = HalfPlane<WorldLine>;
+pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
 
 pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
 pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
@@ -15,7 +15,7 @@ pub type LocalCharacterHalfPlaneSplittingUnitSquare =
 
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<LineType = FloatingPointLine>
+pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
 where
     LineType: DirectedFloatLineTrait,
 {
@@ -110,7 +110,7 @@ where
     }
 
     pub fn point_on_half_plane(&self) -> LineType::PointType {
-        self.dividing_line.a_point_right_of_line()
+        self.dividing_line.arbitrary_point_right_of_line()
     }
 
     pub fn point_off_half_plane(&self) -> LineType::PointType {
@@ -799,7 +799,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_unit_square() {
         let f = |top_y: f32, tolerance: f32| {
-            HalfPlane::<WorldLine>::new_with_inside_down(top_y)
+            HalfPlane::<TwoDifferentWorldPoints>::new_with_inside_down(top_y)
                 .coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
         use RelativeIntervalLocation::*;

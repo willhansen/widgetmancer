@@ -6,8 +6,8 @@ use crate::utility::coordinates::*;
 use crate::utility::line::FloatLineTrait;
 use crate::utility::poses::RelativeFace;
 use crate::utility::{
-    faces_away_from_center_at_rel_square, CoordToString, RelativeSquareWithOrthogonalDir,
-    RigidTransform, RigidlyTransformable, STEP_ZERO,
+    faces_away_from_center_at_rel_square, RelativeSquareWithOrthogonalDir, RigidTransform,
+    RigidlyTransformable, STEP_ZERO,
 };
 use euclid::{point2, Angle};
 use itertools::{all, Itertools};
