@@ -125,8 +125,8 @@ where
     type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
     const IS_ABSOLUTE: bool;
 
-    type Floating: Coordinate<DataType = f32, UnitType = Self::UnitType>;
-    type OnGrid: Coordinate<DataType = i32, UnitType = Self::UnitType>;
+    type Floating: FloatCoordinate<UnitType = Self::UnitType>;
+    type OnGrid: IntCoordinate<UnitType = Self::UnitType>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
