@@ -15,7 +15,7 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{
-    first_inside_square_face_hit_by_ray, is_orthogonal, ith_projection_of_step, naive_ray_endpoint,
+    first_inside_square_face_hit_by_ray, ith_projection_of_step, naive_ray_endpoint,
     revolve_square, AbsOrRelSquareWithOrthogonalDir, QuarterTurnsCcw,
     RelativeSquareWithOrthogonalDir, RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir,
     StepWithQuarterRotations, TwoDifferentWorldPoints, STEP_RIGHT, STEP_ZERO,

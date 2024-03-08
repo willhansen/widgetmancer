@@ -297,7 +297,7 @@ impl Game {
     }
 
     pub fn try_slide_player(&mut self, movement: WorldStep) -> Result<(), ()> {
-        assert!(is_orthodiagonal(movement));
+        assert!(movement.is_orthodiagonal());
         let movement_direction = round_to_king_step(movement);
         let movement_length = king_step_distance(movement);
         self.try_slide_player_by_direction(movement_direction.into(), movement_length)
@@ -461,7 +461,7 @@ impl Game {
     }
 
     pub fn player_blink(&mut self, direction: WorldStep) {
-        assert!(is_king_step(direction));
+        assert!(direction.is_king_step());
         let start_square = self.player_square();
         let blink_range = self.player().blink_range as i32;
         let ideal_end_square = start_square + direction * blink_range;
@@ -1398,7 +1398,7 @@ impl Game {
         for i in 0..range_cap {
             let distance = i + 1;
             // TODO: Allow knights to step through portals (probably by line-of-sight between start and end squares)
-            let square = if is_king_step(repeating_step.stepp()) {
+            let square = if repeating_step.stepp().is_king_step() {
                 if let Ok(end_pose) = self.multiple_portal_aware_steps(
                     SquareWithKingDir::from_square_and_step(
                         start_square,

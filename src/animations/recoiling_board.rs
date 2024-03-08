@@ -5,9 +5,8 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
-use crate::utility::coordinates::{
-    is_diagonal_king_step, round_to_king_step, OrthogonalWorldStep, RIGHT_I,
-};
+use crate::utility::coordinates::{round_to_king_step, OrthogonalWorldStep, RIGHT_I};
+use crate::IntCoordinate;
 use euclid::Length;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
@@ -34,7 +33,7 @@ impl RecoilingBoardAnimation {
         floor_color_enum: FloorColorEnum,
     ) -> RecoilingBoardAnimation {
         let mut orthogonalized_step = round_to_king_step(shot_direction);
-        if is_diagonal_king_step(orthogonalized_step) {
+        if orthogonalized_step.is_diagonal_king_step() {
             orthogonalized_step.y = 0;
         }
 

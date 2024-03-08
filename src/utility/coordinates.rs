@@ -212,6 +212,18 @@ where
         let onto = onto.into();
         onto * (self.dot(onto) / onto.square_length())
     }
+    fn is_orthogonal(&self) -> bool {
+        self.x() == Self::DataType::zero() || self.y() == Self::DataType::zero()
+    }
+    fn is_diagonal(&self) -> bool {
+        self.x() == self.y() || self.x() == self.y().neg()
+    }
+    fn is_orthodiagonal(&self) -> bool {
+        self.is_orthogonal() || self.is_diagonal()
+    }
+    fn is_unit_length(&self) -> bool {
+        self.square_length() == Self::DataType::one()
+    }
 }
 
 impl<T, U> Coordinate for Point2D<T, U>
@@ -331,6 +343,25 @@ where
 // {
 // }
 
+trait_alias_macro!(pub trait IntCoordinateTraitBounds = Coordinate<DataType = i32> + Hash + Eq);
+// TODO: name `GridCoordinate` instead?
+pub trait IntCoordinate: IntCoordinateTraitBounds {
+    fn is_orthogonal_king_step(&self) -> bool {
+        self.square_length() == 1
+    }
+
+    fn is_diagonal_king_step(&self) -> bool {
+        self.square_length() == 2
+    }
+    fn is_king_step(&self) -> bool {
+        self.is_orthogonal_king_step() || self.is_diagonal_king_step()
+    }
+}
+// TODO: convert to auto trait when stable
+impl<T> IntCoordinate for T where T: IntCoordinateTraitBounds {}
+
+trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
+
 pub trait FloatCoordinate: Coordinate<DataType = f32> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
@@ -371,13 +402,14 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
     fn better_angle_from_x_axis(&self) -> Angle<f32> {
         Angle::radians(self.y().atan2(self.x()))
     }
+    fn angle_to(&self, other: Self) -> Angle<f32> {
+        self.better_angle_from_x_axis()
+            .angle_to(other.better_angle_from_x_axis())
+    }
 }
 
 // TODO: convert to auto trait when stable
 impl<T> FloatCoordinate for T where T: Coordinate<DataType = f32> {}
-
-trait_alias_macro!(pub trait GridCoordinate = Coordinate<DataType = i32> + Hash + Eq);
-trait_alias_macro!(pub trait WorldGridCoordinate = GridCoordinate< UnitType = SquareGridInWorldFrame>);
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x()), sign(point.y()))
@@ -453,30 +485,6 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
 
     // truncate towards zero intentionally
     float_step.to_i32()
-}
-
-pub fn is_king_step(step: WorldStep) -> bool {
-    is_orthogonal_king_step(step) || is_diagonal_king_step(step)
-}
-
-pub fn is_orthogonal_king_step(step: WorldStep) -> bool {
-    step.square_length() == 1
-}
-
-pub fn is_diagonal_king_step(step: WorldStep) -> bool {
-    step.square_length() == 2
-}
-
-pub fn is_orthogonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
-    v.x == T::zero() || v.y == T::zero()
-}
-
-pub fn is_diagonal<T: Signed, U>(v: Vector2D<T, U>) -> bool {
-    v.x == v.y || v.x == v.y.neg()
-}
-
-pub fn is_orthodiagonal<T: Signed + Copy, U>(v: Vector2D<T, U>) -> bool {
-    is_orthogonal(v) || is_diagonal(v)
 }
 
 pub fn seeded_rand_radial_offset<P: FloatCoordinate>(rng: &mut StdRng, radius: f32) -> P {
@@ -594,7 +602,7 @@ pub struct KingWorldStep {
 
 impl KingWorldStep {
     pub fn new(dir: WorldStep) -> Self {
-        assert!(is_king_step(dir));
+        assert!(dir.is_king_step());
         KingWorldStep { step: dir }
     }
     pub fn step(&self) -> WorldStep {
@@ -628,20 +636,23 @@ impl From<KingWorldStep> for WorldStep {
 }
 
 #[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy, Default)]
-pub struct OrthogonalWorldStep {
-    step: WorldStep,
+pub struct OrthogonalUnitCoordinate<T: Coordinate> {
+    step: T,
 }
 
-impl OrthogonalWorldStep {
-    pub fn new(dir: impl Into<WorldStep>) -> Self {
+pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
+
+impl<P: Coordinate> OrthogonalUnitCoordinate<P> {
+    pub fn new(dir: impl Into<P>) -> Self {
         let dir = dir.into();
-        assert!(is_orthogonal_king_step(dir));
-        OrthogonalWorldStep { step: dir }
+        assert!(dir.is_unit_length());
+        assert!(dir.is_orthogonal());
+        OrthogonalUnitCoordinate { step: dir }
     }
-    pub fn step(&self) -> WorldStep {
+    pub fn step(&self) -> P {
         self.step
     }
-    pub fn pos_on_axis(&self, pos: WorldStep) -> i32 {
+    pub fn pos_on_axis(&self, pos: P) -> P::DataType {
         self.step().dot(pos)
     }
 }
@@ -685,7 +696,7 @@ pub fn cross_correlate_squares_with_steps(
     step_count_map
 }
 pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
-    assert!(is_king_step(dir));
+    assert!(dir.is_king_step());
     if ORTHOGONAL_STEPS.contains(&dir) {
         if dir.x != 0 {
             HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
@@ -735,7 +746,7 @@ impl QuarterTurnsCcw {
         (0..4).map(|x| x.into())
     }
     pub fn from_vector(dir: WorldStep) -> Self {
-        assert!(is_orthogonal(dir));
+        assert!(dir.is_orthogonal());
         QuarterTurnsCcw::new(if dir.x == 0 {
             if dir.y > 0 {
                 1
@@ -751,16 +762,11 @@ impl QuarterTurnsCcw {
         })
     }
 
-    pub fn from_start_and_end_directions(
-        start: impl Into<WorldStep>,
-        end: impl Into<WorldStep>,
-    ) -> Self {
-        let start = start.into();
-        let end = end.into();
-        assert!(is_king_step(start));
-        assert!(is_king_step(end));
+    pub fn from_start_and_end_directions<P: IntCoordinate>(start: P, end: P) -> Self {
+        assert!(start.is_king_step());
+        assert!(end.is_king_step());
         // needs to be quarter turn, no eighths
-        assert_eq!(is_diagonal(start), is_diagonal(end));
+        assert_eq!(start.is_diagonal(), end.is_diagonal());
 
         let d_angle = start.to_f32().angle_to(end.to_f32());
         let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;

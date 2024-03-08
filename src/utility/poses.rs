@@ -46,10 +46,10 @@ impl Add for StepWithQuarterRotations {
 #[get_copy = "pub"]
 pub struct AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: WorldGridCoordinate,
+    SquareType: WorldIntCoordinate,
 {
     square: SquareType,
-    dir: OrthogonalWorldStep,
+    dir: OrthogonalUnitCoordinate<SquareType::Relative>,
 }
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
@@ -59,7 +59,7 @@ pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
 impl<SquareType> AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: WorldGridCoordinate,
+    SquareType: WorldIntCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
         QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT, self.dir)
@@ -76,7 +76,7 @@ where
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::from_square_and_step(square, quarter_turns.to_orthogonal_direction())
     }
-    pub fn direction(&self) -> OrthogonalWorldStep {
+    pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType::Relative> {
         self.dir()
     }
     pub fn stepped(&self) -> Self {
@@ -217,7 +217,7 @@ where
     }
 }
 
-impl<T: WorldGridCoordinate> Debug for AbsOrRelSquareWithOrthogonalDir<T>
+impl<T: WorldIntCoordinate> Debug for AbsOrRelSquareWithOrthogonalDir<T>
 where
     Self: Display,
 {
@@ -225,7 +225,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: WorldGridCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
+impl<T: WorldIntCoordinate> Display for AbsOrRelSquareWithOrthogonalDir<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -376,7 +376,7 @@ impl<ConvertableToSquareType, SquareType, DirectionType>
     From<(ConvertableToSquareType, DirectionType)> for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
     ConvertableToSquareType: Into<SquareType>,
-    SquareType: WorldGridCoordinate,
+    SquareType: WorldIntCoordinate,
     DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
@@ -388,7 +388,7 @@ impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
     for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
     (T, T): Into<SquareType>,
-    SquareType: WorldGridCoordinate,
+    SquareType: WorldIntCoordinate,
     DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (T, T, DirectionType)) -> Self {
@@ -399,7 +399,7 @@ where
 impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
     for (SquareType, OrthogonalWorldStep)
 where
-    SquareType: WorldGridCoordinate,
+    SquareType: WorldIntCoordinate,
 {
     fn from(
         value: AbsOrRelSquareWithOrthogonalDir<SquareType>,
@@ -461,7 +461,7 @@ pub struct TranslationAndRotationTransform {
 }
 impl<SquareType> RigidlyTransformable for AbsOrRelSquareWithOrthogonalDir<SquareType>
 where
-    SquareType: Copy + RigidlyTransformable + WorldGridCoordinate,
+    SquareType: Copy + RigidlyTransformable + WorldIntCoordinate,
 {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::from_square_and_step(
@@ -481,7 +481,7 @@ pub fn faces_away_from_center_at_rel_square(
         .collect()
 }
 
-pub fn squares_sharing_face<SquareType: WorldGridCoordinate>(
+pub fn squares_sharing_face<SquareType: WorldIntCoordinate>(
     face: AbsOrRelSquareWithOrthogonalDir<SquareType>,
 ) -> [SquareType; 2] {
     [face.square, face.stepped().square]

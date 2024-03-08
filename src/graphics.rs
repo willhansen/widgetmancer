@@ -119,7 +119,7 @@ impl Graphics {
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
-        return if self
+        if self
             .screen
             .world_square_is_at_least_partially_on_screen(square)
         {
@@ -133,7 +133,7 @@ impl Graphics {
             )
         } else {
             0
-        };
+        }
     }
 
     pub fn clear_draw_buffer(&mut self) {
