@@ -112,7 +112,6 @@ pub trait Coordinate:
     // + Display // TODO
     + Neg<Output = Self>
     + From<(Self::DataType, Self::DataType)>
-// TODO: find out why this one isn't working
 // + IntoIterator + FromIterator // TODO
 where
     Self::DataType: CoordinateDataTypeTrait,
@@ -173,6 +172,9 @@ where
     }
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
+    fn cast_metadata<Other: Coordinate<DataType = Self::DataType>>(&self) -> Other {
+        Other::new(self.x(), self.y())
+    }
 
     make_cast_function!(to_f32, f32, Self::Floating);
     make_cast_function!(to_i32, i32, Self::OnGrid);
@@ -343,9 +345,12 @@ where
 // {
 // }
 
-trait_alias_macro!(pub trait IntCoordinateTraitBounds = Coordinate<DataType = i32> + Hash + Eq);
-// TODO: name `GridCoordinate` instead?
-pub trait IntCoordinate: IntCoordinateTraitBounds {
+pub trait IntCoordinate:
+    Coordinate<DataType = i32, Relative = Self::_Relative, Absolute = Self::_Absolute> + Hash + Eq
+{
+    type _Relative: IntCoordinate<UnitType = Self::UnitType>;
+    type _Absolute: IntCoordinate<UnitType = Self::UnitType>;
+
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
     }
@@ -358,7 +363,16 @@ pub trait IntCoordinate: IntCoordinateTraitBounds {
     }
 }
 // TODO: convert to auto trait when stable
-impl<T> IntCoordinate for T where T: IntCoordinateTraitBounds {}
+// TODO: Same trait bounds are copy pasted from main trait declaration
+impl<T> IntCoordinate for T
+where
+    T: Coordinate<DataType = i32, Relative = Self::_Relative, Absolute = Self::_Absolute>
+        + Hash
+        + Eq,
+{
+    type _Relative = Self::Relative;
+    type _Absolute = Self::Absolute;
+}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
 
