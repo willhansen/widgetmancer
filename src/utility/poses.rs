@@ -49,7 +49,7 @@ where
     SquareType: WorldGridCoordinate,
 {
     square: SquareType,
-    dir: OrthogonalCoord,
+    dir: OrthogonalWorldStep,
 }
 
 pub type SquareWithOrthogonalDir = AbsOrRelSquareWithOrthogonalDir<WorldSquare>;
@@ -66,7 +66,7 @@ where
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
-        direction: impl Into<OrthogonalCoord>,
+        direction: impl Into<OrthogonalWorldStep>,
     ) -> Self {
         Self {
             square: square.into(),
@@ -76,7 +76,7 @@ where
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::from_square_and_step(square, quarter_turns.to_orthogonal_direction())
     }
-    pub fn direction(&self) -> OrthogonalCoord {
+    pub fn direction(&self) -> OrthogonalWorldStep {
         self.dir()
     }
     pub fn stepped(&self) -> Self {
@@ -136,10 +136,10 @@ where
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(self.square, self.right())
     }
-    fn left(&self) -> OrthogonalCoord {
+    fn left(&self) -> OrthogonalWorldStep {
         self.direction().quarter_rotated_ccw(1)
     }
-    fn right(&self) -> OrthogonalCoord {
+    fn right(&self) -> OrthogonalWorldStep {
         self.direction().quarter_rotated_ccw(3)
     }
     pub fn turned_back(&self) -> Self {
@@ -377,7 +377,7 @@ impl<ConvertableToSquareType, SquareType, DirectionType>
 where
     ConvertableToSquareType: Into<SquareType>,
     SquareType: WorldGridCoordinate,
-    DirectionType: Into<OrthogonalCoord>,
+    DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
         Self::from_square_and_step(value.0.into(), value.1)
@@ -389,18 +389,21 @@ impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
 where
     (T, T): Into<SquareType>,
     SquareType: WorldGridCoordinate,
-    DirectionType: Into<OrthogonalCoord>,
+    DirectionType: Into<OrthogonalWorldStep>,
 {
     fn from(value: (T, T, DirectionType)) -> Self {
         Self::from_square_and_step((value.0, value.1).into(), value.2)
     }
 }
 
-impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>> for (SquareType, OrthogonalCoord)
+impl<SquareType> From<AbsOrRelSquareWithOrthogonalDir<SquareType>>
+    for (SquareType, OrthogonalWorldStep)
 where
     SquareType: WorldGridCoordinate,
 {
-    fn from(value: AbsOrRelSquareWithOrthogonalDir<SquareType>) -> (SquareType, OrthogonalCoord) {
+    fn from(
+        value: AbsOrRelSquareWithOrthogonalDir<SquareType>,
+    ) -> (SquareType, OrthogonalWorldStep) {
         (value.square, value.direction())
     }
 }

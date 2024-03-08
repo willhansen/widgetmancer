@@ -684,7 +684,7 @@ pub fn first_inside_square_face_hit_by_ray(
 }
 pub fn square_face_as_line(
     square: WorldSquare,
-    face_direction: OrthogonalCoord,
+    face_direction: OrthogonalWorldStep,
 ) -> TwoDifferentWorldPoints {
     let square_center = square.to_f32();
     let face_center = square_center + face_direction.step().to_f32() * 0.5;

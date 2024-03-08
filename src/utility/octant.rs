@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use euclid::Angle;
 
 use super::FAngle;
-use super::OrthogonalCoord;
+use super::OrthogonalWorldStep;
 use super::{QuarterTurnsCcw, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -16,7 +16,7 @@ impl Octant {
     pub fn with_n_quarter_turns_anticlockwise(&self, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::new(self.0 + quarter_turns.quarter_turns() * 2)
     }
-    pub fn outward_and_across_directions(&self) -> (OrthogonalCoord, OrthogonalCoord) {
+    pub fn outward_and_across_directions(&self) -> (OrthogonalWorldStep, OrthogonalWorldStep) {
         // TODO: probably make this an actual equation
         let world_step = match self.0 {
             0 => (STEP_RIGHT, STEP_UP),
@@ -36,8 +36,8 @@ impl Octant {
     }
 
     pub fn from_outward_and_across_directions(
-        outward_direction: OrthogonalCoord,
-        across_direction: OrthogonalCoord,
+        outward_direction: OrthogonalWorldStep,
+        across_direction: OrthogonalWorldStep,
     ) -> Self {
         // TODO: probably make this an actual equation
         let step_pair = (outward_direction.step(), across_direction.step());

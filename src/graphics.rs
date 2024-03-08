@@ -466,7 +466,7 @@ impl Graphics {
     }
     pub fn draw_floor_push_arrows(
         &mut self,
-        floor_push_arrows: &HashMap<WorldSquare, OrthogonalCoord>,
+        floor_push_arrows: &HashMap<WorldSquare, OrthogonalWorldStep>,
     ) {
         floor_push_arrows.iter().for_each(|(&square, &dir)| {
             self.draw_drawable_to_draw_buffer(
@@ -477,7 +477,7 @@ impl Graphics {
     }
     pub fn draw_conveyor_belts(
         &mut self,
-        conveyor_belts: &HashMap<WorldSquare, OrthogonalCoord>,
+        conveyor_belts: &HashMap<WorldSquare, OrthogonalWorldStep>,
         global_phase: f32,
     ) {
         conveyor_belts.iter().for_each(|(&square, &dir)| {

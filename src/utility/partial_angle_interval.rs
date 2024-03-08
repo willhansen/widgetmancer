@@ -16,7 +16,7 @@ use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
-    abs_angle_distance, standardize_angle, Octant, OrthogonalCoord, QuarterTurnsCcw,
+    abs_angle_distance, standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsCcw,
     RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
@@ -184,7 +184,7 @@ impl PartialAngleInterval {
         }
     }
     pub fn from_relative_square_face(rel_face: impl Into<RelativeFace>) -> Self {
-        let (relative_square, face_direction): (WorldStep, OrthogonalCoord) =
+        let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
         let face_center = square_center + face_direction.step().to_f32() / 2.0;

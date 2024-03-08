@@ -8,7 +8,7 @@ use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::coordinates::{
     point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle, FloatCoordinate,
-    OrthogonalCoord,
+    OrthogonalWorldStep,
 };
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
@@ -101,7 +101,7 @@ impl SquareVisibilityFromOneLargeShadow {
             .ordered_line_intersections_with_centered_unit_square()
     }
 
-    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalCoord>) -> Self {
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
         Self::half_visible(
             (-which_half_visible.into())
                 .step()

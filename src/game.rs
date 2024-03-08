@@ -130,8 +130,8 @@ enum GridEntity {
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum FloorFeature {
-    PushArrow(OrthogonalCoord),
-    ConveyorBelt(OrthogonalCoord),
+    PushArrow(OrthogonalWorldStep),
+    ConveyorBelt(OrthogonalWorldStep),
 }
 
 pub struct Player {
@@ -188,8 +188,8 @@ pub struct Game {
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     widgets: HashMap<WorldSquare, Widget>,
-    floor_push_arrows: HashMap<WorldSquare, OrthogonalCoord>,
-    conveyor_belts: HashMap<WorldSquare, OrthogonalCoord>,
+    floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
+    conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,

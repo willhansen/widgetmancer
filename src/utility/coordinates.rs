@@ -262,12 +262,12 @@ where
         vec2(x, y)
     }
 }
-impl<T> From<(T, T)> for OrthogonalCoord
+impl<T> From<(T, T)> for OrthogonalWorldStep
 where
     (T, T): Into<WorldStep>,
 {
     fn from(value: (T, T)) -> Self {
-        OrthogonalCoord::new(value)
+        OrthogonalWorldStep::new(value)
     }
 }
 
@@ -549,7 +549,7 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     }
 }
 
-pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalCoord) -> i32 {
+pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
     step.project_onto_vector(axis.step).dot(axis.step)
 }
 pub fn square_is_odd(square: WorldSquare) -> bool {
@@ -577,7 +577,7 @@ pub fn check_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) -> OkOrMessage 
 pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
     check_about_eq_2d(p1, p2).unwrap();
 }
-pub fn sorted_left_to_right(faces: [OrthogonalCoord; 2]) -> [OrthogonalCoord; 2] {
+pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
     if faces[0] == faces[1].quarter_rotated_ccw(QuarterTurnsCcw::new(1)) {
@@ -615,8 +615,8 @@ impl From<WorldStep> for KingWorldStep {
     }
 }
 
-impl From<OrthogonalCoord> for KingWorldStep {
-    fn from(value: OrthogonalCoord) -> Self {
+impl From<OrthogonalWorldStep> for KingWorldStep {
+    fn from(value: OrthogonalWorldStep) -> Self {
         KingWorldStep::new(value.step)
     }
 }
@@ -628,15 +628,15 @@ impl From<KingWorldStep> for WorldStep {
 }
 
 #[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy, Default)]
-pub struct OrthogonalCoord {
+pub struct OrthogonalWorldStep {
     step: WorldStep,
 }
 
-impl OrthogonalCoord {
+impl OrthogonalWorldStep {
     pub fn new(dir: impl Into<WorldStep>) -> Self {
         let dir = dir.into();
         assert!(is_orthogonal_king_step(dir));
-        OrthogonalCoord { step: dir }
+        OrthogonalWorldStep { step: dir }
     }
     pub fn step(&self) -> WorldStep {
         self.step
@@ -647,27 +647,27 @@ impl OrthogonalCoord {
 }
 
 // TODO: generate with macro
-impl QuarterTurnRotatable for OrthogonalCoord {
+impl QuarterTurnRotatable for OrthogonalWorldStep {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
 
-impl From<WorldStep> for OrthogonalCoord {
+impl From<WorldStep> for OrthogonalWorldStep {
     fn from(value: WorldStep) -> Self {
-        OrthogonalCoord::new(value)
+        OrthogonalWorldStep::new(value)
     }
 }
 
-impl From<OrthogonalCoord> for WorldStep {
-    fn from(value: OrthogonalCoord) -> Self {
+impl From<OrthogonalWorldStep> for WorldStep {
+    fn from(value: OrthogonalWorldStep) -> Self {
         value.step
     }
 }
 
-impl From<KingWorldStep> for OrthogonalCoord {
+impl From<KingWorldStep> for OrthogonalWorldStep {
     fn from(value: KingWorldStep) -> Self {
-        OrthogonalCoord::new(value.step)
+        OrthogonalWorldStep::new(value.step)
     }
 }
 
@@ -710,7 +710,7 @@ impl RigidlyTransformable for WorldStep {
         self.to_point().apply_rigid_transform(tf).to_vector()
     }
 }
-impl RigidlyTransformable for OrthogonalCoord {
+impl RigidlyTransformable for OrthogonalWorldStep {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         tf.rotation().rotate_vector(self.step).into()
     }
