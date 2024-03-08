@@ -6,7 +6,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
 };
 use crate::utility::coordinates::{
-    is_diagonal_king_step, round_to_king_step, OrthogonalWorldStep, RIGHT_I,
+    is_diagonal_king_step, round_to_king_step, OrthogonalCoord, RIGHT_I,
 };
 use euclid::Length;
 use std::f32::consts::PI;
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
-    orthogonal_shot_direction: OrthogonalWorldStep,
+    orthogonal_shot_direction: OrthogonalCoord,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
 }

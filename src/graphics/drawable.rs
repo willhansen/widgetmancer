@@ -25,7 +25,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
-    tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
+    tint_color, KingWorldStep, OrthogonalCoord, QuarterTurnRotatable, QuarterTurnsCcw,
 };
 
 #[delegatable_trait]
@@ -417,13 +417,13 @@ impl Drawable for ArrowDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct ConveyorBeltDrawable {
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalCoord,
     normalized_phase_offset: f32,
     colors: [RGB8; 2],
 }
 
 impl ConveyorBeltDrawable {
-    pub fn new(direction: OrthogonalWorldStep, phase_offset: f32) -> Self {
+    pub fn new(direction: OrthogonalCoord, phase_offset: f32) -> Self {
         ConveyorBeltDrawable {
             direction,
             normalized_phase_offset: phase_offset,

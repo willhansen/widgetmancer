@@ -16,7 +16,7 @@ use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::utility::round_robin_iterator::round_robin;
 use crate::utility::{
-    abs_angle_distance, partial_angle_interval, standardize_angle, Octant, OrthogonalWorldStep,
+    abs_angle_distance, partial_angle_interval, standardize_angle, Octant, OrthogonalCoord,
     QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
     STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };

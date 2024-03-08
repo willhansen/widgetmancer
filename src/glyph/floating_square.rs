@@ -280,7 +280,7 @@ pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleCha
 }
 
 pub fn characters_for_full_square_with_1d_offset(
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalCoord,
     fraction_of_full_square_in_direction: f32,
 ) -> DoubleChar {
     let is_vertical = direction.step().x == 0;
@@ -304,7 +304,7 @@ pub fn characters_for_full_square_with_1d_offset(
     }
 }
 pub fn characters_for_full_square_with_looping_1d_offset(
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalCoord,
     fraction_of_full_square_in_direction: f32,
 ) -> DoubleChar {
     characters_for_full_square_with_1d_offset(

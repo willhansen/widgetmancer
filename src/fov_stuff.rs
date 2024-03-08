@@ -10,7 +10,7 @@ use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
-use crate::utility::coordinates::{king_step_distance, OrthogonalWorldStep};
+use crate::utility::coordinates::{king_step_distance, OrthogonalCoord};
 use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
@@ -469,8 +469,8 @@ impl RigidlyTransformable for FieldOfView {
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct OctantFOVSquareSequenceIter {
-    outward_dir: OrthogonalWorldStep,
-    across_dir: OrthogonalWorldStep,
+    outward_dir: OrthogonalCoord,
+    across_dir: OrthogonalCoord,
     outward_steps: u32,
     across_steps: u32,
 }
