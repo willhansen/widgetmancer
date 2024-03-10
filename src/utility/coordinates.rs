@@ -101,9 +101,8 @@ macro_rules! make_cast_function {
 pub trait Coordinate:
     Copy
     + PartialEq
-    + Add<Self::Relative, Output = Self>
-    + Sub<Self::Relative, Output = Self>
-    + Sub<Self, Output = Self::Relative>
+    + Add<Self>
+    + Sub<Self>
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
@@ -120,9 +119,13 @@ where
     type UnitType;
 
     // TODO: make actually relative
+
+    #[deprecated(note = "TODO: put in wrapper type")]
     type Relative: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
     // TODO: make actually relative
+    #[deprecated(note = "TODO: put in wrapper type")]
     type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
+    #[deprecated(note = "TODO: put in wrapper type")]
     const IS_ABSOLUTE: bool;
 
     type Floating: FloatCoordinate<UnitType = Self::UnitType>;
@@ -228,30 +231,6 @@ where
     }
 }
 
-impl<T, U> Coordinate for Point2D<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
-    type DataType = T;
-    type UnitType = U;
-    type Relative = Vector2D<T, U>;
-    type Absolute = Self;
-    type Floating = Point2D<f32, U>;
-    type OnGrid = Point2D<i32, U>;
-    const IS_ABSOLUTE: bool = true;
-
-    fn x(&self) -> T {
-        self.x
-    }
-
-    fn y(&self) -> T {
-        self.y
-    }
-
-    fn new(x: T, y: T) -> Self {
-        point2(x, y)
-    }
-}
 impl<T, U> Coordinate for Vector2D<T, U>
 where
     T: CoordinateDataTypeTrait,
@@ -345,12 +324,7 @@ where
 // {
 // }
 
-pub trait IntCoordinate:
-    Coordinate<DataType = i32, Relative = Self::_Relative, Absolute = Self::_Absolute> + Hash + Eq
-{
-    type _Relative: IntCoordinate<UnitType = Self::UnitType>;
-    type _Absolute: IntCoordinate<UnitType = Self::UnitType>;
-
+pub trait IntCoordinate: Coordinate<DataType = i32> + Hash + Eq {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
     }
@@ -363,16 +337,8 @@ pub trait IntCoordinate:
     }
 }
 // TODO: convert to auto trait when stable
-// TODO: Same trait bounds are copy pasted from main trait declaration
-impl<T> IntCoordinate for T
-where
-    T: Coordinate<DataType = i32, Relative = Self::_Relative, Absolute = Self::_Absolute>
-        + Hash
-        + Eq,
-{
-    type _Relative = Self::Relative;
-    type _Absolute = Self::Absolute;
-}
+// TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
+impl<T> IntCoordinate for T where T: Coordinate<DataType = i32> + Hash + Eq {}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
 
