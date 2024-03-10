@@ -18,8 +18,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use enum_as_inner::EnumAsInner;
-use euclid::default::Point2D;
-use euclid::point2;
 use rand::SeedableRng;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};

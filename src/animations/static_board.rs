@@ -2,11 +2,12 @@ use crate::animations::Animation;
 use crate::glyph::glyph_constants::BLACK;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
+use crate::size_2d::Size2D;
 use crate::utility::coordinate_frame_conversions::{
     world_square_to_left_world_character_square, BoardSize, WorldCharacterSquareGlyphMap,
     WorldSquare,
 };
-use euclid::vec2;
+use crate::vec2;
 use std::time::{Duration, Instant};
 
 #[derive(Clone)]
@@ -35,8 +36,8 @@ impl Animation for StaticBoard {
 
     fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
         let mut glyphs = WorldCharacterSquareGlyphMap::new();
-        for x in 0..self.board_size.width {
-            for y in 0..self.board_size.height {
+        for x in 0..self.board_size.width() {
+            for y in 0..self.board_size.height() {
                 let world_square = WorldSquare::new(x as i32, y as i32);
                 let glyph = Glyph::new(' ', BLACK, self.floor_color_enum.color_at(world_square));
                 let left_character_square =

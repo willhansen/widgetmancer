@@ -143,6 +143,21 @@ pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f
     the_clone
 }
 
+pub fn min_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
+    if a < b {
+        a
+    } else {
+        b
+    }
+}
+pub fn max_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
 pub trait TupleClone {
     type TupleType;
     fn tuple_clone(&self) -> Self::TupleType;

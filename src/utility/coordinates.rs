@@ -68,6 +68,11 @@ pub type FAngle = Angle<f32>;
 pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
+pub mod default {
+    pub type Point2D<T> = super::Point2D<T, euclid::UnknownUnit>;
+    pub type Vector2D<T> = super::Vector2D<T, euclid::UnknownUnit>;
+}
+
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
 pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>
@@ -87,7 +92,7 @@ where
 trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
 
 // TODO: is this just a scalar?
-trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + Signed + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
+trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
 macro_rules! make_cast_function {
     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -111,7 +116,6 @@ pub trait Coordinate:
     + Sized
     + Debug
     // + Display // TODO
-    + Neg<Output = Self>
     + From<(Self::DataType, Self::DataType)>
 // + IntoIterator + FromIterator // TODO
 where
@@ -130,9 +134,6 @@ where
     // fn zero() -> Self {
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
-    fn to_point(&self) -> Self::Absolute {
-        Self::Absolute::new(self.x(), self.y())
-    }
     fn tuple(&self) -> (Self::DataType, Self::DataType) {
         (self.x(), self.y())
     }
@@ -173,20 +174,6 @@ where
 
     make_cast_function!(to_f32, f32, Self::Floating);
     make_cast_function!(to_i32, i32, Self::OnGrid);
-
-    fn is_absolute(&self) -> bool {
-        Self::IS_ABSOLUTE
-    }
-    fn is_relative(&self) -> bool {
-        !self.is_absolute()
-    }
-
-    fn as_absolute(&self) -> Self::Absolute {
-        Self::Absolute::new(self.x(), self.y())
-    }
-    fn as_relative(&self) -> Self::Relative {
-        Self::Relative::new(self.x(), self.y())
-    }
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
@@ -229,11 +216,9 @@ where
 {
     type DataType = T;
     type UnitType = U;
-    type Relative = Self;
-    type Absolute = Self;
+
     type Floating = Vector2D<f32, U>;
     type OnGrid = Vector2D<i32, U>;
-    const IS_ABSOLUTE: bool = false;
 
     fn x(&self) -> T {
         self.x
@@ -247,6 +232,23 @@ where
         vec2(x, y)
     }
 }
+
+pub trait UnsignedCoordinate: Coordinate {}
+impl<T> UnsignedCoordinate for T
+where
+    T: Coordinate,
+    T::DataType: num::Unsigned,
+{
+}
+
+pub trait SignedCoordinate: Coordinate + Neg<Output = Self> {}
+impl<T> SignedCoordinate for T
+where
+    T: Coordinate + Neg<Output = Self>,
+    T::DataType: num::Signed,
+{
+}
+
 impl<T> From<(T, T)> for OrthogonalWorldStep
 where
     (T, T): Into<WorldStep>,
@@ -316,7 +318,7 @@ where
 // {
 // }
 
-pub trait IntCoordinate: Coordinate<DataType = i32> + Hash + Eq {
+pub trait IntCoordinate: SignedCoordinate<DataType = i32> + Hash + Eq {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
     }
@@ -330,11 +332,11 @@ pub trait IntCoordinate: Coordinate<DataType = i32> + Hash + Eq {
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> IntCoordinate for T where T: Coordinate<DataType = i32> + Hash + Eq {}
+impl<T> IntCoordinate for T where T: SignedCoordinate<DataType = i32> + Hash + Eq {}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
 
-pub trait FloatCoordinate: Coordinate<DataType = f32> {
+pub trait FloatCoordinate: SignedCoordinate<DataType = f32> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
         // NOTE: 0.5 can be exactly represented by floating point numbers
@@ -381,7 +383,7 @@ pub trait FloatCoordinate: Coordinate<DataType = f32> {
 }
 
 // TODO: convert to auto trait when stable
-impl<T> FloatCoordinate for T where T: Coordinate<DataType = f32> {}
+impl<T> FloatCoordinate for T where T: SignedCoordinate<DataType = f32> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x()), sign(point.y()))
@@ -399,7 +401,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
 }
 
 // TODO: make a coordinate method
-pub fn get_8_octant_transforms_of<PointType: Coordinate>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: SignedCoordinate>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
@@ -410,7 +412,7 @@ pub fn get_8_octant_transforms_of<PointType: Coordinate>(v: PointType) -> Vec<Po
 
 impl<V> QuarterTurnRotatable for V
 where
-    V: Coordinate,
+    V: SignedCoordinate,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
         // if self.is_absolute() {
@@ -467,7 +469,7 @@ pub fn seeded_rand_radial_offset<P: FloatCoordinate>(rng: &mut StdRng, radius: f
     v * radius
 }
 
-pub fn rand_radial_offset(radius: f32) -> euclid::default::Vector2D<f32> {
+pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
 pub fn random_unit_vector() -> FVector {
@@ -608,13 +610,13 @@ impl From<KingWorldStep> for WorldStep {
 }
 
 #[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy, Default)]
-pub struct OrthogonalUnitCoordinate<T: Coordinate> {
+pub struct OrthogonalUnitCoordinate<T: SignedCoordinate> {
     step: T,
 }
 
 pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
 
-impl<P: Coordinate> OrthogonalUnitCoordinate<P> {
+impl<P: SignedCoordinate> OrthogonalUnitCoordinate<P> {
     pub fn new(dir: impl Into<P>) -> Self {
         let dir = dir.into();
         assert!(dir.is_unit_length());
@@ -744,7 +746,7 @@ impl QuarterTurnsCcw {
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
-    pub fn rotate_vector<PointType: Coordinate>(&self, v: PointType) -> PointType {
+    pub fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns)
     }
 }
@@ -844,7 +846,7 @@ pub fn furthest_apart_points<P: FloatCoordinate>(points: Vec<P>) -> [P; 2] {
     furthest_values.try_into().unwrap()
 }
 
-pub fn three_points_are_clockwise<P: Coordinate>(a: P, b: P, c: P) -> bool {
+pub fn three_points_are_clockwise<P: SignedCoordinate>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < P::DataType::zero()
@@ -980,31 +982,31 @@ mod tests {
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            euclid::default::Vector2D::new(0.5, 0.5)
+            Vector2D::new(0.5, 0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             45.0
         );
         assert_about_eq!(
-            euclid::default::Vector2D::new(0.0, 0.5)
+            Vector2D::new(0.0, 0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             90.0
         );
         assert_about_eq!(
-            euclid::default::Vector2D::new(0.0, -0.5)
+            Vector2D::new(0.0, -0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            euclid::default::Vector2D::new(1.0, 0.0)
+            Vector2D::new(1.0, 0.0)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             0.0
         );
         assert_about_eq!(
-            euclid::default::Vector2D::new(-1.0, 0.0)
+            Vector2D::new(-1.0, 0.0)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             180.0
@@ -1013,14 +1015,7 @@ mod tests {
 
     #[test]
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
-        assert!(
-            (euclid::default::Vector2D::new(0.5, 0.5)
-                .angle_from_x_axis()
-                .to_degrees()
-                - 45.0)
-                .abs()
-                > 0.01
-        );
+        assert!((Vector2D::new(0.5, 0.5).angle_from_x_axis().to_degrees() - 45.0).abs() > 0.01);
     }
 
     #[test]
@@ -1127,31 +1122,33 @@ mod tests {
         )
     }
     #[test]
+    #[ignore = "Relativity is unimplemented for coordinates for the time being"]
     fn test_relative_and_absolute() {
         let point = WorldPoint::new(4.0, 5.0);
         let moov = WorldMove::new(4.0, 5.0);
         let square = WorldSquare::new(4, 5);
         let step = WorldStep::new(4, 5);
 
-        assert_true!(point.is_absolute());
-        assert_false!(point.is_relative());
-        assert_true!(moov.is_relative());
-        assert_false!(moov.is_absolute());
+        // TODO: uncomment when relativity is re-implemented
+        // assert_true!(point.is_absolute());
+        // assert_false!(point.is_relative());
+        // assert_true!(moov.is_relative());
+        // assert_false!(moov.is_absolute());
 
-        assert_true!(square.is_absolute());
-        assert_false!(square.is_relative());
-        assert_true!(step.is_relative());
-        assert_false!(step.is_absolute());
+        // assert_true!(square.is_absolute());
+        // assert_false!(square.is_relative());
+        // assert_true!(step.is_relative());
+        // assert_false!(step.is_absolute());
 
-        assert_eq!(point.as_relative(), moov);
-        assert_eq!(point.as_absolute(), point);
-        assert_eq!(moov.as_absolute(), point);
-        assert_eq!(moov.as_relative(), moov);
+        // assert_eq!(point.as_relative(), moov);
+        // assert_eq!(point.as_absolute(), point);
+        // assert_eq!(moov.as_absolute(), point);
+        // assert_eq!(moov.as_relative(), moov);
 
-        assert_eq!(square.as_relative(), step);
-        assert_eq!(square.as_absolute(), square);
-        assert_eq!(step.as_absolute(), square);
-        assert_eq!(step.as_relative(), step);
+        // assert_eq!(square.as_relative(), step);
+        // assert_eq!(square.as_absolute(), square);
+        // assert_eq!(step.as_absolute(), square);
+        // assert_eq!(step.as_relative(), step);
     }
     #[test]
     fn test_king_length() {

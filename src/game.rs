@@ -42,6 +42,8 @@ use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 use crate::{lerp, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector, LEFT_I};
 
+use self::size_2d::Size2D;
+
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
 
@@ -268,25 +270,25 @@ impl Game {
 
     pub fn mid_square(&self) -> WorldSquare {
         point2(
-            self.board_size().width as i32 / 2,
-            self.board_size().height as i32 / 2,
+            self.board_size().width() as i32 / 2,
+            self.board_size().height() as i32 / 2,
         )
     }
 
     fn square_is_on_board(&self, pos: WorldSquare) -> bool {
         pos.x >= 0
-            && pos.x < self.board_size().width as i32
+            && pos.x < self.board_size().width() as i32
             && pos.y >= 0
-            && pos.y < self.board_size().height as i32
+            && pos.y < self.board_size().height() as i32
     }
 
     // TODO: test
 
     fn point_is_on_board(&self, point: WorldPoint) -> bool {
         point.x >= -0.5
-            && point.x < self.board_size().width as f32 - 0.5
+            && point.x < self.board_size().width() as f32 - 0.5
             && point.y >= -0.5
-            && point.y < self.board_size().height as f32 - 0.5
+            && point.y < self.board_size().height() as f32 - 0.5
     }
 
     pub fn quit(&mut self) {
@@ -910,9 +912,9 @@ impl Game {
         let mut out_vel = vel;
 
         let xmin = -0.5;
-        let xmax = self.board_size().width as f32 - 0.5;
+        let xmax = self.board_size().width() as f32 - 0.5;
         let ymin = -0.5;
-        let ymax = self.board_size().height as f32 - 0.5;
+        let ymax = self.board_size().height() as f32 - 0.5;
 
         if (pos.x < xmin && vel.x < 0.0) || (pos.x > xmax && vel.x > 0.0) {
             out_vel.x *= -1.0;
@@ -1171,8 +1173,8 @@ impl Game {
         let num_attempts = 40;
         for _ in 0..num_attempts {
             let rand_pos = WorldSquare::new(
-                rng.gen_range(0..self.board_size().width as i32),
-                rng.gen_range(0..self.board_size().height as i32),
+                rng.gen_range(0..self.board_size().width() as i32),
+                rng.gen_range(0..self.board_size().height() as i32),
             );
             if self.square_is_empty(rand_pos) {
                 return Ok(rand_pos);
@@ -2327,7 +2329,7 @@ impl Game {
     }
 
     pub fn set_up_labyrinth(&mut self, rng: &mut StdRng) {
-        let board_squares_total = self.board_size().width * self.board_size().height;
+        let board_squares_total = self.board_size().width() * self.board_size().height();
         let num_blocks = board_squares_total / 3;
         for _ in 0..num_blocks {
             self.place_block_randomly(rng);
@@ -3955,7 +3957,7 @@ mod tests {
 
     fn test_horizontal_wide_portal_has_smooth_edge() {
         let mut game = set_up_nxm_game(16, 10);
-        let player_square: WorldSquare = point2(3, game.board_size.height as i32 / 2);
+        let player_square: WorldSquare = point2(3, game.board_size.height() as i32 / 2);
         game.place_player(player_square);
 
         let entrance = SquareWithOrthogonalDir::from_square_and_step(

@@ -76,7 +76,7 @@ where
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::from_square_and_step(square, quarter_turns.to_orthogonal_direction())
     }
-    pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType::Relative> {
+    pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType> {
         self.dir()
     }
     pub fn stepped(&self) -> Self {
@@ -116,11 +116,7 @@ where
     ) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         (
-            SquareType::from_any_relativity(
-                self.square
-                    .as_relative()
-                    .quarter_rotated_ccw(quarter_turns_ccw),
-            ),
+            SquareType::from_any_relativity(self.square.quarter_rotated_ccw(quarter_turns_ccw)),
             self.dir.quarter_rotated_ccw(quarter_turns_ccw),
         )
             .into()
@@ -278,9 +274,7 @@ impl SquareWithOrthogonalDir {
         let naive_translation: WorldStep = other.square - self.square;
         let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
         Self::from_square_and_step(
-            naive_translation
-                .quarter_rotated_ccw(rotation)
-                .as_absolute(),
+            naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),
         )
     }

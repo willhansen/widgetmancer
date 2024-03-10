@@ -8,7 +8,7 @@ use crate::utility::angle_interval::*;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::coordinates::{
     point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle, FloatCoordinate,
-    OrthogonalWorldStep,
+    OrthogonalWorldStep, SignedCoordinate,
 };
 use crate::utility::general_utility::*;
 use crate::utility::halfplane::*;
@@ -19,9 +19,9 @@ use crate::utility::{
     king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
     QuarterTurnsCcw, TwoDifferentPoints, TwoDifferentWorldPoints, STEP_ZERO,
 };
-use crate::DirectedFloatLineTrait;
+use crate::{point2, DirectedFloatLineTrait};
 use derive_more::Constructor;
-use euclid::{point2, Angle};
+use euclid::Angle;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -115,12 +115,9 @@ impl SquareVisibilityFromOneLargeShadow {
                 point2(0.0, 0.0),
                 LocalSquarePoint::unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)
-                    .to_point()
                     .cast_unit(),
             ),
-            LocalSquarePoint::unit_vector_from_angle(shadow_direction)
-                .to_point()
-                .cast_unit(),
+            LocalSquarePoint::unit_vector_from_angle(shadow_direction).cast_unit(),
         ))
     }
 }
@@ -224,23 +221,17 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             let shadow_line_from_center: TwoDifferentWorldPoints =
                 TwoDifferentPoints::new_from_two_points(
                     point2(0.0, 0.0),
-                    WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle())
-                        .to_point()
-                        .cast_unit(),
+                    WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle()).cast_unit(),
                 );
             let point_in_shadow: WorldPoint =
-                WorldPoint::unit_vector_from_angle(shadow_arc.center_angle())
-                    .to_point()
-                    .cast_unit();
+                WorldPoint::unit_vector_from_angle(shadow_arc.center_angle()).cast_unit();
 
             let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
                 shadow_line_from_center,
                 point_in_shadow,
             );
-            let square_shadow = world_half_plane_to_local_square_half_plane(
-                shadow_half_plane,
-                rel_square.to_point(),
-            );
+            let square_shadow =
+                world_half_plane_to_local_square_half_plane(shadow_half_plane, rel_square);
 
             let shadow_coverage_of_unit_square =
                 square_shadow.coverage_of_centered_unit_square_with_tolerance(length_tolerance);
@@ -464,8 +455,10 @@ impl SquareVisibilityMapFunctions for LocalSquareVisibilityMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::glyph::glyph_constants::{FULL_BLOCK, SPACE};
-    use euclid::vec2;
+    use crate::{
+        glyph::glyph_constants::{FULL_BLOCK, SPACE},
+        vec2,
+    };
     use ntest::{assert_false, timeout};
 
     #[test]

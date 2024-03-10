@@ -5,7 +5,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldPoint,
 };
 use crate::utility::IVector;
-use euclid::{point2, Point2D};
+use crate::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
 
 pub const FIRST_HEXTANT: char = '🬀';
@@ -231,7 +231,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
-    
+
     fn test_hextant_array_to_char() {
         assert_eq!(
             hextant_array_to_char([[false, false], [false, false], [false, false],]),
@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_points_to_hextant_chars() {
         // 00
         // 00
@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_local_character_point_to_local_hextant_point() {
         let char_point1 = LocalCharacterPoint::new(0.0, 0.0);
         let char_point2 = LocalCharacterPoint::new(-0.25, -1.0 / 3.0);
@@ -310,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_snap_to_hextant_grid() {
         let snapped = snap_to_hextant_grid(point2(0.1, 0.0));
         assert_about_eq!(snapped.x, 1.0 / 8.0);
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_hextant_array_to_binary_and_back() {
         let arrays: Vec<HextantArray> = vec![
             [[false, false], [false, false], [false, false]],

@@ -2,7 +2,7 @@ use std::ops::Add;
 
 use euclid::approxeq::ApproxEq;
 use line_drawing::Supercover;
-use num::{One, Signed, Zero};
+use num::{traits::float::FloatCore, One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
 use super::{
@@ -19,8 +19,8 @@ pub type TwoDifferentLocalCharacterPoints =
 // TODO: put in some kind of default module like euclid does?
 pub type TwoDifferentFloatPoints = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait: Sized + Copy {
-    type PointType: Coordinate;
+pub trait LineTrait: Sized + Copy + QuarterTurnRotatable {
+    type PointType: SignedCoordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
 
@@ -61,7 +61,7 @@ pub trait LineTrait: Sized + Copy {
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,
-        direction: impl Into<<Self::PointType as Coordinate>::Relative>,
+        direction: impl Into<Self::PointType>,
     ) -> Self {
         let p1 = point.into();
         let v = direction.into();
@@ -132,14 +132,11 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
         let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
-    fn normal_vector_to_point(
-        &self,
-        point: impl Into<Self::PointType>,
-    ) -> <Self::PointType as Coordinate>::Relative {
+    fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::PointType {
         let point = point.into();
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn normal_vector_from_origin(&self) -> <Self::PointType as Coordinate>::Relative {
+    fn normal_vector_from_origin(&self) -> Self::PointType {
         -self.normal_vector_to_point((0.0, 0.0))
     }
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
@@ -386,10 +383,10 @@ where
     type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
 }
 
-pub trait DirectedLineTrait: LineTrait + QuarterTurnRotatable {
+pub trait DirectedLineTrait: LineTrait {
     fn p1(&self) -> Self::PointType;
     fn p2(&self) -> Self::PointType;
-    fn arbitrary_vector_along_line(&self) -> <Self::PointType as Coordinate>::Relative {
+    fn arbitrary_vector_along_line(&self) -> Self::PointType {
         self.p2() - self.p1()
     }
     fn get_point_by_index(&self, index: u32) -> Self::PointType {
@@ -428,8 +425,7 @@ pub trait DirectedLineTrait: LineTrait + QuarterTurnRotatable {
 pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
     fn points_in_line_order(&self, mut points: Vec<Self::PointType>) -> Vec<Self::PointType> {
         let normalized_line_direction = (self.p2() - self.p1()).normalize();
-        points
-            .sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point.as_relative())));
+        points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point)));
         points
     }
     fn ordered_line_intersections_with_centered_unit_square_with_tolerance(
@@ -476,23 +472,23 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
     pub fn p2(&self) -> P {
         self.p2
     }
-    pub fn xmin(&self) -> P::DataType {
-        self.p1.x().min(self.p2.x())
+    pub fn x_min(&self) -> P::DataType {
+        min_for_partial_ord(self.p1.x(), self.p2.x())
     }
-    pub fn xmax(&self) -> P::DataType {
-        self.p1.x().max(self.p2.x())
+    pub fn x_max(&self) -> P::DataType {
+        max_for_partial_ord(self.p1.x(), self.p2.x())
     }
-    pub fn ymin(&self) -> P::DataType {
-        self.p1.y().min(self.p2.y())
+    pub fn y_min(&self) -> P::DataType {
+        min_for_partial_ord(self.p1.y(), self.p2.y())
     }
-    pub fn ymax(&self) -> P::DataType {
-        self.p1.y().max(self.p2.y())
+    pub fn y_max(&self) -> P::DataType {
+        max_for_partial_ord(self.p1.y(), self.p2.y())
     }
     pub fn width(&self) -> P::DataType {
-        self.xmax() - self.xmin()
+        self.x_max() - self.x_min()
     }
     pub fn height(&self) -> P::DataType {
-        self.ymax() - self.ymin()
+        self.y_max() - self.y_min()
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -517,7 +513,7 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
     }
 }
 
-impl<PointType: Coordinate> LineTrait for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> LineTrait for TwoDifferentPoints<PointType> {
     type PointType = PointType;
     fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         TwoDifferentPoints::new(p1, p2)
@@ -526,7 +522,7 @@ impl<PointType: Coordinate> LineTrait for TwoDifferentPoints<PointType> {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
-impl<PointType: Coordinate> DirectedLineTrait for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> DirectedLineTrait for TwoDifferentPoints<PointType> {
     fn p1(&self) -> PointType {
         self.p1
     }
@@ -571,7 +567,7 @@ macro_rules! make_point_grouping_rotatable {
     };
 }
 
-make_point_grouping_rotatable!(TwoDifferentPoints, Coordinate);
+make_point_grouping_rotatable!(TwoDifferentPoints, SignedCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 
 impl<PointType: Coordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
@@ -635,13 +631,13 @@ impl<PointType: Coordinate> Display for TwoDifferentPoints<PointType> {
     }
 }
 
-impl<PointType> Add<<PointType as Coordinate>::Relative> for TwoDifferentPoints<PointType>
+impl<PointType> Add<PointType> for TwoDifferentPoints<PointType>
 where
     PointType: Coordinate,
 {
     type Output = TwoDifferentPoints<PointType>;
 
-    fn add(self, rhs: <PointType as Coordinate>::Relative) -> Self::Output {
+    fn add(self, rhs: PointType) -> Self::Output {
         TwoDifferentPoints {
             p1: self.p1 + rhs,
             p2: self.p2 + rhs,

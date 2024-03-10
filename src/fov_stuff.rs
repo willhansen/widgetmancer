@@ -16,7 +16,7 @@ use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
-use euclid::{vec2, Angle};
+use euclid::Angle;
 use itertools::*;
 
 use crate::glyph::glyph_constants::{FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, WHITE};
@@ -866,7 +866,6 @@ mod tests {
     use crate::portal_geometry::Portal;
     use crate::utility::poses::faces_away_from_center_at_rel_square;
     use crate::DoubleGlyph;
-    use euclid::point2;
     use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false, assert_true};
     use pretty_assertions::assert_eq;
@@ -2349,7 +2348,7 @@ mod tests {
         let entrance = top_down_portal.absolute_entrance_shape();
         let exit = top_down_portal.absolute_exit_shape();
         let l = 0.4;
-        let v = |vector: WorldStep| vector.to_f32().to_point().cast_unit() * l;
+        let v = |vector: WorldStep| vector.to_f32().cast_unit() * l;
         assert_true!(entrance.point_is_visible(v(STEP_UP_LEFT)));
         assert_true!(entrance.point_is_visible(v(STEP_UP_RIGHT)));
         assert_false!(entrance.point_is_visible(v(STEP_DOWN_LEFT)));

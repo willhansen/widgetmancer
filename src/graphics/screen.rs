@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use euclid::{point2, vec2, Point2D, Vector2D};
 use rgb::RGB8;
 
 use crate::glyph::glyph_constants::WHITE;
@@ -13,7 +12,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{flip_y, get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
-use crate::Coordinate;
+use crate::{point2, vec2, Coordinate, Point2D, SignedCoordinate, Vector2D};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -126,11 +125,10 @@ impl Screen {
 
     pub fn screen_center_as_screen_buffer_character_square(&self) -> ScreenBufferCharacterSquare {
         self.screen_buffer_character_step_from_origin_to_center()
-            .to_point()
     }
 
     fn screen_center_as_screen_buffer_square(&self) -> ScreenBufferSquare {
-        self.screen_buffer_step_from_origin_to_center().to_point()
+        self.screen_buffer_step_from_origin_to_center()
     }
 
     pub fn world_square_is_at_least_partially_on_screen(&self, square: WorldSquare) -> bool {

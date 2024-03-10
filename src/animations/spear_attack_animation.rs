@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-use euclid::vec2;
 use num::ToPrimitive;
 
 use crate::animations::Animation;
@@ -10,7 +9,7 @@ use crate::utility::coordinate_frame_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
 use crate::utility::coordinates::KingWorldStep;
-use crate::FloatCoordinate;
+use crate::{vec2, FloatCoordinate};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -89,9 +88,8 @@ impl Animation for SpearAttackAnimation {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
 
-    use crate::utility::STEP_RIGHT;
+    use crate::{animations::point2, utility::STEP_RIGHT};
 
     use super::*;
 

@@ -9,7 +9,7 @@ use crate::utility::{
     faces_away_from_center_at_rel_square, RelativeSquareWithOrthogonalDir, RigidTransform,
     RigidlyTransformable, STEP_ZERO,
 };
-use euclid::{point2, Angle};
+use euclid::Angle;
 use itertools::{all, Itertools};
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
@@ -263,7 +263,7 @@ impl AngleBasedVisibleSegment {
             .map(|face| face.face_line_segment())
         {
             // TODO: generalize to allow passing in the relative squares, not needing absolute points
-            !line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0, 0.0))
+            !line.same_side_of_line(rel_square.to_f32(), point2(0.0, 0.0))
         } else {
             true
         }
@@ -322,7 +322,6 @@ impl Debug for AngleBasedVisibleSegment {
 
 #[cfg(test)]
 mod tests {
-    use euclid::vec2;
     use ntest::{assert_about_eq, assert_false, assert_true};
 
     use crate::{

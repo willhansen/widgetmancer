@@ -72,7 +72,7 @@ where
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     pub fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
-        vector_to_outside: impl Into<<LineType::PointType as Coordinate>::Relative>,
+        vector_to_outside: impl Into<LineType::PointType>,
     ) -> Self {
         let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
@@ -89,7 +89,7 @@ where
     }
     pub fn new_from_point_on_border_and_vector_pointing_inside(
         point_on_border: impl Into<LineType::PointType>,
-        normal_direction_into_plane: impl Into<<LineType::PointType as Coordinate>::Relative>,
+        normal_direction_into_plane: impl Into<LineType::PointType>,
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
@@ -168,10 +168,7 @@ where
     }
     pub fn extended(&self, extended_distance: f32) -> Self {
         let direction = self.direction_away_from_plane();
-        let move_vector = <LineType::PointType as Coordinate>::Relative::from_angle_and_length(
-            direction,
-            extended_distance,
-        );
+        let move_vector = LineType::PointType::from_angle_and_length(direction, extended_distance);
 
         let line = self.dividing_line();
         let point = self.point_on_half_plane();

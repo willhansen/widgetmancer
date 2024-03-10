@@ -1,6 +1,7 @@
 use crate::animations::Animation;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
+use crate::size_2d::Size2D;
 use crate::utility::coordinate_frame_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
     WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
@@ -110,8 +111,8 @@ impl Animation for RecoilingBoardAnimation {
         let offset_vector: WorldMove =
             self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
 
-        for x in 0..self.board_size.width {
-            for y in 0..self.board_size.height {
+        for x in 0..self.board_size.width() {
+            for y in 0..self.board_size.height() {
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
                 let square_color = self.floor_color_enum.color_at(world_square);
                 let other_square_color = self

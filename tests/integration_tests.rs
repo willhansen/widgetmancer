@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;

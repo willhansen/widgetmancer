@@ -5,7 +5,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use portrait;
 
-use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate};
+use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate, SignedCoordinate};
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
 use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};

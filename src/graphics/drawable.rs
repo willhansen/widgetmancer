@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, SquareVisibility};
+use crate::vec2;
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;
 use dyn_clone::DynClone;
-use euclid::{vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
@@ -569,8 +570,7 @@ mod tests {
     use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
     use crate::utility::halfplane::LocalSquareHalfPlane;
-    use crate::LineTrait;
-    use euclid::point2;
+    use crate::{point2, LineTrait};
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 

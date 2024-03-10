@@ -22,6 +22,7 @@ use crate::utility::{
     SimpleResult, TupleClone, STEP_ZERO,
 };
 use crate::Coordinate;
+use crate::SignedCoordinate;
 use ambassador::delegatable_trait;
 use derive_more::{Constructor, Display};
 use itertools::Itertools;
@@ -920,9 +921,7 @@ impl RasterizedFieldOfView {
         let relative_square = relative_square.into();
         let tf_to_absolute_frame =
             RigidTransform::from_start_and_end_poses(self.view_root, ORIGIN_POSE()).inverse();
-        relative_square
-            .apply_rigid_transform(tf_to_absolute_frame)
-            .to_point()
+        relative_square.apply_rigid_transform(tf_to_absolute_frame)
     }
     // TODO: untested
     pub fn absolute_square_to_relative_square(
@@ -932,9 +931,7 @@ impl RasterizedFieldOfView {
         let absolute_square = absolute_square.into();
         let tf_to_relative_frame =
             RigidTransform::from_start_and_end_poses(self.view_root, ORIGIN_POSE());
-        absolute_square
-            .apply_rigid_transform(tf_to_relative_frame)
-            .to_vector()
+        absolute_square.apply_rigid_transform(tf_to_relative_frame)
     }
 
     fn top_down_portals(&self) -> impl Iterator<Item = TopDownPortal> + '_ {
@@ -1192,12 +1189,12 @@ mod tests {
     use super::*;
     use crate::{
         fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow,
+        point2,
         utility::{
             coordinate_frame_conversions::STEP_LEFT, halfplane::LocalSquareHalfPlane,
             RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP,
         },
     };
-    use euclid::point2;
     use ntest::{assert_false, assert_true, timeout};
 
     #[ignore = "Maybe don't want this"]

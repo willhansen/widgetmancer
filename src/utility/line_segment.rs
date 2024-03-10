@@ -1,18 +1,18 @@
 use rand::{rngs::StdRng, Rng};
 
 use crate::{
-    get_new_rng, seeded_rand_radial_offset, Coordinate, DirectedLineTrait, FloatCoordinate,
-    FloatLineTrait, LineTrait, TwoDifferentPoints,
+    get_new_rng, seeded_rand_radial_offset, DirectedLineTrait, FloatCoordinate, FloatLineTrait,
+    LineTrait, SignedCoordinate, TwoDifferentPoints,
 };
 
 pub trait LineSegment: LineTrait {
-    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
+    fn square_length(&self) -> <Self::PointType as SignedCoordinate>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];
 }
-impl<P: Coordinate> LineSegment for TwoDifferentPoints<P> {
+impl<P: SignedCoordinate> LineSegment for TwoDifferentPoints<P> {
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }
@@ -31,7 +31,7 @@ pub trait FloatLineSegment: FloatLineTrait + LineSegment {
     fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Self::PointType {
         // TODO: make more uniform
         self.seeded_random_point_on_line(rng)
-            + seeded_rand_radial_offset::<<Self::PointType as Coordinate>::Relative>(rng, radius)
+            + seeded_rand_radial_offset::<Self::PointType>(rng, radius)
     }
 
     fn random_point_near_line(&self, radius: f32) -> Self::PointType {

@@ -6,7 +6,6 @@ use crate::utility::coordinate_frame_conversions::{
     WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, WorldMove,
 };
 use crate::utility::*;
-use euclid::{point2, vec2, Point2D};
 use itertools::Itertools;
 use num::clamp;
 use ordered_float::OrderedFloat;
@@ -317,7 +316,6 @@ pub fn characters_for_full_square_with_looping_1d_offset(
 mod tests {
     use super::*;
     use crate::glyph::DoubleChar;
-    use euclid::vec2;
     use ntest::timeout;
 
     #[test]
