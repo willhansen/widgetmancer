@@ -11,7 +11,7 @@ use ntest::assert_false;
 use crate::line_segment::FloatLineSegment;
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::{
-    AbsoluteWorldCoordinate, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    StepSet, WorldCoordinate, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{

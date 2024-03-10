@@ -2,6 +2,8 @@ use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 
+use self::size_2d::Size2D;
+
 // empty enums for euclid typing
 #[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInWorldFrame;
@@ -16,16 +18,15 @@ pub struct CharacterGridInLocalCharacterFrame;
 #[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInLocalSquareFrame;
 
-pub type RelativeWorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
-pub type AbsoluteWorldCoordinate<DataType> = Point2D<DataType, SquareGridInWorldFrame>;
+pub type WorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
 
-pub type WorldSquare = AbsoluteWorldCoordinate<i32>;
-pub type WorldPoint = AbsoluteWorldCoordinate<f32>;
-pub type WorldSquareRect = euclid::Box2D<i32, SquareGridInWorldFrame>;
-pub type BoardSize = euclid::Size2D<u32, SquareGridInWorldFrame>;
+pub type WorldSquare = WorldCoordinate<i32>;
+pub type WorldPoint = WorldCoordinate<f32>;
+pub type WorldSquareRect = TwoDifferentWorldSquares;
+pub type BoardSize = Vector2D<u32, SquareGridInWorldFrame>;
 
-pub type WorldStep = RelativeWorldCoordinate<i32>;
-pub type WorldMove = RelativeWorldCoordinate<f32>;
+pub type WorldStep = WorldCoordinate<i32>;
+pub type WorldMove = WorldCoordinate<f32>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;

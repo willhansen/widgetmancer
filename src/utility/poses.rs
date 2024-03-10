@@ -49,7 +49,7 @@ where
     SquareType: WorldIntCoordinate,
 {
     square: SquareType,
-    dir: OrthogonalUnitCoordinate<SquareType::Relative>,
+    dir: OrthogonalUnitCoordinate<SquareType>,
 }
 
 pub type SquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
@@ -339,9 +339,6 @@ impl RelativeSquareWithOrthogonalDir {
         } else {
             *self
         }
-    }
-    pub fn middle_point_of_face(&self) -> WorldMove {
-        self.square.to_f32() + self.direction().step().to_f32() * 0.5
     }
 }
 

@@ -476,6 +476,24 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
     pub fn p2(&self) -> P {
         self.p2
     }
+    pub fn xmin(&self) -> P::DataType {
+        self.p1.x().min(self.p2.x())
+    }
+    pub fn xmax(&self) -> P::DataType {
+        self.p1.x().max(self.p2.x())
+    }
+    pub fn ymin(&self) -> P::DataType {
+        self.p1.y().min(self.p2.y())
+    }
+    pub fn ymax(&self) -> P::DataType {
+        self.p1.y().max(self.p2.y())
+    }
+    pub fn width(&self) -> P::DataType {
+        self.xmax() - self.xmin()
+    }
+    pub fn height(&self) -> P::DataType {
+        self.ymax() - self.ymin()
+    }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);

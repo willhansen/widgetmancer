@@ -1,8 +1,6 @@
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
-use euclid::vec2;
-
 use crate::animations::Animation;
 use crate::glyph::floating_square;
 use crate::glyph::Glyph;
@@ -12,6 +10,7 @@ use crate::utility::coordinate_frame_conversions::{
     WorldSquareGlyphMap,
 };
 use crate::utility::STEP_RIGHT;
+use crate::vec2;
 
 #[derive(Clone)]
 pub struct RadialShockwave {
@@ -118,8 +117,7 @@ impl Animation for RadialShockwave {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::glyph::glyph_constants::RED;
-    use euclid::point2;
+    use crate::{animations::point2, glyph::glyph_constants::RED};
     use ntest::assert_about_eq;
 
     #[test]

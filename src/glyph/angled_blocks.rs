@@ -262,7 +262,7 @@ pub fn half_plane_to_angled_block_character(
         .into_iter()
         .map(|point| {
             point
-                + <LocalCharacterPoint as Coordinate>::Relative::unit_vector_from_angle(
+                + <LocalCharacterPoint as FloatCoordinate>::unit_vector_from_angle(
                     snapped_bias_direction,
                 ) * (PI / 1000.0)
         })

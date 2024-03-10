@@ -37,6 +37,7 @@ pub mod poses;
 pub mod quadrant;
 pub mod relative_interval_location;
 pub mod round_robin_iterator;
+pub mod size_2d;
 pub mod trait_alias_macro;
 
 pub use self::angle_interval::*;

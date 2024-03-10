@@ -63,7 +63,9 @@ pub type FAngle = Angle<f32>;
 // pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 // pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
-pub type Point2D<DataType, UnitType> = euclid::Point2D<DataType, UnitType>;
+
+// This is kind of hack to ignore relativity until it is re-implemented later
+pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 pub type Vector2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
 // TODO: is this the right place for these two functions?
@@ -101,8 +103,8 @@ macro_rules! make_cast_function {
 pub trait Coordinate:
     Copy
     + PartialEq
-    + Add<Self>
-    + Sub<Self>
+    + Add<Self, Output = Self>
+    + Sub<Self, Output = Self>
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
@@ -117,16 +119,6 @@ where
 {
     type DataType;
     type UnitType;
-
-    // TODO: make actually relative
-
-    #[deprecated(note = "TODO: put in wrapper type")]
-    type Relative: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
-    // TODO: make actually relative
-    #[deprecated(note = "TODO: put in wrapper type")]
-    type Absolute: Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>;
-    #[deprecated(note = "TODO: put in wrapper type")]
-    const IS_ABSOLUTE: bool;
 
     type Floating: FloatCoordinate<UnitType = Self::UnitType>;
     type OnGrid: IntCoordinate<UnitType = Self::UnitType>;
@@ -238,7 +230,7 @@ where
     type DataType = T;
     type UnitType = U;
     type Relative = Self;
-    type Absolute = Point2D<T, U>;
+    type Absolute = Self;
     type Floating = Vector2D<f32, U>;
     type OnGrid = Vector2D<i32, U>;
     const IS_ABSOLUTE: bool = false;
@@ -693,12 +685,6 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
 impl RigidlyTransformable for WorldSquare {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
-    }
-}
-// TODO: Double check this
-impl RigidlyTransformable for WorldStep {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        self.to_point().apply_rigid_transform(tf).to_vector()
     }
 }
 impl RigidlyTransformable for OrthogonalWorldStep {

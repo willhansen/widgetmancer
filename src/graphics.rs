@@ -619,8 +619,8 @@ impl Graphics {
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {
         let mut count: u32 = 0;
-        for x in rect.min.x..=rect.max.x {
-            for y in rect.min.y..=rect.max.y {
+        for x in rect.x_min()..=rect.x_max() {
+            for y in rect.y_min()..=rect.y_max() {
                 let square = WorldSquare::new(x, y);
                 let maybe_glyphs = self
                     .get_drawable_for_square_from_draw_buffer(square)

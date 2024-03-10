@@ -64,10 +64,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
 }
 
 #[derive(PartialEq, Clone, Copy)]
-pub enum SquareVisibilityFromOneLargeShadow
-where
-    LocalSquareHalfPlane: Copy,
-{
+pub enum SquareVisibilityFromOneLargeShadow {
     FullyVisible,
     // TODO: have more than one half plane (two?)
     PartiallyVisible(LocalSquareHalfPlane),
