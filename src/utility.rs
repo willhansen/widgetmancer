@@ -50,6 +50,7 @@ pub use self::octant::*;
 pub use self::poses::*;
 pub use self::quadrant::*;
 pub use self::round_robin_iterator::*;
+use self::size_2d::Size2D;
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
@@ -155,8 +156,8 @@ pub fn rgb_to_string(rgb: RGB8) -> String {
 
 // TODO: turn into iter
 pub fn squares_on_board(size: BoardSize) -> SquareSet {
-    (0..size.width)
-        .cartesian_product((0..size.height).into_iter())
+    (0..size.width())
+        .cartesian_product((0..size.height()).into_iter())
         .map(|(x, y)| WorldSquare::new(x as i32, y as i32))
         .collect()
 }
@@ -384,6 +385,17 @@ pub fn get_by_index<T>(vector: &Vec<T>, index: i32) -> &T {
         index
     } as usize;
     vector.get(index).unwrap()
+}
+
+pub fn abs<T>(x: T) -> T
+where
+    T: PartialOrd + std::ops::Sub<Output = T> + euclid::num::Zero,
+{
+    if x < T::zero() {
+        T::zero() - x
+    } else {
+        x
+    }
 }
 
 #[cfg(test)]

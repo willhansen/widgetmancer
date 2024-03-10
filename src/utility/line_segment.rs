@@ -1,12 +1,12 @@
 use rand::{rngs::StdRng, Rng};
 
 use crate::{
-    get_new_rng, seeded_rand_radial_offset, DirectedLineTrait, FloatCoordinate, FloatLineTrait,
-    LineTrait, SignedCoordinate, TwoDifferentPoints,
+    get_new_rng, seeded_rand_radial_offset, Coordinate, DirectedLineTrait, FloatCoordinate,
+    FloatLineTrait, LineTrait, SignedCoordinate, TwoDifferentPoints,
 };
 
 pub trait LineSegment: LineTrait {
-    fn square_length(&self) -> <Self::PointType as SignedCoordinate>::DataType {
+    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }

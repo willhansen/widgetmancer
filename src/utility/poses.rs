@@ -281,7 +281,7 @@ impl SquareWithOrthogonalDir {
     pub fn other_pose_relative_to_absolute(&self, other: impl Into<Self>) -> Self {
         let other: Self = other.into();
 
-        let relative_translation: WorldStep = other.square.to_vector();
+        let relative_translation: WorldStep = other.square;
         let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
@@ -291,10 +291,9 @@ impl SquareWithOrthogonalDir {
     pub fn other_square_absolute_to_relative(&self, other: impl Into<WorldSquare>) -> WorldStep {
         self.other_pose_absolute_to_relative((other.into(), STEP_UP))
             .square()
-            .to_vector()
     }
     pub fn other_square_relative_to_absolute(&self, other: impl Into<WorldStep>) -> WorldSquare {
-        self.other_pose_relative_to_absolute((other.into().to_point(), STEP_UP))
+        self.other_pose_relative_to_absolute((other.into(), STEP_UP))
             .square()
     }
 }

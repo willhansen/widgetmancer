@@ -733,7 +733,7 @@ pub fn does_ray_hit_oriented_square_face(
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
 pub fn naive_ray_endpoint<P: FloatCoordinate>(start: P, angle: Angle<f32>, length: f32) -> P {
-    start + P::Relative::unit_vector_from_angle(angle) * length
+    start + P::unit_vector_from_angle(angle) * length
 }
 
 #[cfg(test)]

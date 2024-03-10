@@ -134,7 +134,6 @@ pub fn world_point_to_local_character_point(
     origin_character_square: WorldCharacterSquare,
 ) -> LocalCharacterPoint {
     (world_point_to_world_character_point(world_point) - origin_character_square.to_f32())
-        .to_point()
         .cast_unit()
 }
 
@@ -142,16 +141,14 @@ pub fn world_point_to_local_square_point(
     world_point: WorldPoint,
     origin_square: WorldSquare,
 ) -> LocalSquarePoint {
-    (world_point - origin_square.to_f32())
-        .to_point()
-        .cast_unit()
+    (world_point - origin_square.to_f32()).cast_unit()
 }
 
 pub fn local_square_point_to_world_point(
     local_square_point: LocalSquarePoint,
     square: WorldSquare,
 ) -> WorldPoint {
-    local_square_point.cast_unit() + square.to_f32().to_vector()
+    local_square_point.cast_unit() + square.to_f32()
 }
 
 pub fn local_square_point_to_local_character_point(

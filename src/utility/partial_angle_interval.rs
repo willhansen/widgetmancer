@@ -20,7 +20,7 @@ use crate::utility::{
     RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
     STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
 };
-use crate::FloatCoordinate;
+use crate::{vec2, FloatCoordinate};
 
 use super::bool_with_partial::BoolWithPartial;
 use super::coordinates::QuarterTurnRotatable;

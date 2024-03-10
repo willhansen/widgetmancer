@@ -141,11 +141,7 @@ where
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
     fn to_string(&self) -> String {
-        if self.is_absolute() {
-            format!("(x: {}, y: {})", self.x(), self.y())
-        }else {
-            format!("(dx: {}, dy: {})", self.x(), self.y())
-        }
+        format!("(x: {}, y: {})", self.x(), self.y())
     }
     // TODO: somehow shorten long parameter type
     fn from_any_relativity(
@@ -177,8 +173,8 @@ where
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
-        let a = self.x().abs();
-        let b = self.y().abs();
+        let a = abs(self.x());
+        let b = abs(self.y());
         if a >= b {
             a
         } else {
@@ -390,7 +386,7 @@ pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 }
 
 pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    (point - point.round()).to_point()
+    (point - point.round())
 }
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
@@ -899,12 +895,12 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     tolerance: f32,
 ) -> BoolWithPartial {
     assert!(tolerance >= 0.0);
-    let vec = point.into().to_vector();
+    let vec = point.into();
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
 
 pub fn corner_points_of_centered_unit_square<P: FloatCoordinate>() -> Vec<P> {
-    P::Relative::new(0.5, 0.5)
+    P::new(0.5, 0.5)
         .quadrant_rotations_going_ccw()
         .into_iter()
         .map(|v| P::zero() + v)
