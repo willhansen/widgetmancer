@@ -1,9 +1,8 @@
 use std::time::Instant;
 
-use euclid::point2;
-
 use crate::game::Game;
 use crate::piece::Piece;
+use crate::point2;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{LEFT_I, RIGHT_I, STEP_LEFT, STEP_UP, UP_I};
 

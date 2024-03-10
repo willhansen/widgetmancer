@@ -4,7 +4,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Neg, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -435,7 +435,6 @@ impl QuarterTurnRotatable for AngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
     use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use num::zero;

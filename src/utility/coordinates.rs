@@ -17,6 +17,8 @@ use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
+use crate::abs;
+
 // TODO: get rid of this section
 use super::{
     bool_with_partial::*,
@@ -196,7 +198,7 @@ where
         self.x() == Self::DataType::zero() || self.y() == Self::DataType::zero()
     }
     fn is_diagonal(&self) -> bool {
-        self.x() == self.y() || self.x() == self.y().neg()
+        abs(self.x()) == abs(self.y())
     }
     fn is_orthodiagonal(&self) -> bool {
         self.is_orthogonal() || self.is_diagonal()

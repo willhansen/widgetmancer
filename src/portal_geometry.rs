@@ -3,7 +3,7 @@ use std::ops::Add;
 
 use derive_more::Constructor;
 use derive_more::Neg;
-use euclid::{point2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -272,10 +272,11 @@ impl PortalGeometry {
     }
     pub fn ray_to_naive_line_segments(
         &self,
-        mut start: WorldPoint,
+        start: impl Into<WorldPoint>,
         mut angle: Angle<f32>,
         mut range: f32,
     ) -> Vec<TwoDifferentWorldPoints> {
+        let mut start = start.into();
         assert!(range > 0.0);
         let mut naive_line_segments = vec![];
         let STEP_BACK_DISTANCE = 0.001;
@@ -323,6 +324,7 @@ impl PortalGeometry {
 #[cfg(test)]
 mod tests {
     use crate::{
+        point2,
         utility::{
             assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
             STEP_UP_RIGHT,
@@ -336,11 +338,11 @@ mod tests {
     #[test]
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_step(point2(1, 2), STEP_UP),
-            SquareWithOrthogonalDir::from_square_and_step(point2(5, 5), STEP_RIGHT),
+            SquareWithOrthogonalDir::from_square_and_step((1, 2), STEP_UP),
+            SquareWithOrthogonalDir::from_square_and_step((5, 5), STEP_RIGHT),
         );
-        let pose1 = SquareWithOrthogonalDir::from_square_and_step(point2(3, 3), STEP_RIGHT);
-        let pose2 = SquareWithOrthogonalDir::from_square_and_step(point2(6, 3), STEP_DOWN);
+        let pose1 = SquareWithOrthogonalDir::from_square_and_step((3, 3), STEP_RIGHT);
+        let pose2 = SquareWithOrthogonalDir::from_square_and_step((6, 3), STEP_DOWN);
         assert_eq!(pose1.apply_rigid_transform(transform), pose2);
     }
     #[test]
