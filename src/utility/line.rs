@@ -491,8 +491,9 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
         self.y_max() - self.y_min()
     }
 }
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
+impl<P: FloatCoordinate> Copy for TwoDifferentPointsOnCenteredUnitSquare<P> {}
 impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Option<Self> {
         let p1 = p1.into();

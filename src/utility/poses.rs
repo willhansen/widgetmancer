@@ -42,7 +42,7 @@ impl Add for StepWithQuarterRotations {
     }
 }
 
-#[derive(Clone, Copy, Hash, Eq, PartialEq, getset::CopyGetters)]
+#[derive(Clone, Hash, Eq, PartialEq, getset::CopyGetters)]
 #[get_copy = "pub"]
 pub struct OrthogonalFacingIntPose<SquareType>
 where
@@ -51,6 +51,7 @@ where
     square: SquareType,
     dir: OrthogonalUnitCoordinate<SquareType>,
 }
+impl<S: WorldIntCoordinate> Copy for OrthogonalFacingIntPose<S> {}
 
 pub type SquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
 pub type Face = SquareWithOrthogonalDir;

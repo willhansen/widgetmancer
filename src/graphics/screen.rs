@@ -11,7 +11,7 @@ use crate::utility::coordinate_frame_conversions::{
     world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
 };
-use crate::utility::{flip_y, get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
+use crate::utility::{get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
 use crate::{point2, vec2, Coordinate, Point2D, SignedCoordinate, Vector2D};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -277,11 +277,11 @@ impl Screen {
 
     pub fn world_step_to_screen_step(&self, world_step: WorldStep) -> ScreenBufferStep {
         let rotated: WorldStep = (-self.rotation()).rotate_vector(world_step);
-        let flipped: WorldStep = flip_y(rotated);
+        let flipped: WorldStep = rotated.flip_y();
         flipped.cast_unit()
     }
     pub fn screen_step_to_world_step(&self, screen_step: ScreenBufferStep) -> WorldStep {
-        let flipped: ScreenBufferStep = flip_y(screen_step);
+        let flipped: ScreenBufferStep = screen_step.flip_y();
         let rotated: ScreenBufferStep = self.rotation().rotate_vector(flipped);
         rotated.cast_unit()
     }

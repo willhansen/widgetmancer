@@ -239,12 +239,21 @@ where
 {
 }
 
-pub trait SignedCoordinate: Coordinate + Neg<Output = Self> {}
+pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output = Self> {
+    type _DataType: num::Signed;
+    fn flip_x(&self) -> Self {
+        Self::new(-self.x(), self.y())
+    }
+    fn flip_y(&self) -> Self {
+        Self::new(self.x(), -self.y())
+    }
+}
 impl<T> SignedCoordinate for T
 where
     T: Coordinate + Neg<Output = Self>,
     T::DataType: num::Signed,
 {
+    type _DataType = T::DataType;
 }
 
 impl<T> From<(T, T)> for OrthogonalWorldStep
@@ -388,7 +397,7 @@ pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 }
 
 pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    (point - point.round())
+    point - point.round()
 }
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
@@ -504,21 +513,6 @@ pub fn revolve_square(
 ) -> WorldSquare {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
-}
-// TODO: convert to Coordinate::flip_y
-pub fn flip_y<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
-    vec2(v.x, -v.y)
-}
-
-// TODO: convert to Coordinate::flip_x
-pub fn flip_x<T, U>(v: Vector2D<T, U>) -> Vector2D<T, U>
-where
-    T: CoordinateDataTypeTrait,
-{
-    vec2(-v.x, v.y)
 }
 #[deprecated(note = "use Vector2D's to_array function instead")]
 pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
