@@ -67,11 +67,11 @@ where
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
-        direction: impl Into<OrthogonalWorldStep>,
+        direction: impl Into<OrthogonalUnitCoordinate<SquareType>>,
     ) -> Self {
         Self {
             square: square.into(),
-            dir: Into::into(direction),
+            dir: direction.into(),
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {

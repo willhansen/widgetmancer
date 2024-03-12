@@ -120,10 +120,8 @@ pub trait Coordinate:
     // + Display // TODO
     + From<(Self::DataType, Self::DataType)>
 // + IntoIterator + FromIterator // TODO
-where
-    Self::DataType: CoordinateDataTypeTrait,
 {
-    type DataType;
+    type DataType: CoordinateDataTypeTrait;
     type UnitType;
 
     type Floating: FloatCoordinate<UnitType = Self::UnitType>;
@@ -976,31 +974,31 @@ mod tests {
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            Vector2D::new(0.5, 0.5)
+            default::Vector2D::new(0.5, 0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             45.0
         );
         assert_about_eq!(
-            Vector2D::new(0.0, 0.5)
+            default::Vector2D::new(0.0, 0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             90.0
         );
         assert_about_eq!(
-            Vector2D::new(0.0, -0.5)
+            default::Vector2D::new(0.0, -0.5)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            Vector2D::new(1.0, 0.0)
+            default::Vector2D::new(1.0, 0.0)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             0.0
         );
         assert_about_eq!(
-            Vector2D::new(-1.0, 0.0)
+            default::Vector2D::new(-1.0, 0.0)
                 .better_angle_from_x_axis()
                 .to_degrees(),
             180.0
@@ -1009,7 +1007,14 @@ mod tests {
 
     #[test]
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
-        assert!((Vector2D::new(0.5, 0.5).angle_from_x_axis().to_degrees() - 45.0).abs() > 0.01);
+        assert!(
+            (default::Vector2D::new(0.5, 0.5)
+                .angle_from_x_axis()
+                .to_degrees()
+                - 45.0)
+                .abs()
+                > 0.01
+        );
     }
 
     #[test]
