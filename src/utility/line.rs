@@ -2,7 +2,7 @@ use std::ops::Add;
 
 use euclid::approxeq::ApproxEq;
 use line_drawing::Supercover;
-use num::{traits::float::FloatCore, One, Signed, Zero};
+use num::{traits::float::FloatCore, NumCast, One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
 use super::{
@@ -75,22 +75,21 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable {
     fn from_array(a: [Self::PointType; 2]) -> Self {
         Self::new_from_two_points(a[0], a[1])
     }
-    // TODO: These three functions would probably need to return floating points even on int-based lines
-    fn x_intercept(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
+    fn x_intercept(&self) -> Option<f32> {
         if self.is_vertical() {
             let p = self.arbitrary_point_on_line();
-            return Some(p.x());
+            return Some(p.to_f32().x());
         }
         if self.is_horizontal() {
             return None;
         }
         Some(-self.y_intercept().unwrap() / self.slope().unwrap())
     }
-    fn y_intercept(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
+    fn y_intercept(&self) -> Option<f32> {
         if self.is_vertical() {
             return None;
         }
-        let p = self.arbitrary_point_on_line();
+        let p = self.arbitrary_point_on_line().to_f32();
         Some(p.y() - self.slope().unwrap() * p.x())
     }
     fn is_vertical(&self) -> bool {
@@ -101,11 +100,13 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         p1.y() == p2.y()
     }
-    fn slope(&self) -> Option<<Self::PointType as Coordinate>::DataType> {
+    fn slope(&self) -> Option<f32> {
         if self.is_vertical() {
             return None;
         }
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = self
+            .two_different_arbitrary_points_on_line()
+            .map(|a| a.to_f32());
         let (l, r) = if p1.x() < p2.x() { (p1, p2) } else { (p2, p1) };
         Some((r.y() - l.y()) / (r.x() - l.x()))
     }
@@ -571,7 +572,7 @@ macro_rules! make_point_grouping_rotatable {
 make_point_grouping_rotatable!(TwoDifferentPoints, SignedCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 
-impl<PointType: Coordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
+impl<PointType: SignedCoordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
     for TwoDifferentPoints<PointType>
 where
     CanBePointType: Into<PointType>,
@@ -611,7 +612,7 @@ impl TwoDifferentWorldPoints {
     }
 }
 
-impl<PointType: Coordinate> Debug for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -626,7 +627,7 @@ impl<PointType: Coordinate> Debug for TwoDifferentPoints<PointType> {
         )
     }
 }
-impl<PointType: Coordinate> Display for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
     }

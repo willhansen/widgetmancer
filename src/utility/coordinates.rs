@@ -17,7 +17,7 @@ use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-use crate::abs;
+use crate::{abs, orthogonal_unit_coordinate::OrthogonalUnitCoordinate};
 
 // TODO: get rid of this section
 use super::{
@@ -96,7 +96,7 @@ trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output
 // TODO: is this just a scalar?
 trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
-macro_rules! make_cast_function {
+macro_rules! make_coordinate_datatype_cast_function {
     ($name:ident, $data_type:ty, $coord_type:ty) => {
         fn $name(&self) -> $coord_type {
             <$coord_type>::new(
@@ -168,8 +168,8 @@ pub trait Coordinate:
         Other::new(self.x(), self.y())
     }
 
-    make_cast_function!(to_f32, f32, Self::Floating);
-    make_cast_function!(to_i32, i32, Self::OnGrid);
+    make_coordinate_datatype_cast_function!(to_f32, f32, Self::Floating);
+    make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
     fn king_length(&self) -> Self::DataType {
         // TODO: Why isn't there a `PartialOrd::max`?
@@ -237,9 +237,7 @@ where
 {
 }
 
-pub trait SignedCoordinate:
-    Coordinate<DataType = <Self as SignedCoordinate>::_DataType> + Neg<Output = Self>
-{
+pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output = Self> {
     type _DataType: num::Signed;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
@@ -601,27 +599,9 @@ impl From<KingWorldStep> for WorldStep {
     }
 }
 
-#[derive(Clone, Hash, Neg, Eq, PartialEq, Debug, Copy, Default)]
-pub struct OrthogonalUnitCoordinate<T: SignedCoordinate> {
-    step: T,
-}
+type Type = OrthogonalUnitCoordinate<WorldStep>;
 
-pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
-
-impl<P: SignedCoordinate> OrthogonalUnitCoordinate<P> {
-    pub fn new(dir: impl Into<P>) -> Self {
-        let dir = dir.into();
-        assert!(dir.is_unit_length());
-        assert!(dir.is_orthogonal());
-        OrthogonalUnitCoordinate { step: dir }
-    }
-    pub fn step(&self) -> P {
-        self.step
-    }
-    pub fn pos_on_axis(&self, pos: P) -> P::DataType {
-        self.step().dot(pos)
-    }
-}
+pub type OrthogonalWorldStep = Type;
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for OrthogonalWorldStep {
@@ -699,6 +679,7 @@ impl QuarterTurnsCcw {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
+    #[deprecated(note = "use OrthogonalUnitCoordinate::From::from instead")]
     pub fn to_orthogonal_direction(&self) -> WorldStep {
         STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
     }
@@ -838,7 +819,11 @@ pub fn furthest_apart_points<P: FloatCoordinate>(points: Vec<P>) -> [P; 2] {
     furthest_values.try_into().unwrap()
 }
 
-pub fn three_points_are_clockwise<P: SignedCoordinate>(a: P, b: P, c: P) -> bool {
+pub fn three_points_are_clockwise<P>(a: P, b: P, c: P) -> bool
+where
+    P: SignedCoordinate,
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+{
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < P::DataType::zero()

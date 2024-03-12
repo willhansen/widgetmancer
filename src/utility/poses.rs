@@ -377,7 +377,7 @@ impl<ConvertableToSquareType, SquareType, DirectionType>
 where
     ConvertableToSquareType: Into<SquareType>,
     SquareType: WorldIntCoordinate,
-    DirectionType: Into<OrthogonalWorldStep>,
+    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
 {
     fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
         Self::from_square_and_step(value.0.into(), value.1)
@@ -389,18 +389,21 @@ impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
 where
     (T, T): Into<SquareType>,
     SquareType: WorldIntCoordinate,
-    DirectionType: Into<OrthogonalWorldStep>,
+    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
 {
     fn from(value: (T, T, DirectionType)) -> Self {
         Self::from_square_and_step((value.0, value.1).into(), value.2)
     }
 }
 
-impl<SquareType> From<OrthogonalFacingIntPose<SquareType>> for (SquareType, OrthogonalWorldStep)
+impl<SquareType> From<OrthogonalFacingIntPose<SquareType>>
+    for (SquareType, OrthogonalUnitCoordinate<SquareType>)
 where
     SquareType: WorldIntCoordinate,
 {
-    fn from(value: OrthogonalFacingIntPose<SquareType>) -> (SquareType, OrthogonalWorldStep) {
+    fn from(
+        value: OrthogonalFacingIntPose<SquareType>,
+    ) -> (SquareType, OrthogonalUnitCoordinate<SquareType>) {
         (value.square, value.direction())
     }
 }
