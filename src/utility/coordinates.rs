@@ -239,7 +239,9 @@ where
 {
 }
 
-pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output = Self> {
+pub trait SignedCoordinate:
+    Coordinate<DataType = <Self as SignedCoordinate>::_DataType> + Neg<Output = Self>
+{
     type _DataType: num::Signed;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
@@ -325,7 +327,7 @@ where
 // {
 // }
 
-pub trait IntCoordinate: SignedCoordinate<DataType = i32> + Hash + Eq {
+pub trait IntCoordinate: SignedCoordinate<_DataType = i32> + Hash + Eq {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
     }
@@ -339,11 +341,11 @@ pub trait IntCoordinate: SignedCoordinate<DataType = i32> + Hash + Eq {
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> IntCoordinate for T where T: SignedCoordinate<DataType = i32> + Hash + Eq {}
+impl<T> IntCoordinate for T where T: SignedCoordinate<_DataType = i32> + Hash + Eq {}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
 
-pub trait FloatCoordinate: SignedCoordinate<DataType = f32> {
+pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
         // NOTE: 0.5 can be exactly represented by floating point numbers
@@ -390,7 +392,7 @@ pub trait FloatCoordinate: SignedCoordinate<DataType = f32> {
 }
 
 // TODO: convert to auto trait when stable
-impl<T> FloatCoordinate for T where T: SignedCoordinate<DataType = f32> {}
+impl<T> FloatCoordinate for T where T: SignedCoordinate<_DataType = f32> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x()), sign(point.y()))
