@@ -57,6 +57,8 @@ impl<C: SignedCoordinate> From<C> for OrthogonalUnitCoordinate<C> {
 }
 impl<C: SignedCoordinate<UnitType = U>, U> From<QuarterTurnsCcw> for OrthogonalUnitCoordinate<C> {
     fn from(value: QuarterTurnsCcw) -> Self {
-        Self::new(C::right().quarter_rotated_ccw(value.quarter_turns()))
+        // TODO: factor out this default to one place
+        let default_direction_for_zero_turns = C::right();
+        Self::new(default_direction_for_zero_turns.quarter_rotated_ccw(value.quarter_turns()))
     }
 }

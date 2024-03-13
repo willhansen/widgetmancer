@@ -78,7 +78,7 @@ where
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
-        Self::from_square_and_step(square, quarter_turns.into())
+        Self::from_square_and_step(square, quarter_turns)
     }
     pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType> {
         self.dir()
@@ -145,40 +145,26 @@ where
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(self.square, self.right())
     }
-    fn left(&self) -> OrthogonalWorldStep {
+    fn left(&self) -> OrthogonalUnitCoordinate<SquareType> {
         self.direction().quarter_rotated_ccw(1)
     }
-    fn right(&self) -> OrthogonalWorldStep {
+    fn right(&self) -> OrthogonalUnitCoordinate<SquareType> {
         self.direction().quarter_rotated_ccw(3)
     }
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_step(self.square, -self.direction().step())
     }
-    pub fn with_offset(&self, offset: WorldStep) -> Self {
+    pub fn with_offset(&self, offset: SquareType) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
     }
     pub fn at_square(&self, position: impl Into<SquareType>) -> Self {
         Self::from_square_and_step(position, self.dir())
     }
-    pub fn with_direction(&self, dir: WorldStep) -> Self {
+    pub fn with_direction(&self, dir: impl Into<OrthogonalUnitCoordinate<SquareType>>) -> Self {
         Self::from_square_and_step(self.square, dir)
     }
     pub fn reversed(&self) -> Self {
-        self.with_direction(-self.direction().step())
-    }
-    // TODO: remove this?
-    fn as_relative_face(&self) -> RelativeSquareWithOrthogonalDir {
-        RelativeSquareWithOrthogonalDir::from_square_and_step(
-            self.square() - SquareType::zero(),
-            self.dir(),
-        )
-    }
-    // TODO: remove this?
-    fn as_absolute_face(&self) -> SquareWithOrthogonalDir {
-        SquareWithOrthogonalDir::from_square_and_step(
-            WorldSquare::zero() + self.as_relative_face().square(),
-            self.dir(),
-        )
+        self.with_direction(-self.direction())
     }
     pub fn face_is_on_same_line<OtherType: Into<Self>>(&self, other: OtherType) -> bool {
         let other_face: Self = other.into();
@@ -187,13 +173,9 @@ where
             return false;
         }
 
-        let pos_on_dir_axis = self.dir().pos_on_axis(self.as_relative_face().square());
-        let stepped_pos_on_dir_axis = self
-            .dir()
-            .pos_on_axis(self.stepped().as_relative_face().square().into());
-        let other_pos_on_dir_axis = self
-            .dir()
-            .pos_on_axis(other_face.as_relative_face().square().into());
+        let pos_on_dir_axis = self.dir().pos_on_axis(self.square());
+        let stepped_pos_on_dir_axis = self.dir().pos_on_axis(self.stepped().square().into());
+        let other_pos_on_dir_axis = self.dir().pos_on_axis(other_face.square().into());
 
         let same_direction = self.dir() == other_face.dir();
         if same_direction {
@@ -211,8 +193,7 @@ where
     // TODO: make return type relative to Self::UnitType?
     // TODO: return AbsOrRelWorldLine
     pub fn face_line_segment(&self) -> TwoDifferentWorldPoints {
-        let abs_face = self.as_absolute_face();
-        square_face_as_line(abs_face.square, abs_face.dir)
+        square_face_as_line(self.square, self.dir)
     }
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
