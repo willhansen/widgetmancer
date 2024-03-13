@@ -16,8 +16,8 @@ use crate::utility::line::{FloatLineTrait, LineTrait};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::relative_interval_location::RelativeIntervalLocation;
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
-    QuarterTurnsCcw, TwoDifferentPoints, TwoDifferentWorldPoints, STEP_ZERO,
+    king_step_distance, QuarterTurnsCcw, number_to_hue_rotation, standardize_angle,
+    HalfPlane, QuarterTurnRotatable, TwoDifferentPoints, TwoDifferentWorldPoints, STEP_ZERO,
 };
 use crate::{point2, DirectedFloatLineTrait};
 use derive_more::Constructor;
@@ -337,7 +337,10 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         match self {
             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
                 Self::PartiallyVisible(v.quarter_rotated_ccw(quarter_turns_ccw))

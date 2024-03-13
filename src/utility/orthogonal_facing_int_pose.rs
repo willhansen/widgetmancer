@@ -1,17 +1,17 @@
 use std::{
     fmt::{Debug, Display, Formatter},
-    ops::Add,
+    ops::{Add, Sub},
 };
 
 use crate::{
-    about_eq_2d, glyph_constants::FACE_ARROWS,
+    about_eq_2d, glyph_constants::FACE_ARROWS, line_segment::LineSegment, QuarterTurnsCcw,
     orthogonal_unit_coordinate::OrthogonalUnitCoordinate, square_face_as_line, two_in_ccw_order,
-    Glyph, IntCoordinate, QuarterTurnRotatable, QuarterTurnsCcw, SquareWithKingDir,
-    StepWithQuarterRotations, TwoDifferentWorldPoints, WorldIntCoordinate, WorldMove, WorldPoint,
-    WorldSquare, WorldStep, STEP_RIGHT, STEP_UP,
+    Coordinate, Glyph, IntCoordinate, QuarterTurnRotatable, SquareWithKingDir,
+    TwoDifferentWorldPoints, WorldIntCoordinate, WorldMove, WorldPoint, WorldSquare, WorldStep,
+    STEP_RIGHT, STEP_UP,
 };
 
-#[derive(Clone, Hash, Eq, PartialEq, getset::CopyGetters)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, getset::CopyGetters)]
 #[get_copy = "pub"]
 pub struct OrthogonalFacingIntPose<SquareType>
 where
@@ -21,16 +21,16 @@ where
     dir: OrthogonalUnitCoordinate<SquareType>,
 }
 
-// TODO: derive instead
-impl<S: WorldIntCoordinate> Copy for OrthogonalFacingIntPose<S> {}
-
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
 where
     SquareType: IntCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
         // TODO: refactor to QuarterTurnsCcw::quarter_turns_from_default_direction
-        QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT.cast_metadata(), self.dir.step())
+        QuarterTurnsCcw::from_start_and_end_directions(
+            STEP_RIGHT.cast_metadata(),
+            self.dir.step(),
+        )
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
@@ -41,7 +41,10 @@ where
             dir: direction.into(),
         }
     }
-    pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn from_square_and_turns(
+        square: SquareType,
+        quarter_turns: QuarterTurnsCcw,
+    ) -> Self {
         Self::from_square_and_step(square, quarter_turns)
     }
     pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType> {
@@ -155,8 +158,8 @@ where
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
     // TODO: make return type relative to Self::UnitType?
-    // TODO: return AbsOrRelWorldLine
-    pub fn face_line_segment(&self) -> TwoDifferentWorldPoints {
+    // TODO: return
+    pub fn face_line_segment(&self) -> impl LineSegment<PointType = SquareType::Floating> {
         square_face_as_line(self.square, self.dir)
     }
 
@@ -302,24 +305,59 @@ impl TryFrom<SquareWithKingDir> for SquareWithOrthogonalDir {
         }
     }
 }
-impl Add<StepWithQuarterRotations> for SquareWithOrthogonalDir {
+impl<T> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
     type Output = Self;
 
-    fn add(self, rhs: StepWithQuarterRotations) -> Self::Output {
-        SquareWithOrthogonalDir::from_square_and_turns(
-            self.square + rhs.stepp,
-            self.direction_in_quarter_turns() + rhs.rotation,
+    fn add(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
+        OrthogonalFacingIntPose::from_square_and_turns(
+            self.square + rhs.square,
+            self.direction_in_quarter_turns() + rhs.direction_in_quarter_turns(),
         )
     }
 }
 
-impl Sub<SquareWithOrthogonalDir> for SquareWithOrthogonalDir {
-    type Output = StepWithQuarterRotations;
+impl<T> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
+    type Output = Self;
 
-    fn sub(self, rhs: SquareWithOrthogonalDir) -> Self::Output {
-        StepWithQuarterRotations::new(
+    fn sub(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
+        OrthogonalFacingIntPose::from_square_and_turns(
             self.square - rhs.square,
             self.direction_in_quarter_turns() - rhs.direction_in_quarter_turns(),
         )
+    }
+}
+impl<ConvertableToSquareType, SquareType, DirectionType>
+    From<(ConvertableToSquareType, DirectionType)> for OrthogonalFacingIntPose<SquareType>
+where
+    ConvertableToSquareType: Into<SquareType>,
+    SquareType: WorldIntCoordinate,
+    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
+{
+    fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
+        Self::from_square_and_step(value.0.into(), value.1)
+    }
+}
+
+impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
+    for OrthogonalFacingIntPose<SquareType>
+where
+    (T, T): Into<SquareType>,
+    SquareType: WorldIntCoordinate,
+    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
+{
+    fn from(value: (T, T, DirectionType)) -> Self {
+        Self::from_square_and_step((value.0, value.1).into(), value.2)
+    }
+}
+
+impl<SquareType> From<OrthogonalFacingIntPose<SquareType>>
+    for (SquareType, OrthogonalUnitCoordinate<SquareType>)
+where
+    SquareType: WorldIntCoordinate,
+{
+    fn from(
+        value: OrthogonalFacingIntPose<SquareType>,
+    ) -> (SquareType, OrthogonalUnitCoordinate<SquareType>) {
+        (value.square, value.direction())
     }
 }

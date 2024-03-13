@@ -1,5 +1,9 @@
 use crate::{
     glyph::{glyph_constants::FACE_ARROWS, Glyph},
+    orthogonal_facing_int_pose::{
+        OrthogonalFacingIntPose, RelativeFace, RelativeSquareWithOrthogonalDir,
+        SquareWithOrthogonalDir,
+    },
     orthogonal_unit_coordinate::OrthogonalUnitCoordinate,
 };
 
@@ -10,76 +14,6 @@ use super::{
     line::{square_face_as_line, TwoDifferentWorldPoints},
     RigidTransform, RigidlyTransformable,
 };
-
-#[derive(
-    Clone, Hash, Eq, PartialEq, Neg, Debug, Copy, getset::CopyGetters, derive_more::Constructor,
-)]
-#[get_copy = "pub"]
-pub struct StepWithQuarterRotations {
-    stepp: WorldStep,
-    rotation: QuarterTurnsCcw,
-}
-
-impl StepWithQuarterRotations {
-    pub fn from_direction_squares(
-        start: SquareWithOrthogonalDir,
-        end: SquareWithOrthogonalDir,
-    ) -> Self {
-        let translation = end.square() - start.square();
-        let rotation = end.direction_in_quarter_turns() - start.direction_in_quarter_turns();
-        Self::new(translation, rotation)
-    }
-}
-
-impl Default for StepWithQuarterRotations {
-    fn default() -> Self {
-        StepWithQuarterRotations::new(STEP_ZERO, QuarterTurnsCcw::new(0))
-    }
-}
-
-impl Add for StepWithQuarterRotations {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        StepWithQuarterRotations::new(self.stepp + rhs.stepp, self.rotation + rhs.rotation)
-    }
-}
-
-impl<ConvertableToSquareType, SquareType, DirectionType>
-    From<(ConvertableToSquareType, DirectionType)> for OrthogonalFacingIntPose<SquareType>
-where
-    ConvertableToSquareType: Into<SquareType>,
-    SquareType: WorldIntCoordinate,
-    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
-{
-    fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
-        Self::from_square_and_step(value.0.into(), value.1)
-    }
-}
-
-impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
-    for OrthogonalFacingIntPose<SquareType>
-where
-    (T, T): Into<SquareType>,
-    SquareType: WorldIntCoordinate,
-    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
-{
-    fn from(value: (T, T, DirectionType)) -> Self {
-        Self::from_square_and_step((value.0, value.1).into(), value.2)
-    }
-}
-
-impl<SquareType> From<OrthogonalFacingIntPose<SquareType>>
-    for (SquareType, OrthogonalUnitCoordinate<SquareType>)
-where
-    SquareType: WorldIntCoordinate,
-{
-    fn from(
-        value: OrthogonalFacingIntPose<SquareType>,
-    ) -> (SquareType, OrthogonalUnitCoordinate<SquareType>) {
-        (value.square, value.direction())
-    }
-}
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
@@ -157,7 +91,7 @@ pub fn faces_away_from_center_at_rel_square(
 pub fn squares_sharing_face<SquareType: WorldIntCoordinate>(
     face: OrthogonalFacingIntPose<SquareType>,
 ) -> [SquareType; 2] {
-    [face.square, face.stepped().square]
+    [face.square(), face.stepped().square()]
 }
 
 pub fn check_faces_in_ccw_order<T: IntoIterator<Item = impl Into<RelativeFace>> + Clone>(

@@ -25,6 +25,7 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{Drawable, DrawableEnum, SolidColorDrawable, TextDrawable};
 use crate::graphics::Graphics;
 use crate::portal_geometry::PortalGeometry;
+use crate::quarter_turns_ccw::QuarterTurnsCcw;
 use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
@@ -866,6 +867,7 @@ mod tests {
     use crate::glyph_constants::{RED, SPACE};
     use crate::graphics::drawable::PartialVisibilityDrawable;
     use crate::portal_geometry::Portal;
+    use crate::quarter_turns_ccw::QuarterTurnsCcw;
     use crate::utility::poses::faces_away_from_center_at_rel_square;
     use crate::DoubleGlyph;
     use itertools::Itertools;
@@ -881,7 +883,7 @@ mod tests {
     };
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{QuarterTurnsCcw, STEP_DOWN, STEP_LEFT, STEP_UP};
+    use crate::utility::{quarter_turns_ccw, STEP_DOWN, STEP_LEFT, STEP_UP};
 
     use self::square_visibility::{
         RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,

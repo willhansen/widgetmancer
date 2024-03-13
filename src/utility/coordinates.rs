@@ -6,9 +6,10 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
+use quarter_turns_ccw::QuarterTurnsCcw;
+
 use typenum::{Sum, Unsigned};
 
-use derive_more::{AddAssign, Neg};
 pub use euclid::Angle;
 use itertools::Itertools;
 use num::{One, Signed, Zero};
@@ -21,7 +22,7 @@ use crate::{abs, orthogonal_unit_coordinate::OrthogonalUnitCoordinate};
 
 // TODO: get rid of this section
 use super::{
-    bool_with_partial::*,
+    bool_with_partial::BoolWithPartial,
     // TODO: get rid of this line
     coordinate_frame_conversions::{
         SquareGridInWorldFrame, SquareSet, StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
@@ -416,7 +417,10 @@ impl<V> QuarterTurnRotatable for V
 where
     V: SignedCoordinate,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw>,
+    ) -> Self {
         // if self.is_absolute() {
         //     return *self;
         // }
@@ -504,7 +508,7 @@ pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
 pub fn revolve_square(
     moving_square: WorldSquare,
     pivot_square: WorldSquare,
-    rotation: QuarterTurnsCcw,
+    rotation: quarter_turns_ccw::QuarterTurnsCcw,
 ) -> WorldSquare {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
@@ -549,7 +553,7 @@ pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(QuarterTurnsCcw::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(quarter_turns_ccw::QuarterTurnsCcw::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -573,7 +577,10 @@ impl KingWorldStep {
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw> + Copy,
+    ) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -644,103 +651,130 @@ impl RigidlyTransformable for WorldSquare {
     }
 }
 
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, AddAssign)]
-#[get_copy = "pub"]
-pub struct QuarterTurnsCcw {
-    quarter_turns: i32,
-}
+pub mod quarter_turns_ccw {
+    use std::ops::{Add, Div, Mul, Neg, Sub};
 
-impl QuarterTurnsCcw {
-    pub fn new(quarter_turns: i32) -> Self {
-        QuarterTurnsCcw {
-            quarter_turns: quarter_turns.rem_euclid(4),
+    use euclid::Angle;
+
+    use crate::{
+        standardize_angle, IntCoordinate, QuarterTurnRotatable, SignedCoordinate, WorldStep,
+        STEP_RIGHT,
+    };
+
+    #[derive(
+        Hash,
+        Default,
+        Debug,
+        Copy,
+        Clone,
+        Eq,
+        PartialEq,
+        getset::CopyGetters,
+        derive_more::AddAssign,
+    )]
+    #[get_copy = "pub"]
+    pub struct QuarterTurnsCcw {
+        pub(crate) quarter_turns: i32,
+    }
+
+    impl QuarterTurnsCcw {
+        pub fn new(quarter_turns: i32) -> Self {
+            QuarterTurnsCcw {
+                quarter_turns: quarter_turns.rem_euclid(4),
+            }
+        }
+        #[deprecated(note = "use OrthogonalUnitCoordinate::From instead")]
+        pub fn to_orthogonal_direction(&self) -> WorldStep {
+            STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
+        }
+        pub fn all_4() -> impl Iterator<Item = Self> + Clone {
+            (0..4).map(|x| x.into())
+        }
+        pub fn from_vector(dir: WorldStep) -> Self {
+            assert!(dir.is_orthogonal());
+            QuarterTurnsCcw::new(if dir.x == 0 {
+                if dir.y > 0 {
+                    1
+                } else {
+                    3
+                }
+            } else {
+                if dir.x > 0 {
+                    0
+                } else {
+                    2
+                }
+            })
+        }
+
+        pub fn from_start_and_end_directions<P: IntCoordinate>(start: P, end: P) -> Self {
+            assert!(start.is_king_step());
+            assert!(end.is_king_step());
+            // needs to be quarter turn, no eighths
+            assert_eq!(start.is_diagonal(), end.is_diagonal());
+
+            let d_angle = start.to_f32().angle_to(end.to_f32());
+            let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
+            Self::new(quarter_turns)
+        }
+
+        pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
+            standardize_angle(Angle::<f32>::degrees(
+                angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
+            ))
+        }
+        pub fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
+            v.quarter_rotated_ccw(self.quarter_turns)
         }
     }
-    #[deprecated(note = "use OrthogonalUnitCoordinate::From instead")]
-    pub fn to_orthogonal_direction(&self) -> WorldStep {
-        STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
-    }
-    pub fn all_4() -> impl Iterator<Item = Self> + Clone {
-        (0..4).map(|x| x.into())
-    }
-    pub fn from_vector(dir: WorldStep) -> Self {
-        assert!(dir.is_orthogonal());
-        QuarterTurnsCcw::new(if dir.x == 0 {
-            if dir.y > 0 {
-                1
-            } else {
-                3
-            }
-        } else {
-            if dir.x > 0 {
-                0
-            } else {
-                2
-            }
-        })
+
+    impl Neg for QuarterTurnsCcw {
+        type Output = Self;
+
+        fn neg(self) -> Self::Output {
+            QuarterTurnsCcw::new(-self.quarter_turns)
+        }
     }
 
-    pub fn from_start_and_end_directions<P: IntCoordinate>(start: P, end: P) -> Self {
-        assert!(start.is_king_step());
-        assert!(end.is_king_step());
-        // needs to be quarter turn, no eighths
-        assert_eq!(start.is_diagonal(), end.is_diagonal());
+    impl Add for QuarterTurnsCcw {
+        type Output = Self;
 
-        let d_angle = start.to_f32().angle_to(end.to_f32());
-        let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
-        Self::new(quarter_turns)
+        fn add(self, rhs: Self) -> Self::Output {
+            Self::new(self.quarter_turns() + rhs.quarter_turns())
+        }
     }
 
-    pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
-        standardize_angle(Angle::<f32>::degrees(
-            angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
-        ))
+    impl Sub for QuarterTurnsCcw {
+        type Output = Self;
+
+        fn sub(self, rhs: Self) -> Self::Output {
+            Self::new(self.quarter_turns() - rhs.quarter_turns())
+        }
     }
-    pub fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
-        v.quarter_rotated_ccw(self.quarter_turns)
+
+    impl From<i32> for QuarterTurnsCcw {
+        fn from(value: i32) -> Self {
+            Self::new(value)
+        }
     }
-}
 
-impl Neg for QuarterTurnsCcw {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        QuarterTurnsCcw::new(-self.quarter_turns)
-    }
-}
-
-impl Add for QuarterTurnsCcw {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() + rhs.quarter_turns())
-    }
-}
-
-impl Sub for QuarterTurnsCcw {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() - rhs.quarter_turns())
-    }
-}
-
-impl From<i32> for QuarterTurnsCcw {
-    fn from(value: i32) -> Self {
-        Self::new(value)
-    }
-}
-
-impl QuarterTurnRotatable for QuarterTurnsCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
-        *self + quarter_turns_ccw.into()
+    impl QuarterTurnRotatable for QuarterTurnsCcw {
+        fn quarter_rotated_ccw(
+            &self,
+            quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+        ) -> Self {
+            *self + quarter_turns_ccw.into()
+        }
     }
 }
 
 #[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self;
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw> + Copy,
+    ) -> Self;
     #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
@@ -760,7 +794,10 @@ impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw> + Copy,
+    ) -> Self {
         self.iter()
             .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
@@ -772,14 +809,20 @@ impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw> + Copy,
+    ) -> Self {
         self.as_ref()
             .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<quarter_turns_ccw::QuarterTurnsCcw> + Copy,
+    ) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
         ))

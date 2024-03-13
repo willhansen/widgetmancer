@@ -8,7 +8,9 @@ use portrait;
 use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate, SignedCoordinate};
 
 use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
+use crate::utility::coordinates::{
+    about_eq_2d, QuarterTurnsCcw, FAngle, QuarterTurnRotatable,
+};
 use crate::utility::general_utility::{all_true, union};
 use crate::utility::partial_angle_interval::PartialAngleInterval;
 use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
@@ -31,7 +33,10 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         Self::from_faces_in_ccw_order(
             self.edges
                 .iter()

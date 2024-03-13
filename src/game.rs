@@ -340,8 +340,10 @@ impl Game {
 
         self.try_set_player_position(new_pos)?;
 
-        let rotation_from_portals =
-            QuarterTurnsCcw::from_start_and_end_directions(direction.step(), new_dir.step());
+        let rotation_from_portals = QuarterTurnsCcw::from_start_and_end_directions(
+            direction.step(),
+            new_dir.step(),
+        );
         self.graphics.screen.rotate(rotation_from_portals);
 
         Ok(())
@@ -3526,7 +3528,9 @@ mod tests {
             enemy_chars.chars().collect_vec()[0]
         );
 
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(3));
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsCcw::new(3));
 
         game.draw_headless_now();
 
@@ -3587,7 +3591,9 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(1));
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsCcw::new(1));
         game.try_slide_player_relative_to_screen(SCREEN_STEP_UP)
             .expect("slide");
         assert_eq!(game.player_square(), player_square + STEP_LEFT);
@@ -3599,7 +3605,9 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(1));
+        game.graphics
+            .screen
+            .rotate(QuarterTurnsCcw::new(1));
         game.player_blink_relative_to_screen(SCREEN_STEP_UP);
         assert_eq!(game.player_square().y, player_square.y);
         assert!(game.player_square().x < player_square.x);
@@ -4667,7 +4675,9 @@ mod tests {
             STEP_RIGHT.to_f32(),
             Angle::degrees(0.0),
         );
-        game.graphics.screen.set_rotation(QuarterTurnsCcw::new(1));
+        game.graphics
+            .screen
+            .set_rotation(QuarterTurnsCcw::new(1));
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
         let upper_glyphs = game

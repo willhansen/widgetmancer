@@ -1,4 +1,6 @@
-use crate::{QuarterTurnsCcw, RigidTransform, RigidlyTransformable, SignedCoordinate, STEP_RIGHT};
+use crate::{
+    QuarterTurnsCcw, RigidTransform, RigidlyTransformable, SignedCoordinate, STEP_RIGHT,
+};
 use derive_more::Neg;
 
 use super::QuarterTurnRotatable;
@@ -45,7 +47,10 @@ where
 
 // TODO: delegate with macro
 impl<C: SignedCoordinate> QuarterTurnRotatable for OrthogonalUnitCoordinate<C> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -55,7 +60,9 @@ impl<C: SignedCoordinate> From<C> for OrthogonalUnitCoordinate<C> {
         Self::new(value)
     }
 }
-impl<C: SignedCoordinate<UnitType = U>, U> From<QuarterTurnsCcw> for OrthogonalUnitCoordinate<C> {
+impl<C: SignedCoordinate<UnitType = U>, U> From<QuarterTurnsCcw>
+    for OrthogonalUnitCoordinate<C>
+{
     fn from(value: QuarterTurnsCcw) -> Self {
         // TODO: factor out this default to one place
         let default_direction_for_zero_turns = C::right();

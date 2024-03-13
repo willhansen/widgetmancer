@@ -13,8 +13,8 @@ use crate::glyph::DoubleGlyph;
 use crate::glyph_constants::*;
 use crate::piece::PieceType::*;
 use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::coordinates::QuarterTurnsCcw;
+use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{
     adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
     ORTHOGONAL_STEPS, STEP_RIGHT,
@@ -250,7 +250,10 @@ impl Piece {
 }
 
 impl QuarterTurnRotatable for Piece {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Piece {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Piece {
         assert!(self.can_turn());
         Piece {
             piece_type: self.piece_type,

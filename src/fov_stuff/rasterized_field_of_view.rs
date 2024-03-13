@@ -18,7 +18,7 @@ use crate::utility::poses::StepWithQuarterRotations;
 use crate::utility::RigidTransform;
 use crate::utility::RigidlyTransformable;
 use crate::utility::{
-    king_step_distance, number_to_hue_rotation, QuarterTurnRotatable, QuarterTurnsCcw,
+    king_step_distance, QuarterTurnsCcw, number_to_hue_rotation, QuarterTurnRotatable,
     SimpleResult, TupleClone, STEP_ZERO,
 };
 use crate::Coordinate;
@@ -66,7 +66,10 @@ impl Debug for TopDownPortal {
 }
 
 impl QuarterTurnRotatable for TopDownPortal {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+    ) -> Self {
         Self {
             shape_in_exit_frame: self
                 .shape_in_exit_frame
