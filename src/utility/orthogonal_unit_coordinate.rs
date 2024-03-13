@@ -43,7 +43,7 @@ where
     }
 }
 
-// TODO: generate with macro
+// TODO: delegate with macro
 impl<C: SignedCoordinate> QuarterTurnRotatable for OrthogonalUnitCoordinate<C> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()

@@ -32,6 +32,7 @@ pub mod has_origin_pose;
 pub mod line;
 pub mod line_segment;
 pub mod octant;
+pub mod orthogonal_facing_int_pose;
 pub mod orthogonal_unit_coordinate;
 pub mod partial_angle_interval; // TODO: make private and contained within angle_interval?
 pub mod poses;

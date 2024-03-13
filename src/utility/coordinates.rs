@@ -143,12 +143,6 @@ pub trait Coordinate:
     fn to_string(&self) -> String {
         format!("(x: {}, y: {})", self.x(), self.y())
     }
-    // TODO: somehow shorten long parameter type
-    fn from_any_relativity(
-        other: impl Coordinate<DataType = Self::DataType, UnitType = Self::UnitType>,
-    ) -> Self {
-        Self::new(other.x(), other.y())
-    }
     fn is_vertical(&self) -> bool {
         self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
     }

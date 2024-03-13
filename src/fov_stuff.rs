@@ -10,11 +10,12 @@ use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
+use crate::orthogonal_facing_int_pose::SquareWithOrthogonalDir;
+use crate::orthogonal_facing_int_pose::{Face, RelativeSquareWithOrthogonalDir};
 use crate::utility::coordinates::{king_step_distance, OrthogonalWorldStep};
 use crate::utility::has_origin_pose::HasOriginPose;
 use crate::utility::octant::Octant;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
 use euclid::Angle;
 use itertools::*;
@@ -28,6 +29,7 @@ use crate::utility::angle_interval::AngleInterval;
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
+use self::orthogonal_facing_int_pose::RelativeFace;
 use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 
 type Pose = SquareWithOrthogonalDir;
@@ -872,15 +874,14 @@ mod tests {
 
     use std::f32::consts::PI;
 
+    use crate::fov_stuff::SquareWithOrthogonalDir;
     use crate::glyph::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
         angled_block_flip_y,
     };
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{
-        QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
-    };
+    use crate::utility::{QuarterTurnsCcw, STEP_DOWN, STEP_LEFT, STEP_UP};
 
     use self::square_visibility::{
         RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,
