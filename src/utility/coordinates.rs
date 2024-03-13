@@ -245,6 +245,18 @@ pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output 
     fn flip_y(&self) -> Self {
         Self::new(self.x(), -self.y())
     }
+    fn right() -> Self {
+        Self::new(Self::DataType::one(), Self::DataType::zero())
+    }
+    fn left() -> Self {
+        Self::new(-Self::DataType::one(), Self::DataType::zero())
+    }
+    fn up() -> Self {
+        Self::new(Self::DataType::zero(), Self::DataType::one())
+    }
+    fn down() -> Self {
+        Self::new(Self::DataType::zero(), -Self::DataType::one())
+    }
 }
 impl<T> SignedCoordinate for T
 where
@@ -252,15 +264,6 @@ where
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
-}
-
-impl<T> From<(T, T)> for OrthogonalWorldStep
-where
-    (T, T): Into<WorldStep>,
-{
-    fn from(value: (T, T)) -> Self {
-        OrthogonalWorldStep::new(value)
-    }
 }
 
 // TODO: uncomment when newtyping Vector2D and Point2D
@@ -522,7 +525,7 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
 }
 
 pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
-    step.project_onto_vector(axis.step).dot(axis.step)
+    step.project_onto_vector(axis.step()).dot(axis.step())
 }
 pub fn square_is_odd(square: WorldSquare) -> bool {
     (square.x + square.y) % 2 == 1
@@ -589,7 +592,7 @@ impl From<WorldStep> for KingWorldStep {
 
 impl From<OrthogonalWorldStep> for KingWorldStep {
     fn from(value: OrthogonalWorldStep) -> Self {
-        KingWorldStep::new(value.step)
+        KingWorldStep::new(value.step())
     }
 }
 
@@ -599,26 +602,11 @@ impl From<KingWorldStep> for WorldStep {
     }
 }
 
-type Type = OrthogonalUnitCoordinate<WorldStep>;
-
-pub type OrthogonalWorldStep = Type;
-
-// TODO: generate with macro
-impl QuarterTurnRotatable for OrthogonalWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
-        self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
-    }
-}
-
-impl From<WorldStep> for OrthogonalWorldStep {
-    fn from(value: WorldStep) -> Self {
-        OrthogonalWorldStep::new(value)
-    }
-}
+pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
 
 impl From<OrthogonalWorldStep> for WorldStep {
     fn from(value: OrthogonalWorldStep) -> Self {
-        value.step
+        value.step()
     }
 }
 
@@ -661,11 +649,6 @@ impl RigidlyTransformable for WorldSquare {
         revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
     }
 }
-impl RigidlyTransformable for OrthogonalWorldStep {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        tf.rotation().rotate_vector(self.step).into()
-    }
-}
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, AddAssign)]
 #[get_copy = "pub"]
@@ -679,7 +662,7 @@ impl QuarterTurnsCcw {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
-    #[deprecated(note = "use OrthogonalUnitCoordinate::From::from instead")]
+    #[deprecated(note = "use OrthogonalUnitCoordinate::From instead")]
     pub fn to_orthogonal_direction(&self) -> WorldStep {
         STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
     }

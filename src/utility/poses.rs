@@ -1,4 +1,7 @@
-use crate::glyph::{glyph_constants::FACE_ARROWS, Glyph};
+use crate::{
+    glyph::{glyph_constants::FACE_ARROWS, Glyph},
+    orthogonal_unit_coordinate::OrthogonalUnitCoordinate,
+};
 
 use super::{
     coordinate_frame_conversions::*,
@@ -75,7 +78,7 @@ where
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
-        Self::from_square_and_step(square, quarter_turns.to_orthogonal_direction())
+        Self::from_square_and_step(square, quarter_turns.into())
     }
     pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType> {
         self.dir()
