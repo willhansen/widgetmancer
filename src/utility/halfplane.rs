@@ -1,7 +1,4 @@
-use super::{
-    bool_with_partial::*, coordinate_frame_conversions::*, coordinates::*, general_utility::*,
-    line::*, relative_interval_location::*,
-};
+use crate::utility::*;
 use euclid::num::Zero;
 
 pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;

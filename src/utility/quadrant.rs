@@ -1,4 +1,4 @@
-use super::{coordinate_frame_conversions::*, coordinates::*, general_utility::*};
+use crate::utility::*;
 
 #[derive(Clone, Hash, Debug, Eq, Copy)]
 pub struct Quadrant(pub i32);

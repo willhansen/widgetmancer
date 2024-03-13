@@ -21,39 +21,38 @@ use crate::glyph::glyph_constants::{
 use crate::piece::PieceType::King;
 use crate::{DoubleGlyph, Glyph};
 
-pub mod angle_interval;
-pub mod bool_with_partial;
-pub mod circular_interval;
-pub mod coordinate_frame_conversions;
-pub mod coordinates;
-pub mod general_utility;
-pub mod halfplane;
-pub mod has_origin_pose;
-pub mod line;
-pub mod line_segment;
-pub mod octant;
-pub mod orthogonal_facing_int_pose;
-pub mod orthogonal_unit_coordinate;
-pub mod partial_angle_interval; // TODO: make private and contained within angle_interval?
-pub mod poses;
-pub mod quadrant;
-pub mod quarter_turns_ccw;
-pub mod relative_interval_location;
-pub mod round_robin_iterator;
-pub mod size_2d;
-pub mod trait_alias_macro;
+macro_rules! pub_mod_and_use {
+    ($($module:ident), +) => {
+        $(
+            pub mod $module;
+            pub use self::$module::*;
+        )+
+    };
+}
 
-pub use self::angle_interval::*;
-pub use self::coordinate_frame_conversions::*;
-pub use self::coordinates::*;
-pub use self::general_utility::*;
-pub use self::halfplane::*;
-pub use self::line::*;
-pub use self::octant::*;
-pub use self::poses::*;
-pub use self::quadrant::*;
-pub use self::round_robin_iterator::*;
-use self::size_2d::Size2D;
+pub_mod_and_use!(
+    angle_interval,
+    bool_with_partial,
+    circular_interval,
+    coordinate_frame_conversions,
+    coordinates,
+    general_utility,
+    halfplane,
+    has_origin_pose,
+    line,
+    line_segment,
+    octant,
+    orthogonal_facing_int_pose,
+    orthogonal_unit_coordinate,
+    partial_angle_interval, // TODO: make private and contained within angle_interval?
+    poses,
+    quadrant,
+    quarter_turns_ccw,
+    relative_interval_location,
+    round_robin_iterator,
+    size_2d,
+    trait_alias_macro
+);
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
@@ -250,14 +249,14 @@ impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
 // TODO: create a relative version of a rigid transform
 #[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
-    start_pose: SquareWithOrthogonalDir,
-    end_pose: SquareWithOrthogonalDir,
+    start_pose: WorldSquareWithOrthogonalDir,
+    end_pose: WorldSquareWithOrthogonalDir,
 }
 
 impl RigidTransform {
     pub fn from_start_and_end_poses(
-        start: impl Into<SquareWithOrthogonalDir>,
-        end: impl Into<SquareWithOrthogonalDir>,
+        start: impl Into<WorldSquareWithOrthogonalDir>,
+        end: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         RigidTransform {
             start_pose: start.into(),
@@ -267,8 +266,8 @@ impl RigidTransform {
     // Treats the start pose as the origin
     // TODO: move to a relative version of a rigidtransform
     pub fn new_relative_transform_from_start_to_end(
-        start: impl Into<SquareWithOrthogonalDir>,
-        end: impl Into<SquareWithOrthogonalDir>,
+        start: impl Into<WorldSquareWithOrthogonalDir>,
+        end: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         let start = start.into();
         let end = end.into();
@@ -371,8 +370,8 @@ impl Eq for RigidTransform {}
 impl Default for RigidTransform {
     fn default() -> Self {
         RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
-            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            WorldSquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            WorldSquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
         )
     }
 }

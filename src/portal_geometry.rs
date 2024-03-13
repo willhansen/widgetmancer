@@ -15,10 +15,8 @@ use crate::utility::coordinate_frame_conversions::{
 };
 use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{
-    first_inside_square_face_hit_by_ray, ith_projection_of_step, QuarterTurnsCcw,
-    naive_ray_endpoint, revolve_square, OrthogonalFacingIntPose, RelativeSquareWithOrthogonalDir,
-    RigidTransform, SquareWithKingDir, SquareWithOrthogonalDir, StepWithQuarterRotations,
-    TwoDifferentWorldPoints, STEP_RIGHT, STEP_ZERO,
+    first_inside_square_face_hit_by_ray, naive_ray_endpoint, RigidTransform, SquareWithKingDir,
+    TwoDifferentWorldPoints, WorldSquareWithOrthogonalDir, STEP_RIGHT,
 };
 use crate::FloatLineTrait;
 use crate::LineTrait;
@@ -26,12 +24,12 @@ use crate::LineTrait;
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, CopyGetters)]
 #[get_copy = "pub"]
 pub struct Portal {
-    entrance: SquareWithOrthogonalDir,
-    exit: SquareWithOrthogonalDir,
+    entrance: WorldSquareWithOrthogonalDir,
+    exit: WorldSquareWithOrthogonalDir,
 }
 
 impl Portal {
-    pub fn new(entrance: SquareWithOrthogonalDir, exit: SquareWithOrthogonalDir) -> Self {
+    pub fn new(entrance: WorldSquareWithOrthogonalDir, exit: WorldSquareWithOrthogonalDir) -> Self {
         //assert!( *entrance.direction() == *exit.direction() || *entrance.direction() == -*exit.direction() );
         assert_ne!(exit, entrance.stepped());
         Portal { entrance, exit }
@@ -46,7 +44,7 @@ impl Portal {
 
 #[derive(Default, Debug)]
 pub struct PortalGeometry {
-    portal_exits_by_entrance: HashMap<SquareWithOrthogonalDir, SquareWithOrthogonalDir>,
+    portal_exits_by_entrance: HashMap<WorldSquareWithOrthogonalDir, WorldSquareWithOrthogonalDir>,
 }
 
 impl PortalGeometry {
@@ -57,22 +55,22 @@ impl PortalGeometry {
     }
     pub fn with_portal(
         mut self,
-        entrance_step: impl Into<SquareWithOrthogonalDir>,
-        exit_step: impl Into<SquareWithOrthogonalDir>,
+        entrance_step: impl Into<WorldSquareWithOrthogonalDir>,
+        exit_step: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         self.create_portal(entrance_step, exit_step);
         self
     }
     pub fn new_with_portal(
-        entrance_step: impl Into<SquareWithOrthogonalDir>,
-        exit_step: impl Into<SquareWithOrthogonalDir>,
+        entrance_step: impl Into<WorldSquareWithOrthogonalDir>,
+        exit_step: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         Self::new().with_portal(entrance_step, exit_step)
     }
     pub fn create_portal(
         &mut self,
-        entrance_step: impl Into<SquareWithOrthogonalDir>,
-        exit_step: impl Into<SquareWithOrthogonalDir>,
+        entrance_step: impl Into<WorldSquareWithOrthogonalDir>,
+        exit_step: impl Into<WorldSquareWithOrthogonalDir>,
     ) {
         let entrance_step = entrance_step.into();
         let exit_step = exit_step.into();
@@ -82,8 +80,8 @@ impl PortalGeometry {
     }
     pub fn create_double_sided_one_way_portal(
         &mut self,
-        entrance_step: SquareWithOrthogonalDir,
-        exit_step: SquareWithOrthogonalDir,
+        entrance_step: WorldSquareWithOrthogonalDir,
+        exit_step: WorldSquareWithOrthogonalDir,
     ) {
         self.create_portal(entrance_step, exit_step);
         self.create_portal(
@@ -93,16 +91,16 @@ impl PortalGeometry {
     }
     pub fn create_single_sided_two_way_portal(
         &mut self,
-        entrance_step: SquareWithOrthogonalDir,
-        exit_step: SquareWithOrthogonalDir,
+        entrance_step: WorldSquareWithOrthogonalDir,
+        exit_step: WorldSquareWithOrthogonalDir,
     ) {
         self.create_portal(entrance_step, exit_step);
         self.create_portal(exit_step.reversed(), entrance_step.reversed());
     }
     pub fn create_double_sided_two_way_portal(
         &mut self,
-        entrance_step: SquareWithOrthogonalDir,
-        exit_step: SquareWithOrthogonalDir,
+        entrance_step: WorldSquareWithOrthogonalDir,
+        exit_step: WorldSquareWithOrthogonalDir,
     ) {
         self.create_single_sided_two_way_portal(entrance_step, exit_step);
         self.create_single_sided_two_way_portal(
@@ -115,7 +113,7 @@ impl PortalGeometry {
         &self,
         start: SquareWithKingDir,
     ) -> Result<SquareWithKingDir, ()> {
-        if let Ok(ortho_start) = SquareWithOrthogonalDir::try_from(start) {
+        if let Ok(ortho_start) = WorldSquareWithOrthogonalDir::try_from(start) {
             Ok(
                 if let Some(&exit) = self.portal_exits_by_entrance.get(&ortho_start) {
                     exit.into()
@@ -131,13 +129,13 @@ impl PortalGeometry {
             let x_dir_square = start_square + x_step;
             let y_dir_square = start_square + y_step;
             let first_x_entrance =
-                SquareWithOrthogonalDir::from_square_and_step(start_square, x_step);
+                WorldSquareWithOrthogonalDir::from_square_and_step(start_square, x_step);
             let second_x_entrance =
-                SquareWithOrthogonalDir::from_square_and_step(x_dir_square, y_step);
+                WorldSquareWithOrthogonalDir::from_square_and_step(x_dir_square, y_step);
             let first_y_entrance =
-                SquareWithOrthogonalDir::from_square_and_step(start_square, y_step);
+                WorldSquareWithOrthogonalDir::from_square_and_step(start_square, y_step);
             let second_y_entrance =
-                SquareWithOrthogonalDir::from_square_and_step(y_dir_square, x_step);
+                WorldSquareWithOrthogonalDir::from_square_and_step(y_dir_square, x_step);
 
             let maybe_first_x_portal: Option<Portal> =
                 self.get_portal_by_entrance(first_x_entrance);
@@ -233,7 +231,7 @@ impl PortalGeometry {
             }
         }
     }
-    pub fn get_portal_by_entrance(&self, entrance: SquareWithOrthogonalDir) -> Option<Portal> {
+    pub fn get_portal_by_entrance(&self, entrance: WorldSquareWithOrthogonalDir) -> Option<Portal> {
         self.portal_exits_by_entrance
             .get(&entrance)
             .map(|&exit| Portal::new(entrance, exit))
@@ -259,14 +257,16 @@ impl PortalGeometry {
         self.portal_exits_by_entrance
             .iter()
             .filter(
-                |(&entrance, &exit): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
-                    entrance.square() == square
-                },
+                |(&entrance, &exit): &(
+                    &WorldSquareWithOrthogonalDir,
+                    &WorldSquareWithOrthogonalDir,
+                )| { entrance.square() == square },
             )
             .map(
-                |(&entrance, &exit): (&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
-                    Portal::new(entrance, exit)
-                },
+                |(&entrance, &exit): (
+                    &WorldSquareWithOrthogonalDir,
+                    &WorldSquareWithOrthogonalDir,
+                )| { Portal::new(entrance, exit) },
             )
             .collect()
     }
@@ -314,8 +314,8 @@ impl PortalGeometry {
         start: WorldPoint,
         angle: Angle<f32>,
         range: f32,
-    ) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
-        let all_entrances: HashSet<SquareWithOrthogonalDir> =
+    ) -> Option<(WorldSquareWithOrthogonalDir, WorldPoint)> {
+        let all_entrances: HashSet<WorldSquareWithOrthogonalDir> =
             self.portal_exits_by_entrance.keys().cloned().collect();
         first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
     }
@@ -338,11 +338,11 @@ mod tests {
     #[test]
     fn test_slide_rotation_transform() {
         let transform = RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_step((1, 2), STEP_UP),
-            SquareWithOrthogonalDir::from_square_and_step((5, 5), STEP_RIGHT),
+            WorldSquareWithOrthogonalDir::from_square_and_step((1, 2), STEP_UP),
+            WorldSquareWithOrthogonalDir::from_square_and_step((5, 5), STEP_RIGHT),
         );
-        let pose1 = SquareWithOrthogonalDir::from_square_and_step((3, 3), STEP_RIGHT);
-        let pose2 = SquareWithOrthogonalDir::from_square_and_step((6, 3), STEP_DOWN);
+        let pose1 = WorldSquareWithOrthogonalDir::from_square_and_step((3, 3), STEP_RIGHT);
+        let pose2 = WorldSquareWithOrthogonalDir::from_square_and_step((6, 3), STEP_DOWN);
         assert_eq!(pose1.apply_rigid_transform(transform), pose2);
     }
     #[test]

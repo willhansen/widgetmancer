@@ -7,22 +7,23 @@ use portrait;
 
 use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate, SignedCoordinate};
 
-use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinates::{
-    about_eq_2d, QuarterTurnsCcw, FAngle, QuarterTurnRotatable,
-};
 use crate::utility::general_utility::{all_true, union};
+use crate::utility::orthogonal_facing_int_pose::RelativeSquareWithOrthogonalDir;
 use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
+use crate::utility::poses::check_faces_in_ccw_order;
+use crate::utility::*;
 use crate::utility::{
     angle_interval::AngleInterval,
-    coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
-    RelativeSquareWithOrthogonalDir, RigidlyTransformable,
+    coordinate_frame_conversions::{WorldMove, WorldStep},
+    RigidlyTransformable,
 };
 use crate::utility::{
     check_vectors_in_ccw_order, get_by_index, quadrants_of_rel_square, squares_sharing_face,
     two_in_ccw_order, Quadrant, SimpleResult, STEP_ZERO,
 };
+
+use self::orthogonal_facing_int_pose::RelativeFace;
+use self::quarter_turns_ccw::QuarterTurnsCcw;
 
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq, Eq, Default)]
@@ -33,10 +34,8 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_faces_in_ccw_order(
             self.edges
                 .iter()

@@ -5,12 +5,7 @@ use line_drawing::Supercover;
 use num::{traits::float::FloatCore, NumCast, One, Signed, Zero};
 use rand::{rngs::StdRng, Rng};
 
-use crate::orthogonal_unit_coordinate::OrthogonalUnitCoordinate;
-
-use super::{
-    coordinate_frame_conversions::*, coordinates::*, general_utility::*, get_new_rng, poses::*,
-    trait_alias_macro::trait_alias_macro,
-};
+use crate::utility::*;
 
 pub type TwoDifferentWorldPoints = TwoDifferentPoints<WorldPoint>;
 pub type TwoDifferentWorldSquares = TwoDifferentPoints<WorldSquare>;
@@ -658,11 +653,11 @@ pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,
     angle: Angle<f32>,
     range: f32,
-    inside_faces: &HashSet<SquareWithOrthogonalDir>,
-) -> Option<(SquareWithOrthogonalDir, WorldPoint)> {
+    inside_faces: &HashSet<WorldSquareWithOrthogonalDir>,
+) -> Option<(WorldSquareWithOrthogonalDir, WorldPoint)> {
     let ray_direction: WorldMove = WorldMove::unit_vector_from_angle(angle);
 
-    let inside_faces_facing_ray: HashSet<SquareWithOrthogonalDir> = inside_faces
+    let inside_faces_facing_ray: HashSet<WorldSquareWithOrthogonalDir> = inside_faces
         .iter()
         .filter(|&&face| {
             let vector_into_face = face.direction();
@@ -681,7 +676,7 @@ pub fn first_inside_square_face_hit_by_ray(
     .map(|(x, y)| WorldSquare::new(x, y))
     .collect();
 
-    let inside_faces_of_squares_touching_line: HashSet<SquareWithOrthogonalDir> =
+    let inside_faces_of_squares_touching_line: HashSet<WorldSquareWithOrthogonalDir> =
         inside_faces_facing_ray
             .iter()
             .filter(|face| squares_on_naive_line.contains(&face.square()))
@@ -717,7 +712,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
     start: WorldPoint,
     angle: Angle<f32>,
     range: f32,
-    face: SquareWithOrthogonalDir,
+    face: WorldSquareWithOrthogonalDir,
 ) -> Option<WorldPoint> {
     let ray_direction = WorldMove::unit_vector_from_angle(angle);
     let face_is_facing_ray = ray_direction.dot(face.dir().step().to_f32()) > 0.0;
@@ -732,7 +727,7 @@ pub fn does_ray_hit_oriented_square_face(
     start: WorldPoint,
     angle: Angle<f32>,
     range: f32,
-    face: SquareWithOrthogonalDir,
+    face: WorldSquareWithOrthogonalDir,
 ) -> bool {
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }

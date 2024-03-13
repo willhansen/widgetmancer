@@ -13,18 +13,11 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, QuarterTurnsCcw, partial_angle_interval, standardize_angle,
-    Octant, OrthogonalWorldStep, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir,
-    ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
-};
+use crate::utility::*;
 
 use super::bool_with_partial::BoolWithPartial;
 use super::coordinates::QuarterTurnRotatable;
 use super::partial_angle_interval::PartialAngleInterval;
-use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -7,22 +7,7 @@ use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
-use crate::utility::coordinate_frame_conversions::ORIGIN_POSE;
-use crate::utility::coordinate_frame_conversions::STEP_LEFT;
-use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinate_frame_conversions::{SquareSet, StepSet, WorldSquare, WorldStep};
-use crate::utility::general_utility::union;
-use crate::utility::has_origin_pose::HasOriginPose;
-use crate::utility::poses::SquareWithOrthogonalDir;
-use crate::utility::poses::StepWithQuarterRotations;
-use crate::utility::RigidTransform;
-use crate::utility::RigidlyTransformable;
-use crate::utility::{
-    king_step_distance, QuarterTurnsCcw, number_to_hue_rotation, QuarterTurnRotatable,
-    SimpleResult, TupleClone, STEP_ZERO,
-};
-use crate::Coordinate;
-use crate::SignedCoordinate;
+use crate::utility::*;
 use ambassador::delegatable_trait;
 use derive_more::{Constructor, Display};
 use itertools::Itertools;
@@ -66,10 +51,7 @@ impl Debug for TopDownPortal {
 }
 
 impl QuarterTurnRotatable for TopDownPortal {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         Self {
             shape_in_exit_frame: self
                 .shape_in_exit_frame
@@ -83,12 +65,12 @@ impl QuarterTurnRotatable for TopDownPortal {
 /// TODO: maybe precalculate indexes(?)
 #[derive(PartialEq, Clone, Debug)]
 pub struct RasterizedFieldOfView {
-    pub view_root: SquareWithOrthogonalDir,
+    pub view_root: WorldSquareWithOrthogonalDir,
     map_of_top_down_portal_exit_shapes_by_coordinates: UniqueTopDownPortals,
 }
 
 impl HasOriginPose for RasterizedFieldOfView {
-    fn origin_pose(&self) -> SquareWithOrthogonalDir {
+    fn origin_pose(&self) -> WorldSquareWithOrthogonalDir {
         self.view_root
     }
 }
@@ -99,7 +81,7 @@ pub trait RasterizedFieldOfViewFunctions {
     // creation
     // TODO: return an iterator
     fn visibility_map_to_top_down_portals(
-        root: impl Into<SquareWithOrthogonalDir>,
+        root: impl Into<WorldSquareWithOrthogonalDir>,
         vis_map: &LocalSquareVisibilityMap,
     ) -> Vec<TopDownPortal>;
 
@@ -200,7 +182,7 @@ pub trait RasterizedFieldOfViewFunctions {
     // modifying
     fn as_seen_through_portal_from_other_view_root(
         &self,
-        new_view_root: SquareWithOrthogonalDir,
+        new_view_root: WorldSquareWithOrthogonalDir,
         portal_transform_from_other_to_self: RigidTransform,
     ) -> Self;
     fn absorb(&self, other: &Self) -> Self;
@@ -282,7 +264,7 @@ impl SquareOfTopDownPortals {
             .collect()
     }
     fn from_top_down_portals<T: IntoIterator<Item = TopDownPortal> + Clone>(
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
         iter: T,
     ) -> Self {
         RasterizedFieldOfView::from_top_down_portals(view_root, iter)
@@ -339,7 +321,7 @@ impl ViewRoundable for SquareOfTopDownPortals {
 
 impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     fn visibility_map_to_top_down_portals(
-        root: impl Into<SquareWithOrthogonalDir>,
+        root: impl Into<WorldSquareWithOrthogonalDir>,
         vis_map: &LocalSquareVisibilityMap,
     ) -> Vec<TopDownPortal> {
         let root = root.into();
@@ -614,7 +596,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     /// Note: does not account for any field of view limitations of the portal.  The entire rasterized field of view is propagated through
     fn as_seen_through_portal_from_other_view_root(
         &self,
-        new_view_root: SquareWithOrthogonalDir,
+        new_view_root: WorldSquareWithOrthogonalDir,
         portal_transform_from_other_to_self: RigidTransform,
     ) -> Self {
         // self root is used only for finding how the top-down portals look from the new view root, and is otherwise discarded
@@ -670,7 +652,7 @@ impl RasterizedFieldOfView {
     }
     fn as_seen_from_other_local_view_root(
         &self,
-        new_view_root: impl Into<SquareWithOrthogonalDir>,
+        new_view_root: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         let new_view_root = new_view_root.into();
 
@@ -691,7 +673,7 @@ impl RasterizedFieldOfView {
         self.as_seen_from_other_local_view_root(ORIGIN_POSE())
     }
     fn new_with_one_top_down_portal(
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
         top_down_portal: TopDownPortal,
     ) -> Self {
         let mut thing = Self::new_empty_with_view_root(view_root);
@@ -699,14 +681,14 @@ impl RasterizedFieldOfView {
         thing
     }
     fn new_with_one_fully_visible_local_square(
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
         relative_square: impl Into<WorldStep>,
     ) -> Self {
         let mut fov = Self::new_empty_with_view_root(view_root);
         fov.add_fully_visible_local_relative_square(relative_square);
         fov
     }
-    fn new_empty_with_view_root(view_root: impl Into<SquareWithOrthogonalDir>) -> Self {
+    fn new_empty_with_view_root(view_root: impl Into<WorldSquareWithOrthogonalDir>) -> Self {
         Self {
             view_root: view_root.into(),
             map_of_top_down_portal_exit_shapes_by_coordinates: Default::default(),
@@ -735,7 +717,7 @@ impl RasterizedFieldOfView {
             .insert(new_positioned_portal_target, new_portal_shape);
     }
     fn from_view_root_and_one_direct_local_connection(
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
         rel_square: impl Into<WorldStep>,
     ) -> Self {
         let mut thing = Self::new_empty_with_view_root(view_root);
@@ -799,7 +781,7 @@ impl RasterizedFieldOfView {
         }
     }
     pub fn from_top_down_portals(
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
         iter: impl IntoIterator<Item = TopDownPortal> + Clone, // TODO: get rid of this clone requirement
     ) -> Self {
         let view_root = view_root.into();
@@ -1437,8 +1419,8 @@ mod tests {
             )),
         );
 
-        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
-        let new_fov_root_pose: SquareWithOrthogonalDir = old_fov_root_pose.clone();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let new_fov_root_pose: WorldSquareWithOrthogonalDir = old_fov_root_pose.clone();
 
         let old_rasterized_fov =
             RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
@@ -1487,8 +1469,8 @@ mod tests {
             SquareVisibility::new_bottom_half_visible(),
         );
 
-        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
-        let new_fov_root_pose: SquareWithOrthogonalDir =
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let new_fov_root_pose: WorldSquareWithOrthogonalDir =
             old_fov_root_pose.clone().with_offset(STEP_RIGHT * 2);
 
         let old_rasterized_fov =
@@ -1521,9 +1503,9 @@ mod tests {
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
-        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
 
-        let new_fov_root_pose: SquareWithOrthogonalDir = old_fov_root_pose.clone();
+        let new_fov_root_pose: WorldSquareWithOrthogonalDir = old_fov_root_pose.clone();
 
         let old_rasterized_fov =
             RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
@@ -1578,9 +1560,9 @@ mod tests {
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
-        let old_fov_root_pose: SquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
 
-        let new_fov_root_pose: SquareWithOrthogonalDir = (3, 0, STEP_RIGHT).into();
+        let new_fov_root_pose: WorldSquareWithOrthogonalDir = (3, 0, STEP_RIGHT).into();
 
         let old_rasterized_fov =
             RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);

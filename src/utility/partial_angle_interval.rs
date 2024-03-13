@@ -13,19 +13,7 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, QuarterTurnsCcw, standardize_angle, Octant, OrthogonalWorldStep,
-    RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT,
-    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
-};
-use crate::{vec2, FloatCoordinate};
-
-use super::bool_with_partial::BoolWithPartial;
-use super::coordinates::QuarterTurnRotatable;
-use super::poses::RelativeFace;
-use super::{FAngle, RigidTransform, RigidlyTransformable};
+use crate::utility::*;
 
 #[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
@@ -73,10 +61,7 @@ impl Display for PartialAngleInterval {
 }
 // TODO: have a macro make this code
 impl QuarterTurnRotatable for PartialAngleInterval {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         Self::from_angles(
             self.clockwise_end.quarter_rotated_ccw(quarter_turns_ccw),
             self.anticlockwise_end
@@ -454,10 +439,7 @@ impl PartialAngleInterval {
         )
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
-    pub fn rotated_quarter_turns(
-        &self,
-        quarter_turns: impl Into<QuarterTurnsCcw> + Copy,
-    ) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<QuarterTurnsCcw> + Copy) -> Self {
         self.quarter_rotated_ccw(quarter_turns)
     }
     pub fn rotated_ccw(&self, d_angle: Angle<f32>) -> Self {

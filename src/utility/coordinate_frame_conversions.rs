@@ -87,7 +87,7 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_LEFT,
 ];
 
-pub fn ORIGIN_POSE() -> SquareWithOrthogonalDir {
+pub fn ORIGIN_POSE() -> WorldSquareWithOrthogonalDir {
     (0, 0, STEP_UP).into()
 }
 
