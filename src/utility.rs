@@ -37,6 +37,7 @@ pub mod orthogonal_unit_coordinate;
 pub mod partial_angle_interval; // TODO: make private and contained within angle_interval?
 pub mod poses;
 pub mod quadrant;
+pub mod quarter_turns_ccw;
 pub mod relative_interval_location;
 pub mod round_robin_iterator;
 pub mod size_2d;
