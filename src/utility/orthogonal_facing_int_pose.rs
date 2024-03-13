@@ -20,8 +20,7 @@ where
     SquareType: IntCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
-        // TODO: refactor to QuarterTurnsCcw::quarter_turns_from_default_direction
-        QuarterTurnsCcw::from_start_and_end_directions(STEP_RIGHT.cast_metadata(), self.dir.step())
+        QuarterTurnsCcw::turns_from_x_axis(self.dir.step())
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
@@ -153,7 +152,7 @@ where
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
-            return self.direction() == STEP_RIGHT.into();
+            return self.direction().step() == SquareType::right();
         }
 
         self.square.x() > SquareType::DataType::zero()
@@ -179,7 +178,7 @@ impl<T: WorldIntCoordinate> Display for OrthogonalFacingIntPose<T> {
             self.square().y(),
             self.dir().step().x(),
             self.dir().step().y(),
-            Glyph::extract_arrow_from_arrow_string(self.dir().step(), FACE_ARROWS)
+            Glyph::extract_arrow_from_arrow_string(self.dir().step().cast_unit(), FACE_ARROWS)
         )
     }
 }
@@ -318,7 +317,7 @@ impl<ConvertableToSquareType, SquareType, DirectionType>
     From<(ConvertableToSquareType, DirectionType)> for OrthogonalFacingIntPose<SquareType>
 where
     ConvertableToSquareType: Into<SquareType>,
-    SquareType: WorldIntCoordinate,
+    SquareType: IntCoordinate,
     DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
 {
     fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {

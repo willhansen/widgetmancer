@@ -2,9 +2,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use euclid::Angle;
 
-use crate::{
-    standardize_angle, IntCoordinate, QuarterTurnRotatable, SignedCoordinate, WorldStep, STEP_RIGHT,
-};
+use crate::utility::*;
 
 #[derive(
     Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, derive_more::AddAssign,
@@ -27,21 +25,24 @@ impl QuarterTurnsCcw {
     pub fn all_4() -> impl Iterator<Item = Self> + Clone {
         (0..4).map(|x| x.into())
     }
-    pub fn from_vector(dir: WorldStep) -> Self {
+    pub fn from_vector(dir: impl IntCoordinate) -> Self {
         assert!(dir.is_orthogonal());
-        QuarterTurnsCcw::new(if dir.x == 0 {
-            if dir.y > 0 {
+        QuarterTurnsCcw::new(if dir.x() == 0 {
+            if dir.y() > 0 {
                 1
             } else {
                 3
             }
         } else {
-            if dir.x > 0 {
+            if dir.x() > 0 {
                 0
             } else {
                 2
             }
         })
+    }
+    pub fn turns_from_x_axis<P: IntCoordinate>(end: P) -> Self {
+        Self::from_start_and_end_directions(P::right(), end)
     }
 
     pub fn from_start_and_end_directions<P: IntCoordinate>(start: P, end: P) -> Self {

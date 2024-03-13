@@ -1,19 +1,6 @@
-use crate::{
-    glyph::{glyph_constants::FACE_ARROWS, Glyph},
-    orthogonal_facing_int_pose::{
-        OrthogonalFacingIntPose, RelativeFace, RelativeSquareWithOrthogonalDir,
-        WorldSquareWithOrthogonalDir,
-    },
-    orthogonal_unit_coordinate::OrthogonalUnitCoordinate,
-};
+use crate::glyph::{glyph_constants::FACE_ARROWS, Glyph};
 
-use super::{
-    coordinate_frame_conversions::*,
-    coordinates::*,
-    general_utility::*,
-    line::{square_face_as_line, TwoDifferentWorldPoints},
-    RigidTransform, RigidlyTransformable,
-};
+use crate::utility::*;
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]

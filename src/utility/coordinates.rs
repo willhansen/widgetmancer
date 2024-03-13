@@ -126,12 +126,9 @@ pub trait Coordinate:
         self.x() * self.x() + self.y() * self.y()
     }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
-    fn cast_unit<C, U>(&self) -> C where C: Coordinate<DataType = Self::DataType, UnitType = U>{
-        C::new(self.x(), self.y())
-    }
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
-    fn cast_metadata<Other: Coordinate<DataType = Self::DataType>>(&self) -> Other {
+    fn cast_unit<Other: Coordinate<DataType = Self::DataType>>(&self) -> Other {
         Other::new(self.x(), self.y())
     }
 

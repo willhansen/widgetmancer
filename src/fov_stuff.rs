@@ -53,7 +53,7 @@ impl HasOriginPose for FieldOfView {
 // TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
-        let quaquarter_turns_ccw = quarter_turns_ccw.into();
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         FieldOfView::new(
             self.view_root
                 .quarter_revolved_ccw_around_origin(quarter_turns_ccw),
