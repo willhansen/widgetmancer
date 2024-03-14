@@ -1,7 +1,7 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::RED;
 use crate::glyph::{floating_square, DoubleGlyph, Glyph};
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     world_square_glyph_map_to_world_character_glyph_map, WorldCharacterSquareGlyphMap, WorldSquare,
 };
 use crate::utility::STEP_UP;

@@ -38,6 +38,11 @@ pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
 
+pub type WorldSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
+pub type Face = WorldSquareWithOrthogonalDir;
+pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
+pub type RelativeFace = RelativeSquareWithOrthogonalDir;
+
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 #[deprecated(note = "Obselete since screen rotation")]

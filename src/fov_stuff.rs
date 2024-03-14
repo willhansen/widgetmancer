@@ -10,12 +10,6 @@ use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
     LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
-use crate::orthogonal_facing_int_pose::WorldSquareWithOrthogonalDir;
-use crate::orthogonal_facing_int_pose::{Face, RelativeSquareWithOrthogonalDir};
-use crate::utility::coordinates::{king_step_distance, OrthogonalWorldStep};
-use crate::utility::has_origin_pose::HasOriginPose;
-use crate::utility::octant::Octant;
-use crate::utility::partial_angle_interval::PartialAngleInterval;
 use derive_more::Constructor;
 use euclid::Angle;
 use itertools::*;
@@ -25,11 +19,8 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{Drawable, DrawableEnum, SolidColorDrawable, TextDrawable};
 use crate::graphics::Graphics;
 use crate::portal_geometry::PortalGeometry;
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::*;
 
-use self::orthogonal_facing_int_pose::RelativeFace;
 use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 
 type Pose = WorldSquareWithOrthogonalDir;

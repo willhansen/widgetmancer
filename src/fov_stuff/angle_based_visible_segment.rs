@@ -3,8 +3,8 @@ use crate::fov_stuff::RelativeSquareWithOrthogonalDir;
 use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
 use crate::orthogonal_facing_int_pose::RelativeFace;
 use crate::utility::angle_interval::AngleInterval;
+use crate::utility::application_specific_units_and_conversions::{StepSet, WorldStep, STEP_LEFT};
 use crate::utility::circular_interval::circular_merging;
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep, STEP_LEFT};
 use crate::utility::coordinates::*;
 use crate::utility::line::FloatLineTrait;
 use crate::utility::{
@@ -328,7 +328,9 @@ mod tests {
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
         utility::{
-            coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
+            application_specific_units_and_conversions::{
+                STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
+            },
             coordinates::FVector,
             general_utility::{as_set, set_of_keys},
         },

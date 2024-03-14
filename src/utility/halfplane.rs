@@ -381,7 +381,7 @@ mod tests {
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::utility::coordinate_frame_conversions::SquareGridInWorldFrame;
+    use crate::utility::application_specific_units_and_conversions::SquareGridInWorldFrame;
 
     use super::*;
     #[test]

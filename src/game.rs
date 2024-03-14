@@ -38,7 +38,7 @@ use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
 use crate::portal_geometry::PortalGeometry;
-use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::application_specific_units_and_conversions::*;
 use crate::utility::*;
 use crate::{lerp, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector, LEFT_I};
 

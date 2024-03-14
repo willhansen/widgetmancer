@@ -1176,7 +1176,7 @@ mod tests {
         fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow,
         point2,
         utility::{
-            coordinate_frame_conversions::STEP_LEFT, halfplane::LocalSquareHalfPlane,
+            application_specific_units_and_conversions::STEP_LEFT, halfplane::LocalSquareHalfPlane,
             RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP,
         },
     };

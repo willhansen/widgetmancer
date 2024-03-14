@@ -10,7 +10,7 @@ use ntest::assert_false;
 
 use crate::line_segment::FloatLineSegment;
 use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     StepSet, WorldCoordinate, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::coordinates::QuarterTurnRotatable;

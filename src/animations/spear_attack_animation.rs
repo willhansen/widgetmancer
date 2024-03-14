@@ -5,7 +5,7 @@ use num::ToPrimitive;
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
 use crate::utility::coordinates::KingWorldStep;

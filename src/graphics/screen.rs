@@ -6,7 +6,7 @@ use rgb::RGB8;
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::Drawable;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     world_character_square_to_world_square, world_point_to_world_character_point,
     world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
     WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,

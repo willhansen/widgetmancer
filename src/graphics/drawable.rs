@@ -21,12 +21,12 @@ use crate::glyph::floating_square::{
 };
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
 use crate::glyph::{DoubleChar, DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
     WorldPoint, WorldSquare, WorldStep,
 };
 use crate::utility::{
-    QuarterTurnsCcw, tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable,
+    tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
 };
 
 #[delegatable_trait]
@@ -629,10 +629,7 @@ mod tests {
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
-        let character = d
-            .quarter_rotated_ccw(QuarterTurnsCcw::new(1))
-            .to_glyphs()[0]
-            .character;
+        let character = d.quarter_rotated_ccw(QuarterTurnsCcw::new(1)).to_glyphs()[0].character;
         assert_eq!(
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)

@@ -1,7 +1,7 @@
 use crate::animations::{Animation, DOTS_IN_SELECTOR};
 use crate::glyph::glyph_constants::SELECTOR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldSquare,
 };
 use euclid::Angle;

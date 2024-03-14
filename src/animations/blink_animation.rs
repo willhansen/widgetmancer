@@ -10,7 +10,7 @@ use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph::Glyph;
 use crate::line_segment::FloatLineSegment;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
 use crate::utility::coordinates::SignedCoordinate;

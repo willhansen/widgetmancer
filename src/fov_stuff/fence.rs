@@ -14,7 +14,7 @@ use crate::utility::poses::check_faces_in_ccw_order;
 use crate::utility::*;
 use crate::utility::{
     angle_interval::AngleInterval,
-    coordinate_frame_conversions::{WorldMove, WorldStep},
+    application_specific_units_and_conversions::{WorldMove, WorldStep},
     RigidlyTransformable,
 };
 use crate::utility::{

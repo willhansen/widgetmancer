@@ -160,7 +160,7 @@ where
             && self.direction().step().is_horizontal()
     }
 }
-impl<T: WorldIntCoordinate> Debug for OrthogonalFacingIntPose<T>
+impl<T: IntCoordinate> Debug for OrthogonalFacingIntPose<T>
 where
     Self: Display,
 {
@@ -168,7 +168,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: WorldIntCoordinate> Display for OrthogonalFacingIntPose<T> {
+impl<T: IntCoordinate> Display for OrthogonalFacingIntPose<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -182,11 +182,6 @@ impl<T: WorldIntCoordinate> Display for OrthogonalFacingIntPose<T> {
         )
     }
 }
-
-pub type WorldSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
-pub type Face = WorldSquareWithOrthogonalDir;
-pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
-pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
 // ambiguous.  use the revolve or rotate in place functions instead
 // impl<T: WorldGridCoordinate> QuarterTurnRotatable for AbsOrRelSquareWithOrthogonalDir<T> {

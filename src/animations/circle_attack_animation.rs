@@ -1,7 +1,7 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::CYAN;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::application_specific_units_and_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
 };
 use euclid::Angle;
