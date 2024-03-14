@@ -21,13 +21,7 @@ use crate::glyph::floating_square::{
 };
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
 use crate::glyph::{DoubleChar, DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::application_specific_units_and_conversions::{
-    local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
-    WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::{
-    tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable, QuarterTurnsCcw,
-};
+use crate::utility::*;
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug + QuarterTurnRotatable {

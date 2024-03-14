@@ -38,7 +38,6 @@ use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
 use crate::portal_geometry::PortalGeometry;
-use crate::utility::application_specific_units_and_conversions::*;
 use crate::utility::*;
 use crate::{lerp, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector, LEFT_I};
 
@@ -2428,9 +2427,7 @@ mod tests {
     };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
-    use crate::utility::{
-        STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
-    };
+    use crate::utility::*;
     use crate::utils_for_tests::*;
 
     use super::*;

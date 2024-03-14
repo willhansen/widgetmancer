@@ -10,11 +10,7 @@ use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::{DoubleGlyph, DoubleGlyphFunctions};
 use rust_roguelike::piece::{Piece, PieceType};
-use rust_roguelike::utility::application_specific_units_and_conversions::*;
-use rust_roguelike::utility::{
-    DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP,
-    STEP_UP_RIGHT, UP_I,
-};
+use rust_roguelike::utility::*;
 use rust_roguelike::utils_for_tests::*;
 
 #[test]

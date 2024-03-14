@@ -1,15 +1,7 @@
 use crate::fov_stuff::QuarterTurnsCcw;
 use crate::fov_stuff::RelativeSquareWithOrthogonalDir;
 use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
-use crate::orthogonal_facing_int_pose::RelativeFace;
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::application_specific_units_and_conversions::{StepSet, WorldStep, STEP_LEFT};
-use crate::utility::circular_interval::circular_merging;
-use crate::utility::coordinates::*;
-use crate::utility::line::FloatLineTrait;
-use crate::utility::{
-    faces_away_from_center_at_rel_square, RigidTransform, RigidlyTransformable, STEP_ZERO,
-};
+use crate::utility::*;
 use euclid::Angle;
 use itertools::{all, Itertools};
 use ordered_float::OrderedFloat;

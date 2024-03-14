@@ -210,7 +210,7 @@ impl WorldSquareWithOrthogonalDir {
         let other = other.into();
 
         let naive_translation: WorldStep = other.square - self.square;
-        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
+        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir.step(), STEP_UP);
         Self::from_square_and_step(
             naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),

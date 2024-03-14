@@ -5,8 +5,7 @@ use crate::graphics::screen::{
     ScreenBufferStep, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_LEFT, SCREEN_STEP_DOWN_RIGHT,
     SCREEN_STEP_LEFT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_LEFT, SCREEN_STEP_UP_RIGHT,
 };
-use crate::utility::application_specific_units_and_conversions::*;
-use crate::utility::{FVector, IVector};
+use crate::utility::*;
 use crate::{point2, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {

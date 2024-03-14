@@ -5,25 +5,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use portrait;
 
-use crate::{rotated_to_have_split_at_max, Coordinate, FloatCoordinate, SignedCoordinate};
-
-use crate::utility::general_utility::{all_true, union};
-use crate::utility::orthogonal_facing_int_pose::RelativeSquareWithOrthogonalDir;
-use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::poses::check_faces_in_ccw_order;
 use crate::utility::*;
-use crate::utility::{
-    angle_interval::AngleInterval,
-    application_specific_units_and_conversions::{WorldMove, WorldStep},
-    RigidlyTransformable,
-};
-use crate::utility::{
-    check_vectors_in_ccw_order, get_by_index, quadrants_of_rel_square, squares_sharing_face,
-    two_in_ccw_order, Quadrant, SimpleResult, STEP_ZERO,
-};
-
-use self::orthogonal_facing_int_pose::RelativeFace;
-use self::quarter_turns_ccw::QuarterTurnsCcw;
 
 // #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq, Eq, Default)]

@@ -2,11 +2,7 @@ use crate::animations::Animation;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
 use crate::size_2d::Size2D;
-use crate::utility::application_specific_units_and_conversions::{
-    world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
-    WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
-};
-use crate::utility::coordinates::{round_to_king_step, OrthogonalWorldStep, RIGHT_I};
+use crate::utility::*;
 use crate::IntCoordinate;
 use euclid::Length;
 use std::f32::consts::PI;

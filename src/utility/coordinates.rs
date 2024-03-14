@@ -16,8 +16,6 @@ use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-use crate::{abs, orthogonal_unit_coordinate::OrthogonalUnitCoordinate};
-
 use crate::utility::*;
 
 pub type IPoint = Point2D<i32, euclid::UnknownUnit>;
@@ -554,29 +552,9 @@ impl From<WorldStep> for KingWorldStep {
     }
 }
 
-impl From<OrthogonalWorldStep> for KingWorldStep {
-    fn from(value: OrthogonalWorldStep) -> Self {
-        KingWorldStep::new(value.step())
-    }
-}
-
 impl From<KingWorldStep> for WorldStep {
     fn from(value: KingWorldStep) -> Self {
         value.step
-    }
-}
-
-pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
-
-impl From<OrthogonalWorldStep> for WorldStep {
-    fn from(value: OrthogonalWorldStep) -> Self {
-        value.step()
-    }
-}
-
-impl From<KingWorldStep> for OrthogonalWorldStep {
-    fn from(value: KingWorldStep) -> Self {
-        OrthogonalWorldStep::new(value.step)
     }
 }
 

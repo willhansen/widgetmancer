@@ -42,6 +42,7 @@ pub type WorldSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
 pub type Face = WorldSquareWithOrthogonalDir;
 pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
 pub type RelativeFace = RelativeSquareWithOrthogonalDir;
+pub type OrthogonalWorldStep = OrthogonalUnitCoordinate<WorldStep>;
 
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;

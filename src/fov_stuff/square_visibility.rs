@@ -4,21 +4,7 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
-use crate::utility::angle_interval::*;
-use crate::utility::application_specific_units_and_conversions::*;
-use crate::utility::coordinates::{
-    point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle, FloatCoordinate,
-    OrthogonalWorldStep, SignedCoordinate,
-};
-use crate::utility::general_utility::*;
-use crate::utility::halfplane::*;
-use crate::utility::line::{FloatLineTrait, LineTrait};
-use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::relative_interval_location::RelativeIntervalLocation;
-use crate::utility::{
-    king_step_distance, number_to_hue_rotation, standardize_angle, HalfPlane, QuarterTurnRotatable,
-    QuarterTurnsCcw, TwoDifferentPoints, TwoDifferentWorldPoints, STEP_ZERO,
-};
+use crate::utility::*;
 use crate::{point2, DirectedFloatLineTrait};
 use derive_more::Constructor;
 use euclid::Angle;
