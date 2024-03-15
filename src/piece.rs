@@ -244,7 +244,7 @@ impl Piece {
 }
 
 impl QuarterTurnRotatable for Piece {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Piece {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Piece {
         assert!(self.can_turn());
         Piece {
             piece_type: self.piece_type,

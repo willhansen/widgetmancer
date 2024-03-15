@@ -19,7 +19,7 @@ use std::fmt::Debug;
 struct TopDownPortalTarget {
     absolute_square: WorldSquare,
     portal_depth: u32,
-    portal_rotation_to_target: QuarterTurnsCcw,
+    portal_rotation_to_target: OrthoAngle,
 }
 type LocallyPositionedTopDownPortalTarget = (WorldStep, TopDownPortalTarget);
 
@@ -51,7 +51,7 @@ impl Debug for TopDownPortal {
 }
 
 impl QuarterTurnRotatable for TopDownPortal {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         Self {
             shape_in_exit_frame: self
                 .shape_in_exit_frame
@@ -143,7 +143,7 @@ pub trait RasterizedFieldOfViewFunctions {
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
         relative_square: impl Into<WorldStep>,
-    ) -> QuarterTurnsCcw;
+    ) -> OrthoAngle;
     fn lone_square_visibility_in_exit_frame_for_relative_square_or_panic(
         &self,
         relative_square: WorldStep,
@@ -218,7 +218,7 @@ impl SquareOfTopDownPortals {
     fn lone_portal_depth_or_panic(&self) -> u32 {
         self.lone_top_down_portal_or_panic().target.portal_depth
     }
-    fn lone_portal_rotation_or_panic(&self) -> QuarterTurnsCcw {
+    fn lone_portal_rotation_or_panic(&self) -> OrthoAngle {
         self.lone_top_down_portal_or_panic()
             .target
             .portal_rotation_to_target
@@ -235,7 +235,7 @@ impl SquareOfTopDownPortals {
         self.0.lone_top_down_portal_or_panic()
     }
 
-    fn one_portal_deeper(&self, forward_rotation_through_portal: QuarterTurnsCcw) -> Self {
+    fn one_portal_deeper(&self, forward_rotation_through_portal: OrthoAngle) -> Self {
         todo!()
         // Self::from(self.top_down_portals.iter().map(|x| {
         //     Into::<TopDownPortal>::into(x.tuple_clone())
@@ -494,7 +494,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
     fn lone_portal_rotation_for_relative_square_or_panic(
         &self,
         relative_square: impl Into<WorldStep>,
-    ) -> QuarterTurnsCcw {
+    ) -> OrthoAngle {
         self.lone_top_down_portal_for_relative_square_or_panic(relative_square)
             .portal_rotation_to_target()
     }
@@ -977,7 +977,7 @@ impl TopDownPortal {
     }
     pub fn with_forward_portal_rotation(
         mut self,
-        forward_portal_rotation: impl Into<QuarterTurnsCcw>,
+        forward_portal_rotation: impl Into<OrthoAngle>,
     ) -> Self {
         self.target.portal_rotation_to_target = forward_portal_rotation.into();
         self
@@ -1003,7 +1003,7 @@ impl TopDownPortal {
     pub fn portal_depth(&self) -> u32 {
         self.target.portal_depth
     }
-    pub fn portal_rotation_to_target(&self) -> QuarterTurnsCcw {
+    pub fn portal_rotation_to_target(&self) -> OrthoAngle {
         self.target.portal_rotation_to_target
     }
 
@@ -1062,7 +1062,7 @@ impl TopDownPortalTarget {
     fn new(
         absolute_square: impl Into<WorldSquare>,
         portal_depth: u32,
-        portal_rotation_to_target: impl Into<QuarterTurnsCcw>,
+        portal_rotation_to_target: impl Into<OrthoAngle>,
     ) -> Self {
         Self {
             absolute_square: absolute_square.into(),
@@ -1252,7 +1252,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             shape_in_exit_frame: TopDownPortalShape::new_fully_visible(),
         })
@@ -1274,7 +1274,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             shape_in_exit_frame: TopDownPortalShape::new_fully_visible(),
         });
@@ -1283,7 +1283,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             shape_in_exit_frame: TopDownPortalShape::new_top_half_visible(),
         });
@@ -1298,7 +1298,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (10, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             shape_in_exit_frame: TopDownPortalShape::new_bottom_half_visible(),
         });
@@ -1307,7 +1307,7 @@ mod tests {
             target: TopDownPortalTarget {
                 absolute_square: (90, 10).into(),
                 portal_depth: 1,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             shape_in_exit_frame: TopDownPortalShape::new_from_visible_half_plane(
                 LocalSquareHalfPlane::top_half_plane().extended(0.001),
@@ -1335,7 +1335,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 5),
                 portal_depth: 3,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1344,7 +1344,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 7),
                 portal_depth: 5,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1358,7 +1358,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 5),
                 portal_depth: 3,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1367,7 +1367,7 @@ mod tests {
             TopDownPortalTarget {
                 absolute_square: point2(5, 7),
                 portal_depth: 5,
-                portal_rotation_to_target: QuarterTurnsCcw::default(),
+                portal_rotation_to_target: OrthoAngle::default(),
             },
             SquareVisibility::new_fully_visible(),
         );
@@ -1772,7 +1772,7 @@ mod tests {
     #[test]
     fn test_top_down_portal_constructors_are_consistent() {
         let rel_square = (4, 5);
-        let forward_portal_rotation = QuarterTurnsCcw::new(3);
+        let forward_portal_rotation = OrthoAngle::new(3);
         let target = TopDownPortalTarget::new((10, 20), 4, forward_portal_rotation);
         let entrance_shape = TopDownPortalShape::new_orthogonal_half_visible(STEP_RIGHT);
         let exit_shape = TopDownPortalShape::new_orthogonal_half_visible(STEP_DOWN);
@@ -1797,20 +1797,20 @@ mod tests {
 
         #[derive(Debug)]
         struct TestParams {
-            root_rotation: QuarterTurnsCcw,
-            forward_portal_rotation: QuarterTurnsCcw,
-            portal_exit_direction: QuarterTurnsCcw,
-            expected_absolute_entrance_orientation: QuarterTurnsCcw,
-            expected_relative_entrance_orientation: QuarterTurnsCcw,
+            root_rotation: OrthoAngle,
+            forward_portal_rotation: OrthoAngle,
+            portal_exit_direction: OrthoAngle,
+            expected_absolute_entrance_orientation: OrthoAngle,
+            expected_relative_entrance_orientation: OrthoAngle,
         }
         impl TestParams {
             // TODO: This kind of constructor should be derivable.  No way someone hasn't made a macro for it already.
             pub fn new(
-                root_rotation: impl Into<QuarterTurnsCcw>,
-                forward_portal_rotation: impl Into<QuarterTurnsCcw>,
-                portal_exit_direction: impl Into<QuarterTurnsCcw>,
-                expected_absolute_entrance_orientation: impl Into<QuarterTurnsCcw>,
-                expected_relative_entrance_orientation: impl Into<QuarterTurnsCcw>,
+                root_rotation: impl Into<OrthoAngle>,
+                forward_portal_rotation: impl Into<OrthoAngle>,
+                portal_exit_direction: impl Into<OrthoAngle>,
+                expected_absolute_entrance_orientation: impl Into<OrthoAngle>,
+                expected_relative_entrance_orientation: impl Into<OrthoAngle>,
             ) -> Self {
                 Self {
                     root_rotation: root_rotation.into(),
@@ -1823,7 +1823,7 @@ mod tests {
                 }
             }
         }
-        let portal_direction_to_shape = |orientation: QuarterTurnsCcw| {
+        let portal_direction_to_shape = |orientation: OrthoAngle| {
             TopDownPortalShape::new_orthogonal_half_visible(orientation.to_orthogonal_direction())
         };
 

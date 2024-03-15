@@ -697,7 +697,7 @@ pub fn first_inside_square_face_hit_by_ray(
 }
 pub fn square_face_as_line<P: IntCoordinate>(
     square: P,
-    face_direction: QuarterTurnsCcw,
+    face_direction: OrthoAngle,
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
     // TODO: avoid the type notation on `step` somehow

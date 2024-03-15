@@ -227,7 +227,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
 pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
 
 impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
         let rotation_function = match quarter_turns_ccw.into().quarter_turns() {
             0 => |x, y| (x, y),
             1 => |x, y| (SIZE - 1 - y, x),
@@ -274,7 +274,7 @@ impl RigidTransform {
 
         Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_absolute_to_relative(end))
     }
-    pub fn from_rotation(r: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    pub fn from_rotation(r: impl Into<OrthoAngle> + Copy) -> Self {
         let p = ORIGIN_POSE();
         Self::from_start_and_end_poses(p, p.quarter_rotated_ccw_in_place(r))
     }
@@ -284,8 +284,8 @@ impl RigidTransform {
     pub fn translation(&self) -> WorldStep {
         (self.end_pose - self.start_pose).dir().step()
     }
-    pub fn rotation(&self) -> QuarterTurnsCcw {
-        QuarterTurnsCcw::from_orthogonal_vector((self.end_pose - self.start_pose).dir().step())
+    pub fn rotation(&self) -> OrthoAngle {
+        OrthoAngle::from_orthogonal_vector((self.end_pose - self.start_pose).dir().step())
     }
     // TODO: maybe te.st this if sus
     pub fn transform_relative_pose(

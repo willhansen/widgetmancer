@@ -8,13 +8,13 @@ use crate::utility::*;
     Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, derive_more::AddAssign,
 )]
 #[get_copy = "pub"]
-pub struct QuarterTurnsCcw {
+pub struct OrthoAngle {
     pub(crate) quarter_turns: i32,
 }
 
-impl QuarterTurnsCcw {
+impl OrthoAngle {
     pub fn new(quarter_turns: i32) -> Self {
-        QuarterTurnsCcw {
+        OrthoAngle {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
@@ -29,7 +29,7 @@ impl QuarterTurnsCcw {
     }
     pub fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
         assert!(dir.is_orthogonal());
-        QuarterTurnsCcw::new(if dir.x() == T::DataType::zero() {
+        OrthoAngle::new(if dir.x() == T::DataType::zero() {
             if dir.y() > T::DataType::zero() {
                 1
             } else {
@@ -68,15 +68,15 @@ impl QuarterTurnsCcw {
     }
 }
 
-impl Neg for QuarterTurnsCcw {
+impl Neg for OrthoAngle {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        QuarterTurnsCcw::new(-self.quarter_turns)
+        OrthoAngle::new(-self.quarter_turns)
     }
 }
 
-impl Add for QuarterTurnsCcw {
+impl Add for OrthoAngle {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -84,7 +84,7 @@ impl Add for QuarterTurnsCcw {
     }
 }
 
-impl Sub for QuarterTurnsCcw {
+impl Sub for OrthoAngle {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -92,20 +92,14 @@ impl Sub for QuarterTurnsCcw {
     }
 }
 
-impl From<i32> for QuarterTurnsCcw {
+impl From<i32> for OrthoAngle {
     fn from(value: i32) -> Self {
         Self::new(value)
     }
 }
 
-impl<T: SignedCoordinate> From<QuarterTurnsCcw> for T {
-    fn from(value: QuarterTurnsCcw) -> Self {
-        value.step()
-    }
-}
-
-impl QuarterTurnRotatable for QuarterTurnsCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+impl QuarterTurnRotatable for OrthoAngle {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         *self + quarter_turns_ccw.into()
     }
 }

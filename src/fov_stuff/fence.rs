@@ -16,7 +16,7 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_faces_in_ccw_order(
             self.edges

@@ -43,7 +43,7 @@ impl HasOriginPose for FieldOfView {
 
 // TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         FieldOfView::new(
             self.view_root
@@ -387,7 +387,7 @@ impl FieldOfView {
     fn rasterized_at_depth(
         &self,
         starting_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<QuarterTurnsCcw>,
+        forward_portal_rotation_to_this_depth: impl Into<OrthoAngle>,
     ) -> RasterizedFieldOfView {
         let forward_portal_rotation_to_this_depth = forward_portal_rotation_to_this_depth.into();
         // rasterize top level
@@ -416,7 +416,7 @@ impl FieldOfView {
     fn rasterized_main_view(
         &self,
         top_level_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<QuarterTurnsCcw> + Copy,
+        forward_portal_rotation_to_this_depth: impl Into<OrthoAngle> + Copy,
     ) -> RasterizedFieldOfView {
         let top_down_portals = RasterizedFieldOfView::visibility_map_to_top_down_portals(
             self.view_root,
@@ -486,7 +486,7 @@ impl OctantFOVSquareSequenceIter {
     }
 
     // todo: change to implementation of QuarterTurnRotatable trait
-    pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn rotated(&self, quarter_turns: OrthoAngle) -> Self {
         Self {
             outward_dir: self.outward_dir.quarter_rotated_ccw(quarter_turns),
             across_dir: self.across_dir.quarter_rotated_ccw(quarter_turns),
@@ -858,7 +858,7 @@ mod tests {
     use crate::glyph_constants::{RED, SPACE};
     use crate::graphics::drawable::PartialVisibilityDrawable;
     use crate::portal_geometry::Portal;
-    use crate::quarter_turns_ccw::QuarterTurnsCcw;
+    use crate::quarter_turns_ccw::OrthoAngle;
     use crate::utility::poses::faces_away_from_center_at_rel_square;
     use crate::DoubleGlyph;
     use itertools::Itertools;
@@ -1414,7 +1414,7 @@ mod tests {
             range.for_each(|dx| {
                 assert_eq!(
                     rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
-                    QuarterTurnsCcw::new(turns)
+                    OrthoAngle::new(turns)
                 );
             });
         });
@@ -1607,7 +1607,7 @@ mod tests {
 
         let transform = portal.get_transform();
         assert_eq!(transform.translation(), vec2(47, 67));
-        assert_eq!(transform.rotation(), QuarterTurnsCcw::new(3));
+        assert_eq!(transform.rotation(), OrthoAngle::new(3));
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
             (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
@@ -2094,7 +2094,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsCcw::new(0)
+            OrthoAngle::new(0)
         );
     }
 
@@ -2157,7 +2157,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsCcw::new(1)
+            OrthoAngle::new(1)
         );
         let the_square_visibility = rasterized_fov
             .lone_absolute_portal_entrance_shape_for_relative_square_or_panic(test_square);

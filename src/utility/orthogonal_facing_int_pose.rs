@@ -12,14 +12,14 @@ where
     SquareType: IntCoordinate,
 {
     square: SquareType,
-    dir: QuarterTurnsCcw,
+    dir: OrthoAngle,
 }
 
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
 where
     SquareType: IntCoordinate,
 {
-    pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
+    pub fn direction_in_quarter_turns(&self) -> OrthoAngle {
         self.dir
     }
     pub fn from_square_and_step(
@@ -31,10 +31,10 @@ where
             dir: direction.try_into().unwrap(),
         }
     }
-    pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn from_square_and_turns(square: SquareType, quarter_turns: OrthoAngle) -> Self {
         Self::from_square_and_step(square, quarter_turns)
     }
-    pub fn direction(&self) -> QuarterTurnsCcw {
+    pub fn direction(&self) -> OrthoAngle {
         self.dir
     }
     pub fn stepped(&self) -> Self {
@@ -70,7 +70,7 @@ where
 
     pub fn quarter_revolved_ccw_around_origin(
         &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw>,
+        quarter_turns_ccw: impl Into<OrthoAngle>,
     ) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         (
@@ -82,7 +82,7 @@ where
     }
     pub fn quarter_rotated_ccw_in_place(
         &self,
-        quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_ccw: impl Into<OrthoAngle> + Copy,
     ) -> Self {
         (self.square, self.dir.quarter_rotated_ccw(quarter_turns_ccw))
             .try_into()
@@ -212,7 +212,7 @@ impl WorldSquareWithOrthogonalDir {
         let other = other.into();
 
         let naive_translation: WorldStep = other.square - self.square;
-        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir.step(), STEP_UP);
+        let rotation = OrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
         Self::from_square_and_step(
             naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),
@@ -225,7 +225,7 @@ impl WorldSquareWithOrthogonalDir {
         let other: Self = other.into();
 
         let relative_translation: WorldStep = other.square;
-        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP.into());
+        let rotation = OrthoAngle::from_start_and_end_directions(self.dir, STEP_UP.into());
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),

@@ -175,6 +175,12 @@ pub trait Coordinate:
     }
 }
 
+impl<T, U> From<OrthoAngle> for Vector2D<T, U> {
+    fn from(value: OrthoAngle) -> Self {
+        value.step()
+    }
+}
+
 impl<T, U> Coordinate for Vector2D<T, U>
 where
     T: CoordinateDataTypeTrait,
@@ -206,7 +212,9 @@ where
 {
 }
 
-pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output = Self> {
+pub trait SignedCoordinate:
+    Coordinate<DataType = Self::_DataType> + Neg<Output = Self> + From<OrthoAngle>
+{
     type _DataType: num::Signed;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
@@ -229,7 +237,7 @@ pub trait SignedCoordinate: Coordinate<DataType = Self::_DataType> + Neg<Output 
 }
 impl<T> SignedCoordinate for T
 where
-    T: Coordinate + Neg<Output = Self>,
+    T: Coordinate + Neg<Output = Self> + From<OrthoAngle>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -391,7 +399,7 @@ impl<V> QuarterTurnRotatable for V
 where
     V: SignedCoordinate,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
         // if self.is_absolute() {
         //     return *self;
         // }
@@ -479,7 +487,7 @@ pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
 pub fn revolve_square(
     moving_square: WorldSquare,
     pivot_square: WorldSquare,
-    rotation: QuarterTurnsCcw,
+    rotation: OrthoAngle,
 ) -> WorldSquare {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
@@ -524,7 +532,7 @@ pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(QuarterTurnsCcw::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(OrthoAngle::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -554,7 +562,7 @@ impl From<OrthogonalWorldStep> for KingWorldStep {
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -608,7 +616,7 @@ impl RigidlyTransformable for WorldSquare {
 #[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self;
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self;
     #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
@@ -628,7 +636,7 @@ impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         self.iter()
             .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
@@ -640,14 +648,14 @@ impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         self.as_ref()
             .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
         ))
@@ -857,7 +865,7 @@ mod tests {
     #[test]
     fn test_revolve_square() {
         assert_eq!(
-            revolve_square(point2(3, 4), point2(5, 5), QuarterTurnsCcw::new(3),),
+            revolve_square(point2(3, 4), point2(5, 5), OrthoAngle::new(3),),
             point2(4, 7)
         );
     }
@@ -865,20 +873,20 @@ mod tests {
     #[test]
     fn test_quarter_turns_from_vectors() {
         assert_eq!(
-            QuarterTurnsCcw::from_start_and_end_directions(STEP_UP, STEP_UP),
-            QuarterTurnsCcw::new(0)
+            OrthoAngle::from_start_and_end_directions(STEP_UP, STEP_UP),
+            OrthoAngle::new(0)
         );
         assert_eq!(
-            QuarterTurnsCcw::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
-            QuarterTurnsCcw::new(3)
+            OrthoAngle::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
+            OrthoAngle::new(3)
         );
         assert_eq!(
-            QuarterTurnsCcw::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
-            QuarterTurnsCcw::new(2)
+            OrthoAngle::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
+            OrthoAngle::new(2)
         );
         assert_eq!(
-            QuarterTurnsCcw::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
-            QuarterTurnsCcw::new(1)
+            OrthoAngle::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
+            OrthoAngle::new(1)
         );
     }
     #[test]

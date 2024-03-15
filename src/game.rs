@@ -340,7 +340,7 @@ impl Game {
         self.try_set_player_position(new_pos)?;
 
         let rotation_from_portals =
-            QuarterTurnsCcw::from_start_and_end_directions(direction.step(), new_dir.step());
+            OrthoAngle::from_start_and_end_directions(direction.step(), new_dir.step());
         self.graphics.screen.rotate(rotation_from_portals);
 
         Ok(())
@@ -3168,7 +3168,7 @@ mod tests {
         let start = WorldSquareWithOrthogonalDir::from_square_and_step(point2(2, 6), STEP_RIGHT);
         let end = WorldSquareWithOrthogonalDir::from_square_and_step(point2(5, 2), STEP_DOWN);
         game.place_single_sided_one_way_portal(start, end);
-        game.place_arrow(start.square(), start.direction().into());
+        game.place_arrow(start.square(), KingWorldStep::new(start.direction().into()));
         game.tick_projectile_arrows();
         assert_eq!(game.arrows().get(&end.square()), Some(&STEP_DOWN.into()));
     }
@@ -3536,7 +3536,7 @@ mod tests {
             enemy_chars.chars().collect_vec()[0]
         );
 
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(3));
+        game.graphics.screen.rotate(OrthoAngle::new(3));
 
         game.draw_headless_now();
 
@@ -3578,7 +3578,7 @@ mod tests {
         game.place_single_sided_two_way_portal(entrance_step, exit_step);
 
         game.draw_headless_now();
-        assert_eq!(game.graphics.screen.rotation(), QuarterTurnsCcw::new(0));
+        assert_eq!(game.graphics.screen.rotation(), OrthoAngle::new(0));
 
         game.try_slide_player_by_direction(STEP_RIGHT.into(), 1)
             .ok();
@@ -3588,7 +3588,7 @@ mod tests {
         );
 
         game.draw_headless_now();
-        assert_eq!(game.graphics.screen.rotation(), QuarterTurnsCcw::new(1));
+        assert_eq!(game.graphics.screen.rotation(), OrthoAngle::new(1));
     }
 
     #[test]
@@ -3597,7 +3597,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(1));
+        game.graphics.screen.rotate(OrthoAngle::new(1));
         game.try_slide_player_relative_to_screen(SCREEN_STEP_UP)
             .expect("slide");
         assert_eq!(game.player_square(), player_square + STEP_LEFT);
@@ -3609,7 +3609,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(QuarterTurnsCcw::new(1));
+        game.graphics.screen.rotate(OrthoAngle::new(1));
         game.player_blink_relative_to_screen(SCREEN_STEP_UP);
         assert_eq!(game.player_square().y, player_square.y);
         assert!(game.player_square().x < player_square.x);
@@ -3622,10 +3622,7 @@ mod tests {
 
         let mut unrotated_game = set_up_10x10_game();
         let mut rotated_game = set_up_10x10_game();
-        rotated_game
-            .graphics
-            .screen
-            .rotate(QuarterTurnsCcw::new(-1));
+        rotated_game.graphics.screen.rotate(OrthoAngle::new(-1));
 
         let mut games = [unrotated_game, rotated_game];
         let shadow_glyphs: Vec<DoubleGlyph> = games
@@ -4685,7 +4682,7 @@ mod tests {
             STEP_RIGHT.to_f32(),
             Angle::degrees(0.0),
         );
-        game.graphics.screen.set_rotation(QuarterTurnsCcw::new(1));
+        game.graphics.screen.set_rotation(OrthoAngle::new(1));
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
         let upper_glyphs = game

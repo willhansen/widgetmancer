@@ -43,13 +43,13 @@ impl<C: SignedCoordinate> From<C> for OrthogonalUnitCoordinate<C> {
 }
 
 impl<C: SignedCoordinate> QuarterTurnRotatable for OrthogonalUnitCoordinate<C> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         Self::new(self.0.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
-impl<C: SignedCoordinate<UnitType = U>, U> From<QuarterTurnsCcw> for OrthogonalUnitCoordinate<C> {
-    fn from(value: QuarterTurnsCcw) -> Self {
+impl<C: SignedCoordinate<UnitType = U>, U> From<OrthoAngle> for OrthogonalUnitCoordinate<C> {
+    fn from(value: OrthoAngle) -> Self {
         // TODO: factor out this default to one place
         let default_direction_for_zero_turns = C::right();
         Self::new(default_direction_for_zero_turns.quarter_rotated_ccw(value.quarter_turns()))
