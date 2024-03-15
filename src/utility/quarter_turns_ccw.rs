@@ -18,23 +18,25 @@ impl QuarterTurnsCcw {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
-    #[deprecated(note = "use OrthogonalUnitCoordinate::From instead")]
     pub fn to_orthogonal_direction(&self) -> WorldStep {
-        STEP_RIGHT.quarter_rotated_ccw(self.quarter_turns)
+        self.step()
+    }
+    pub fn step<T: SignedCoordinate>(&self) -> T {
+        T::right().quarter_rotated_ccw(*self)
     }
     pub fn all_4() -> impl Iterator<Item = Self> + Clone {
         (0..4).map(|x| x.into())
     }
-    pub fn from_vector(dir: impl IntCoordinate) -> Self {
+    pub fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
         assert!(dir.is_orthogonal());
-        QuarterTurnsCcw::new(if dir.x() == 0 {
-            if dir.y() > 0 {
+        QuarterTurnsCcw::new(if dir.x() == T::DataType::zero() {
+            if dir.y() > T::DataType::zero() {
                 1
             } else {
                 3
             }
         } else {
-            if dir.x() > 0 {
+            if dir.x() > T::DataType::zero() {
                 0
             } else {
                 2
@@ -93,6 +95,12 @@ impl Sub for QuarterTurnsCcw {
 impl From<i32> for QuarterTurnsCcw {
     fn from(value: i32) -> Self {
         Self::new(value)
+    }
+}
+
+impl<T: SignedCoordinate> From<QuarterTurnsCcw> for T {
+    fn from(value: QuarterTurnsCcw) -> Self {
+        value.step()
     }
 }
 

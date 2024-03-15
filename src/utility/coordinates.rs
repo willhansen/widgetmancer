@@ -546,6 +546,12 @@ impl KingWorldStep {
     }
 }
 
+impl From<OrthogonalWorldStep> for KingWorldStep {
+    fn from(value: OrthogonalWorldStep) -> Self {
+        KingWorldStep::new(value.step())
+    }
+}
+
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {

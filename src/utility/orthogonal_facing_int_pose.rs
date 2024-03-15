@@ -12,7 +12,7 @@ where
     SquareType: IntCoordinate,
 {
     square: SquareType,
-    dir: OrthogonalUnitCoordinate<SquareType>,
+    dir: QuarterTurnsCcw,
 }
 
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
@@ -20,22 +20,22 @@ where
     SquareType: IntCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
-        QuarterTurnsCcw::quarter_turns_from_x_axis(self.dir.step())
+        self.dir
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
-        direction: impl Into<OrthogonalUnitCoordinate<SquareType>>,
+        direction: impl Into<SquareType>,
     ) -> Self {
         Self {
             square: square.into(),
-            dir: direction.into(),
+            dir: direction.try_into().unwrap(),
         }
     }
     pub fn from_square_and_turns(square: SquareType, quarter_turns: QuarterTurnsCcw) -> Self {
         Self::from_square_and_step(square, quarter_turns)
     }
-    pub fn direction(&self) -> OrthogonalUnitCoordinate<SquareType> {
-        self.dir()
+    pub fn direction(&self) -> QuarterTurnsCcw {
+        self.dir
     }
     pub fn stepped(&self) -> Self {
         Self::from_square_and_step(
@@ -286,7 +286,7 @@ impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
     fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
         Ok(Self::from_square_and_step(
             value.square(),
-            value.direction(),
+            value.direction().try_into()?,
         ))
     }
 }
@@ -313,6 +313,9 @@ impl<T: IntCoordinate> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
     }
 }
 
+// Generic pair to single type thing
+// TODO: implement for base Pose trait
+// TODO: make base Pose trait
 impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
     for OrthogonalFacingIntPose<SquareType>
 where

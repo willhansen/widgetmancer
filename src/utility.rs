@@ -282,10 +282,10 @@ impl RigidTransform {
         Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
     }
     pub fn translation(&self) -> WorldStep {
-        (self.end_pose - self.start_pose).dir().into()
+        (self.end_pose - self.start_pose).dir().step()
     }
     pub fn rotation(&self) -> QuarterTurnsCcw {
-        QuarterTurnsCcw::from_vector((self.end_pose - self.start_pose).dir().step())
+        QuarterTurnsCcw::from_orthogonal_vector((self.end_pose - self.start_pose).dir().step())
     }
     // TODO: maybe te.st this if sus
     pub fn transform_relative_pose(

@@ -697,15 +697,16 @@ pub fn first_inside_square_face_hit_by_ray(
 }
 pub fn square_face_as_line<P: IntCoordinate>(
     square: P,
-    face_direction: OrthogonalUnitCoordinate<P>,
+    face_direction: QuarterTurnsCcw,
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
-    let face_center = square_center + face_direction.step().to_f32() * 0.5;
-    let p1_direction = face_direction.step().quarter_rotated_ccw(1);
+    // TODO: avoid the type notation on `step` somehow
+    let face_center = square_center + face_direction.step::<P::Floating>() * 0.5;
+    let p1_direction = face_direction.quarter_rotated_ccw(1);
     let p2_direction = -p1_direction;
     TwoDifferentPoints::new_from_two_points(
-        face_center + p1_direction.to_f32() * 0.5,
-        face_center + p2_direction.to_f32() * 0.5,
+        face_center + p1_direction.step::<P::Floating>() * 0.5,
+        face_center + p2_direction.step::<P::Floating>() * 0.5,
     )
 }
 pub fn ray_intersection_point_with_oriented_square_face(

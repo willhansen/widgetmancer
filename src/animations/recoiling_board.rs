@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
-    orthogonal_shot_direction: OrthogonalWorldStep,
+    orthogonal_shot_direction: QuarterTurnsCcw,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
 }
@@ -36,7 +36,7 @@ impl RecoilingBoardAnimation {
 
         RecoilingBoardAnimation {
             board_size,
-            orthogonal_shot_direction: orthogonalized_step.into(),
+            orthogonal_shot_direction: QuarterTurnsCcw::from_orthogonal_vector(orthogonalized_step),
             start_time: Instant::now(),
             floor_color_enum,
         }
@@ -105,7 +105,7 @@ impl Animation for RecoilingBoardAnimation {
         let mut glyph_map = WorldSquareGlyphMap::new();
 
         let offset_vector: WorldMove =
-            self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
+            self.orthogonal_shot_direction.step::<WorldMove>() * offset_distance_in_squares;
 
         for x in 0..self.board_size.width() {
             for y in 0..self.board_size.height() {
