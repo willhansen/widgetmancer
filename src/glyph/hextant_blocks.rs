@@ -1,5 +1,5 @@
 use super::glyph_constants::*;
-use crate::utility::application_specific_units_and_conversions::{
+use crate::utility::units::{
     world_point_to_local_character_point, world_point_to_world_character_point,
     LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,
     WorldPoint,

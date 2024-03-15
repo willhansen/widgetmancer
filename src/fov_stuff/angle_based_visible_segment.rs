@@ -320,11 +320,9 @@ mod tests {
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
         utility::{
-            application_specific_units_and_conversions::{
-                STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
-            },
             coordinates::FVector,
             general_utility::{as_set, set_of_keys},
+            units::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
         },
     };
 

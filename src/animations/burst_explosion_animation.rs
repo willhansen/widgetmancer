@@ -2,10 +2,8 @@ use crate::animations::Animation;
 use crate::coordinates::Coordinate;
 use crate::glyph::glyph_constants::EXPLOSION_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::application_specific_units_and_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
 use crate::utility::coordinates::SignedCoordinate;
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
 use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};

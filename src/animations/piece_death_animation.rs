@@ -1,9 +1,7 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::EXPLOSION_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::application_specific_units_and_conversions::{
-    WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare};
 use crate::vec2;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};

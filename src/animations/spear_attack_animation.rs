@@ -5,10 +5,10 @@ use num::ToPrimitive;
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::application_specific_units_and_conversions::{
+use crate::utility::coordinates::KingWorldStep;
+use crate::utility::units::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
 };
-use crate::utility::coordinates::KingWorldStep;
 use crate::{vec2, FloatCoordinate};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

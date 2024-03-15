@@ -41,7 +41,7 @@ impl QuarterTurnsCcw {
             }
         })
     }
-    pub fn turns_from_x_axis<P: IntCoordinate>(end: P) -> Self {
+    pub fn quarter_turns_from_x_axis<P: IntCoordinate>(end: P) -> Self {
         Self::from_start_and_end_directions(P::right(), end)
     }
 

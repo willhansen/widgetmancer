@@ -10,10 +10,10 @@ use ntest::assert_false;
 
 use crate::line_segment::FloatLineSegment;
 use crate::utility::angle_interval::AngleInterval;
-use crate::utility::application_specific_units_and_conversions::{
+use crate::utility::coordinates::QuarterTurnRotatable;
+use crate::utility::units::{
     StepSet, WorldCoordinate, WorldMove, WorldPoint, WorldSquare, WorldStep,
 };
-use crate::utility::coordinates::QuarterTurnRotatable;
 use crate::utility::{
     first_inside_square_face_hit_by_ray, naive_ray_endpoint, RigidTransform, SquareWithKingDir,
     TwoDifferentWorldPoints, WorldSquareWithOrthogonalDir, STEP_RIGHT,

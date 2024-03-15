@@ -3,7 +3,7 @@ use std::time::Instant;
 use crate::game::Game;
 use crate::piece::Piece;
 use crate::point2;
-use crate::utility::application_specific_units_and_conversions::*;
+use crate::utility::units::*;
 use crate::utility::{LEFT_I, RIGHT_I, STEP_LEFT, STEP_UP, UP_I};
 
 pub fn set_up_nxm_game(rows: u32, cols: u32) -> Game {

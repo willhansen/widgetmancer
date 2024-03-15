@@ -1,7 +1,7 @@
 use crate::glyph::glyph_constants::*;
 use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offset};
 use crate::glyph::DoubleChar;
-use crate::utility::application_specific_units_and_conversions::{
+use crate::utility::units::{
     world_character_point_to_world_character_square, CharacterGridInLocalCharacterFrame,
     WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, WorldMove,
 };

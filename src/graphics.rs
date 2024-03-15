@@ -54,7 +54,7 @@ use crate::graphics::screen::{
 };
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
-use crate::utility::application_specific_units_and_conversions::*;
+use crate::utility::units::*;
 use crate::utility::*;
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,

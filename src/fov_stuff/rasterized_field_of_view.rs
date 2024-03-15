@@ -1176,8 +1176,8 @@ mod tests {
         fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow,
         point2,
         utility::{
-            application_specific_units_and_conversions::STEP_LEFT, halfplane::LocalSquareHalfPlane,
-            RigidTransform, STEP_DOWN, STEP_RIGHT, STEP_UP,
+            halfplane::LocalSquareHalfPlane, units::STEP_LEFT, RigidTransform, STEP_DOWN,
+            STEP_RIGHT, STEP_UP,
         },
     };
     use ntest::{assert_false, assert_true, timeout};

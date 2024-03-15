@@ -34,7 +34,7 @@ pub_mod_and_use!(
     angle_interval,
     bool_with_partial,
     circular_interval,
-    application_specific_units_and_conversions,
+    units,
     coordinates,
     general_utility,
     halfplane,

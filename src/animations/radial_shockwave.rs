@@ -5,7 +5,7 @@ use crate::animations::Animation;
 use crate::glyph::floating_square;
 use crate::glyph::Glyph;
 use crate::graphics::{FloorColorEnum, Graphics};
-use crate::utility::application_specific_units_and_conversions::{
+use crate::utility::units::{
     world_square_glyph_map_to_world_character_glyph_map, WorldCharacterSquareGlyphMap, WorldSquare,
     WorldSquareGlyphMap,
 };

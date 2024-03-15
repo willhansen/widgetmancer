@@ -10,7 +10,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
-use crate::utility::application_specific_units_and_conversions::*;
+use crate::utility::units::*;
 use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]

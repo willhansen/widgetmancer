@@ -1,9 +1,7 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::CYAN;
 use crate::glyph::Glyph;
-use crate::utility::application_specific_units_and_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
 use euclid::Angle;
 use std::time::{Duration, Instant};
 

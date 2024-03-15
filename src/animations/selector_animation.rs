@@ -1,9 +1,7 @@
 use crate::animations::{Animation, DOTS_IN_SELECTOR};
 use crate::glyph::glyph_constants::SELECTOR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::application_specific_units_and_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldSquare,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldSquare};
 use euclid::Angle;
 use std::f32::consts::TAU;
 use std::time::{Duration, Instant};

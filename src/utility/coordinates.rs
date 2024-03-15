@@ -31,12 +31,13 @@ pub const RIGHT_I: IVector = vec2(1, 0);
 
 pub type FAngle = Angle<f32>;
 
-// TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket?
-// TODO: replace these with versions that properly incorporate addition and subtraction relativity
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg)]
-pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
+// TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket? // TODO: replace these with versions that properly incorporate addition and subtraction relativity #[derive( Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg, )]
+// pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 // pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
+
+// This is kind of hack to ignore relativity until it is re-implemented later
+pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 // pub struct Point2D<DataType, UnitType> {

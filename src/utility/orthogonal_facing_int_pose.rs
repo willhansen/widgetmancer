@@ -20,7 +20,7 @@ where
     SquareType: IntCoordinate,
 {
     pub fn direction_in_quarter_turns(&self) -> QuarterTurnsCcw {
-        QuarterTurnsCcw::turns_from_x_axis(self.dir.step())
+        QuarterTurnsCcw::quarter_turns_from_x_axis(self.dir.step())
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
@@ -77,13 +77,16 @@ where
             self.square.quarter_rotated_ccw(quarter_turns_ccw),
             self.dir.quarter_rotated_ccw(quarter_turns_ccw),
         )
-            .into()
+            .try_into()
+            .unwrap()
     }
     pub fn quarter_rotated_ccw_in_place(
         &self,
         quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy,
     ) -> Self {
-        (self.square, self.dir.quarter_rotated_ccw(quarter_turns_ccw)).into()
+        (self.square, self.dir.quarter_rotated_ccw(quarter_turns_ccw))
+            .try_into()
+            .unwrap()
     }
     pub fn quadrant_revolutions_in_ccw_order(&self) -> [Self; 4] {
         (0..4)
@@ -144,8 +147,6 @@ where
     ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
-    // TODO: make return type relative to Self::UnitType?
-    // TODO: return
     pub fn face_line_segment(&self) -> impl LineSegment<PointType = SquareType::Floating> {
         square_face_as_line(self.square, self.dir)
     }
@@ -200,6 +201,7 @@ static_assertions::assert_not_impl_any!(WorldSquareWithOrthogonalDir: QuarterTur
 static_assertions::assert_not_impl_any!(RelativeSquareWithOrthogonalDir: QuarterTurnRotatable);
 static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable);
 
+// TODO: Generalize these functions for any unit
 impl WorldSquareWithOrthogonalDir {
     pub fn middle_point_of_face(&self) -> WorldPoint {
         self.square.to_f32() + self.direction().step().to_f32() * 0.5
@@ -216,22 +218,27 @@ impl WorldSquareWithOrthogonalDir {
             other.dir.quarter_rotated_ccw(rotation),
         )
     }
-    pub fn other_pose_relative_to_absolute(&self, other: impl Into<Self>) -> Self {
+    pub fn convert_other_pose_from_using_this_origin_to_absolute_origin(
+        &self,
+        other: impl Into<Self>,
+    ) -> Self {
         let other: Self = other.into();
 
         let relative_translation: WorldStep = other.square;
-        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP);
+        let rotation = QuarterTurnsCcw::from_start_and_end_directions(self.dir, STEP_UP.into());
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),
         )
     }
+    // TODO: Rename
     pub fn other_square_absolute_to_relative(&self, other: impl Into<WorldSquare>) -> WorldStep {
         self.other_pose_absolute_to_relative((other.into(), STEP_UP))
             .square()
     }
+    // TODO: Rename
     pub fn other_square_relative_to_absolute(&self, other: impl Into<WorldStep>) -> WorldSquare {
-        self.other_pose_relative_to_absolute((other.into(), STEP_UP))
+        self.convert_other_pose_from_using_this_origin_to_absolute_origin((other.into(), STEP_UP))
             .square()
     }
 }
@@ -274,19 +281,16 @@ impl RelativeSquareWithOrthogonalDir {
 }
 
 impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
-    type Error = ();
+    type Error = &'static str;
 
     fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
-        if value.direction().into().is_orthogonal() {
-            Ok(WorldSquareWithOrthogonalDir::from_square_and_step(
-                value.square(),
-                value.direction(),
-            ))
-        } else {
-            Err(())
-        }
+        Ok(Self::from_square_and_step(
+            value.square(),
+            value.direction(),
+        ))
     }
 }
+
 impl<T: IntCoordinate> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
     type Output = Self;
 
@@ -308,15 +312,19 @@ impl<T: IntCoordinate> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
         )
     }
 }
-impl<ConvertableToSquareType, SquareType, DirectionType>
-    From<(ConvertableToSquareType, DirectionType)> for OrthogonalFacingIntPose<SquareType>
+
+impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
+    for OrthogonalFacingIntPose<SquareType>
 where
-    ConvertableToSquareType: Into<SquareType>,
     SquareType: IntCoordinate,
-    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
+    IntoSquareType: Into<SquareType>,
+    IntoStepType: Into<OrthogonalUnitCoordinate<SquareType>>,
 {
-    fn from(value: (ConvertableToSquareType, DirectionType)) -> Self {
-        Self::from_square_and_step(value.0.into(), value.1)
+    // type Error = &'static str;
+
+    // fn try_from(value: (IntoSquareType, IntoStepType)) -> Result<Self, Self::Error> {
+    fn from(value: (IntoSquareType, IntoStepType)) -> Self {
+        Self::from_square_and_step(value.0.into(), value.1.into())
     }
 }
 
