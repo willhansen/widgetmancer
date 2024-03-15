@@ -3205,7 +3205,7 @@ mod tests {
         game.place_piece(Piece::from_type(OmniDirectionalSoldier), enemy_square);
 
         game.place_player(player_square);
-        game.player().faced_direction = entrance.direction().into();
+        game.player().faced_direction = entrance.direction().step::<WorldStep>().into();
 
         assert_false!(game.pieces.is_empty());
         game.do_player_spear_attack();

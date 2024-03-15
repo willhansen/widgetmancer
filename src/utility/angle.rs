@@ -1,15 +1,10 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-use euclid::Angle;
-
 use crate::utility::*;
 
-#[derive(
-    Hash, Default, Debug, Copy, Clone, Eq, PartialEq, getset::CopyGetters, derive_more::AddAssign,
-)]
-#[get_copy = "pub"]
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct OrthoAngle {
-    pub(crate) quarter_turns: i32,
+    quarter_turns: i32,
 }
 
 impl OrthoAngle {
@@ -18,11 +13,22 @@ impl OrthoAngle {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
     }
+    pub fn quarter_turns(&self) -> i32 {
+        self.quarter_turns
+    }
+    pub fn xy<T: num::Signed>(&self) -> (T, T) {
+        match self.quarter_turns() % 4 {
+            0 => (T::one(), T::zero()),
+            1 => (T::zero(), T::one()),
+            2 => (-T::one(), T::zero()),
+            3 => (T::zero(), -T::one()),
+        }
+    }
     pub fn to_orthogonal_direction(&self) -> WorldStep {
         self.step()
     }
     pub fn step<T: SignedCoordinate>(&self) -> T {
-        T::right().quarter_rotated_ccw(*self)
+        self.xy().into()
     }
     pub fn all_4() -> impl Iterator<Item = Self> + Clone {
         (0..4).map(|x| x.into())
@@ -58,13 +64,25 @@ impl OrthoAngle {
         Self::new(quarter_turns)
     }
 
-    pub fn rotate_angle(&self, angle: Angle<f32>) -> Angle<f32> {
-        standardize_angle(Angle::<f32>::degrees(
+    pub fn rotate_angle(&self, angle: FAngle) -> FAngle {
+        standardize_angle(euclid::Angle::<f32>::degrees(
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
+    pub fn to_float_angle(&self) -> FAngle {
+        self.rotate_angle(FAngle::degrees(0.0))
+    }
     pub fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns)
+    }
+    pub fn left(&self) -> Self {
+        self.quarter_rotated_ccw(1)
+    }
+    pub fn right(&self) -> Self {
+        self.quarter_rotated_ccw(3)
+    }
+    pub fn back(&self) -> Self {
+        self.quarter_rotated_ccw(2)
     }
 }
 

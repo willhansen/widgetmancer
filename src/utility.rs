@@ -47,7 +47,7 @@ pub_mod_and_use!(
     partial_angle_interval, // TODO: make private and contained within angle_interval?
     poses,
     quadrant,
-    quarter_turns_ccw,
+    angle,
     relative_interval_location,
     round_robin_iterator,
     size_2d,
@@ -285,7 +285,7 @@ impl RigidTransform {
         (self.end_pose - self.start_pose).dir().step()
     }
     pub fn rotation(&self) -> OrthoAngle {
-        OrthoAngle::from_orthogonal_vector((self.end_pose - self.start_pose).dir().step())
+        (self.end_pose - self.start_pose).dir()
     }
     // TODO: maybe te.st this if sus
     pub fn transform_relative_pose(
@@ -296,9 +296,9 @@ impl RigidTransform {
             .square()
             .quarter_rotated_ccw(self.rotation().quarter_turns());
 
-        let end_direction = self.rotation().rotate_vector(pose.direction().step());
+        let end_direction = self.rotation() + pose.direction();
 
-        RelativeSquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
+        RelativeSquareWithOrthogonalDir::from_square_and_turns(end_square, end_direction)
     }
     pub fn inverse(&self) -> Self {
         Self {
@@ -328,24 +328,19 @@ impl RigidTransform {
         let start_tf_angle = self
             .start_pose
             .direction()
-            .step()
+            .step::<WorldStep>()
             .to_f32()
             .better_angle_from_x_axis();
 
         let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
-        let end_tf_angle = self
-            .end_pose
-            .direction()
-            .step()
-            .to_f32()
-            .better_angle_from_x_axis();
+        let end_tf_angle = self.end_pose.direction().to_float_angle();
 
         let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
 
         let new_ray_start = if dist_from_tf_start == 0.0 {
             self.end_pose.square().to_f32()
         } else {
-            let tf_start_point = self.start_pose.direction().step().to_f32();
+            let tf_start_point: WorldMove = self.start_pose.direction().step();
             let position_angle_from_tf_start =
                 tf_start_point.angle_to(ray_start_relative_to_tf_start);
 

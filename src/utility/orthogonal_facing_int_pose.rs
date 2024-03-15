@@ -26,34 +26,31 @@ where
         square: impl Into<SquareType>,
         direction: impl Into<SquareType>,
     ) -> Self {
+        Self::from_square_and_turns(square, OrthoAngle::from_orthogonal_vector(direction.into()))
+    }
+    pub fn from_square_and_turns(
+        square: impl Into<SquareType>,
+        quarter_turns: impl Into<OrthoAngle>,
+    ) -> Self {
         Self {
             square: square.into(),
-            dir: direction.try_into().unwrap(),
+            dir: quarter_turns.into(),
         }
-    }
-    pub fn from_square_and_turns(square: SquareType, quarter_turns: OrthoAngle) -> Self {
-        Self::from_square_and_step(square, quarter_turns)
     }
     pub fn direction(&self) -> OrthoAngle {
         self.dir
     }
     pub fn stepped(&self) -> Self {
-        Self::from_square_and_step(
-            self.square + self.direction().step(),
-            self.direction().step(),
-        )
+        Self::from_square_and_turns(self.square + self.direction().step(), self.direction())
     }
     pub fn stepped_n(&self, n: i32) -> Self {
-        Self::from_square_and_step(
-            self.square + self.direction().step() * n,
-            self.direction().step(),
+        Self::from_square_and_turns(
+            self.square + self.direction().step::<SquareType>() * n,
+            self.direction(),
         )
     }
     pub fn stepped_back(&self) -> Self {
-        Self::from_square_and_step(
-            self.square - self.direction().step(),
-            self.direction().step(),
-        )
+        Self::from_square_and_turns(self.square - self.direction().step(), self.direction())
     }
     pub fn strafed_left(&self) -> Self {
         self.strafed_right_n(-1)
@@ -62,7 +59,10 @@ where
         self.strafed_right_n(1)
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
-        Self::from_square_and_step(self.square + self.right().step() * n, self.direction())
+        Self::from_square_and_step(
+            self.square + self.right().step::<SquareType>() * n,
+            self.direction(),
+        )
     }
     pub fn strafed_left_n(&self, n: i32) -> Self {
         self.strafed_right_n(-n)
@@ -102,14 +102,14 @@ where
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(self.square, self.right())
     }
-    fn left(&self) -> OrthogonalUnitCoordinate<SquareType> {
-        self.direction().quarter_rotated_ccw(1)
+    fn left(&self) -> OrthoAngle {
+        self.direction().left()
     }
-    fn right(&self) -> OrthogonalUnitCoordinate<SquareType> {
-        self.direction().quarter_rotated_ccw(3)
+    fn right(&self) -> OrthoAngle {
+        self.direction().right()
     }
     pub fn turned_back(&self) -> Self {
-        Self::from_square_and_step(self.square, -self.direction().step())
+        Self::from_square_and_turns(self.square, self.direction().back())
     }
     pub fn with_offset(&self, offset: SquareType) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
@@ -117,8 +117,8 @@ where
     pub fn at_square(&self, position: impl Into<SquareType>) -> Self {
         Self::from_square_and_step(position, self.dir())
     }
-    pub fn with_direction(&self, dir: impl Into<OrthogonalUnitCoordinate<SquareType>>) -> Self {
-        Self::from_square_and_step(self.square, dir)
+    pub fn with_direction(&self, dir: impl Into<OrthoAngle>) -> Self {
+        Self::from_square_and_turns(self.square, dir)
     }
     pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction())

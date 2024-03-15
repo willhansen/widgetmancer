@@ -555,7 +555,7 @@ impl<PointType: FloatCoordinate> DirectedLineTrait
 macro_rules! make_point_grouping_rotatable {
     ($grouping_type:ident, $point_trait:ident) => {
         impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
-            fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+            fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
                 let quarter_turns_ccw = quarter_turns_ccw.into();
                 let new_points = self
                     .to_array()
@@ -661,7 +661,7 @@ pub fn first_inside_square_face_hit_by_ray(
         .iter()
         .filter(|&&face| {
             let vector_into_face = face.direction();
-            ray_direction.dot(vector_into_face.step().to_f32()) >= 0.0
+            ray_direction.dot(vector_into_face.step()) >= 0.0
         })
         .cloned()
         .collect();
@@ -716,7 +716,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
     face: WorldSquareWithOrthogonalDir,
 ) -> Option<WorldPoint> {
     let ray_direction = WorldMove::unit_vector_from_angle(angle);
-    let face_is_facing_ray = ray_direction.dot(face.dir().step().to_f32()) > 0.0;
+    let face_is_facing_ray = ray_direction.dot(face.dir().step()) > 0.0;
     if !face_is_facing_ray {
         return None;
     }

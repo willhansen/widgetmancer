@@ -152,10 +152,10 @@ impl PortalGeometry {
                 let first_y_portal = maybe_first_y_portal.unwrap();
                 if first_x_portal.is_coherent_with(&first_y_portal) {
                     // TODO: account for other second portals on the other side of the first ones.
-                    let dest_square =
-                        first_x_portal.exit.square() + first_y_portal.exit.direction().step();
-                    let dest_dir = first_x_portal.exit.direction().step()
-                        + first_y_portal.exit.direction().step();
+                    let dest_square = first_x_portal.exit.square()
+                        + first_y_portal.exit.direction().step::<WorldStep>();
+                    let dest_dir = first_x_portal.exit.direction().step::<WorldSquare>()
+                        + first_y_portal.exit.direction().step::<WorldStep>();
                     Ok(SquareWithKingDir::from_square_and_step(
                         dest_square,
                         dest_dir,
@@ -172,8 +172,8 @@ impl PortalGeometry {
                     let second_y_portal = maybe_second_y_portal.unwrap();
                     if second_x_portal.is_coherent_with(&second_y_portal) {
                         let dest_square = second_x_portal.exit.square();
-                        let dest_dir = second_x_portal.exit.direction().step()
-                            + second_y_portal.exit.direction().step();
+                        let dest_dir = second_x_portal.exit.direction().step::<WorldSquare>()
+                            + second_y_portal.exit.direction().step::<WorldSquare>();
                         Ok(SquareWithKingDir::from_square_and_step(
                             dest_square,
                             dest_dir,
@@ -190,15 +190,15 @@ impl PortalGeometry {
 
                     let turn_after_portal = if y_dir_to_x_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = second_x_portal
+                    let sideways_dir_after_portal: WorldStep = second_x_portal
                         .exit
                         .direction()
-                        .step()
-                        .quarter_rotated_ccw(turn_after_portal);
+                        .quarter_rotated_ccw(turn_after_portal)
+                        .step();
 
                     let dest_square = second_x_portal.exit.square();
-                    let dest_dir =
-                        second_x_portal.exit.direction().step() + sideways_dir_after_portal;
+                    let dest_dir = second_x_portal.exit.direction().step::<WorldStep>()
+                        + sideways_dir_after_portal;
 
                     Ok(SquareWithKingDir::from_square_and_step(
                         dest_square,
@@ -213,12 +213,12 @@ impl PortalGeometry {
                     let sideways_dir_after_portal = second_y_portal
                         .exit
                         .direction()
-                        .step()
-                        .quarter_rotated_ccw(turn_after_portal);
+                        .quarter_rotated_ccw(turn_after_portal)
+                        .step::<WorldStep>();
 
                     let dest_square = second_y_portal.exit.square();
-                    let dest_dir =
-                        second_y_portal.exit.direction().step() + sideways_dir_after_portal;
+                    let dest_dir = second_y_portal.exit.direction().step::<WorldStep>()
+                        + sideways_dir_after_portal;
 
                     Ok(SquareWithKingDir::from_square_and_step(
                         dest_square,

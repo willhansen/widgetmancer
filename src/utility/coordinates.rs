@@ -175,9 +175,13 @@ pub trait Coordinate:
     }
 }
 
-impl<T, U> From<OrthoAngle> for Vector2D<T, U> {
+impl<T, U> From<OrthoAngle> for Vector2D<T, U>
+where
+    T: CoordinateDataTypeTrait + num::Signed,
+{
     fn from(value: OrthoAngle) -> Self {
-        value.step()
+        let (x, y) = value.xy();
+        vec2(x, y)
     }
 }
 
@@ -403,7 +407,7 @@ where
         // if self.is_absolute() {
         //     return *self;
         // }
-        let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns;
+        let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns();
         Self::new(
             self.x() * int_to_T(int_cos(quarter_turns))
                 - self.y() * int_to_T(int_sin(quarter_turns)),
@@ -657,7 +661,7 @@ where
 impl QuarterTurnRotatable for Angle<f32> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         standardize_angle(Angle::radians(
-            self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns as f32,
+            self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
         ))
     }
 }

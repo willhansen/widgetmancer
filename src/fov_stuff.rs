@@ -858,8 +858,7 @@ mod tests {
     use crate::glyph_constants::{RED, SPACE};
     use crate::graphics::drawable::PartialVisibilityDrawable;
     use crate::portal_geometry::Portal;
-    use crate::quarter_turns_ccw::OrthoAngle;
-    use crate::utility::poses::faces_away_from_center_at_rel_square;
+    use crate::utility::*;
     use crate::DoubleGlyph;
     use itertools::Itertools;
     use ntest::{assert_about_eq, assert_false, assert_true};
@@ -874,7 +873,7 @@ mod tests {
     };
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{quarter_turns_ccw, STEP_DOWN, STEP_LEFT, STEP_UP};
+    use crate::utility::*;
 
     use self::square_visibility::{
         RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,
@@ -1629,12 +1628,12 @@ mod tests {
         {
             let actual_center = entrance
                 .with_offset(offset_from_entrance)
-                .with_direction(direction_near_entrance);
+                .with_direction(OrthoAngle::from_orthogonal_vector(direction_near_entrance));
             let virtual_center_at_exit =
                 actual_center.apply_rigid_transform(portal.get_transform());
             let correct_center_at_exit = exit
                 .with_offset(offset_from_exit)
-                .with_direction(direction_near_exit);
+                .with_direction(OrthoAngle::from_orthogonal_vector(direction_near_exit));
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
     }
