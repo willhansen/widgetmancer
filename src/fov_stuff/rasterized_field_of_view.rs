@@ -51,10 +51,7 @@ impl Debug for TopDownPortal {
 }
 
 impl QuarterTurnRotatable for TopDownPortal {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         Self {
             shape_in_exit_frame: self
                 .shape_in_exit_frame
@@ -1175,14 +1172,7 @@ impl DirectConnectionToLocalSquare {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow,
-        point2,
-        utility::{
-            halfplane::LocalSquareHalfPlane, units::STEP_LEFT, RigidTransform, STEP_DOWN,
-            STEP_RIGHT, STEP_UP,
-        },
-    };
+    use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use ntest::{assert_false, assert_true, timeout};
 
     #[ignore = "Maybe don't want this"]
@@ -1262,7 +1252,7 @@ mod tests {
     }
     #[test]
     fn test_local_coordinates_are_relative_to_root_pose_rotation() {
-        let mut rfov = RasterizedFieldOfView::new_empty_with_view_root((5, 3, STEP_RIGHT));
+        let mut rfov = RasterizedFieldOfView::new_empty_with_view_root((5, 3, RIGHT));
         rfov.add_fully_visible_local_relative_square((-1, 2));
         assert!(rfov.absolute_square_is_fully_visible((7, 4)));
         assert_eq!(rfov.visible_relative_squares(), [(-1, 2).into()].into());
@@ -1351,7 +1341,7 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        RasterizedFieldOfView::from_top_down_portals((0, 0, STEP_RIGHT), vec![portal1, portal2]);
+        RasterizedFieldOfView::from_top_down_portals((0, 0, RIGHT), vec![portal1, portal2]);
     }
     #[test]
     #[should_panic]
@@ -1374,7 +1364,7 @@ mod tests {
             },
             SquareVisibility::new_fully_visible(),
         );
-        SquareOfTopDownPortals::from_top_down_portals((0, 0, STEP_UP), vec![portal1, portal2]);
+        SquareOfTopDownPortals::from_top_down_portals((0, 0, UP), vec![portal1, portal2]);
     }
     #[test]
     fn test_top_down_portal_one_portal_deeper() {
@@ -1387,7 +1377,7 @@ mod tests {
         );
 
         let forward_tf_through_portal =
-            RigidTransform::from_start_and_end_poses((3, 4, STEP_RIGHT), (5, 8, STEP_UP));
+            RigidTransform::from_start_and_end_poses((3, 4, RIGHT), (5, 8, UP));
 
         assert_eq!(forward_tf_through_portal.rotation(), 1.into());
         assert_eq!(forward_tf_through_portal.translation(), (2, 4).into());
@@ -1422,7 +1412,7 @@ mod tests {
             )),
         );
 
-        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, UP).into();
         let new_fov_root_pose: WorldSquareWithOrthogonalDir = old_fov_root_pose.clone();
 
         let old_rasterized_fov =
@@ -1472,7 +1462,7 @@ mod tests {
             SquareVisibility::new_bottom_half_visible(),
         );
 
-        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, UP).into();
         let new_fov_root_pose: WorldSquareWithOrthogonalDir =
             old_fov_root_pose.clone().with_offset(STEP_RIGHT * 2);
 
@@ -1506,7 +1496,7 @@ mod tests {
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
-        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, UP).into();
 
         let new_fov_root_pose: WorldSquareWithOrthogonalDir = old_fov_root_pose.clone();
 
@@ -1563,9 +1553,9 @@ mod tests {
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
-        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, STEP_UP).into();
+        let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, UP).into();
 
-        let new_fov_root_pose: WorldSquareWithOrthogonalDir = (3, 0, STEP_RIGHT).into();
+        let new_fov_root_pose: WorldSquareWithOrthogonalDir = (3, 0, RIGHT).into();
 
         let old_rasterized_fov =
             RasterizedFieldOfView::new_with_one_top_down_portal(old_fov_root_pose, top_down_portal);
@@ -1625,7 +1615,7 @@ mod tests {
     #[should_panic]
     fn test_prevent_top_down_portal_entrance_overlap__add_individually() {
         let portals = two_top_down_portals_with_overlapping_entrances_but_not_exits();
-        let mut rfov = RasterizedFieldOfView::new_empty_with_view_root((5, 5, STEP_UP));
+        let mut rfov = RasterizedFieldOfView::new_empty_with_view_root((5, 5, UP));
         portals
             .into_iter()
             .for_each(|p| rfov.add_top_down_portal(p))
@@ -1639,7 +1629,7 @@ mod tests {
     #[test]
     fn test_local_positions_are_relative_to_view_root_orientation() {
         let rfov = RasterizedFieldOfView::from_view_root_and_one_direct_local_connection(
-            (3, 4, STEP_RIGHT),
+            (3, 4, RIGHT),
             (2, 3),
         );
 
@@ -1656,7 +1646,7 @@ mod tests {
     #[test]
     fn test_seen_from_other_local_view_root__origin() {
         let rfov = RasterizedFieldOfView::from_view_root_and_one_direct_local_connection(
-            (3, 4, STEP_RIGHT),
+            (3, 4, RIGHT),
             (2, 3),
         );
 
@@ -1672,10 +1662,10 @@ mod tests {
     #[test]
     fn test_seen_from_other_local_view_root__non_origin() {
         let rfov = RasterizedFieldOfView::from_view_root_and_one_direct_local_connection(
-            (3, 4, STEP_RIGHT),
+            (3, 4, RIGHT),
             (2, 3),
         );
-        let new_rfov = rfov.as_seen_from_other_local_view_root((5, 5, STEP_LEFT));
+        let new_rfov = rfov.as_seen_from_other_local_view_root((5, 5, LEFT));
         assert_eq!(
             new_rfov
                 .top_down_portals_vec()
@@ -1698,8 +1688,7 @@ mod tests {
     /// Because the local side might be hidden behind a portal
     fn test_visible_absolute_squares_only_counts_target_side_of_portal__actual_portal() {
         let test_portal = get_generic_partial_square_top_down_portal();
-        let rfov =
-            RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
+        let rfov = RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, RIGHT), test_portal);
 
         let visible_absolute_squares = rfov.visible_absolute_squares();
         let correct_local_square =
@@ -1712,10 +1701,8 @@ mod tests {
     #[test]
     /// Because the local side might be hidden behind a portal
     fn test_visible_absolute_squares_only_counts_target_side_of_portal__direct_local_connection() {
-        let rfov = RasterizedFieldOfView::new_with_one_fully_visible_local_square(
-            (3, 4, STEP_RIGHT),
-            (5, 5),
-        );
+        let rfov =
+            RasterizedFieldOfView::new_with_one_fully_visible_local_square((3, 4, RIGHT), (5, 5));
         let test_portal = rfov.top_down_portals_vec().iter().next().unwrap().clone();
 
         let visible_absolute_squares = rfov.visible_absolute_squares();
@@ -1731,7 +1718,7 @@ mod tests {
     ) {
         let test_portal = get_generic_partial_square_top_down_portal();
         let mut rfov =
-            RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, STEP_RIGHT), test_portal);
+            RasterizedFieldOfView::new_with_one_top_down_portal((3, 4, RIGHT), test_portal);
 
         // TODO: make this a function in RasterizedFieldOfView
         let direct_local_connection = TopDownPortal::new_with_exit_shape(
@@ -1762,12 +1749,12 @@ mod tests {
                 let p1 = TopDownPortal::new_with_entrance_shape(
                     rel_pos,
                     TopDownPortalTarget::new((5, 0), 1, portal_turns_1),
-                    SquareVisibility::new_orthogonal_half_visible(STEP_UP),
+                    SquareVisibility::new_orthogonal_half_visible(UP),
                 );
                 let p2 = TopDownPortal::new_with_entrance_shape(
                     rel_pos,
                     TopDownPortalTarget::new((0, 5), 1, portal_turns_2),
-                    SquareVisibility::new_orthogonal_half_visible(STEP_DOWN),
+                    SquareVisibility::new_orthogonal_half_visible(DOWN),
                 );
                 assert!(TopDownPortal::find_conflicting_entrances([p1, p2]).is_empty());
             });
@@ -1777,8 +1764,8 @@ mod tests {
         let rel_square = (4, 5);
         let forward_portal_rotation = NormalizedOrthoAngle::new(3);
         let target = TopDownPortalTarget::new((10, 20), 4, forward_portal_rotation);
-        let entrance_shape = TopDownPortalShape::new_orthogonal_half_visible(STEP_RIGHT);
-        let exit_shape = TopDownPortalShape::new_orthogonal_half_visible(STEP_DOWN);
+        let entrance_shape = TopDownPortalShape::new_orthogonal_half_visible(RIGHT);
+        let exit_shape = TopDownPortalShape::new_orthogonal_half_visible(DOWN);
 
         assert!(entrance_shape
             .quarter_rotated_ccw(forward_portal_rotation)
@@ -1827,7 +1814,7 @@ mod tests {
             }
         }
         let portal_direction_to_shape = |orientation: NormalizedOrthoAngle| {
-            TopDownPortalShape::new_orthogonal_half_visible(orientation.to_orthogonal_direction())
+            TopDownPortalShape::new_orthogonal_half_visible(orientation)
         };
 
         (0..4)

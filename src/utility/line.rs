@@ -555,7 +555,10 @@ impl<PointType: FloatCoordinate> DirectedLineTrait
 macro_rules! make_point_grouping_rotatable {
     ($grouping_type:ident, $point_trait:ident) => {
         impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
-            fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+            fn quarter_rotated_ccw(
+                &self,
+                quarter_turns_ccw: impl Into<OrthogonalDirection>,
+            ) -> Self {
                 let quarter_turns_ccw = quarter_turns_ccw.into();
                 let new_points = self
                     .to_array()

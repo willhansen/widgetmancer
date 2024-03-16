@@ -499,8 +499,8 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let relative_square = self.outward_dir.step() * self.outward_steps as i32
-            + self.across_dir.step() * self.across_steps as i32;
+        let relative_square = self.outward_dir.step::<WorldStep>() * self.outward_steps as i32
+            + self.across_dir.step::<WorldStep>() * self.across_steps as i32;
 
         self.across_steps += 1;
         if self.across_steps > self.outward_steps {
@@ -1492,8 +1492,8 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, STEP_UP).into();
-        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, UP).into();
+        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
 
         (0..4)
             .cartesian_product(0..4)
@@ -1528,10 +1528,10 @@ mod tests {
 
     #[test]
     fn test_sub_fov_view_transform() {
-        let sub_center: WorldSquareWithOrthogonalDir = (3, 1, STEP_RIGHT).into();
+        let sub_center: WorldSquareWithOrthogonalDir = (3, 1, RIGHT).into();
         let mut sub_fov = FieldOfView::new_empty_fov_with_root(sub_center);
 
-        let main_center: WorldSquareWithOrthogonalDir = (50, 10, STEP_UP).into();
+        let main_center: WorldSquareWithOrthogonalDir = (50, 10, UP).into();
         let mut main_fov = FieldOfView::new_empty_fov_with_root(main_center);
 
         let absolute_test_square: WorldSquare = point2(1, 4);
@@ -1761,10 +1761,10 @@ mod tests {
     fn test_combined_fovs_combine_visibility__full_squares_from_faces() {
         let fov_center = point2(5, 5);
         let visible_rel_faces = [
-            (12, 0, STEP_RIGHT),
-            (12, 1, STEP_RIGHT),
-            (12, 2, STEP_RIGHT),
-            (12, 3, STEP_RIGHT),
+            (12, 0, RIGHT),
+            (12, 1, RIGHT),
+            (12, 2, RIGHT),
+            (12, 3, RIGHT),
         ];
         let rel_squares_that_should_be_fully_visible = [(12, 1), (12, 2)];
         let fovs = visible_rel_faces
@@ -2208,7 +2208,7 @@ mod tests {
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
 
-        assert_eq!(rasterized.view_root, (5, 5, STEP_UP).into());
+        assert_eq!(rasterized.view_root, (5, 5, UP).into());
 
         assert_eq!(
             rasterized.relative_square_to_absolute_square((2, 0)),
@@ -2244,7 +2244,7 @@ mod tests {
                 AngleInterval::from_degrees(0.0, 0.001),
                 5,
             )
-            .with_start_face((3, 0, STEP_RIGHT));
+            .with_start_face((3, 0, RIGHT));
         let mut fov = FieldOfView::new_empty_fov_at((5, 7));
         fov.visible_segments_in_main_view_only.push(view_segment);
         let rfov = fov.rasterized();
@@ -2272,8 +2272,8 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, STEP_UP).into();
-        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, UP).into();
+        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
 
         let portal_geometry = PortalGeometry::new()
             .with_portal(
@@ -2307,7 +2307,7 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
         let portal_geometry = PortalGeometry::new().with_portal(
             entrance_pose,
             entrance_pose
@@ -2330,7 +2330,7 @@ mod tests {
     #[test]
     fn test_rasterize_one_rotated_view() {
         let mut base_fov = FieldOfView::new_empty_fov_at((0, 0));
-        let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, STEP_LEFT));
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, LEFT));
         sub_fov.visible_segments_in_main_view_only.push(
             AngleBasedVisibleSegment::from_arc_and_fence_radius(
                 AngleInterval::from_degrees(0.0, 45.0),
@@ -2363,7 +2363,7 @@ mod tests {
             (0, 0),
             3,
             &Default::default(),
-            &PortalGeometry::new_with_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((2, 1, RIGHT), (2, 4, UP)),
         )
         .rasterized();
     }
@@ -2373,7 +2373,7 @@ mod tests {
             (0, 0),
             5,
             &Default::default(),
-            &PortalGeometry::new_with_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((0, 1, RIGHT), (2, 4, UP)),
         )
         .rasterized();
     }

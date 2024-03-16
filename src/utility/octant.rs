@@ -2,9 +2,7 @@ use std::f32::consts::PI;
 
 use euclid::Angle;
 
-use super::FAngle;
-use super::OrthogonalWorldStep;
-use super::{NormalizedOrthoAngle, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
@@ -16,7 +14,7 @@ impl Octant {
     pub fn with_n_quarter_turns_anticlockwise(&self, quarter_turns: NormalizedOrthoAngle) -> Self {
         Self::new(self.0 + quarter_turns.quarter_turns() * 2)
     }
-    pub fn outward_and_across_directions(&self) -> (OrthogonalWorldStep, OrthogonalWorldStep) {
+    pub fn outward_and_across_directions(&self) -> (OrthogonalDirection, OrthogonalDirection) {
         // TODO: probably make this an actual equation
         let world_step = match self.0 {
             0 => (STEP_RIGHT, STEP_UP),
@@ -36,8 +34,8 @@ impl Octant {
     }
 
     pub fn from_outward_and_across_directions(
-        outward_direction: OrthogonalWorldStep,
-        across_direction: OrthogonalWorldStep,
+        outward_direction: OrthogonalDirection,
+        across_direction: OrthogonalDirection,
     ) -> Self {
         // TODO: probably make this an actual equation
         let step_pair = (outward_direction.step(), across_direction.step());

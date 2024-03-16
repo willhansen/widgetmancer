@@ -131,8 +131,8 @@ enum GridEntity {
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum FloorFeature {
-    PushArrow(OrthogonalWorldStep),
-    ConveyorBelt(OrthogonalWorldStep),
+    PushArrow(OrthogonalDirection),
+    ConveyorBelt(OrthogonalDirection),
 }
 
 pub struct Player {
@@ -189,8 +189,8 @@ pub struct Game {
     upgrades: HashMap<WorldSquare, Upgrade>,
     blocks: HashSet<WorldSquare>,
     widgets: HashMap<WorldSquare, Widget>,
-    floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
-    conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
+    floor_push_arrows: HashMap<WorldSquare, OrthogonalDirection>,
+    conveyor_belts: HashMap<WorldSquare, OrthogonalDirection>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -2038,11 +2038,11 @@ impl Game {
     pub fn place_widget(&mut self, pushable: Widget, square: WorldSquare) {
         self.widgets.insert(square, pushable);
     }
-    pub fn place_floor_push_arrow(&mut self, square: WorldSquare, dir: WorldStep) {
-        self.floor_push_arrows.insert(square, dir.into());
+    pub fn place_floor_push_arrow(&mut self, square: WorldSquare, dir: OrthogonalDirection) {
+        self.floor_push_arrows.insert(square, dir);
     }
-    pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
-        self.conveyor_belts.insert(square, dir.into());
+    pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: OrthogonalDirection) {
+        self.conveyor_belts.insert(square, dir);
     }
     pub fn conveyor_belt_speed() -> f32 {
         1.0 / CONVEYOR_BELT_MOVEMENT_PERIOD_S
@@ -2195,8 +2195,8 @@ impl Game {
         self.place_widget(Widget::new(5), base_square + STEP_UP * 4);
         self.place_widget(Widget::new(13), base_square + STEP_UP * 5);
         for i in 0..3 {
-            self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * i, STEP_RIGHT);
-            self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, STEP_LEFT);
+            self.place_floor_push_arrow(base_square + STEP_UP * 6 + STEP_RIGHT * i, RIGHT);
+            self.place_conveyor_belt(base_square + STEP_UP * 8 + STEP_RIGHT * i, LEFT);
         }
 
         for i in 0..4 {
@@ -4473,7 +4473,7 @@ mod tests {
         let start_square = point2(5, 5);
         game.place_player(start_square);
         let pushable_square = start_square + STEP_RIGHT;
-        game.place_floor_push_arrow(pushable_square, STEP_UP);
+        game.place_floor_push_arrow(pushable_square, UP);
         game.draw_headless_now();
         let glyphs = game
             .graphics
@@ -4491,7 +4491,7 @@ mod tests {
         //game.place_player(start_square);
         let widget_square = start_square + STEP_RIGHT;
         game.place_widget(Widget::new(4), widget_square);
-        game.place_floor_push_arrow(widget_square, STEP_UP);
+        game.place_floor_push_arrow(widget_square, UP);
 
         assert!(game.widgets.contains_key(&widget_square));
         game.tick_game_logic();
@@ -4503,7 +4503,7 @@ mod tests {
         let start_square = point2(0, 0);
         game.place_player(start_square);
         // let widget_square = start_square + STEP_RIGHT * 2 + STEP_UP;
-        game.place_single_sided_one_way_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP));
+        game.place_single_sided_one_way_portal((2, 1, RIGHT), (2, 4, UP));
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
     }
@@ -4513,7 +4513,7 @@ mod tests {
         let start_square = point2(0, 0);
         game.place_player(start_square);
         // let widget_square = start_square + STEP_RIGHT * 2 + STEP_UP;
-        game.place_single_sided_one_way_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP));
+        game.place_single_sided_one_way_portal((0, 1, RIGHT), (2, 4, UP));
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
     }
@@ -4720,7 +4720,7 @@ mod tests {
         game.place_player(player_square);
         let belt_square = player_square + STEP_DOWN;
         assert!(belt_square.is_even());
-        game.place_conveyor_belt(belt_square, STEP_RIGHT);
+        game.place_conveyor_belt(belt_square, RIGHT);
         let advance_and_get_glyphs = |game: &mut Game, duration: Duration| {
             game.tick_realtime_effects(duration);
             game.draw_headless_now();
@@ -4763,8 +4763,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_player(square);
-        let dir = STEP_RIGHT;
-        game.place_conveyor_belt(square, dir.into());
+        let dir = RIGHT;
+        game.place_conveyor_belt(square, dir);
 
         assert_eq!(game.player_square(), square);
         game.tick_realtime_effects(Duration::from_secs_f32(
@@ -4778,8 +4778,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_widget(Widget::new(5), square);
-        let dir = STEP_RIGHT;
-        game.place_conveyor_belt(square, dir.into());
+        let dir = RIGHT;
+        game.place_conveyor_belt(square, dir);
 
         assert!(game.widgets.contains_key(&square));
         game.tick_realtime_effects(Duration::from_secs_f32(
@@ -4794,8 +4794,8 @@ mod tests {
         let square = point2(5, 5);
         game.place_floating_hunter_drone(square.to_f32(), STEP_ZERO.to_f32(), Angle::degrees(0.0));
 
-        let dir = STEP_RIGHT;
-        game.place_conveyor_belt(square, dir.into());
+        let dir = RIGHT;
+        game.place_conveyor_belt(square, dir);
 
         let pos = game.floating_hunter_drones.iter().next().unwrap().position;
         assert!((pos - square.to_f32()).length() < 0.001);
@@ -4815,8 +4815,8 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_linear_death_cube(square.to_f32(), vec2(0.0, 0.0));
-        let dir = STEP_RIGHT;
-        game.place_conveyor_belt(square, dir.into());
+        let dir = RIGHT;
+        game.place_conveyor_belt(square, dir);
 
         let pos = game.death_cubes.get(0).unwrap().position;
         assert!((pos - square.to_f32()).length() < 0.001);
@@ -4841,8 +4841,8 @@ mod tests {
             STEP_ZERO.to_f32(),
             Angle::degrees(0.0),
         );
-        let dir = STEP_RIGHT;
-        game.place_floor_push_arrow(square, dir.into());
+        let dir = RIGHT;
+        game.place_floor_push_arrow(square, dir);
 
         let pos = game.floating_hunter_drones.iter().next().unwrap().position;
         assert!((pos - start_pos).length() < 0.001);
@@ -4850,7 +4850,7 @@ mod tests {
         game.tick_game_logic();
 
         let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
-        let new_correct_pos = start_pos + dir.to_f32();
+        let new_correct_pos = start_pos + dir;
 
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
@@ -4860,7 +4860,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_player(square);
-        game.place_floor_push_arrow(square, STEP_RIGHT.into());
+        game.place_floor_push_arrow(square, RIGHT);
 
         assert_eq!(game.player_square(), square);
         game.tick_game_logic();
@@ -4872,7 +4872,7 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_widget(Widget::new(5), square);
-        game.place_floor_push_arrow(square, STEP_RIGHT.into());
+        game.place_floor_push_arrow(square, RIGHT);
         game.tick_game_logic();
         assert_eq!(*game.widgets.keys().next().unwrap(), square + STEP_RIGHT);
         game.tick_game_logic();

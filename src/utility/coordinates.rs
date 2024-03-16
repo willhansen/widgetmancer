@@ -520,17 +520,17 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
 }
 
 #[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
-pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
+pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalDirection) -> i32 {
     step.project_onto_vector(axis.step()).dot(axis.step())
 }
 
 pub fn assert_about_eq_2d<P: FloatCoordinate>(p1: P, p2: P) {
     p1.check_about_eq(p2).unwrap();
 }
-pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
+pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(OrthogonalDirection::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -552,8 +552,8 @@ impl KingWorldStep {
     }
 }
 
-impl From<OrthogonalWorldStep> for KingWorldStep {
-    fn from(value: OrthogonalWorldStep) -> Self {
+impl From<OrthogonalDirection> for KingWorldStep {
+    fn from(value: OrthogonalDirection) -> Self {
         KingWorldStep::new(value.step())
     }
 }
@@ -617,10 +617,7 @@ impl RigidlyTransformable for WorldSquare {
 #[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self;
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self;
     #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
@@ -907,10 +904,7 @@ mod tests {
     }
     #[test]
     fn test_project_step_onto_axis() {
-        assert_eq!(
-            distance_of_step_along_axis(STEP_UP_LEFT * 8, STEP_RIGHT.into()),
-            -8
-        );
+        assert_eq!(distance_of_step_along_axis(STEP_UP_LEFT * 8, RIGHT), -8);
     }
     #[test]
     fn test_relative_points_in_ccw_order() {

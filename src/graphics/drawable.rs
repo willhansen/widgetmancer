@@ -46,7 +46,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn quarter_rotated_ccw(&self, b: impl Into<NormalizedOrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, b: impl Into<NormalizedOrthoAngle>) -> Self {
         match self {
             Self::Text(a) => a.quarter_rotated_ccw(b).into(),
             Self::PartialVisibility(a) => a.quarter_rotated_ccw(b).into(),
@@ -412,13 +412,13 @@ impl Drawable for ArrowDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct ConveyorBeltDrawable {
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalDirection,
     normalized_phase_offset: f32,
     colors: [RGB8; 2],
 }
 
 impl ConveyorBeltDrawable {
-    pub fn new(direction: OrthogonalWorldStep, phase_offset: f32) -> Self {
+    pub fn new(direction: OrthogonalDirection, phase_offset: f32) -> Self {
         ConveyorBeltDrawable {
             direction,
             normalized_phase_offset: phase_offset,

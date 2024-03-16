@@ -84,13 +84,8 @@ impl SquareVisibilityFromOneLargeShadow {
             .ordered_line_intersections_with_centered_unit_square()
     }
 
-    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
-        Self::half_visible(
-            (-which_half_visible.into())
-                .step()
-                .to_f32()
-                .better_angle_from_x_axis(),
-        )
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalDirection>) -> Self {
+        Self::half_visible((-which_half_visible.into()).into())
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
@@ -323,10 +318,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         match self {
             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
                 Self::PartiallyVisible(v.quarter_rotated_ccw(quarter_turns_ccw))

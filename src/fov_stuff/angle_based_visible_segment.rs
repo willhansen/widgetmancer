@@ -20,10 +20,7 @@ pub struct AngleBasedVisibleSegment {
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl QuarterTurnRotatable for AngleBasedVisibleSegment {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         Self::new_with_optional_start_face(
             self.arc.quarter_rotated_ccw(quarter_turns_ccw),
             self.end_fence.quarter_rotated_ccw(quarter_turns_ccw),
@@ -163,7 +160,7 @@ impl AngleBasedVisibleSegment {
         if first_square == 0 {
             segment
         } else {
-            segment.with_start_face((first_square as i32, 0, STEP_LEFT))
+            segment.with_start_face((first_square as i32, 0, LEFT))
         }
     }
     pub fn with_weakly_applied_start_face(
@@ -517,7 +514,7 @@ mod tests {
     fn test_no_excess_fence() {
         AngleBasedVisibleSegment::new(
             AngleInterval::from_degrees(0.0, 1.0),
-            Fence::from_faces_in_ccw_order([(3, 0, STEP_RIGHT), (3, 1, STEP_RIGHT)]),
+            Fence::from_faces_in_ccw_order([(3, 0, RIGHT), (3, 1, RIGHT)]),
         );
     }
     #[test]
@@ -557,8 +554,8 @@ mod tests {
     #[test]
     fn test_start_line_orientation_does_not_matter() {
         let seg = AngleBasedVisibleSegment::narrow_segment_to_right(0, 5);
-        let seg1 = seg.with_start_face((3, 0, STEP_RIGHT));
-        let seg2 = seg.with_start_face((4, 0, STEP_LEFT));
+        let seg1 = seg.with_start_face((3, 0, RIGHT));
+        let seg2 = seg.with_start_face((4, 0, LEFT));
         assert_eq!(
             seg1.to_local_square_visibility_map(),
             seg2.to_local_square_visibility_map()

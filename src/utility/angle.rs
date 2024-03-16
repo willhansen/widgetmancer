@@ -4,40 +4,50 @@ use crate::utility::*;
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
-impl NormalizedOrthoAngle {
-    
-    pub fn new(quarter_turns: i32) -> Self {
+impl OrthoAngle for NormalizedOrthoAngle
+where
+    Self: Sized,
+{
+    fn new(quarter_turns: i32) -> Self {
         NormalizedOrthoAngle(quarter_turns.rem_euclid(4))
-    }
-}
-
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
-pub struct UnNormalizedOrthoAngle(i32);
-impl UnNormalizedOrthoAngle {
-    pub fn new(quarter_turns: i32) -> Self {
-        UnNormalizedOrthoAngle(quarter_turns)
-    }
-}
-
-
-
-pub trait OrthoAngle {
-    const X_AXIS: Self = Self::new(0);
-    fn new(quarter_turns: i32) -> Self;
-    fn normalized(&self) -> NormalizedOrthoAngle {
-        NormalizedOrthoAngle::new(self.0)
-    }
-    fn right() -> Self {
-        Self::X_AXIS
-    }
-    fn up() -> Self {
-        Self::X_AXIS.quarter_rotated_ccw(1)
     }
     fn quarter_turns(&self) -> i32 {
         self.0
     }
+}
+pub type OrthogonalDirection = NormalizedOrthoAngle;
+
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
+pub struct UnNormalizedOrthoAngle(i32);
+impl OrthoAngle for UnNormalizedOrthoAngle
+where
+    Self: Sized,
+{
+    fn new(quarter_turns: i32) -> Self {
+        UnNormalizedOrthoAngle(quarter_turns)
+    }
+    fn quarter_turns(&self) -> i32 {
+        self.0
+    }
+}
+
+pub trait OrthoAngle: Sized {
+    fn new(quarter_turns: i32) -> Self;
+    fn quarter_turns(&self) -> i32;
+    fn normalized(&self) -> NormalizedOrthoAngle {
+        NormalizedOrthoAngle::new(self.quarter_turns())
+    }
+    fn x_axis() -> Self {
+        Self::new(0)
+    }
+    fn right() -> Self {
+        Self::x_axis()
+    }
+    fn up() -> Self {
+        Self::x_axis().quarter_rotated_ccw(1)
+    }
     fn xy<T: num::Signed>(&self) -> (T, T) {
-        match self.normalized() {
+        match self.normalized().quarter_turns() {
             0 => (T::one(), T::zero()),
             1 => (T::zero(), T::one()),
             2 => (-T::one(), T::zero()),
@@ -45,7 +55,7 @@ pub trait OrthoAngle {
         }
     }
     fn dir_name(&self) -> &'static str {
-        match self.normalized() {
+        match self.normalized().quarter_turns() {
             0 => "Right",
             1 => "Up",
             2 => "Left",
@@ -53,23 +63,23 @@ pub trait OrthoAngle {
         }
     }
     fn cos<T: num::Signed>(&self) -> T {
-        match self.normalized() {
+        match self.normalized().0 {
             0 => T::one(),
             1 | 3 => T::zero(),
             2 => -T::one(),
         }
     }
     fn sin<T: num::Signed>(&self) -> T {
-        match self.normalized() {
+        match self.normalized().0 {
             0 | 2 => T::zero(),
             1 => T::one(),
             3 => -T::one(),
         }
     }
-    fn dot<T: num::Signed>(&self, other: impl Into<Self>) -> T {
-        (*self - other.into()).cos()
+    fn dot<T: num::Signed>(&self, other: impl OrthoAngle) -> T {
+        (*self - other).cos()
     }
-    fn is_parallel(&self, other: impl Into<Self>) -> bool {
+    fn is_parallel(&self, other: impl OrthoAngle) -> bool {
         self.dot::<i32>(other) != 0
     }
     fn is_horizontal(&self) -> bool {
@@ -78,16 +88,20 @@ pub trait OrthoAngle {
     fn is_vertical(&self) -> bool {
         self.sin::<i32>() != 0
     }
+    fn is_positive(&self) -> bool {
+        match self.normalized().0 {
+            0 | 1 => true,
+            2 | 3 => false,
+        }
+    }
 
     #[deprecated(note = "use step instead")]
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.step()
     }
+    // TODO: find a way to automatically just take whatever type is convenient
     fn step<T: SignedCoordinate>(&self) -> T {
         self.xy().into()
-    }
-    fn all_4() -> impl Iterator<Item = Self> + Clone {
-        (0..4).map(|x| x.into())
     }
     fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
         assert!(dir.is_orthogonal());
@@ -142,64 +156,76 @@ pub trait OrthoAngle {
     }
 }
 
-impl<T:OrthoAngle> Neg for T {
-    type Output = Self;
+macro_rules! impl_ops_for_OrthoAngles {
+    ($Type:ty) => {
+        impl Neg for $Type {
+            type Output = Self;
 
-    fn neg(self) -> Self::Output {
-        Self::new(-self.quarter_turns())
-    }
+            fn neg(self) -> Self::Output {
+                Self::new(-self.quarter_turns())
+            }
+        }
+
+        impl Add for $Type {
+            type Output = Self;
+
+            fn add(self, rhs: Self) -> Self::Output {
+                Self::new(self.quarter_turns() + rhs.quarter_turns())
+            }
+        }
+
+        impl Sub for $Type {
+            type Output = Self;
+
+            fn sub(self, rhs: Self) -> Self::Output {
+                Self::new(self.quarter_turns() - rhs.quarter_turns())
+            }
+        }
+
+        impl From<i32> for $Type {
+            fn from(value: i32) -> Self {
+                Self::new(value)
+            }
+        }
+        impl QuarterTurnRotatable for $Type {
+            fn quarter_rotated_ccw(
+                &self,
+                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
+            ) -> Self {
+                *self + quarter_turns_ccw.into()
+            }
+        }
+
+        impl Display for $Type {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                // TODO: tidy
+                write!(
+                    f,
+                    "(x:{}, y:{}) {} {} ",
+                    self.xy::<i32>().0,
+                    self.xy::<i32>().1,
+                    self.dir_name(),
+                    Glyph::extract_arrow_from_arrow_string(self.step(), FACE_ARROWS)
+                )
+            }
+        }
+        impl Into<FAngle> for $Type {
+            fn into(self) -> FAngle {
+                self.to_float_angle()
+            }
+        }
+    };
 }
 
-impl<T:OrthoAngle> Add for T {
-    type Output = Self;
+impl_ops_for_OrthoAngles!(NormalizedOrthoAngle);
+impl_ops_for_OrthoAngles!(UnNormalizedOrthoAngle);
 
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() + rhs.quarter_turns())
-    }
-}
-
-impl<T: OrthoAngle> Sub for T {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.quarter_turns() - rhs.quarter_turns())
-    }
-}
-
-impl<T: OrthoAngle> From<i32> for T {
-    fn from(value: i32) -> Self {
-        Self::new(value)
-    }
-}
 // impl<T: Coordinate> TryFrom<T> for OrthoAngle {
 //     type Error = ();
 //     fn try_from(value: T) -> Result<T, Self::Error> {
 //         Ok(Self::from_orthogonal_vector(value))
 //     }
 // }
-
-impl QuarterTurnRotatable for NormalizedOrthoAngle {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
-        *self + quarter_turns_ccw.into()
-    }
-}
-
-impl Display for NormalizedOrthoAngle {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO: tidy
-        write!(
-            f,
-            "(x:{}, y:{}) {} {} ",
-            self.xy::<i32>().0,
-            self.xy::<i32>().1,
-            self.dir_name(),
-            Glyph::extract_arrow_from_arrow_string(self.step(), FACE_ARROWS)
-        )
-    }
-}
 
 #[cfg(test)]
 mod tests {

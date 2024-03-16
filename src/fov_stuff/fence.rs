@@ -906,8 +906,7 @@ mod tests {
             ((0, 0), STEP_RIGHT),
             ((0, 0), STEP_UP),
         ]);
-        let correct_break_point: WorldMove =
-            RelativeFace::from((0, 0, STEP_RIGHT)).cw_end_of_face();
+        let correct_break_point: WorldMove = RelativeFace::from((0, 0, RIGHT)).cw_end_of_face();
         fence
             .cw_end_point()
             .check_about_eq(correct_break_point)
@@ -919,7 +918,7 @@ mod tests {
     }
     #[test]
     fn test_sub_fence_in_arc__simple_case() {
-        let fence = Fence::straight_fence_from_cw_end_and_length((5, -2, STEP_RIGHT), 20);
+        let fence = Fence::straight_fence_from_cw_end_and_length((5, -2, RIGHT), 20);
 
         let start_segment = fence.edges[4];
         let end_segment = fence.edges[15];

@@ -78,6 +78,11 @@ pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
 pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
 
+pub const UP: OrthogonalDirection = OrthogonalDirection::new(0);
+pub const DOWN: OrthogonalDirection = OrthogonalDirection::new(1);
+pub const RIGHT: OrthogonalDirection = OrthogonalDirection::new(2);
+pub const LEFT: OrthogonalDirection = OrthogonalDirection::new(3);
+
 pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
 pub const DIAGONAL_STEPS: [WorldStep; 4] =
     [STEP_UP_RIGHT, STEP_UP_LEFT, STEP_DOWN_RIGHT, STEP_DOWN_LEFT];
