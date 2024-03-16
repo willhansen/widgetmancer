@@ -127,7 +127,7 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_point = point - p1;
         let p1_to_p2 = p2 - p1;
-        let parallel_part_of_p1_to_point = p1_to_point.project_onto_vector(p1_to_p2);
+        let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
     fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::PointType {
@@ -175,7 +175,7 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_p = point.into() - p1;
         let p1_to_p2 = p2 - p1;
-        let parallel_part = p1_to_p.project_onto_vector(p1_to_p2);
+        let parallel_part = p1_to_p.projected_onto(p1_to_p2);
         let perpendicular_part = p1_to_p - parallel_part;
         let p1_to_reflected_p = parallel_part - perpendicular_part;
         p1 + p1_to_reflected_p

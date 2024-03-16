@@ -125,14 +125,14 @@ where
     }
     pub fn face_is_on_same_line<OtherType: Into<Self>>(&self, other: OtherType) -> bool {
         let other_face: Self = other.into();
-        let directions_are_parallel = self.dir.step().dot(other_face.dir.step()) != 0;
+        let directions_are_parallel = self.dir.is_parallel(other_face.dir);
         if !directions_are_parallel {
             return false;
         }
 
-        let pos_on_dir_axis = self.dir().pos_on_axis(self.square());
-        let stepped_pos_on_dir_axis = self.dir().pos_on_axis(self.stepped().square().into());
-        let other_pos_on_dir_axis = self.dir().pos_on_axis(other_face.square().into());
+        let pos_on_dir_axis = self.square().position_on_axis(self.dir());
+        let stepped_pos_on_dir_axis = self.stepped().square().position_on_axis(self.dir());
+        let other_pos_on_dir_axis = other_face.square().position_on_axis(self.dir());
 
         let same_direction = self.dir() == other_face.dir();
         if same_direction {

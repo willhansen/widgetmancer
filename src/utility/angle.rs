@@ -17,13 +17,34 @@ impl OrthoAngle {
         self.quarter_turns
     }
     pub fn xy<T: num::Signed>(&self) -> (T, T) {
-        match self.quarter_turns() % 4 {
+        match self.quarter_turns().rem_euclid(4) {
             0 => (T::one(), T::zero()),
             1 => (T::zero(), T::one()),
             2 => (-T::one(), T::zero()),
             3 => (T::zero(), -T::one()),
         }
     }
+    pub fn cos<T: num::Signed>(&self) -> T {
+        match self.quarter_turns.rem_euclid(4) {
+            0 => T::one(),
+            1 | 3 => T::zero(),
+            2 => -T::one(),
+        }
+    }
+    pub fn sin<T: num::Signed>(&self) -> T {
+        match self.quarter_turns.rem_euclid(4) {
+            0 | 2 => T::zero(),
+            1 => T::one(),
+            3 => -T::one(),
+        }
+    }
+    pub fn dot<T: num::Signed>(&self, other: Self) -> T {
+        (*self - other).cos()
+    }
+    pub fn is_parallel(&self, other: Self) -> bool {
+        self.dot(other) != 0
+    }
+    #[deprecated(note = "use step instead")]
     pub fn to_orthogonal_direction(&self) -> WorldStep {
         self.step()
     }
@@ -119,5 +140,27 @@ impl From<i32> for OrthoAngle {
 impl QuarterTurnRotatable for OrthoAngle {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         *self + quarter_turns_ccw.into()
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dot() {
+        [
+            (0, 0, 1),
+            (0, 1, 0),
+            (0, 2, -1),
+            (0, 3, 0),
+            (1, 0, 0),
+            (2, 1, 0),
+            (3, 3, 1),
+            (4, 2, -1),
+        ]
+        .into_iter()
+        .for_each(|(a, b, c)| {
+            assert_eq!(OrthoAngle::new(a).dot::<i32>(OrthoAngle::new(b)), c);
+        });
     }
 }

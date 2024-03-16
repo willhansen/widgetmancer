@@ -157,7 +157,7 @@ pub trait Coordinate:
     fn cross(&self, other: Self) -> Self::DataType {
         self.x() * other.y() - self.y() * other.x()
     }
-    fn project_onto_vector(self, onto: impl Into<Self>) -> Self {
+    fn projected_onto(self, onto: impl Into<Self>) -> Self {
         let onto = onto.into();
         onto * (self.dot(onto) / onto.square_length())
     }
@@ -237,6 +237,10 @@ pub trait SignedCoordinate:
     }
     fn down() -> Self {
         Self::new(Self::DataType::zero(), -Self::DataType::one())
+    }
+    fn position_on_axis(&self, axis: impl Into<OrthoAngle>) -> Self::DataType {
+        let axis_vector: Self = axis.into().step();
+        self.dot(axis_vector)
     }
 }
 impl<T> SignedCoordinate for T
@@ -403,16 +407,14 @@ impl<V> QuarterTurnRotatable for V
 where
     V: SignedCoordinate,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, angle: impl Into<OrthoAngle>) -> Self {
         // if self.is_absolute() {
         //     return *self;
         // }
-        let quarter_turns: i32 = quarter_turns_ccw.into().quarter_turns();
+        let angle = angle.into();
         Self::new(
-            self.x() * int_to_T(int_cos(quarter_turns))
-                - self.y() * int_to_T(int_sin(quarter_turns)),
-            self.x() * int_to_T(int_sin(quarter_turns))
-                + self.y() * int_to_T(int_cos(quarter_turns)),
+            self.x() * angle.cos() - self.y() * angle.sin(),
+            self.x() * angle.sin() + self.y() * angle.cos(),
         )
     }
 }
@@ -505,6 +507,7 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     }
 }
 
+#[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
 pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
     step.project_onto_vector(axis.step()).dot(axis.step())
 }

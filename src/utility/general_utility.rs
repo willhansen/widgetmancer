@@ -28,32 +28,7 @@ pub fn sign(x: f32) -> f32 {
         0.0
     }
 }
-pub fn int_to_T<T: Signed>(x: i32) -> T {
-    match x {
-        1 => T::one(),
-        0 => T::zero(),
-        -1 => -T::one(),
-        _ => panic!(),
-    }
-}
 
-pub fn int_cos(quarter_periods: i32) -> i32 {
-    match quarter_periods.rem_euclid(4) {
-        0 => 1,
-        1 | 3 => 0,
-        2 => -1,
-        _ => panic!(),
-    }
-}
-
-pub fn int_sin(quarter_periods: i32) -> i32 {
-    match quarter_periods.rem_euclid(4) {
-        0 | 2 => 0,
-        1 => 1,
-        3 => -1,
-        _ => panic!(),
-    }
-}
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a * (1.0 - t) + b * t
 }
