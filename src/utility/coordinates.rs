@@ -69,8 +69,6 @@ where
     Vector2D::new(x, y)
 }
 
-trait_alias_macro!(pub trait AbsOrRelPoint = Copy + PartialEq + Sub<Self, Output = WorldMove>);
-
 // TODO: is this just a scalar?
 trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
@@ -170,11 +168,11 @@ pub trait Coordinate:
     }
 }
 
-impl<T, U> From<OrthoAngle> for Vector2D<T, U>
+impl<T, U> From<NormalizedOrthoAngle> for Vector2D<T, U>
 where
     T: CoordinateDataTypeTrait + num::Signed,
 {
-    fn from(value: OrthoAngle) -> Self {
+    fn from(value: NormalizedOrthoAngle) -> Self {
         let (x, y) = value.xy();
         vec2(x, y)
     }
@@ -212,7 +210,7 @@ where
 }
 
 pub trait SignedCoordinate:
-    Coordinate<DataType = Self::_DataType> + Neg<Output = Self> + From<OrthoAngle>
+    Coordinate<DataType = Self::_DataType> + Neg<Output = Self> + From<NormalizedOrthoAngle>
 {
     type _DataType: num::Signed;
     fn flip_x(&self) -> Self {
@@ -233,14 +231,14 @@ pub trait SignedCoordinate:
     fn down() -> Self {
         Self::new(Self::DataType::zero(), -Self::DataType::one())
     }
-    fn position_on_axis(&self, axis: impl Into<OrthoAngle>) -> Self::DataType {
+    fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
         let axis_vector: Self = axis.into().step();
         self.dot(axis_vector)
     }
 }
 impl<T> SignedCoordinate for T
 where
-    T: Coordinate + Neg<Output = Self> + From<OrthoAngle>,
+    T: Coordinate + Neg<Output = Self> + From<NormalizedOrthoAngle>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -317,6 +315,12 @@ pub trait IntCoordinate: SignedCoordinate<_DataType = i32> + Hash + Eq {
     fn is_king_step(&self) -> bool {
         self.is_orthogonal_king_step() || self.is_diagonal_king_step()
     }
+    fn is_even(&self) -> bool {
+        (self.x() + self.y()) % 2 == 0
+    }
+    fn is_odd(&self) -> bool {
+        !self.is_even()
+    }
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
@@ -359,14 +363,27 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
     }
-    // TODO: remember the reason for this existing (there IS a good reason)
-    // related to `test_built_in_angle_from_x_axis_can_not_be_trusted`
+    // euclid uses fast and imprecise trig for this by default for some reason
     fn better_angle_from_x_axis(&self) -> Angle<f32> {
         Angle::radians(self.y().atan2(self.x()))
     }
     fn angle_to(&self, other: Self) -> Angle<f32> {
         self.better_angle_from_x_axis()
             .angle_to(other.better_angle_from_x_axis())
+    }
+    fn about_eq(&self, other: Self, tolerance: Self::DataType) -> bool {
+        (*self - other).length() < tolerance
+    }
+    fn check_about_eq(&self, other: Self) -> OkOrMessage {
+        let tolerance = 0.001; // TODO: make parameter
+        if self.about_eq(other, tolerance) {
+            Ok(())
+        } else {
+            Err(format!(
+                "\nPoints too far apart:\n\tp1: {:?}\n\tp2: {:?}\n",
+                self, other
+            ))
+        }
     }
 }
 
@@ -402,7 +419,7 @@ impl<V> QuarterTurnRotatable for V
 where
     V: SignedCoordinate,
 {
-    fn quarter_rotated_ccw(&self, angle: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, angle: impl Into<NormalizedOrthoAngle>) -> Self {
         // if self.is_absolute() {
         //     return *self;
         // }
@@ -488,7 +505,7 @@ pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
 pub fn revolve_square(
     moving_square: WorldSquare,
     pivot_square: WorldSquare,
-    rotation: OrthoAngle,
+    rotation: NormalizedOrthoAngle,
 ) -> WorldSquare {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
@@ -506,35 +523,14 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
 pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalWorldStep) -> i32 {
     step.project_onto_vector(axis.step()).dot(axis.step())
 }
-pub fn square_is_odd(square: WorldSquare) -> bool {
-    (square.x + square.y) % 2 == 1
-}
-pub fn square_is_even(square: WorldSquare) -> bool {
-    !square_is_odd(square)
-}
-pub fn about_eq_2d<P: AbsOrRelPoint>(p1: P, p2: P, tolerance: f32) -> bool {
-    (p1 - p2).length().abs() < tolerance
-}
-pub fn check_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) -> OkOrMessage {
-    let tolerance = 0.001; // TODO: make parameter
 
-    if about_eq_2d(p1, p2, tolerance) {
-        Ok(())
-    } else {
-        Err(format!(
-            "\nPoints too far apart:\n\tp1: {:?}\n\tp2: {:?}\n",
-            p1, p2
-        ))
-    }
-}
-
-pub fn assert_about_eq_2d<P: AbsOrRelPoint + Debug>(p1: P, p2: P) {
-    check_about_eq_2d(p1, p2).unwrap();
+pub fn assert_about_eq_2d<P: FloatCoordinate>(p1: P, p2: P) {
+    p1.check_about_eq(p2).unwrap();
 }
 pub fn sorted_left_to_right(faces: [OrthogonalWorldStep; 2]) -> [OrthogonalWorldStep; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(OrthoAngle::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -564,7 +560,10 @@ impl From<OrthogonalWorldStep> for KingWorldStep {
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
@@ -618,7 +617,10 @@ impl RigidlyTransformable for WorldSquare {
 #[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self;
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self;
     #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
@@ -638,7 +640,10 @@ impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self {
         self.iter()
             .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
@@ -650,14 +655,20 @@ impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self {
         self.as_ref()
             .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
         ))
@@ -870,7 +881,7 @@ mod tests {
     #[test]
     fn test_revolve_square() {
         assert_eq!(
-            revolve_square(point2(3, 4), point2(5, 5), OrthoAngle::new(3),),
+            revolve_square(point2(3, 4), point2(5, 5), NormalizedOrthoAngle::new(3),),
             point2(4, 7)
         );
     }
@@ -878,20 +889,20 @@ mod tests {
     #[test]
     fn test_quarter_turns_from_vectors() {
         assert_eq!(
-            OrthoAngle::from_start_and_end_directions(STEP_UP, STEP_UP),
-            OrthoAngle::new(0)
+            NormalizedOrthoAngle::from_start_and_end_directions(STEP_UP, STEP_UP),
+            NormalizedOrthoAngle::new(0)
         );
         assert_eq!(
-            OrthoAngle::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
-            OrthoAngle::new(3)
+            NormalizedOrthoAngle::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
+            NormalizedOrthoAngle::new(3)
         );
         assert_eq!(
-            OrthoAngle::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
-            OrthoAngle::new(2)
+            NormalizedOrthoAngle::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
+            NormalizedOrthoAngle::new(2)
         );
         assert_eq!(
-            OrthoAngle::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
-            OrthoAngle::new(1)
+            NormalizedOrthoAngle::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
+            NormalizedOrthoAngle::new(1)
         );
     }
     #[test]

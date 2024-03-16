@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
-    orthogonal_shot_direction: OrthoAngle,
+    orthogonal_shot_direction: NormalizedOrthoAngle,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
 }
@@ -36,7 +36,9 @@ impl RecoilingBoardAnimation {
 
         RecoilingBoardAnimation {
             board_size,
-            orthogonal_shot_direction: OrthoAngle::from_orthogonal_vector(orthogonalized_step),
+            orthogonal_shot_direction: NormalizedOrthoAngle::from_orthogonal_vector(
+                orthogonalized_step,
+            ),
             start_time: Instant::now(),
             floor_color_enum,
         }

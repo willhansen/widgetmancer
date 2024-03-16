@@ -46,7 +46,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn quarter_rotated_ccw(&self, b: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, b: impl Into<NormalizedOrthoAngle> + Copy) -> Self {
         match self {
             Self::Text(a) => a.quarter_rotated_ccw(b).into(),
             Self::PartialVisibility(a) => a.quarter_rotated_ccw(b).into(),
@@ -82,7 +82,7 @@ impl TextDrawable {
 impl QuarterTurnRotatable for TextDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         // lmao no
         self.clone().into()
@@ -147,7 +147,7 @@ impl PartialVisibilityDrawable {
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self
@@ -243,7 +243,7 @@ impl BrailleDrawable {
 impl QuarterTurnRotatable for BrailleDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         let r = self
             .braille_array
@@ -301,7 +301,7 @@ impl SolidColorDrawable {
 impl QuarterTurnRotatable for SolidColorDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         self.clone().into()
     }
@@ -361,7 +361,7 @@ impl ArrowDrawable {
 impl QuarterTurnRotatable for ArrowDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         ArrowDrawable {
             direction: self
@@ -430,7 +430,7 @@ impl ConveyorBeltDrawable {
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         ConveyorBeltDrawable {
             direction: self
@@ -521,7 +521,7 @@ impl OffsetSquareDrawable {
 impl QuarterTurnRotatable for OffsetSquareDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<OrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.quarter_rotated_ccw(quarter_turns_anticlockwise),
@@ -623,7 +623,10 @@ mod tests {
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
-        let character = d.quarter_rotated_ccw(OrthoAngle::new(1)).to_glyphs()[0].character;
+        let character = d
+            .quarter_rotated_ccw(NormalizedOrthoAngle::new(1))
+            .to_glyphs()[0]
+            .character;
         assert_eq!(
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
@@ -659,7 +662,7 @@ mod tests {
         drawable.braille_array.print();
         let f = |i| {
             drawable
-                .quarter_rotated_ccw(OrthoAngle::new(i))
+                .quarter_rotated_ccw(NormalizedOrthoAngle::new(i))
                 .to_glyphs()
                 .chars()
         };

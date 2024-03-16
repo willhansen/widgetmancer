@@ -43,7 +43,6 @@ pub_mod_and_use!(
     line_segment,
     octant,
     orthogonal_facing_int_pose,
-    orthogonal_unit_coordinate,
     partial_angle_interval, // TODO: make private and contained within angle_interval?
     poses,
     quadrant,
@@ -227,7 +226,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
 pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
 
 impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let rotation_function = match quarter_turns_ccw.into().quarter_turns() {
             0 => |x, y| (x, y),
             1 => |x, y| (SIZE - 1 - y, x),
@@ -274,7 +273,7 @@ impl RigidTransform {
 
         Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_absolute_to_relative(end))
     }
-    pub fn from_rotation(r: impl Into<OrthoAngle> + Copy) -> Self {
+    pub fn from_rotation(r: impl Into<NormalizedOrthoAngle> + Copy) -> Self {
         let p = ORIGIN_POSE();
         Self::from_start_and_end_poses(p, p.quarter_rotated_ccw_in_place(r))
     }
@@ -284,7 +283,7 @@ impl RigidTransform {
     pub fn translation(&self) -> WorldStep {
         (self.end_pose - self.start_pose).dir().step()
     }
-    pub fn rotation(&self) -> OrthoAngle {
+    pub fn rotation(&self) -> NormalizedOrthoAngle {
         (self.end_pose - self.start_pose).dir()
     }
     // TODO: maybe te.st this if sus

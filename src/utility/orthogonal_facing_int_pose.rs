@@ -12,32 +12,35 @@ where
     SquareType: IntCoordinate,
 {
     square: SquareType,
-    dir: OrthoAngle,
+    dir: NormalizedOrthoAngle,
 }
 
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
 where
     SquareType: IntCoordinate,
 {
-    pub fn direction_in_quarter_turns(&self) -> OrthoAngle {
+    pub fn direction_in_quarter_turns(&self) -> NormalizedOrthoAngle {
         self.dir
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
         direction: impl Into<SquareType>,
     ) -> Self {
-        Self::from_square_and_turns(square, OrthoAngle::from_orthogonal_vector(direction.into()))
+        Self::from_square_and_turns(
+            square,
+            NormalizedOrthoAngle::from_orthogonal_vector(direction.into()),
+        )
     }
     pub fn from_square_and_turns(
         square: impl Into<SquareType>,
-        quarter_turns: impl Into<OrthoAngle>,
+        quarter_turns: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         Self {
             square: square.into(),
             dir: quarter_turns.into(),
         }
     }
-    pub fn direction(&self) -> OrthoAngle {
+    pub fn direction(&self) -> NormalizedOrthoAngle {
         self.dir
     }
     pub fn stepped(&self) -> Self {
@@ -70,7 +73,7 @@ where
 
     pub fn quarter_revolved_ccw_around_origin(
         &self,
-        quarter_turns_ccw: impl Into<OrthoAngle>,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         (
@@ -82,7 +85,7 @@ where
     }
     pub fn quarter_rotated_ccw_in_place(
         &self,
-        quarter_turns_ccw: impl Into<OrthoAngle> + Copy,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> Self {
         (self.square, self.dir.quarter_rotated_ccw(quarter_turns_ccw))
             .try_into()
@@ -102,10 +105,10 @@ where
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(self.square, self.right())
     }
-    fn left(&self) -> OrthoAngle {
+    fn left(&self) -> NormalizedOrthoAngle {
         self.direction().turned_left()
     }
-    fn right(&self) -> OrthoAngle {
+    fn right(&self) -> NormalizedOrthoAngle {
         self.direction().turned_right()
     }
     pub fn turned_back(&self) -> Self {
@@ -117,7 +120,7 @@ where
     pub fn at_square(&self, position: impl Into<SquareType>) -> Self {
         Self::from_square_and_step(position, self.dir())
     }
-    pub fn with_direction(&self, dir: impl Into<OrthoAngle>) -> Self {
+    pub fn with_direction(&self, dir: impl Into<NormalizedOrthoAngle>) -> Self {
         Self::from_square_and_turns(self.square, dir)
     }
     pub fn reversed(&self) -> Self {
@@ -153,7 +156,7 @@ where
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
-            return self.direction() == OrthoAngle::right();
+            return self.direction() == NormalizedOrthoAngle::right();
         }
 
         self.square.x() > SquareType::DataType::zero()
@@ -189,10 +192,10 @@ where
         let tolerance = 1e-6;
         self.end_points_of_face()
             .into_iter()
-            .any(|end_point| about_eq_2d(end_point, point, tolerance))
+            .any(|end_point| end_point.about_eq(point, tolerance))
     }
     pub fn flipped_to_face_origin(&self) -> Self {
-        if self.square().dot(self.direction().into()) < 0 {
+        if self.square().dot(self.direction()) < 0 {
             self.stepped().turned_back()
         } else {
             *self
@@ -248,7 +251,8 @@ impl WorldSquareWithOrthogonalDir {
         let other = other.into();
 
         let naive_translation: WorldStep = other.square - self.square;
-        let rotation = OrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
+        let rotation =
+            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
         Self::from_square_and_step(
             naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),
@@ -261,7 +265,8 @@ impl WorldSquareWithOrthogonalDir {
         let other: Self = other.into();
 
         let relative_translation: WorldStep = other.square;
-        let rotation = OrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
+        let rotation =
+            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),
@@ -285,7 +290,7 @@ impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
     fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
         Ok(Self::from_square_and_step(
             value.square(),
-            value.direction().try_into()?,
+            value.direction().step(),
         ))
     }
 }
@@ -320,7 +325,7 @@ impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepTyp
 where
     SquareType: IntCoordinate,
     IntoSquareType: Into<SquareType>,
-    IntoStepType: Into<OrthogonalUnitCoordinate<SquareType>>,
+    IntoStepType: Into<SquareType>,
 {
     // type Error = &'static str;
 
@@ -330,26 +335,23 @@ where
     }
 }
 
-impl<T, SquareType, DirectionType> From<(T, T, DirectionType)>
+impl<T, SquareType, IntoDirectionType> From<(T, T, IntoDirectionType)>
     for OrthogonalFacingIntPose<SquareType>
 where
     (T, T): Into<SquareType>,
     SquareType: WorldIntCoordinate,
-    DirectionType: Into<OrthogonalUnitCoordinate<SquareType>>,
+    IntoDirectionType: Into<NormalizedOrthoAngle>,
 {
-    fn from(value: (T, T, DirectionType)) -> Self {
-        Self::from_square_and_step((value.0, value.1).into(), value.2)
+    fn from(value: (T, T, IntoDirectionType)) -> Self {
+        Self::from_square_and_turns((value.0, value.1).into(), value.2)
     }
 }
 
-impl<SquareType> From<OrthogonalFacingIntPose<SquareType>>
-    for (SquareType, OrthogonalUnitCoordinate<SquareType>)
+impl<SquareType> From<OrthogonalFacingIntPose<SquareType>> for (SquareType, NormalizedOrthoAngle)
 where
     SquareType: WorldIntCoordinate,
 {
-    fn from(
-        value: OrthogonalFacingIntPose<SquareType>,
-    ) -> (SquareType, OrthogonalUnitCoordinate<SquareType>) {
+    fn from(value: OrthogonalFacingIntPose<SquareType>) -> (SquareType, NormalizedOrthoAngle) {
         (value.square, value.direction())
     }
 }

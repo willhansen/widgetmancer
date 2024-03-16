@@ -199,7 +199,7 @@ mod tests {
                 } else {
                     edge
                 };
-                let canonicalized = edge.flipped_to_face_origin();
+                let canonicalized = edge.face_flipped_to_face_origin();
                 assert_eq!(
                     canonicalized, correct,
                     "edge: {:?}\ncanonicalized: {:?}\ncorrect: {:?}",

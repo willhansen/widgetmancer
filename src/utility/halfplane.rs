@@ -351,7 +351,7 @@ impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P
 }
 
 impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineType> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
         let point = self.point_on_half_plane();

@@ -16,7 +16,7 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_faces_in_ccw_order(
             self.edges
@@ -59,8 +59,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
 
         // TODO: standardize tolerance
-        let endpoints_are_connected =
-            about_eq_2d(new_fence.start_point(), new_fence.end_point(), 0.001);
+        let endpoints_are_connected = new_fence
+            .start_point()
+            .about_eq(new_fence.end_point(), 0.001);
         if !endpoints_are_connected {
             return Ok(new_fence);
         }
@@ -907,8 +908,14 @@ mod tests {
         ]);
         let correct_break_point: WorldMove =
             RelativeFace::from((0, 0, STEP_RIGHT)).cw_end_of_face();
-        check_about_eq_2d(fence.cw_end_point(), correct_break_point).unwrap();
-        check_about_eq_2d(fence.ccw_end_point(), correct_break_point).unwrap();
+        fence
+            .cw_end_point()
+            .check_about_eq(correct_break_point)
+            .unwrap();
+        fence
+            .ccw_end_point()
+            .check_about_eq(correct_break_point)
+            .unwrap();
     }
     #[test]
     fn test_sub_fence_in_arc__simple_case() {

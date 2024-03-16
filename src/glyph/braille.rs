@@ -609,7 +609,7 @@ mod tests {
             for p in t.1 {
                 assert_eq!(
                     array
-                        .quarter_rotated_ccw(OrthoAngle::new(t.0))
+                        .quarter_rotated_ccw(NormalizedOrthoAngle::new(t.0))
                         .get_xy(p.0, p.1),
                     true
                 );

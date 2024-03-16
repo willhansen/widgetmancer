@@ -323,7 +323,10 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
+    ) -> Self {
         match self {
             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
                 Self::PartiallyVisible(v.quarter_rotated_ccw(quarter_turns_ccw))
@@ -378,7 +381,7 @@ impl PartialSquareVisibilityFromPointSource {
 }
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone

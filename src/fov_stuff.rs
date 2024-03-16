@@ -43,7 +43,7 @@ impl HasOriginPose for FieldOfView {
 
 // TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         FieldOfView::new(
             self.view_root
@@ -387,7 +387,7 @@ impl FieldOfView {
     fn rasterized_at_depth(
         &self,
         starting_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<OrthoAngle>,
+        forward_portal_rotation_to_this_depth: impl Into<NormalizedOrthoAngle>,
     ) -> RasterizedFieldOfView {
         let forward_portal_rotation_to_this_depth = forward_portal_rotation_to_this_depth.into();
         // rasterize top level
@@ -416,7 +416,7 @@ impl FieldOfView {
     fn rasterized_main_view(
         &self,
         top_level_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<OrthoAngle> + Copy,
+        forward_portal_rotation_to_this_depth: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> RasterizedFieldOfView {
         let top_down_portals = RasterizedFieldOfView::visibility_map_to_top_down_portals(
             self.view_root,
@@ -463,8 +463,8 @@ impl RigidlyTransformable for FieldOfView {
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct OctantFOVSquareSequenceIter {
-    outward_dir: OrthogonalWorldStep,
-    across_dir: OrthogonalWorldStep,
+    outward_dir: NormalizedOrthoAngle,
+    across_dir: NormalizedOrthoAngle,
     outward_steps: u32,
     across_steps: u32,
 }
@@ -486,7 +486,7 @@ impl OctantFOVSquareSequenceIter {
     }
 
     // todo: change to implementation of QuarterTurnRotatable trait
-    pub fn rotated(&self, quarter_turns: OrthoAngle) -> Self {
+    pub fn rotated(&self, quarter_turns: NormalizedOrthoAngle) -> Self {
         Self {
             outward_dir: self.outward_dir.quarter_rotated_ccw(quarter_turns),
             across_dir: self.across_dir.quarter_rotated_ccw(quarter_turns),
@@ -1413,7 +1413,7 @@ mod tests {
             range.for_each(|dx| {
                 assert_eq!(
                     rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
-                    OrthoAngle::new(turns)
+                    NormalizedOrthoAngle::new(turns)
                 );
             });
         });
@@ -1606,7 +1606,7 @@ mod tests {
 
         let transform = portal.get_transform();
         assert_eq!(transform.translation(), vec2(47, 67));
-        assert_eq!(transform.rotation(), OrthoAngle::new(3));
+        assert_eq!(transform.rotation(), NormalizedOrthoAngle::new(3));
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
             (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
@@ -1626,14 +1626,14 @@ mod tests {
             direction_near_exit,
         ) in entrance_offset_and_direction_exit_offset_and_direction
         {
-            let actual_center = entrance
-                .with_offset(offset_from_entrance)
-                .with_direction(OrthoAngle::from_orthogonal_vector(direction_near_entrance));
+            let actual_center = entrance.with_offset(offset_from_entrance).with_direction(
+                NormalizedOrthoAngle::from_orthogonal_vector(direction_near_entrance),
+            );
             let virtual_center_at_exit =
                 actual_center.apply_rigid_transform(portal.get_transform());
-            let correct_center_at_exit = exit
-                .with_offset(offset_from_exit)
-                .with_direction(OrthoAngle::from_orthogonal_vector(direction_near_exit));
+            let correct_center_at_exit = exit.with_offset(offset_from_exit).with_direction(
+                NormalizedOrthoAngle::from_orthogonal_vector(direction_near_exit),
+            );
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
     }
@@ -2093,7 +2093,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            OrthoAngle::new(0)
+            NormalizedOrthoAngle::new(0)
         );
     }
 
@@ -2156,7 +2156,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            OrthoAngle::new(1)
+            NormalizedOrthoAngle::new(1)
         );
         let the_square_visibility = rasterized_fov
             .lone_absolute_portal_entrance_shape_for_relative_square_or_panic(test_square);
