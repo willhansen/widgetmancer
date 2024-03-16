@@ -141,14 +141,9 @@ pub trait Coordinate:
     make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
     fn king_length(&self) -> Self::DataType {
-        // TODO: Why isn't there a `PartialOrd::max`?
         let a = abs(self.x());
         let b = abs(self.y());
-        if a >= b {
-            a
-        } else {
-            b
-        }
+        max_for_partial_ord(a,b)
     }
     fn dot(&self, other: impl Into<Self>) -> Self::DataType {
         let other = other.into();
@@ -689,12 +684,15 @@ where
     ab.cross(ac) < P::DataType::zero()
 }
 
-pub fn two_in_ccw_order(a: WorldMove, b: WorldMove) -> bool {
-    a.cross(b) > 0.0
+pub fn two_points_are_ccw_with_origin<P: SignedCoordinate>(a: P, b: P) -> bool
+where
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+{
+    a.cross(b) > P::DataType::zero()
 }
 
 pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
-    if two_in_ccw_order(v[0], v[1]) {
+    if two_points_are_ccw_with_origin(v[0], v[1]) {
         v
     } else {
         [v[1], v[0]]
@@ -711,7 +709,7 @@ pub fn check_vectors_in_ccw_order(
     v.into_iter()
         .map(|x| x.into())
         .tuple_windows()
-        .map(|(a, b)| match two_in_ccw_order(a, b) {
+        .map(|(a, b)| match two_points_are_ccw_with_origin(a, b) {
             true => Ok(()),
             false => Err(format!(
                 "These two points not in order: \na: {}\nb: {}",
@@ -905,23 +903,38 @@ mod tests {
     }
     #[test]
     fn test_relative_points_in_ccw_order() {
-        assert_true!(two_in_ccw_order(STEP_RIGHT.to_f32(), STEP_UP.to_f32()));
-        assert_true!(two_in_ccw_order(STEP_UP.to_f32(), STEP_LEFT.to_f32()));
+        assert_true!(two_points_are_ccw_with_origin(
+            STEP_RIGHT.to_f32(),
+            STEP_UP.to_f32()
+        ));
+        assert_true!(two_points_are_ccw_with_origin(
+            STEP_UP.to_f32(),
+            STEP_LEFT.to_f32()
+        ));
         // slight diff
-        assert_true!(two_in_ccw_order(
+        assert_true!(two_points_are_ccw_with_origin(
             STEP_UP.to_f32(),
             STEP_UP.to_f32() + WorldMove::new(-0.001, 0.0)
         ));
-        assert_true!(two_in_ccw_order(
+        assert_true!(two_points_are_ccw_with_origin(
             STEP_UP.to_f32(),
             STEP_DOWN.to_f32() + WorldMove::new(-0.001, 0.0)
         ));
 
         // across
-        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_DOWN.to_f32()));
+        assert_false!(two_points_are_ccw_with_origin(
+            STEP_UP.to_f32(),
+            STEP_DOWN.to_f32()
+        ));
 
-        assert_false!(two_in_ccw_order(STEP_UP.to_f32(), STEP_RIGHT.to_f32()));
-        assert_false!(two_in_ccw_order(STEP_ZERO.to_f32(), STEP_RIGHT.to_f32()));
+        assert_false!(two_points_are_ccw_with_origin(
+            STEP_UP.to_f32(),
+            STEP_RIGHT.to_f32()
+        ));
+        assert_false!(two_points_are_ccw_with_origin(
+            STEP_ZERO.to_f32(),
+            STEP_RIGHT.to_f32()
+        ));
     }
     #[test]
     fn test_point_is_in_centered_unit_square__simple_true() {

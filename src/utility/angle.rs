@@ -17,6 +17,9 @@ impl OrthoAngle {
     pub fn right() -> Self {
         Self::X_AXIS
     }
+    pub fn up() -> Self {
+        Self::X_AXIS.quarter_rotated_ccw(1)
+    }
     pub fn quarter_turns(&self) -> i32 {
         self.quarter_turns
     }
@@ -26,6 +29,14 @@ impl OrthoAngle {
             1 => (T::zero(), T::one()),
             2 => (-T::one(), T::zero()),
             3 => (T::zero(), -T::one()),
+        }
+    }
+    pub fn dir_name(&self) -> &'static str {
+        match self.quarter_turns().rem_euclid(4) {
+            0 => "Right",
+            1 => "Up",
+            2 => "Left",
+            3 => "Down",
         }
     }
     pub fn cos<T: num::Signed>(&self) -> T {
@@ -147,12 +158,33 @@ impl From<i32> for OrthoAngle {
         Self::new(value)
     }
 }
+// impl<T: Coordinate> TryFrom<T> for OrthoAngle {
+//     type Error = ();
+//     fn try_from(value: T) -> Result<T, Self::Error> {
+//         Ok(Self::from_orthogonal_vector(value))
+//     }
+// }
 
 impl QuarterTurnRotatable for OrthoAngle {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<OrthoAngle> + Copy) -> Self {
         *self + quarter_turns_ccw.into()
     }
 }
+
+impl Display for OrthoAngle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO: tidy
+        write!(
+            f,
+            "(x:{}, y:{}) {} {} ",
+            self.xy::<i32>().0,
+            self.xy::<i32>().1,
+            self.dir_name(),
+            Glyph::extract_arrow_from_arrow_string(self.step(), FACE_ARROWS)
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

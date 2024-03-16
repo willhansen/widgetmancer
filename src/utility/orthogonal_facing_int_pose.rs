@@ -160,6 +160,44 @@ where
             && self.square.y() == 0
             && self.direction().is_horizontal()
     }
+
+    pub fn center_point_of_face(&self) -> <SquareType as Coordinate>::Floating {
+        self.square().to_f32() + self.dir().step::<<SquareType as Coordinate>::Floating>() * 0.5
+    }
+    pub fn end_points_of_face(&self) -> [<SquareType as Coordinate>::Floating; 2] {
+        [self.left(), self.right()].map(|dir| {
+            self.center_point_of_face() + dir.step::<<SquareType as Coordinate>::Floating>() * 0.5
+        })
+    }
+    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as Coordinate>::Floating; 2] {
+        let mut ps = self.end_points_of_face();
+        if !two_points_are_ccw_with_origin(ps[0], ps[1]) {
+            ps.reverse();
+        }
+        ps
+    }
+    pub fn cw_end_of_face(&self) -> <SquareType as Coordinate>::Floating {
+        self.end_points_of_face_in_ccw_order()[0]
+    }
+    pub fn ccw_end_of_face(&self) -> <SquareType as Coordinate>::Floating {
+        self.end_points_of_face_in_ccw_order()[1]
+    }
+    pub fn face_end_point_approx_touches_point(
+        &self,
+        point: <SquareType as Coordinate>::Floating,
+    ) -> bool {
+        let tolerance = 1e-6;
+        self.end_points_of_face()
+            .into_iter()
+            .any(|end_point| about_eq_2d(end_point, point, tolerance))
+    }
+    pub fn flipped_to_face_origin(&self) -> Self {
+        if self.square().dot(self.direction().into()) < 0 {
+            self.stepped().turned_back()
+        } else {
+            *self
+        }
+    }
 }
 impl<T: IntCoordinate> Debug for OrthogonalFacingIntPose<T>
 where
@@ -174,12 +212,10 @@ impl<T: IntCoordinate> Display for OrthogonalFacingIntPose<T> {
         // TODO: tidy
         write!(
             f,
-            "Pos: (x:{}, y:{}), Dir: (x: {}, y: {}) {} ",
+            "Pos: (x:{}, y:{}), Dir: {}",
             self.square().x(),
             self.square().y(),
-            self.dir().step().x(),
-            self.dir().step().y(),
-            Glyph::extract_arrow_from_arrow_string(self.dir().step().cast_unit(), FACE_ARROWS)
+            self.dir()
         )
     }
 }
@@ -204,7 +240,7 @@ static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable)
 // TODO: Generalize these functions for any unit
 impl WorldSquareWithOrthogonalDir {
     pub fn middle_point_of_face(&self) -> WorldPoint {
-        self.square.to_f32() + self.direction().step().to_f32() * 0.5
+        self.square.to_f32() + self.direction().step::<WorldMove>() * 0.5
     }
 
     // TODO: replace with just subtraction, returning whatever a relative pose is (probably a translation and rotation)
@@ -225,7 +261,7 @@ impl WorldSquareWithOrthogonalDir {
         let other: Self = other.into();
 
         let relative_translation: WorldStep = other.square;
-        let rotation = OrthoAngle::from_start_and_end_directions(self.dir, STEP_UP.into());
+        let rotation = OrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),
@@ -240,43 +276,6 @@ impl WorldSquareWithOrthogonalDir {
     pub fn other_square_relative_to_absolute(&self, other: impl Into<WorldStep>) -> WorldSquare {
         self.convert_other_pose_from_using_this_origin_to_absolute_origin((other.into(), STEP_UP))
             .square()
-    }
-}
-
-// TODO: generalize for absolute squares too
-impl RelativeSquareWithOrthogonalDir {
-    pub fn center_point_of_face(&self) -> WorldMove {
-        self.square().to_f32() + self.dir().step().to_f32() * 0.5
-    }
-    pub fn end_points_of_face(&self) -> [WorldMove; 2] {
-        [self.left(), self.right()]
-            .map(|dir| self.center_point_of_face() + dir.step().to_f32() * 0.5)
-    }
-    pub fn end_points_of_face_in_ccw_order(&self) -> [WorldMove; 2] {
-        let mut ps = self.end_points_of_face();
-        if !two_in_ccw_order(ps[0], ps[1]) {
-            ps.reverse();
-        }
-        ps
-    }
-    pub fn cw_end_of_face(&self) -> WorldMove {
-        self.end_points_of_face_in_ccw_order()[0]
-    }
-    pub fn ccw_end_of_face(&self) -> WorldMove {
-        self.end_points_of_face_in_ccw_order()[1]
-    }
-    pub fn face_end_point_approx_touches_point(&self, point: WorldMove) -> bool {
-        let tolerance = 1e-6;
-        self.end_points_of_face()
-            .into_iter()
-            .any(|end_point| about_eq_2d(end_point, point, tolerance))
-    }
-    pub fn flipped_to_face_origin(&self) -> Self {
-        if self.square().dot(self.direction().into()) < 0 {
-            self.stepped().turned_back()
-        } else {
-            *self
-        }
     }
 }
 

@@ -201,14 +201,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.ccw_end_point());
         let edge_is_ccw_of_self =
-            two_in_ccw_order(self.ccw_end_point(), edge.center_point_of_face());
+            two_points_are_ccw_with_origin(self.ccw_end_point(), edge.center_point_of_face());
 
         !overlapping && ends_touch && edge_is_ccw_of_self
     }
     fn can_connect_to_cw_end(&self, edge: RelativeFace) -> bool {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.cw_end_point());
-        let edge_is_cw_of_self = two_in_ccw_order(edge.center_point_of_face(), self.cw_end_point());
+        let edge_is_cw_of_self =
+            two_points_are_ccw_with_origin(edge.center_point_of_face(), self.cw_end_point());
 
         !overlapping && ends_touch && edge_is_cw_of_self
     }
@@ -523,7 +524,7 @@ mod tests {
         let edges = ORTHOGONAL_STEPS.map(|step| ((5, 5), step));
         for edge in edges {
             let fence = Fence::from_one_edge(edge);
-            assert!(two_in_ccw_order(
+            assert!(two_points_are_ccw_with_origin(
                 fence.cw_end_point(),
                 fence.ccw_end_point()
             ));
