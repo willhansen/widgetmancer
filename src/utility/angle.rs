@@ -8,10 +8,14 @@ pub struct OrthoAngle {
 }
 
 impl OrthoAngle {
+    const X_AXIS: Self = Self::new(0);
     pub fn new(quarter_turns: i32) -> Self {
         OrthoAngle {
             quarter_turns: quarter_turns.rem_euclid(4),
         }
+    }
+    pub fn right() -> Self {
+        Self::X_AXIS
     }
     pub fn quarter_turns(&self) -> i32 {
         self.quarter_turns
@@ -38,12 +42,19 @@ impl OrthoAngle {
             3 => -T::one(),
         }
     }
-    pub fn dot<T: num::Signed>(&self, other: Self) -> T {
-        (*self - other).cos()
+    pub fn dot<T: num::Signed>(&self, other: impl Into<Self>) -> T {
+        (*self - other.into()).cos()
     }
-    pub fn is_parallel(&self, other: Self) -> bool {
-        self.dot(other) != 0
+    pub fn is_parallel(&self, other: impl Into<Self>) -> bool {
+        self.dot::<i32>(other) != 0
     }
+    pub fn is_horizontal(&self) -> bool {
+        self.cos::<i32>() != 0
+    }
+    pub fn is_vertical(&self) -> bool {
+        self.sin::<i32>() != 0
+    }
+
     #[deprecated(note = "use step instead")]
     pub fn to_orthogonal_direction(&self) -> WorldStep {
         self.step()
@@ -96,13 +107,13 @@ impl OrthoAngle {
     pub fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns)
     }
-    pub fn left(&self) -> Self {
+    pub fn turned_left(&self) -> Self {
         self.quarter_rotated_ccw(1)
     }
-    pub fn right(&self) -> Self {
+    pub fn turned_right(&self) -> Self {
         self.quarter_rotated_ccw(3)
     }
-    pub fn back(&self) -> Self {
+    pub fn turned_back(&self) -> Self {
         self.quarter_rotated_ccw(2)
     }
 }

@@ -103,13 +103,13 @@ where
         Self::from_square_and_step(self.square, self.right())
     }
     fn left(&self) -> OrthoAngle {
-        self.direction().left()
+        self.direction().turned_left()
     }
     fn right(&self) -> OrthoAngle {
-        self.direction().right()
+        self.direction().turned_right()
     }
     pub fn turned_back(&self) -> Self {
-        Self::from_square_and_turns(self.square, self.direction().back())
+        Self::from_square_and_turns(self.square, self.direction().turned_back())
     }
     pub fn with_offset(&self, offset: SquareType) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
@@ -153,12 +153,12 @@ where
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
-            return self.direction().step() == SquareType::right();
+            return self.direction() == OrthoAngle::right();
         }
 
         self.square.x() > SquareType::DataType::zero()
             && self.square.y() == 0
-            && self.direction().step().is_horizontal()
+            && self.direction().is_horizontal()
     }
 }
 impl<T: IntCoordinate> Debug for OrthogonalFacingIntPose<T>
