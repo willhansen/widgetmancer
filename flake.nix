@@ -23,6 +23,8 @@
 			      lldb
 			      gdb
 			      bacon
+            cargo-flamegraph
+            cargo-profiler
 					];
           shellHook = "zsh";
         };
