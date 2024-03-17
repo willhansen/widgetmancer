@@ -25,6 +25,7 @@
 			      bacon
             cargo-flamegraph
             cargo-profiler
+            cargo-nextest
 					];
           shellHook = "zsh";
         };
