@@ -232,7 +232,7 @@ pub trait SignedCoordinate:
         Self::new(Self::DataType::zero(), -Self::DataType::one())
     }
     fn step(&self, dir: OrthogonalDirection) -> Self {
-        *self + dir.step::<Self>()
+        *self + dir.to_step::<Self>()
     }
     fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
         let axis_vector: Self = axis.into().step();
@@ -524,7 +524,7 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
 
 #[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
 pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalDirection) -> i32 {
-    step.project_onto_vector(axis.step()).dot(axis.step())
+    step.project_onto_vector(axis.to_step()).dot(axis.to_step())
 }
 
 pub fn assert_about_eq_2d<P: FloatCoordinate>(p1: P, p2: P) {
@@ -557,7 +557,7 @@ impl KingWorldStep {
 
 impl From<OrthogonalDirection> for KingWorldStep {
     fn from(value: OrthogonalDirection) -> Self {
-        KingWorldStep::new(value.step())
+        KingWorldStep::new(value.to_step())
     }
 }
 

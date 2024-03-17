@@ -281,7 +281,7 @@ impl RigidTransform {
         Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
     }
     pub fn translation(&self) -> WorldStep {
-        (self.end_pose - self.start_pose).dir().step()
+        (self.end_pose - self.start_pose).dir().to_step()
     }
     pub fn rotation(&self) -> NormalizedOrthoAngle {
         (self.end_pose - self.start_pose).dir()
@@ -327,7 +327,7 @@ impl RigidTransform {
         let start_tf_angle = self
             .start_pose
             .direction()
-            .step::<WorldStep>()
+            .to_step::<WorldStep>()
             .to_f32()
             .better_angle_from_x_axis();
 
@@ -339,7 +339,7 @@ impl RigidTransform {
         let new_ray_start = if dist_from_tf_start == 0.0 {
             self.end_pose.square().to_f32()
         } else {
-            let tf_start_point: WorldMove = self.start_pose.direction().step();
+            let tf_start_point: WorldMove = self.start_pose.direction().to_step();
             let position_angle_from_tf_start =
                 tf_start_point.angle_to(ray_start_relative_to_tf_start);
 

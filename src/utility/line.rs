@@ -664,7 +664,7 @@ pub fn first_inside_square_face_hit_by_ray(
         .iter()
         .filter(|&&face| {
             let vector_into_face = face.direction();
-            ray_direction.dot(vector_into_face.step()) >= 0.0
+            ray_direction.dot(vector_into_face.to_step()) >= 0.0
         })
         .cloned()
         .collect();
@@ -704,12 +704,12 @@ pub fn square_face_as_line<P: IntCoordinate>(
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
     // TODO: avoid the type notation on `step` somehow
-    let face_center = square_center + face_direction.step::<P::Floating>() * 0.5;
+    let face_center = square_center + face_direction.to_step::<P::Floating>() * 0.5;
     let p1_direction = face_direction.quarter_rotated_ccw(1);
     let p2_direction = -p1_direction;
     TwoDifferentPoints::new_from_two_points(
-        face_center + p1_direction.step::<P::Floating>() * 0.5,
-        face_center + p2_direction.step::<P::Floating>() * 0.5,
+        face_center + p1_direction.to_step::<P::Floating>() * 0.5,
+        face_center + p2_direction.to_step::<P::Floating>() * 0.5,
     )
 }
 pub fn ray_intersection_point_with_oriented_square_face(
@@ -719,7 +719,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
     face: WorldSquareWithOrthogonalDir,
 ) -> Option<WorldPoint> {
     let ray_direction = WorldMove::unit_vector_from_angle(angle);
-    let face_is_facing_ray = ray_direction.dot(face.dir().step()) > 0.0;
+    let face_is_facing_ray = ray_direction.dot(face.dir().to_step()) > 0.0;
     if !face_is_facing_ray {
         return None;
     }

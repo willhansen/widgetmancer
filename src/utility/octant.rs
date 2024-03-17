@@ -38,7 +38,7 @@ impl Octant {
         across_direction: OrthogonalDirection,
     ) -> Self {
         // TODO: probably make this an actual equation
-        let step_pair = (outward_direction.step(), across_direction.step());
+        let step_pair = (outward_direction.to_step(), across_direction.to_step());
         let octant_number = if step_pair == (STEP_RIGHT, STEP_UP) {
             0
         } else if step_pair == (STEP_UP, STEP_RIGHT) {

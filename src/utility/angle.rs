@@ -102,12 +102,12 @@ pub trait OrthoAngle:
         }
     }
 
-    #[deprecated(note = "use step instead")]
+    #[deprecated(note = "use to_step instead")]
     fn to_orthogonal_direction(&self) -> WorldStep {
-        self.step()
+        self.to_step()
     }
     // TODO: find a way to automatically just take whatever type is convenient
-    fn step<T: SignedCoordinate>(&self) -> T {
+    fn to_step<T: SignedCoordinate>(&self) -> T {
         self.xy().into()
     }
     fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {

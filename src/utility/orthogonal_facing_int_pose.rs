@@ -44,16 +44,16 @@ where
         self.dir
     }
     pub fn stepped(&self) -> Self {
-        Self::from_square_and_turns(self.square + self.direction().step(), self.direction())
+        Self::from_square_and_turns(self.square + self.direction().to_step(), self.direction())
     }
     pub fn stepped_n(&self, n: i32) -> Self {
         Self::from_square_and_turns(
-            self.square + self.direction().step::<SquareType>() * n,
+            self.square + self.direction().to_step::<SquareType>() * n,
             self.direction(),
         )
     }
     pub fn stepped_back(&self) -> Self {
-        Self::from_square_and_turns(self.square - self.direction().step(), self.direction())
+        Self::from_square_and_turns(self.square - self.direction().to_step(), self.direction())
     }
     pub fn strafed_left(&self) -> Self {
         self.strafed_right_n(-1)
@@ -63,7 +63,7 @@ where
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
         Self::from_square_and_step(
-            self.square + self.right().step::<SquareType>() * n,
+            self.square + self.right().to_step::<SquareType>() * n,
             self.direction(),
         )
     }
@@ -165,11 +165,12 @@ where
     }
 
     pub fn center_point_of_face(&self) -> <SquareType as Coordinate>::Floating {
-        self.square().to_f32() + self.dir().step::<<SquareType as Coordinate>::Floating>() * 0.5
+        self.square().to_f32() + self.dir().to_step::<<SquareType as Coordinate>::Floating>() * 0.5
     }
     pub fn end_points_of_face(&self) -> [<SquareType as Coordinate>::Floating; 2] {
         [self.left(), self.right()].map(|dir| {
-            self.center_point_of_face() + dir.step::<<SquareType as Coordinate>::Floating>() * 0.5
+            self.center_point_of_face()
+                + dir.to_step::<<SquareType as Coordinate>::Floating>() * 0.5
         })
     }
     pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as Coordinate>::Floating; 2] {
@@ -243,7 +244,7 @@ static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable)
 // TODO: Generalize these functions for any unit
 impl WorldSquareWithOrthogonalDir {
     pub fn middle_point_of_face(&self) -> WorldPoint {
-        self.square.to_f32() + self.direction().step::<WorldMove>() * 0.5
+        self.square.to_f32() + self.direction().to_step::<WorldMove>() * 0.5
     }
 
     // TODO: replace with just subtraction, returning whatever a relative pose is (probably a translation and rotation)
@@ -252,7 +253,7 @@ impl WorldSquareWithOrthogonalDir {
 
         let naive_translation: WorldStep = other.square - self.square;
         let rotation =
-            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
+            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.to_step(), STEP_UP);
         Self::from_square_and_step(
             naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),
@@ -266,7 +267,7 @@ impl WorldSquareWithOrthogonalDir {
 
         let relative_translation: WorldStep = other.square;
         let rotation =
-            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.step(), STEP_UP);
+            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.to_step(), STEP_UP);
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),

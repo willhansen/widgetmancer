@@ -107,7 +107,7 @@ impl Animation for RecoilingBoardAnimation {
         let mut glyph_map = WorldSquareGlyphMap::new();
 
         let offset_vector: WorldMove =
-            self.orthogonal_shot_direction.step::<WorldMove>() * offset_distance_in_squares;
+            self.orthogonal_shot_direction.to_step::<WorldMove>() * offset_distance_in_squares;
 
         for x in 0..self.board_size.width() {
             for y in 0..self.board_size.height() {

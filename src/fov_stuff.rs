@@ -499,8 +499,8 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let relative_square = self.outward_dir.step::<WorldStep>() * self.outward_steps as i32
-            + self.across_dir.step::<WorldStep>() * self.across_steps as i32;
+        let relative_square = self.outward_dir.to_step::<WorldStep>() * self.outward_steps as i32
+            + self.across_dir.to_step::<WorldStep>() * self.across_steps as i32;
 
         self.across_steps += 1;
         if self.across_steps > self.outward_steps {

@@ -178,9 +178,9 @@ impl PartialAngleInterval {
         let (relative_square, face_direction): (WorldStep, OrthogonalDirection) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.step::<WorldMove>() / 2.0;
+        let face_center = square_center + face_direction.to_step::<WorldMove>() / 2.0;
         let face_corners = [1, -1].map(|sign| {
-            face_center + (face_direction.step::<WorldMove>() / 2.0).quarter_rotated_ccw(sign)
+            face_center + (face_direction.to_step::<WorldMove>() / 2.0).quarter_rotated_ccw(sign)
         });
 
         let center_angle = face_center.better_angle_from_x_axis();
