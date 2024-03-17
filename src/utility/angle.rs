@@ -31,7 +31,14 @@ where
     }
 }
 
-pub trait OrthoAngle: Sized {
+pub trait OrthoAngle:
+    Sized
+    + Sub<NormalizedOrthoAngle, Output = Self>
+    + Add<NormalizedOrthoAngle, Output = Self>
+    + Sub
+    + Add
+    + QuarterTurnRotatable
+{
     fn new(quarter_turns: i32) -> Self;
     fn quarter_turns(&self) -> i32;
     fn normalized(&self) -> NormalizedOrthoAngle {
@@ -77,7 +84,7 @@ pub trait OrthoAngle: Sized {
         }
     }
     fn dot<T: num::Signed>(&self, other: impl OrthoAngle) -> T {
-        (*self - other).cos()
+        (*self - other.normalized()).cos()
     }
     fn is_parallel(&self, other: impl OrthoAngle) -> bool {
         self.dot::<i32>(other) != 0
@@ -105,7 +112,7 @@ pub trait OrthoAngle: Sized {
     }
     fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
         assert!(dir.is_orthogonal());
-        NormalizedOrthoAngle::new(if dir.x() == T::DataType::zero() {
+        Self::new(if dir.x() == T::DataType::zero() {
             if dir.y() > T::DataType::zero() {
                 1
             } else {
@@ -143,7 +150,7 @@ pub trait OrthoAngle: Sized {
         self.rotate_angle(FAngle::degrees(0.0))
     }
     fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
-        v.quarter_rotated_ccw(self.quarter_turns)
+        v.quarter_rotated_ccw(self.quarter_turns())
     }
     fn turned_left(&self) -> Self {
         self.quarter_rotated_ccw(1)
@@ -166,18 +173,18 @@ macro_rules! impl_ops_for_OrthoAngles {
             }
         }
 
-        impl Add for $Type {
+        impl<T: OrthoAngle> Add<T> for $Type {
             type Output = Self;
 
-            fn add(self, rhs: Self) -> Self::Output {
+            fn add(self, rhs: T) -> Self::Output {
                 Self::new(self.quarter_turns() + rhs.quarter_turns())
             }
         }
 
-        impl Sub for $Type {
+        impl<T: OrthoAngle> Sub<T> for $Type {
             type Output = Self;
 
-            fn sub(self, rhs: Self) -> Self::Output {
+            fn sub(self, rhs: T) -> Self::Output {
                 Self::new(self.quarter_turns() - rhs.quarter_turns())
             }
         }

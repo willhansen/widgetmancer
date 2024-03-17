@@ -231,6 +231,9 @@ pub trait SignedCoordinate:
     fn down() -> Self {
         Self::new(Self::DataType::zero(), -Self::DataType::one())
     }
+    fn step(&self, dir: OrthogonalDirection) -> Self {
+        *self + dir.step::<Self>()
+    }
     fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
         let axis_vector: Self = axis.into().step();
         self.dot(axis_vector)
@@ -560,10 +563,7 @@ impl From<OrthogonalDirection> for KingWorldStep {
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }

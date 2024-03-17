@@ -6,13 +6,7 @@ use rgb::RGB8;
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::Drawable;
-use crate::utility::units::{
-    world_character_square_to_world_square, world_point_to_world_character_point,
-    world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
-    WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::{get_by_point, NormalizedOrthoAngle, RIGHT_I, STEP_RIGHT, STEP_UP};
-use crate::{point2, vec2, Coordinate, Point2D, SignedCoordinate, Vector2D};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -96,7 +90,7 @@ impl Screen {
             .screen_step_from_origin_to_max()
             .reflect(STEP_UP.cast_unit())
             .cast_unit();
-        self.rotation.rotate_vector(unrotated)
+        unrotated.quarter_rotated_ccw(self.rotation)
     }
 
     fn world_step_from_origin_to_center(&self) -> WorldStep {

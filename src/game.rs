@@ -4770,7 +4770,7 @@ mod tests {
         game.tick_realtime_effects(Duration::from_secs_f32(
             CONVEYOR_BELT_MOVEMENT_PERIOD_S * 1.1,
         ));
-        assert_eq!(game.player_square(), square + dir);
+        assert_eq!(game.player_square(), square.step(dir));
     }
     #[test]
 
@@ -4785,7 +4785,7 @@ mod tests {
         game.tick_realtime_effects(Duration::from_secs_f32(
             CONVEYOR_BELT_MOVEMENT_PERIOD_S * 1.1,
         ));
-        assert!(game.widgets.contains_key(&(square + dir)));
+        assert!(game.widgets.contains_key(&(square.step(dir))));
     }
     #[test]
 
@@ -4850,7 +4850,7 @@ mod tests {
         game.tick_game_logic();
 
         let new_pos = game.floating_hunter_drones.iter().next().unwrap().position;
-        let new_correct_pos = start_pos + dir;
+        let new_correct_pos = start_pos.step(dir);
 
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
@@ -4885,7 +4885,7 @@ mod tests {
         let square = point2(8, 5);
         game.place_player(square);
         for i in 0..5 {
-            game.place_floor_push_arrow(square + STEP_LEFT * (i + 1), STEP_RIGHT.into());
+            game.place_floor_push_arrow(square + STEP_LEFT * (i + 1), RIGHT);
         }
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();

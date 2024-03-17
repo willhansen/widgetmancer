@@ -601,53 +601,29 @@ mod tests {
 
     fn test_offset_full_square() {
         let f = characters_for_full_square_with_1d_offset;
-        assert_eq!(f(STEP_UP.into(), 0.5), [UPPER_HALF_BLOCK; 2], "Basic up");
-        assert_eq!(
-            f(STEP_UP.into(), 1.0 / 3.0),
-            [UPPER_TWO_THIRD_BLOCK; 2],
-            "1/3 up"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), 0.25),
-            [RIGHT_HALF_BLOCK, FULL_BLOCK],
-            "right"
-        );
-        assert_eq!(
-            f(STEP_LEFT.into(), 0.25),
-            [FULL_BLOCK, LEFT_HALF_BLOCK],
-            "left"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), 0.75),
-            [SPACE, RIGHT_HALF_BLOCK],
-            "right more"
-        );
+        assert_eq!(f(UP, 0.5), [UPPER_HALF_BLOCK; 2], "Basic up");
+        assert_eq!(f(UP, 1.0 / 3.0), [UPPER_TWO_THIRD_BLOCK; 2], "1/3 up");
+        assert_eq!(f(RIGHT, 0.25), [RIGHT_HALF_BLOCK, FULL_BLOCK], "right");
+        assert_eq!(f(LEFT, 0.25), [FULL_BLOCK, LEFT_HALF_BLOCK], "left");
+        assert_eq!(f(RIGHT, 0.75), [SPACE, RIGHT_HALF_BLOCK], "right more");
         for i in 0..20 {
             assert_eq!(
-                f(STEP_RIGHT.into(), 0.1 * i as f32),
-                f(STEP_LEFT.into(), -0.1 * i as f32),
+                f(RIGHT, 0.1 * i as f32),
+                f(LEFT, -0.1 * i as f32),
                 "negative equivalence horizontally.  i={}",
                 i
             );
             assert_eq!(
-                f(STEP_DOWN.into(), 0.1 * i as f32),
-                f(STEP_UP.into(), -0.1 * i as f32),
+                f(DOWN, 0.1 * i as f32),
+                f(UP, -0.1 * i as f32),
                 "negative equivalence vertically.  i={}",
                 i
             );
         }
+        assert_eq!(f(RIGHT, 9.75), [SPACE, SPACE], "No wraparound right");
+        assert_eq!(f(LEFT, 9.75), [SPACE, SPACE], "No wraparound left");
         assert_eq!(
-            f(STEP_RIGHT.into(), 9.75),
-            [SPACE, SPACE],
-            "No wraparound right"
-        );
-        assert_eq!(
-            f(STEP_LEFT.into(), 9.75),
-            [SPACE, SPACE],
-            "No wraparound left"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), -9.75),
+            f(RIGHT, -9.75),
             [SPACE, SPACE],
             "No wraparound negative right"
         );
@@ -678,26 +654,22 @@ mod tests {
         let f = characters_for_full_square_with_looping_1d_offset;
         for i in 0..20 {
             assert_eq!(
-                f(STEP_RIGHT.into(), 0.1 * i as f32),
-                f(STEP_RIGHT.into(), 0.1 * i as f32 + 2.0),
+                f(RIGHT, 0.1 * i as f32),
+                f(RIGHT, 0.1 * i as f32 + 2.0),
                 "modulo.  i={}",
                 i
             );
             assert_eq!(
-                f(STEP_DOWN.into(), 0.1 * i as f32),
-                f(STEP_DOWN.into(), 0.1 * i as f32 + 22.0),
+                f(DOWN, 0.1 * i as f32),
+                f(DOWN, 0.1 * i as f32 + 22.0),
                 "modulo. i={}",
                 i
             );
         }
-        assert_eq!(f(STEP_RIGHT.into(), 0.3), f(STEP_LEFT.into(), 1.7),);
-        assert_eq!(
-            f(STEP_UP.into(), 0.3),
-            f(STEP_UP.into(), -1.7),
-            "negative equivalence"
-        );
-        assert_eq!(f(STEP_RIGHT.into(), 1.25), [LEFT_HALF_BLOCK, SPACE]);
-        assert_eq!(f(STEP_LEFT.into(), 1.25), [SPACE, RIGHT_HALF_BLOCK]);
+        assert_eq!(f(RIGHT, 0.3), f(LEFT, 1.7),);
+        assert_eq!(f(UP, 0.3), f(UP, -1.7), "negative equivalence");
+        assert_eq!(f(RIGHT, 1.25), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(f(LEFT, 1.25), [SPACE, RIGHT_HALF_BLOCK]);
     }
     #[test]
 

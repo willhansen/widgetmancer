@@ -82,9 +82,9 @@ impl TextDrawable {
 impl QuarterTurnRotatable for TextDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
-        // lmao no
+        // No rotation, only self
         self.clone().into()
     }
 }
@@ -147,7 +147,7 @@ impl PartialVisibilityDrawable {
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self
@@ -243,7 +243,7 @@ impl BrailleDrawable {
 impl QuarterTurnRotatable for BrailleDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         let r = self
             .braille_array
@@ -301,7 +301,7 @@ impl SolidColorDrawable {
 impl QuarterTurnRotatable for SolidColorDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         self.clone().into()
     }
@@ -361,7 +361,7 @@ impl ArrowDrawable {
 impl QuarterTurnRotatable for ArrowDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         ArrowDrawable {
             direction: self
@@ -430,7 +430,7 @@ impl ConveyorBeltDrawable {
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         ConveyorBeltDrawable {
             direction: self
@@ -521,7 +521,7 @@ impl OffsetSquareDrawable {
 impl QuarterTurnRotatable for OffsetSquareDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.quarter_rotated_ccw(quarter_turns_anticlockwise),
@@ -563,13 +563,11 @@ impl Drawable for OffsetSquareDrawable {
 mod tests {
     use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
-    use crate::utility::halfplane::LocalSquareHalfPlane;
     use crate::{point2, LineTrait};
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{TwoDifferentPoints, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -634,7 +632,7 @@ mod tests {
     }
     #[test]
     fn test_conveyor_belt_drawable__half_down() {
-        let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
+        let drawable = ConveyorBeltDrawable::new(DOWN, 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
     #[test]
