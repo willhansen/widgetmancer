@@ -43,6 +43,7 @@ pub trait OrthoAngle:
     + Sub
     + Add
     + QuarterTurnRotatable
+    + Copy
 {
     fn new(quarter_turns: i32) -> Self;
     fn quarter_turns(&self) -> i32;
@@ -59,11 +60,13 @@ pub trait OrthoAngle:
         Self::x_axis().quarter_rotated_ccw(1)
     }
     fn xy<T: num::Signed>(&self) -> (T, T) {
+        // TODO: use enum rather than matching an i32?
         match self.normalized().quarter_turns() {
             0 => (T::one(), T::zero()),
             1 => (T::zero(), T::one()),
             2 => (-T::one(), T::zero()),
             3 => (T::zero(), -T::one()),
+            x => panic!("Invalid OrthogonalDirection: {}", x)
         }
     }
     fn dir_name(&self) -> &'static str {
@@ -72,6 +75,7 @@ pub trait OrthoAngle:
             1 => "Up",
             2 => "Left",
             3 => "Down",
+            x => panic!("Invalid OrthogonalDirection: {}", x)
         }
     }
     fn cos<T: num::Signed>(&self) -> T {
@@ -79,6 +83,7 @@ pub trait OrthoAngle:
             0 => T::one(),
             1 | 3 => T::zero(),
             2 => -T::one(),
+            x => panic!("Invalid OrthogonalDirection: {}", x)
         }
     }
     fn sin<T: num::Signed>(&self) -> T {
@@ -86,6 +91,7 @@ pub trait OrthoAngle:
             0 | 2 => T::zero(),
             1 => T::one(),
             3 => -T::one(),
+            x => panic!("Invalid OrthogonalDirection: {}", x)
         }
     }
     fn dot<T: num::Signed>(&self, other: impl OrthoAngle) -> T {
@@ -104,6 +110,7 @@ pub trait OrthoAngle:
         match self.normalized().0 {
             0 | 1 => true,
             2 | 3 => false,
+            x => panic!("Invalid OrthogonalDirection: {}", x)
         }
     }
 

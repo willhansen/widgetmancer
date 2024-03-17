@@ -62,6 +62,7 @@ impl Display for PartialAngleInterval {
 // TODO: have a macro make this code
 impl QuarterTurnRotatable for PartialAngleInterval {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_angles(
             self.clockwise_end.quarter_rotated_ccw(quarter_turns_ccw),
             self.anticlockwise_end

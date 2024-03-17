@@ -212,7 +212,7 @@ where
 pub trait SignedCoordinate:
     Coordinate<DataType = Self::_DataType> + Neg<Output = Self> + From<NormalizedOrthoAngle>
 {
-    type _DataType: num::Signed;
+    type _DataType: num::Signed + Copy;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
     }
