@@ -17,6 +17,11 @@ where
 }
 pub type OrthogonalDirection = NormalizedOrthoAngle;
 
+pub const UP: NormalizedOrthoAngle = NormalizedOrthoAngle(0);
+pub const DOWN: NormalizedOrthoAngle = NormalizedOrthoAngle(1);
+pub const RIGHT: NormalizedOrthoAngle = NormalizedOrthoAngle(2);
+pub const LEFT: NormalizedOrthoAngle = NormalizedOrthoAngle(3);
+
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct UnNormalizedOrthoAngle(i32);
 impl OrthoAngle for UnNormalizedOrthoAngle

@@ -638,6 +638,7 @@ where
     T: QuarterTurnRotatable,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         self.iter()
             .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
