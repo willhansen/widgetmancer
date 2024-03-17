@@ -63,7 +63,7 @@ impl AngleBasedVisibleSegment {
             arc: arc.into(),
             end_fence: end_fence.into(),
             start_internal_relative_face: optional_start_face
-                .map(|y| y.into().flipped_to_face_origin()),
+                .map(|y| y.into().face_flipped_to_face_origin()),
         };
         x.validate();
         x

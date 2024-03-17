@@ -89,7 +89,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         first_edge: impl Into<RelativeFace>,
         length: u32,
     ) -> Self {
-        let first_edge = first_edge.into().flipped_to_face_origin();
+        let first_edge = first_edge.into().face_flipped_to_face_origin();
         Fence::from_faces_in_ccw_order((0..length).map(|i| first_edge.strafed_left_n(i as i32)))
     }
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
@@ -164,7 +164,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         self.try_add_edge(edge).expect("Failed to add edge: ");
     }
     fn try_add_edge(&mut self, edge: impl Into<RelativeFace>) -> Result<(), String> {
-        let edge = edge.into().flipped_to_face_origin();
+        let edge = edge.into().face_flipped_to_face_origin();
 
         if self.edges.is_empty() {
             self.edges.push(edge);

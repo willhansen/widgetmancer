@@ -98,7 +98,7 @@ pub const KING_STEPS: [WorldStep; 8] = [
 ];
 
 pub fn ORIGIN_POSE() -> WorldSquareWithOrthogonalDir {
-    (0, 0, STEP_UP).into()
+    (0, 0, UP).into()
 }
 
 pub fn world_square_glyph_map_to_world_character_glyph_map(

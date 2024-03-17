@@ -195,7 +195,7 @@ where
             .into_iter()
             .any(|end_point| end_point.about_eq(point, tolerance))
     }
-    pub fn flipped_to_face_origin(&self) -> Self {
+    pub fn face_flipped_to_face_origin(&self) -> Self {
         if self.square().dot(self.direction()) < 0 {
             self.stepped().turned_back()
         } else {

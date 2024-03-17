@@ -278,7 +278,7 @@ impl RigidTransform {
         Self::from_start_and_end_poses(p, p.quarter_rotated_ccw_in_place(r))
     }
     pub fn identity() -> Self {
-        Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
+        Self::from_start_and_end_poses((0, 0, UP), (0, 0, UP))
     }
     pub fn translation(&self) -> WorldStep {
         (self.end_pose - self.start_pose).dir().to_step()
@@ -456,7 +456,7 @@ mod tests {
     }
     #[test]
     fn test_parts_of_identity_rigid_transform() {
-        let tf = RigidTransform::from_start_and_end_poses((2, 5, STEP_UP), (2, 5, STEP_UP));
+        let tf = RigidTransform::from_start_and_end_poses((2, 5, UP), (2, 5, UP));
         assert_eq!(tf.rotation(), 0.into());
         assert_eq!(tf.translation(), (0, 0).into());
     }
@@ -469,8 +469,8 @@ mod tests {
     }
     #[test]
     fn test_relative_rigid_transform() {
-        let start = (4, 3, STEP_LEFT);
-        let end = (2, 2, STEP_RIGHT);
+        let start = (4, 3, LEFT);
+        let end = (2, 2, RIGHT);
         let rel_tf = RigidTransform::new_relative_transform_from_start_to_end(start, end);
         assert_eq!(rel_tf.translation(), (-1, 2).into());
         assert_eq!(rel_tf.rotation(), 2.into());

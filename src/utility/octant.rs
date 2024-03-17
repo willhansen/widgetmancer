@@ -17,17 +17,17 @@ impl Octant {
     pub fn outward_and_across_directions(&self) -> (OrthogonalDirection, OrthogonalDirection) {
         // TODO: probably make this an actual equation
         let world_step = match self.0 {
-            0 => (STEP_RIGHT, STEP_UP),
-            1 => (STEP_UP, STEP_RIGHT),
-            2 => (STEP_UP, STEP_LEFT),
-            3 => (STEP_LEFT, STEP_UP),
-            4 => (STEP_LEFT, STEP_DOWN),
-            5 => (STEP_DOWN, STEP_LEFT),
-            6 => (STEP_DOWN, STEP_RIGHT),
-            7 => (STEP_RIGHT, STEP_DOWN),
+            0 => (RIGHT, UP),
+            1 => (UP, RIGHT),
+            2 => (UP, LEFT),
+            3 => (LEFT, UP),
+            4 => (LEFT, DOWN),
+            5 => (DOWN, LEFT),
+            6 => (DOWN, RIGHT),
+            7 => (RIGHT, DOWN),
             _ => panic!("bad octant: {}", self.0),
         };
-        (world_step.0.into(), world_step.1.into())
+        (world_step.0, world_step.1)
     }
     pub fn number(&self) -> i32 {
         self.0

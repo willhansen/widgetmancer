@@ -212,7 +212,7 @@ macro_rules! impl_ops_for_OrthoAngles {
                     self.xy::<i32>().0,
                     self.xy::<i32>().1,
                     self.dir_name(),
-                    Glyph::extract_arrow_from_arrow_string(self.step(), FACE_ARROWS)
+                    Glyph::extract_arrow_from_arrow_string(self.to_step(), FACE_ARROWS)
                 )
             }
         }

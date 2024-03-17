@@ -8,18 +8,7 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use crate::line_segment::FloatLineSegment;
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinates::QuarterTurnRotatable;
-use crate::utility::units::{
-    StepSet, WorldCoordinate, WorldMove, WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::{
-    first_inside_square_face_hit_by_ray, naive_ray_endpoint, RigidTransform, SquareWithKingDir,
-    TwoDifferentWorldPoints, WorldSquareWithOrthogonalDir, STEP_RIGHT,
-};
-use crate::FloatLineTrait;
-use crate::LineTrait;
+use crate::utility::*;
 
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, CopyGetters)]
 #[get_copy = "pub"]
@@ -153,9 +142,9 @@ impl PortalGeometry {
                 if first_x_portal.is_coherent_with(&first_y_portal) {
                     // TODO: account for other second portals on the other side of the first ones.
                     let dest_square = first_x_portal.exit.square()
-                        + first_y_portal.exit.direction().step::<WorldStep>();
-                    let dest_dir = first_x_portal.exit.direction().step::<WorldSquare>()
-                        + first_y_portal.exit.direction().step::<WorldStep>();
+                        + first_y_portal.exit.direction().to_step::<WorldStep>();
+                    let dest_dir = first_x_portal.exit.direction().to_step::<WorldSquare>()
+                        + first_y_portal.exit.direction().to_step::<WorldStep>();
                     Ok(SquareWithKingDir::from_square_and_step(
                         dest_square,
                         dest_dir,
@@ -172,8 +161,8 @@ impl PortalGeometry {
                     let second_y_portal = maybe_second_y_portal.unwrap();
                     if second_x_portal.is_coherent_with(&second_y_portal) {
                         let dest_square = second_x_portal.exit.square();
-                        let dest_dir = second_x_portal.exit.direction().step::<WorldSquare>()
-                            + second_y_portal.exit.direction().step::<WorldSquare>();
+                        let dest_dir = second_x_portal.exit.direction().to_step::<WorldSquare>()
+                            + second_y_portal.exit.direction().to_step::<WorldSquare>();
                         Ok(SquareWithKingDir::from_square_and_step(
                             dest_square,
                             dest_dir,
@@ -194,10 +183,10 @@ impl PortalGeometry {
                         .exit
                         .direction()
                         .quarter_rotated_ccw(turn_after_portal)
-                        .step();
+                        .to_step();
 
                     let dest_square = second_x_portal.exit.square();
-                    let dest_dir = second_x_portal.exit.direction().step::<WorldStep>()
+                    let dest_dir = second_x_portal.exit.direction().to_step::<WorldStep>()
                         + sideways_dir_after_portal;
 
                     Ok(SquareWithKingDir::from_square_and_step(
@@ -214,10 +203,10 @@ impl PortalGeometry {
                         .exit
                         .direction()
                         .quarter_rotated_ccw(turn_after_portal)
-                        .step::<WorldStep>();
+                        .to_step::<WorldStep>();
 
                     let dest_square = second_y_portal.exit.square();
-                    let dest_dir = second_y_portal.exit.direction().step::<WorldStep>()
+                    let dest_dir = second_y_portal.exit.direction().to_step::<WorldStep>()
                         + sideways_dir_after_portal;
 
                     Ok(SquareWithKingDir::from_square_and_step(
@@ -348,7 +337,7 @@ mod tests {
     #[test]
     fn test_ray_through_portal() {
         let mut portal_geometry = PortalGeometry::default();
-        portal_geometry.create_portal((3, 3, STEP_UP), (6, 5, STEP_RIGHT));
+        portal_geometry.create_portal((3, 3, UP), (6, 5, RIGHT));
         let ray_segments =
             portal_geometry.ray_to_naive_line_segments(point2(3.0, 2.0), Angle::degrees(90.0), 5.0);
         let correct_points = vec![
@@ -400,7 +389,7 @@ mod tests {
     #[test]
     fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
         let mut portal_geometry = PortalGeometry::default();
-        portal_geometry.create_portal((3, 3, STEP_UP), (6, 5, STEP_RIGHT));
+        portal_geometry.create_portal((3, 3, UP), (6, 5, RIGHT));
         let segments =
             portal_geometry.ray_to_naive_line_segments(point2(3.0, 3.0), Angle::degrees(90.0), 1.0);
         let squares = segments

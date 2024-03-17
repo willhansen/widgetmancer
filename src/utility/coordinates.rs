@@ -235,7 +235,7 @@ pub trait SignedCoordinate:
         *self + dir.to_step::<Self>()
     }
     fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
-        let axis_vector: Self = axis.into().step();
+        let axis_vector: Self = axis.into().to_step();
         self.dot(axis_vector)
     }
 }
@@ -637,10 +637,7 @@ impl<T> QuarterTurnRotatable for Vec<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.iter()
             .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
             .collect()
@@ -652,20 +649,14 @@ impl<T> QuarterTurnRotatable for Option<T>
 where
     T: QuarterTurnRotatable,
 {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.as_ref()
             .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 
 impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: impl Into<NormalizedOrthoAngle> + Copy,
-    ) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         standardize_angle(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
         ))
@@ -712,7 +703,7 @@ pub fn opposite_angle(a: FAngle) -> FAngle {
 }
 
 pub fn check_vectors_in_ccw_order(
-    v: impl IntoIterator<Item = impl Into<WorldMove> + Copy>,
+    v: impl IntoIterator<Item = impl Into<WorldMove>>,
 ) -> OkOrMessage {
     v.into_iter()
         .map(|x| x.into())

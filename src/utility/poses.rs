@@ -209,42 +209,39 @@ mod tests {
     }
     #[test]
     fn test_rotate_vs_revolve_a_face() {
-        let rel_face: RelativeFace = (3, 5, STEP_UP).into();
+        let rel_face: RelativeFace = (3, 5, UP).into();
 
         assert_eq!(
             rel_face.quarter_rotated_ccw_in_place(1),
-            (3, 5, STEP_LEFT).into()
+            (3, 5, LEFT).into()
         );
         assert_eq!(
             rel_face.quarter_revolved_ccw_around_origin(1),
-            (-5, 3, STEP_LEFT).into()
+            (-5, 3, LEFT).into()
         );
         assert_eq!(
             rel_face.quarter_rotated_ccw_in_place(2),
-            (3, 5, STEP_DOWN).into()
+            (3, 5, DOWN).into()
         );
         assert_eq!(
             rel_face.quarter_revolved_ccw_around_origin(2),
-            (-3, -5, STEP_DOWN).into()
+            (-3, -5, DOWN).into()
         );
 
-        let abs_face: Face = (5, 1, STEP_LEFT).into();
+        let abs_face: Face = (5, 1, LEFT).into();
 
-        assert_eq!(
-            abs_face.quarter_rotated_ccw_in_place(-1),
-            (5, 1, STEP_UP).into()
-        );
+        assert_eq!(abs_face.quarter_rotated_ccw_in_place(-1), (5, 1, UP).into());
         assert_eq!(
             abs_face.quarter_revolved_ccw_around_origin(-1),
-            (1, -5, STEP_UP).into()
+            (1, -5, UP).into()
         );
         assert_eq!(
             abs_face.quarter_rotated_ccw_in_place(2),
-            (5, 1, STEP_RIGHT).into()
+            (5, 1, RIGHT).into()
         );
         assert_eq!(
             abs_face.quarter_revolved_ccw_around_origin(2),
-            (-5, -1, STEP_RIGHT).into()
+            (-5, -1, RIGHT).into()
         );
     }
     #[test]
