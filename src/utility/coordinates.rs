@@ -231,8 +231,11 @@ pub trait SignedCoordinate:
     fn down() -> Self {
         Self::new(Self::DataType::zero(), -Self::DataType::one())
     }
-    fn step(&self, dir: OrthogonalDirection) -> Self {
-        *self + dir.to_step::<Self>()
+    fn stepped(&self, dir: OrthogonalDirection) -> Self {
+        self.moved(dir, Self::DataType::one())
+    }
+    fn moved(&self, dir: OrthogonalDirection, length: Self::DataType) -> Self {
+        *self + dir.to_step::<Self>() * length
     }
     fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
         let axis_vector: Self = axis.into().to_step();
@@ -330,6 +333,8 @@ pub trait IntCoordinate: SignedCoordinate<_DataType = i32> + Hash + Eq {
 impl<T> IntCoordinate for T where T: SignedCoordinate<_DataType = i32> + Hash + Eq {}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
+
+trait_alias_macro!(pub trait SignedIntCoordinate = IntCoordinate + SignedCoordinate);
 
 pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
     // TODO: Add tolerance?

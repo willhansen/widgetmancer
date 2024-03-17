@@ -463,8 +463,8 @@ impl RigidlyTransformable for FieldOfView {
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct OctantFOVSquareSequenceIter {
-    outward_dir: NormalizedOrthoAngle,
-    across_dir: NormalizedOrthoAngle,
+    outward_dir: OrthogonalDirection,
+    across_dir: OrthogonalDirection,
     outward_steps: u32,
     across_steps: u32,
 }

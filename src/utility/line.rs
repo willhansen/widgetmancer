@@ -557,7 +557,7 @@ macro_rules! make_point_grouping_rotatable {
         impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
             fn quarter_rotated_ccw(
                 &self,
-                quarter_turns_ccw: impl Into<OrthogonalDirection>,
+                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
             ) -> Self {
                 let quarter_turns_ccw = quarter_turns_ccw.into();
                 let new_points = self
@@ -698,18 +698,16 @@ pub fn first_inside_square_face_hit_by_ray(
         .map(|(face, point)| (face, point.unwrap()))
         .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
 }
-pub fn square_face_as_line<P: IntCoordinate>(
+pub fn square_face_as_line<P: SignedIntCoordinate>(
     square: P,
     face_direction: NormalizedOrthoAngle,
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
     // TODO: avoid the type notation on `step` somehow
-    let face_center = square_center + face_direction.to_step::<P::Floating>() * 0.5;
-    let p1_direction = face_direction.quarter_rotated_ccw(1);
-    let p2_direction = -p1_direction;
+    let face_center = square_center.moved(face_direction, 0.5);
     TwoDifferentPoints::new_from_two_points(
-        face_center + p1_direction.to_step::<P::Floating>() * 0.5,
-        face_center + p2_direction.to_step::<P::Floating>() * 0.5,
+        face_center.moved(face_direction.turned_left(), 0.5),
+        face_center.moved(face_direction.turned_right(), 0.5),
     )
 }
 pub fn ray_intersection_point_with_oriented_square_face(

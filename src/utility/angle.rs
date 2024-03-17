@@ -8,19 +8,13 @@ impl OrthoAngle for NormalizedOrthoAngle
 where
     Self: Sized,
 {
-    fn new(quarter_turns: i32) -> Self {
-        NormalizedOrthoAngle(quarter_turns.rem_euclid(4))
+    fn new(quarter_turns_ccw: i32) -> Self {
+        NormalizedOrthoAngle(quarter_turns_ccw.rem_euclid(4))
     }
     fn quarter_turns(&self) -> i32 {
         self.0
     }
 }
-pub type OrthogonalDirection = NormalizedOrthoAngle;
-
-pub const UP: NormalizedOrthoAngle = NormalizedOrthoAngle(0);
-pub const DOWN: NormalizedOrthoAngle = NormalizedOrthoAngle(1);
-pub const RIGHT: NormalizedOrthoAngle = NormalizedOrthoAngle(2);
-pub const LEFT: NormalizedOrthoAngle = NormalizedOrthoAngle(3);
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct UnNormalizedOrthoAngle(i32);
@@ -66,7 +60,7 @@ pub trait OrthoAngle:
             1 => (T::zero(), T::one()),
             2 => (-T::one(), T::zero()),
             3 => (T::zero(), -T::one()),
-            x => panic!("Invalid OrthogonalDirection: {}", x)
+            x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
     fn dir_name(&self) -> &'static str {
@@ -75,7 +69,7 @@ pub trait OrthoAngle:
             1 => "Up",
             2 => "Left",
             3 => "Down",
-            x => panic!("Invalid OrthogonalDirection: {}", x)
+            x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
     fn cos<T: num::Signed>(&self) -> T {
@@ -83,7 +77,7 @@ pub trait OrthoAngle:
             0 => T::one(),
             1 | 3 => T::zero(),
             2 => -T::one(),
-            x => panic!("Invalid OrthogonalDirection: {}", x)
+            x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
     fn sin<T: num::Signed>(&self) -> T {
@@ -91,7 +85,7 @@ pub trait OrthoAngle:
             0 | 2 => T::zero(),
             1 => T::one(),
             3 => -T::one(),
-            x => panic!("Invalid OrthogonalDirection: {}", x)
+            x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
     fn dot<T: num::Signed>(&self, other: impl OrthoAngle) -> T {
@@ -110,7 +104,7 @@ pub trait OrthoAngle:
         match self.normalized().0 {
             0 | 1 => true,
             2 | 3 => false,
-            x => panic!("Invalid OrthogonalDirection: {}", x)
+            x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
 
@@ -174,17 +168,17 @@ pub trait OrthoAngle:
         self.quarter_rotated_ccw(2)
     }
 }
+// Don't implement for NormalizedOrthoAngle because of ambiguity when treating it as a direction vs an angle
+impl Neg for UnNormalizedOrthoAngle {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::new(-self.quarter_turns())
+    }
+}
 
 macro_rules! impl_ops_for_OrthoAngles {
     ($Type:ty) => {
-        impl Neg for $Type {
-            type Output = Self;
-
-            fn neg(self) -> Self::Output {
-                Self::new(-self.quarter_turns())
-            }
-        }
-
         impl<T: OrthoAngle> Add<T> for $Type {
             type Output = Self;
 
@@ -245,10 +239,70 @@ impl_ops_for_OrthoAngles!(UnNormalizedOrthoAngle);
 //         Ok(Self::from_orthogonal_vector(value))
 //     }
 // }
+#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct OrthogonalDirection(NormalizedOrthoAngle);
+
+pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(0));
+pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1));
+pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(2));
+pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(3));
+
+impl OrthogonalDirection {
+    pub fn left(&self) -> Self {
+        Self(self.0.turned_left())
+    }
+    pub fn right(&self) -> Self {
+        Self(self.0.turned_right())
+    }
+}
+impl Neg for OrthogonalDirection {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self(self.0.turned_back())
+    }
+}
+
+impl From<NormalizedOrthoAngle> for OrthogonalDirection {
+    fn from(value: NormalizedOrthoAngle) -> Self {
+        Self(value)
+    }
+}
+impl From<OrthogonalDirection> for NormalizedOrthoAngle {
+    fn from(value: OrthogonalDirection) -> Self {
+        value.0
+    }
+}
+impl QuarterTurnRotatable for OrthogonalDirection {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_init() {
+        assert_eq!(OrthogonalDirection::new(-3), UP);
+        assert_eq!(OrthogonalDirection::new(-2), LEFT);
+        assert_eq!(OrthogonalDirection::new(-1), DOWN);
+        assert_eq!(OrthogonalDirection::new(0), RIGHT);
+        assert_eq!(OrthogonalDirection::new(1), UP);
+        assert_eq!(OrthogonalDirection::new(2), LEFT);
+        assert_eq!(OrthogonalDirection::new(3), DOWN);
+        assert_eq!(OrthogonalDirection::new(4), RIGHT);
+        assert_eq!(OrthogonalDirection::new(5), UP);
+        assert_eq!(OrthogonalDirection::new(6), LEFT);
+    }
+    #[test]
+    fn test_negative() {
+        assert_eq!(LEFT.turned_back(), RIGHT);
+        assert_eq!(RIGHT.turned_back(), LEFT);
+        assert_eq!(UP.turned_back(), DOWN);
+        assert_eq!(DOWN.turned_back(), UP);
+    }
 
     #[test]
     fn test_dot() {
