@@ -56,7 +56,7 @@ fn test_player_can_not_move_off_high_edge() {
 
     game.draw_headless_now();
 
-    let bottom_right = point2((game.board_size().width - 1) as i32, 0);
+    let bottom_right = point2((game.board_size().width() - 1) as i32, 0);
 
     game.try_set_player_position(bottom_right)
         .expect("Failed to set player pos");
@@ -365,10 +365,8 @@ fn test_selector() {
     game.draw_headless_now();
 
     let diagonal = WorldStep::new(2, 2);
-    let test_area: Box2D<i32, SquareGridInWorldFrame> = Box2D {
-        min: test_square - diagonal,
-        max: test_square + diagonal,
-    };
+    let test_area: TwoDifferentWorldSquares =
+        TwoDifferentWorldSquares::new(test_square - diagonal, test_square + diagonal);
 
     assert!(
         game.borrow_graphics_mut()

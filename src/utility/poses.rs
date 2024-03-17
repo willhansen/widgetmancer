@@ -264,11 +264,11 @@ mod tests {
     fn test_square_relative_to_pose__reversibility() {
         // pretty arbitrary
         let pose_square = vec![
-            ((0, 0, STEP_UP), (0, 0)),    // origin
-            ((0, 0, STEP_UP), (5, 0)),    // pure x
-            ((0, 0, STEP_LEFT), (5, 0)),  // rotation
-            ((3, 4, STEP_UP), (5, 7)),    // translation
-            ((3, 4, STEP_RIGHT), (5, 7)), // rotation and translation
+            ((0, 0, UP), (0, 0)),    // origin
+            ((0, 0, UP), (5, 0)),    // pure x
+            ((0, 0, LEFT), (5, 0)),  // rotation
+            ((3, 4, UP), (5, 7)),    // translation
+            ((3, 4, RIGHT), (5, 7)), // rotation and translation
         ];
         pose_square.into_iter().for_each(|(p, s)| {
             let pose: WorldSquareWithOrthogonalDir = p.into();
@@ -284,12 +284,12 @@ mod tests {
 
     #[test]
     fn test_rigid_transform_of_relative_versus_absolute_pose() {
-        let base_tuple = (4, 3, STEP_RIGHT);
+        let base_tuple = (4, 3, RIGHT);
         let abs_pose: WorldSquareWithOrthogonalDir = base_tuple.into();
         let rel_pose: RelativeSquareWithOrthogonalDir = base_tuple.into();
-        let tf = RigidTransform::from_start_and_end_poses((5, 4, STEP_UP), (7, 4, STEP_RIGHT));
+        let tf = RigidTransform::from_start_and_end_poses((5, 4, UP), (7, 4, RIGHT));
 
-        assert_eq!(abs_pose.apply_rigid_transform(tf), (6, 5, STEP_DOWN).into());
+        assert_eq!(abs_pose.apply_rigid_transform(tf), (6, 5, DOWN).into());
         assert_eq!(
             rel_pose.apply_rigid_transform(tf),
             abs_pose.apply_rigid_transform(tf).as_relative_face()
