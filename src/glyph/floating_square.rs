@@ -1,12 +1,11 @@
 use crate::glyph::glyph_constants::*;
 use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offset};
 use crate::glyph::DoubleChar;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::units::{
     world_character_point_to_world_character_square, CharacterGridInLocalCharacterFrame,
     WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, WorldMove,
 };
 use crate::utility::*;
-use euclid::{point2, vec2, Point2D};
 use itertools::Itertools;
 use num::clamp;
 use ordered_float::OrderedFloat;
@@ -61,7 +60,7 @@ pub fn get_smooth_horizontal_chars_for_floating_square(pos: FPoint) -> Vec<Vec<O
         }
     }
 
-    return output;
+    output
 }
 pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
     let width = 3;
@@ -81,7 +80,7 @@ pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Opt
             ));
         }
     }
-    return output;
+    output
 }
 
 pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
@@ -96,14 +95,14 @@ pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<ch
             let y = j as i32 - 1;
             let square = point2(x, y);
             if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                let character = square_with_half_step_offset((grid_offset - square.to_f32()));
+                let character = square_with_half_step_offset(grid_offset - square.to_f32());
                 if character != ' ' {
                     output[i][j] = Some(character);
                 }
             }
         }
     }
-    return output;
+    output
 }
 
 pub fn square_with_half_step_offset(offset: FVector) -> char {
@@ -280,11 +279,11 @@ pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleCha
 }
 
 pub fn characters_for_full_square_with_1d_offset(
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalDirection,
     fraction_of_full_square_in_direction: f32,
 ) -> DoubleChar {
-    let is_vertical = direction.step().x == 0;
-    let is_positive_direction = direction.step().x + direction.step().y > 0;
+    let is_vertical = direction.is_vertical();
+    let is_positive_direction = direction.is_positive();
 
     let fraction_of_full_square_in_positive_direction =
         fraction_of_full_square_in_direction * if is_positive_direction { 1.0 } else { -1.0 };
@@ -304,7 +303,7 @@ pub fn characters_for_full_square_with_1d_offset(
     }
 }
 pub fn characters_for_full_square_with_looping_1d_offset(
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalDirection,
     fraction_of_full_square_in_direction: f32,
 ) -> DoubleChar {
     characters_for_full_square_with_1d_offset(
@@ -317,11 +316,10 @@ pub fn characters_for_full_square_with_looping_1d_offset(
 mod tests {
     use super::*;
     use crate::glyph::DoubleChar;
-    use euclid::vec2;
     use ntest::timeout;
 
     #[test]
-    
+
     fn test_colored_square_with_half_step_offsets() {
         assert_eq!(
             square_with_half_step_offset(vec2(0.0, 0.0)),
@@ -382,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_glyph_when_rounding_to_zero_for_both_axes() {
         let test_pos = point2(-0.24, 0.01);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -398,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_half_step_up_for_y() {
         let test_pos = point2(0.24, 0.26);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -414,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_up_for_y() {
         let test_pos = point2(0.24, 0.25);
 
@@ -431,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_down_for_y() {
         let test_pos = point2(-0.2, -0.25);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -447,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_right_for_x() {
         let test_pos = point2(0.3, 0.1);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -463,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_left_for_x() {
         let test_pos = point2(-0.3, 0.2);
         let chars = get_half_grid_chars_for_floating_square(test_pos);
@@ -481,7 +479,7 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    
+
     fn test_character_square_horizontal_offset__base_case() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, 0.0),
@@ -490,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__round_to_zero() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.001),
@@ -504,14 +502,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__out_of_range() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.5), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.5), SPACE);
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__halfway() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.5),
@@ -524,14 +522,14 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_character_square_horizontal_offset__match_opposite_ends() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.0), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.0), SPACE);
     }
 
     #[test]
-    
+
     fn test_eighths_1d_offset() {
         assert_eq!(
             character_for_half_square_with_1d_eighths_offset(false, 0),
@@ -556,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_2d_square_offset() {
         assert_eq!(
             character_for_half_square_with_2d_offset(vec2(0.0, 0.0)),
@@ -583,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_chars_for_floating_square__at_origin() {
         let chars = character_map_for_full_square_at_point(point2(0.0, 0.0));
         assert_eq!(chars.len(), 3);
@@ -592,7 +590,7 @@ mod tests {
         assert_eq!(chars.get(&point2(1, 0)), Some(&LEFT_HALF_BLOCK));
     }
     #[test]
-    
+
     fn test_chars_for_floating_square__at_square_center() {
         let chars = character_map_for_full_square_at_point(point2(0.5, 0.0));
         assert_eq!(chars.len(), 2);
@@ -600,62 +598,38 @@ mod tests {
         assert_eq!(chars.get(&point2(1, 0)), Some(&FULL_BLOCK));
     }
     #[test]
-    
+
     fn test_offset_full_square() {
         let f = characters_for_full_square_with_1d_offset;
-        assert_eq!(f(STEP_UP.into(), 0.5), [UPPER_HALF_BLOCK; 2], "Basic up");
-        assert_eq!(
-            f(STEP_UP.into(), 1.0 / 3.0),
-            [UPPER_TWO_THIRD_BLOCK; 2],
-            "1/3 up"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), 0.25),
-            [RIGHT_HALF_BLOCK, FULL_BLOCK],
-            "right"
-        );
-        assert_eq!(
-            f(STEP_LEFT.into(), 0.25),
-            [FULL_BLOCK, LEFT_HALF_BLOCK],
-            "left"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), 0.75),
-            [SPACE, RIGHT_HALF_BLOCK],
-            "right more"
-        );
+        assert_eq!(f(UP, 0.5), [UPPER_HALF_BLOCK; 2], "Basic up");
+        assert_eq!(f(UP, 1.0 / 3.0), [UPPER_TWO_THIRD_BLOCK; 2], "1/3 up");
+        assert_eq!(f(RIGHT, 0.25), [RIGHT_HALF_BLOCK, FULL_BLOCK], "right");
+        assert_eq!(f(LEFT, 0.25), [FULL_BLOCK, LEFT_HALF_BLOCK], "left");
+        assert_eq!(f(RIGHT, 0.75), [SPACE, RIGHT_HALF_BLOCK], "right more");
         for i in 0..20 {
             assert_eq!(
-                f(STEP_RIGHT.into(), 0.1 * i as f32),
-                f(STEP_LEFT.into(), -0.1 * i as f32),
+                f(RIGHT, 0.1 * i as f32),
+                f(LEFT, -0.1 * i as f32),
                 "negative equivalence horizontally.  i={}",
                 i
             );
             assert_eq!(
-                f(STEP_DOWN.into(), 0.1 * i as f32),
-                f(STEP_UP.into(), -0.1 * i as f32),
+                f(DOWN, 0.1 * i as f32),
+                f(UP, -0.1 * i as f32),
                 "negative equivalence vertically.  i={}",
                 i
             );
         }
+        assert_eq!(f(RIGHT, 9.75), [SPACE, SPACE], "No wraparound right");
+        assert_eq!(f(LEFT, 9.75), [SPACE, SPACE], "No wraparound left");
         assert_eq!(
-            f(STEP_RIGHT.into(), 9.75),
-            [SPACE, SPACE],
-            "No wraparound right"
-        );
-        assert_eq!(
-            f(STEP_LEFT.into(), 9.75),
-            [SPACE, SPACE],
-            "No wraparound left"
-        );
-        assert_eq!(
-            f(STEP_RIGHT.into(), -9.75),
+            f(RIGHT, -9.75),
             [SPACE, SPACE],
             "No wraparound negative right"
         );
     }
     #[test]
-    
+
     fn test_one_third_height_single_character() {
         assert_eq!(
             character_for_half_square_with_1d_offset(true, 2.0 / 3.0),
@@ -675,34 +649,30 @@ mod tests {
         );
     }
     #[test]
-    
+
     fn test_offset_full_square_looping() {
         let f = characters_for_full_square_with_looping_1d_offset;
         for i in 0..20 {
             assert_eq!(
-                f(STEP_RIGHT.into(), 0.1 * i as f32),
-                f(STEP_RIGHT.into(), 0.1 * i as f32 + 2.0),
+                f(RIGHT, 0.1 * i as f32),
+                f(RIGHT, 0.1 * i as f32 + 2.0),
                 "modulo.  i={}",
                 i
             );
             assert_eq!(
-                f(STEP_DOWN.into(), 0.1 * i as f32),
-                f(STEP_DOWN.into(), 0.1 * i as f32 + 22.0),
+                f(DOWN, 0.1 * i as f32),
+                f(DOWN, 0.1 * i as f32 + 22.0),
                 "modulo. i={}",
                 i
             );
         }
-        assert_eq!(f(STEP_RIGHT.into(), 0.3), f(STEP_LEFT.into(), 1.7),);
-        assert_eq!(
-            f(STEP_UP.into(), 0.3),
-            f(STEP_UP.into(), -1.7),
-            "negative equivalence"
-        );
-        assert_eq!(f(STEP_RIGHT.into(), 1.25), [LEFT_HALF_BLOCK, SPACE]);
-        assert_eq!(f(STEP_LEFT.into(), 1.25), [SPACE, RIGHT_HALF_BLOCK]);
+        assert_eq!(f(RIGHT, 0.3), f(LEFT, 1.7),);
+        assert_eq!(f(UP, 0.3), f(UP, -1.7), "negative equivalence");
+        assert_eq!(f(RIGHT, 1.25), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(f(LEFT, 1.25), [SPACE, RIGHT_HALF_BLOCK]);
     }
     #[test]
-    
+
     fn test_characters_for_full_square_with_2d_offset() {
         let f = characters_for_full_square_with_2d_offset;
         KING_STEPS

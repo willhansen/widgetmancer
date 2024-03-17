@@ -1,19 +1,12 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use euclid::{point2, vec2, Point2D, Vector2D};
 use rgb::RGB8;
 
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::Drawable;
-use crate::utility::coordinate_frame_conversions::{
-    world_character_square_to_world_square, world_point_to_world_character_point,
-    world_square_to_left_world_character_square, SquareSet, WorldCharacterSquare,
-    WorldCharacterStep, WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::CoordToString;
-use crate::utility::{flip_y, get_by_point, QuarterTurnsCcw, RIGHT_I, STEP_RIGHT, STEP_UP};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -43,7 +36,7 @@ pub const SCREEN_STEP_DOWN_RIGHT: ScreenBufferStep = vec2(1, 1);
 
 pub struct Screen {
     screen_origin: WorldSquare,
-    rotation: QuarterTurnsCcw,
+    rotation: NormalizedOrthoAngle,
     pub screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
     pub current_screen_state: Vec<Vec<Glyph>>,
@@ -56,7 +49,7 @@ impl Screen {
     pub fn new(terminal_width: u16, terminal_height: u16) -> Self {
         Screen {
             screen_origin: point2(0, terminal_height as i32 - 1),
-            rotation: QuarterTurnsCcw::default(),
+            rotation: NormalizedOrthoAngle::default(),
             screen_buffer: vec![
                 vec![Glyph::from_char(' '); terminal_height as usize];
                 terminal_width as usize
@@ -97,7 +90,7 @@ impl Screen {
             .screen_step_from_origin_to_max()
             .reflect(STEP_UP.cast_unit())
             .cast_unit();
-        self.rotation.rotate_vector(unrotated)
+        unrotated.quarter_rotated_ccw(self.rotation)
     }
 
     fn world_step_from_origin_to_center(&self) -> WorldStep {
@@ -126,11 +119,10 @@ impl Screen {
 
     pub fn screen_center_as_screen_buffer_character_square(&self) -> ScreenBufferCharacterSquare {
         self.screen_buffer_character_step_from_origin_to_center()
-            .to_point()
     }
 
     fn screen_center_as_screen_buffer_square(&self) -> ScreenBufferSquare {
-        self.screen_buffer_step_from_origin_to_center().to_point()
+        self.screen_buffer_step_from_origin_to_center()
     }
 
     pub fn world_square_is_at_least_partially_on_screen(&self, square: WorldSquare) -> bool {
@@ -182,23 +174,23 @@ impl Screen {
         &self,
         buffer_char_pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
     ) -> bool {
-        return buffer_char_pos.x >= 0
+        buffer_char_pos.x >= 0
             && buffer_char_pos.x < self.terminal_width as i32
             && buffer_char_pos.y >= 0
-            && buffer_char_pos.y < self.terminal_height as i32;
+            && buffer_char_pos.y < self.terminal_height as i32
     }
 
-    pub fn rotate(&mut self, rotation: QuarterTurnsCcw) {
+    pub fn rotate(&mut self, rotation: NormalizedOrthoAngle) {
         let old_center = self.screen_center_as_world_square();
         self.rotation += rotation;
         self.set_screen_center_by_world_square(old_center);
     }
-    pub fn set_rotation(&mut self, rotation: QuarterTurnsCcw) {
+    pub fn set_rotation(&mut self, rotation: NormalizedOrthoAngle) {
         let old_center = self.screen_center_as_world_square();
         self.rotation = rotation;
         self.set_screen_center_by_world_square(old_center);
     }
-    pub fn rotation(&self) -> QuarterTurnsCcw {
+    pub fn rotation(&self) -> NormalizedOrthoAngle {
         self.rotation
     }
 
@@ -279,11 +271,11 @@ impl Screen {
 
     pub fn world_step_to_screen_step(&self, world_step: WorldStep) -> ScreenBufferStep {
         let rotated: WorldStep = (-self.rotation()).rotate_vector(world_step);
-        let flipped: WorldStep = flip_y(rotated);
+        let flipped: WorldStep = rotated.flip_y();
         flipped.cast_unit()
     }
     pub fn screen_step_to_world_step(&self, screen_step: ScreenBufferStep) -> WorldStep {
-        let flipped: ScreenBufferStep = flip_y(screen_step);
+        let flipped: ScreenBufferStep = screen_step.flip_y();
         let rotated: ScreenBufferStep = self.rotation().rotate_vector(flipped);
         rotated.cast_unit()
     }
@@ -354,7 +346,7 @@ impl Screen {
     }
 
     pub fn get_screen_buffered_glyph(&self, pos: ScreenBufferCharacterSquare) -> &Glyph {
-        return &self.screen_buffer[pos.x as usize][pos.y as usize];
+        &self.screen_buffer[pos.x as usize][pos.y as usize]
     }
     pub fn get_glyphs_at_screen_square(&self, square: ScreenBufferSquare) -> DoubleGlyph {
         self.screen_buffer_square_to_both_screen_buffer_character_squares(square)
@@ -549,7 +541,7 @@ mod tests {
 
     fn test_screen_max_position__with_rotation() {
         let mut s = set_up_nxn_square_screen(5);
-        s.set_rotation(QuarterTurnsCcw::new(3));
+        s.set_rotation(NormalizedOrthoAngle::new(3));
         s.set_screen_origin_by_world_square(point2(3, 79));
 
         assert_eq!(s.screen_max_as_world_square(), point2(-1, 75));
@@ -617,7 +609,7 @@ mod tests {
         s.set_screen_center_by_world_square(center);
         assert_eq!(s.screen_center_as_world_square(), center);
 
-        assert_eq!(s.rotation(), QuarterTurnsCcw::new(0));
+        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(0));
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
             point2(4, 7)
@@ -627,9 +619,9 @@ mod tests {
             point2(-1, 16)
         );
 
-        s.rotate(QuarterTurnsCcw::new(1));
+        s.rotate(NormalizedOrthoAngle::new(1));
 
-        assert_eq!(s.rotation(), QuarterTurnsCcw::new(1));
+        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(1));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
@@ -641,9 +633,9 @@ mod tests {
             ),
             center + STEP_UP * 2
         );
-        s.rotate(QuarterTurnsCcw::new(6));
+        s.rotate(NormalizedOrthoAngle::new(6));
 
-        assert_eq!(s.rotation(), QuarterTurnsCcw::new(3));
+        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(3));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_LEFT),
@@ -668,7 +660,7 @@ mod tests {
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(370, 20)));
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
 
-        s.set_rotation(QuarterTurnsCcw::new(1));
+        s.set_rotation(NormalizedOrthoAngle::new(1));
         assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
 
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
@@ -684,13 +676,13 @@ mod tests {
         s.set_screen_center_by_world_square(center);
         let start_origin = s.screen_origin_as_world_square();
 
-        assert_eq!(s.rotation(), QuarterTurnsCcw::new(0));
+        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(0));
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(s.screen_origin_as_world_square(), start_origin);
         (0..3).for_each(|i| {
-            s.rotate(QuarterTurnsCcw::new(1));
+            s.rotate(NormalizedOrthoAngle::new(1));
 
-            assert_eq!(s.rotation(), QuarterTurnsCcw::new(i + 1));
+            assert_eq!(s.rotation(), NormalizedOrthoAngle::new(i + 1));
             assert_eq!(s.screen_center_as_world_square(), center);
             assert_ne!(s.screen_origin_as_world_square(), start_origin);
         });

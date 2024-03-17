@@ -13,6 +13,7 @@
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            # rustup
 			      cargo
 			      rustc
 			      cargo-watch
@@ -21,6 +22,7 @@
 			      clippy
 			      lldb
 			      gdb
+			      bacon
 					];
           shellHook = "zsh";
         };

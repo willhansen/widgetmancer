@@ -16,8 +16,8 @@ use hextant_blocks::*;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
 use crate::piece::Upgrade;
-use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::sign;
+use crate::utility::units::*;
 use crate::utility::*;
 
 pub mod angled_blocks;
@@ -119,7 +119,7 @@ impl Glyph {
             output,
             color::Bg(color::Reset),
         );
-        return output;
+        output
     }
 
     pub fn from_char(character: char) -> Glyph {
@@ -156,7 +156,7 @@ impl Glyph {
         square_color: RGB8,
         background_color: RGB8,
     ) -> DoubleGlyph {
-        assert!(is_orthogonal(offset_vector));
+        assert!(offset_vector.is_orthogonal());
         let is_vertical = offset_vector.x == 0.0;
         // because sign
         let offset_magnitude = if is_vertical {
@@ -532,7 +532,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
             halfwidth_only_output
         };
 
-        return output;
+        output
     }
     fn to_string(&self) -> String {
         self[0].to_string() + &self[1].to_string()

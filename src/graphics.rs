@@ -54,7 +54,7 @@ use crate::graphics::screen::{
 };
 use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
-use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::units::*;
 use crate::utility::*;
 use crate::{
     get_by_point, glyph, pair_up_character_square_map, DoubleGlyphFunctions, Game, IPoint,
@@ -119,7 +119,7 @@ impl Graphics {
     }
 
     fn count_braille_dots_in_square(&self, square: WorldSquare) -> u32 {
-        return if self
+        if self
             .screen
             .world_square_is_at_least_partially_on_screen(square)
         {
@@ -133,7 +133,7 @@ impl Graphics {
             )
         } else {
             0
-        };
+        }
     }
 
     pub fn clear_draw_buffer(&mut self) {
@@ -438,7 +438,7 @@ impl Graphics {
     pub fn draw_floating_hunter_drone(
         &mut self,
         drone: &FloatingHunterDrone,
-        sight_line_segments: &Vec<WorldLine>,
+        sight_line_segments: &Vec<TwoDifferentWorldPoints>,
     ) {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1(), line.p2(), SIGHT_LINE_SEEKING_COLOR);
@@ -466,7 +466,7 @@ impl Graphics {
     }
     pub fn draw_floor_push_arrows(
         &mut self,
-        floor_push_arrows: &HashMap<WorldSquare, OrthogonalWorldStep>,
+        floor_push_arrows: &HashMap<WorldSquare, OrthogonalDirection>,
     ) {
         floor_push_arrows.iter().for_each(|(&square, &dir)| {
             self.draw_drawable_to_draw_buffer(
@@ -477,11 +477,11 @@ impl Graphics {
     }
     pub fn draw_conveyor_belts(
         &mut self,
-        conveyor_belts: &HashMap<WorldSquare, OrthogonalWorldStep>,
+        conveyor_belts: &HashMap<WorldSquare, OrthogonalDirection>,
         global_phase: f32,
     ) {
         conveyor_belts.iter().for_each(|(&square, &dir)| {
-            let phase = global_phase + if square_is_odd(square) { 0.5 } else { 0.0 };
+            let phase = global_phase + if square.is_odd() { 0.5 } else { 0.0 };
             self.draw_drawable_to_draw_buffer(square, &ConveyorBeltDrawable::new(dir, phase))
         })
     }
@@ -619,8 +619,8 @@ impl Graphics {
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {
         let mut count: u32 = 0;
-        for x in rect.min.x..=rect.max.x {
-            for y in rect.min.y..=rect.max.y {
+        for x in rect.x_min()..=rect.x_max() {
+            for y in rect.y_min()..=rect.y_max() {
                 let square = WorldSquare::new(x, y);
                 let maybe_glyphs = self
                     .get_drawable_for_square_from_draw_buffer(square)

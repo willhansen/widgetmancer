@@ -1,22 +1,15 @@
-use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
-use euclid::{point2, vec2, Angle};
 use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
 
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
+use crate::utility::coordinates::KingWorldStep;
+use crate::utility::units::{
     MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
-    WorldStep,
 };
-use crate::utility::coordinates::{
-    better_angle_from_x_axis, is_king_step, is_orthodiagonal, rotate_vect, KingWorldStep,
-};
-
-use crate::utility::KING_STEPS;
+use crate::{vec2, FloatCoordinate};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -72,7 +65,7 @@ impl Animation for SpearAttackAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
-        let angle = better_angle_from_x_axis(self.direction.step().to_f32());
+        let angle = self.direction.step().to_f32().better_angle_from_x_axis();
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
             let relative_position = WorldMove::from_angle_and_length(
@@ -85,7 +78,7 @@ impl Animation for SpearAttackAnimation {
         let rel_spear_tip = WorldMove::from_angle_and_length(angle, spear_length);
         let mut spearhead_points: PointList = SpearAttackAnimation::points_in_an_arrow()
             .into_iter()
-            .map(|p: WorldMove| rotate_vect(p, better_angle_from_x_axis(rel_spear_tip)))
+            .map(|p: WorldMove| p.rotate_vect(rel_spear_tip.better_angle_from_x_axis()))
             .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
             .collect();
         points_to_draw.append(&mut spearhead_points);
@@ -95,10 +88,8 @@ impl Animation for SpearAttackAnimation {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
-    use ntest::timeout;
 
-    use crate::utility::STEP_RIGHT;
+    use crate::{animations::point2, utility::STEP_RIGHT};
 
     use super::*;
 

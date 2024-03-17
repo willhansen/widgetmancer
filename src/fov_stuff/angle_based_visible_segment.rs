@@ -1,15 +1,8 @@
+use crate::fov_stuff::NormalizedOrthoAngle;
+use crate::fov_stuff::RelativeSquareWithOrthogonalDir;
 use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::circular_interval::circular_merging;
-use crate::utility::coordinate_frame_conversions::{StepSet, WorldStep, STEP_LEFT};
-use crate::utility::coordinates::*;
-use crate::utility::line::FloatLineTrait;
-use crate::utility::poses::RelativeFace;
-use crate::utility::{
-    better_angle_from_x_axis, faces_away_from_center_at_rel_square, CoordToString,
-    RelativeSquareWithOrthogonalDir, RigidTransform, RigidlyTransformable, STEP_ZERO,
-};
-use euclid::{point2, Angle};
+use crate::utility::*;
+use euclid::Angle;
 use itertools::{all, Itertools};
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
@@ -27,7 +20,8 @@ pub struct AngleBasedVisibleSegment {
     start_internal_relative_face: Option<RelativeSquareWithOrthogonalDir>,
 }
 impl QuarterTurnRotatable for AngleBasedVisibleSegment {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::new_with_optional_start_face(
             self.arc.quarter_rotated_ccw(quarter_turns_ccw),
             self.end_fence.quarter_rotated_ccw(quarter_turns_ccw),
@@ -70,7 +64,7 @@ impl AngleBasedVisibleSegment {
             arc: arc.into(),
             end_fence: end_fence.into(),
             start_internal_relative_face: optional_start_face
-                .map(|y| y.into().flipped_to_face_origin()),
+                .map(|y| y.into().face_flipped_to_face_origin()),
         };
         x.validate();
         x
@@ -99,7 +93,7 @@ impl AngleBasedVisibleSegment {
         all(points_that_should_be_in_arc, |point| {
             self.arc
                 .contains_angle(
-                    better_angle_from_x_axis(point),
+                    point.better_angle_from_x_axis(),
                     Self::default_angle_tolerance(),
                 )
                 .is_false()
@@ -124,7 +118,7 @@ impl AngleBasedVisibleSegment {
         }
 
         let angle_span_of_extended_line_as_seen_from_origin = AngleInterval::from_center_and_width(
-            better_angle_from_x_axis(vector_to_line_from_origin),
+            vector_to_line_from_origin.better_angle_from_x_axis(),
             FAngle::degrees(180.0),
         );
 
@@ -164,11 +158,11 @@ impl AngleBasedVisibleSegment {
             ),
             last_square,
         );
-        return if first_square == 0 {
+        if first_square == 0 {
             segment
         } else {
-            segment.with_start_face((first_square as i32, 0, STEP_LEFT))
-        };
+            segment.with_start_face((first_square as i32, 0, LEFT))
+        }
     }
     pub fn with_weakly_applied_start_face(
         &self,
@@ -263,7 +257,7 @@ impl AngleBasedVisibleSegment {
             .map(|face| face.face_line_segment())
         {
             // TODO: generalize to allow passing in the relative squares, not needing absolute points
-            !line.same_side_of_line(rel_square.to_point().to_f32(), point2(0.0, 0.0))
+            !line.same_side_of_line(rel_square.to_f32(), point2(0.0, 0.0))
         } else {
             true
         }
@@ -295,8 +289,7 @@ impl AngleBasedVisibleSegment {
             .map(|rel_square| {
                 (
                     rel_square,
-                    SquareVisibility::from_relative_square_and_view_arc(self.arc, rel_square)
-                        .unwrap(),
+                    SquareVisibility::from_relative_square_and_view_arc(self.arc, rel_square),
                 )
                 //TODO: change shadow type
                 // SquareVisibilityFromPointSource::from_single_visible_arc(
@@ -323,15 +316,14 @@ impl Debug for AngleBasedVisibleSegment {
 
 #[cfg(test)]
 mod tests {
-    use euclid::vec2;
     use ntest::{assert_about_eq, assert_false, assert_true};
 
     use crate::{
         fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
         utility::{
-            coordinate_frame_conversions::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
             coordinates::FVector,
             general_utility::{as_set, set_of_keys},
+            units::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
         },
     };
 
@@ -504,12 +496,12 @@ mod tests {
         let segment = AngleBasedVisibleSegment::from_relative_square((5, 2));
         assert_about_eq!(
             segment.arc.cw().radians,
-            better_angle_from_x_axis(FVector::new(5.5, 1.5)).radians,
+            FVector::new(5.5, 1.5).better_angle_from_x_axis().radians,
             1e-4
         );
         assert_about_eq!(
             segment.arc.ccw().radians,
-            better_angle_from_x_axis(FVector::new(4.5, 2.5)).radians,
+            FVector::new(4.5, 2.5).better_angle_from_x_axis().radians,
             1e-4
         );
         assert_eq!(segment.start_internal_relative_face, None);
@@ -523,7 +515,7 @@ mod tests {
     fn test_no_excess_fence() {
         AngleBasedVisibleSegment::new(
             AngleInterval::from_degrees(0.0, 1.0),
-            Fence::from_faces_in_ccw_order([(3, 0, STEP_RIGHT), (3, 1, STEP_RIGHT)]),
+            Fence::from_faces_in_ccw_order([(3, 0, RIGHT), (3, 1, RIGHT)]),
         );
     }
     #[test]
@@ -563,8 +555,8 @@ mod tests {
     #[test]
     fn test_start_line_orientation_does_not_matter() {
         let seg = AngleBasedVisibleSegment::narrow_segment_to_right(0, 5);
-        let seg1 = seg.with_start_face((3, 0, STEP_RIGHT));
-        let seg2 = seg.with_start_face((4, 0, STEP_LEFT));
+        let seg1 = seg.with_start_face((3, 0, RIGHT));
+        let seg2 = seg.with_start_face((4, 0, LEFT));
         assert_eq!(
             seg1.to_local_square_visibility_map(),
             seg2.to_local_square_visibility_map()

@@ -1,10 +1,8 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::EXPLOSION_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
-};
-use euclid::vec2;
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare};
+use crate::vec2;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use std::f32::consts::PI;

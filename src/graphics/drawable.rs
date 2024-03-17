@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, SquareVisibility};
+use crate::vec2;
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
 use derive_more::From;
 use dyn_clone::DynClone;
-use euclid::{vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
@@ -20,14 +21,7 @@ use crate::glyph::floating_square::{
 };
 use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
 use crate::glyph::{DoubleChar, DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::coordinate_frame_conversions::{
-    local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
-    WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::{
-    rotate_vect, tint_color, KingWorldStep, OrthogonalWorldStep, QuarterTurnRotatable,
-    QuarterTurnsCcw,
-};
+use crate::utility::*;
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug + QuarterTurnRotatable {
@@ -52,7 +46,7 @@ pub enum DrawableEnum {
 
 // TODO: make more concise
 impl QuarterTurnRotatable for DrawableEnum {
-    fn quarter_rotated_ccw(&self, b: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, b: impl Into<NormalizedOrthoAngle>) -> Self {
         match self {
             Self::Text(a) => a.quarter_rotated_ccw(b).into(),
             Self::PartialVisibility(a) => a.quarter_rotated_ccw(b).into(),
@@ -88,9 +82,9 @@ impl TextDrawable {
 impl QuarterTurnRotatable for TextDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
-        // lmao no
+        // No rotation, only self
         self.clone().into()
     }
 }
@@ -130,7 +124,7 @@ impl PartialVisibilityDrawable {
         note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
     )]
     pub fn from_square_visibility(square_viz: SquareVisibility) -> Self {
-        assert!(!square_viz.is_fully_visible());
+        assert!(square_viz.is_only_partially_visible());
         PartialVisibilityDrawable {
             visibility: square_viz,
             fg_color: GREEN,              // TODO: no default color
@@ -153,7 +147,7 @@ impl PartialVisibilityDrawable {
 impl QuarterTurnRotatable for PartialVisibilityDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         let mut the_clone = self.clone();
         the_clone.visibility = self
@@ -181,7 +175,8 @@ impl Drawable for PartialVisibilityDrawable {
         let glyphs = character_visible_portions
             .iter()
             .map(|vis_portion| {
-                let angle_char = half_plane_to_angled_block_character(*vis_portion, bias_direction);
+                let angle_char =
+                    half_plane_to_angled_block_character((*vis_portion).into(), bias_direction);
                 Glyph::new(angle_char, self.fg_color, self.bg_color)
             })
             .collect::<Vec<Glyph>>()
@@ -248,7 +243,7 @@ impl BrailleDrawable {
 impl QuarterTurnRotatable for BrailleDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         let r = self
             .braille_array
@@ -306,7 +301,7 @@ impl SolidColorDrawable {
 impl QuarterTurnRotatable for SolidColorDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         self.clone().into()
     }
@@ -366,7 +361,7 @@ impl ArrowDrawable {
 impl QuarterTurnRotatable for ArrowDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         ArrowDrawable {
             direction: self
@@ -417,13 +412,13 @@ impl Drawable for ArrowDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct ConveyorBeltDrawable {
-    direction: OrthogonalWorldStep,
+    direction: OrthogonalDirection,
     normalized_phase_offset: f32,
     colors: [RGB8; 2],
 }
 
 impl ConveyorBeltDrawable {
-    pub fn new(direction: OrthogonalWorldStep, phase_offset: f32) -> Self {
+    pub fn new(direction: OrthogonalDirection, phase_offset: f32) -> Self {
         ConveyorBeltDrawable {
             direction,
             normalized_phase_offset: phase_offset,
@@ -435,7 +430,7 @@ impl ConveyorBeltDrawable {
 impl QuarterTurnRotatable for ConveyorBeltDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         ConveyorBeltDrawable {
             direction: self
@@ -526,7 +521,7 @@ impl OffsetSquareDrawable {
 impl QuarterTurnRotatable for OffsetSquareDrawable {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         OffsetSquareDrawable {
             offset: self.offset.quarter_rotated_ccw(quarter_turns_anticlockwise),
@@ -568,13 +563,11 @@ impl Drawable for OffsetSquareDrawable {
 mod tests {
     use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
-    use crate::utility::halfplane::LocalSquareHalfPlane;
-    use euclid::point2;
+    use crate::{point2, LineTrait};
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -617,7 +610,7 @@ mod tests {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
+                TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
                 point2(0.0, 25.0),
             ),
         );
@@ -628,7 +621,10 @@ mod tests {
     #[test]
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
-        let character = d.quarter_rotated_ccw(QuarterTurnsCcw::new(1)).to_glyphs()[0].character;
+        let character = d
+            .quarter_rotated_ccw(NormalizedOrthoAngle::new(1))
+            .to_glyphs()[0]
+            .character;
         assert_eq!(
             character,
             Glyph::extract_arrow_from_arrow_string(STEP_UP.into(), THICK_ARROWS)
@@ -636,7 +632,7 @@ mod tests {
     }
     #[test]
     fn test_conveyor_belt_drawable__half_down() {
-        let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
+        let drawable = ConveyorBeltDrawable::new(DOWN, 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }
     #[test]
@@ -664,7 +660,7 @@ mod tests {
         drawable.braille_array.print();
         let f = |i| {
             drawable
-                .quarter_rotated_ccw(QuarterTurnsCcw::new(i))
+                .quarter_rotated_ccw(NormalizedOrthoAngle::new(i))
                 .to_glyphs()
                 .chars()
         };

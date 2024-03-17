@@ -28,32 +28,7 @@ pub fn sign(x: f32) -> f32 {
         0.0
     }
 }
-pub fn int_to_T<T: Signed>(x: i32) -> T {
-    match x {
-        1 => T::one(),
-        0 => T::zero(),
-        -1 => -T::one(),
-        _ => panic!(),
-    }
-}
 
-pub fn int_cos(quarter_periods: i32) -> i32 {
-    match quarter_periods.rem_euclid(4) {
-        0 => 1,
-        1 | 3 => 0,
-        2 => -1,
-        _ => panic!(),
-    }
-}
-
-pub fn int_sin(quarter_periods: i32) -> i32 {
-    match quarter_periods.rem_euclid(4) {
-        0 | 2 => 0,
-        1 => 1,
-        3 => -1,
-        _ => panic!(),
-    }
-}
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a * (1.0 - t) + b * t
 }
@@ -141,6 +116,21 @@ pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f
     let mut the_clone = vec.clone();
     the_clone.rotate_left(index_of_new_end);
     the_clone
+}
+
+pub fn min_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
+    if a < b {
+        a
+    } else {
+        b
+    }
+}
+pub fn max_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
+    if a > b {
+        a
+    } else {
+        b
+    }
 }
 
 pub trait TupleClone {

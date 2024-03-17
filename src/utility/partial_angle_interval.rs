@@ -4,7 +4,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Neg, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -13,18 +13,7 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, standardize_angle, Octant, OrthogonalWorldStep,
-    QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
-    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
-};
-
-use super::bool_with_partial::BoolWithPartial;
-use super::coordinates::QuarterTurnRotatable;
-use super::poses::RelativeFace;
-use super::{FAngle, RigidTransform, RigidlyTransformable};
+use crate::utility::*;
 
 #[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
@@ -72,7 +61,8 @@ impl Display for PartialAngleInterval {
 }
 // TODO: have a macro make this code
 impl QuarterTurnRotatable for PartialAngleInterval {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_angles(
             self.clockwise_end.quarter_rotated_ccw(quarter_turns_ccw),
             self.anticlockwise_end
@@ -162,10 +152,10 @@ impl PartialAngleInterval {
             rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
         ];
 
-        let center_angle = better_angle_from_x_axis(rel_square_center);
+        let center_angle = rel_square_center.better_angle_from_x_axis();
         let corner_angles: Vec<Angle<f32>> = rel_square_corners
             .iter()
-            .map(|rel_corner_point| better_angle_from_x_axis(*rel_corner_point))
+            .map(|rel_corner_point| rel_corner_point.better_angle_from_x_axis())
             .collect();
 
         let most_clockwise = corner_angles
@@ -183,16 +173,16 @@ impl PartialAngleInterval {
         }
     }
     pub fn from_relative_square_face(rel_face: impl Into<RelativeFace>) -> Self {
-        let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
+        let (relative_square, face_direction): (WorldStep, OrthogonalDirection) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.step().to_f32() / 2.0;
+        let face_center = square_center + face_direction.to_step::<WorldMove>() / 2.0;
         let face_corners = [1, -1].map(|sign| {
-            face_center + (face_direction.step().to_f32() / 2.0).quarter_rotated_ccw(sign)
+            face_center + (face_direction.to_step::<WorldMove>() / 2.0).quarter_rotated_ccw(sign)
         });
 
-        let center_angle = better_angle_from_x_axis(face_center);
-        let face_corner_angles = face_corners.map(better_angle_from_x_axis);
+        let center_angle = face_center.better_angle_from_x_axis();
+        let face_corner_angles = face_corners.map(|x| x.better_angle_from_x_axis());
 
         let first_corner_angle_is_more_clockwise =
             center_angle.angle_to(face_corner_angles[0]).radians < 0.0;
@@ -450,7 +440,7 @@ impl PartialAngleInterval {
         )
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
-    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<NormalizedOrthoAngle>) -> Self {
         self.quarter_rotated_ccw(quarter_turns)
     }
     pub fn rotated_ccw(&self, d_angle: Angle<f32>) -> Self {
@@ -552,7 +542,6 @@ impl Debug for PartialAngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
     use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, timeout};
     use num::zero;
@@ -797,7 +786,7 @@ mod tests {
                 ccw_end_of_other: FAngle,
                 correct_overlap_result: BoolWithPartial,
                 case_name: String,
-            };
+            }
 
             let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; 4] = [
                 TestData {

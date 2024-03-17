@@ -10,7 +10,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
-use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::units::*;
 use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -178,7 +178,7 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
 }
 
 fn get_character_from_snap_points(
-    line: Line<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
+    line: TwoDifferentPoints<Point2D<i32, AngleBlockSnapGridInLocalFrame>>,
 ) -> char {
     let pointA = line.p1();
     let pointB = line.p2();
@@ -192,7 +192,7 @@ fn get_character_from_snap_points(
         let same_y = pointA.y == pointB.y;
         let both_on_same_edge =
             (same_x && [0, 2].contains(&pointA.x)) || (same_y && [0, 3].contains(&pointA.y));
-        let center_is_clockwise = three_points_are_clockwise(
+        let center_is_clockwise = three_points_are_clockwise::<LocalCharacterPoint>(
             local_snap_grid_to_local_character_frame(pointA),
             local_snap_grid_to_local_character_frame(pointB),
             point2(0.0, 0.0),
@@ -231,7 +231,7 @@ fn get_character_from_snap_points(
 }
 
 pub fn half_plane_to_angled_block_character(
-    half_plane: HalfPlane<LocalCharacterLine>,
+    half_plane: HalfPlane<TwoDifferentLocalCharacterPoints>,
     bias_direction: Angle<f32>,
 ) -> char {
     // angle blocks have important edge points
@@ -253,7 +253,7 @@ pub fn half_plane_to_angled_block_character(
 
     let raw_intersection_points = half_plane
         .dividing_line()
-        .line_intersections_with_centered_unit_square();
+        .ordered_line_intersections_with_centered_unit_square();
     assert!(raw_intersection_points.len() <= 2);
 
     // slightly offsetting these intersection points, so rationally sloped sight lines don't hit the points exactly halfway between the angle block snap points
@@ -261,7 +261,10 @@ pub fn half_plane_to_angled_block_character(
     let biased_intersection_points: Vec<_> = raw_intersection_points
         .into_iter()
         .map(|point| {
-            point + unit_vector_from_angle(snapped_bias_direction).cast_unit() * (PI / 1000.0)
+            point
+                + <LocalCharacterPoint as FloatCoordinate>::unit_vector_from_angle(
+                    snapped_bias_direction,
+                ) * (PI / 1000.0)
         })
         .collect();
 
@@ -285,7 +288,7 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        let mut grid_line = Line::new_from_two_points(
+        let mut grid_line = TwoDifferentPoints::new_from_two_points(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
@@ -294,7 +297,7 @@ pub fn half_plane_to_angled_block_character(
             half_plane.dividing_line().p2(),
             half_plane.point_on_half_plane(),
         ) {
-            grid_line.reverse();
+            grid_line = grid_line.reversed();
         }
         get_character_from_snap_points(grid_line)
     }
@@ -339,7 +342,7 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
-    use crate::utility::Line;
+    use crate::utility::TwoDifferentPoints;
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 
@@ -352,7 +355,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.5, 0.5),),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.5, 0.5),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -367,7 +370,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.5, 0.5)),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.5, 0.5)),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -382,7 +385,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(-0.5, -0.5), point2(-0.4, -0.4)),
+                    TwoDifferentPoints::new(point2(-0.5, -0.5), point2(-0.4, -0.4)),
                     point2(2.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -397,7 +400,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.0, -0.5), point2(0.5, -0.15),),
+                    TwoDifferentPoints::new(point2(0.0, -0.5), point2(0.5, -0.15),),
                     point2(0.0, 0.0),
                 ),
                 Angle::degrees(45.0)
@@ -431,30 +434,48 @@ mod tests {
 
     fn test_snap_points_to_character() {
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(0, 0), point2(2, 3))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(0, 0),
+                point2(2, 3)
+            )),
             '◢',
             "lower-right diagonal"
         );
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(2, 3), point2(0, 0))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(2, 3),
+                point2(0, 0)
+            )),
             '◤',
             "swap points"
         );
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(2, 1), point2(0, 3))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(2, 1),
+                point2(0, 3)
+            )),
             '🭥',
             "upper right corner"
         );
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(0, 1), point2(2, 1))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(0, 1),
+                point2(2, 1)
+            )),
             LOWER_ONE_THIRD_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(1, 0), point2(1, 3))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(1, 0),
+                point2(1, 3)
+            )),
             RIGHT_HALF_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(Line::new_from_two_points(point2(0, 0), point2(2, 1))),
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+                point2(0, 0),
+                point2(2, 1)
+            )),
             '🭈'
         );
     }
@@ -463,7 +484,7 @@ mod tests {
 
     fn test_half_plane_to_character__from_failure_data() {
         let half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
-            (point2(-1.5, -1.0), point2(-0.08, -0.3)),
+            TwoDifferentPoints::new(point2(-1.5, -1.0), point2(-0.08, -0.3)),
             point2(-0.06, -0.3),
         );
         let the_char = half_plane_to_angled_block_character(half_plane, Angle::degrees(45.0));
@@ -490,7 +511,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.5, 0.0), point2(-1.5, 0.0),),
+                    TwoDifferentPoints::new(point2(0.5, 0.0), point2(-1.5, 0.0),),
                     point2(0.0, 25.0),
                 ),
                 Angle::degrees(-90.0)
@@ -504,7 +525,7 @@ mod tests {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::new_from_line_and_point_on_half_plane(
-                    (point2(0.0, 0.5), point2(0.0, -1.5),),
+                    TwoDifferentPoints::new(point2(0.0, 0.5), point2(0.0, -1.5),),
                     point2(-20.0, 0.0),
                 ),
                 Angle::degrees(0.0)

@@ -4,23 +4,10 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
-use crate::utility::angle_interval::*;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::{
-    better_angle_from_x_axis, point_is_in_centered_unit_square_with_tolerance, Coordinate, FAngle,
-    OrthogonalWorldStep,
-};
-use crate::utility::general_utility::*;
-use crate::utility::halfplane::*;
-use crate::utility::line::{FloatLineTrait, LineTrait};
-use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::relative_interval_location::RelativeIntervalLocation;
-use crate::utility::{
-    king_step_distance, number_to_hue_rotation, standardize_angle, unit_vector_from_angle,
-    HalfPlane, Line, QuarterTurnRotatable, QuarterTurnsCcw, WorldLine, STEP_ZERO,
-};
+use crate::utility::*;
+use crate::{point2, DirectedFloatLineTrait};
 use derive_more::Constructor;
-use euclid::{point2, Angle};
+use euclid::Angle;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -50,7 +37,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
-    ) -> Option<SquareVisibility>;
+    ) -> SquareVisibility;
 
     // other
     fn overlaps(&self, other: Self, tolerance: f32) -> bool;
@@ -94,29 +81,24 @@ impl SquareVisibilityFromOneLargeShadow {
         self.visible_portion()
             .unwrap()
             .dividing_line()
-            .line_intersections_with_centered_unit_square()
+            .ordered_line_intersections_with_centered_unit_square()
     }
 
-    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalWorldStep>) -> Self {
-        Self::half_visible(better_angle_from_x_axis(
-            (-which_half_visible.into()).step().to_f32(),
-        ))
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalDirection>) -> Self {
+        Self::half_visible((-which_half_visible.into()).into())
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
         // todo: may be backwards
         shadow_direction = standardize_angle(shadow_direction);
         Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
-            Line::new_from_two_points(
+            TwoDifferentPoints::<LocalSquarePoint>::new_from_two_points(
                 point2(0.0, 0.0),
-                unit_vector_from_angle(shadow_direction)
+                LocalSquarePoint::unit_vector_from_angle(shadow_direction)
                     .quarter_rotated_ccw(1)
-                    .to_point()
                     .cast_unit(),
             ),
-            unit_vector_from_angle(shadow_direction)
-                .to_point()
-                .cast_unit(),
+            LocalSquarePoint::unit_vector_from_angle(shadow_direction).cast_unit(),
         ))
     }
 }
@@ -217,24 +199,20 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             let shadow_arc = partial_view_arc.complement();
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
-            let shadow_line_from_center: WorldLine = Line::new_from_two_points(
-                point2(0.0, 0.0),
-                unit_vector_from_angle(overlapped_shadow_edge.angle())
-                    .to_point()
-                    .cast_unit(),
-            );
-            let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
-                .to_point()
-                .cast_unit();
+            let shadow_line_from_center: TwoDifferentWorldPoints =
+                TwoDifferentPoints::new_from_two_points(
+                    point2(0.0, 0.0),
+                    WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle()).cast_unit(),
+                );
+            let point_in_shadow: WorldPoint =
+                WorldPoint::unit_vector_from_angle(shadow_arc.center_angle()).cast_unit();
 
             let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
                 shadow_line_from_center,
                 point_in_shadow,
             );
-            let square_shadow = world_half_plane_to_local_square_half_plane(
-                shadow_half_plane,
-                rel_square.to_point(),
-            );
+            let square_shadow =
+                world_half_plane_to_local_square_half_plane(shadow_half_plane, rel_square);
 
             let shadow_coverage_of_unit_square =
                 square_shadow.coverage_of_centered_unit_square_with_tolerance(length_tolerance);
@@ -340,7 +318,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 }
 impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         match self {
             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
                 Self::PartiallyVisible(v.quarter_rotated_ccw(quarter_turns_ccw))
@@ -395,7 +373,7 @@ impl PartialSquareVisibilityFromPointSource {
 }
 
 impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let mut the_clone = self.clone();
         the_clone.visibility_switch_angles_going_ccw = the_clone
@@ -458,15 +436,17 @@ impl SquareVisibilityMapFunctions for LocalSquareVisibilityMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::glyph::glyph_constants::{FULL_BLOCK, SPACE};
-    use euclid::vec2;
+    use crate::{
+        glyph::glyph_constants::{FULL_BLOCK, SPACE},
+        vec2,
+    };
     use ntest::{assert_false, timeout};
 
     #[test]
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(
             HalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                TwoDifferentPoints::new_from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
                 point2(-12.061038, -1.3054879),
             ),
         );
@@ -480,14 +460,14 @@ mod tests {
             interval,
             square_relative_to_center,
         );
-        let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
+        let string = PartialVisibilityDrawable::from_square_visibility(visibility)
             .to_glyphs()
             .to_clean_string();
         assert_eq!(&string, "🭞🭚");
     }
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = Line::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line = TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 
@@ -508,9 +488,9 @@ mod tests {
         let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
         let partial = SquareVisibility::from_relative_square_and_view_arc(arc, square);
-        assert!(!partial.unwrap().is_fully_visible());
+        assert!(!partial.is_fully_visible());
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
+            PartialVisibilityDrawable::from_square_visibility(partial)
                 .to_glyphs()
                 .to_clean_string(),
             [FULL_BLOCK, SPACE].into_iter().collect::<String>()
@@ -554,13 +534,13 @@ mod tests {
     fn test_square_visibility_overlap__simple_non_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.4),
+                TwoDifferentPoints::new_horizontal(0.4),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.3),
+                TwoDifferentPoints::new_horizontal(0.3),
                 (0.0, -1.0),
             ),
         );
@@ -572,13 +552,13 @@ mod tests {
     fn test_square_visibility_overlap__simple_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(-0.3),
+                TwoDifferentPoints::new_horizontal(-0.3),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
             LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                Line::new_horizontal(0.2),
+                TwoDifferentPoints::new_horizontal(0.2),
                 (0.0, -1.0),
             ),
         );
@@ -587,13 +567,11 @@ mod tests {
     }
     #[test]
     fn test_view_arc_source_is_not_visible_by_default() {
-        assert_eq!(
-            SquareVisibility::from_relative_square_and_view_arc(
-                AngleInterval::from_degrees(0.0, 45.0),
-                (0, 0)
-            ),
-            None
-        );
+        assert!(SquareVisibility::from_relative_square_and_view_arc(
+            AngleInterval::from_degrees(0.0, 45.0),
+            (0, 0)
+        )
+        .is_not_visible());
     }
     // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
     #[test]

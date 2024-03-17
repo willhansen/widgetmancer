@@ -2,30 +2,31 @@ use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 
+use self::size_2d::Size2D;
+
 // empty enums for euclid typing
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInWorldFrame;
 
-#[deprecated(note = "Obselete since screen rotation")]
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[deprecated(note = "Obsolete since screen rotation")]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct CharacterGridInWorldFrame;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct CharacterGridInLocalCharacterFrame;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInLocalSquareFrame;
 
-pub type RelativeWorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
-pub type AbsoluteWorldCoordinate<DataType> = Point2D<DataType, SquareGridInWorldFrame>;
+pub type WorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
 
-pub type WorldSquare = AbsoluteWorldCoordinate<i32>;
-pub type WorldPoint = AbsoluteWorldCoordinate<f32>;
-pub type WorldSquareRect = euclid::Box2D<i32, SquareGridInWorldFrame>;
-pub type BoardSize = euclid::Size2D<u32, SquareGridInWorldFrame>;
+pub type WorldSquare = WorldCoordinate<i32>;
+pub type WorldPoint = WorldCoordinate<f32>;
+pub type WorldSquareRect = TwoDifferentWorldSquares;
+pub type BoardSize = Vector2D<u32, SquareGridInWorldFrame>;
 
-pub type WorldStep = RelativeWorldCoordinate<i32>;
-pub type WorldMove = RelativeWorldCoordinate<f32>;
+pub type WorldStep = WorldCoordinate<i32>;
+pub type WorldMove = WorldCoordinate<f32>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
@@ -36,6 +37,11 @@ pub type MoveList = Vec<WorldMove>;
 pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
+
+pub type WorldSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
+pub type Face = WorldSquareWithOrthogonalDir;
+pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
+pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
@@ -72,6 +78,7 @@ pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
 pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
 
+
 pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
 pub const DIAGONAL_STEPS: [WorldStep; 4] =
     [STEP_UP_RIGHT, STEP_UP_LEFT, STEP_DOWN_RIGHT, STEP_DOWN_LEFT];
@@ -86,8 +93,8 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_LEFT,
 ];
 
-pub fn ORIGIN_POSE() -> SquareWithOrthogonalDir {
-    (0, 0, STEP_UP).into()
+pub fn ORIGIN_POSE() -> WorldSquareWithOrthogonalDir {
+    (0, 0, UP).into()
 }
 
 pub fn world_square_glyph_map_to_world_character_glyph_map(
@@ -133,7 +140,6 @@ pub fn world_point_to_local_character_point(
     origin_character_square: WorldCharacterSquare,
 ) -> LocalCharacterPoint {
     (world_point_to_world_character_point(world_point) - origin_character_square.to_f32())
-        .to_point()
         .cast_unit()
 }
 
@@ -141,16 +147,14 @@ pub fn world_point_to_local_square_point(
     world_point: WorldPoint,
     origin_square: WorldSquare,
 ) -> LocalSquarePoint {
-    (world_point - origin_square.to_f32())
-        .to_point()
-        .cast_unit()
+    (world_point - origin_square.to_f32()).cast_unit()
 }
 
 pub fn local_square_point_to_world_point(
     local_square_point: LocalSquarePoint,
     square: WorldSquare,
 ) -> WorldPoint {
-    (local_square_point.cast_unit() + square.to_f32().to_vector())
+    local_square_point.cast_unit() + square.to_f32()
 }
 
 pub fn local_square_point_to_local_character_point(
@@ -171,25 +175,25 @@ pub fn local_square_point_to_local_character_point(
 
 // TODO: make this more general
 pub fn world_half_plane_to_local_square_half_plane(
-    world_half_plane: HalfPlane<WorldLine>,
+    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
     ref_square: WorldSquare,
-) -> HalfPlane<LocalSquareLine> {
+) -> HalfPlane<TwoDifferentLocalSquarePoints> {
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
 pub fn local_square_half_plane_to_local_character_half_plane(
-    square_half_plane: HalfPlane<WorldLine>,
+    square_half_plane: LocalSquareHalfPlane,
     character_index_in_square: usize,
-) -> HalfPlane<LocalCharacterLine> {
+) -> LocalCharacterHalfPlane {
     square_half_plane.with_transformed_points(|p| {
         local_square_point_to_local_character_point(p, character_index_in_square)
     })
 }
 
 pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<WorldLine>,
+    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
     ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<LocalCharacterLine> {
+) -> HalfPlane<TwoDifferentLocalCharacterPoints> {
     world_half_plane
         .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }

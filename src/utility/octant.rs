@@ -2,9 +2,7 @@ use std::f32::consts::PI;
 
 use euclid::Angle;
 
-use super::FAngle;
-use super::OrthogonalWorldStep;
-use super::{QuarterTurnsCcw, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
@@ -13,34 +11,34 @@ impl Octant {
     pub fn new(octant: i32) -> Self {
         Octant(octant.rem_euclid(8))
     }
-    pub fn with_n_quarter_turns_anticlockwise(&self, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn with_n_quarter_turns_anticlockwise(&self, quarter_turns: NormalizedOrthoAngle) -> Self {
         Self::new(self.0 + quarter_turns.quarter_turns() * 2)
     }
-    pub fn outward_and_across_directions(&self) -> (OrthogonalWorldStep, OrthogonalWorldStep) {
+    pub fn outward_and_across_directions(&self) -> (OrthogonalDirection, OrthogonalDirection) {
         // TODO: probably make this an actual equation
         let world_step = match self.0 {
-            0 => (STEP_RIGHT, STEP_UP),
-            1 => (STEP_UP, STEP_RIGHT),
-            2 => (STEP_UP, STEP_LEFT),
-            3 => (STEP_LEFT, STEP_UP),
-            4 => (STEP_LEFT, STEP_DOWN),
-            5 => (STEP_DOWN, STEP_LEFT),
-            6 => (STEP_DOWN, STEP_RIGHT),
-            7 => (STEP_RIGHT, STEP_DOWN),
+            0 => (RIGHT, UP),
+            1 => (UP, RIGHT),
+            2 => (UP, LEFT),
+            3 => (LEFT, UP),
+            4 => (LEFT, DOWN),
+            5 => (DOWN, LEFT),
+            6 => (DOWN, RIGHT),
+            7 => (RIGHT, DOWN),
             _ => panic!("bad octant: {}", self.0),
         };
-        (world_step.0.into(), world_step.1.into())
+        (world_step.0, world_step.1)
     }
     pub fn number(&self) -> i32 {
         self.0
     }
 
     pub fn from_outward_and_across_directions(
-        outward_direction: OrthogonalWorldStep,
-        across_direction: OrthogonalWorldStep,
+        outward_direction: OrthogonalDirection,
+        across_direction: OrthogonalDirection,
     ) -> Self {
         // TODO: probably make this an actual equation
-        let step_pair = (outward_direction.step(), across_direction.step());
+        let step_pair = (outward_direction.to_step(), across_direction.to_step());
         let octant_number = if step_pair == (STEP_RIGHT, STEP_UP) {
             0
         } else if step_pair == (STEP_UP, STEP_RIGHT) {

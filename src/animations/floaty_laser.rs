@@ -2,9 +2,7 @@ use crate::animations::Animation;
 use crate::glyph::braille::world_points_for_braille_line;
 use crate::glyph::glyph_constants::RED;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
 use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};

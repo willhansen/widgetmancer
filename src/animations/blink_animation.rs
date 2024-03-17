@@ -5,14 +5,14 @@ use num::ToPrimitive;
 use rand::SeedableRng;
 
 use crate::animations::Animation;
+use crate::coordinates::Coordinate;
 use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
-};
-use crate::utility::coordinates::{Coordinate, FloatCoordinate};
-use crate::utility::line::{FloatLineTrait, Line, LineTrait};
+use crate::line_segment::FloatLineSegment;
+use crate::utility::coordinates::SignedCoordinate;
+use crate::utility::line::{FloatLineTrait, LineTrait, TwoDifferentPoints};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -66,20 +66,20 @@ impl Animation for BlinkAnimation {
 
         let start_speed = motion_distance / ostensible_blink_duration;
 
-        let start_vel = motion_direction * start_speed;
+        // let start_vel = motion_direction * start_speed;
 
         let end_point = self.end_square.to_f32();
         let start_point = self.start_square.to_f32();
         let end_point_mirrored_over_start_point = start_point - (end_point - start_point);
         let float_line_centered_on_start =
-            Line::new_from_two_points(end_point_mirrored_over_start_point, end_point);
+            TwoDifferentPoints::new_from_two_points(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
         let total_seconds = self.duration().as_secs_f32();
         let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
-        let lifetime_fraction_remaining = remaining_seconds / total_seconds;
-        let lifetime_fraction_spent = spent_seconds / total_seconds;
+        // let lifetime_fraction_remaining = remaining_seconds / total_seconds;
+        // let lifetime_fraction_spent = spent_seconds / total_seconds;
 
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
@@ -90,7 +90,7 @@ impl Animation for BlinkAnimation {
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
-            .map(|i| {
+            .map(|_i| {
                 float_line_centered_on_start
                     .seeded_random_point_near_line(&mut rng, point_spread_radius)
             })
@@ -100,7 +100,7 @@ impl Animation for BlinkAnimation {
         let moved_points: Vec<WorldPoint> =
             base_points.into_iter().map(|p| p + displacement).collect();
 
-        let blink_line = Line::new_from_two_points(start_point, end_point);
+        let blink_line = TwoDifferentPoints::new_from_two_points(start_point, end_point);
         let visible_points: Vec<WorldPoint> = moved_points
             .into_iter()
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))

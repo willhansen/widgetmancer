@@ -1,26 +1,17 @@
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
-
-use euclid::Length;
-use rgb::RGB8;
-
-use crate::animations::static_board::StaticBoard;
 use crate::animations::Animation;
 use crate::glyph::Glyph;
-use crate::graphics::{FloorColorEnum, Graphics};
-use crate::utility::coordinate_frame_conversions::{
-    world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
-    WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
-};
-use crate::utility::coordinates::{
-    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, OrthogonalWorldStep,
-    RIGHT_I,
-};
+use crate::graphics::FloorColorEnum;
+use crate::size_2d::Size2D;
+use crate::utility::*;
+use crate::IntCoordinate;
+use euclid::Length;
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
     board_size: BoardSize,
-    orthogonal_shot_direction: OrthogonalWorldStep,
+    orthogonal_shot_direction: NormalizedOrthoAngle,
     start_time: Instant,
     floor_color_enum: FloorColorEnum,
 }
@@ -39,13 +30,15 @@ impl RecoilingBoardAnimation {
         floor_color_enum: FloorColorEnum,
     ) -> RecoilingBoardAnimation {
         let mut orthogonalized_step = round_to_king_step(shot_direction);
-        if is_diagonal_king_step(orthogonalized_step) {
+        if orthogonalized_step.is_diagonal_king_step() {
             orthogonalized_step.y = 0;
         }
 
         RecoilingBoardAnimation {
             board_size,
-            orthogonal_shot_direction: orthogonalized_step.into(),
+            orthogonal_shot_direction: NormalizedOrthoAngle::from_orthogonal_vector(
+                orthogonalized_step,
+            ),
             start_time: Instant::now(),
             floor_color_enum,
         }
@@ -73,7 +66,7 @@ impl RecoilingBoardAnimation {
         }
 
         let duration = end_time - start_time;
-        normalized_cos_ease_in_and_out(((age - start_time) / duration)) * start_height
+        normalized_cos_ease_in_and_out((age - start_time) / duration) * start_height
     }
 
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
@@ -114,10 +107,10 @@ impl Animation for RecoilingBoardAnimation {
         let mut glyph_map = WorldSquareGlyphMap::new();
 
         let offset_vector: WorldMove =
-            self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
+            self.orthogonal_shot_direction.to_step::<WorldMove>() * offset_distance_in_squares;
 
-        for x in 0..self.board_size.width {
-            for y in 0..self.board_size.height {
+        for x in 0..self.board_size.width() {
+            for y in 0..self.board_size.height() {
                 let world_square: WorldSquare = WorldSquare::new(x as i32, y as i32);
                 let square_color = self.floor_color_enum.color_at(world_square);
                 let other_square_color = self

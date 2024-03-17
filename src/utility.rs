@@ -1,28 +1,16 @@
 extern crate num;
 
-#[feature(unboxed_closures)]
-use std::collections::{HashMap, HashSet};
-use std::f32::consts::{PI, TAU};
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
 use std::iter::zip;
-use std::mem;
-use std::ops::{Add, AddAssign, Neg, Sub};
 use std::string::ToString;
 
 use ambassador::delegatable_trait;
 
 use approx::AbsDiffEq;
-use derive_more::{AddAssign, Constructor, Display, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::num::Zero;
-use getset::CopyGetters;
-use itertools::Itertools;
 use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;
-use num::traits::{Euclid, Signed};
-use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
@@ -33,33 +21,37 @@ use crate::glyph::glyph_constants::{
 use crate::piece::PieceType::King;
 use crate::{DoubleGlyph, Glyph};
 
-pub mod angle_interval;
-pub mod bool_with_partial;
-pub mod circular_interval;
-pub mod coordinate_frame_conversions;
-pub mod coordinates;
-pub mod general_utility;
-pub mod halfplane;
-pub mod has_origin_pose;
-pub mod line;
-pub mod octant;
-pub mod partial_angle_interval; // TODO: make private and contained within angle_interval
-pub mod poses;
-pub mod quadrant;
-pub mod relative_interval_location;
-pub mod round_robin_iterator;
-pub mod trait_alias_macro;
+macro_rules! pub_mod_and_use {
+    ($($module:ident), +) => {
+        $(
+            pub mod $module;
+            pub use self::$module::*;
+        )+
+    };
+}
 
-pub use self::angle_interval::*;
-pub use self::coordinate_frame_conversions::*;
-pub use self::coordinates::*;
-pub use self::general_utility::*;
-pub use self::halfplane::*;
-pub use self::line::*;
-pub use self::octant::*;
-pub use self::poses::*;
-pub use self::quadrant::*;
-pub use self::round_robin_iterator::*;
+pub_mod_and_use!(
+    angle_interval,
+    bool_with_partial,
+    circular_interval,
+    units,
+    coordinates,
+    general_utility,
+    halfplane,
+    has_origin_pose,
+    line,
+    line_segment,
+    octant,
+    orthogonal_facing_int_pose,
+    partial_angle_interval, // TODO: make private and contained within angle_interval?
+    poses,
+    quadrant,
+    angle,
+    relative_interval_location,
+    round_robin_iterator,
+    size_2d,
+    trait_alias_macro
+);
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
@@ -165,8 +157,8 @@ pub fn rgb_to_string(rgb: RGB8) -> String {
 
 // TODO: turn into iter
 pub fn squares_on_board(size: BoardSize) -> SquareSet {
-    (0..size.width)
-        .cartesian_product((0..size.height).into_iter())
+    (0..size.width())
+        .cartesian_product((0..size.height()).into_iter())
         .map(|(x, y)| WorldSquare::new(x as i32, y as i32))
         .collect()
 }
@@ -234,7 +226,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> BoolArray2D<WIDTH, HEIGHT> {
 pub type SquareBoolArray2D<const SIZE: usize> = BoolArray2D<SIZE, SIZE>;
 
 impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let rotation_function = match quarter_turns_ccw.into().quarter_turns() {
             0 => |x, y| (x, y),
             1 => |x, y| (SIZE - 1 - y, x),
@@ -256,14 +248,14 @@ impl<const SIZE: usize> QuarterTurnRotatable for SquareBoolArray2D<SIZE> {
 // TODO: create a relative version of a rigid transform
 #[derive(Hash, Clone, Copy, Debug)]
 pub struct RigidTransform {
-    start_pose: SquareWithOrthogonalDir,
-    end_pose: SquareWithOrthogonalDir,
+    start_pose: WorldSquareWithOrthogonalDir,
+    end_pose: WorldSquareWithOrthogonalDir,
 }
 
 impl RigidTransform {
     pub fn from_start_and_end_poses(
-        start: impl Into<SquareWithOrthogonalDir>,
-        end: impl Into<SquareWithOrthogonalDir>,
+        start: impl Into<WorldSquareWithOrthogonalDir>,
+        end: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         RigidTransform {
             start_pose: start.into(),
@@ -273,26 +265,26 @@ impl RigidTransform {
     // Treats the start pose as the origin
     // TODO: move to a relative version of a rigidtransform
     pub fn new_relative_transform_from_start_to_end(
-        start: impl Into<SquareWithOrthogonalDir>,
-        end: impl Into<SquareWithOrthogonalDir>,
+        start: impl Into<WorldSquareWithOrthogonalDir>,
+        end: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         let start = start.into();
         let end = end.into();
 
         Self::from_start_and_end_poses(ORIGIN_POSE(), start.other_pose_absolute_to_relative(end))
     }
-    pub fn from_rotation(r: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    pub fn from_rotation(r: impl Into<NormalizedOrthoAngle> + Copy) -> Self {
         let p = ORIGIN_POSE();
         Self::from_start_and_end_poses(p, p.quarter_rotated_ccw_in_place(r))
     }
     pub fn identity() -> Self {
-        Self::from_start_and_end_poses((0, 0, STEP_UP), (0, 0, STEP_UP))
+        Self::from_start_and_end_poses((0, 0, UP), (0, 0, UP))
     }
     pub fn translation(&self) -> WorldStep {
-        (self.end_pose - self.start_pose).stepp()
+        (self.end_pose - self.start_pose).dir().to_step()
     }
-    pub fn rotation(&self) -> QuarterTurnsCcw {
-        (self.end_pose - self.start_pose).rotation()
+    pub fn rotation(&self) -> NormalizedOrthoAngle {
+        (self.end_pose - self.start_pose).dir()
     }
     // TODO: maybe te.st this if sus
     pub fn transform_relative_pose(
@@ -303,9 +295,9 @@ impl RigidTransform {
             .square()
             .quarter_rotated_ccw(self.rotation().quarter_turns());
 
-        let end_direction = self.rotation().rotate_vector(pose.direction().step());
+        let end_direction = self.rotation() + pose.direction();
 
-        RelativeSquareWithOrthogonalDir::from_square_and_step(end_square, end_direction)
+        RelativeSquareWithOrthogonalDir::from_square_and_turns(end_square, end_direction)
     }
     pub fn inverse(&self) -> Self {
         Self {
@@ -332,25 +324,29 @@ impl RigidTransform {
     ) -> (WorldPoint, Angle<f32>) {
         let ray_start_relative_to_tf_start = ray_start - self.start_pose.square().to_f32();
         let dist_from_tf_start = ray_start_relative_to_tf_start.length();
-        let start_tf_angle = better_angle_from_x_axis(self.start_pose.direction().step().to_f32());
+        let start_tf_angle = self
+            .start_pose
+            .direction()
+            .to_step::<WorldStep>()
+            .to_f32()
+            .better_angle_from_x_axis();
 
         let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
-        let end_tf_angle = better_angle_from_x_axis(self.end_pose.direction().step().to_f32());
+        let end_tf_angle = self.end_pose.direction().to_float_angle();
 
         let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
 
         let new_ray_start = if dist_from_tf_start == 0.0 {
             self.end_pose.square().to_f32()
         } else {
-            let tf_start_point = self.start_pose.direction().step().to_f32();
+            let tf_start_point: WorldMove = self.start_pose.direction().to_step();
             let position_angle_from_tf_start =
                 tf_start_point.angle_to(ray_start_relative_to_tf_start);
 
             let position_angle_from_tf_end = end_tf_angle + position_angle_from_tf_start;
 
             self.end_pose.square().to_f32()
-                + unit_vector_from_angle(position_angle_from_tf_end).cast_unit()
-                    * dist_from_tf_start
+                + WorldMove::unit_vector_from_angle(position_angle_from_tf_end) * dist_from_tf_start
         };
 
         (new_ray_start, new_ray_direction)
@@ -368,8 +364,8 @@ impl Eq for RigidTransform {}
 impl Default for RigidTransform {
     fn default() -> Self {
         RigidTransform::from_start_and_end_poses(
-            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
-            SquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            WorldSquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
+            WorldSquareWithOrthogonalDir::from_square_and_step(point2(0, 0), STEP_RIGHT),
         )
     }
 }
@@ -385,6 +381,17 @@ pub fn get_by_index<T>(vector: &Vec<T>, index: i32) -> &T {
         index
     } as usize;
     vector.get(index).unwrap()
+}
+
+pub fn abs<T>(x: T) -> T
+where
+    T: PartialOrd + std::ops::Sub<Output = T> + euclid::num::Zero,
+{
+    if x < T::zero() {
+        T::zero() - x
+    } else {
+        x
+    }
 }
 
 #[cfg(test)]
@@ -449,7 +456,7 @@ mod tests {
     }
     #[test]
     fn test_parts_of_identity_rigid_transform() {
-        let tf = RigidTransform::from_start_and_end_poses((2, 5, STEP_UP), (2, 5, STEP_UP));
+        let tf = RigidTransform::from_start_and_end_poses((2, 5, UP), (2, 5, UP));
         assert_eq!(tf.rotation(), 0.into());
         assert_eq!(tf.translation(), (0, 0).into());
     }
@@ -462,8 +469,8 @@ mod tests {
     }
     #[test]
     fn test_relative_rigid_transform() {
-        let start = (4, 3, STEP_LEFT);
-        let end = (2, 2, STEP_RIGHT);
+        let start = (4, 3, LEFT);
+        let end = (2, 2, RIGHT);
         let rel_tf = RigidTransform::new_relative_transform_from_start_to_end(start, end);
         assert_eq!(rel_tf.translation(), (-1, 2).into());
         assert_eq!(rel_tf.rotation(), 2.into());

@@ -4,7 +4,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Neg, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -13,19 +13,11 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, partial_angle_interval, standardize_angle,
-    Octant, OrthogonalWorldStep, QuarterTurnsCcw, RelativeSquareWithOrthogonalDir,
-    SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
-    STEP_UP_RIGHT, STEP_ZERO,
-};
+use crate::utility::*;
 
 use super::bool_with_partial::BoolWithPartial;
 use super::coordinates::QuarterTurnRotatable;
 use super::partial_angle_interval::PartialAngleInterval;
-use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -423,7 +415,7 @@ impl RigidlyTransformable for AngleInterval {
 impl QuarterTurnRotatable for AngleInterval {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         match self {
             AngleInterval::PartialArc(partial_arc) => partial_arc
@@ -436,7 +428,6 @@ impl QuarterTurnRotatable for AngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
     use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use num::zero;
