@@ -292,7 +292,7 @@ mod tests {
         assert_eq!(abs_pose.apply_rigid_transform(tf), (6, 5, DOWN).into());
         assert_eq!(
             rel_pose.apply_rigid_transform(tf),
-            abs_pose.apply_rigid_transform(tf).as_relative_face()
+            abs_pose.apply_rigid_transform(tf)
         );
     }
 }
