@@ -499,8 +499,9 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let relative_square = self.outward_dir.to_step::<WorldStep>() * self.outward_steps as i32
-            + self.across_dir.to_step::<WorldStep>() * self.across_steps as i32;
+        let relative_square = WorldSquare::zero()
+            .moved(self.outward_dir, self.outward_steps as i32)
+            .moved(self.across_dir, self.across_steps as i32);
 
         self.across_steps += 1;
         if self.across_steps > self.outward_steps {
@@ -690,7 +691,7 @@ pub fn single_octant_field_of_view(
         portal_geometry,
         WorldSquareWithOrthogonalDir::from_square_and_step(
             center_square,
-            FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+            FieldOfView::DEFAULT_FOV_ROOT_DIRECTION,
         ),
         radius,
         AngleInterval::from_octant(octant),
@@ -1375,7 +1376,7 @@ mod tests {
             &portals,
             WorldSquareWithOrthogonalDir::from_square_and_step(
                 start,
-                FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+                FieldOfView::DEFAULT_FOV_ROOT_DIRECTION,
             ),
             fov_range,
             narrow_arc_to_right_in_first_octant(),

@@ -44,15 +44,6 @@ pub trait OrthoAngle:
     fn normalized(&self) -> NormalizedOrthoAngle {
         NormalizedOrthoAngle::new(self.quarter_turns())
     }
-    fn x_axis() -> Self {
-        Self::new(0)
-    }
-    fn right() -> Self {
-        Self::x_axis()
-    }
-    fn up() -> Self {
-        Self::x_axis().quarter_rotated_ccw(1)
-    }
     fn xy<T: num::Signed>(&self) -> (T, T) {
         // TODO: use enum rather than matching an i32?
         match self.normalized().quarter_turns() {
@@ -107,6 +98,9 @@ pub trait OrthoAngle:
             x => panic!("Invalid OrthogonalDirection: {}", x),
         }
     }
+    fn dir(&self) -> OrthogonalDirection {
+        OrthogonalDirection(self.normalized())
+    }
 
     #[deprecated(note = "use to_step instead")]
     fn to_orthogonal_direction(&self) -> WorldStep {
@@ -158,22 +152,14 @@ pub trait OrthoAngle:
     fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns())
     }
-    fn turned_left(&self) -> Self {
+    fn left(&self) -> Self {
         self.quarter_rotated_ccw(1)
     }
-    fn turned_right(&self) -> Self {
+    fn right(&self) -> Self {
         self.quarter_rotated_ccw(3)
     }
     fn turned_back(&self) -> Self {
         self.quarter_rotated_ccw(2)
-    }
-}
-// Don't implement for NormalizedOrthoAngle because of ambiguity when treating it as a direction vs an angle
-impl Neg for UnNormalizedOrthoAngle {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self::new(-self.quarter_turns())
     }
 }
 
@@ -192,6 +178,13 @@ macro_rules! impl_ops_for_OrthoAngles {
 
             fn sub(self, rhs: T) -> Self::Output {
                 Self::new(self.quarter_turns() - rhs.quarter_turns())
+            }
+        }
+        impl Neg for $Type {
+            type Output = Self;
+
+            fn neg(self) -> Self::Output {
+                Self::new(-self.quarter_turns())
             }
         }
 
@@ -247,14 +240,36 @@ pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1))
 pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(2));
 pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(3));
 
+macro_rules! delegate_getter {
+    ($ret:ty, $($fun:ident), +) => {
+        $(
+            pub fn $fun(&self) -> $ret {
+                self.0.$fun()
+            }
+        )+
+    };
+}
+macro_rules! delegate_modder {
+    ($ret:ty, $($fun:ident), +) => {
+        $(
+            pub fn $fun(&self) -> $ret {
+                Self(self.0.$fun())
+            }
+        )+
+    };
+}
 impl OrthogonalDirection {
-    pub fn left(&self) -> Self {
-        Self(self.0.turned_left())
+    pub fn angle(&self) -> NormalizedOrthoAngle {
+        self.0
     }
-    pub fn right(&self) -> Self {
-        Self(self.0.turned_right())
+    delegate_modder!(Self, left, right);
+    delegate_getter!(bool, is_vertical, is_horizontal, is_positive);
+
+    pub fn to_step<T: SignedCoordinate>(&self) -> T {
+        self.0.to_step()
     }
 }
+// Behavior of negative is the main difference between orthogonaldirection and normalizedorthoangle
 impl Neg for OrthogonalDirection {
     type Output = Self;
 
@@ -263,9 +278,9 @@ impl Neg for OrthogonalDirection {
     }
 }
 
-impl From<NormalizedOrthoAngle> for OrthogonalDirection {
-    fn from(value: NormalizedOrthoAngle) -> Self {
-        Self(value)
+impl<T: OrthoAngle> From<T> for OrthogonalDirection {
+    fn from(value: T) -> Self {
+        value.dir()
     }
 }
 impl From<OrthogonalDirection> for NormalizedOrthoAngle {
@@ -285,23 +300,29 @@ mod tests {
 
     #[test]
     fn test_init() {
-        assert_eq!(OrthogonalDirection::new(-3), UP);
-        assert_eq!(OrthogonalDirection::new(-2), LEFT);
-        assert_eq!(OrthogonalDirection::new(-1), DOWN);
-        assert_eq!(OrthogonalDirection::new(0), RIGHT);
-        assert_eq!(OrthogonalDirection::new(1), UP);
-        assert_eq!(OrthogonalDirection::new(2), LEFT);
-        assert_eq!(OrthogonalDirection::new(3), DOWN);
-        assert_eq!(OrthogonalDirection::new(4), RIGHT);
-        assert_eq!(OrthogonalDirection::new(5), UP);
-        assert_eq!(OrthogonalDirection::new(6), LEFT);
+        [
+            (-3, UP),
+            (-2, LEFT),
+            (-1, DOWN),
+            (0, RIGHT),
+            (1, UP),
+            (2, LEFT),
+            (3, DOWN),
+            (4, RIGHT),
+            (5, UP),
+            (6, LEFT),
+        ]
+        .into_iter()
+        .for_each(|(quarter_turns, dir)| {
+            assert_eq!(NormalizedOrthoAngle::new(quarter_turns).dir(), dir);
+        });
     }
     #[test]
     fn test_negative() {
-        assert_eq!(LEFT.turned_back(), RIGHT);
-        assert_eq!(RIGHT.turned_back(), LEFT);
-        assert_eq!(UP.turned_back(), DOWN);
-        assert_eq!(DOWN.turned_back(), UP);
+        assert_eq!(-LEFT, RIGHT);
+        assert_eq!(-RIGHT, LEFT);
+        assert_eq!(-UP, DOWN);
+        assert_eq!(-DOWN, UP);
     }
 
     #[test]

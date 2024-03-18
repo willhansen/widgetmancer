@@ -843,7 +843,7 @@ impl RasterizedFieldOfView {
     fn new_centered_at(new_root: impl Into<WorldSquare>) -> Self {
         RasterizedFieldOfView::new_empty_with_view_root((
             new_root,
-            Self::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+            Self::DEFAULT_FOV_ROOT_DIRECTION,
         ))
     }
 
@@ -1854,7 +1854,7 @@ mod tests {
                 let rfov = RasterizedFieldOfView::from_top_down_portals(
                     (
                         view_root_square,
-                        RasterizedFieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP
+                        RasterizedFieldOfView::DEFAULT_FOV_ROOT_DIRECTION
                             .quarter_rotated_ccw(root_rotation),
                     ),
                     [top_down_portal],

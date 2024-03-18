@@ -281,10 +281,10 @@ impl RigidTransform {
         Self::from_start_and_end_poses((0, 0, UP), (0, 0, UP))
     }
     pub fn translation(&self) -> WorldStep {
-        (self.end_pose - self.start_pose).dir().to_step()
+        (self.end_pose - self.start_pose).square()
     }
     pub fn rotation(&self) -> NormalizedOrthoAngle {
-        (self.end_pose - self.start_pose).dir()
+        (self.end_pose - self.start_pose).angle()
     }
     // TODO: maybe te.st this if sus
     pub fn transform_relative_pose(
@@ -295,7 +295,7 @@ impl RigidTransform {
             .square()
             .quarter_rotated_ccw(self.rotation().quarter_turns());
 
-        let end_direction = self.rotation() + pose.direction();
+        let end_direction = self.rotation() + pose.angle();
 
         RelativeSquareWithOrthogonalDir::from_square_and_turns(end_square, end_direction)
     }
@@ -332,7 +332,7 @@ impl RigidTransform {
             .better_angle_from_x_axis();
 
         let ray_angle_from_tf_start = start_tf_angle.angle_to(ray_direction);
-        let end_tf_angle = self.end_pose.direction().to_float_angle();
+        let end_tf_angle = self.end_pose.angle().to_float_angle();
 
         let new_ray_direction = end_tf_angle + ray_angle_from_tf_start;
 

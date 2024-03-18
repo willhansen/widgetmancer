@@ -177,6 +177,14 @@ where
         vec2(x, y)
     }
 }
+impl<T, U> From<OrthogonalDirection> for Vector2D<T, U>
+where
+    T: CoordinateDataTypeTrait + num::Signed,
+{
+    fn from(value: OrthogonalDirection) -> Self {
+        value.angle().into()
+    }
+}
 
 impl<T, U> Coordinate for Vector2D<T, U>
 where
@@ -210,7 +218,10 @@ where
 }
 
 pub trait SignedCoordinate:
-    Coordinate<DataType = Self::_DataType> + Neg<Output = Self> + From<NormalizedOrthoAngle>
+    Coordinate<DataType = Self::_DataType>
+    + Neg<Output = Self>
+    + From<NormalizedOrthoAngle>
+    + From<OrthogonalDirection>
 {
     type _DataType: num::Signed + Copy;
     fn flip_x(&self) -> Self {
@@ -244,7 +255,7 @@ pub trait SignedCoordinate:
 }
 impl<T> SignedCoordinate for T
 where
-    T: Coordinate + Neg<Output = Self> + From<NormalizedOrthoAngle>,
+    T: Coordinate + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -538,7 +549,7 @@ pub fn assert_about_eq_2d<P: FloatCoordinate>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(OrthogonalDirection::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new(1)) {
         faces
     } else {
         [faces[1], faces[0]]

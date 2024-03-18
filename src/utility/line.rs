@@ -700,14 +700,14 @@ pub fn first_inside_square_face_hit_by_ray(
 }
 pub fn square_face_as_line<P: SignedIntCoordinate>(
     square: P,
-    face_direction: NormalizedOrthoAngle,
+    face_direction: OrthogonalDirection,
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
     // TODO: avoid the type notation on `step` somehow
     let face_center = square_center.moved(face_direction, 0.5);
     TwoDifferentPoints::new_from_two_points(
-        face_center.moved(face_direction.turned_left(), 0.5),
-        face_center.moved(face_direction.turned_right(), 0.5),
+        face_center.moved(face_direction.left(), 0.5),
+        face_center.moved(face_direction.right(), 0.5),
     )
 }
 pub fn ray_intersection_point_with_oriented_square_face(

@@ -12,15 +12,15 @@ where
     SquareType: IntCoordinate,
 {
     square: SquareType,
-    dir: NormalizedOrthoAngle,
+    dir: OrthogonalDirection,
 }
 
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
 where
     SquareType: IntCoordinate,
 {
-    pub fn direction_in_quarter_turns(&self) -> NormalizedOrthoAngle {
-        self.dir
+    pub fn angle(&self) -> NormalizedOrthoAngle {
+        self.dir.into()
     }
     pub fn from_square_and_step(
         square: impl Into<SquareType>,
@@ -37,10 +37,10 @@ where
     ) -> Self {
         Self {
             square: square.into(),
-            dir: quarter_turns.into(),
+            dir: quarter_turns.into().into(),
         }
     }
-    pub fn direction(&self) -> NormalizedOrthoAngle {
+    pub fn direction(&self) -> OrthogonalDirection {
         self.dir
     }
     pub fn stepped(&self) -> Self {
@@ -105,14 +105,14 @@ where
     pub fn turned_right(&self) -> Self {
         Self::from_square_and_step(self.square, self.right())
     }
-    fn left(&self) -> NormalizedOrthoAngle {
-        self.direction().turned_left()
+    fn left(&self) -> OrthogonalDirection {
+        self.direction().left()
     }
-    fn right(&self) -> NormalizedOrthoAngle {
-        self.direction().turned_right()
+    fn right(&self) -> OrthogonalDirection {
+        self.direction().right()
     }
     pub fn turned_back(&self) -> Self {
-        Self::from_square_and_turns(self.square, self.direction().turned_back())
+        Self::from_square_and_turns(self.square, -self.direction())
     }
     pub fn with_offset(&self, offset: SquareType) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
@@ -156,7 +156,7 @@ where
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
-            return self.direction() == NormalizedOrthoAngle::right();
+            return self.direction() == RIGHT;
         }
 
         self.square.x() > SquareType::DataType::zero()
@@ -302,7 +302,7 @@ impl<T: IntCoordinate> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
     fn add(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
         OrthogonalFacingIntPose::from_square_and_turns(
             self.square + rhs.square,
-            self.direction_in_quarter_turns() + rhs.direction_in_quarter_turns(),
+            self.angle() + rhs.angle(),
         )
     }
 }
@@ -313,7 +313,7 @@ impl<T: IntCoordinate> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
     fn sub(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
         OrthogonalFacingIntPose::from_square_and_turns(
             self.square - rhs.square,
-            self.direction_in_quarter_turns() - rhs.direction_in_quarter_turns(),
+            self.angle() - rhs.angle(),
         )
     }
 }

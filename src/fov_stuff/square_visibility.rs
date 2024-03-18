@@ -85,7 +85,7 @@ impl SquareVisibilityFromOneLargeShadow {
     }
 
     pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalDirection>) -> Self {
-        Self::half_visible((-which_half_visible.into()).into())
+        Self::half_visible((-which_half_visible.into()).angle().into())
     }
 
     fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
