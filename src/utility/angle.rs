@@ -44,31 +44,12 @@ pub trait OrthoAngle:
     fn normalized(&self) -> NormalizedOrthoAngle {
         NormalizedOrthoAngle::new(self.quarter_turns())
     }
-    fn xy<T: num::Signed>(&self) -> (T, T) {
-        // TODO: use enum rather than matching an i32?
-        match self.normalized().quarter_turns() {
-            0 => (T::one(), T::zero()),
-            1 => (T::zero(), T::one()),
-            2 => (-T::one(), T::zero()),
-            3 => (T::zero(), -T::one()),
-            x => panic!("Invalid OrthogonalDirection: {}", x),
-        }
-    }
-    fn dir_name(&self) -> &'static str {
-        match self.normalized().quarter_turns() {
-            0 => "Right",
-            1 => "Up",
-            2 => "Left",
-            3 => "Down",
-            x => panic!("Invalid OrthogonalDirection: {}", x),
-        }
-    }
     fn cos<T: num::Signed>(&self) -> T {
         match self.normalized().0 {
             0 => T::one(),
             1 | 3 => T::zero(),
             2 => -T::one(),
-            x => panic!("Invalid OrthogonalDirection: {}", x),
+            x => panic!("Invalid angle: {}", x),
         }
     }
     fn sin<T: num::Signed>(&self) -> T {
@@ -76,26 +57,7 @@ pub trait OrthoAngle:
             0 | 2 => T::zero(),
             1 => T::one(),
             3 => -T::one(),
-            x => panic!("Invalid OrthogonalDirection: {}", x),
-        }
-    }
-    fn dot<T: num::Signed>(&self, other: impl OrthoAngle) -> T {
-        (*self - other.normalized()).cos()
-    }
-    fn is_parallel(&self, other: impl OrthoAngle) -> bool {
-        self.dot::<i32>(other) != 0
-    }
-    fn is_horizontal(&self) -> bool {
-        self.cos::<i32>() != 0
-    }
-    fn is_vertical(&self) -> bool {
-        self.sin::<i32>() != 0
-    }
-    fn is_positive(&self) -> bool {
-        match self.normalized().0 {
-            0 | 1 => true,
-            2 | 3 => false,
-            x => panic!("Invalid OrthogonalDirection: {}", x),
+            x => panic!("Invalid angle: {}", x),
         }
     }
     fn dir(&self) -> OrthogonalDirection {
@@ -105,10 +67,6 @@ pub trait OrthoAngle:
     #[deprecated(note = "use to_step instead")]
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.to_step()
-    }
-    // TODO: find a way to automatically just take whatever type is convenient
-    fn to_step<T: SignedCoordinate>(&self) -> T {
-        self.xy().into()
     }
     fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
         assert!(dir.is_orthogonal());
@@ -151,15 +109,6 @@ pub trait OrthoAngle:
     }
     fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(self.quarter_turns())
-    }
-    fn left(&self) -> Self {
-        self.quarter_rotated_ccw(1)
-    }
-    fn right(&self) -> Self {
-        self.quarter_rotated_ccw(3)
-    }
-    fn turned_back(&self) -> Self {
-        self.quarter_rotated_ccw(2)
     }
 }
 
@@ -274,7 +223,7 @@ impl Neg for OrthogonalDirection {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self(self.0.turned_back())
+        Self(self.0.reversed())
     }
 }
 
@@ -291,6 +240,81 @@ impl From<OrthogonalDirection> for NormalizedOrthoAngle {
 impl QuarterTurnRotatable for OrthogonalDirection {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
+    }
+}
+trait Direction: QuarterTurnRotatable + Copy + Sized {
+    // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
+    fn angle(&self) -> NormalizedOrthoAngle;
+    fn from_angle(angle: impl OrthoAngle) -> Self;
+    fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self;
+    fn try_from_coordinate<T: Coordinate>(coord: T) -> Self;
+    fn left(&self) -> Self {
+        self.quarter_rotated_ccw(1)
+    }
+    fn right(&self) -> Self {
+        self.quarter_rotated_ccw(3)
+    }
+    fn reversed(&self) -> Self {
+        self.quarter_rotated_ccw(2)
+    }
+    fn is_parallel(&self, other: impl Direction) -> bool {
+        self.dot::<i32>(other) != 0
+    }
+    fn is_horizontal(&self) -> bool {
+        self.angle().cos::<i32>() != 0
+    }
+    fn is_vertical(&self) -> bool {
+        self.angle().sin::<i32>() != 0
+    }
+    fn is_positive(&self) -> bool {
+        let a = self.angle();
+        a.cos::<i32>() > 0 || a.sin::<i32>() > 0
+    }
+    fn dot<T: num::Signed>(&self, other: impl Direction) -> T {
+        (self.angle() - other.angle()).cos()
+    }
+    fn xy<T: num::Signed>(&self) -> (T, T) {
+        // TODO: use enum rather than matching an i32?
+        match self.angle().quarter_turns() {
+            0 => (T::one(), T::zero()),
+            1 => (T::zero(), T::one()),
+            2 => (-T::one(), T::zero()),
+            3 => (T::zero(), -T::one()),
+            x => panic!("Invalid OrthogonalDirection: {}", x),
+        }
+    }
+    fn dir_name(&self) -> &'static str {
+        match self.angle().quarter_turns() {
+            0 => "Right",
+            1 => "Up",
+            2 => "Left",
+            3 => "Down",
+            x => panic!("Invalid OrthogonalDirection: {}", x),
+        }
+    }
+    // TODO: find a way to automatically just take whatever type is convenient
+    fn to_step<T: SignedCoordinate>(&self) -> T {
+        // let (x, y) = self.xy();
+        // T::new(x, y)
+        self.xy().into()
+    }
+}
+
+impl<T> Direction for T
+where
+    T: OrthoAngle,
+{
+    fn angle(&self) -> NormalizedOrthoAngle {
+        self.normalized()
+    }
+
+    fn from_angle(angle: impl OrthoAngle) -> Self {
+        todo!()
+    }
+
+    fn try_from_coordinate<T: Coordinate>(coord: T) -> Resule<Self, String> {
+        if coord.is_orthogonal() {}
+        todo!()
     }
 }
 
