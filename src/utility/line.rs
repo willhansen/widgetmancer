@@ -16,7 +16,7 @@ pub type TwoDifferentLocalCharacterPoints =
 // TODO: put in some kind of default module like euclid does?
 pub type TwoDifferentFloatPoints = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
 
-pub trait LineTrait: Sized + Copy + QuarterTurnRotatable {
+pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     type PointType: SignedCoordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
@@ -156,7 +156,7 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
     }
 
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = other.two_different_arbitrary_points_on_line();
         self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)
     }
 

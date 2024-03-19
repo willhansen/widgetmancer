@@ -386,22 +386,25 @@ mod tests {
     use super::*;
     #[test]
     fn test_half_plane_complementary_check__different_lines() {
-        let line: TwoDifferentPoints<WorldPoint> =
+        let good_line: TwoDifferentPoints<WorldPoint> =
             TwoDifferentPoints::new_from_two_points((0.0, 0.0), (1.0, 1.0));
-        let line2: TwoDifferentPoints<WorldPoint> =
+        let bad_line: TwoDifferentPoints<WorldPoint> =
             TwoDifferentPoints::new_from_two_points((0.1, 0.0), (1.0, 1.0));
-        let p1 = WorldPoint::new(0.0, 1.0);
-        let p2 = WorldPoint::new(1.0, 0.0);
+        let upper_point = WorldPoint::new(0.0, 1.0);
+        let right_point = WorldPoint::new(1.0, 0.0);
 
-        let half_plane_1 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p2);
-        let half_plane_3 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
+        let good_half_plane_upwards =
+            WorldHalfPlane::new_from_line_and_point_on_half_plane(good_line, upper_point);
+        let good_half_plane_downwards =
+            WorldHalfPlane::new_from_line_and_point_on_half_plane(good_line, right_point);
+        let bad_half_plane =
+            WorldHalfPlane::new_from_line_and_point_on_half_plane(bad_line, right_point);
 
-        assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
-        assert!(half_plane_2.about_complementary(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.about_complementary(half_plane_1, 1e-6));
-        assert_false!(half_plane_1.about_complementary(half_plane_3, 1e-6));
-        assert_false!(half_plane_2.about_complementary(half_plane_3, 1e-6));
+        assert!(good_half_plane_upwards.about_complementary(good_half_plane_downwards, 1e-6));
+        assert!(good_half_plane_downwards.about_complementary(good_half_plane_upwards, 1e-6));
+        assert_false!(good_half_plane_upwards.about_complementary(good_half_plane_upwards, 1e-6));
+        assert_false!(good_half_plane_upwards.about_complementary(bad_half_plane, 1e-6));
+        assert_false!(good_half_plane_downwards.about_complementary(bad_half_plane, 1e-6));
     }
 
     #[test]

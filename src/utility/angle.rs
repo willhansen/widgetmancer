@@ -328,10 +328,6 @@ impl Direction for OrthogonalDirection {
     fn from_angle(angle: impl OrthoAngle) -> Self {
         Self(angle.normalized())
     }
-
-    fn try_from_coordinate<T: Coordinate>(coord: T) -> Result<Self, String> {
-        todo!()
-    }
 }
 
 #[cfg(test)]
