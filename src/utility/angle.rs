@@ -2,6 +2,13 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use crate::utility::*;
 
+pub enum AngleVariety {
+    Orthogonal,
+    Diagonal,
+    OrthoDiagonal,
+    FloatingPoint,
+}
+
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
 impl OrthoAngle for NormalizedOrthoAngle
@@ -13,6 +20,12 @@ where
     }
     fn quarter_turns(&self) -> i32 {
         self.0
+    }
+}
+
+impl From<UnNormalizedOrthoAngle> for NormalizedOrthoAngle {
+    fn from(value: UnNormalizedOrthoAngle) -> Self {
+        value.normalized()
     }
 }
 
@@ -38,6 +51,7 @@ pub trait OrthoAngle:
     + Add
     + QuarterTurnRotatable
     + Copy
+    + Into<NormalizedOrthoAngle>
 {
     fn new(quarter_turns: i32) -> Self;
     fn quarter_turns(&self) -> i32;
@@ -61,16 +75,18 @@ pub trait OrthoAngle:
         }
     }
     fn dir(&self) -> OrthogonalDirection {
-        OrthogonalDirection(self.normalized())
+        OrthogonalDirection::from_angle(*self)
     }
 
     #[deprecated(note = "use to_step instead")]
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.to_step()
     }
-    fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self {
-        assert!(dir.is_orthogonal());
-        Self::new(if dir.x() == T::DataType::zero() {
+    fn try_from_coordinate<T: Coordinate>(dir: T) -> Result<Self, String> {
+        if !dir.is_orthogonal() {
+            return Err(format!("Not orthogonal: {}", dir.to_string()));
+        }
+        Ok(Self::new(if dir.x() == T::DataType::zero() {
             if dir.y() > T::DataType::zero() {
                 1
             } else {
@@ -82,7 +98,10 @@ pub trait OrthoAngle:
             } else {
                 2
             }
-        })
+        }))
+    }
+    fn from_coordinate<T: Coordinate>(dir: T) -> Self {
+        Self::try_from_coordinate(dir).unwrap()
     }
     fn quarter_turns_from_x_axis<P: IntCoordinate>(end: P) -> Self {
         Self::from_start_and_end_directions(P::right(), end)
@@ -108,7 +127,7 @@ pub trait OrthoAngle:
         self.rotate_angle(FAngle::degrees(0.0))
     }
     fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
-        v.quarter_rotated_ccw(self.quarter_turns())
+        v.quarter_rotated_ccw(*self)
     }
 }
 
@@ -189,41 +208,18 @@ pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1))
 pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(2));
 pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(3));
 
-macro_rules! delegate_getter {
-    ($ret:ty, $($fun:ident), +) => {
-        $(
-            pub fn $fun(&self) -> $ret {
-                self.0.$fun()
-            }
-        )+
-    };
-}
-macro_rules! delegate_modder {
-    ($ret:ty, $($fun:ident), +) => {
-        $(
-            pub fn $fun(&self) -> $ret {
-                Self(self.0.$fun())
-            }
-        )+
-    };
-}
-impl OrthogonalDirection {
-    pub fn angle(&self) -> NormalizedOrthoAngle {
-        self.0
-    }
-    delegate_modder!(Self, left, right);
-    delegate_getter!(bool, is_vertical, is_horizontal, is_positive);
-
-    pub fn to_step<T: SignedCoordinate>(&self) -> T {
-        self.0.to_step()
-    }
-}
 // Behavior of negative is the main difference between orthogonaldirection and normalizedorthoangle
 impl Neg for OrthogonalDirection {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self(self.0.reversed())
+        self.reversed()
+    }
+}
+
+impl Display for OrthogonalDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.dir_name())
     }
 }
 
@@ -234,7 +230,7 @@ impl<T: OrthoAngle> From<T> for OrthogonalDirection {
 }
 impl From<OrthogonalDirection> for NormalizedOrthoAngle {
     fn from(value: OrthogonalDirection) -> Self {
-        value.0
+        value.angle()
     }
 }
 impl QuarterTurnRotatable for OrthogonalDirection {
@@ -242,12 +238,18 @@ impl QuarterTurnRotatable for OrthogonalDirection {
         self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
-trait Direction: QuarterTurnRotatable + Copy + Sized {
+pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
     fn from_angle(angle: impl OrthoAngle) -> Self;
-    fn from_orthogonal_vector<T: Coordinate>(dir: T) -> Self;
-    fn try_from_coordinate<T: Coordinate>(coord: T) -> Self;
+    fn from_coordinate<T: Coordinate>(dir: T) -> Self {
+        Self::try_from_coordinate(dir).unwrap()
+    }
+    fn try_from_coordinate<T: Coordinate>(coord: T) -> Result<Self, String> {
+        Ok(Self::from_angle(
+            <NormalizedOrthoAngle as OrthoAngle>::try_from_coordinate(coord)?,
+        ))
+    }
     fn left(&self) -> Self {
         self.quarter_rotated_ccw(1)
     }
@@ -312,8 +314,22 @@ where
         todo!()
     }
 
-    fn try_from_coordinate<T: Coordinate>(coord: T) -> Resule<Self, String> {
+    fn try_from_coordinate<P: Coordinate>(coord: P) -> Result<Self, String> {
         if coord.is_orthogonal() {}
+        todo!()
+    }
+}
+
+impl Direction for OrthogonalDirection {
+    fn angle(&self) -> NormalizedOrthoAngle {
+        self.0
+    }
+
+    fn from_angle(angle: impl OrthoAngle) -> Self {
+        Self(angle.normalized())
+    }
+
+    fn try_from_coordinate<T: Coordinate>(coord: T) -> Result<Self, String> {
         todo!()
     }
 }

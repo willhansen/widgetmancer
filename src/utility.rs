@@ -297,7 +297,7 @@ impl RigidTransform {
 
         let end_direction = self.rotation() + pose.angle();
 
-        RelativeSquareWithOrthogonalDir::from_square_and_turns(end_square, end_direction)
+        RelativeSquareWithOrthogonalDir::from_square_and_dir(end_square, end_direction)
     }
     pub fn inverse(&self) -> Self {
         Self {

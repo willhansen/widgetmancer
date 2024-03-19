@@ -252,6 +252,9 @@ pub trait SignedCoordinate:
         let axis_vector: Self = axis.into().to_step();
         self.dot(axis_vector)
     }
+    fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
+        <NormalizedOrthoAngle as OrthoAngle>::try_from_coordinate(*self)
+    }
 }
 impl<T> SignedCoordinate for T
 where

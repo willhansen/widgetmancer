@@ -1610,14 +1610,14 @@ mod tests {
         assert_eq!(transform.rotation(), NormalizedOrthoAngle::new(3));
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
-            (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
-            (STEP_LEFT, STEP_RIGHT, STEP_UP * 2, STEP_DOWN),
-            (STEP_ZERO, STEP_RIGHT, STEP_UP, STEP_DOWN),
+            (STEP_LEFT, UP, STEP_UP * 2, RIGHT),
+            (STEP_LEFT, RIGHT, STEP_UP * 2, DOWN),
+            (STEP_ZERO, RIGHT, STEP_UP, DOWN),
             (
                 STEP_UP + STEP_LEFT * 2,
-                STEP_DOWN,
+                DOWN,
                 STEP_RIGHT + STEP_UP * 3,
-                STEP_LEFT,
+                LEFT,
             ),
         ];
         for (
@@ -1627,14 +1627,14 @@ mod tests {
             direction_near_exit,
         ) in entrance_offset_and_direction_exit_offset_and_direction
         {
-            let actual_center = entrance.with_offset(offset_from_entrance).with_direction(
-                NormalizedOrthoAngle::from_orthogonal_vector(direction_near_entrance),
-            );
+            let actual_center = entrance
+                .with_offset(offset_from_entrance)
+                .with_direction(direction_near_entrance);
             let virtual_center_at_exit =
                 actual_center.apply_rigid_transform(portal.get_transform());
-            let correct_center_at_exit = exit.with_offset(offset_from_exit).with_direction(
-                NormalizedOrthoAngle::from_orthogonal_vector(direction_near_exit),
-            );
+            let correct_center_at_exit = exit
+                .with_offset(offset_from_exit)
+                .with_direction(direction_near_exit);
             assert_eq!(virtual_center_at_exit, correct_center_at_exit);
         }
     }

@@ -36,9 +36,7 @@ impl RecoilingBoardAnimation {
 
         RecoilingBoardAnimation {
             board_size,
-            orthogonal_shot_direction: NormalizedOrthoAngle::from_orthogonal_vector(
-                orthogonalized_step,
-            ),
+            orthogonal_shot_direction: orthogonalized_step.orthogonal_angle().unwrap(),
             start_time: Instant::now(),
             floor_color_enum,
         }
