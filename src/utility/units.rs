@@ -28,6 +28,17 @@ pub type BoardSize = Vector2D<u32, SquareGridInWorldFrame>;
 pub type WorldStep = WorldCoordinate<i32>;
 pub type WorldMove = WorldCoordinate<f32>;
 
+pub type TwoDifferentWorldPoints = TwoDifferentPoints<WorldPoint>;
+pub type TwoDifferentWorldSquares = TwoDifferentPoints<WorldSquare>;
+pub type TwoDifferentLocalSquarePoints =
+    TwoDifferentPoints<Point2D<f32, SquareGridInLocalSquareFrame>>;
+pub type TwoDifferentLocalCharacterPoints =
+    TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
+// TODO: put in some kind of default module like euclid does?
+pub type TwoDifferentFloatPoints = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
+pub type WorldLine = TwoDifferentWorldPoints;
+pub type LocalSquareLine = TwoDifferentLocalSquarePoints;
+
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
 pub type NStepList = Vec<NStep>;
@@ -77,7 +88,6 @@ pub const STEP_UP_RIGHT: WorldStep = vec2(1, 1);
 pub const STEP_UP_LEFT: WorldStep = vec2(-1, 1);
 pub const STEP_DOWN_LEFT: WorldStep = vec2(-1, -1);
 pub const STEP_DOWN_RIGHT: WorldStep = vec2(1, -1);
-
 
 pub const ORTHOGONAL_STEPS: [WorldStep; 4] = [STEP_UP, STEP_DOWN, STEP_RIGHT, STEP_LEFT];
 pub const DIAGONAL_STEPS: [WorldStep; 4] =

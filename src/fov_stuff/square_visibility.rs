@@ -91,7 +91,7 @@ impl SquareVisibilityFromOneLargeShadow {
     fn half_visible(shadow_direction: Angle<f32>) -> Self {
         // TODO: may be backwards
         let shadow_direction = standardize_angle(shadow_direction);
-        let shadow_line = <TwoDifferentFloatPoints as LineTrait>::new_through_origin(
+        let shadow_line = LocalSquareLine::new_through_origin(
             LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
         );
         Self::new_partially_visible(
@@ -499,7 +499,7 @@ mod tests {
     #[should_panic]
     fn test_one_shadow__should_fail_to_make_not_visible() {
         let non_vis = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::top_half_plane().extended(-0.6),
+            HalfPlaneCuttingLocalSquare::top_half_plane().extended(-0.6),
         );
     }
     #[test]
@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn test_one_shadow__only_partially_visible() {
         let vis = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-3),
+            HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
         );
         assert!(vis.is_only_partially_visible());
         assert!(vis.is_at_least_partially_visible());
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn test_one_shadow__almost_fully_visible() {
         let vis = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-3),
+            HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
         );
 
         assert!(!vis.is_just_barely_fully_visible(0.0));
@@ -532,14 +532,14 @@ mod tests {
     #[test]
     fn test_square_visibility_overlap__simple_non_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_horizontal(0.4),
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(0.4),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_horizontal(0.3),
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(0.3),
                 (0.0, -1.0),
             ),
         );
@@ -550,14 +550,14 @@ mod tests {
     #[test]
     fn test_square_visibility_overlap__simple_overlap() {
         let vis1 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_horizontal(-0.3),
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(-0.3),
                 (0.0, 1.0),
             ),
         );
         let vis2 = SquareVisibility::new_partially_visible(
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_horizontal(0.2),
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(0.2),
                 (0.0, -1.0),
             ),
         );

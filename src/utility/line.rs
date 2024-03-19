@@ -7,15 +7,6 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub type TwoDifferentWorldPoints = TwoDifferentPoints<WorldPoint>;
-pub type TwoDifferentWorldSquares = TwoDifferentPoints<WorldSquare>;
-pub type TwoDifferentLocalSquarePoints =
-    TwoDifferentPoints<Point2D<f32, SquareGridInLocalSquareFrame>>;
-pub type TwoDifferentLocalCharacterPoints =
-    TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
-// TODO: put in some kind of default module like euclid does?
-pub type TwoDifferentFloatPoints = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
-
 pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     type PointType: SignedCoordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;

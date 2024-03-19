@@ -161,7 +161,7 @@ impl Drawable for PartialVisibilityDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
         let character_visible_portions = [0, 1].map(|i| {
             local_square_half_plane_to_local_character_half_plane(
-                self.visibility.visible_portion().unwrap(),
+                self.visibility.visible_portion().unwrap().into(),
                 i,
             )
         });
@@ -609,8 +609,11 @@ mod tests {
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(-1.0, 0.0)),
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::new_from_two_points(
+                    point2(0.0, 0.0),
+                    point2(-1.0, 0.0),
+                ),
                 point2(0.0, 25.0),
             ),
         );
