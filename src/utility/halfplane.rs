@@ -5,9 +5,9 @@ pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
 
 pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
 pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
-pub type LocalSquareHalfPlaneSplittingUnitSquare =
+pub type LocalSquareHalfPlaneWithBorderInUnitSquare =
     HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
-pub type LocalCharacterHalfPlaneSplittingUnitSquare =
+pub type LocalCharacterHalfPlaneWithBorderInUnitSquare =
     HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
 
 // TODO: allow non-floating-point-based half planes
