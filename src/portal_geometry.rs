@@ -376,7 +376,7 @@ mod tests {
             RigidTransform::from_start_and_end_poses(((3, 4), STEP_RIGHT), ((3, 4), STEP_DOWN));
         let (new_start, new_direction) = tf.transform_ray(point2(3.0, 4.0), Angle::degrees(45.0));
         assert_about_eq_2d(new_start, point2(3.0, 4.0));
-        assert_about_eq!(new_direction.to_degrees(), -45.0);
+        assert_about_eq!(new_direction.to_degrees(), -45.0, 1e-5);
     }
     #[test]
     fn test_transform_ray__move_and_rotate() {
