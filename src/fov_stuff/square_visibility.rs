@@ -30,7 +30,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     // creators
     #[deprecated(note = "just use the enum")]
     fn new_fully_visible() -> Self;
-    fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self;
+    fn new_partially_visible(visible_portion: HalfPlaneCuttingLocalSquare) -> Self;
     fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
     fn new_top_half_visible() -> Self;
     fn new_bottom_half_visible() -> Self;
@@ -53,13 +53,13 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
 pub enum SquareVisibilityFromOneLargeShadow {
     FullyVisible,
     // TODO: have more than one half plane (two?)
-    PartiallyVisible(LocalSquareHalfPlane),
+    PartiallyVisible(HalfPlaneCuttingLocalSquare),
     // PartiallyVisible(LocalSquareHalfPlaneWithBorderOnUnitSquare), // TODO
     NotVisible,
 }
 
 impl SquareVisibilityFromOneLargeShadow {
-    pub(crate) fn visible_portion(&self) -> Option<LocalSquareHalfPlane> {
+    pub(crate) fn visible_portion(&self) -> Option<HalfPlaneCuttingLocalSquare> {
         match self {
             Self::PartiallyVisible(v) => Some(*v),
             _ => None,
@@ -88,18 +88,23 @@ impl SquareVisibilityFromOneLargeShadow {
         Self::half_visible((-which_half_visible.into()).angle().into())
     }
 
-    fn half_visible(mut shadow_direction: Angle<f32>) -> Self {
-        // todo: may be backwards
-        shadow_direction = standardize_angle(shadow_direction);
-        Self::new_partially_visible(HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::<LocalSquarePoint>::new_from_two_points(
-                point2(0.0, 0.0),
-                LocalSquarePoint::unit_vector_from_angle(shadow_direction)
-                    .quarter_rotated_ccw(1)
-                    .cast_unit(),
+    fn half_visible(shadow_direction: Angle<f32>) -> Self {
+        // TODO: may be backwards
+        let shadow_direction = standardize_angle(shadow_direction);
+        let shadow_line = <TwoDifferentFloatPoints as LineTrait>::new_through_origin(
+            LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
+        );
+        Self::new_partially_visible(
+            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                TwoDifferentPointsOnCenteredUnitSquare::<LocalSquarePoint>::new_from_two_points(
+                    point2(0.0, 0.0),
+                    LocalSquarePoint::unit_vector_from_angle(shadow_direction)
+                        .quarter_rotated_ccw(1)
+                        .cast_unit(),
+                ),
+                LocalSquarePoint::unit_vector_from_angle(shadow_direction).cast_unit(),
             ),
-            LocalSquarePoint::unit_vector_from_angle(shadow_direction).cast_unit(),
-        ))
+        )
     }
 }
 
@@ -132,7 +137,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
     fn is_just_barely_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion()
-            .is_some_and(|v: LocalSquareHalfPlane| {
+            .is_some_and(|v: HalfPlaneCuttingLocalSquare| {
                 v.fully_covers_centered_unit_square_with_tolerance(tolerance)
                     .is_partial()
             })
@@ -141,27 +146,18 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         Self::FullyVisible
     }
 
-    fn new_partially_visible(visible_portion: LocalSquareHalfPlane) -> Self {
-        assert!(visible_portion.at_least_partially_covers_unit_square());
-        assert!(visible_portion
-            .fully_covers_centered_unit_square()
-            .is_false());
+    fn new_partially_visible(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
         SquareVisibilityFromOneLargeShadow::PartiallyVisible(visible_portion)
     }
 
     fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
         assert!(visible_portion.at_least_partially_covers_unit_square());
-        if let Some(cutting_half_plane) = visible_portion.try_into() {}
-
-        if visible_portion
-            .fully_covers_centered_unit_square()
-            .is_true()
-        {
-            Self::new_fully_visible()
-        } else if visible_portion.at_least_partially_covers_unit_square() {
-            Self::new_partially_visible(visible_portion)
+        if let Ok(cutting_half_plane) = visible_portion.try_into() {
+            Self::PartiallyVisible(cutting_half_plane)
+        } else if visible_portion.covers_origin().is_true() {
+            Self::FullyVisible
         } else {
-            panic!("half plane does not even partially cover centered unit square")
+            Self::NotVisible
         }
     }
     fn new_top_half_visible() -> Self {

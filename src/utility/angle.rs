@@ -251,13 +251,13 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
         ))
     }
     fn left(&self) -> Self {
-        self.quarter_rotated_ccw(1)
+        self.turned_left()
     }
     fn right(&self) -> Self {
-        self.quarter_rotated_ccw(3)
+        self.turned_right()
     }
     fn reversed(&self) -> Self {
-        self.quarter_rotated_ccw(2)
+        self.turned_back()
     }
     fn is_parallel(&self, other: impl Direction) -> bool {
         self.dot::<i32>(other) != 0

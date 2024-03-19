@@ -649,6 +649,24 @@ pub trait QuarterTurnRotatable {
             .try_into()
             .unwrap()
     }
+    fn turned_left(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(1)
+    }
+    fn turned_right(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(-1)
+    }
+    fn turned_back(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(2)
+    }
 }
 
 // TODO: generate with macro

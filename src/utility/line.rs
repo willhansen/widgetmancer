@@ -48,13 +48,7 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
         )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
-        Self::new_from_two_points(
-            Self::PointType::new(
-                <Self::PointType as Coordinate>::DataType::zero(),
-                <Self::PointType as Coordinate>::DataType::zero(),
-            ),
-            second_point,
-        )
+        Self::new_from_two_points(<Self::PointType as euclid::num::Zero>::zero(), second_point)
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,

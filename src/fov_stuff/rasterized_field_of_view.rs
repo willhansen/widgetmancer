@@ -1199,13 +1199,13 @@ mod tests {
         rasterized_fov.add_partially_visible_local_relative_square(
             STEP_UP,
             &TopDownPortalShape::new_partially_visible(
-                LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-2),
+                HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-2),
             ),
         );
         rasterized_fov.add_partially_visible_local_relative_square(
             STEP_DOWN,
             &TopDownPortalShape::new_partially_visible(
-                LocalSquareHalfPlane::top_half_plane().extended(0.5 - 1e-4),
+                HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-4),
             ),
         );
         assert_eq!(rasterized_fov.visible_local_relative_squares().len(), 4);
@@ -1371,9 +1371,9 @@ mod tests {
         let top_down_portal = TopDownPortal::new_with_exit_shape(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
-            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::new_with_inside_down(
-                0.0,
-            )),
+            SquareVisibility::new_partially_visible(
+                HalfPlaneCuttingLocalSquare::new_with_inside_down(0.0),
+            ),
         );
 
         let forward_tf_through_portal =
@@ -1407,9 +1407,9 @@ mod tests {
         let top_down_portal = TopDownPortal::new_with_exit_shape(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
-            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::new_with_inside_down(
-                0.0,
-            )),
+            SquareVisibility::new_partially_visible(
+                HalfPlaneCuttingLocalSquare::new_with_inside_down(0.0),
+            ),
         );
 
         let old_fov_root_pose: WorldSquareWithOrthogonalDir = (2, 1, UP).into();
@@ -1490,9 +1490,9 @@ mod tests {
         let top_down_portal = TopDownPortal::new_with_exit_shape(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
-            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::new_with_inside_down(
-                0.0,
-            )),
+            SquareVisibility::new_partially_visible(
+                HalfPlaneCuttingLocalSquare::new_with_inside_down(0.0),
+            ),
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
@@ -1547,9 +1547,9 @@ mod tests {
         let top_down_portal = TopDownPortal::new_with_exit_shape(
             (5, 3),
             TopDownPortalTarget::new((20, 205), 5, 2),
-            SquareVisibility::new_partially_visible(LocalSquareHalfPlane::new_with_inside_down(
-                0.0,
-            )),
+            SquareVisibility::new_partially_visible(
+                HalfPlaneCuttingLocalSquare::new_with_inside_down(0.0),
+            ),
         );
 
         // top-down portal is at (2+5, 1+3) = (7,4)
