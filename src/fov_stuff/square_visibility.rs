@@ -96,7 +96,7 @@ impl SquareVisibilityFromOneLargeShadow {
         );
         Self::new_partially_visible(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoDifferentPointsOnCenteredUnitSquare::<LocalSquarePoint>::new_from_two_points(
+                TwoDifferentPointsOnCenteredUnitSquare::<LocalSquarePoint>::new_from_two_points_on_line(
                     point2(0.0, 0.0),
                     LocalSquarePoint::unit_vector_from_angle(shadow_direction)
                         .quarter_rotated_ccw(1)
@@ -199,7 +199,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
             let shadow_line_from_center: TwoDifferentWorldPoints =
-                TwoDifferentPoints::new_from_two_points(
+                TwoDifferentPoints::new_from_two_points_on_line(
                     point2(0.0, 0.0),
                     WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle()).cast_unit(),
                 );
@@ -445,7 +445,10 @@ mod tests {
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(
             HalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                TwoDifferentPoints::new_from_two_points_on_line(
+                    point2(-5.0, 2.0),
+                    point2(5.0, 2.2928933),
+                ),
                 point2(-12.061038, -1.3054879),
             ),
         );
@@ -466,7 +469,8 @@ mod tests {
     }
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = TwoDifferentPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line =
+            TwoDifferentPoints::new_from_two_points_on_line(point2(0.0, 0.0), point2(1.0, 1.0));
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 

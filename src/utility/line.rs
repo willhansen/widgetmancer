@@ -10,7 +10,10 @@ use crate::utility::*;
 pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     type PointType: SignedCoordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
-    fn new_from_two_points(p1: impl Into<Self::PointType>, p2: impl Into<Self::PointType>) -> Self;
+    fn new_from_two_points_on_line(
+        p1: impl Into<Self::PointType>,
+        p2: impl Into<Self::PointType>,
+    ) -> Self;
 
     fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
 
@@ -23,23 +26,26 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
         OtherLine: LineTrait<PointType = Self::PointType>,
     {
         let [p1, p2] = other_line.two_different_arbitrary_points_on_line();
-        Self::new_from_two_points(p1, p2)
+        Self::new_from_two_points_on_line(p1, p2)
     }
 
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points(
+        Self::new_from_two_points_on_line(
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
         )
     }
     fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points(
+        Self::new_from_two_points_on_line(
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
         )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
-        Self::new_from_two_points(<Self::PointType as euclid::num::Zero>::zero(), second_point)
+        Self::new_from_two_points_on_line(
+            <Self::PointType as euclid::num::Zero>::zero(),
+            second_point,
+        )
     }
     fn from_point_and_direction(
         point: impl Into<Self::PointType>,
@@ -48,14 +54,14 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
         let p1 = point.into();
         let v = direction.into();
         let p2 = p1 + v;
-        Self::new_from_two_points(p1, p2)
+        Self::new_from_two_points_on_line(p1, p2)
     }
     fn is_orthogonal(&self) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         p1.x() == p2.x() || p1.y() == p2.y()
     }
     fn from_array(a: [Self::PointType; 2]) -> Self {
-        Self::new_from_two_points(a[0], a[1])
+        Self::new_from_two_points_on_line(a[0], a[1])
     }
     fn x_intercept(&self) -> Option<f32> {
         if self.is_vertical() {
@@ -175,7 +181,7 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
     }
     fn from_ray(start: Self::PointType, angle: Angle<f32>, length: f32) -> Self {
         assert!(length > 0.0);
-        Self::new_from_two_points(start, naive_ray_endpoint(start, angle, length))
+        Self::new_from_two_points_on_line(start, naive_ray_endpoint(start, angle, length))
     }
     fn same_side_of_line(
         &self,
@@ -383,10 +389,10 @@ pub trait DirectedLineTrait: LineTrait {
     where
         OtherLine: DirectedLineTrait<PointType = Self::PointType>,
     {
-        Self::new_from_two_points(other.p1(), other.p2())
+        Self::new_from_two_points_on_line(other.p1(), other.p2())
     }
     fn reversed(&self) -> Self {
-        Self::new_from_two_points(self.p2(), self.p1())
+        Self::new_from_two_points_on_line(self.p2(), self.p1())
     }
     fn to_array(&self) -> [Self::PointType; 2] {
         [self.p1(), self.p2()]
@@ -477,8 +483,8 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
 #[derive(Clone, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
 impl<P: FloatCoordinate> Copy for TwoDifferentPointsOnCenteredUnitSquare<P> {}
-impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Option<Self> {
+impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointType> {
+    fn try_new(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Option<Self> {
         let p1 = p1.into();
         let p2 = p2.into();
         let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
@@ -488,18 +494,28 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
             None
         }
     }
-    fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+    fn new(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         let p1 = p1.into();
         let p2 = p2.into();
         assert!(p1.on_centered_unit_square());
         assert!(p2.on_centered_unit_square());
         Self(TwoDifferentPoints::new(p1, p2))
     }
+    fn try_from_line<LineType: FloatLineTrait<_PointType = PointType>>(
+        line: LineType,
+    ) -> Option<Self> {
+        let points: Vec<PointType> = line.unordered_line_intersections_with_centered_unit_square();
+        if points.len() < 2 {
+            None
+        } else {
+            Self::try_new(points[0], points[1])
+        }
+    }
 }
 
 impl<PointType: SignedCoordinate> LineTrait for TwoDifferentPoints<PointType> {
     type PointType = PointType;
-    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
+    fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         TwoDifferentPoints::new(p1, p2)
     }
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
@@ -517,8 +533,9 @@ impl<PointType: SignedCoordinate> DirectedLineTrait for TwoDifferentPoints<Point
 
 impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
-    fn new_from_two_points(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
-        Self::new(p1, p2)
+    fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
+        let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
+        Self::try_from_line(less_constrained_line).unwrap()
     }
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
@@ -563,7 +580,7 @@ where
     CanBePointType: Into<PointType>,
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
-        Self::new_from_two_points(value.0, value.1)
+        Self::new_from_two_points_on_line(value.0, value.1)
     }
 }
 
@@ -690,7 +707,7 @@ pub fn square_face_as_line<P: SignedIntCoordinate>(
     let square_center = square.to_f32();
     // TODO: avoid the type notation on `step` somehow
     let face_center = square_center.moved(face_direction, 0.5);
-    TwoDifferentPoints::new_from_two_points(
+    TwoDifferentPoints::new_from_two_points_on_line(
         face_center.moved(face_direction.left(), 0.5),
         face_center.moved(face_direction.right(), 0.5),
     )
@@ -731,10 +748,13 @@ mod tests {
     use super::*;
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
-        let input_line = TwoDifferentWorldPoints::new_from_two_points((-1.5, -1.0), (0.0, 0.0));
+        let input_line =
+            TwoDifferentWorldPoints::new_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
-        let output_line =
-            TwoDifferentWorldPoints::new_from_two_points(output_points[0], output_points[1]);
+        let output_line = TwoDifferentWorldPoints::new_from_two_points_on_line(
+            output_points[0],
+            output_points[1],
+        );
         let in_vec = input_line.p2 - input_line.p1;
         let out_vec = output_line.p2 - output_line.p1;
 
@@ -746,7 +766,7 @@ mod tests {
     fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
     ) {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points(point2(-0.5, -0.5), point2(-0.5, 0.5));
+            TwoDifferentPoints::new_from_two_points_on_line(point2(-0.5, -0.5), point2(-0.5, 0.5));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
         assert_eq!(input_line.p1, output_points[0]);
         assert_eq!(input_line.p2, output_points[1]);
@@ -754,7 +774,10 @@ mod tests {
 
     #[test]
     fn test_same_side_of_line__vertical_line() {
-        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_points((-0.5, -0.5), (-0.5, 0.5));
+        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_points_on_line(
+            (-0.5, -0.5),
+            (-0.5, 0.5),
+        );
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
         assert_false!(line.same_side_of_line(neg_point, origin))
@@ -766,13 +789,16 @@ mod tests {
     }
     #[test]
     fn test_line_intersections__observed_3_intersections() {
-        TwoDifferentPoints::<WorldPoint>::new_from_two_points((-29.5, 5.0), (-27.589872, 4.703601))
-            .ordered_line_intersections_with_centered_unit_square();
+        TwoDifferentPoints::<WorldPoint>::new_from_two_points_on_line(
+            (-29.5, 5.0),
+            (-27.589872, 4.703601),
+        )
+        .ordered_line_intersections_with_centered_unit_square();
     }
     #[test]
     fn test_line_point_reflection() {
         let line: TwoDifferentWorldPoints =
-            TwoDifferentPoints::new_from_two_points((1.0, 5.0), (2.4, 5.0));
+            TwoDifferentPoints::new_from_two_points_on_line((1.0, 5.0), (2.4, 5.0));
 
         assert_about_eq!(
             line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
@@ -785,7 +811,7 @@ mod tests {
     }
     #[test]
     fn test_same_side_of_line() {
-        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_points(
+        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_points_on_line(
             point2(1.0, 1.0),
             point2(2.0, 1.0),
         );
@@ -811,7 +837,7 @@ mod tests {
     #[test]
     fn test_horizontal_line_intersection_with_square() {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points(point2(0.5, 0.0), point2(-1.5, 0.0));
+            TwoDifferentPoints::new_from_two_points_on_line(point2(0.5, 0.0), point2(-1.5, 0.0));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.5, 0.0), point2(-0.5, 0.0)]);
     }
@@ -848,7 +874,7 @@ mod tests {
     #[test]
     fn test_vertical_line_intersection_with_square() {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points(point2(0.0, 0.5), point2(0.0, -1.5));
+            TwoDifferentPoints::new_from_two_points_on_line(point2(0.0, 0.5), point2(0.0, -1.5));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
         assert_eq!(output_points, vec![point2(0.0, 0.5), point2(0.0, -0.5)]);
     }
@@ -1029,78 +1055,95 @@ mod tests {
     #[test]
     fn test_line_line_intersection__easy_orthogonal_hit() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_points(point2(0.0, 0.0), point2(0.0, 4.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(-1.0, 1.0),
-                        point2(1.0, 1.0),
-                    ),
-                )
-                .unwrap(),
+            TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(0.0, 0.0),
+                point2(0.0, 4.0),
+            )
+            .intersection_point_with_other_line_segment(
+                &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                    point2(-1.0, 1.0),
+                    point2(1.0, 1.0),
+                ),
+            )
+            .unwrap(),
             point2(0.0, 1.0),
         )
     }
     #[test]
     fn test_line_line_intersection__diagonal_intersection() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(1.0, 0.0),
-                        point2(0.0, 1.0),
-                    ),
-                )
-                .unwrap(),
+            TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(0.0, 0.0),
+                point2(1.0, 1.0),
+            )
+            .intersection_point_with_other_line_segment(
+                &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                    point2(1.0, 0.0),
+                    point2(0.0, 1.0),
+                ),
+            )
+            .unwrap(),
             point2(0.5, 0.5),
         )
     }
     #[test]
     fn test_line_line_intersection__miss() {
-        assert!(
-            TwoDifferentWorldPoints::new_from_two_points(point2(0.0, 0.0), point2(1.0, 1.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(100.0, 1000.0),
-                        point2(10.0, 10.0),
-                    )
-                )
-                .is_none()
+        assert!(TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(0.0, 0.0),
+            point2(1.0, 1.0)
         )
+        .intersection_point_with_other_line_segment(
+            &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(100.0, 1000.0),
+                point2(10.0, 10.0),
+            )
+        )
+        .is_none())
     }
     #[test]
     fn test_line_line_intersection__endpoint_touch_mid_counts() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(7.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(5.5, 5.0),
-                        point2(10.0, 10.0),
-                    ),
-                )
-                .unwrap(),
+            TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(5.0, 5.0),
+                point2(7.0, 5.0),
+            )
+            .intersection_point_with_other_line_segment(
+                &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                    point2(5.5, 5.0),
+                    point2(10.0, 10.0),
+                ),
+            )
+            .unwrap(),
             point2(5.5, 5.0),
         )
     }
     #[test]
     fn test_line_line_intersection__perpendicular_endpoints_touch() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(10.0, 5.0),
-                        point2(10.0, 10.0),
-                    ),
-                )
-                .unwrap(),
+            TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0),
+            )
+            .intersection_point_with_other_line_segment(
+                &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                    point2(10.0, 5.0),
+                    point2(10.0, 10.0),
+                ),
+            )
+            .unwrap(),
             point2(10.0, 5.0),
         )
     }
     #[test]
     fn test_line_line_intersection__parallel_endpoints_touch() {
-        let line1 =
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0));
-        let line2 =
-            TwoDifferentWorldPoints::new_from_two_points(point2(10.0, 5.0), point2(20.0, 5.0));
+        let line1 = TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0),
+        );
+        let line2 = TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(10.0, 5.0),
+            point2(20.0, 5.0),
+        );
         assert_about_eq_2d(
             line1
                 .intersection_point_with_other_line_segment(&line2)
@@ -1130,55 +1173,59 @@ mod tests {
     }
     #[test]
     fn test_line_line_intersection__parallel_miss() {
-        assert!(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(11.0, 5.0),
-                        point2(20.0, 5.0),
-                    )
-                )
-                .is_none(),
+        assert!(TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .intersection_point_with_other_line_segment(
+            &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(11.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_line_line_intersection__parallel_overlap_does_not_count() {
-        assert!(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(9.0, 5.0),
-                        point2(20.0, 5.0),
-                    )
-                )
-                .is_none(),
+        assert!(TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .intersection_point_with_other_line_segment(
+            &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(9.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_line_line_intersection__parallel_full_overlap_does_not_count() {
-        assert!(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(0.0, 5.0),
-                        point2(20.0, 5.0),
-                    )
-                )
-                .is_none(),
+        assert!(TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .intersection_point_with_other_line_segment(
+            &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(0.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_line_line_intersection__parallel_exact_overlap_does_not_count() {
-        assert!(
-            TwoDifferentWorldPoints::new_from_two_points(point2(5.0, 5.0), point2(10.0, 5.0))
-                .intersection_point_with_other_line_segment(
-                    &TwoDifferentWorldPoints::new_from_two_points(
-                        point2(5.0, 5.0),
-                        point2(10.0, 5.0),
-                    )
-                )
-                .is_none(),
+        assert!(TwoDifferentWorldPoints::new_from_two_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .intersection_point_with_other_line_segment(
+            &TwoDifferentWorldPoints::new_from_two_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_first_inside_square_face_hit_by_ray__simple_case() {
@@ -1263,7 +1310,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner__within_tolerance(
     ) {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::new_from_two_points((0.49, 0.5), (0.5, 0.49));
+            TwoDifferentPoints::new_from_two_points_on_line((0.49, 0.5), (0.5, 0.49));
         let tolerance = 0.1;
 
         let expected_points = [(0.49, 0.5), (0.5, 0.49)];
@@ -1360,74 +1407,74 @@ mod tests {
     }
     #[test]
     fn test_x_intercept__vertical_zero() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((0.0, 0.0), (0.0, 1.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((0.0, 0.0), (0.0, 1.0));
         assert_about_eq!(line.x_intercept().unwrap(), 0.0);
     }
     #[test]
     fn test_x_intercept__vertical_non_zero() {
         let x = 5.5;
-        let line = TwoDifferentWorldPoints::new_from_two_points((x, 0.0), (x, 1.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((x, 0.0), (x, 1.0));
         assert_about_eq!(line.x_intercept().unwrap(), x);
     }
     #[test]
     fn test_x_intercept__horizontal_zero() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((0.0, 0.0), (1000.0, 0.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((0.0, 0.0), (1000.0, 0.0));
         assert!(line.x_intercept().is_none());
     }
     #[test]
     fn test_x_intercept__horizontal_non_zero() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((7.0, 1.0), (0.0, 1.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((7.0, 1.0), (0.0, 1.0));
         assert!(line.x_intercept().is_none());
     }
     #[test]
     fn test_x_intercept__diagonal() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((5.0, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((5.0, 1.0), (6.0, 2.0));
         assert_about_eq!(line.x_intercept().unwrap(), 4.0);
     }
     #[test]
     fn test_y_intercept_vertical_zero() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((0.0, 1.0), (0.0, 0.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((0.0, 1.0), (0.0, 0.0));
         assert!(line.y_intercept().is_none());
     }
     #[test]
     fn test_y_intercept_vertical_non_zero() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((7.0, 1.0), (7.0, 7.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((7.0, 1.0), (7.0, 7.0));
         assert!(line.y_intercept().is_none());
     }
     #[test]
     fn test_y_intercept_positive_slope() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((2.0, 1.0), (3.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((2.0, 1.0), (3.0, 2.0));
         assert_about_eq!(line.y_intercept().unwrap(), -1.0);
     }
     #[test]
     fn test_y_intercept_horizontal() {
         let y = 2.0;
-        let line = TwoDifferentWorldPoints::new_from_two_points((-2.0, y), (3.0, y));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((-2.0, y), (3.0, y));
         assert_about_eq!(line.y_intercept().unwrap(), y);
     }
     #[test]
     fn test_y_intercept_negative_slope() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((-2.0, 1.0), (-3.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((-2.0, 1.0), (-3.0, 2.0));
         assert_about_eq!(line.y_intercept().unwrap(), -1.0);
     }
     #[test]
     fn test_slope__positive() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((5.5, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((5.5, 1.0), (6.0, 2.0));
         assert_about_eq!(line.slope().unwrap(), 2.0);
     }
     #[test]
     fn test_slope__vertical() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((6.0, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((6.0, 1.0), (6.0, 2.0));
         assert!(line.slope().is_none());
     }
     #[test]
     fn test_slope__horizontal() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((5.5, 2.0), (60.0, 2.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((5.5, 2.0), (60.0, 2.0));
         assert_about_eq!(line.slope().unwrap(), 0.0);
     }
     #[test]
     fn test_slope__negative() {
-        let line = TwoDifferentWorldPoints::new_from_two_points((4.0, 0.0), (0.0, 80.0));
+        let line = TwoDifferentWorldPoints::new_from_two_points_on_line((4.0, 0.0), (0.0, 80.0));
         assert_about_eq!(line.slope().unwrap(), -20.0);
     }
 }

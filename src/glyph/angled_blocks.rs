@@ -288,7 +288,7 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        let mut grid_line = TwoDifferentPoints::new_from_two_points(
+        let mut grid_line = TwoDifferentPoints::new_from_two_points_on_line(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
@@ -434,7 +434,7 @@ mod tests {
 
     fn test_snap_points_to_character() {
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(0, 0),
                 point2(2, 3)
             )),
@@ -442,7 +442,7 @@ mod tests {
             "lower-right diagonal"
         );
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(2, 3),
                 point2(0, 0)
             )),
@@ -450,7 +450,7 @@ mod tests {
             "swap points"
         );
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(2, 1),
                 point2(0, 3)
             )),
@@ -458,21 +458,21 @@ mod tests {
             "upper right corner"
         );
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(0, 1),
                 point2(2, 1)
             )),
             LOWER_ONE_THIRD_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(1, 0),
                 point2(1, 3)
             )),
             RIGHT_HALF_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points(
+            get_character_from_snap_points(TwoDifferentPoints::new_from_two_points_on_line(
                 point2(0, 0),
                 point2(2, 1)
             )),
