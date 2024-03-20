@@ -11,13 +11,25 @@ pub type HalfPlaneCuttingLocalCharacter =
     HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
 
 // TODO: allow non-floating-point-based half planes
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
 where
     LineType: DirectedFloatLineTrait,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
+}
+
+impl<L: DirectedFloatLineTrait> Debug for HalfPlane<L> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HalfPlane")
+            .field("dividing_line", &self.dividing_line)
+            .field(
+                "inside_direction",
+                &self.dividing_line.direction().turned_right(),
+            )
+            .finish()
+    }
 }
 
 impl<LineType> HalfPlane<LineType>
@@ -38,11 +50,12 @@ where
     ) -> Self {
         // let dividing_line = LineType::from_other_line(dividing_line);
         let dividing_line = dividing_line.into();
+        let point_on_half_plane = point_on_half_plane.into();
         HalfPlane {
             dividing_line: if three_points_are_clockwise(
                 dividing_line.p1(),
                 dividing_line.p2(),
-                point_on_half_plane.into(),
+                point_on_half_plane,
             ) {
                 dividing_line
             } else {

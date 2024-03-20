@@ -535,21 +535,21 @@ mod tests {
     }
     #[test]
     fn test_square_visibility_overlap__simple_non_overlap() {
-        let vis1 = SquareVisibility::new_partially_visible(
+        let up = SquareVisibility::new_partially_visible(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                 TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(0.4),
                 (0.0, 1.0),
             ),
         );
-        let vis2 = SquareVisibility::new_partially_visible(
+        let down = SquareVisibility::PartiallyVisible(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                 TwoDifferentPointsOnCenteredUnitSquare::new_horizontal(0.3),
                 (0.0, -1.0),
             ),
         );
-        assert_false!(vis1.overlaps(vis2, 1e-5));
-        assert_false!(vis2.overlaps(vis1, 1e-5));
-        assert_false!(vis1.overlaps(vis1.complement(), 1e-5));
+        assert_false!(up.overlaps(down, 1e-5));
+        assert_false!(down.overlaps(up, 1e-5));
+        assert_false!(up.overlaps(up.complement(), 1e-5));
     }
     #[test]
     fn test_square_visibility_overlap__simple_overlap() {

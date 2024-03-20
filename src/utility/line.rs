@@ -501,10 +501,10 @@ impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointTyp
         assert!(p2.on_centered_unit_square());
         Self(TwoDifferentPoints::new(p1, p2))
     }
-    fn try_from_line<LineType: FloatLineTrait<_PointType = PointType>>(
+    fn try_from_line<LineType: DirectedFloatLineTrait<_PointType = PointType>>(
         line: LineType,
     ) -> Option<Self> {
-        let points: Vec<PointType> = line.unordered_line_intersections_with_centered_unit_square();
+        let points: Vec<PointType> = line.ordered_line_intersections_with_centered_unit_square();
         if points.len() < 2 {
             None
         } else {
