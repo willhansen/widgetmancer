@@ -649,11 +649,6 @@ where
     }
 }
 
-pub struct Ray<U> {
-    pub point: Point2D<f32, U>,
-    pub angle: Angle<f32>,
-}
-
 pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,
     angle: Angle<f32>,

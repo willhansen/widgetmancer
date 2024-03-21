@@ -172,12 +172,18 @@ impl AngleInterval {
 
         Some(
             PartialAngleInterval {
-                anticlockwise_end: if a.contains_angle(b.ccw(), tolerance).is_at_least_partial() {
+                anticlockwise_end: if a
+                    .contains_angle_with_tolerance(b.ccw(), tolerance)
+                    .is_at_least_partial()
+                {
                     a.ccw()
                 } else {
                     b.ccw()
                 },
-                clockwise_end: if a.contains_angle(b.cw(), tolerance).is_at_least_partial() {
+                clockwise_end: if a
+                    .contains_angle_with_tolerance(b.cw(), tolerance)
+                    .is_at_least_partial()
+                {
                     a.cw()
                 } else {
                     b.cw()
@@ -201,12 +207,14 @@ impl AngleInterval {
 
         if a.overlaps_partial_arc(b, tolerance).is_true() {
             vec![AngleInterval::from_angles(
-                if b.contains_angle(a.cw(), tolerance).is_true() {
+                if b.contains_angle_with_tolerance(a.cw(), tolerance).is_true() {
                     a.cw()
                 } else {
                     b.cw()
                 },
-                if b.contains_angle(a.ccw(), tolerance).is_true() {
+                if b.contains_angle_with_tolerance(a.ccw(), tolerance)
+                    .is_true()
+                {
                     a.ccw()
                 } else {
                     b.ccw()
@@ -243,11 +251,11 @@ impl AngleInterval {
         }
 
         let mut split_results = vec![];
-        if a.contains_or_touches_angle(b.cw()) && a.cw() != b.cw() {
+        if a.contains_angle_inclusive(b.cw()) && a.cw() != b.cw() {
             let below_interval = AngleInterval::from_angles(a.cw(), b.cw());
             split_results.push(below_interval);
         }
-        if a.contains_or_touches_angle(b.ccw()) && a.ccw() != b.ccw() {
+        if a.contains_angle_inclusive(b.ccw()) && a.ccw() != b.ccw() {
             let above_interval = AngleInterval::from_angles(b.ccw(), a.ccw());
             split_results.push(above_interval);
         }
@@ -361,7 +369,7 @@ impl AngleInterval {
         match self {
             Empty => False,
             FullCircle => True,
-            PartialArc(partial_arc) => partial_arc.contains_angle(angle, tolerance),
+            PartialArc(partial_arc) => partial_arc.contains_angle_with_tolerance(angle, tolerance),
         }
     }
 

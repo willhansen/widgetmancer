@@ -172,62 +172,112 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         rel_square: impl Into<WorldStep>,
     ) -> Self {
         let rel_square: WorldStep = rel_square.into(); // TODO: tired of writing this out a bunch
-        let angle_tolerance = FAngle::degrees(0.01); // TODO: double check this, maybe standardize
-        let length_tolerance = rel_square.to_f32().length() * angle_tolerance.radians;
         let partial_view_arc = match view_arc.into() {
             AngleInterval::Empty => return Self::NotVisible,
             AngleInterval::FullCircle => return Self::FullyVisible,
             AngleInterval::PartialArc(partial) => partial,
         };
         if rel_square == STEP_ZERO {
-            // return Some(SquareVisibility::new_fully_visible());
             return Self::NotVisible;
         }
-        let square_arc = PartialAngleInterval::from_relative_square(rel_square);
-        if partial_view_arc
-            .contains_partial_arc(square_arc, angle_tolerance)
-            .is_at_least_partial()
-        {
-            Self::FullyVisible
-        } else if partial_view_arc
-            .overlaps_partial_arc(square_arc, angle_tolerance)
-            .is_at_least_partial()
-        {
-            // TODO: double check tolerance choice on this "if"
+        let view_arc_edges: [CenteredWorldArcEdge; 2] = partial_view_arc.edges();
+        let intersections: Vec<HalfPlaneCuttingWorldSquare> = view_arc_edges
+            .iter()
+            .map(|edge| edge.intersection_with_square(rel_square))
+            .collect();
 
-            let shadow_arc = partial_view_arc.complement();
-            let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
+        // Cases:
+        // - 1 intersection
 
-            let shadow_line_from_center: TwoDifferentWorldPoints =
-                TwoDifferentPoints::new_from_two_points_on_line(
-                    point2(0.0, 0.0),
-                    WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle()).cast_unit(),
-                );
-            let point_in_shadow: WorldPoint =
-                WorldPoint::unit_vector_from_angle(shadow_arc.center_angle()).cast_unit();
+        // - 2 intersections, narrow fov
+        // - 2 intersections, very wide fov
+        // --> Check if dot of arc center and square center is positive
+        // --> Choose most overlapped
 
-            let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
-                shadow_line_from_center,
-                point_in_shadow,
-            );
-            let square_shadow =
-                world_half_plane_to_local_square_half_plane(shadow_half_plane, rel_square);
-
-            let shadow_coverage_of_unit_square =
-                square_shadow.coverage_of_centered_unit_square_with_tolerance(length_tolerance);
-
-            match shadow_coverage_of_unit_square {
-                RelativeIntervalLocation::MORE_THAN_FULL
-                | RelativeIntervalLocation::EXACTLY_FULL => Self::NotVisible,
-                RelativeIntervalLocation::PARTIALLY_FULL => {
-                    Self::PartiallyVisible(square_shadow.complement().try_into().unwrap())
+        // - no intersections, fully visible
+        // - no intersections, not visible
+        // --> Check if square center is in the arc
+        return match intersections.len() {
+            0 => {
+                let square_is_in_arc =
+                    partial_view_arc.contains_angle_inclusive(rel_square.angle_to_center());
+                if square_is_in_arc {
+                    Self::FullyVisible
+                } else {
+                    Self::NotVisible
                 }
-                RelativeIntervalLocation::EXACTLY_EMPTY
-                | RelativeIntervalLocation::LESS_THAN_EMPTY => Self::FullyVisible,
             }
-        } else {
-            Self::NotVisible
-        }
+            1 => Self::PartiallyVisible(intersections[0].into()),
+            2 => {
+                let is_wraparound_case = partial_view_arc
+                    .center_angle()
+                    .dot(rel_square.angle_to_center())
+                    > 0.0;
+                // high coverage percentage means more visible
+                // wraparound case means there's a small angle segment not visible
+                let selector = if is_wraparound_case {
+                    Iter::max_by_key
+                } else {
+                    Iter::min_by_key
+                };
+                selector(intersections.iter(), |i| {
+                    OrderedFloat(i.fraction_of_square_covered())
+                })
+                .unwrap()
+            }
+            n => panic!("invalid number of intersections: {}", n),
+        };
+
+        // TODO: delete below this line in this function
+
+        // let angle_tolerance = FAngle::degrees(0.01); // TODO: double check this, maybe standardize
+        // let length_tolerance = rel_square.to_f32().length() * angle_tolerance.radians;
+
+        // let square_arc = PartialAngleInterval::from_relative_square(rel_square);
+        // if partial_view_arc
+        //     .contains_partial_arc(square_arc, angle_tolerance)
+        //     .is_at_least_partial()
+        // {
+        //     Self::FullyVisible
+        // } else if partial_view_arc
+        //     .overlaps_partial_arc(square_arc, angle_tolerance)
+        //     .is_at_least_partial()
+        // {
+        //     // TODO: double check tolerance choice on this "if"
+
+        //     let shadow_arc = partial_view_arc.complement();
+        //     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
+
+        //     let shadow_line_from_center: TwoDifferentWorldPoints =
+        //         TwoDifferentPoints::new_from_two_points_on_line(
+        //             point2(0.0, 0.0),
+        //             WorldPoint::unit_vector_from_angle(overlapped_shadow_edge.angle()).cast_unit(),
+        //         );
+        //     let point_in_shadow: WorldPoint =
+        //         WorldPoint::unit_vector_from_angle(shadow_arc.center_angle()).cast_unit();
+
+        //     let shadow_half_plane = HalfPlane::new_from_line_and_point_on_half_plane(
+        //         shadow_line_from_center,
+        //         point_in_shadow,
+        //     );
+        //     let square_shadow =
+        //         world_half_plane_to_local_square_half_plane(shadow_half_plane, rel_square);
+
+        //     let shadow_coverage_of_unit_square =
+        //         square_shadow.coverage_of_centered_unit_square_with_tolerance(length_tolerance);
+
+        //     match shadow_coverage_of_unit_square {
+        //         RelativeIntervalLocation::MORE_THAN_FULL
+        //         | RelativeIntervalLocation::EXACTLY_FULL => Self::NotVisible,
+        //         RelativeIntervalLocation::PARTIALLY_FULL => {
+        //             Self::PartiallyVisible(square_shadow.complement().try_into().unwrap())
+        //         }
+        //         RelativeIntervalLocation::EXACTLY_EMPTY
+        //         | RelativeIntervalLocation::LESS_THAN_EMPTY => Self::FullyVisible,
+        //     }
+        // } else {
+        //     Self::NotVisible
+        // }
     }
 
     fn overlaps(&self, other: Self, tolerance: f32) -> bool {
@@ -572,6 +622,14 @@ mod tests {
     fn test_view_arc_source_is_not_visible_by_default() {
         assert!(SquareVisibility::from_relative_square_and_view_arc(
             AngleInterval::from_degrees(0.0, 45.0),
+            (0, 0)
+        )
+        .is_not_visible());
+    }
+    #[test]
+    fn test_view_arc_source_is_not_visible_by_default__full_circle() {
+        assert!(SquareVisibility::from_relative_square_and_view_arc(
+            AngleInterval::FullCircle,
             (0, 0)
         )
         .is_not_visible());

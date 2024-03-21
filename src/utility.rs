@@ -31,9 +31,12 @@ macro_rules! pub_mod_and_use {
 }
 
 pub_mod_and_use!(
+    angle,
     angle_interval,
+    angular_direction,
     bool_with_partial,
     circular_interval,
+    angular_edge_of_centered_arc,
     units,
     coordinates,
     general_utility,
@@ -46,7 +49,7 @@ pub_mod_and_use!(
     partial_angle_interval, // TODO: make private and contained within angle_interval?
     poses,
     quadrant,
-    angle,
+    ray,
     relative_interval_location,
     round_robin_iterator,
     size_2d,
