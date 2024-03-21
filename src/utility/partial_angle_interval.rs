@@ -255,15 +255,12 @@ impl PartialAngleInterval {
         let contained_in_other = other.num_contained_or_touching_edges(*self);
         contained_in_self >= 1 && contained_in_other >= 1
     }
-    pub fn edge_of_this_overlapped_by(
-        &self,
-        other: PartialAngleInterval,
-    ) -> DirectionalAngularEdge {
+    pub fn edge_of_this_overlapped_by(&self, other: PartialAngleInterval) -> ArcEdge {
         if !self.partially_overlaps_other_while_including_edges(other) {
             panic!("no overlap between {} and {}", self, other);
         }
         let is_clockwise_end = other.contains_angle_inclusive(self.clockwise_end);
-        DirectionalAngularEdge::new(
+        ArcEdge::new(
             if is_clockwise_end {
                 self.clockwise_end
             } else {
@@ -272,7 +269,7 @@ impl PartialAngleInterval {
             is_clockwise_end,
         )
     }
-    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> DirectionalAngularEdge {
+    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> ArcEdge {
         assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
         let clockwise_dist =
             PartialAngleInterval::from_angles(other.clockwise_end, self.clockwise_end).width();
@@ -280,7 +277,7 @@ impl PartialAngleInterval {
             PartialAngleInterval::from_angles(self.anticlockwise_end, other.anticlockwise_end)
                 .width();
         let clockwise_edge_is_deeper = clockwise_dist.radians > anticlockwise_dist.radians;
-        DirectionalAngularEdge::new(
+        ArcEdge::new(
             if clockwise_edge_is_deeper {
                 self.clockwise_end
             } else {
@@ -388,10 +385,7 @@ impl PartialAngleInterval {
             .overlaps_partial_arc(other, tolerance)
             .not()
     }
-    pub fn most_overlapped_edge_of_self(
-        &self,
-        other: PartialAngleInterval,
-    ) -> DirectionalAngularEdge {
+    pub fn most_overlapped_edge_of_self(&self, other: PartialAngleInterval) -> ArcEdge {
         assert!(self.touches_or_overlaps(other));
 
         // Select edge of self closest to the other's center
@@ -399,7 +393,7 @@ impl PartialAngleInterval {
         let dist_from_anticlockwise_edge =
             abs_angle_distance(self.anticlockwise_end, other.center_angle());
         let clockwise_is_closer = dist_from_clockwise_edge < dist_from_anticlockwise_edge;
-        DirectionalAngularEdge::new(
+        ArcEdge::new(
             if clockwise_is_closer {
                 self.clockwise_end
             } else {
@@ -554,7 +548,7 @@ mod tests {
         assert_eq!(
             PartialAngleInterval::from_degrees(135.0, 90.0)
                 .most_overlapped_edge_of_self(PartialAngleInterval::from_degrees(45.0, 135.0)),
-            DirectionalAngularEdge::new(Angle::degrees(90.0), false)
+            ArcEdge::new(Angle::degrees(90.0), false)
         );
     }
     #[test]

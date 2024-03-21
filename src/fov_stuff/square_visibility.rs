@@ -180,7 +180,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         if rel_square == STEP_ZERO {
             return Self::NotVisible;
         }
-        let view_arc_edges: [CenteredWorldArcEdge; 2] = partial_view_arc.edges();
+        let view_arc_edges: [ArcEdge; 2] = partial_view_arc.edges();
         let intersections: Vec<HalfPlaneCuttingWorldSquare> = view_arc_edges
             .iter()
             .map(|edge| edge.intersection_with_square(rel_square))

@@ -1,12 +1,35 @@
 use crate::utility::*;
 
 pub trait AngularEdgeOfCenteredArc {
-    fn edge_direction(&self) -> FAngle;
-    fn edge_ray<T: Coordinate>(&self) -> impl RayTrait<T>;
-    fn border_as_halfplane<T: Coordinate>(&self) -> HalfPlane<FloatLineTrait<T>>;
+    fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self;
+    fn angle(&self) -> FAngle;
+    // fn edge_ray<T: Ray>(&self) -> T;
+    // fn border_as_halfplane<T: HalfPlane>(&self) -> T;
     fn outside_angular_direction(&self) -> AngularDirection;
+    fn flipped(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self::new(self.angle(), -self.outside_angular_direction())
+    }
     fn inside_angular_direction(&self) -> AngularDirection {
         -self.outside_angular_direction()
+    }
+    fn cw_direction(&self) -> FAngle {
+        self.angle().turned_right()
+    }
+    fn ccw_direction(&self) -> FAngle {
+        self.cw_direction().turned_back()
+    }
+    fn outside_direction(&self) -> FAngle {
+        if self.is_cw_edge() {
+            self.cw_direction()
+        } else {
+            self.ccw_direction()
+        }
+    }
+    fn inside_direction(&self) -> FAngle {
+        self.outside_direction().turned_back()
     }
     fn is_cw_edge(&self) -> bool {
         self.outside_angular_direction() == AngularDirection::CW
@@ -16,31 +39,18 @@ pub trait AngularEdgeOfCenteredArc {
     }
 }
 
-impl<P> AngularEdgeOfCenteredArc<P> for (FAngle, AngularDirection) {}
-
-#[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
-#[get_copy = "pub"]
-// TODO: might be unused
-pub struct DirectionalAngularEdge {
-    angle: Angle<f32>,
-    is_clockwise_edge: bool,
-}
-
-impl DirectionalAngularEdge {
-    pub fn new(angle: Angle<f32>, is_clockwise_edge: bool) -> Self {
-        DirectionalAngularEdge {
-            angle: standardize_angle(angle),
-            is_clockwise_edge,
-        }
+// impl AngularEdgeOfCenteredArc for (FAngle, AngularDirection) {}
+pub struct ArcEdge(FAngle, AngularDirection);
+impl AngularEdgeOfCenteredArc for ArcEdge {
+    fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self {
+        Self(edge_angle, which_edge)
     }
-    pub fn flipped(&self) -> Self {
-        DirectionalAngularEdge {
-            angle: self.angle,
-            is_clockwise_edge: !self.is_clockwise_edge,
-        }
+
+    fn angle(&self) -> FAngle {
+        self.0
     }
-    pub fn direction_to_inside(&self) -> Angle<f32> {
-        let rotation_sign = if self.is_clockwise_edge { 1.0 } else { -1.0 };
-        standardize_angle(self.angle + Angle::degrees(rotation_sign * 90.0))
+
+    fn outside_angular_direction(&self) -> AngularDirection {
+        self.1
     }
 }
