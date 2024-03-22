@@ -131,6 +131,9 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
     fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
         self.normal_vector_to_point(point).length()
     }
+    fn distance_from_origin(&self) -> f32 {
+        self.normal_vector_from_origin().length()
+    }
     fn point_is_on_or_normal_to_line_segment(&self, point: Self::PointType) -> bool {
         let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
@@ -566,6 +569,14 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnGridSquare<P> {
     pub fn as_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P> {
         self.points_on_the_square
     }
+}
+
+pub trait TwoPointsOnASquare {
+    type SquareType: IntCoordinate;
+    type LocalPointType: FloatCoordinate;
+    fn which_square() -> Self::SquareType;
+    fn points_relative_to_the_square(
+    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType>;
 }
 
 impl<PointType: SignedCoordinate> LineTrait for TwoDifferentPoints<PointType> {

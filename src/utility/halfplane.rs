@@ -253,13 +253,17 @@ where
     }
     // TODO: change output type to guarantee value in normalized range ( [0.0,1.0] )
     pub fn fraction_coverage_of_centered_unit_square(&self) -> f32 {
-        todo!()
-    }
-    pub fn fraction_coverage_of_relative_square(
-        &self,
-        rel_square: <LineType::PointType as Coordinate>::OnGrid,
-    ) -> f32 {
-        todo!()
+        let dist = self.dividing_line.distance_from_origin();
+        let corner_dist = 2.0.sqrt() * 0.5;
+        let side_dist = 0.5;
+
+        // TODO: Do the actual math instead of lerp
+        let fraction_on_origin_side_of_line = lerp(0.5, 1.0, dist / corner_dist).clamp(0.5, 1.0);
+        if self.covers_origin().is_true() {
+            fraction_on_origin_side_of_line
+        } else {
+            1.0 - fraction_on_origin_side_of_line
+        }
     }
     pub fn coverage_of_centered_unit_square_with_tolerance(
         &self,
@@ -393,6 +397,18 @@ impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineTy
     //         .unwrap()
     // }
 }
+
+pub trait HalfPlaneCuttingSquareTrait {
+    // TODO: change output to normalized float
+    type SquareType: IntCoordinate;
+    // type PointType: FloatCoordinate;
+    fn fraction_covered(&self) -> f32;
+    fn to_local(&self) -> HalfPlaneCuttingLocalSquare;
+    fn which_square(&self) -> Self::SquareType;
+}
+
+impl HalfPlaneCuttingSquareTrait for HalfPlaneCuttingLocalSquare {}
+
 #[cfg(test)]
 mod tests {
 
@@ -846,5 +862,12 @@ mod tests {
         assert!(hp.at_least_partially_covers_point((0.0, 0.0)));
         assert!(hp.at_least_partially_covers_point((0.0, -0.1)));
         assert_false!(hp.at_least_partially_covers_point((0.0, 0.1)));
+    }
+    #[test]
+    fn test_fraction_coverage_of_square() {
+        assert_about_eq!(
+            WorldHalfPlane::new_with_inside_down(-0.4).fraction_coverage_of_centered_unit_square(),
+            0.1
+        );
     }
 }
