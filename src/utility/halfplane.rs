@@ -398,16 +398,35 @@ impl<LineType: DirectedFloatLineTrait> QuarterTurnRotatable for HalfPlane<LineTy
     // }
 }
 
-pub trait HalfPlaneCuttingSquareTrait {
+pub trait HalfPlaneCuttingSquareTrait<T: IntCoordinate> {
     // TODO: change output to normalized float
     type SquareType: IntCoordinate;
     // type PointType: FloatCoordinate;
-    fn fraction_covered(&self) -> f32;
-    fn to_local(&self) -> HalfPlaneCuttingLocalSquare;
     fn which_square(&self) -> Self::SquareType;
+    fn to_local(&self) -> HalfPlaneCuttingLocalSquare;
+    fn fraction_of_square_covered(&self) -> f32 {
+        self.to_local().fraction_coverage_of_centered_unit_square()
+    }
 }
 
-impl HalfPlaneCuttingSquareTrait for HalfPlaneCuttingLocalSquare {}
+impl<P, L> HalfPlaneCuttingSquareTrait<P> for HalfPlane<L>
+where
+    L: TwoPointsOnASquare<SquareType = P, LocalPointType = LocalSquarePoint>
+        + DirectedFloatLineTrait,
+    P: IntCoordinate,
+{
+    type SquareType = P;
+
+    fn which_square(&self) -> Self::SquareType {
+        self.dividing_line.which_square()
+    }
+
+    fn to_local(&self) -> HalfPlaneCuttingLocalSquare {
+        HalfPlaneCuttingLocalSquare::new_from_directed_line(
+            self.dividing_line.points_relative_to_the_square(),
+        )
+    }
+}
 
 #[cfg(test)]
 mod tests {

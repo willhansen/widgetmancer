@@ -574,8 +574,9 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnGridSquare<P> {
 pub trait TwoPointsOnASquare {
     type SquareType: IntCoordinate;
     type LocalPointType: FloatCoordinate;
-    fn which_square() -> Self::SquareType;
+    fn which_square(&self) -> Self::SquareType;
     fn points_relative_to_the_square(
+        &self,
     ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType>;
 }
 
