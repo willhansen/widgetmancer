@@ -5,11 +5,7 @@ use num::ToPrimitive;
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::SPEAR_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinates::KingWorldStep;
-use crate::utility::units::{
-    MoveList, PointList, WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare,
-};
-use crate::{vec2, FloatCoordinate};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -65,7 +61,7 @@ impl Animation for SpearAttackAnimation {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
-        let angle = self.direction.step().to_f32().better_angle_from_x_axis();
+        let angle = self.direction.step().better_angle_from_x_axis();
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
             let relative_position = WorldMove::from_angle_and_length(

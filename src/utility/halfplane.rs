@@ -1,16 +1,6 @@
 use crate::utility::*;
 use euclid::num::Zero;
 
-pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
-
-pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
-pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
-pub type HalfPlaneCuttingLocalSquare =
-    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>>;
-pub type HalfPlaneCuttingWorldSquare = HalfPlane<TwoDifferentPointsOnOneSquare<WorldPoint>>;
-pub type HalfPlaneCuttingLocalCharacter =
-    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
-
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
@@ -256,7 +246,9 @@ where
         -self.depth_of_point_in_half_plane(point)
     }
     // TODO: change output type to guarantee value in normalized range ( [0.0,1.0] )
-    pub fn fraction_coverage_of_centered_unit_square(&self) -> f32 {}
+    pub fn fraction_coverage_of_centered_unit_square(&self) -> f32 {
+        todo!()
+    }
     pub fn coverage_of_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,

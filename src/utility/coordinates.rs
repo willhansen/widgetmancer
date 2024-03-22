@@ -134,7 +134,13 @@ pub trait Coordinate:
     fn cast_unit<Other: Coordinate<DataType = Self::DataType>>(&self) -> Other {
         Other::new(self.x(), self.y())
     }
+    // euclid uses fast and imprecise trig for this by default for some reason
+    fn better_angle_from_x_axis(&self) -> Angle<f32> {
+        let float_self = self.to_f32();
+        Angle::radians(float_self.y().atan2(float_self.x()))
+    }
 
+    // TODO: generalize
     make_coordinate_datatype_cast_function!(to_f32, f32, Self::Floating);
     make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
@@ -384,10 +390,6 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
     }
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
-    }
-    // euclid uses fast and imprecise trig for this by default for some reason
-    fn better_angle_from_x_axis(&self) -> Angle<f32> {
-        Angle::radians(self.y().atan2(self.x()))
     }
     fn angle_to(&self, other: Self) -> Angle<f32> {
         self.better_angle_from_x_axis()

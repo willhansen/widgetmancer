@@ -183,7 +183,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         let view_arc_edges: [ArcEdge; 2] = partial_view_arc.edges();
         let intersections: Vec<HalfPlaneCuttingWorldSquare> = view_arc_edges
             .iter()
-            .map(|edge| edge.intersection_with_square(rel_square))
+            .filter_map(|edge| edge.intersection_with_relative_square(rel_square))
             .collect();
 
         // Cases:
@@ -199,26 +199,26 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         // --> Check if square center is in the arc
         return match intersections.len() {
             0 => {
-                let square_is_in_arc =
-                    partial_view_arc.contains_angle_inclusive(rel_square.angle_to_center());
+                let square_is_in_arc = partial_view_arc
+                    .contains_angle_inclusive(rel_square.better_angle_from_x_axis());
                 if square_is_in_arc {
                     Self::FullyVisible
                 } else {
                     Self::NotVisible
                 }
             }
-            1 => Self::PartiallyVisible(intersections[0].into()),
+            1 => Self::PartiallyVisible(intersections[0].as_local()),
             2 => {
-                let is_wraparound_case = partial_view_arc
-                    .center_angle()
-                    .dot(rel_square.angle_to_center())
-                    > 0.0;
+                let is_wraparound_case = fangle_dot(
+                    partial_view_arc.center_angle(),
+                    rel_square.better_angle_from_x_axis(),
+                ) > 0.0;
                 // high coverage percentage means more visible
                 // wraparound case means there's a small angle segment not visible
                 let selector = if is_wraparound_case {
-                    Iter::max_by_key
+                    Iterator::max_by_key
                 } else {
-                    Iter::min_by_key
+                    Iterator::min_by_key
                 };
                 selector(intersections.iter(), |i| {
                     OrderedFloat(i.fraction_of_square_covered())

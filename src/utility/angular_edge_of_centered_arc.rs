@@ -37,9 +37,16 @@ pub trait AngularEdgeOfCenteredArc {
     fn is_ccw_edge(&self) -> bool {
         !self.is_cw_edge()
     }
+    fn intersection_with_relative_square(
+        &self,
+        rel_square: impl IntCoordinate,
+    ) -> Option<HalfPlaneCuttingWorldSquare> {
+        todo!()
+    }
 }
 
 // impl AngularEdgeOfCenteredArc for (FAngle, AngularDirection) {}
+#[derive(Copy, Clone, PartialEq)]
 pub struct ArcEdge(FAngle, AngularDirection);
 impl AngularEdgeOfCenteredArc for ArcEdge {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self {

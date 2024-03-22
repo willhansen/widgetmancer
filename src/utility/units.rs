@@ -54,6 +54,18 @@ pub type Face = WorldSquareWithOrthogonalDir;
 pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
 pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
+pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
+
+pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
+pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
+pub type HalfPlaneCuttingLocalCharacter =
+    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
+
+pub type LineCuttingLocalSquare = TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>;
+pub type LineCuttingWorldSquare = TwoDifferentPointsOnGridSquare<WorldPoint>;
+pub type HalfPlaneCuttingLocalSquare = HalfPlane<LineCuttingLocalSquare>;
+pub type HalfPlaneCuttingWorldSquare = HalfPlane<LineCuttingWorldSquare>;
+
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
 #[deprecated(note = "Obselete since screen rotation")]

@@ -488,6 +488,12 @@ impl PartialAngleInterval {
                 .is_at_least_partial()
         })
     }
+    pub fn edges(&self) -> [ArcEdge; 2] {
+        [
+            ArcEdge::new(self.cw(), AngularDirection::CW),
+            ArcEdge::new(self.ccw(), AngularDirection::CCW),
+        ]
+    }
 }
 
 impl Debug for PartialAngleInterval {

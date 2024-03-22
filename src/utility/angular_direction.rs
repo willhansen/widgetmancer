@@ -1,4 +1,4 @@
-#[derive(Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum AngularDirection {
     CW,
     CCW,

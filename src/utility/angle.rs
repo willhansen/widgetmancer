@@ -330,6 +330,11 @@ impl Direction for OrthogonalDirection {
     }
 }
 
+// TODO: make member of more general angle trait
+pub fn fangle_dot(a: FAngle, b: FAngle) -> f32 {
+    WorldPoint::unit_vector_from_angle(a).dot(WorldPoint::unit_vector_from_angle(b))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
