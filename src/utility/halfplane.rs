@@ -1,6 +1,20 @@
 use crate::utility::*;
 use euclid::num::Zero;
 
+// pub trait HalfPlaneTrait<LineType>
+// where
+//     LineType: DirectedLineTrait,
+// {
+//     fn new_from_directed_line<P>(line: P) -> Self
+//     where
+//         P: DirectedLineTrait;
+
+//     fn new_from_line_and_point_on_half_plane(
+//         dividing_line: impl Into<LineType>,
+//         point_on_half_plane: impl Into<LineType::PointType>,
+//     ) -> Self;
+// }
+
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
@@ -53,14 +67,6 @@ where
                 dividing_line.reversed()
             },
         }
-    }
-    pub fn new_from_line_and_point_off_half_plane(
-        can_be_dividing_line: impl Into<LineType>,
-        point_on_half_plane: impl Into<LineType::PointType>,
-    ) -> Self {
-        let line = can_be_dividing_line.into();
-        let point_off = point_on_half_plane.into();
-        Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line(point_off))
     }
     pub fn new_with_inside_down(y: f32) -> Self {
         Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
@@ -247,6 +253,12 @@ where
     }
     // TODO: change output type to guarantee value in normalized range ( [0.0,1.0] )
     pub fn fraction_coverage_of_centered_unit_square(&self) -> f32 {
+        todo!()
+    }
+    pub fn fraction_coverage_of_relative_square(
+        &self,
+        rel_square: <LineType::PointType as Coordinate>::OnGrid,
+    ) -> f32 {
         todo!()
     }
     pub fn coverage_of_centered_unit_square_with_tolerance(

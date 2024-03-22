@@ -444,7 +444,7 @@ impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait
 
 pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()>;
-    fn point_by_index(&self, pi: usize) -> P;
+    fn point_by_index(&self, point_index: usize) -> P;
     fn p1(&self) -> P {
         self.point_by_index(0)
     }
@@ -553,14 +553,18 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGri
         })
     }
 
-    fn point_by_index(&self, pi: usize) -> P {
-        self.points_on_the_square(pi) + self.square_center()
+    fn point_by_index(&self, point_index: usize) -> P {
+        self.points_on_the_square.point_by_index(point_index) + self.square_center()
     }
 }
 
 impl<P: FloatCoordinate> TwoDifferentPointsOnGridSquare<P> {
     pub fn square_center(&self) -> P {
-        self.the_square.to_f32();
+        self.the_square.to_f32()
+    }
+
+    pub fn as_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P> {
+        self.points_on_the_square
     }
 }
 

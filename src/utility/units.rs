@@ -203,6 +203,13 @@ pub fn world_half_plane_to_local_square_half_plane(
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
+pub fn halfplane_cutting_world_square_to_halfplane_local_square(
+    world_version: HalfPlaneCuttingWorldSquare,
+) -> HalfPlaneCuttingLocalSquare {
+    let line = world_version.dividing_line.as_local();
+    HalfPlaneCuttingLocalSquare::new_from_directed_line(line)
+}
+
 pub fn local_square_half_plane_to_local_character_half_plane(
     square_half_plane: LocalSquareHalfPlane,
     character_index_in_square: usize,

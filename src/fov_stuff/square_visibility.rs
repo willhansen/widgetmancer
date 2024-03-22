@@ -197,7 +197,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         // - no intersections, fully visible
         // - no intersections, not visible
         // --> Check if square center is in the arc
-        return match intersections.len() {
+        match intersections.len() {
             0 => {
                 let square_is_in_arc = partial_view_arc
                     .contains_angle_inclusive(rel_square.better_angle_from_x_axis());
@@ -207,7 +207,9 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                     Self::NotVisible
                 }
             }
-            1 => Self::PartiallyVisible(intersections[0].as_local()),
+            1 => Self::PartiallyVisible(halfplane_cutting_world_square_to_halfplane_local_square(
+                intersections[0],
+            )),
             2 => {
                 let is_wraparound_case = fangle_dot(
                     partial_view_arc.center_angle(),
@@ -220,13 +222,15 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 } else {
                     Iterator::min_by_key
                 };
-                selector(intersections.iter(), |i| {
-                    OrderedFloat(i.fraction_of_square_covered())
-                })
-                .unwrap()
+                Self::PartiallyVisible(halfplane_cutting_world_square_to_halfplane_local_square(
+                    *selector(intersections.iter(), |i: HalfPlaneCuttingWorldSquare| {
+                        OrderedFloat(i.fraction_of_square_covered())
+                    })
+                    .unwrap(),
+                ))
             }
             n => panic!("invalid number of intersections: {}", n),
-        };
+        }
 
         // TODO: delete below this line in this function
 
