@@ -1414,7 +1414,7 @@ mod tests {
             range.for_each(|dx| {
                 assert_eq!(
                     rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
-                    NormalizedOrthoAngle::new(turns)
+                    NormalizedOrthoAngle::new_from_quarter_turns(turns)
                 );
             });
         });
@@ -1607,7 +1607,10 @@ mod tests {
 
         let transform = portal.get_transform();
         assert_eq!(transform.translation(), vec2(47, 67));
-        assert_eq!(transform.rotation(), NormalizedOrthoAngle::new(3));
+        assert_eq!(
+            transform.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(3)
+        );
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
             (STEP_LEFT, UP, STEP_UP * 2, RIGHT),
@@ -2094,7 +2097,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            NormalizedOrthoAngle::new(0)
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
         );
     }
 
@@ -2157,7 +2160,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            NormalizedOrthoAngle::new(1)
+            NormalizedOrthoAngle::new_from_quarter_turns(1)
         );
         let the_square_visibility = rasterized_fov
             .lone_absolute_portal_entrance_shape_for_relative_square_or_panic(test_square);

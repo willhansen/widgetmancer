@@ -554,7 +554,7 @@ pub fn assert_about_eq_2d<P: FloatCoordinate>(p1: P, p2: P) {
 pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new(1)) {
+    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(1)) {
         faces
     } else {
         [faces[1], faces[0]]
@@ -909,7 +909,11 @@ mod tests {
     #[test]
     fn test_revolve_square() {
         assert_eq!(
-            revolve_square(point2(3, 4), point2(5, 5), NormalizedOrthoAngle::new(3),),
+            revolve_square(
+                point2(3, 4),
+                point2(5, 5),
+                NormalizedOrthoAngle::new_from_quarter_turns(3),
+            ),
             point2(4, 7)
         );
     }
@@ -918,19 +922,19 @@ mod tests {
     fn test_quarter_turns_from_vectors() {
         assert_eq!(
             NormalizedOrthoAngle::from_start_and_end_directions(STEP_UP, STEP_UP),
-            NormalizedOrthoAngle::new(0)
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
         );
         assert_eq!(
             NormalizedOrthoAngle::from_start_and_end_directions(STEP_UP, STEP_RIGHT),
-            NormalizedOrthoAngle::new(3)
+            NormalizedOrthoAngle::new_from_quarter_turns(3)
         );
         assert_eq!(
             NormalizedOrthoAngle::from_start_and_end_directions(STEP_LEFT, STEP_RIGHT),
-            NormalizedOrthoAngle::new(2)
+            NormalizedOrthoAngle::new_from_quarter_turns(2)
         );
         assert_eq!(
             NormalizedOrthoAngle::from_start_and_end_directions(STEP_DOWN_LEFT, STEP_DOWN_RIGHT,),
-            NormalizedOrthoAngle::new(1)
+            NormalizedOrthoAngle::new_from_quarter_turns(1)
         );
     }
     #[test]

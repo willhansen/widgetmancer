@@ -217,16 +217,17 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 ) > 0.0;
                 // high coverage percentage means more visible
                 // wraparound case means there's a small angle segment not visible
-                let selector = if is_wraparound_case {
-                    Iterator::max_by_key
+                let key_fn =
+                    |i: &&HalfPlaneCuttingWorldSquare| OrderedFloat(i.fraction_of_square_covered());
+                let selected = if is_wraparound_case {
+                    intersections.iter().max_by_key(key_fn)
                 } else {
-                    Iterator::min_by_key
-                };
+                    intersections.iter().min_by_key(key_fn)
+                }
+                .unwrap();
+
                 Self::PartiallyVisible(halfplane_cutting_world_square_to_halfplane_local_square(
-                    *selector(intersections.iter(), |i: HalfPlaneCuttingWorldSquare| {
-                        OrderedFloat(i.fraction_of_square_covered())
-                    })
-                    .unwrap(),
+                    *selected,
                 ))
             }
             n => panic!("invalid number of intersections: {}", n),

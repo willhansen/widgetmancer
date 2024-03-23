@@ -15,7 +15,7 @@ impl OrthoAngle for NormalizedOrthoAngle
 where
     Self: Sized,
 {
-    fn new(quarter_turns_ccw: i32) -> Self {
+    fn new_from_quarter_turns(quarter_turns_ccw: i32) -> Self {
         NormalizedOrthoAngle(quarter_turns_ccw.rem_euclid(4))
     }
     fn quarter_turns(&self) -> i32 {
@@ -35,7 +35,7 @@ impl OrthoAngle for UnNormalizedOrthoAngle
 where
     Self: Sized,
 {
-    fn new(quarter_turns: i32) -> Self {
+    fn new_from_quarter_turns(quarter_turns: i32) -> Self {
         UnNormalizedOrthoAngle(quarter_turns)
     }
     fn quarter_turns(&self) -> i32 {
@@ -53,10 +53,10 @@ pub trait OrthoAngle:
     + Copy
     + Into<NormalizedOrthoAngle>
 {
-    fn new(quarter_turns: i32) -> Self;
+    fn new_from_quarter_turns(quarter_turns: i32) -> Self;
     fn quarter_turns(&self) -> i32;
     fn normalized(&self) -> NormalizedOrthoAngle {
-        NormalizedOrthoAngle::new(self.quarter_turns())
+        NormalizedOrthoAngle::new_from_quarter_turns(self.quarter_turns())
     }
     fn cos<T: num::Signed>(&self) -> T {
         match self.normalized().0 {
@@ -86,19 +86,21 @@ pub trait OrthoAngle:
         if !dir.is_orthogonal() {
             return Err(format!("Not orthogonal: {}", dir.to_string()));
         }
-        Ok(Self::new(if dir.x() == T::DataType::zero() {
-            if dir.y() > T::DataType::zero() {
-                1
+        Ok(Self::new_from_quarter_turns(
+            if dir.x() == T::DataType::zero() {
+                if dir.y() > T::DataType::zero() {
+                    1
+                } else {
+                    3
+                }
             } else {
-                3
-            }
-        } else {
-            if dir.x() > T::DataType::zero() {
-                0
-            } else {
-                2
-            }
-        }))
+                if dir.x() > T::DataType::zero() {
+                    0
+                } else {
+                    2
+                }
+            },
+        ))
     }
     fn from_coordinate<T: Coordinate>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
@@ -115,7 +117,7 @@ pub trait OrthoAngle:
 
         let d_angle = start.to_f32().angle_to(end.to_f32());
         let quarter_turns = (d_angle.to_degrees() / 90.0).round() as i32;
-        Self::new(quarter_turns)
+        Self::new_from_quarter_turns(quarter_turns)
     }
 
     fn rotate_angle(&self, angle: FAngle) -> FAngle {
@@ -137,7 +139,7 @@ macro_rules! impl_ops_for_OrthoAngles {
             type Output = Self;
 
             fn add(self, rhs: T) -> Self::Output {
-                Self::new(self.quarter_turns() + rhs.quarter_turns())
+                Self::new_from_quarter_turns(self.quarter_turns() + rhs.quarter_turns())
             }
         }
 
@@ -145,20 +147,20 @@ macro_rules! impl_ops_for_OrthoAngles {
             type Output = Self;
 
             fn sub(self, rhs: T) -> Self::Output {
-                Self::new(self.quarter_turns() - rhs.quarter_turns())
+                Self::new_from_quarter_turns(self.quarter_turns() - rhs.quarter_turns())
             }
         }
         impl Neg for $Type {
             type Output = Self;
 
             fn neg(self) -> Self::Output {
-                Self::new(-self.quarter_turns())
+                Self::new_from_quarter_turns(-self.quarter_turns())
             }
         }
 
         impl From<i32> for $Type {
             fn from(value: i32) -> Self {
-                Self::new(value)
+                Self::new_from_quarter_turns(value)
             }
         }
         impl QuarterTurnRotatable for $Type {
@@ -355,7 +357,10 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(quarter_turns, dir)| {
-            assert_eq!(NormalizedOrthoAngle::new(quarter_turns).dir(), dir);
+            assert_eq!(
+                NormalizedOrthoAngle::new_from_quarter_turns(quarter_turns).dir(),
+                dir
+            );
         });
     }
     #[test]
@@ -381,7 +386,8 @@ mod tests {
         .into_iter()
         .for_each(|(a, b, c)| {
             assert_eq!(
-                NormalizedOrthoAngle::new(a).dot::<i32>(NormalizedOrthoAngle::new(b)),
+                NormalizedOrthoAngle::new_from_quarter_turns(a)
+                    .dot::<i32>(NormalizedOrthoAngle::new_from_quarter_turns(b)),
                 c
             );
         });

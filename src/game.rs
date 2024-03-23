@@ -3537,7 +3537,9 @@ mod tests {
             enemy_chars.chars().collect_vec()[0]
         );
 
-        game.graphics.screen.rotate(NormalizedOrthoAngle::new(3));
+        game.graphics
+            .screen
+            .rotate(NormalizedOrthoAngle::new_from_quarter_turns(3));
 
         game.draw_headless_now();
 
@@ -3581,7 +3583,7 @@ mod tests {
         game.draw_headless_now();
         assert_eq!(
             game.graphics.screen.rotation(),
-            NormalizedOrthoAngle::new(0)
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
         );
 
         game.try_slide_player_by_direction(STEP_RIGHT.into(), 1)
@@ -3594,7 +3596,7 @@ mod tests {
         game.draw_headless_now();
         assert_eq!(
             game.graphics.screen.rotation(),
-            NormalizedOrthoAngle::new(1)
+            NormalizedOrthoAngle::new_from_quarter_turns(1)
         );
     }
 
@@ -3604,7 +3606,9 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(NormalizedOrthoAngle::new(1));
+        game.graphics
+            .screen
+            .rotate(NormalizedOrthoAngle::new_from_quarter_turns(1));
         game.try_slide_player_relative_to_screen(SCREEN_STEP_UP)
             .expect("slide");
         assert_eq!(game.player_square(), player_square + STEP_LEFT);
@@ -3616,7 +3620,9 @@ mod tests {
         let mut game = set_up_10x10_game();
         let player_square = point2(5, 5);
         game.place_player(player_square);
-        game.graphics.screen.rotate(NormalizedOrthoAngle::new(1));
+        game.graphics
+            .screen
+            .rotate(NormalizedOrthoAngle::new_from_quarter_turns(1));
         game.player_blink_relative_to_screen(SCREEN_STEP_UP);
         assert_eq!(game.player_square().y, player_square.y);
         assert!(game.player_square().x < player_square.x);
@@ -3632,7 +3638,7 @@ mod tests {
         rotated_game
             .graphics
             .screen
-            .rotate(NormalizedOrthoAngle::new(-1));
+            .rotate(NormalizedOrthoAngle::new_from_quarter_turns(-1));
 
         let mut games = [unrotated_game, rotated_game];
         let shadow_glyphs: Vec<DoubleGlyph> = games
@@ -4694,7 +4700,7 @@ mod tests {
         );
         game.graphics
             .screen
-            .set_rotation(NormalizedOrthoAngle::new(1));
+            .set_rotation(NormalizedOrthoAngle::new_from_quarter_turns(1));
         game.draw_headless_now();
         game.graphics.screen.print_screen_buffer();
         let upper_glyphs = game

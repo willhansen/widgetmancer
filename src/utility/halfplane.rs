@@ -56,12 +56,9 @@ where
         // let dividing_line = LineType::from_other_line(dividing_line);
         let dividing_line = dividing_line.into();
         let point_on_half_plane = point_on_half_plane.into();
+        let [p1, p2] = dividing_line.two_points_on_line_in_order();
         HalfPlane {
-            dividing_line: if three_points_are_clockwise(
-                dividing_line.p1(),
-                dividing_line.p2(),
-                point_on_half_plane,
-            ) {
+            dividing_line: if three_points_are_clockwise(p1, p2, point_on_half_plane) {
                 dividing_line
             } else {
                 dividing_line.reversed()
@@ -181,8 +178,9 @@ where
         let point = self.point_on_half_plane();
 
         let shifted_point = point + move_vector;
+        let [p1, p2] = line.two_points_on_line_in_order();
         let shifted_line =
-            LineType::new_from_two_points_on_line(line.p1() + move_vector, line.p2() + move_vector);
+            LineType::new_from_two_points_on_line(p1 + move_vector, p2 + move_vector);
 
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
@@ -220,10 +218,11 @@ where
         V: Copy + Debug,
         F: Fn(LineType::PointType) -> Point2D<f32, V>,
     {
+        let [p1, p2] = self.dividing_line.two_points_on_line_in_order();
         HalfPlane::new_from_line_and_point_on_half_plane(
             TwoDifferentPoints::new_from_two_points_on_line(
-                point_transform_function(self.dividing_line.p1()),
-                point_transform_function(self.dividing_line.p2()),
+                point_transform_function(p1),
+                point_transform_function(p2),
             ),
             point_transform_function(self.point_on_half_plane()),
         )
@@ -411,7 +410,7 @@ pub trait HalfPlaneCuttingSquareTrait<T: IntCoordinate> {
 
 impl<P, L> HalfPlaneCuttingSquareTrait<P> for HalfPlane<L>
 where
-    L: TwoPointsOnASquare<SquareType = P, LocalPointType = LocalSquarePoint>
+    L: TwoPointsOnASquareTrait<SquareType = P, LocalPointType = LocalSquarePoint>
         + DirectedFloatLineTrait,
     P: IntCoordinate,
 {

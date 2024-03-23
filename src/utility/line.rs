@@ -16,6 +16,9 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     ) -> Self;
 
     fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
+    fn new_from_array_of_points(points: [Self::PointType; 2]) -> Self {
+        Self::new_from_two_points_on_line(points[0], points[1])
+    }
 
     fn arbitrary_point_on_line(&self) -> Self::PointType {
         self.two_different_arbitrary_points_on_line()[0]
@@ -376,29 +379,24 @@ where
 }
 
 pub trait DirectedLineTrait: LineTrait {
-    fn p1(&self) -> Self::PointType;
-    fn p2(&self) -> Self::PointType;
+    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2];
     fn arbitrary_vector_along_line(&self) -> Self::PointType {
-        self.p2() - self.p1()
+        let [p1, p2] = self.two_points_on_line_in_order();
+        p2 - p1
     }
-    fn get_point_by_index(&self, index: u32) -> Self::PointType {
-        match index {
-            0 => self.p1(),
-            1 => self.p2(),
-            _ => panic!("only two points defining the line"),
-        }
+    fn direction(&self) -> FAngle {
+        self.arbitrary_vector_along_line()
+            .better_angle_from_x_axis()
     }
     fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
     where
         OtherLine: DirectedLineTrait<PointType = Self::PointType>,
     {
-        Self::new_from_two_points_on_line(other.p1(), other.p2())
+        Self::new_from_array_of_points(other.two_points_on_line_in_order())
     }
     fn reversed(&self) -> Self {
-        Self::new_from_two_points_on_line(self.p2(), self.p1())
-    }
-    fn to_array(&self) -> [Self::PointType; 2] {
-        [self.p1(), self.p2()]
+        let [p1, p2] = self.two_points_on_line_in_order();
+        Self::new_from_two_points_on_line(p2, p1)
     }
     fn arbitrary_point_clockwise_of_line(&self) -> Self::PointType {
         self.arbitrary_point_on_line() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
@@ -415,8 +413,11 @@ pub trait DirectedLineTrait: LineTrait {
 }
 
 pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
-    fn points_in_line_order(&self, mut points: Vec<Self::PointType>) -> Vec<Self::PointType> {
-        let normalized_line_direction = (self.p2() - self.p1()).normalize();
+    fn points_sorted_by_line_direction(
+        &self,
+        mut points: Vec<Self::PointType>,
+    ) -> Vec<Self::PointType> {
+        let normalized_line_direction = Self::PointType::unit_vector_from_angle(self.direction());
         points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point)));
         points
     }
@@ -424,7 +425,7 @@ pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
         &self,
         tolerance: f32,
     ) -> Vec<Self::PointType> {
-        self.points_in_line_order(
+        self.points_sorted_by_line_direction(
             self.unordered_line_intersections_with_centered_unit_square_with_tolerance(tolerance),
         )
     }
@@ -432,15 +433,12 @@ pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
         &self,
         expansion_length: f32,
     ) -> Vec<Self::PointType> {
-        self.points_in_line_order(
+        self.points_sorted_by_line_direction(
             self.unordered_line_intersections_with_expanded_centered_unit_square(expansion_length),
         )
     }
     fn ordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
         self.ordered_line_intersections_with_expanded_centered_unit_square(0.0)
-    }
-    fn direction(&self) -> Angle<f32> {
-        (self.p2() - self.p1()).better_angle_from_x_axis()
     }
 }
 impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait {}
@@ -453,6 +451,9 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     }
     fn p2(&self) -> P {
         self.point_by_index(1)
+    }
+    fn to_array(&self) -> [P; 2] {
+        [0, 1].map(|i| self.point_by_index(i))
     }
     fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
         Self::try_new(p1, p2).unwrap()
@@ -561,9 +562,17 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGri
     }
 }
 
-impl<P: FloatCoordinate> TwoDifferentPointsOnGridSquare<P> {
+impl<P> TwoDifferentPointsOnGridSquare<P>
+where
+    P: FloatCoordinate,
+    // P::OnGrid: IntCoordinate<Floating = Self>,
+{
+    pub fn the_square(&self) -> P::OnGrid {
+        self.the_square
+    }
+
     pub fn square_center(&self) -> P {
-        self.the_square.to_f32()
+        self.the_square().to_f32()
     }
 
     pub fn as_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P> {
@@ -571,13 +580,46 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnGridSquare<P> {
     }
 }
 
-pub trait TwoPointsOnASquare {
+pub trait TwoPointsOnASquareTrait {
     type SquareType: IntCoordinate;
     type LocalPointType: FloatCoordinate;
     fn which_square(&self) -> Self::SquareType;
     fn points_relative_to_the_square(
         &self,
     ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType>;
+}
+
+impl<P> TwoPointsOnASquareTrait for TwoDifferentPointsOnCenteredUnitSquare<P>
+where
+    P: FloatCoordinate,
+{
+    type SquareType = P::OnGrid;
+    type LocalPointType = P;
+    fn which_square(&self) -> Self::SquareType {
+        <Self::SquareType as euclid::num::Zero>::zero()
+    }
+    fn points_relative_to_the_square(
+        &self,
+    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType> {
+        *self
+    }
+}
+impl<P> TwoPointsOnASquareTrait for TwoDifferentPointsOnGridSquare<P>
+where
+    P: FloatCoordinate,
+{
+    type SquareType = P::OnGrid;
+    // TODO: LocalSquarePoint feels wrong.  Might be better as SquareType::Float::Relative
+    type LocalPointType = LocalSquarePoint;
+
+    fn which_square(&self) -> Self::SquareType {
+        self.the_square()
+    }
+    fn points_relative_to_the_square(
+        &self,
+    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType> {
+        self.as_local()
+    }
 }
 
 impl<PointType: SignedCoordinate> LineTrait for TwoDifferentPoints<PointType> {
@@ -613,11 +655,8 @@ make_point_grouping_rotatable!(TwoDifferentPointsOnGridSquare, FloatCoordinate);
 macro_rules! impl_directed_line_trait_for_two_points {
     ($TheStruct:ident, $point_trait:ident) => {
         impl<PointType: $point_trait> DirectedLineTrait for $TheStruct<PointType> {
-            fn p1(&self) -> PointType {
-                <Self as TwoPointsWithRestriction<PointType>>::p1(self)
-            }
-            fn p2(&self) -> PointType {
-                <Self as TwoPointsWithRestriction<PointType>>::p2(self)
+            fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
+                <Self as TwoPointsWithRestriction<PointType>>::to_array(self)
             }
         }
     };

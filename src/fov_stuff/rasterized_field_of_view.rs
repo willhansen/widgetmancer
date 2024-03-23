@@ -1762,7 +1762,7 @@ mod tests {
     #[test]
     fn test_top_down_portal_constructors_are_consistent() {
         let rel_square = (4, 5);
-        let forward_portal_rotation = NormalizedOrthoAngle::new(3);
+        let forward_portal_rotation = NormalizedOrthoAngle::new_from_quarter_turns(3);
         let target = TopDownPortalTarget::new((10, 20), 4, forward_portal_rotation);
         let entrance_shape = TopDownPortalShape::new_orthogonal_half_visible(RIGHT);
         let exit_shape = TopDownPortalShape::new_orthogonal_half_visible(DOWN);

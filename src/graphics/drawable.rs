@@ -625,7 +625,7 @@ mod tests {
     fn test_arrow_drawable_rotation() {
         let d = ArrowDrawable::new(STEP_RIGHT.into(), THICK_ARROWS, BLUE);
         let character = d
-            .quarter_rotated_ccw(NormalizedOrthoAngle::new(1))
+            .quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(1))
             .to_glyphs()[0]
             .character;
         assert_eq!(
@@ -663,7 +663,7 @@ mod tests {
         drawable.braille_array.print();
         let f = |i| {
             drawable
-                .quarter_rotated_ccw(NormalizedOrthoAngle::new(i))
+                .quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(i))
                 .to_glyphs()
                 .chars()
         };

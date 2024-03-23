@@ -28,7 +28,7 @@ pub fn rel_square_is_in_quadrant_or_on_adjacent_axis(
     todo!()
 }
 pub fn direction_of_quadrant(quadrant: Quadrant) -> WorldStep {
-    STEP_UP_RIGHT.quarter_rotated_ccw(NormalizedOrthoAngle::new(quadrant.0))
+    STEP_UP_RIGHT.quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(quadrant.0))
 }
 #[cfg(test)]
 mod tests {

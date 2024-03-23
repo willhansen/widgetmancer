@@ -541,7 +541,7 @@ mod tests {
 
     fn test_screen_max_position__with_rotation() {
         let mut s = set_up_nxn_square_screen(5);
-        s.set_rotation(NormalizedOrthoAngle::new(3));
+        s.set_rotation(NormalizedOrthoAngle::new_from_quarter_turns(3));
         s.set_screen_origin_by_world_square(point2(3, 79));
 
         assert_eq!(s.screen_max_as_world_square(), point2(-1, 75));
@@ -609,7 +609,10 @@ mod tests {
         s.set_screen_center_by_world_square(center);
         assert_eq!(s.screen_center_as_world_square(), center);
 
-        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(0));
+        assert_eq!(
+            s.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
+        );
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
             point2(4, 7)
@@ -619,9 +622,12 @@ mod tests {
             point2(-1, 16)
         );
 
-        s.rotate(NormalizedOrthoAngle::new(1));
+        s.rotate(NormalizedOrthoAngle::new_from_quarter_turns(1));
 
-        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(1));
+        assert_eq!(
+            s.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(1)
+        );
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_UP * 2),
@@ -633,9 +639,12 @@ mod tests {
             ),
             center + STEP_UP * 2
         );
-        s.rotate(NormalizedOrthoAngle::new(6));
+        s.rotate(NormalizedOrthoAngle::new_from_quarter_turns(6));
 
-        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(3));
+        assert_eq!(
+            s.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(3)
+        );
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(
             s.world_square_to_screen_buffer_square(center + STEP_LEFT),
@@ -660,7 +669,7 @@ mod tests {
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(370, 20)));
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(300, 26)));
 
-        s.set_rotation(NormalizedOrthoAngle::new(1));
+        s.set_rotation(NormalizedOrthoAngle::new_from_quarter_turns(1));
         assert_eq!(s.screen_center_as_world_square(), point2(300, 20));
 
         assert_false!(s.world_square_is_at_least_partially_on_screen(point2(340, 22)));
@@ -676,13 +685,19 @@ mod tests {
         s.set_screen_center_by_world_square(center);
         let start_origin = s.screen_origin_as_world_square();
 
-        assert_eq!(s.rotation(), NormalizedOrthoAngle::new(0));
+        assert_eq!(
+            s.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
+        );
         assert_eq!(s.screen_center_as_world_square(), center);
         assert_eq!(s.screen_origin_as_world_square(), start_origin);
         (0..3).for_each(|i| {
-            s.rotate(NormalizedOrthoAngle::new(1));
+            s.rotate(NormalizedOrthoAngle::new_from_quarter_turns(1));
 
-            assert_eq!(s.rotation(), NormalizedOrthoAngle::new(i + 1));
+            assert_eq!(
+                s.rotation(),
+                NormalizedOrthoAngle::new_from_quarter_turns(i + 1)
+            );
             assert_eq!(s.screen_center_as_world_square(), center);
             assert_ne!(s.screen_origin_as_world_square(), start_origin);
         });
