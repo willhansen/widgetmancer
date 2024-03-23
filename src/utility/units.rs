@@ -61,6 +61,7 @@ pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPo
 pub type HalfPlaneCuttingLocalCharacter =
     HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
 
+// TODO: replace local frame with relative world frame
 pub type LineCuttingLocalSquare = TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>;
 pub type LineCuttingWorldSquare = TwoDifferentPointsOnGridSquare<WorldPoint>;
 pub type HalfPlaneCuttingLocalSquare = HalfPlane<LineCuttingLocalSquare>;

@@ -100,8 +100,8 @@ pub trait Coordinate:
     type DataType: CoordinateDataTypeTrait;
     type UnitType;
 
-    type Floating: FloatCoordinate<UnitType = Self::UnitType>;
-    type OnGrid: IntCoordinate<UnitType = Self::UnitType>;
+    type Floating: FloatCoordinate<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
+    type OnGrid: IntCoordinate<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
@@ -350,13 +350,13 @@ pub trait IntCoordinate: SignedCoordinate<_DataType = i32> + Hash + Eq {
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> IntCoordinate for T where T: SignedCoordinate<_DataType = i32> + Hash + Eq {}
+impl<T> IntCoordinate for T where T: SignedCoordinate<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
 trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinate< UnitType = SquareGridInWorldFrame>);
 
 trait_alias_macro!(pub trait SignedIntCoordinate = IntCoordinate + SignedCoordinate);
 
-pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
+pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
         // NOTE: 0.5 can be exactly represented by floating point numbers
@@ -412,7 +412,7 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32> {
 }
 
 // TODO: convert to auto trait when stable
-impl<T> FloatCoordinate for T where T: SignedCoordinate<_DataType = f32> {}
+impl<T> FloatCoordinate for T where T: SignedCoordinate<_DataType = f32, Floating = T> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign(point.x()), sign(point.y()))

@@ -565,7 +565,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGri
 impl<P> TwoDifferentPointsOnGridSquare<P>
 where
     P: FloatCoordinate,
-    // P::OnGrid: IntCoordinate<Floating = Self>,
+    // P::OnGrid: IntCoordinate<Floating = P>,
 {
     pub fn the_square(&self) -> P::OnGrid {
         self.the_square
