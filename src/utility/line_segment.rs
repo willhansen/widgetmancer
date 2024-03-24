@@ -1,9 +1,6 @@
 use rand::{rngs::StdRng, Rng};
 
-use crate::{
-    get_new_rng, seeded_rand_radial_offset, Coordinate, DirectedLineTrait, FloatCoordinate,
-    FloatLineTrait, LineTrait, SignedCoordinate, TwoDifferentPoints,
-};
+use crate::utility::*;
 
 pub trait LineSegment: LineTrait {
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
@@ -40,12 +37,29 @@ pub trait FloatLineSegment: FloatLineTrait + LineSegment {
 }
 impl<T> FloatLineSegment for T where T: FloatLineTrait + LineSegment {}
 
-pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {}
+pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {
+    fn endpoints_in_order(&self) -> [Self::PointType; 2] {
+        Self::PointType::points_sorted_along_axis(
+            self.endpoints_in_arbitrary_order(),
+            self.direction(),
+        )
+        .into_iter()
+        .collect_vec()
+        .try_into()
+        .unwrap()
+    }
+    fn start(&self) -> Self::PointType {
+        self.endpoints_in_order()[0]
+    }
+    fn end(&self) -> Self::PointType {
+        self.endpoints_in_order()[1]
+    }
+}
 impl<T> DirectedLineSegment for T where T: DirectedLineTrait + LineSegment {}
 
 pub trait DirectedFloatLineSegment: DirectedLineTrait + FloatLineSegment {
     fn lerp(&self, t: f32) -> Self::PointType {
-        self.p1().lerp2d(self.p2(), t)
+        self.start().lerp2d(self.end(), t)
     }
 }
 impl<T> DirectedFloatLineSegment for T where T: DirectedLineTrait + FloatLineSegment {}

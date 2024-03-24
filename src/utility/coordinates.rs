@@ -128,6 +128,9 @@ pub trait Coordinate:
     fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
+    fn length(&self) -> f32 {
+        self.to_f32().square_length().sqrt()
+    }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
@@ -135,7 +138,7 @@ pub trait Coordinate:
         Other::new(self.x(), self.y())
     }
     // euclid uses fast and imprecise trig for this by default for some reason
-    fn better_angle_from_x_axis(&self) -> Angle<f32> {
+    fn better_angle_from_x_axis(&self) -> FAngle {
         let float_self = self.to_f32();
         Angle::radians(float_self.y().atan2(float_self.x()))
     }
@@ -159,6 +162,13 @@ pub trait Coordinate:
     fn projected_onto(self, onto: impl Into<Self>) -> Self {
         let onto = onto.into();
         onto * (self.dot(onto) / onto.square_length())
+    }
+    fn points_sorted_along_axis(points: impl IntoIterator<Item = Self>, axis: FAngle) -> impl IntoIterator<Item = Self> {
+        points.into_iter().sorted_by_key(|&point|OrderedFloat(point.position_on_axis(axis)))
+    }
+    fn position_on_axis(&self, angle: FAngle) -> f32 {
+        let cos_factor = self.better_angle_from_x_axis().angle_to(angle).radians.cos();
+        self.length() * cos_factor
     }
     fn is_orthogonal(&self) -> bool {
         self.x() == Self::DataType::zero() || self.y() == Self::DataType::zero()
@@ -254,7 +264,7 @@ pub trait SignedCoordinate:
     fn moved(&self, dir: OrthogonalDirection, length: Self::DataType) -> Self {
         *self + dir.to_step::<Self>() * length
     }
-    fn position_on_axis(&self, axis: impl Into<NormalizedOrthoAngle>) -> Self::DataType {
+    fn position_on_orthogonal_axis(&self, axis: impl Into<OrthogonalDirection>) -> Self::DataType {
         let axis_vector: Self = axis.into().to_step();
         self.dot(axis_vector)
     }
@@ -362,9 +372,6 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
         // NOTE: 0.5 can be exactly represented by floating point numbers
         self.king_length() == 0.5
     }
-    fn length(&self) -> Self::DataType {
-        self.square_length().sqrt()
-    }
     fn normalize(&self) -> Self {
         *self / self.length()
     }
@@ -382,7 +389,6 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     fn unit_vector_from_angle(angle: Angle<f32>) -> Self {
         Self::new(angle.radians.cos(), angle.radians.sin())
     }
-
     fn rotate_vect(&self, delta_angle: Angle<f32>) -> Self {
         let start_angle = self.better_angle_from_x_axis();
         let new_angle = start_angle + delta_angle;

@@ -46,7 +46,7 @@ pub trait AngularEdgeOfCenteredArc {
 }
 
 // impl AngularEdgeOfCenteredArc for (FAngle, AngularDirection) {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ArcEdge(FAngle, AngularDirection);
 impl AngularEdgeOfCenteredArc for ArcEdge {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self {

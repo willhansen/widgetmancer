@@ -86,6 +86,21 @@ impl PartialAngleInterval {
     pub fn ccw(&self) -> FAngle {
         self.anticlockwise_end
     }
+    pub fn edge(&self, which_edge: AngularDirection) -> ArcEdge {
+        use AngularDirection::*;
+        match which_edge {
+            CW => ArcEdge::new(self.cw(), CW),
+            CCW => ArcEdge::new(self.ccw(), CCW),
+        }
+    }
+    pub fn cw_edge(&self) -> ArcEdge {
+        use AngularDirection::*;
+        self.edge(CW)
+    }
+    pub fn ccw_edge(&self) -> ArcEdge {
+        use AngularDirection::*;
+        self.edge(CCW)
+    }
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
         Self::from_angles(Angle::degrees(cw), Angle::degrees(ccw))
     }
@@ -260,14 +275,12 @@ impl PartialAngleInterval {
             panic!("no overlap between {} and {}", self, other);
         }
         let is_clockwise_end = other.contains_angle_inclusive(self.clockwise_end);
-        ArcEdge::new(
-            if is_clockwise_end {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            is_clockwise_end,
-        )
+
+        if is_clockwise_end {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
+        }
     }
     pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> ArcEdge {
         assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
@@ -277,14 +290,11 @@ impl PartialAngleInterval {
             PartialAngleInterval::from_angles(self.anticlockwise_end, other.anticlockwise_end)
                 .width();
         let clockwise_edge_is_deeper = clockwise_dist.radians > anticlockwise_dist.radians;
-        ArcEdge::new(
-            if clockwise_edge_is_deeper {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            clockwise_edge_is_deeper,
-        )
+        if clockwise_edge_is_deeper {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
+        }
     }
     #[deprecated(note = "use version with tolerance instead")]
     fn exactly_touches_arc(&self, other: PartialAngleInterval) -> bool {
@@ -393,14 +403,11 @@ impl PartialAngleInterval {
         let dist_from_anticlockwise_edge =
             abs_angle_distance(self.anticlockwise_end, other.center_angle());
         let clockwise_is_closer = dist_from_clockwise_edge < dist_from_anticlockwise_edge;
-        ArcEdge::new(
-            if clockwise_is_closer {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            clockwise_is_closer,
-        )
+        if clockwise_is_closer {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
+        }
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
     pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<NormalizedOrthoAngle>) -> Self {
@@ -489,10 +496,7 @@ impl PartialAngleInterval {
         })
     }
     pub fn edges(&self) -> [ArcEdge; 2] {
-        [
-            ArcEdge::new(self.cw(), AngularDirection::CW),
-            ArcEdge::new(self.ccw(), AngularDirection::CCW),
-        ]
+        [self.cw_edge(), self.ccw_edge()]
     }
 }
 
@@ -554,7 +558,7 @@ mod tests {
         assert_eq!(
             PartialAngleInterval::from_degrees(135.0, 90.0)
                 .most_overlapped_edge_of_self(PartialAngleInterval::from_degrees(45.0, 135.0)),
-            ArcEdge::new(Angle::degrees(90.0), false)
+            ArcEdge::new(Angle::degrees(90.0), AngularDirection::CCW)
         );
     }
     #[test]

@@ -134,9 +134,12 @@ where
             return false;
         }
 
-        let pos_on_dir_axis = self.square().position_on_axis(self.dir());
-        let stepped_pos_on_dir_axis = self.stepped().square().position_on_axis(self.dir());
-        let other_pos_on_dir_axis = other_face.square().position_on_axis(self.dir());
+        let pos_on_dir_axis = self.square().position_on_orthogonal_axis(self.dir());
+        let stepped_pos_on_dir_axis = self
+            .stepped()
+            .square()
+            .position_on_orthogonal_axis(self.dir());
+        let other_pos_on_dir_axis = other_face.square().position_on_orthogonal_axis(self.dir());
 
         let same_direction = self.dir() == other_face.dir();
         if same_direction {

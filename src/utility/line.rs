@@ -514,6 +514,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
     fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
         let p1 = p1.into();
         let p2 = p2.into();
+        // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
         let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
         if points_are_valid {
             Ok(Self(TwoDifferentPoints::try_new(p1, p2)?))
@@ -663,13 +664,11 @@ impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitS
 impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
-        let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
-
-        Self::try_from_line(less_constrained_line).unwrap()
+        Self::try_new(p1, p2).unwrap()
     }
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
-        self.0.two_different_arbitrary_points_on_line()
+        [0, 1].map(|i| self.point_by_index(i))
     }
 }
 
@@ -696,7 +695,7 @@ impl<P: FloatCoordinate> TryFrom<TwoDifferentPoints<P>>
     type Error = ();
 
     fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
-        Self::try_new(value.p1, value.p2).ok_or(())
+        Self::try_new(value.p1, value.p2)
     }
 }
 
