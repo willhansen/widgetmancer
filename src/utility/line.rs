@@ -16,7 +16,7 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     ) -> Self;
 
     fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
-    fn new_from_array_of_points(points: [Self::PointType; 2]) -> Self {
+    fn from_array(points: [Self::PointType; 2]) -> Self {
         Self::new_from_two_points_on_line(points[0], points[1])
     }
 
@@ -62,9 +62,6 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
     fn is_orthogonal(&self) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         p1.x() == p2.x() || p1.y() == p2.y()
-    }
-    fn from_array(a: [Self::PointType; 2]) -> Self {
-        Self::new_from_two_points_on_line(a[0], a[1])
     }
     fn x_intercept(&self) -> Option<f32> {
         if self.is_vertical() {
@@ -392,7 +389,7 @@ pub trait DirectedLineTrait: LineTrait {
     where
         OtherLine: DirectedLineTrait<PointType = Self::PointType>,
     {
-        Self::new_from_array_of_points(other.two_points_on_line_in_order())
+        Self::from_array(other.two_points_on_line_in_order())
     }
     fn reversed(&self) -> Self {
         let [p1, p2] = self.two_points_on_line_in_order();
@@ -451,6 +448,12 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     }
     fn p2(&self) -> P {
         self.point_by_index(1)
+    }
+    fn cast_unit<OtherLine: LineTrait>(&self) -> OtherLine
+    where
+        OtherLine::PointType: Coordinate<DataType = P::DataType>,
+    {
+        OtherLine::from_array(self.to_array().map(|p| p.cast_unit()))
     }
     fn to_array(&self) -> [P; 2] {
         [0, 1].map(|i| self.point_by_index(i))
@@ -580,44 +583,24 @@ where
     }
 }
 
-pub trait TwoPointsOnASquareTrait {
-    type SquareType: IntCoordinate;
-    type LocalPointType: FloatCoordinate;
-    fn which_square(&self) -> Self::SquareType;
-    fn points_relative_to_the_square(
-        &self,
-    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType>;
+pub trait TwoPointsOnASquareTrait<P: FloatCoordinate> {
+    fn which_square(&self) -> P::OnGrid;
+    fn points_relative_to_the_square(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P>;
 }
 
-impl<P> TwoPointsOnASquareTrait for TwoDifferentPointsOnCenteredUnitSquare<P>
-where
-    P: FloatCoordinate,
-{
-    type SquareType = P::OnGrid;
-    type LocalPointType = P;
-    fn which_square(&self) -> Self::SquareType {
-        <Self::SquareType as euclid::num::Zero>::zero()
+impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn which_square(&self) -> P::OnGrid {
+        <P::OnGrid as euclid::num::Zero>::zero()
     }
-    fn points_relative_to_the_square(
-        &self,
-    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType> {
+    fn points_relative_to_the_square(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P> {
         *self
     }
 }
-impl<P> TwoPointsOnASquareTrait for TwoDifferentPointsOnGridSquare<P>
-where
-    P: FloatCoordinate,
-{
-    type SquareType = P::OnGrid;
-    // TODO: LocalSquarePoint feels wrong.  Might be better as SquareType::Float::Relative
-    type LocalPointType = LocalSquarePoint;
-
-    fn which_square(&self) -> Self::SquareType {
+impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoDifferentPointsOnGridSquare<P> {
+    fn which_square(&self) -> P::OnGrid {
         self.the_square()
     }
-    fn points_relative_to_the_square(
-        &self,
-    ) -> TwoDifferentPointsOnCenteredUnitSquare<Self::LocalPointType> {
+    fn points_relative_to_the_square(&self) -> TwoDifferentPointsOnCenteredUnitSquare<P> {
         self.as_local()
     }
 }
