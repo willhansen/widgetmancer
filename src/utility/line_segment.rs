@@ -14,7 +14,7 @@ impl<P: SignedCoordinate> LineSegment for TwoDifferentPoints<P> {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }
 }
-pub trait FloatLineSegment: FloatLineTrait + LineSegment {
+pub trait FloatLineSegment: FloatLineLike + LineSegment {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
@@ -35,9 +35,9 @@ pub trait FloatLineSegment: FloatLineTrait + LineSegment {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
 }
-impl<T> FloatLineSegment for T where T: FloatLineTrait + LineSegment {}
+impl<T> FloatLineSegment for T where T: FloatLineLike + LineSegment {}
 
-pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {
+pub trait DirectedLineSegment: DirectedLineLike + LineSegment {
     fn endpoints_in_order(&self) -> [Self::PointType; 2] {
         Self::PointType::points_sorted_along_axis(
             self.endpoints_in_arbitrary_order(),
@@ -55,11 +55,11 @@ pub trait DirectedLineSegment: DirectedLineTrait + LineSegment {
         self.endpoints_in_order()[1]
     }
 }
-impl<T> DirectedLineSegment for T where T: DirectedLineTrait + LineSegment {}
+impl<T> DirectedLineSegment for T where T: DirectedLineLike + LineSegment {}
 
-pub trait DirectedFloatLineSegment: DirectedLineTrait + FloatLineSegment {
+pub trait DirectedFloatLineSegment: DirectedLineLike + FloatLineSegment {
     fn lerp(&self, t: f32) -> Self::PointType {
         self.start().lerp2d(self.end(), t)
     }
 }
-impl<T> DirectedFloatLineSegment for T where T: DirectedLineTrait + FloatLineSegment {}
+impl<T> DirectedFloatLineSegment for T where T: DirectedLineLike + FloatLineSegment {}

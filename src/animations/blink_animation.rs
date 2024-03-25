@@ -5,14 +5,11 @@ use num::ToPrimitive;
 use rand::SeedableRng;
 
 use crate::animations::Animation;
-use crate::coordinates::Coordinate;
 use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph::Glyph;
 use crate::line_segment::FloatLineSegment;
-use crate::utility::coordinates::SignedCoordinate;
-use crate::utility::line::{FloatLineTrait, LineLike, TwoDifferentPoints};
-use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare};
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {

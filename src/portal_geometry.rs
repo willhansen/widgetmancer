@@ -318,7 +318,7 @@ mod tests {
             assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
             STEP_UP_RIGHT,
         },
-        DirectedLineTrait,
+        DirectedLineLike,
     };
     use ntest::{assert_about_eq, timeout};
 

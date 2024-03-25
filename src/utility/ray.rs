@@ -1,7 +1,8 @@
 use crate::utility::*;
 
 pub trait Ray {
-    type PointType: SignedCoordinate;
+    // TODO: allow for intCoordinate-based rays
+    type PointType: FloatCoordinate;
     fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self;
     fn point(&self) -> Self::PointType;
     fn angle(&self) -> FAngle;
@@ -14,7 +15,10 @@ pub trait Ray {
     {
         self.point() + Self::PointType::from_angle_and_length(self.angle(), dist_from_start)
     }
-    fn line<T: DirectedLineTrait>(&self) -> T {
-        T::from_point_and_vector(self.point(), self.angle())
+    fn line<T: DirectedLineLike<PointType = Self::PointType>>(&self) -> T {
+        T::from_point_and_vector(
+            self.point(),
+            Self::PointType::unit_vector_from_angle(self.angle()),
+        )
     }
 }

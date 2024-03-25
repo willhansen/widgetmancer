@@ -7,7 +7,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub trait FloatLineTrait: LineLike<PointType = Self::_PointType> {
+pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
     type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
 
     fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
@@ -274,7 +274,7 @@ pub trait FloatLineTrait: LineLike<PointType = Self::_PointType> {
         self.intersection_point_with_other_extended_line(&other)
     }
 }
-impl<L> FloatLineTrait for L
+impl<L> FloatLineLike for L
 where
     L: LineLike,
     L::PointType: FloatCoordinate,
@@ -282,41 +282,7 @@ where
     type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
 }
 
-pub trait DirectedLineTrait: LineLike {
-    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2];
-    fn arbitrary_vector_along_line(&self) -> Self::PointType {
-        let [p1, p2] = self.two_points_on_line_in_order();
-        p2 - p1
-    }
-    fn direction(&self) -> FAngle {
-        self.arbitrary_vector_along_line()
-            .better_angle_from_x_axis()
-    }
-    fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
-    where
-        OtherLine: DirectedLineTrait<PointType = Self::PointType>,
-    {
-        Self::from_array(other.two_points_on_line_in_order())
-    }
-    fn reversed(&self) -> Self {
-        let [p1, p2] = self.two_points_on_line_in_order();
-        Self::new_from_two_points_on_line(p2, p1)
-    }
-    fn arbitrary_point_clockwise_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_on_line() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
-    }
-    fn arbitrary_point_anticlockwise_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_on_line() + self.arbitrary_vector_along_line().quarter_rotated_ccw(1)
-    }
-    fn arbitrary_point_right_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_clockwise_of_line()
-    }
-    fn arbitrary_point_left_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_anticlockwise_of_line()
-    }
-}
-
-pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
+pub trait DirectedFloatLineLike: FloatLineLike + DirectedLineLike {
     fn points_sorted_by_line_direction(
         &self,
         mut points: Vec<Self::PointType>,
@@ -344,6 +310,18 @@ pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
     fn ordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
         self.ordered_line_intersections_with_expanded_centered_unit_square(0.0)
     }
+    fn ordered_line_intersections_with_square(
+        &self,
+        square: <Self::PointType as Coordinate>::OnGrid,
+    ) -> Vec<Self::PointType> {
+        let offset = square.to_f32();
+        let relative_intersections =
+            (*self - offset).ordered_line_intersections_with_centered_unit_square();
+        relative_intersections
+            .iter()
+            .map(|p| p + offset)
+            .collect_vec()
+    }
     fn from_point_and_angle(
         point: impl Into<Self::PointType>,
         direction: impl Into<FAngle>,
@@ -354,7 +332,7 @@ pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
         Self::new_from_two_points_on_line(p1, p2)
     }
 }
-impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait {}
+impl<L> DirectedFloatLineLike for L where L: DirectedLineLike + FloatLineLike {}
 
 pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()>;
@@ -423,10 +401,13 @@ impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     }
 }
 
-impl<P: SignedCoordinate> Ray for TwoDifferentPoints<P> {
+impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
     type PointType = P;
 
-    fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self {
+    fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self
+    where
+        P: FloatCoordinate,
+    {
         Self::new(point, point + Self::PointType::unit_vector_from_angle(dir))
     }
 
@@ -462,7 +443,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
     }
 }
 impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointType> {
-    fn try_from_line<LineType: DirectedFloatLineTrait<_PointType = PointType>>(
+    fn try_from_line<LineType: DirectedFloatLineLike<_PointType = PointType>>(
         line: LineType,
     ) -> Result<Self, ()> {
         let points: Vec<PointType> = line.ordered_line_intersections_with_centered_unit_square();
@@ -507,10 +488,10 @@ where
     // P::OnGrid: IntCoordinate<Floating = P>,
 {
     pub fn try_new_from_line_and_square(
-        line: impl DirectedLineTrait,
+        line: impl DirectedLineLike,
         square: impl IntCoordinate,
     ) -> Result<Self, ()> {
-        if let Some((p1, p2)) = line.ordered_line_interesections_with_square(square) {
+        if let Some((p1, p2)) = line.ordered_line_intersections_with_square(square) {
             Ok(Self::try_new_from_points(p1, p2))
         } else {
             Err(())
@@ -577,13 +558,14 @@ macro_rules! make_point_grouping_rotatable {
     };
 }
 
+// TODO: replace macro with traits
 make_point_grouping_rotatable!(TwoDifferentPoints, SignedCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnGridSquare, FloatCoordinate);
 
 macro_rules! impl_directed_line_trait_for_two_points {
     ($TheStruct:ident, $point_trait:ident) => {
-        impl<PointType: $point_trait> DirectedLineTrait for $TheStruct<PointType> {
+        impl<PointType: $point_trait> DirectedLineLike for $TheStruct<PointType> {
             fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
                 <Self as TwoPointsWithRestriction<PointType>>::to_array(self)
             }
@@ -591,6 +573,7 @@ macro_rules! impl_directed_line_trait_for_two_points {
     };
 }
 
+// TODO: replace macro with traits
 impl_directed_line_trait_for_two_points!(TwoDifferentPoints, SignedCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnGridSquare, FloatCoordinate);

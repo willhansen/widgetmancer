@@ -55,11 +55,11 @@ pub trait AngularEdgeOfCenteredArc {
             SquareType::Floating::unit_vector_from_angle(self.inside_direction());
 
         let edge_ray: TwoDifferentPoints<SquareType::Floating> = self.edge_ray();
-        let line = TwoDifferentPointsOnGridSquare::try_new_from_line_and_square(
-            edge_ray.line(),
-            rel_square,
-        )
-        .ok()?;
+        let line =
+            TwoDifferentPointsOnGridSquare::<SquareType::Floating>::try_new_from_line_and_square(
+                edge_ray, rel_square,
+            )
+            .ok()?;
 
         Some(
             HalfPlaneCuttingSquare::<SquareType>::new_from_line_and_point_on_half_plane(

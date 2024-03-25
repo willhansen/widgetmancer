@@ -5,7 +5,7 @@ use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
 };
 use crate::utility::*;
-use crate::{point2, DirectedFloatLineTrait};
+use crate::{point2, DirectedFloatLineLike};
 use derive_more::Constructor;
 use euclid::Angle;
 use itertools::Itertools;
