@@ -2,7 +2,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub trait LineSegment: LineTrait {
+pub trait LineSegment: LineLike {
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()

@@ -11,7 +11,7 @@ use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid
 use crate::glyph::Glyph;
 use crate::line_segment::FloatLineSegment;
 use crate::utility::coordinates::SignedCoordinate;
-use crate::utility::line::{FloatLineTrait, LineTrait, TwoDifferentPoints};
+use crate::utility::line::{FloatLineTrait, LineLike, TwoDifferentPoints};
 use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint, WorldSquare};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

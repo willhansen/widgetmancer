@@ -563,7 +563,7 @@ impl Drawable for OffsetSquareDrawable {
 mod tests {
     use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
-    use crate::{point2, LineTrait};
+    use crate::{point2, LineLike};
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};
 

@@ -7,100 +7,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
-    type PointType: SignedCoordinate;
-    // type DataType = <Self::PointType as Coordinate>::DataType;
-    fn new_from_two_points_on_line(
-        p1: impl Into<Self::PointType>,
-        p2: impl Into<Self::PointType>,
-    ) -> Self;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
-    fn from_array(points: [Self::PointType; 2]) -> Self {
-        Self::new_from_two_points_on_line(points[0], points[1])
-    }
-
-    fn arbitrary_point_on_line(&self) -> Self::PointType {
-        self.two_different_arbitrary_points_on_line()[0]
-    }
-
-    fn from_other_line<OtherLine>(other_line: OtherLine) -> Self
-    where
-        OtherLine: LineTrait<PointType = Self::PointType>,
-    {
-        let [p1, p2] = other_line.two_different_arbitrary_points_on_line();
-        Self::new_from_two_points_on_line(p1, p2)
-    }
-
-    fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points_on_line(
-            Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
-            Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
-        )
-    }
-    fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points_on_line(
-            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
-            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
-        )
-    }
-    fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
-        Self::new_from_two_points_on_line(
-            <Self::PointType as euclid::num::Zero>::zero(),
-            second_point,
-        )
-    }
-    fn from_point_and_vector(
-        point: impl Into<Self::PointType>,
-        direction: impl Into<Self::PointType>,
-    ) -> Self {
-        let p1 = point.into();
-        let v = direction.into();
-        let p2 = p1 + v;
-        Self::new_from_two_points_on_line(p1, p2)
-    }
-    fn is_orthogonal(&self) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        p1.x() == p2.x() || p1.y() == p2.y()
-    }
-    fn x_intercept(&self) -> Option<f32> {
-        if self.is_vertical() {
-            let p = self.arbitrary_point_on_line();
-            return Some(p.to_f32().x());
-        }
-        if self.is_horizontal() {
-            return None;
-        }
-        Some(-self.y_intercept().unwrap() / self.slope().unwrap())
-    }
-    fn y_intercept(&self) -> Option<f32> {
-        if self.is_vertical() {
-            return None;
-        }
-        let p = self.arbitrary_point_on_line().to_f32();
-        Some(p.y() - self.slope().unwrap() * p.x())
-    }
-    fn is_vertical(&self) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        p1.x() == p2.x()
-    }
-    fn is_horizontal(&self) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        p1.y() == p2.y()
-    }
-    fn slope(&self) -> Option<f32> {
-        if self.is_vertical() {
-            return None;
-        }
-        let [p1, p2] = self
-            .two_different_arbitrary_points_on_line()
-            .map(|a| a.to_f32());
-        let (l, r) = if p1.x() < p2.x() { (p1, p2) } else { (p2, p1) };
-        Some((r.y() - l.y()) / (r.x() - l.x()))
-    }
-}
-
-pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
+pub trait FloatLineTrait: LineLike<PointType = Self::_PointType> {
     type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
 
     fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
@@ -369,13 +276,13 @@ pub trait FloatLineTrait: LineTrait<PointType = Self::_PointType> {
 }
 impl<L> FloatLineTrait for L
 where
-    L: LineTrait,
+    L: LineLike,
     L::PointType: FloatCoordinate,
 {
     type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
 }
 
-pub trait DirectedLineTrait: LineTrait {
+pub trait DirectedLineTrait: LineLike {
     fn two_points_on_line_in_order(&self) -> [Self::PointType; 2];
     fn arbitrary_vector_along_line(&self) -> Self::PointType {
         let [p1, p2] = self.two_points_on_line_in_order();
@@ -458,7 +365,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     fn p2(&self) -> P {
         self.point_by_index(1)
     }
-    fn cast_unit<OtherLine: LineTrait>(&self) -> OtherLine
+    fn cast_unit<OtherLine: LineLike>(&self) -> OtherLine
     where
         OtherLine::PointType: Coordinate<DataType = P::DataType>,
     {
@@ -644,7 +551,7 @@ impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoDifferentPointsOnGrid
     }
 }
 
-impl<PointType: SignedCoordinate> LineTrait for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> LineLike for TwoDifferentPoints<PointType> {
     type PointType = PointType;
     fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         TwoDifferentPoints::new(p1, p2)
@@ -688,7 +595,7 @@ impl_directed_line_trait_for_two_points!(TwoDifferentPoints, SignedCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnGridSquare, FloatCoordinate);
 
-impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
+impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
@@ -699,7 +606,7 @@ impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitS
         self.0.two_different_arbitrary_points_on_line()
     }
 }
-impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnGridSquare<PointType> {
+impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
         Self::try_new_from_points(p1, p2).unwrap()

@@ -31,6 +31,8 @@ macro_rules! pub_mod_and_use {
 }
 
 pub_mod_and_use!(
+    line_like,
+    endless_line,
     angle,
     angle_interval,
     angular_direction,
