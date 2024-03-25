@@ -376,7 +376,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
 }
 
 // TODO: convert to trait
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
     p2: PointType,
@@ -424,7 +424,7 @@ impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
 // TODO: Maybe add restriction that the points are also on different faces of the square.
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
+pub struct TwoDifferentPointsOnCenteredUnitSquare<P: Coordinate>(TwoDifferentPoints<P>);
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
@@ -455,7 +455,7 @@ impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointTyp
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TwoDifferentPointsOnGridSquare<P: FloatCoordinate> {
+pub struct TwoDifferentPointsOnGridSquare<P: Coordinate> {
     points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare<P>,
     the_square: P::OnGrid,
 }
@@ -492,7 +492,7 @@ where
         square: impl IntCoordinate,
     ) -> Result<Self, ()> {
         if let Some((p1, p2)) = line.ordered_line_intersections_with_square(square) {
-            Ok(Self::try_new_from_points(p1, p2))
+            Ok(Self::try_new_from_points(p1, p2)?)
         } else {
             Err(())
         }
@@ -558,7 +558,8 @@ macro_rules! make_point_grouping_rotatable {
     };
 }
 
-// TODO: replace macro with traits
+// TODO: combine with other macros
+// TODO: remove coordinate trait parameter
 make_point_grouping_rotatable!(TwoDifferentPoints, SignedCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 make_point_grouping_rotatable!(TwoDifferentPointsOnGridSquare, FloatCoordinate);
@@ -573,10 +574,43 @@ macro_rules! impl_directed_line_trait_for_two_points {
     };
 }
 
-// TODO: replace macro with traits
+// TODO: combine with other macros
+// TODO: remove coordinate trait parameter
 impl_directed_line_trait_for_two_points!(TwoDifferentPoints, SignedCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnCenteredUnitSquare, FloatCoordinate);
 impl_directed_line_trait_for_two_points!(TwoDifferentPointsOnGridSquare, FloatCoordinate);
+
+macro_rules! impl_traits_for_two_points_with_restriction {
+    ($TheStruct:ident) => {
+        impl<P> Add<P> for $TheStruct<P>
+        where
+            Self: TwoPointsWithRestriction<P>,
+            P: Coordinate,
+        {
+            type Output = Self;
+
+            fn add(self, rhs: P) -> Self::Output {
+                Self::try_new_from_points(self.p1() + rhs, self.p2() + rhs).unwrap()
+            }
+        }
+        impl<P> Sub<P> for $TheStruct<P>
+        where
+            Self: TwoPointsWithRestriction<P>,
+            P: Coordinate,
+        {
+            type Output = Self;
+
+            fn sub(self, rhs: P) -> Self::Output {
+                Self::try_new_from_points(self.p1() - rhs, self.p2() - rhs).unwrap()
+            }
+        }
+    };
+}
+
+// TODO: combine into one macro call
+impl_traits_for_two_points_with_restriction!(TwoDifferentPoints);
+impl_traits_for_two_points_with_restriction!(TwoDifferentPointsOnCenteredUnitSquare);
+impl_traits_for_two_points_with_restriction!(TwoDifferentPointsOnGridSquare);
 
 impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
@@ -640,7 +674,7 @@ impl TwoDifferentWorldPoints {
     }
 }
 
-impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -653,25 +687,6 @@ impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
                 .map_or("N/A".to_owned(), |v| v.to_string()),
             self.slope().map_or("inf".to_owned(), |v| v.to_string()),
         )
-    }
-}
-impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(&self, f)
-    }
-}
-
-impl<PointType> Add<PointType> for TwoDifferentPoints<PointType>
-where
-    PointType: Coordinate,
-{
-    type Output = TwoDifferentPoints<PointType>;
-
-    fn add(self, rhs: PointType) -> Self::Output {
-        TwoDifferentPoints {
-            p1: self.p1 + rhs,
-            p2: self.p2 + rhs,
-        }
     }
 }
 
