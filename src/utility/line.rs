@@ -50,7 +50,7 @@ pub trait LineTrait: Sized + Copy + QuarterTurnRotatable + Debug {
             second_point,
         )
     }
-    fn from_point_and_direction(
+    fn from_point_and_vector(
         point: impl Into<Self::PointType>,
         direction: impl Into<Self::PointType>,
     ) -> Self {
@@ -437,11 +437,20 @@ pub trait DirectedFloatLineTrait: FloatLineTrait + DirectedLineTrait {
     fn ordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
         self.ordered_line_intersections_with_expanded_centered_unit_square(0.0)
     }
+    fn from_point_and_angle(
+        point: impl Into<Self::PointType>,
+        direction: impl Into<FAngle>,
+    ) -> Self {
+        let p1 = point.into();
+        let v = Self::PointType::unit_vector_from_angle(direction.into());
+        let p2 = p1 + v;
+        Self::new_from_two_points_on_line(p1, p2)
+    }
 }
 impl<L> DirectedFloatLineTrait for L where L: DirectedLineTrait + FloatLineTrait {}
 
 pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
-    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()>;
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()>;
     fn point_by_index(&self, point_index: usize) -> P;
     fn p1(&self) -> P {
         self.point_by_index(0)
@@ -459,7 +468,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
         [0, 1].map(|i| self.point_by_index(i))
     }
     fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
-        Self::try_new(p1, p2).unwrap()
+        Self::try_new_from_points(p1, p2).unwrap()
     }
     fn x_min(&self) -> P::DataType {
         min_for_partial_ord(self.p1().x(), self.p2().x())
@@ -481,6 +490,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
     }
 }
 
+// TODO: convert to trait
 #[derive(Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
@@ -488,7 +498,7 @@ pub struct TwoDifferentPoints<PointType: Coordinate> {
 }
 
 impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
-    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
         let p1 = p1.into();
         let p2 = p2.into();
         if p1 == p2 {
@@ -505,19 +515,37 @@ impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
         }
     }
 }
+
+impl<P: SignedCoordinate> Ray for TwoDifferentPoints<P> {
+    type PointType = P;
+
+    fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self {
+        Self::new(point, point + Self::PointType::unit_vector_from_angle(dir))
+    }
+
+    fn point(&self) -> Self::PointType {
+        self.p1()
+    }
+
+    fn angle(&self) -> FAngle {
+        let dir = self.p2() - self.p1();
+        dir.better_angle_from_x_axis()
+    }
+}
+
 // TODO: Maybe add restriction that the points are also on different faces of the square.
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: FloatCoordinate>(TwoDifferentPoints<P>);
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
         let p1 = p1.into();
         let p2 = p2.into();
         // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
         let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
         if points_are_valid {
-            Ok(Self(TwoDifferentPoints::try_new(p1, p2)?))
+            Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
         } else {
             Err(())
         }
@@ -534,7 +562,7 @@ impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointTyp
         if points.len() < 2 {
             Err(())
         } else {
-            Self::try_new(points[0], points[1])
+            Self::try_new_from_points(points[0], points[1])
         }
     }
 }
@@ -545,7 +573,7 @@ pub struct TwoDifferentPointsOnGridSquare<P: FloatCoordinate> {
 }
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGridSquare<P> {
-    fn try_new(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
         let p1 = p1.into();
         let p2 = p2.into();
         // NOTE: this leaves ambiguity between two squares if the points are both on the same face of a square.  This choice is made by rounding.
@@ -553,7 +581,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGri
         let centered_p1 = p1 - square_center;
         let centered_p2 = p2 - square_center;
         Ok(Self {
-            points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare::try_new(
+            points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare::try_new_from_points(
                 centered_p1,
                 centered_p2,
             )?,
@@ -571,6 +599,16 @@ where
     P: FloatCoordinate,
     // P::OnGrid: IntCoordinate<Floating = P>,
 {
+    pub fn try_new_from_line_and_square(
+        line: impl DirectedLineTrait,
+        square: impl IntCoordinate,
+    ) -> Result<Self, ()> {
+        if let Some((p1, p2)) = line.ordered_line_interesections_with_square(square) {
+            Ok(Self::try_new_from_points(p1, p2))
+        } else {
+            Err(())
+        }
+    }
     pub fn the_square(&self) -> P::OnGrid {
         self.the_square
     }
@@ -664,7 +702,7 @@ impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnCenteredUnitS
 impl<PointType: FloatCoordinate> LineTrait for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
     fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
-        Self::try_new(p1, p2).unwrap()
+        Self::try_new_from_points(p1, p2).unwrap()
     }
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
@@ -695,7 +733,7 @@ impl<P: FloatCoordinate> TryFrom<TwoDifferentPoints<P>>
     type Error = ();
 
     fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
-        Self::try_new(value.p1, value.p2)
+        Self::try_new_from_points(value.p1, value.p2)
     }
 }
 
@@ -1417,7 +1455,7 @@ mod tests {
     #[test]
     fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner_exact() {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::from_point_and_direction((0.5, 0.5), (1.0, -1.0));
+            TwoDifferentPoints::from_point_and_vector((0.5, 0.5), (1.0, -1.0));
         let tolerance = 0.1;
 
         let expected_points = [(0.5, 0.5)];
@@ -1432,7 +1470,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__within_tolerance(
     ) {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+            TwoDifferentPoints::from_point_and_vector((0.5, 0.52), (1.0, -1.0));
         let tolerance = 0.1;
         let expected_points = [(0.5, 0.5)];
 
@@ -1447,7 +1485,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__outside_tolerance(
     ) {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+            TwoDifferentPoints::from_point_and_vector((0.5, 0.52), (1.0, -1.0));
         let tolerance = 0.0001;
 
         let intersections =
@@ -1458,7 +1496,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_corner__all_corners_within_tolerance(
     ) {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::from_point_and_direction((0.5, 0.52), (1.0, -1.0));
+            TwoDifferentPoints::from_point_and_vector((0.5, 0.52), (1.0, -1.0));
         let tolerance = 100.0;
         let expected_points = [(0.5, 0.5)];
 
@@ -1487,7 +1525,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__miss_almost_parallel__all_corners_within_tolerance(
     ) {
         let line: TwoDifferentFloatPoints =
-            TwoDifferentPoints::from_point_and_direction((0.0, 0.52), (1.0, 0.0001));
+            TwoDifferentPoints::from_point_and_vector((0.0, 0.52), (1.0, 0.0001));
         let tolerance = 100.0;
         let expected_points = [(-0.5, 0.5)];
 

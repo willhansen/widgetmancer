@@ -3,7 +3,9 @@ use crate::utility::*;
 pub trait AngularEdgeOfCenteredArc {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self;
     fn angle(&self) -> FAngle;
-    // fn edge_ray<T: Ray>(&self) -> T;
+    fn edge_ray<R: Ray>(&self) -> R {
+        R::new_from_point_and_dir(R::PointType::zero(), self.angle())
+    }
     // fn border_as_halfplane<T: HalfPlane>(&self) -> T;
     fn outside_angular_direction(&self) -> AngularDirection;
     fn flipped(&self) -> Self
@@ -37,11 +39,34 @@ pub trait AngularEdgeOfCenteredArc {
     fn is_ccw_edge(&self) -> bool {
         !self.is_cw_edge()
     }
-    fn intersection_with_relative_square(
+    fn intersection_with_relative_square<SquareType: IntCoordinate>(
         &self,
-        rel_square: impl IntCoordinate,
-    ) -> Option<HalfPlaneCuttingWorldSquare> {
-        todo!()
+        rel_square: SquareType,
+    ) -> Option<HalfPlaneCuttingSquare<SquareType>> {
+        if rel_square.is_zero() {
+            return None;
+        }
+
+        if rel_square.position_on_axis(self.angle()) < 0.0 {
+            return None;
+        }
+
+        let point_on_inside_of_edge =
+            SquareType::Floating::unit_vector_from_angle(self.inside_direction());
+
+        let edge_ray: TwoDifferentPoints<SquareType::Floating> = self.edge_ray();
+        let line = TwoDifferentPointsOnGridSquare::try_new_from_line_and_square(
+            edge_ray.line(),
+            rel_square,
+        )
+        .ok()?;
+
+        Some(
+            HalfPlaneCuttingSquare::<SquareType>::new_from_line_and_point_on_half_plane(
+                line,
+                point_on_inside_of_edge,
+            ),
+        )
     }
 }
 

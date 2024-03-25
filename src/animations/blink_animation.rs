@@ -52,7 +52,7 @@ impl Animation for BlinkAnimation {
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
 
         // the tunable constants
-        let ostensible_blink_duration = 0.2;
+        // let ostensible_blink_duration = 0.2;
         let settling_time = 0.8;
 
         let time_constant = settling_time / 5.0;
@@ -60,11 +60,11 @@ impl Animation for BlinkAnimation {
         let points_per_square_blinked = 1.0;
         let point_spread_radius = 0.5;
 
-        let motion_vector: WorldMove = self.end_square.to_f32() - self.start_square.to_f32();
-        let motion_direction = motion_vector.normalize();
-        let motion_distance = motion_vector.length();
+        // let motion_vector: WorldMove = self.end_square.to_f32() - self.start_square.to_f32();
+        // let motion_direction = motion_vector.normalize();
+        // let motion_distance = motion_vector.length();
 
-        let start_speed = motion_distance / ostensible_blink_duration;
+        // let start_speed = motion_distance / ostensible_blink_duration;
 
         // let start_vel = motion_direction * start_speed;
 
@@ -77,8 +77,8 @@ impl Animation for BlinkAnimation {
         );
 
         let age = time.duration_since(self.start_time);
-        let total_seconds = self.duration().as_secs_f32();
-        let remaining_seconds = total_seconds - age.as_secs_f32();
+        // let total_seconds = self.duration().as_secs_f32();
+        // let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
         // let lifetime_fraction_remaining = remaining_seconds / total_seconds;
         // let lifetime_fraction_spent = spent_seconds / total_seconds;
