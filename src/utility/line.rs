@@ -314,9 +314,10 @@ pub trait DirectedFloatLineLike: FloatLineLike + DirectedLineLike {
         &self,
         square: <Self::PointType as Coordinate>::OnGrid,
     ) -> Vec<Self::PointType> {
-        let offset: Self::PointType = square.to_f32();
+        let offset = square.to_f32();
+        let relative_self = self - offset;
         let relative_intersections =
-            (self - offset).ordered_line_intersections_with_centered_unit_square();
+            relative_self.ordered_line_intersections_with_centered_unit_square();
         relative_intersections
             .iter()
             .map(|&p| p + offset)

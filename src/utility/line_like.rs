@@ -1,6 +1,13 @@
 use crate::utility::*;
 
-pub trait LineLike: Sized + Copy + QuarterTurnRotatable + Debug {
+pub trait LineLike:
+    Sized
+    + Copy
+    + QuarterTurnRotatable
+    + Debug
+    + Sub<Self::PointType, Output = Self>
+    + Add<Self::PointType, Output = Self>
+{
     type PointType: SignedCoordinate;
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn new_from_two_points_on_line(
