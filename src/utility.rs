@@ -7,7 +7,7 @@ use ambassador::delegatable_trait;
 
 use approx::AbsDiffEq;
 use euclid::approxeq::ApproxEq;
-use euclid::num::Zero;
+use euclid::num::{One, Zero};
 use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;

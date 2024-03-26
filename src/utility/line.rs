@@ -314,12 +314,12 @@ pub trait DirectedFloatLineLike: FloatLineLike + DirectedLineLike {
         &self,
         square: <Self::PointType as Coordinate>::OnGrid,
     ) -> Vec<Self::PointType> {
-        let offset = square.to_f32();
+        let offset: Self::PointType = square.to_f32();
         let relative_intersections =
-            (*self - offset).ordered_line_intersections_with_centered_unit_square();
+            (self - offset).ordered_line_intersections_with_centered_unit_square();
         relative_intersections
             .iter()
-            .map(|p| p + offset)
+            .map(|&p| p + offset)
             .collect_vec()
     }
     fn from_point_and_angle(
@@ -487,15 +487,19 @@ where
     P: FloatCoordinate,
     // P::OnGrid: IntCoordinate<Floating = P>,
 {
-    pub fn try_new_from_line_and_square(
-        line: impl DirectedLineLike,
-        square: impl IntCoordinate,
+    pub fn try_new_from_line_and_square<T: Coordinate>(
+        line: impl DirectedFloatLineLike<PointType = T>,
+        square: T::OnGrid,
     ) -> Result<Self, ()> {
-        if let Some((p1, p2)) = line.ordered_line_intersections_with_square(square) {
-            Ok(Self::try_new_from_points(p1, p2)?)
-        } else {
-            Err(())
+        let intersection_points = line.ordered_line_intersections_with_square(square);
+        if intersection_points.len() != 2 {
+            return Err(());
         }
+
+        Ok(Self::try_new_from_points(
+            intersection_points[0],
+            intersection_points[1],
+        )?)
     }
     pub fn the_square(&self) -> P::OnGrid {
         self.the_square
@@ -543,7 +547,7 @@ impl<PointType: SignedCoordinate> LineLike for TwoDifferentPoints<PointType> {
 }
 macro_rules! make_point_grouping_rotatable {
     ($grouping_type:ident, $point_trait:ident) => {
-        impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
+        impl<PointType: SignedCoordinate> QuarterTurnRotatable for $grouping_type<PointType> {
             fn quarter_rotated_ccw(
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
