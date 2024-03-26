@@ -315,7 +315,7 @@ pub trait DirectedFloatLineLike: FloatLineLike + DirectedLineLike {
         square: <Self::PointType as Coordinate>::OnGrid,
     ) -> Vec<Self::PointType> {
         let offset = square.to_f32();
-        let relative_self = self - offset;
+        let relative_self = *self - offset;
         let relative_intersections =
             relative_self.ordered_line_intersections_with_centered_unit_square();
         relative_intersections
@@ -486,11 +486,10 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGri
 impl<P> TwoDifferentPointsOnGridSquare<P>
 where
     P: FloatCoordinate,
-    // P::OnGrid: IntCoordinate<Floating = P>,
 {
-    pub fn try_new_from_line_and_square<T: Coordinate>(
-        line: impl DirectedFloatLineLike<PointType = T>,
-        square: T::OnGrid,
+    pub fn try_new_from_line_and_square<L: DirectedFloatLineLike<_PointType = P>>(
+        line: L,
+        square: P::OnGrid,
     ) -> Result<Self, ()> {
         let intersection_points = line.ordered_line_intersections_with_square(square);
         if intersection_points.len() != 2 {
@@ -548,7 +547,7 @@ impl<PointType: SignedCoordinate> LineLike for TwoDifferentPoints<PointType> {
 }
 macro_rules! make_point_grouping_rotatable {
     ($grouping_type:ident, $point_trait:ident) => {
-        impl<PointType: SignedCoordinate> QuarterTurnRotatable for $grouping_type<PointType> {
+        impl<PointType: $point_trait> QuarterTurnRotatable for $grouping_type<PointType> {
             fn quarter_rotated_ccw(
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
