@@ -340,7 +340,7 @@ where
 // {
 // }
 
-pub trait IntCoordinate: SignedCoordinate<_DataType = i32> + Hash + Eq {
+pub trait IntCoordinate: SignedCoordinate<_DataType = i32, OnGrid = Self> + Hash + Eq {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
     }
