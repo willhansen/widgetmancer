@@ -4,6 +4,7 @@ use std::iter::zip;
 use std::string::ToString;
 
 use ambassador::delegatable_trait;
+use try_partialord::*;
 
 use approx::AbsDiffEq;
 use euclid::approxeq::ApproxEq;
