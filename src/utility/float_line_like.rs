@@ -75,6 +75,9 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
             (p1 - p2).better_angle_from_x_axis(),
         ]
     }
+    fn perpendicular_directions(&self) -> [Angle<f32>; 2] {
+        self.parallel_directions().map(|d| d.turned_right())
+    }
     fn same_side_of_line(
         &self,
         point_c: impl Into<Self::PointType> + Copy,

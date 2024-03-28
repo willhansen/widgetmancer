@@ -26,9 +26,16 @@ pub trait FloatLine: Line + FloatLineLike {
         p1 + parallel_part_of_p1_to_point
     }
     fn depth_in_square(&self, square: <Self::PointType as Coordinate>::OnGrid) -> f32 {
-        let square_center = square.to_f32();
-        let closest_point_on_line = self.closest_point_to_point(square_center);
-        let vector_from_square_center_to_point = closest_point_on_line - square_center;
+        let normal_to_line: FAngle = self.perpendicular_directions()[0];
+
+        let line_position_on_axis = self
+            .arbitrary_point_on_line()
+            .position_on_axis(normal_to_line);
+
+        let square_projected_onto_axis = square.projected_onto_axis(normal_to_line);
+
+        let square_center_on_axis = square.to_f32().position_on_axis(normal_to_line);
+
         // let proj_of_square_on_axis = self.perpendicular_directions()[0]
         // let dir_to_point =
         // let_corner_positions_on_axis = square.square_corners().map(Coordinate::position_on_axis())

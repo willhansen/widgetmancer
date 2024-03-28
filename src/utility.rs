@@ -48,6 +48,7 @@ pub_mod_and_use!(
     grid_square,
     halfplane,
     has_origin_pose,
+    interval,
     line,
     line_like,
     line_segment,

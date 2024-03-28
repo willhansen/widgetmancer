@@ -1,5 +1,4 @@
 use crate::utility::*;
-use interval::Interval;
 
 pub trait GridSquare: IntCoordinate {
     fn square_corners(&self) -> [Self::Floating; 4] {
@@ -10,8 +9,25 @@ pub trait GridSquare: IntCoordinate {
     fn square_center(&self) -> Self::Floating {
         self.to_f32()
     }
-    fn projected_onto_axis(&self, axis: FAngle) -> Interval<Self::Floating> {
-        todo!()
+    fn projected_onto_axis(
+        &self,
+        axis: FAngle,
+    ) -> ClosedInterval<<Self::Floating as Coordinate>::DataType> {
+        let all_square_corners_on_axis: [f32; 4] =
+            self.square_corners().map(|p| p.position_on_axis(axis));
+
+        ClosedInterval::new(
+            all_square_corners_on_axis
+                .iter()
+                .min_by_key(|&&x| OrderedFloat(x))
+                .unwrap()
+                .clone(),
+            all_square_corners_on_axis
+                .iter()
+                .max_by_key(|&&x| OrderedFloat(x))
+                .unwrap()
+                .clone(),
+        )
     }
 }
 
