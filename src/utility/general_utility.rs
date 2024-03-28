@@ -10,6 +10,7 @@ pub use std::{
     mem,
     ops::Neg,
 };
+use try_partialord::TryMinMax;
 
 pub use derive_more::Neg;
 
@@ -119,18 +120,10 @@ pub fn rotated_to_have_split_at_max<T: Copy>(vec: &Vec<T>, f: impl Fn(T, T) -> f
 }
 
 pub fn min_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
-    if a < b {
-        a
-    } else {
-        b
-    }
+    [a, b].try_min().unwrap().unwrap()
 }
 pub fn max_for_partial_ord<T: PartialOrd + Copy>(a: T, b: T) -> T {
-    if a > b {
-        a
-    } else {
-        b
-    }
+    [a, b].try_max().unwrap().unwrap()
 }
 
 pub trait TupleClone {
