@@ -292,7 +292,9 @@ impl PortalGeometry {
                 let stepped_forward_start = naive_ray_endpoint(start, angle, STEP_BACK_DISTANCE);
                 start = stepped_forward_start;
             } else {
-                naive_line_segments.push(TwoDifferentWorldPoints::from_ray(start, angle, range));
+                naive_line_segments.push(TwoDifferentWorldPoints::from_point_angle_and_distance(
+                    start, angle, range,
+                ));
                 range = 0.0;
             }
         }

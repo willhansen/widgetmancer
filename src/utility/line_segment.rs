@@ -34,6 +34,36 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
     fn random_point_near_line(&self, radius: f32) -> Self::PointType {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
+
+    // TODO: make parameter impl LineSegment
+    fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<Self::PointType> {
+        let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
+        let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
+
+        if self.same_side_of_line(other_p1, other_p2) || other.same_side_of_line(self_p1, self_p2) {
+            let on_same_line = self
+                .to_line::<TwoDifferentPoints<_>>()
+                .point_is_on_line(other_p1);
+            if !on_same_line {
+                return None;
+            }
+            return if self_p2 == other_p1 && on_line_in_this_order(self_p1, self_p2, other_p2) {
+                Some(self_p2)
+            } else if self_p2 == other_p2 && on_line_in_this_order(self_p1, self_p2, other_p1) {
+                Some(self_p2)
+            } else if self_p1 == other_p1 && on_line_in_this_order(self_p2, self_p1, other_p2) {
+                Some(self_p1)
+            } else if self_p1 == other_p2 && on_line_in_this_order(self_p2, self_p1, other_p1) {
+                Some(self_p1)
+            } else {
+                None
+            };
+        }
+        // from here, we know the line segments are overlapping, including the case of exactly touching
+        // A simple line intersection check is all that's left
+
+        self.intersection_point_with_other_extended_line(&other)
+    }
 }
 impl<T> FloatLineSegment for T where T: FloatLineLike + LineSegment {}
 

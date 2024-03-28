@@ -19,7 +19,7 @@ use euclid::num::Zero;
 #[derive(PartialEq, Clone, Copy)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
 where
-    LineType: DirectedFloatLineLike,
+    LineType: DirectedFloatLine,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
@@ -27,7 +27,7 @@ where
 
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedFloatLineLike,
+    LineType: DirectedFloatLine,
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
     where
@@ -339,7 +339,7 @@ where
     }
 }
 
-impl<L: DirectedFloatLineLike> Debug for HalfPlane<L> {
+impl<L: DirectedFloatLine> Debug for HalfPlane<L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
             .field("dividing_line", &self.dividing_line)
@@ -373,7 +373,7 @@ impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P
     }
 }
 
-impl<LineType: DirectedFloatLineLike> QuarterTurnRotatable for HalfPlane<LineType> {
+impl<LineType: DirectedFloatLine> QuarterTurnRotatable for HalfPlane<LineType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -400,7 +400,7 @@ impl<LineType: DirectedFloatLineLike> QuarterTurnRotatable for HalfPlane<LineTyp
 pub type HalfPlaneCuttingSquare<SquareType: IntCoordinate> =
     HalfPlane<TwoDifferentPointsOnGridSquare<SquareType::Floating>>;
 
-pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLineLike> {
+pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
     // type PointType: FloatCoordinate;
     fn which_square(&self) -> <LineType::PointType as Coordinate>::OnGrid;
     fn to_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<LineType::PointType>;
@@ -414,7 +414,7 @@ pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLineLike> {
 
 impl<L> HalfPlaneCuttingSquareTrait<L> for HalfPlane<L>
 where
-    L: TwoPointsOnASquareTrait<L::PointType> + DirectedFloatLineLike,
+    L: TwoPointsOnASquareTrait<L::PointType> + DirectedFloatLine,
 {
     fn which_square(&self) -> <L::PointType as Coordinate>::OnGrid {
         self.dividing_line.which_square()

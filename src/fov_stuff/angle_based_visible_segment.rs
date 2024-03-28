@@ -12,7 +12,6 @@ use super::fence::{Fence, RelativeFenceFullyVisibleFromOriginGoingCcw};
 use super::square_visibility::RelativeSquareVisibilityFunctions;
 use super::NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES;
 
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq)]
 pub struct AngleBasedVisibleSegment {
     arc: AngleInterval,
@@ -363,6 +362,7 @@ mod tests {
             .get(&vec2(2, 0))
             .unwrap()
             .is_only_partially_visible());
+        dbg!(segment, visibilities.get(&vec2(3, 0)).unwrap());
         assert!(visibilities.get(&vec2(3, 0)).unwrap().is_fully_visible());
         assert_eq!(visibilities.len(), 3);
     }

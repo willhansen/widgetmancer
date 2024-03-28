@@ -49,7 +49,7 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone)]
 pub enum SquareVisibilityFromOneLargeShadow {
     FullyVisible,
     // TODO: have more than one half plane (two?)
@@ -57,6 +57,9 @@ pub enum SquareVisibilityFromOneLargeShadow {
     // PartiallyVisible(LocalSquareHalfPlaneWithBorderOnUnitSquare), // TODO
     NotVisible,
 }
+
+// not derived because error trace through macro is nightly only
+impl Copy for SquareVisibilityFromOneLargeShadow {}
 
 impl SquareVisibilityFromOneLargeShadow {
     pub(crate) fn visible_portion(&self) -> Option<HalfPlaneCuttingLocalSquare> {
@@ -186,18 +189,12 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             .filter_map(|edge| edge.intersection_with_relative_square(rel_square))
             .collect();
 
-        // Cases:
-        // - 1 intersection
+        let substantial_intersections: Vec<HalfPlaneCuttingWorldSquare> = intersections
+            .into_iter()
+            .filter(|x| x.dividing_line().depth_in_square(rel_square) > 0.001) // TODO: standardize tolerance
+            .collect();
 
-        // - 2 intersections, narrow fov
-        // - 2 intersections, very wide fov
-        // --> Check if dot of arc center and square center is positive
-        // --> Choose most overlapped
-
-        // - no intersections, fully visible
-        // - no intersections, not visible
-        // --> Check if square center is in the arc
-        match intersections.len() {
+        match substantial_intersections.len() {
             0 => {
                 let square_is_in_arc = partial_view_arc
                     .contains_angle_inclusive(rel_square.better_angle_from_x_axis());
@@ -208,7 +205,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 }
             }
             1 => Self::PartiallyVisible(halfplane_cutting_world_square_to_halfplane_local_square(
-                intersections[0],
+                substantial_intersections[0],
             )),
             2 => {
                 let is_wraparound_case = fangle_dot(
@@ -220,9 +217,9 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                 let key_fn =
                     |i: &&HalfPlaneCuttingWorldSquare| OrderedFloat(i.fraction_of_square_covered());
                 let selected = if is_wraparound_case {
-                    intersections.iter().max_by_key(key_fn)
+                    substantial_intersections.iter().max_by_key(key_fn)
                 } else {
-                    intersections.iter().min_by_key(key_fn)
+                    substantial_intersections.iter().min_by_key(key_fn)
                 }
                 .unwrap();
 

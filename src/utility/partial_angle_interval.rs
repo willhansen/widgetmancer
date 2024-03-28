@@ -15,7 +15,6 @@ use termion::cursor::Left;
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::*;
 
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialAngleInterval {
@@ -51,7 +50,6 @@ impl RigidlyTransformable for PartialAngleInterval {
     }
 }
 
-// TODO: remove this if portrait works
 // impl QuarterTurnRotatable for PartialAngleInterval {
 //     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
 //         let quarter_turns = quarter_turns.into();

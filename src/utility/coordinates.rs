@@ -13,7 +13,6 @@ pub use euclid::Angle;
 use itertools::Itertools;
 use num::{One, Signed, Zero};
 use ordered_float::OrderedFloat;
-use portrait::derive_delegate;
 use rand::{rngs::StdRng, Rng};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 
@@ -641,11 +640,9 @@ impl RigidlyTransformable for WorldSquare {
     }
 }
 
-#[portrait::make()]
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self;
-    #[portrait(derive_delegate(reduce = |s,x|{x}))] // TODO: understand
     fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
     where
         Self: Sized + Debug,
@@ -784,11 +781,10 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
 }
 
 pub fn corner_points_of_centered_unit_square<P: FloatCoordinate>() -> Vec<P> {
-    P::new(0.5, 0.5)
-        .quadrant_rotations_going_ccw()
+    <P::OnGrid as euclid::num::Zero>::zero()
+        .square_corners()
         .into_iter()
-        .map(|v| P::zero() + v)
-        .collect()
+        .collect_vec()
 }
 
 #[cfg(test)]

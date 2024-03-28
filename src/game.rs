@@ -802,7 +802,8 @@ impl Game {
     }
 
     fn raycast(&self, start_point: WorldPoint, direction: Angle<f32>, range: f32) -> RaycastResult {
-        let naive_line = TwoDifferentWorldPoints::from_ray(start_point, direction, range);
+        let naive_line =
+            TwoDifferentWorldPoints::from_point_angle_and_distance(start_point, direction, range);
 
         let line_segments_after_portal_awareness: Vec<TwoDifferentWorldPoints> = self
             .portal_geometry

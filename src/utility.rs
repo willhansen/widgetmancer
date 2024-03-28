@@ -31,21 +31,25 @@ macro_rules! pub_mod_and_use {
 }
 
 pub_mod_and_use!(
-    directed_line_like,
-    line_like,
-    endless_line,
     angle,
     angle_interval,
     angular_direction,
+    angular_edge_of_centered_arc,
     bool_with_partial,
     circular_interval,
-    angular_edge_of_centered_arc,
-    units,
     coordinates,
+    directed_float_line,
+    directed_float_line_like,
+    directed_line,
+    directed_line_like,
+    float_line,
+    float_line_like,
     general_utility,
+    grid_square,
     halfplane,
     has_origin_pose,
     line,
+    line_like,
     line_segment,
     octant,
     orthogonal_facing_int_pose,
@@ -56,7 +60,8 @@ pub_mod_and_use!(
     relative_interval_location,
     round_robin_iterator,
     size_2d,
-    trait_alias_macro
+    trait_alias_macro,
+    units
 );
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {

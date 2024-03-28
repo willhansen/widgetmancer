@@ -3,11 +3,9 @@ use std::fmt::{Debug, Display, Formatter};
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use portrait;
 
 use crate::utility::*;
 
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,

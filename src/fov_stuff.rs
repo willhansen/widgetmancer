@@ -27,7 +27,6 @@ type Pose = WorldSquareWithOrthogonalDir;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
     view_root: WorldSquareWithOrthogonalDir,
@@ -41,7 +40,6 @@ impl HasOriginPose for FieldOfView {
     }
 }
 
-// TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
