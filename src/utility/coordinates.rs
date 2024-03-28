@@ -163,6 +163,7 @@ pub trait Coordinate:
         onto * (self.dot(onto) / onto.square_length())
     }
     fn points_sorted_along_axis(points: impl IntoIterator<Item = Self>, axis: FAngle) -> impl IntoIterator<Item = Self> {
+        // TODO: panic if there's a nan.
         points.into_iter().sorted_by_key(|&point|OrderedFloat(point.position_on_axis(axis)))
     }
     fn position_on_axis(&self, angle: FAngle) -> f32 {

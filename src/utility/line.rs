@@ -50,7 +50,7 @@ pub trait Line: LineLike {
 }
 
 pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()>;
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String>;
     fn point_by_index(&self, point_index: usize) -> P;
     fn p1(&self) -> P {
         self.point_by_index(0)
@@ -108,11 +108,11 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
 }
 
 impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
         let p1 = p1.into();
         let p2 = p2.into();
         if p1 == p2 {
-            Err(())
+            Err(format!("Points are equal: {:?}, {:?}", p1, p2))
         } else {
             Ok(TwoDifferentPoints { p1, p2 })
         }
@@ -152,7 +152,7 @@ impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: Coordinate>(TwoDifferentPoints<P>);
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
         let p1 = p1.into();
         let p2 = p2.into();
         // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
@@ -160,7 +160,10 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
         if points_are_valid {
             Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
         } else {
-            Err(())
+            Err(format!(
+                "At least one point not on centered unit square: {:?}, {:?}",
+                p1, p2
+            ))
         }
     }
     fn point_by_index(&self, pi: usize) -> P {
@@ -170,10 +173,13 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
 impl<PointType: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     fn try_from_line<LineType: DirectedFloatLine<_PointType = PointType>>(
         line: LineType,
-    ) -> Result<Self, ()> {
+    ) -> Result<Self, String> {
         let points: Vec<PointType> = line.ordered_line_intersections_with_centered_unit_square();
         if points.len() < 2 {
-            Err(())
+            Err(format!(
+                "Wrong number of intersection points: {:?},",
+                points
+            ))
         } else {
             Self::try_new_from_points(points[0], points[1])
         }
@@ -186,7 +192,7 @@ pub struct TwoDifferentPointsOnGridSquare<P: Coordinate> {
 }
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGridSquare<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, ()> {
+    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
         let p1 = p1.into();
         let p2 = p2.into();
         // NOTE: this leaves ambiguity between two squares if the points are both on the same face of a square.  This choice is made by rounding.
@@ -214,10 +220,13 @@ where
     pub fn try_new_from_line_and_square<L: DirectedFloatLine<_PointType = P>>(
         line: L,
         square: P::OnGrid,
-    ) -> Result<Self, ()> {
+    ) -> Result<Self, String> {
         let intersection_points = line.ordered_line_intersections_with_square(square);
         if intersection_points.len() != 2 {
-            return Err(());
+            return Err(format!(
+                "Wrong number of intersection points: {:?},",
+                intersection_points
+            ));
         }
 
         Ok(Self::try_new_from_points(
@@ -375,7 +384,7 @@ impl<P: FloatCoordinate> From<TwoDifferentPointsOnCenteredUnitSquare<P>> for Two
 impl<P: FloatCoordinate> TryFrom<TwoDifferentPoints<P>>
     for TwoDifferentPointsOnCenteredUnitSquare<P>
 {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
         Self::try_new_from_points(value.p1, value.p2)
