@@ -48,9 +48,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
     }
 
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let angle_a = (p1 - p2).better_angle_from_x_axis();
-        let angle_b = (p2 - p1).better_angle_from_x_axis();
+        let [angle_a, angle_b] = self.parallel_directions();
         if angle_a.radians.cos() < 0.0 {
             angle_b
         } else {
@@ -68,16 +66,6 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         p1 + p1_to_reflected_p
     }
 
-    fn parallel_directions(&self) -> [Angle<f32>; 2] {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        [
-            (p2 - p1).better_angle_from_x_axis(),
-            (p1 - p2).better_angle_from_x_axis(),
-        ]
-    }
-    fn perpendicular_directions(&self) -> [Angle<f32>; 2] {
-        self.parallel_directions().map(|d| d.turned_right())
-    }
     fn same_side_of_line(
         &self,
         point_c: impl Into<Self::PointType> + Copy,

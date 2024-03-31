@@ -2,14 +2,6 @@ use crate::utility::*;
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
 pub trait FloatLine: Line + FloatLineLike {
-    fn from_point_angle_and_distance(
-        start: Self::PointType,
-        angle: Angle<f32>,
-        length: f32,
-    ) -> Self {
-        assert!(length > 0.0);
-        Self::new_from_two_points_on_line(start, naive_ray_endpoint(start, angle, length))
-    }
     fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         on_line(p1, p2, point.into())

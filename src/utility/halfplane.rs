@@ -20,6 +20,7 @@ use euclid::num::Zero;
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
 where
     LineType: DirectedFloatLine,
+    Self: FromDirectedLine<LineType::PointType>,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
@@ -28,6 +29,7 @@ where
 impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedFloatLine,
+    Self: FromDirectedLine<LineType::PointType>,
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
     where
@@ -85,9 +87,11 @@ where
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
+        assert_ne!(v.square_length(), 0.0);
+        let direction_along_edge_with_inside_on_right = v.turned_left();
+
         let border_line = LineType::new_from_two_points_on_line(p, p + v.quarter_rotated_ccw(1));
         let point_on_half_plane = p + v;
-        assert_ne!(v.square_length(), 0.0);
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
     }
 
@@ -336,6 +340,19 @@ where
                 .into_iter()
                 .map(|p| self.covers_point_with_tolerance(p, tolerance)),
         )
+    }
+}
+
+impl<P, L> FromDirectedLine<P> for HalfPlane<L>
+where
+    L: DirectedFloatLine<_PointType = P>,
+    P: FloatCoordinate,
+{
+    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        todo!()
     }
 }
 

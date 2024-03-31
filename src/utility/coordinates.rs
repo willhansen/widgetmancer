@@ -258,6 +258,7 @@ pub trait SignedCoordinate:
     fn down() -> Self {
         Self::new(Self::DataType::zero(), -Self::DataType::one())
     }
+    // TODO: allow non-orthogonal directions
     fn stepped(&self, dir: OrthogonalDirection) -> Self {
         self.moved(dir, Self::DataType::one())
     }

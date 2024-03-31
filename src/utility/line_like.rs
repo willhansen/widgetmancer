@@ -57,7 +57,17 @@ pub trait LineLike:
         let (l, r) = if p1.x() < p2.x() { (p1, p2) } else { (p2, p1) };
         Some((r.y() - l.y()) / (r.x() - l.x()))
     }
-    #[allow(invalid_type_param_default)]
+    fn parallel_directions_as_vectors(&self) -> [Self::PointType; 2] {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        [p2 - p1, p1 - p2]
+    }
+    fn parallel_directions(&self) -> [Angle<f32>; 2] {
+        self.parallel_directions_as_vectors()
+            .map(|p| p.better_angle_from_x_axis())
+    }
+    fn perpendicular_directions(&self) -> [Angle<f32>; 2] {
+        self.parallel_directions().map(|d| d.turned_right())
+    }
     fn to_line<T: Line<PointType = Self::PointType>>(&self) -> T {
         T::from_line_like(*self)
     }

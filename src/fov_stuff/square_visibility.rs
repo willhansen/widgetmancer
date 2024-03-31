@@ -94,18 +94,13 @@ impl SquareVisibilityFromOneLargeShadow {
     fn half_visible(shadow_direction: Angle<f32>) -> Self {
         // TODO: may be backwards
         let shadow_direction = standardize_angle(shadow_direction);
-        let shadow_line = LocalSquareLine::new_through_origin(
+        let shadow_line = TwoDifferentPointsOnCenteredUnitSquare::new_through_origin(
             LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
         );
         Self::new_partially_visible(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoDifferentPointsOnCenteredUnitSquare::<LocalSquarePoint>::new_from_two_points_on_line(
-                    point2(0.0, 0.0),
-                    LocalSquarePoint::unit_vector_from_angle(shadow_direction)
-                        .quarter_rotated_ccw(1)
-                        .cast_unit(),
-                ),
-                LocalSquarePoint::unit_vector_from_angle(shadow_direction).cast_unit(),
+                shadow_line,
+                LocalSquarePoint::unit_vector_from_angle(shadow_direction),
             ),
         )
     }
@@ -497,10 +492,7 @@ mod tests {
     fn test_square_visibility_knows_if_its_fully_visible() {
         let partial = SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(
             HalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new_from_two_points_on_line(
-                    point2(-5.0, 2.0),
-                    point2(5.0, 2.2928933),
-                ),
+                TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
                 point2(-12.061038, -1.3054879),
             ),
         );

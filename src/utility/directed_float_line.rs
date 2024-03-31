@@ -1,16 +1,6 @@
 use crate::utility::*;
 
 pub trait DirectedFloatLine: DirectedLine + FloatLine {
-    fn from_point_and_angle(
-        point: impl Into<Self::PointType>,
-        direction: impl Into<FAngle>,
-    ) -> Self {
-        let p1 = point.into();
-        let v = Self::PointType::unit_vector_from_angle(direction.into());
-        let p2 = p1 + v;
-        Self::new_from_two_points_on_line(p1, p2)
-    }
-
     fn ordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,

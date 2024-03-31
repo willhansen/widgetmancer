@@ -32,6 +32,10 @@ macro_rules! pub_mod_and_use {
 }
 
 pub_mod_and_use!(
+    reversible,
+    two_points,
+    from_line,
+    from_directed_line,
     angle,
     angle_interval,
     angular_direction,

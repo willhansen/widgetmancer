@@ -68,10 +68,8 @@ impl Animation for BlinkAnimation {
         let end_point = self.end_square.to_f32();
         let start_point = self.start_square.to_f32();
         let end_point_mirrored_over_start_point = start_point - (end_point - start_point);
-        let float_line_centered_on_start = TwoDifferentPoints::new_from_two_points_on_line(
-            end_point_mirrored_over_start_point,
-            end_point,
-        );
+        let float_line_centered_on_start =
+            TwoDifferentPoints::new(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
         // let total_seconds = self.duration().as_secs_f32();
@@ -99,7 +97,7 @@ impl Animation for BlinkAnimation {
         let moved_points: Vec<WorldPoint> =
             base_points.into_iter().map(|p| p + displacement).collect();
 
-        let blink_line = TwoDifferentPoints::new_from_two_points_on_line(start_point, end_point);
+        let blink_line = TwoDifferentPoints::new(start_point, end_point);
         let visible_points: Vec<WorldPoint> = moved_points
             .into_iter()
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))
