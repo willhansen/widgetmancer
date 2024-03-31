@@ -5,14 +5,6 @@ use euclid::num::Zero;
 // where
 //     LineType: DirectedLineTrait,
 // {
-//     fn new_from_directed_line<P>(line: P) -> Self
-//     where
-//         P: DirectedLineTrait;
-
-//     fn new_from_line_and_point_on_half_plane(
-//         dividing_line: impl Into<LineType>,
-//         point_on_half_plane: impl Into<LineType::PointType>,
-//     ) -> Self;
 // }
 
 // TODO: allow non-floating-point-based half planes
@@ -28,7 +20,7 @@ where
 
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedFloatLine,
+    LineType: DirectedFloatLine + TryFromTwoPoints<LineType::PointType>,
     Self: FromDirectedLine<LineType::PointType>,
 {
     pub fn new_from_directed_line<P>(line: P) -> Self
@@ -90,7 +82,9 @@ where
         assert_ne!(v.square_length(), 0.0);
         let direction_along_edge_with_inside_on_right = v.turned_left();
 
-        let border_line = LineType::new_from_two_points_on_line(p, p + v.quarter_rotated_ccw(1));
+        let border_line =
+            LineType::try_from_two_points_allowing_snap_along_line(p, p + v.quarter_rotated_ccw(1))
+                .unwrap();
         let point_on_half_plane = p + v;
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
     }
@@ -171,8 +165,11 @@ where
 
         let shifted_point = point + move_vector;
         let [p1, p2] = line.two_points_on_line_in_order();
-        let shifted_line =
-            LineType::new_from_two_points_on_line(p1 + move_vector, p2 + move_vector);
+        let shifted_line = LineType::try_from_two_points_allowing_snap_along_line(
+            p1 + move_vector,
+            p2 + move_vector,
+        )
+        .unwrap();
 
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
@@ -202,22 +199,21 @@ where
 
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    pub fn with_transformed_points<F, V>(
+    pub fn with_transformed_points<F, P>(
         &self,
         point_transform_function: F,
-    ) -> HalfPlane<TwoDifferentPoints<Point2D<f32, V>>>
+    ) -> HalfPlane<TwoDifferentPoints<P>>
     where
-        V: Copy + Debug,
-        F: Fn(LineType::PointType) -> Point2D<f32, V>,
+        P: FloatCoordinate,
+        F: Fn(LineType::PointType) -> P,
     {
-        let [p1, p2] = self.dividing_line.two_points_on_line_in_order();
-        HalfPlane::new_from_line_and_point_on_half_plane(
-            TwoDifferentPoints::new_from_two_points_on_line(
-                point_transform_function(p1),
-                point_transform_function(p2),
-            ),
-            point_transform_function(self.point_on_half_plane()),
-        )
+        let [p1, p2] = self
+            .dividing_line
+            .two_points_on_line_in_order()
+            .map(point_transform_function);
+        let transformed_line = TwoDifferentFloatPoints::try_from_two_exact_points(p1, p2).unwrap();
+
+        HalfPlane::new_from_directed_line(transformed_line)
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(

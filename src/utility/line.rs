@@ -8,7 +8,7 @@ use rand::{rngs::StdRng, Rng};
 use crate::utility::*;
 
 /// A traditional line that extends infinitely in both directions
-pub trait Line: LineLike {
+pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
     fn from_point_array(points: [Self::PointType; 2]) -> Self {
         Self::new_from_two_points_on_line(points[0], points[1])
     }
@@ -168,8 +168,8 @@ mod tests {
             output_points[0],
             output_points[1],
         );
-        let in_vec = input_line.p2 - input_line.p1;
-        let out_vec = output_line.p2 - output_line.p1;
+        let in_vec = input_line.p2() - input_line.p1();
+        let out_vec = output_line.p2() - output_line.p1();
 
         let same_direction = in_vec.dot(out_vec) > 0.0;
         assert!(same_direction);
@@ -181,8 +181,8 @@ mod tests {
         let input_line: TwoDifferentPoints<WorldPoint> =
             TwoDifferentPoints::new_from_two_points_on_line(point2(-0.5, -0.5), point2(-0.5, 0.5));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
-        assert_eq!(input_line.p1, output_points[0]);
-        assert_eq!(input_line.p2, output_points[1]);
+        assert_eq!(input_line.p1(), output_points[0]);
+        assert_eq!(input_line.p2(), output_points[1]);
     }
 
     #[test]

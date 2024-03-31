@@ -38,10 +38,15 @@ impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoDifferentPointsOnGrid
 }
 
 // TODO: Switch from template to associated point type
-pub trait TwoPointsWithRestriction<P: Coordinate>: Sized + Copy + PartialEq {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String>;
+pub trait TwoPointsWithRestriction<P: Coordinate>:
+    Sized + Copy + PartialEq + TryFromTwoPoints<P>
+{
+    #[deprecated(note = "use TryFromTwoPoints::try_from_two_points instead")]
+    fn try_new_from_points(p1: P, p2: P) -> Result<Self, String> {
+        Self::try_from_two_exact_points(p1, p2)
+    }
     fn point_by_index(&self, point_index: usize) -> P;
-    fn new(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+    fn new(p1: P, p2: P) -> Self {
         Self::try_new_from_points(p1, p2).unwrap()
     }
     fn new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Self {
@@ -112,16 +117,17 @@ impl<P: Coordinate> FromLine<P> for TwoDifferentPoints<P> {
         Ok(Self::new_from_points(p1, p2))
     }
 }
-impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
-        let p1 = p1.into();
-        let p2 = p2.into();
+impl<P: Coordinate> TryFromTwoPoints<P> for TwoDifferentPoints<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
         } else {
             Ok(TwoDifferentPoints { p1, p2 })
         }
     }
+}
+
+impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {
         match pi {
             0 => self.p1,
@@ -155,20 +161,6 @@ impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
 pub struct TwoDifferentPointsOnCenteredUnitSquare<P: Coordinate>(TwoDifferentPoints<P>);
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
-        let p1 = p1.into();
-        let p2 = p2.into();
-        // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
-        let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
-        if points_are_valid {
-            Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
-        } else {
-            Err(format!(
-                "At least one point not on centered unit square: {:?}, {:?}",
-                p1, p2
-            ))
-        }
-    }
     fn point_by_index(&self, pi: usize) -> P {
         self.0.point_by_index(pi)
     }
@@ -191,7 +183,7 @@ impl<P: FloatCoordinate> FromLine<P> for TwoDifferentPointsOnCenteredUnitSquare<
     where
         Self: Sized,
     {
-        Self::try_new_from_directed_line(line.with_direction(line.parallel_directions()[0]))
+        Self::try_new_from_directed_line(line.with_arbitrary_direction())
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -201,22 +193,6 @@ pub struct TwoDifferentPointsOnGridSquare<P: Coordinate> {
 }
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnGridSquare<P> {
-    fn try_new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Result<Self, String> {
-        let p1 = p1.into();
-        let p2 = p2.into();
-        // NOTE: this leaves ambiguity between two squares if the points are both on the same face of a square.  This choice is made by rounding.
-        let square_center = p1.lerp2d(p2, 0.5).round();
-        let centered_p1 = p1 - square_center;
-        let centered_p2 = p2 - square_center;
-        Ok(Self {
-            points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare::try_new_from_points(
-                centered_p1,
-                centered_p2,
-            )?,
-            the_square: square_center.to_i32(),
-        })
-    }
-
     fn point_by_index(&self, point_index: usize) -> P {
         self.points_on_the_square.point_by_index(point_index) + self.square_center()
     }
@@ -397,5 +373,37 @@ impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
                 .map_or("N/A".to_owned(), |v| v.to_string()),
             self.slope().map_or("inf".to_owned(), |v| v.to_string()),
         )
+    }
+}
+
+impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
+        let points_are_valid = p1.on_centered_unit_square() && p2.on_centered_unit_square();
+        if points_are_valid {
+            Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
+        } else {
+            Err(format!(
+                "At least one point not on centered unit square: {:?}, {:?}",
+                p1, p2
+            ))
+        }
+    }
+}
+impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnGridSquare<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        let p1 = p1.into();
+        let p2 = p2.into();
+        // NOTE: this potentially leaves ambiguity between two squares if the points are both on the same face of a square.  Tie break by default rounding direction for now because why not (I think it's away from zero).
+        let square_center = p1.lerp2d(p2, 0.5).round();
+        let centered_p1 = p1 - square_center;
+        let centered_p2 = p2 - square_center;
+        Ok(Self {
+            points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare::try_new_from_points(
+                centered_p1,
+                centered_p2,
+            )?,
+            the_square: square_center.to_i32(),
+        })
     }
 }
