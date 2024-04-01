@@ -35,7 +35,7 @@ pub type TwoDifferentLocalSquarePoints =
 pub type TwoDifferentLocalCharacterPoints =
     TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 // TODO: put in some kind of default module like euclid does?
-pub type TwoDifferentFloatPoints = TwoDifferentPoints<Point2D<f32, euclid::UnknownUnit>>;
+pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 pub type WorldLine = TwoDifferentWorldPoints;
 pub type LocalSquareLine = TwoDifferentLocalSquarePoints;
 

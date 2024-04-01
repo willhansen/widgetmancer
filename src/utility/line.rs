@@ -10,7 +10,7 @@ use crate::utility::*;
 /// A traditional line that extends infinitely in both directions
 pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
     fn from_point_array(points: [Self::PointType; 2]) -> Self {
-        Self::new_from_two_points_on_line(points[0], points[1])
+        Self::easy_new_from_two_points_on_line(points[0], points[1])
     }
     // fn from_line_like(line_like: impl LineLike<PointType = Self::PointType>) -> Self {
     //     Self::try_new_from_line(line_like.to_line::<TwoDifferentPoints<_>>()).unwrap()

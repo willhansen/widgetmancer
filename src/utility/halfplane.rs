@@ -9,7 +9,7 @@ use euclid::num::Zero;
 
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy)]
-pub struct HalfPlane<LineType = TwoDifferentFloatPoints>
+pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
 where
     LineType: DirectedFloatLine,
     Self: FromDirectedLine<LineType::PointType>,
@@ -211,13 +211,14 @@ where
             .dividing_line
             .two_points_on_line_in_order()
             .map(point_transform_function);
-        let transformed_line = TwoDifferentFloatPoints::try_from_two_exact_points(p1, p2).unwrap();
+        let transformed_line: TwoDifferentPoints<P> =
+            TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::new_from_directed_line(transformed_line)
+        HalfPlane::<TwoDifferentPoints<P>>::new_from_directed_line(transformed_line)
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            LineType::new_from_two_points_on_line((1.0, 0.0), (-1.0, 0.0)),
+            LineType::easy_from_two_exact_points((1.0, 0.0), (-1.0, 0.0)),
             LineType::PointType::new(0.0, 1.0),
         )
     }
@@ -452,9 +453,9 @@ mod tests {
     #[test]
     fn test_half_plane_complementary_check__different_lines() {
         let good_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points_on_line((0.0, 0.0), (1.0, 1.0));
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.0, 0.0), (1.0, 1.0));
         let bad_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points_on_line((0.1, 0.0), (1.0, 1.0));
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.1, 0.0), (1.0, 1.0));
         let upper_point = WorldPoint::new(0.0, 1.0);
         let right_point = WorldPoint::new(1.0, 0.0);
 
@@ -475,9 +476,9 @@ mod tests {
     #[test]
     fn test_half_plane_complementary_check__equivalent_lines() {
         let line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points_on_line((0.0, 0.0), (1.0, 1.0));
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.0, 0.0), (1.0, 1.0));
         let line2: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_points_on_line((2.0, 2.0), (5.0, 5.0));
+            TwoDifferentPoints::easy_new_from_two_points_on_line((2.0, 2.0), (5.0, 5.0));
         let p1 = WorldPoint::new(0.0, 1.0);
         let p2 = WorldPoint::new(1.0, 0.0);
 
@@ -747,7 +748,7 @@ mod tests {
             TwoDifferentPoints::new_horizontal(-0.2),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points_on_line((0.0, 0.5), (0.5, -0.3)),
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.0, 0.5), (0.5, -0.3)),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -759,7 +760,7 @@ mod tests {
             TwoDifferentPoints::new_horizontal(-0.2),
         );
         let b: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points_on_line((0.0, 0.5), (0.5, -0.1)),
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.0, 0.5), (0.5, -0.1)),
         );
         assert!(a
             .overlaps_other_inside_centered_unit_square_with_tolerance(&b, 1e-5)
@@ -778,7 +779,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_within_unit_square__true__identical_on_corner() {
         let a: LocalSquareHalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points_on_line((0.5, 0.5), (0.0, 1.0)),
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.5, 0.5), (0.0, 1.0)),
         );
         let b: LocalSquareHalfPlane = a.clone();
         assert!(a
@@ -852,7 +853,7 @@ mod tests {
             TwoDifferentPoints::new_horizontal(0.5),
         );
         let just_touching_corner: HalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::new_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
+            TwoDifferentPoints::easy_new_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
         );
         assert!(just_fully_covering
             .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)

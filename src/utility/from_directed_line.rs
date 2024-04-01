@@ -1,16 +1,13 @@
 use crate::utility::*;
 
 pub trait FromDirectedLine<P: Coordinate> {
-    fn new_from_two_ordered_points_on_line(p1: impl Into<P>, p2: impl Into<P>) -> Self
+    fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_two_ordered_points_on_line(p1, p2).unwrap()
     }
-    fn try_new_from_two_ordered_points_on_line(
-        p1: impl Into<P>,
-        p2: impl Into<P>,
-    ) -> Result<Self, String>
+    fn try_new_from_two_ordered_points_on_line(p1: P, p2: P) -> Result<Self, String>
     where
         Self: Sized,
     {

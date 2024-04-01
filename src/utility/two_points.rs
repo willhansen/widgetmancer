@@ -49,7 +49,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     fn new(p1: P, p2: P) -> Self {
         Self::try_new_from_points(p1, p2).unwrap()
     }
-    fn new_from_points(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+    fn new_from_points(p1: P, p2: P) -> Self {
         Self::new(p1, p2)
     }
     fn try_new_from_point_and_radial(
@@ -329,7 +329,7 @@ where
     CanBePointType: Into<PointType>,
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
-        Self::new_from_two_points_on_line(value.0, value.1)
+        Self::new_from_two_points_on_line(value.0.into(), value.1.into())
     }
 }
 
@@ -392,8 +392,6 @@ impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnCenteredUni
 }
 impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnGridSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        let p1 = p1.into();
-        let p2 = p2.into();
         // NOTE: this potentially leaves ambiguity between two squares if the points are both on the same face of a square.  Tie break by default rounding direction for now because why not (I think it's away from zero).
         let square_center = p1.lerp2d(p2, 0.5).round();
         let centered_p1 = p1 - square_center;
