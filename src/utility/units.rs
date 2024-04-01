@@ -4,6 +4,8 @@ use crate::utility::*;
 
 use self::size_2d::Size2D;
 
+// TODO: Utility modules shouldn't know about world class, should use default like euclid::UnknownUnit, and be compatible with any.
+
 // empty enums for euclid typing
 #[derive(Clone, PartialEq, Debug, Copy, Eq, Hash)]
 pub struct SquareGridInWorldFrame;

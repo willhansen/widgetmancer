@@ -10,28 +10,29 @@ use crate::utility::*;
 /// A traditional line that extends infinitely in both directions
 pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
     fn from_point_array(points: [Self::PointType; 2]) -> Self {
-        Self::easy_new_from_two_points_on_line(points[0], points[1])
+        Self::from_two_exact_points(points[0], points[1])
     }
-    // fn from_line_like(line_like: impl LineLike<PointType = Self::PointType>) -> Self {
-    //     Self::try_new_from_line(line_like.to_line::<TwoDifferentPoints<_>>()).unwrap()
-    // }
+    fn from_line_like(line_like: impl LineLike<PointType = Self::PointType>) -> Self {
+        let p = line_like.two_different_arbitrary_points_on_line();
+        Self::from_two_points_allowing_snap_along_line(p[1], p[1])
+    }
     // // fn try_new_from_line(line: impl Line<PointType = Self::PointType>) -> Result<Self, String>;
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points_on_line(
+        Self::from_two_exact_points(
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
         )
     }
     fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::new_from_two_points_on_line(
+        Self::from_two_exact_points(
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
         )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
-        Self::new_from_two_points_on_line(
+        Self::from_two_points_allowing_snap_along_line(
             <Self::PointType as euclid::num::Zero>::zero(),
-            second_point,
+            second_point.into(),
         )
     }
     fn from_point_and_vector(
@@ -41,7 +42,7 @@ pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
         let p1 = point.into();
         let v = direction.into();
         let p2 = p1 + v;
-        Self::new_from_two_points_on_line(p1, p2)
+        Self::from_two_points_allowing_snap_along_line(p1, p2)
     }
     fn with_direction(
         &self,
@@ -162,7 +163,7 @@ mod tests {
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
         let input_line =
-            TwoDifferentWorldPoints::new_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
+            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
         let output_line = TwoDifferentWorldPoints::new_from_two_points_on_line(
             output_points[0],
@@ -187,10 +188,8 @@ mod tests {
 
     #[test]
     fn test_same_side_of_line__vertical_line() {
-        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_points_on_line(
-            (-0.5, -0.5),
-            (-0.5, 0.5),
-        );
+        let line =
+            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-0.5, -0.5), (-0.5, 0.5));
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
         assert_false!(line.same_side_of_line(neg_point, origin))
@@ -202,7 +201,7 @@ mod tests {
     }
     #[test]
     fn test_line_intersections__observed_3_intersections() {
-        TwoDifferentPoints::<WorldPoint>::new_from_two_points_on_line(
+        TwoDifferentWorldPoints::easy_new_from_two_points_on_line(
             (-29.5, 5.0),
             (-27.589872, 4.703601),
         )
@@ -211,7 +210,7 @@ mod tests {
     #[test]
     fn test_line_point_reflection() {
         let line: TwoDifferentWorldPoints =
-            TwoDifferentPoints::new_from_two_points_on_line((1.0, 5.0), (2.4, 5.0));
+            TwoDifferentPoints::easy_new_from_two_points_on_line((1.0, 5.0), (2.4, 5.0));
 
         assert_about_eq!(
             line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
@@ -688,7 +687,7 @@ mod tests {
         let tolerance = 0.0;
 
         let expected_points = [(0.5, y), (-0.5, y)];
-        let intersections = TwoDifferentFloatPoints::new_horizontal(y)
+        let intersections = TwoDifferentWorldPoints::new_horizontal(y)
             .unordered_line_intersections_with_centered_unit_square_with_tolerance(tolerance);
         assert_eq!(intersections.len(), expected_points.len());
         expected_points

@@ -405,3 +405,21 @@ impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnGridSquare<
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::array::from_fn;
+
+    #[test]
+    fn test_orthogonal_line_constructors() {
+        TwoDifferentWorldPoints::new_horizontal(5.0);
+        TwoDifferentWorldPoints::new_vertical(5.0);
+
+        TwoDifferentPointsOnCenteredUnitSquare::<WorldPoint>::new_horizontal(0.3);
+        TwoDifferentPointsOnCenteredUnitSquare::<WorldPoint>::new_vertical(0.3);
+
+        TwoDifferentPointsOnGridSquare::<WorldPoint>::new_horizontal(0.3);
+        TwoDifferentPointsOnGridSquare::<WorldPoint>::new_vertical(0.3);
+    }
+}
