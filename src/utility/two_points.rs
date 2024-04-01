@@ -1,5 +1,7 @@
 use crate::utility::*;
 
+pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
+
 // TODO: convert to trait
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {

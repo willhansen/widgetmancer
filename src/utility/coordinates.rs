@@ -47,11 +47,6 @@ pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 // TODO: fix relativity
 pub type Vector2D<T, U> = Point2D<T, U>;
 
-pub mod default {
-    pub type Point2D<T> = super::Point2D<T, euclid::UnknownUnit>;
-    pub type Vector2D<T> = super::Vector2D<T, euclid::UnknownUnit>;
-}
-
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
 pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>

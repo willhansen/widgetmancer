@@ -71,6 +71,12 @@ pub_mod_and_use!(
     units
 );
 
+pub mod default {
+    pub type TwoDifferentFloatPoints = super::TwoDifferentFloatPoints<euclid::UnknownUnit>;
+    pub type Point2D<T> = super::Point2D<T, euclid::UnknownUnit>;
+    pub type Vector2D<T> = super::Vector2D<T, euclid::UnknownUnit>;
+}
+
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
 }
