@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait FromDirectedLine<P: Coordinate> {
+pub trait FromDirectedLine<P: SignedCoordinate> {
     fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
@@ -12,8 +12,7 @@ pub trait FromDirectedLine<P: Coordinate> {
         Self: Sized,
     {
         let line = TwoDifferentPoints::<P>::new(p1, p2);
-        todo!();
-        // Self::try_new_from_directed_line(line)
+        Self::try_new_from_directed_line(line)
     }
     fn new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Self
     where

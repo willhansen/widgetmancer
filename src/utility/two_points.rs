@@ -110,12 +110,12 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     }
 }
 
-impl<P: Coordinate> FromLine<P> for TwoDifferentPoints<P> {
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
+    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
-        let [p1, p2] = line.two_different_arbitrary_points_on_line();
+        let [p1, p2] = line.two_points_on_line_in_order();
         Ok(Self::new_from_points(p1, p2))
     }
 }
@@ -167,8 +167,14 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
         self.0.point_by_index(pi)
     }
 }
-impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String> {
+
+impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {}
+
+impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
         let points: Vec<P> = line.ordered_line_intersections_with_centered_unit_square();
         if points.len() < 2 {
             Err(format!(
@@ -178,14 +184,6 @@ impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {
         } else {
             Self::try_new_from_points(points[0], points[1])
         }
-    }
-}
-impl<P: FloatCoordinate> FromLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        Self::try_new_from_directed_line(line.with_arbitrary_direction())
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -331,7 +329,7 @@ where
     CanBePointType: Into<PointType>,
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
-        Self::new_from_two_points_on_line(value.0.into(), value.1.into())
+        Self::easy_from_two_exact_points(value.0, value.1)
     }
 }
 
@@ -391,6 +389,9 @@ impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnCenteredUni
             ))
         }
     }
+    fn try_from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Result<Self, String> {
+        Self::try_new_from_two_ordered_points_on_line(p1, p2)
+    }
 }
 impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnGridSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
@@ -405,6 +406,19 @@ impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoDifferentPointsOnGridSquare<
             )?,
             the_square: square_center.to_i32(),
         })
+    }
+    fn try_from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Result<Self, String> {
+        let square_center = p1.lerp2d(p2, 0.5).round();
+        let square: P::OnGrid = square_center.to_i32();
+        let line = TwoDifferentPoints::<P>::from_two_exact_points(p1, p2);
+        let intersections = line.ordered_line_intersections_with_square(square);
+        let Ok(two_points): Result<[P; 2], _> = intersections.clone().try_into() else {
+            return Err(format!(
+                "There are not two intersection points with square {:?}: {:?}",
+                square, intersections
+            ));
+        };
+        Self::try_from_array_of_two_exact_points(two_points)
     }
 }
 
@@ -423,5 +437,9 @@ mod tests {
 
         TwoDifferentPointsOnGridSquare::<WorldPoint>::new_horizontal(0.3);
         TwoDifferentPointsOnGridSquare::<WorldPoint>::new_vertical(0.3);
+    }
+    #[test]
+    fn test_point_snap_along_line() {
+        TwoDifferentPointsOnCenteredUnitSquare::<WorldPoint>::from_two_points_allowing_snap_along_line(point2(0.3,1.0), point2(0.3, 0.0));
     }
 }

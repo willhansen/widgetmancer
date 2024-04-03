@@ -1,11 +1,17 @@
 use crate::utility::*;
 
-pub trait FromLine<P: Coordinate> {
+pub trait FromLine<P: SignedCoordinate> {
     fn new_from_two_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_two_points_on_line(p1, p2).unwrap()
+    }
+    fn try_from_array_of_two_points_on_line(p: [P; 2]) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        Self::try_new_from_two_points_on_line(p[0], p[1])
     }
     fn easy_new_from_two_points_on_line(p1: impl Into<P>, p2: impl Into<P>) -> Self
     where
@@ -18,7 +24,7 @@ pub trait FromLine<P: Coordinate> {
         Self: Sized,
     {
         let line = TwoDifferentPoints::<P>::new(p1, p2);
-        todo!()
+        asdfasdfaasdf
         // Self::try_new_from_line(line)
     }
     fn new_from_line(line: impl Line<PointType = P>) -> Self
@@ -30,4 +36,16 @@ pub trait FromLine<P: Coordinate> {
     fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
     where
         Self: Sized;
+}
+impl<T, P: SignedCoordinate> FromLine<P> for T
+where
+    T: FromDirectedLine<P>,
+{
+    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        // Discard direction of line
+        Self::try_from_array_of_two_points_on_line(line.two_different_arbitrary_points_on_line())
+    }
 }

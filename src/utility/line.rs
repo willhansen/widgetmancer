@@ -10,7 +10,7 @@ use crate::utility::*;
 /// A traditional line that extends infinitely in both directions
 pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
     fn from_point_array(points: [Self::PointType; 2]) -> Self {
-        Self::from_two_exact_points(points[0], points[1])
+        Self::from_array_of_two_exact_points(points)
     }
     fn from_line_like(line_like: impl LineLike<PointType = Self::PointType>) -> Self {
         let p = line_like.two_different_arbitrary_points_on_line();
@@ -18,13 +18,13 @@ pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
     }
     // // fn try_new_from_line(line: impl Line<PointType = Self::PointType>) -> Result<Self, String>;
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::from_two_exact_points(
+        Self::from_two_points_allowing_snap_along_line(
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
             Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
         )
     }
     fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
-        Self::from_two_exact_points(
+        Self::from_two_points_allowing_snap_along_line(
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
             Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
         )
