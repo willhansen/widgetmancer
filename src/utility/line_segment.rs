@@ -36,7 +36,10 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
     }
 
     // TODO: make parameter impl LineSegment
-    fn intersection_point_with_other_line_segment(&self, other: &Self) -> Option<Self::PointType> {
+    fn intersection_point_with_other_line_segment(
+        &self,
+        other: impl LineSegment<PointType = Self::PointType>,
+    ) -> Option<Self::PointType> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
 
@@ -62,7 +65,7 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
         // from here, we know the line segments are overlapping, including the case of exactly touching
         // A simple line intersection check is all that's left
 
-        self.intersection_point_with_other_extended_line(&other)
+        self.intersection_point_with_other_extended_line(other)
     }
 }
 impl<T> FloatLineSegment for T where T: FloatLineLike + LineSegment {}

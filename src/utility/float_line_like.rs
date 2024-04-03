@@ -66,11 +66,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         p1 + p1_to_reflected_p
     }
 
-    fn same_side_of_line(
-        &self,
-        point_c: impl Into<Self::PointType> + Copy,
-        point_d: impl Into<Self::PointType> + Copy,
-    ) -> bool {
+    fn same_side_of_line(&self, point_c: Self::PointType, point_d: Self::PointType) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let point_a = p1;
         let point_b = p2;
@@ -199,7 +195,10 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
             .is_empty()
     }
 
-    fn intersection_point_with_other_extended_line(&self, other: &Self) -> Option<Self::PointType> {
+    fn intersection_point_with_other_extended_line(
+        &self,
+        other: impl LineLike<PointType = Self::PointType>,
+    ) -> Option<Self::PointType> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
 

@@ -139,7 +139,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
     }
     let face_line_segment = square_face_as_line(face.square(), face.dir());
     let ray_line_segment = TwoDifferentWorldPoints::new_from_point_and_radial(start, angle, range);
-    ray_line_segment.intersection_point_with_other_line_segment(&face_line_segment)
+    ray_line_segment.intersection_point_with_other_line_segment(face_line_segment)
 }
 pub fn does_ray_hit_oriented_square_face(
     start: WorldPoint,
@@ -481,7 +481,7 @@ mod tests {
                 point2(0.0, 4.0),
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
                     point2(-1.0, 1.0),
                     point2(1.0, 1.0),
                 ),
@@ -498,7 +498,7 @@ mod tests {
                 point2(1.0, 1.0),
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
                     point2(1.0, 0.0),
                     point2(0.0, 1.0),
                 ),
@@ -515,7 +515,7 @@ mod tests {
                 point2(1.0, 1.0)
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
                     point2(100.0, 1000.0),
                     point2(10.0, 10.0),
                 )
@@ -526,12 +526,12 @@ mod tests {
     #[test]
     fn test_line_line_intersection__endpoint_touch_mid_counts() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(7.0, 5.0),
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
                     point2(5.5, 5.0),
                     point2(10.0, 10.0),
                 ),
@@ -542,18 +542,16 @@ mod tests {
     }
     #[test]
     fn test_line_line_intersection__perpendicular_endpoints_touch() {
+        let a = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0),
+        );
+        let b = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(10.0, 5.0),
+            point2(10.0, 10.0),
+        );
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-                point2(5.0, 5.0),
-                point2(10.0, 5.0),
-            )
-            .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-                    point2(10.0, 5.0),
-                    point2(10.0, 10.0),
-                ),
-            )
-            .unwrap(),
+            a.intersection_point_with_other_line_segment(b).unwrap(),
             point2(10.0, 5.0),
         )
     }
@@ -569,27 +567,27 @@ mod tests {
         );
         assert_about_eq_2d(
             line1
-                .intersection_point_with_other_line_segment(&line2)
+                .intersection_point_with_other_line_segment(line2)
                 .unwrap(),
             point2(10.0, 5.0),
         );
         assert_about_eq_2d(
             line1
                 .reversed()
-                .intersection_point_with_other_line_segment(&line2)
+                .intersection_point_with_other_line_segment(line2)
                 .unwrap(),
             point2(10.0, 5.0),
         );
         assert_about_eq_2d(
             line1
-                .intersection_point_with_other_line_segment(&line2.reversed())
+                .intersection_point_with_other_line_segment(line2.reversed())
                 .unwrap(),
             point2(10.0, 5.0),
         );
         assert_about_eq_2d(
             line1
                 .reversed()
-                .intersection_point_with_other_line_segment(&line2.reversed())
+                .intersection_point_with_other_line_segment(line2.reversed())
                 .unwrap(),
             point2(10.0, 5.0),
         );
@@ -602,7 +600,7 @@ mod tests {
                 point2(10.0, 5.0)
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
                     point2(11.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -618,7 +616,7 @@ mod tests {
                 point2(10.0, 5.0)
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
                     point2(9.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -634,7 +632,7 @@ mod tests {
                 point2(10.0, 5.0)
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
                     point2(0.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -650,7 +648,7 @@ mod tests {
                 point2(10.0, 5.0)
             )
             .intersection_point_with_other_line_segment(
-                &TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
                     point2(5.0, 5.0),
                     point2(10.0, 5.0),
                 )

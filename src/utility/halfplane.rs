@@ -229,7 +229,7 @@ where
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
-            .same_side_of_line(self.point_on_half_plane(), point);
+            .same_side_of_line(self.point_on_half_plane(), point.into());
         if is_on_half_plane {
             dist
         } else {
