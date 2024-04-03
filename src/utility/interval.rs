@@ -10,6 +10,10 @@ where
         assert!(low <= high);
         ClosedInterval([low, high])
     }
+    pub fn new_any_order(a: T, b: T) -> Self {
+        ClosedInterval::new([a.min(b), a.max(b)])
+    }
+
     pub fn low(&self) -> T {
         self.0[0]
     }

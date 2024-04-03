@@ -758,10 +758,10 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<P: FloatCoordinate>(a: P, b: P, c: P) -> bool {
+pub fn on_line<P: Coordinate>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
-    ab.cross(ac) == 0.0
+    ab.cross(ac) == P::DataType::zero()
 }
 
 pub fn on_line_in_this_order<P: FloatCoordinate>(a: P, b: P, c: P) -> bool {

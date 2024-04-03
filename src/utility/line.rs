@@ -16,6 +16,10 @@ pub trait Line: LineLike + TryFromTwoPoints<Self::PointType> {
         let p = line_like.two_different_arbitrary_points_on_line();
         Self::from_two_points_allowing_snap_along_line(p[0], p[1])
     }
+    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        on_line(p1, p2, point.into())
+    }
     // // fn try_new_from_line(line: impl Line<PointType = Self::PointType>) -> Result<Self, String>;
     fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
