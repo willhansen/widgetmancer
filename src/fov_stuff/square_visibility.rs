@@ -513,8 +513,10 @@ mod tests {
     }
     #[test]
     fn complementary_partial_squares_combine_to_full_visibility() {
-        let line =
-            TwoDifferentPoints::new_from_two_points_on_line(point2(0.0, 0.0), point2(1.0, 1.0));
+        let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+            point2(0.0, 0.0),
+            point2(1.0, 1.0),
+        );
         let p1 = point2(0.0, 1.0);
         let p2 = point2(1.0, 0.0);
 

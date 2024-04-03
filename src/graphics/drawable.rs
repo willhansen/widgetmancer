@@ -610,7 +610,7 @@ mod tests {
         let base = SolidColorDrawable::new(RED).to_enum();
         let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoDifferentPointsOnCenteredUnitSquare::new_from_two_points_on_line(
+                TwoDifferentPointsOnCenteredUnitSquare::new_from_two_unordered_points_on_line(
                     point2(0.0, 0.0),
                     point2(-1.0, 0.0),
                 ),

@@ -1872,8 +1872,10 @@ impl Game {
                     .rotate_vect(Angle::radians(rotation_if_uniform))
                     .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
-            let line =
-                TwoDifferentWorldPoints::new_from_two_points_on_line(line_start.to_f32(), line_end);
+            let line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                line_start.to_f32(),
+                line_end,
+            );
 
             for square in line.touched_squares() {
                 if self.is_non_player_piece_at(square) {

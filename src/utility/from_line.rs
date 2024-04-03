@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-pub trait FromLine<P: SignedCoordinate> {
-    fn new_from_two_points_on_line(p1: P, p2: P) -> Self
+pub trait FromLine<P: SignedCoordinate>: TryFromTwoPoints<P> {
+    fn new_from_two_unordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
     {
@@ -17,15 +17,14 @@ pub trait FromLine<P: SignedCoordinate> {
     where
         Self: Sized,
     {
-        Self::new_from_two_points_on_line(p1.into(), p2.into())
+        Self::new_from_two_unordered_points_on_line(p1.into(), p2.into())
     }
     fn try_new_from_two_points_on_line(p1: P, p2: P) -> Result<Self, String>
     where
         Self: Sized,
     {
         let line = TwoDifferentPoints::<P>::new(p1, p2);
-        asdfasdfaasdf
-        // Self::try_new_from_line(line)
+        Self::try_new_from_line(line)
     }
     fn new_from_line(line: impl Line<PointType = P>) -> Self
     where
@@ -36,16 +35,4 @@ pub trait FromLine<P: SignedCoordinate> {
     fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
     where
         Self: Sized;
-}
-impl<T, P: SignedCoordinate> FromLine<P> for T
-where
-    T: FromDirectedLine<P>,
-{
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        // Discard direction of line
-        Self::try_from_array_of_two_points_on_line(line.two_different_arbitrary_points_on_line())
-    }
 }

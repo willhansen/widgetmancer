@@ -8,7 +8,7 @@ pub trait TryFromTwoPoints<P: Coordinate>: Sized {
         Self::try_from_array_of_two_exact_points(p).unwrap()
     }
     fn try_from_array_of_two_exact_points(p: [P; 2]) -> Result<Self, String> {
-        Self::try_from_two_exact_points(p[1], p[2])
+        Self::try_from_two_exact_points(p[0], p[1])
     }
     fn easy_from_two_exact_points(p1: impl Into<P>, p2: impl Into<P>) -> Self {
         Self::from_two_exact_points(p1.into(), p2.into())

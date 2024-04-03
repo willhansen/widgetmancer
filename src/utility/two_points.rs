@@ -119,6 +119,14 @@ impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
         Ok(Self::new_from_points(p1, p2))
     }
 }
+impl<P: SignedCoordinate> FromLine<P> for TwoDifferentPoints<P> {
+    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        Self::try_new_from_directed_line(line.with_arbitrary_direction())
+    }
+}
 impl<P: Coordinate> TryFromTwoPoints<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         if p1 == p2 {
@@ -184,6 +192,14 @@ impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUni
         } else {
             Self::try_new_from_points(points[0], points[1])
         }
+    }
+}
+impl<P: FloatCoordinate> FromLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        Self::try_new_from_directed_line(line.with_arbitrary_direction())
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
