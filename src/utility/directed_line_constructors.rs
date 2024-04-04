@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait FromDirectedLine<P: SignedCoordinate> {
+pub trait DirectedLineConstructors<P: SignedCoordinate> {
     fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,

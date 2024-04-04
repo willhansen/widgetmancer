@@ -113,7 +113,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     }
 }
 
-impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
+impl<P: SignedCoordinate> DirectedLineConstructors<P> for TwoDifferentPoints<P> {
     fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
@@ -122,7 +122,7 @@ impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
         Ok(Self::new_from_points(p1, p2))
     }
 }
-impl<P: SignedCoordinate> FromLine<P> for TwoDifferentPoints<P> {
+impl<P: SignedCoordinate> LineConstructors<P> for TwoDifferentPoints<P> {
     fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
@@ -181,7 +181,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
 
 impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {}
 
-impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+impl<P: FloatCoordinate> DirectedLineConstructors<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
@@ -197,7 +197,7 @@ impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUni
         }
     }
 }
-impl<P: FloatCoordinate> FromLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
+impl<P: FloatCoordinate> LineConstructors<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
     fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,

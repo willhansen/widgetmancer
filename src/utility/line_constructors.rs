@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait FromLine<P: SignedCoordinate>: TryFromTwoPoints<P> {
+pub trait LineConstructors<P: SignedCoordinate>: TryFromTwoPoints<P> {
     fn new_from_two_unordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,

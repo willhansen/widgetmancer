@@ -12,7 +12,7 @@ use euclid::num::Zero;
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
 where
     LineType: DirectedFloatLine,
-    Self: FromDirectedLine<LineType::PointType>,
+    Self: DirectedLineConstructors<LineType::PointType>,
 {
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
@@ -21,7 +21,7 @@ where
 impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedFloatLine + TryFromTwoPoints<LineType::PointType>,
-    Self: FromDirectedLine<LineType::PointType>,
+    Self: DirectedLineConstructors<LineType::PointType>,
 {
     pub fn halfplane_from_border_with_inside_on_right(line: LineType) -> Self
 where {
@@ -340,7 +340,7 @@ where {
     }
 }
 
-impl<P, L> FromDirectedLine<P> for HalfPlane<L>
+impl<P, L> DirectedLineConstructors<P> for HalfPlane<L>
 where
     L: DirectedFloatLine<_PointType = P>,
     P: FloatCoordinate,

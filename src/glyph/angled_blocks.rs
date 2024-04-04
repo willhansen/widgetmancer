@@ -288,7 +288,7 @@ pub fn half_plane_to_angled_block_character(
             SPACE
         }
     } else {
-        let mut grid_line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+        let mut grid_line = TwoDifferentPoints::from_two_exact_points(
             snap_to_grid(snapped_points[0]),
             snap_to_grid(snapped_points[1]),
         );
@@ -434,60 +434,48 @@ mod tests {
 
     fn test_snap_points_to_character() {
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(0, 0),
-                    point2(2, 3)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(0, 0),
+                point2(2, 3)
+            )),
             '◢',
             "lower-right diagonal"
         );
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(2, 3),
-                    point2(0, 0)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(2, 3),
+                point2(0, 0)
+            )),
             '◤',
             "swap points"
         );
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(2, 1),
-                    point2(0, 3)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(2, 1),
+                point2(0, 3)
+            )),
             '🭥',
             "upper right corner"
         );
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(0, 1),
-                    point2(2, 1)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(0, 1),
+                point2(2, 1)
+            )),
             LOWER_ONE_THIRD_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(1, 0),
-                    point2(1, 3)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(1, 0),
+                point2(1, 3)
+            )),
             RIGHT_HALF_BLOCK
         );
         assert_eq!(
-            get_character_from_snap_points(
-                TwoDifferentPoints::new_from_two_unordered_points_on_line(
-                    point2(0, 0),
-                    point2(2, 1)
-                )
-            ),
+            get_character_from_snap_points(TwoDifferentPoints::from_two_exact_points(
+                point2(0, 0),
+                point2(2, 1)
+            )),
             '🭈'
         );
     }
