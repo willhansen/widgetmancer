@@ -77,6 +77,9 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     fn p2(&self) -> P {
         self.point_by_index(1)
     }
+    fn points(&self) -> [P; 2] {
+        self.to_array()
+    }
     fn cast_unit<Other, OtherPointType>(&self) -> Other
     where
         Other: TwoPointsWithRestriction<OtherPointType>,
@@ -458,5 +461,13 @@ mod tests {
     #[test]
     fn test_point_snap_along_line() {
         TwoDifferentPointsOnCenteredUnitSquare::<WorldPoint>::from_two_points_allowing_snap_along_line(point2(0.3,1.0), point2(0.3, 0.0));
+    }
+    #[test]
+    fn test_initilize_from_unordered_points_on_line() {
+        let a = point2(5.0, 5.0);
+        let b = point2(10.0, 5.0);
+        let line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(a, b);
+        assert!(line.point_is_on_line(a));
+        assert!(line.point_is_on_line(b));
     }
 }

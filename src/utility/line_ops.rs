@@ -183,14 +183,14 @@ pub fn first_inside_square_face_hit_by_ray(
         .map(|(face, point)| (face, point.unwrap()))
         .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
 }
+// Move to gridsquare file
 pub fn square_face_as_line<P: SignedIntCoordinate>(
     square: P,
     face_direction: OrthogonalDirection,
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
-    // TODO: avoid the type notation on `step` somehow
     let face_center = square_center.moved(face_direction, 0.5);
-    TwoDifferentPoints::new_from_two_unordered_points_on_line(
+    TwoDifferentPoints::from_two_exact_points(
         face_center.moved(face_direction.left(), 0.5),
         face_center.moved(face_direction.right(), 0.5),
     )
@@ -375,14 +375,14 @@ mod tests {
         let range = 5.0;
         let face = (point2(5, 6), STEP_UP).into();
 
-        let result = does_ray_hit_oriented_square_face(
+        let hit = does_ray_hit_oriented_square_face(
             start_point,
             Angle::degrees(degrees as f32),
             range,
             face,
         );
 
-        assert!(result);
+        assert!(hit);
     }
 
     #[test]
@@ -803,5 +803,21 @@ mod tests {
         let line =
             TwoDifferentWorldPoints::easy_new_from_two_points_on_line((4.0, 0.0), (0.0, 80.0));
         assert_about_eq!(line.slope().unwrap(), -20.0);
+    }
+    #[test]
+    fn test_square_face_as_line() {
+        let s: default::IntPoint = point2(3, 7);
+        let dir = UP;
+        let face_line = square_face_as_line(s, dir);
+        assert!(
+            face_line.points().contains(&point2(2.5, 7.5)),
+            "{}",
+            face_line
+        );
+        assert!(
+            face_line.points().contains(&point2(3.5, 7.5)),
+            "{}",
+            face_line
+        );
     }
 }

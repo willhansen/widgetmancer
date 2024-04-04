@@ -166,14 +166,9 @@ mod tests {
 
     #[test]
     fn test_intersection__perpendicular_endpoints_touch() {
-        let a = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-            point2(5.0, 5.0),
-            point2(10.0, 5.0),
-        );
-        let b = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-            point2(10.0, 5.0),
-            point2(10.0, 10.0),
-        );
+        let a = TwoDifferentWorldPoints::from_two_exact_points(point2(5.0, 5.0), point2(10.0, 5.0));
+        let b =
+            TwoDifferentWorldPoints::from_two_exact_points(point2(10.0, 5.0), point2(10.0, 10.0));
         assert_about_eq_2d(
             a.line_segment_intersection_point(b).unwrap(),
             point2(10.0, 5.0),
@@ -249,14 +244,10 @@ mod tests {
 
     #[test]
     fn test_intersection__parallel_endpoints_touch() {
-        let line1 = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-            point2(5.0, 5.0),
-            point2(10.0, 5.0),
-        );
-        let line2 = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
-            point2(10.0, 5.0),
-            point2(20.0, 5.0),
-        );
+        let line1 =
+            TwoDifferentWorldPoints::from_two_exact_points(point2(5.0, 5.0), point2(10.0, 5.0));
+        let line2 =
+            TwoDifferentWorldPoints::from_two_exact_points(point2(10.0, 5.0), point2(20.0, 5.0));
         assert_about_eq_2d(
             line1.line_segment_intersection_point(line2).unwrap(),
             point2(10.0, 5.0),

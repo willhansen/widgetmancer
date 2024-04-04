@@ -362,7 +362,6 @@ mod tests {
             .get(&vec2(2, 0))
             .unwrap()
             .is_only_partially_visible());
-        dbg!(segment, visibilities.get(&vec2(3, 0)).unwrap());
         assert!(visibilities.get(&vec2(3, 0)).unwrap().is_fully_visible());
         assert_eq!(visibilities.len(), 3);
     }

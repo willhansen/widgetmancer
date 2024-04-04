@@ -1053,4 +1053,11 @@ mod tests {
         assert_eq!(WorldSquare::new(-2, 200).king_length(), 200);
         assert_eq!(WorldPoint::new(1.5, 3.3).king_length(), 3.3);
     }
+    #[test]
+    fn test_moving_a_point_by_rotated_direction() {
+        let p: default::IntPoint = point2(3, 5);
+        let dir = DOWN;
+        let out = p.moved(dir.left(), 1);
+        assert_eq!(out, point2(4, 5));
+    }
 }
