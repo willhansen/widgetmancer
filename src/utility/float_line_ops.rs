@@ -1,7 +1,7 @@
 use crate::utility::*;
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
-pub trait FloatLineOps: LineOps + LineLike<PointType = Self::_PointType> {
+pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
     type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
 
     #[deprecated(note = "use Line::closest_point_to_point instead")]
@@ -42,9 +42,7 @@ pub trait FloatLineOps: LineOps + LineLike<PointType = Self::_PointType> {
     // TODO: Double check how tolerances are applied here.  Looks like it depends on the points from the line
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
         let [p1, p2] = other.two_different_arbitrary_points_on_line();
-        let self_line: TwoDifferentPoints<Self::PointType> = self.to_line();
-        self_line.point_is_approx_on_line(p1, tolerance)
-            && self_line.point_is_approx_on_line(p2, tolerance)
+        self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)
     }
 
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
@@ -70,9 +68,8 @@ pub trait FloatLineOps: LineOps + LineLike<PointType = Self::_PointType> {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let point_a = p1;
         let point_b = p2;
-        let self_line: TwoDifferentPoints<Self::PointType> = self.to_line();
-        let c_on_line = self_line.point_is_on_line(point_c);
-        let d_on_line = self_line.point_is_on_line(point_d);
+        let c_on_line = self.point_is_on_line(point_c);
+        let d_on_line = self.point_is_on_line(point_d);
 
         if c_on_line {
             return if d_on_line { true } else { false };
@@ -197,7 +194,7 @@ pub trait FloatLineOps: LineOps + LineLike<PointType = Self::_PointType> {
 
     fn intersection_point_with_other_extended_line(
         &self,
-        other: impl LineLike<PointType = Self::PointType>,
+        other: impl LineOps<PointType = Self::PointType>,
     ) -> Option<Self::PointType> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();

@@ -23,14 +23,15 @@ where
     LineType: DirectedFloatLine + TryFromTwoPoints<LineType::PointType>,
     Self: FromDirectedLine<LineType::PointType>,
 {
-    pub fn new_from_directed_line<P>(line: P) -> Self
-    where
-        P: DirectedLineLike<PointType = LineType::PointType>,
-    {
-        Self {
-            dividing_line: LineType::from_other_directed_line(line),
-        }
-    }
+    // TODO: delete
+    // pub fn halfplane_from_border_with_inside_on_right<P>(line: P) -> Self
+    // where
+    //     P: DirectedLineOps<PointType = LineType::PointType>,
+    // {
+    //     Self {
+    //         dividing_line: LineType::from_other_directed_line(line),
+    //     }
+    // }
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl Into<LineType>,
         point_on_half_plane: impl Into<LineType::PointType>,
@@ -214,7 +215,9 @@ where
         let transformed_line: TwoDifferentPoints<P> =
             TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<TwoDifferentPoints<P>>::new_from_directed_line(transformed_line)
+        TwoDifferentPoints<P>::halfplane_from_border_with_inside_on_right(
+            transformed_line,
+        )
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
@@ -345,7 +348,7 @@ where
     L: DirectedFloatLine<_PointType = P>,
     P: FloatCoordinate,
 {
-    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
@@ -374,7 +377,7 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
         let points: Result<TwoDifferentPointsOnCenteredUnitSquare<P>, _> =
             value.dividing_line.try_into();
         match points {
-            Ok(x) => Ok(Self::new_from_directed_line(x)),
+            Ok(x) => Ok(Self::halfplane_from_border_with_inside_on_right(x)),
             _ => Err(()),
         }
     }
@@ -383,7 +386,7 @@ impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P
     for HalfPlane<TwoDifferentPoints<P>>
 {
     fn from(value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>) -> Self {
-        Self::new_from_directed_line(value.dividing_line)
+        Self::halfplane_from_border_with_inside_on_right(value.dividing_line)
     }
 }
 
@@ -421,7 +424,7 @@ pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
         // TODO: tidy this up when halfplane is a trait
-        HalfPlane::<LineType>::new_from_directed_line(self.to_local())
+        HalfPlane::<LineType>::halfplane_from_border_with_inside_on_right(self.to_local())
             .very_approximate_fraction_coverage_of_centered_unit_square()
     }
 }

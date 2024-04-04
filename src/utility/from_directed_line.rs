@@ -14,13 +14,15 @@ pub trait FromDirectedLine<P: SignedCoordinate> {
         let line = TwoDifferentPoints::<P>::new(p1, p2);
         Self::try_new_from_directed_line(line)
     }
-    fn new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Self
+    fn new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_directed_line(line).unwrap()
     }
-    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    fn try_new_from_directed_line(
+        line: impl DirectedLineOps<PointType = P>,
+    ) -> Result<Self, String>
     where
         Self: Sized;
     fn from_point_and_angle(point: impl Into<P>, direction: impl Into<FAngle>) -> Self

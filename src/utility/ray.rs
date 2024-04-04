@@ -15,7 +15,7 @@ pub trait Ray {
     {
         self.point() + Self::PointType::from_angle_and_length(self.angle(), dist_from_start)
     }
-    fn line<T: DirectedLine<PointType = Self::PointType>>(&self) -> T {
+    fn line<T: DirectedLineOps<PointType = Self::PointType>>(&self) -> T {
         T::from_point_and_vector(
             self.point(),
             Self::PointType::unit_vector_from_angle(self.angle()),

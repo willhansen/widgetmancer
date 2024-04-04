@@ -1,10 +1,10 @@
 use crate::utility::*;
 
-pub trait DirectedLine: LineOps + Reversible {
+pub trait DirectedLineOps: LineOps + Reversible {
     // TODO: maybe no constructors in these operation collections?
     fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
     where
-        OtherLine: DirectedLine<PointType = Self::PointType>,
+        OtherLine: DirectedLineOps<PointType = Self::PointType>,
     {
         Self::from_point_array(other.two_points_on_line_in_order())
     }
@@ -31,4 +31,3 @@ pub trait DirectedLine: LineOps + Reversible {
         self.arbitrary_point_anticlockwise_of_line()
     }
 }
-impl<L> DirectedLine for L where L: LineOps + Reversible {}

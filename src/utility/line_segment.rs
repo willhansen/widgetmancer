@@ -2,19 +2,19 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub trait LineSegment: LineLike {
+pub trait LineSegmentOps: LineOps {
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];
 }
-impl<P: SignedCoordinate> LineSegment for TwoDifferentPoints<P> {
+impl<P: SignedCoordinate> LineSegmentOps for TwoDifferentPoints<P> {
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }
 }
-pub trait FloatLineSegment: FloatLineLike + LineSegment {
+pub trait FloatLineSegmentOps: FloatLineOps + LineSegmentOps {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
@@ -63,7 +63,7 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
 
     fn line_segment_intersection_point(
         &self,
-        other: impl LineSegment<PointType = Self::PointType>,
+        other: impl LineSegmentOps<PointType = Self::PointType>,
     ) -> Option<Self::PointType> {
         let [a1, a2] = self.endpoints_in_arbitrary_order();
         let [b1, b2] = other.endpoints_in_arbitrary_order();
@@ -133,9 +133,9 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
         }
     }
 }
-impl<T> FloatLineSegment for T where T: FloatLineLike + LineSegment {}
+impl<T> FloatLineSegmentOps for T where T: FloatLineOps + LineSegmentOps {}
 
-pub trait DirectedLineSegment: DirectedLineLike + LineSegment {
+pub trait DirectedLineSegment: DirectedLineOps + LineSegmentOps {
     fn endpoints_in_order(&self) -> [Self::PointType; 2] {
         Self::PointType::points_sorted_along_axis(
             self.endpoints_in_arbitrary_order(),
@@ -153,14 +153,14 @@ pub trait DirectedLineSegment: DirectedLineLike + LineSegment {
         self.endpoints_in_order()[1]
     }
 }
-impl<T> DirectedLineSegment for T where T: DirectedLineLike + LineSegment {}
+impl<T> DirectedLineSegment for T where T: DirectedLineOps + LineSegmentOps {}
 
-pub trait DirectedFloatLineSegment: DirectedLineLike + FloatLineSegment {
+pub trait DirectedFloatLineSegment: DirectedLineOps + FloatLineSegmentOps {
     fn lerp(&self, t: f32) -> Self::PointType {
         self.start().lerp2d(self.end(), t)
     }
 }
-impl<T> DirectedFloatLineSegment for T where T: DirectedLineLike + FloatLineSegment {}
+impl<T> DirectedFloatLineSegment for T where T: DirectedLineOps + FloatLineSegmentOps {}
 #[cfg(test)]
 mod tests {
 

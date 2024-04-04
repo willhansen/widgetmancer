@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait DirectedFloatLine: DirectedLine + FloatLineOps {
+pub trait DirectedFloatLine: DirectedLineOps + FloatLineOps {
     fn points_sorted_by_line_direction(
         &self,
         mut points: Vec<Self::PointType>,
@@ -43,4 +43,4 @@ pub trait DirectedFloatLine: DirectedLine + FloatLineOps {
     }
 }
 
-impl<L> DirectedFloatLine for L where L: FloatLineOps + DirectedLine {}
+impl<L> DirectedFloatLine for L where L: FloatLineOps + DirectedLineOps {}

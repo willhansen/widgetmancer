@@ -116,7 +116,7 @@ pub trait LineOps:
     fn with_direction(
         &self,
         direction_hint: FAngle,
-    ) -> impl DirectedLine<PointType = Self::PointType> {
+    ) -> impl DirectedLineOps<PointType = Self::PointType> {
         let p = self.arbitrary_point_on_shape();
         let dirs = self.parallel_directions_as_vectors();
 
@@ -132,7 +132,7 @@ pub trait LineOps:
         let p2 = p + *good_dir;
         TwoDifferentPoints::new(p, p2)
     }
-    fn with_arbitrary_direction(&self) -> impl DirectedLine<PointType = Self::PointType> {
+    fn with_arbitrary_direction(&self) -> impl DirectedLineOps<PointType = Self::PointType> {
         self.with_direction(self.parallel_directions()[1])
     }
 }

@@ -12,7 +12,7 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
     pub fn reversed(&self) -> Self {
         Self::try_new_from_points(self.p2, self.p1).unwrap()
     }
-    fn new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Self {
+    fn new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Self {
         let [p1, p2] = line.two_points_on_line_in_order();
         Self::new_from_points(p1, p2)
     }
@@ -111,7 +111,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
 }
 
 impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
-    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
@@ -179,7 +179,7 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoDifferentPointsOnCen
 impl<P: FloatCoordinate> TwoDifferentPointsOnCenteredUnitSquare<P> {}
 
 impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_directed_line(line: impl DirectedLine<PointType = P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
@@ -322,7 +322,7 @@ impl_traits_for_two_points_with_restriction!(TwoDifferentPoints);
 impl_traits_for_two_points_with_restriction!(TwoDifferentPointsOnCenteredUnitSquare);
 impl_traits_for_two_points_with_restriction!(TwoDifferentPointsOnGridSquare);
 
-impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
+impl<PointType: FloatCoordinate> LineOps for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
     // fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
     //     let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
@@ -333,7 +333,7 @@ impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSq
         self.0.two_different_arbitrary_points_on_line()
     }
 }
-impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnGridSquare<PointType> {
+impl<PointType: FloatCoordinate> LineOps for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
