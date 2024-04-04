@@ -4,7 +4,7 @@ use crate::utility::*;
 
 pub trait LineSegment: LineLike {
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
-        let [p1, p2] = self.two_different_arbitrary_points_on_shape();
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];

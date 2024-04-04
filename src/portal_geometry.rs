@@ -314,14 +314,6 @@ impl PortalGeometry {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        point2,
-        utility::{
-            assert_about_eq_2d, RigidlyTransformable, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP,
-            STEP_UP_RIGHT,
-        },
-        DirectedLineLike,
-    };
     use ntest::{assert_about_eq, timeout};
 
     use super::*;

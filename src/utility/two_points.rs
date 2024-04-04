@@ -246,21 +246,22 @@ where
         self.points_on_the_square
     }
 }
-impl<PointType: SignedCoordinate> LineLike for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> LineOps for TwoDifferentPoints<PointType> {
     type PointType = PointType;
-    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
 macro_rules! impl_for_two_different_points {
     ($TheStruct:ident, $point_trait:ident) => {
-        impl<PointType: $point_trait> DirectedLineLike for $TheStruct<PointType> {
+        impl<PointType: $point_trait> DirectedLineOps for $TheStruct<PointType> {
             fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
                 <Self as TwoPointsWithRestriction<PointType>>::to_array(self)
             }
         }
 
-        impl<PointType: $point_trait> Line for $TheStruct<PointType> {}
+        // TODO: Delete
+        // impl<PointType: $point_trait> LineOps for $TheStruct<PointType> {}
 
         impl<PointType: $point_trait> Reversible for $TheStruct<PointType> {
             fn reversed(&self) -> Self {
@@ -328,14 +329,14 @@ impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSq
     //     Self::try_from_line(less_constrained_line).unwrap()
     // }
 
-    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
-        self.0.two_different_arbitrary_points_on_shape()
+    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
+        self.0.two_different_arbitrary_points_on_line()
     }
 }
 impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
 
-    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [0, 1].map(|i| self.point_by_index(i))
     }
 }
