@@ -120,7 +120,7 @@ impl<P: SignedCoordinate> FromDirectedLine<P> for TwoDifferentPoints<P> {
     }
 }
 impl<P: SignedCoordinate> FromLine<P> for TwoDifferentPoints<P> {
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
@@ -195,7 +195,7 @@ impl<P: FloatCoordinate> FromDirectedLine<P> for TwoDifferentPointsOnCenteredUni
     }
 }
 impl<P: FloatCoordinate> FromLine<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized,
     {
@@ -248,7 +248,7 @@ where
 }
 impl<PointType: SignedCoordinate> LineLike for TwoDifferentPoints<PointType> {
     type PointType = PointType;
-    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
+    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
@@ -328,14 +328,14 @@ impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnCenteredUnitSq
     //     Self::try_from_line(less_constrained_line).unwrap()
     // }
 
-    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
-        self.0.two_different_arbitrary_points_on_line()
+    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
+        self.0.two_different_arbitrary_points_on_shape()
     }
 }
 impl<PointType: FloatCoordinate> LineLike for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
 
-    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
+    fn two_different_arbitrary_points_on_shape(&self) -> [PointType; 2] {
         [0, 1].map(|i| self.point_by_index(i))
     }
 }

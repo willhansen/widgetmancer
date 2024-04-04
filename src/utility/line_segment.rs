@@ -4,7 +4,7 @@ use crate::utility::*;
 
 pub trait LineSegment: LineLike {
     fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = self.two_different_arbitrary_points_on_shape();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];
@@ -35,20 +35,33 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
 
-    fn projected_onto_parallel_line_through_origin_with_positive_direction_hint(&self, positive_direction_hint: FAngle) -> ClosedInterval<f32> {
-        let Some(positive_direction) = self.parallel_directions().iter().filter(|&&dir| fangle_dot(dir, positive_direction_hint) > 0.0).next() else {
-            panic!("direction hint not useful.  hint: {:?}, parallel directions: {:?}", positive_direction_hint, self.parallel_directions());
+    fn projected_onto_parallel_line_through_origin_with_positive_direction_hint(
+        &self,
+        positive_direction_hint: FAngle,
+    ) -> ClosedInterval<f32> {
+        let Some(positive_direction) = self
+            .parallel_directions()
+            .iter()
+            .filter(|&&dir| fangle_dot(dir, positive_direction_hint) > 0.0)
+            .next()
+        else {
+            panic!(
+                "direction hint not useful.  hint: {:?}, parallel directions: {:?}",
+                positive_direction_hint,
+                self.parallel_directions()
+            );
         };
 
-        
         todo!();
     }
     fn projected_onto_parallel_line_through_origin(&self) -> ClosedInterval<f32> {
         let chosen_positive = self.parallel_directions()[0];
-        self.projected_onto_parallel_line_through_origin_with_positive_direction_hint(chosen_positive)
+        self.projected_onto_parallel_line_through_origin_with_positive_direction_hint(
+            chosen_positive,
+        )
     }
 
-    fn intersection_point_with_other_line_segment(
+    fn line_segment_intersection_point(
         &self,
         other: impl LineSegment<PointType = Self::PointType>,
     ) -> Option<Self::PointType> {
@@ -69,8 +82,14 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
             let [a1_1d, a2_1d, b1_1d, b2_1d] = [a1, a2, b1, b2]
                 .map(|p| (p - a1).position_on_axis((a2 - a1).better_angle_from_x_axis()));
 
-            let (b_min, b_max) = (b1_1d.min(b2_1d), b1_1d.max(b2_1d));
-            let (a_min, a_max) = (a1_1d.min(a2_1d), a1_1d.max(a2_1d));
+            let (b_min, b_max) = (
+                min_for_partial_ord(b1_1d, b2_1d),
+                max_for_partial_ord(b1_1d, b2_1d),
+            );
+            let (a_min, a_max) = (
+                min_for_partial_ord(a1_1d, a2_1d),
+                max_for_partial_ord(a1_1d, a2_1d),
+            );
 
             let no_overlap = a_max < b_min || b_max < a_min;
 
@@ -78,19 +97,31 @@ pub trait FloatLineSegment: FloatLineLike + LineSegment {
                 return None;
             }
 
-            let too_much_overlap = b1_1d > a_min && b1_1d < a_max || 
-
-            if a2 == b1 && on_line_in_this_order(a1, a2, b2) {
-                Some(a2)
-            } else if a2 == b2 && on_line_in_this_order(a1, a2, b1) {
-                Some(a2)
-            } else if a1 == b1 && on_line_in_this_order(a2, a1, b2) {
-                Some(a1)
-            } else if a1 == b2 && on_line_in_this_order(a2, a1, b1) {
-                Some(a1)
-            } else {
-                None
+            let b1_in_a = b1_1d > a_min && b1_1d < a_max;
+            let b2_in_a = b2_1d > a_min && b2_1d < a_max;
+            let a1_in_b = a1_1d > b_min && a1_1d < b_max;
+            let a2_in_b = a2_1d > b_min && a2_1d < b_max;
+            let too_much_overlap = b1_in_a || b2_in_a || a1_in_b || a2_in_b;
+            if too_much_overlap {
+                return None;
             }
+
+            // Only case left is exact matches.  note that both matching is bad.
+            let identical_segments = a_min == b_min && a_max == b_max;
+            if identical_segments {
+                return None;
+            }
+
+            Some(if a1 == b1 || a1 == b2 {
+                a1
+            } else if a2 == b1 || a2 == b2 {
+                a2
+            } else {
+                panic!(
+                    "endpoints do not match: self: {:?}, other: {:?}",
+                    &self, &other
+                );
+            })
         } else {
             let no_intersection = self.same_side_of_line(b1, b2) || other.same_side_of_line(a1, a2);
             if no_intersection {
@@ -130,3 +161,191 @@ pub trait DirectedFloatLineSegment: DirectedLineLike + FloatLineSegment {
     }
 }
 impl<T> DirectedFloatLineSegment for T where T: DirectedLineLike + FloatLineSegment {}
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_intersection__perpendicular_endpoints_touch() {
+        let a = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0),
+        );
+        let b = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(10.0, 5.0),
+            point2(10.0, 10.0),
+        );
+        assert_about_eq_2d(
+            a.line_segment_intersection_point(b).unwrap(),
+            point2(10.0, 5.0),
+        )
+    }
+    #[test]
+    fn test_intersection__easy_orthogonal_hit() {
+        assert_about_eq_2d(
+            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                point2(0.0, 0.0),
+                point2(0.0, 4.0),
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                    point2(-1.0, 1.0),
+                    point2(1.0, 1.0),
+                ),
+            )
+            .unwrap(),
+            point2(0.0, 1.0),
+        )
+    }
+    #[test]
+    fn test_intersection__diagonal_intersection() {
+        assert_about_eq_2d(
+            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                point2(0.0, 0.0),
+                point2(1.0, 1.0),
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                    point2(1.0, 0.0),
+                    point2(0.0, 1.0),
+                ),
+            )
+            .unwrap(),
+            point2(0.5, 0.5),
+        )
+    }
+    #[test]
+    fn test_intersection__miss() {
+        assert!(
+            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                point2(0.0, 0.0),
+                point2(1.0, 1.0)
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                    point2(100.0, 1000.0),
+                    point2(10.0, 10.0),
+                )
+            )
+            .is_none()
+        )
+    }
+    #[test]
+    fn test_intersection__endpoint_touch_mid_counts() {
+        assert_about_eq_2d(
+            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                point2(5.0, 5.0),
+                point2(7.0, 5.0),
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                    point2(5.5, 5.0),
+                    point2(10.0, 10.0),
+                ),
+            )
+            .unwrap(),
+            point2(5.5, 5.0),
+        )
+    }
+
+    #[test]
+    fn test_intersection__parallel_endpoints_touch() {
+        let line1 = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0),
+        );
+        let line2 = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            point2(10.0, 5.0),
+            point2(20.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1.line_segment_intersection_point(line2).unwrap(),
+            point2(10.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1
+                .reversed()
+                .line_segment_intersection_point(line2)
+                .unwrap(),
+            point2(10.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1
+                .line_segment_intersection_point(line2.reversed())
+                .unwrap(),
+            point2(10.0, 5.0),
+        );
+        assert_about_eq_2d(
+            line1
+                .reversed()
+                .line_segment_intersection_point(line2.reversed())
+                .unwrap(),
+            point2(10.0, 5.0),
+        );
+    }
+    #[test]
+    fn test_intersection__parallel_miss() {
+        assert!(
+            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0)
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                    point2(11.0, 5.0),
+                    point2(20.0, 5.0),
+                )
+            )
+            .is_none(),
+        )
+    }
+    #[test]
+    fn test_intersection__parallel_overlap_does_not_count() {
+        assert!(
+            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0)
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                    point2(9.0, 5.0),
+                    point2(20.0, 5.0),
+                )
+            )
+            .is_none(),
+        )
+    }
+    #[test]
+    fn test_intersection__parallel_full_overlap_does_not_count() {
+        assert!(
+            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0)
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                    point2(0.0, 5.0),
+                    point2(20.0, 5.0),
+                )
+            )
+            .is_none(),
+        )
+    }
+    #[test]
+    fn test_intersection__parallel_exact_overlap_does_not_count() {
+        assert!(
+            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                point2(5.0, 5.0),
+                point2(10.0, 5.0)
+            )
+            .line_segment_intersection_point(
+                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                    point2(5.0, 5.0),
+                    point2(10.0, 5.0),
+                )
+            )
+            .is_none(),
+        )
+    }
+}

@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait DirectedFloatLine: DirectedLine + FloatLine {
+pub trait DirectedFloatLine: DirectedLine + FloatLineOps {
     fn ordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
@@ -35,4 +35,4 @@ pub trait DirectedFloatLine: DirectedLine + FloatLine {
     }
 }
 
-impl<L> DirectedFloatLine for L where L: FloatLine + DirectedLine {}
+impl<L> DirectedFloatLine for L where L: FloatLineOps + DirectedLine {}

@@ -11,10 +11,10 @@ pub trait DirectedLineLike: LineLike {
             .better_angle_from_x_axis()
     }
     fn arbitrary_point_clockwise_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_on_line() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
+        self.arbitrary_point_on_shape() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
     }
     fn arbitrary_point_anticlockwise_of_line(&self) -> Self::PointType {
-        self.arbitrary_point_on_line() + self.arbitrary_vector_along_line().quarter_rotated_ccw(1)
+        self.arbitrary_point_on_shape() + self.arbitrary_vector_along_line().quarter_rotated_ccw(1)
     }
     fn arbitrary_point_right_of_line(&self) -> Self::PointType {
         self.arbitrary_point_clockwise_of_line()

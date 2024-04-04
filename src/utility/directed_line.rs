@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait DirectedLine: Line + DirectedLineLike + Reversible {
+pub trait DirectedLine: LineOps + DirectedLineLike + Reversible {
     fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
     where
         OtherLine: DirectedLineLike<PointType = Self::PointType>,
@@ -8,4 +8,4 @@ pub trait DirectedLine: Line + DirectedLineLike + Reversible {
         Self::from_point_array(other.two_points_on_line_in_order())
     }
 }
-impl<L> DirectedLine for L where L: Line + DirectedLineLike + Reversible {}
+impl<L> DirectedLine for L where L: LineOps + DirectedLineLike + Reversible {}

@@ -8,8 +8,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         &self,
         point: impl Into<Self::PointType>,
     ) -> Self::PointType {
-        self.to_line::<TwoDifferentPoints<Self::PointType>>()
-            .closest_point_to_point(point)
+        self.closest_point_on_line_to_point(point)
     }
     fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::PointType {
         let point = point.into();
@@ -25,7 +24,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         self.normal_vector_from_origin().length()
     }
     fn point_is_on_or_normal_to_line_segment(&self, point: Self::PointType) -> bool {
-        let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
+        let [start_point, end_point] = self.two_different_arbitrary_points_on_shape();
 
         let point_relative_to_start_point = point - start_point;
         let end_point_relative_to_start_point = end_point - start_point;
@@ -41,7 +40,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
 
     // TODO: Double check how tolerances are applied here.  Looks like it depends on the points from the line
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
-        let [p1, p2] = other.two_different_arbitrary_points_on_line();
+        let [p1, p2] = other.two_different_arbitrary_points_on_shape();
         let self_line: TwoDifferentPoints<Self::PointType> = self.to_line();
         self_line.point_is_approx_on_line(p1, tolerance)
             && self_line.point_is_approx_on_line(p2, tolerance)
@@ -57,7 +56,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
     }
 
     fn reflect_point_over_line(&self, point: impl Into<Self::PointType>) -> Self::PointType {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = self.two_different_arbitrary_points_on_shape();
         let p1_to_p = point.into() - p1;
         let p1_to_p2 = p2 - p1;
         let parallel_part = p1_to_p.projected_onto(p1_to_p2);
@@ -67,7 +66,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
     }
 
     fn same_side_of_line(&self, point_c: Self::PointType, point_d: Self::PointType) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = self.two_different_arbitrary_points_on_shape();
         let point_a = p1;
         let point_b = p2;
         let self_line: TwoDifferentPoints<Self::PointType> = self.to_line();
@@ -123,7 +122,7 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         &self,
         expansion_length: f32,
     ) -> Vec<Self::PointType> {
-        let [line_point_a, line_point_b] = self.two_different_arbitrary_points_on_line();
+        let [line_point_a, line_point_b] = self.two_different_arbitrary_points_on_shape();
         let half_side_length = 0.5 + expansion_length;
 
         let is_vertical_line = line_point_a.x() == line_point_b.x();
@@ -199,8 +198,8 @@ pub trait FloatLineLike: LineLike<PointType = Self::_PointType> {
         &self,
         other: impl LineLike<PointType = Self::PointType>,
     ) -> Option<Self::PointType> {
-        let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
-        let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
+        let [self_p1, self_p2] = self.two_different_arbitrary_points_on_shape();
+        let [other_p1, other_p2] = other.two_different_arbitrary_points_on_shape();
 
         // Equation from https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
         let (x1, y1) = self_p1.tuple();

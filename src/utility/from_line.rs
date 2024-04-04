@@ -26,13 +26,13 @@ pub trait FromLine<P: SignedCoordinate>: TryFromTwoPoints<P> {
         let line = TwoDifferentPoints::<P>::new(p1, p2);
         Self::try_new_from_line(line)
     }
-    fn new_from_line(line: impl Line<PointType = P>) -> Self
+    fn new_from_line(line: impl LineOps<PointType = P>) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_line(line).unwrap()
     }
-    fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>
+    fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
     where
         Self: Sized;
 }

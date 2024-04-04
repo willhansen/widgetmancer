@@ -11,7 +11,7 @@ where
         ClosedInterval([low, high])
     }
     pub fn new_any_order(a: T, b: T) -> Self {
-        ClosedInterval::new([a.min(b), a.max(b)])
+        ClosedInterval::new(min_for_partial_ord(a, b), max_for_partial_ord(a, b))
     }
 
     pub fn low(&self) -> T {
