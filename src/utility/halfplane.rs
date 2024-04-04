@@ -23,15 +23,12 @@ where
     LineType: DirectedFloatLine + TryFromTwoPoints<LineType::PointType>,
     Self: FromDirectedLine<LineType::PointType>,
 {
-    // TODO: delete
-    // pub fn halfplane_from_border_with_inside_on_right<P>(line: P) -> Self
-    // where
-    //     P: DirectedLineOps<PointType = LineType::PointType>,
-    // {
-    //     Self {
-    //         dividing_line: LineType::from_other_directed_line(line),
-    //     }
-    // }
+    pub fn halfplane_from_border_with_inside_on_right(line: LineType) -> Self
+where {
+        Self {
+            dividing_line: line,
+        }
+    }
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl Into<LineType>,
         point_on_half_plane: impl Into<LineType::PointType>,
@@ -215,7 +212,7 @@ where
         let transformed_line: TwoDifferentPoints<P> =
             TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
 
-        TwoDifferentPoints<P>::halfplane_from_border_with_inside_on_right(
+        HalfPlane::<TwoDifferentPoints<P>>::halfplane_from_border_with_inside_on_right(
             transformed_line,
         )
     }
@@ -386,7 +383,7 @@ impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P
     for HalfPlane<TwoDifferentPoints<P>>
 {
     fn from(value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>) -> Self {
-        Self::halfplane_from_border_with_inside_on_right(value.dividing_line)
+        Self::halfplane_from_border_with_inside_on_right(value.dividing_line.into())
     }
 }
 
@@ -417,6 +414,7 @@ impl<LineType: DirectedFloatLine> QuarterTurnRotatable for HalfPlane<LineType> {
 pub type HalfPlaneCuttingSquare<SquareType: IntCoordinate> =
     HalfPlane<TwoDifferentPointsOnGridSquare<SquareType::Floating>>;
 
+// TODO: remove this trait.  functions should be in concrete implementation?
 pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
     // type PointType: FloatCoordinate;
     fn which_square(&self) -> <LineType::PointType as Coordinate>::OnGrid;
@@ -424,7 +422,7 @@ pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
         // TODO: tidy this up when halfplane is a trait
-        HalfPlane::<LineType>::halfplane_from_border_with_inside_on_right(self.to_local())
+        HalfPlane::<TwoDifferentPointsOnCenteredUnitSquare<LineType::PointType>>::halfplane_from_border_with_inside_on_right(self.to_local().into())
             .very_approximate_fraction_coverage_of_centered_unit_square()
     }
 }

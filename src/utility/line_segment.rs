@@ -69,9 +69,7 @@ pub trait FloatLineSegmentOps: FloatLineOps + LineSegmentOps {
         let [b1, b2] = other.endpoints_in_arbitrary_order();
 
         // TODO: This is cumbersome.  Should be more concise somehow
-        let self_extended_line: TwoDifferentPoints<Self::PointType> = self.to_line();
-        let both_on_same_line =
-            self_extended_line.point_is_on_line(b1) && self_extended_line.point_is_on_line(b2);
+        let both_on_same_line = self.point_is_on_line(b1) && self.point_is_on_line(b2);
 
         if both_on_same_line {
             // Now dealing with one-dimensional intersection.

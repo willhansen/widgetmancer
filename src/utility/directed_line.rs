@@ -2,12 +2,6 @@ use crate::utility::*;
 
 pub trait DirectedLineOps: LineOps + Reversible {
     // TODO: maybe no constructors in these operation collections?
-    fn from_other_directed_line<OtherLine>(other: OtherLine) -> Self
-    where
-        OtherLine: DirectedLineOps<PointType = Self::PointType>,
-    {
-        Self::from_point_array(other.two_points_on_line_in_order())
-    }
 
     fn two_points_on_line_in_order(&self) -> [Self::PointType; 2];
     fn arbitrary_vector_along_line(&self) -> Self::PointType {
