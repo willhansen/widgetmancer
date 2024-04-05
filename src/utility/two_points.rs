@@ -122,14 +122,6 @@ impl<P: SignedCoordinate> DirectedLineConstructors<P> for TwoDifferentPoints<P> 
         Ok(Self::new_from_points(p1, p2))
     }
 }
-impl<P: SignedCoordinate> LineConstructors<P> for TwoDifferentPoints<P> {
-    fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        Self::try_new_from_directed_line(line.with_arbitrary_direction())
-    }
-}
 impl<P: Coordinate> TryFromTwoPoints<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         if p1 == p2 {
@@ -197,14 +189,6 @@ impl<P: FloatCoordinate> DirectedLineConstructors<P> for TwoDifferentPointsOnCen
         }
     }
 }
-impl<P: FloatCoordinate> LineConstructors<P> for TwoDifferentPointsOnCenteredUnitSquare<P> {
-    fn try_new_from_line(line: impl LineOps<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        Self::try_new_from_directed_line(line.with_arbitrary_direction())
-    }
-}
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct TwoDifferentPointsOnGridSquare<P: Coordinate> {
     points_on_the_square: TwoDifferentPointsOnCenteredUnitSquare<P>,
@@ -251,6 +235,7 @@ where
 }
 impl<PointType: SignedCoordinate> LineOps for TwoDifferentPoints<PointType> {
     type PointType = PointType;
+    // type P = Self::PointType;
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
@@ -327,6 +312,7 @@ impl_traits_for_two_points_with_restriction!(TwoDifferentPointsOnGridSquare);
 
 impl<PointType: FloatCoordinate> LineOps for TwoDifferentPointsOnCenteredUnitSquare<PointType> {
     type PointType = PointType;
+    // type P = Self::PointType;
     // fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
     //     let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
     //     Self::try_from_line(less_constrained_line).unwrap()
@@ -338,6 +324,7 @@ impl<PointType: FloatCoordinate> LineOps for TwoDifferentPointsOnCenteredUnitSqu
 }
 impl<PointType: FloatCoordinate> LineOps for TwoDifferentPointsOnGridSquare<PointType> {
     type PointType = PointType;
+    // type P = Self::PointType;
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         [0, 1].map(|i| self.point_by_index(i))

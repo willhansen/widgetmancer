@@ -169,14 +169,14 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         rel_square: impl Into<WorldStep>,
     ) -> Self {
         let rel_square: WorldStep = rel_square.into(); // TODO: tired of writing this out a bunch
+        if rel_square == STEP_ZERO {
+            return Self::NotVisible;
+        }
         let partial_view_arc = match view_arc.into() {
             AngleInterval::Empty => return Self::NotVisible,
             AngleInterval::FullCircle => return Self::FullyVisible,
             AngleInterval::PartialArc(partial) => partial,
         };
-        if rel_square == STEP_ZERO {
-            return Self::NotVisible;
-        }
         let view_arc_edges: [ArcEdge; 2] = partial_view_arc.edges();
         let intersections: Vec<HalfPlaneCuttingWorldSquare> = view_arc_edges
             .iter()
@@ -623,11 +623,15 @@ mod tests {
     }
     #[test]
     fn test_view_arc_source_is_not_visible_by_default__full_circle() {
-        assert!(SquareVisibility::from_relative_square_and_view_arc(
-            AngleInterval::FullCircle,
-            (0, 0)
-        )
-        .is_not_visible());
+        let arc =
+            SquareVisibility::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
+        assert!(arc.is_not_visible());
+    }
+    #[test]
+    fn test_debug_draw_arc() {
+        let arc =
+            SquareVisibility::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
+        dbg!(arc); // keep this debug statement
     }
     // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
     #[test]

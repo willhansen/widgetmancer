@@ -18,6 +18,7 @@ pub trait LineOps:
     + TryFromTwoPoints<Self::PointType>
 {
     type PointType: SignedCoordinate;
+    // type P: SignedCoordinate; // shorthand for PointType
 
     // type DataType = <Self::PointType as Coordinate>::DataType;
     fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
@@ -232,7 +233,7 @@ mod tests {
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
         let input_line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
+            TwoDifferentWorldPoints::easy_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
         let output_line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
             output_points[0],
@@ -260,8 +261,7 @@ mod tests {
 
     #[test]
     fn test_same_side_of_line__vertical_line() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-0.5, -0.5), (-0.5, 0.5));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((-0.5, -0.5), (-0.5, 0.5));
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
         assert_false!(line.same_side_of_line(neg_point, origin))
@@ -273,16 +273,13 @@ mod tests {
     }
     #[test]
     fn test_line_intersections__observed_3_intersections() {
-        TwoDifferentWorldPoints::easy_new_from_two_points_on_line(
-            (-29.5, 5.0),
-            (-27.589872, 4.703601),
-        )
-        .ordered_line_intersections_with_centered_unit_square();
+        TwoDifferentWorldPoints::easy_from_two_points_on_line((-29.5, 5.0), (-27.589872, 4.703601))
+            .ordered_line_intersections_with_centered_unit_square();
     }
     #[test]
     fn test_line_point_reflection() {
         let line: TwoDifferentWorldPoints =
-            TwoDifferentPoints::easy_new_from_two_points_on_line((1.0, 5.0), (2.4, 5.0));
+            TwoDifferentPoints::easy_from_two_points_on_line((1.0, 5.0), (2.4, 5.0));
 
         assert_about_eq!(
             line.reflect_point_over_line(point2(0.0, 3.0)).to_array(),
@@ -625,7 +622,7 @@ mod tests {
     fn test_line_intersections_with_centered_unit_square_with_tolerance__cut_corner__within_tolerance(
     ) {
         let line: default::TwoDifferentFloatPoints =
-            TwoDifferentPoints::easy_new_from_two_points_on_line((0.49, 0.5), (0.5, 0.49));
+            TwoDifferentPoints::easy_from_two_points_on_line((0.49, 0.5), (0.5, 0.49));
         let tolerance = 0.1;
 
         let expected_points = [(0.49, 0.5), (0.5, 0.49)];
@@ -722,86 +719,74 @@ mod tests {
     }
     #[test]
     fn test_x_intercept__vertical_zero() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((0.0, 0.0), (0.0, 1.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((0.0, 0.0), (0.0, 1.0));
         assert_about_eq!(line.x_intercept().unwrap(), 0.0);
     }
     #[test]
     fn test_x_intercept__vertical_non_zero() {
         let x = 5.5;
-        let line = TwoDifferentWorldPoints::easy_new_from_two_points_on_line((x, 0.0), (x, 1.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((x, 0.0), (x, 1.0));
         assert_about_eq!(line.x_intercept().unwrap(), x);
     }
     #[test]
     fn test_x_intercept__horizontal_zero() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((0.0, 0.0), (1000.0, 0.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((0.0, 0.0), (1000.0, 0.0));
         assert!(line.x_intercept().is_none());
     }
     #[test]
     fn test_x_intercept__horizontal_non_zero() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((7.0, 1.0), (0.0, 1.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((7.0, 1.0), (0.0, 1.0));
         assert!(line.x_intercept().is_none());
     }
     #[test]
     fn test_x_intercept__diagonal() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((5.0, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((5.0, 1.0), (6.0, 2.0));
         assert_about_eq!(line.x_intercept().unwrap(), 4.0);
     }
     #[test]
     fn test_y_intercept_vertical_zero() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((0.0, 1.0), (0.0, 0.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((0.0, 1.0), (0.0, 0.0));
         assert!(line.y_intercept().is_none());
     }
     #[test]
     fn test_y_intercept_vertical_non_zero() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((7.0, 1.0), (7.0, 7.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((7.0, 1.0), (7.0, 7.0));
         assert!(line.y_intercept().is_none());
     }
     #[test]
     fn test_y_intercept_positive_slope() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((2.0, 1.0), (3.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((2.0, 1.0), (3.0, 2.0));
         assert_about_eq!(line.y_intercept().unwrap(), -1.0);
     }
     #[test]
     fn test_y_intercept_horizontal() {
         let y = 2.0;
-        let line = TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-2.0, y), (3.0, y));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((-2.0, y), (3.0, y));
         assert_about_eq!(line.y_intercept().unwrap(), y);
     }
     #[test]
     fn test_y_intercept_negative_slope() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((-2.0, 1.0), (-3.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((-2.0, 1.0), (-3.0, 2.0));
         assert_about_eq!(line.y_intercept().unwrap(), -1.0);
     }
     #[test]
     fn test_slope__positive() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((5.5, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((5.5, 1.0), (6.0, 2.0));
         assert_about_eq!(line.slope().unwrap(), 2.0);
     }
     #[test]
     fn test_slope__vertical() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((6.0, 1.0), (6.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((6.0, 1.0), (6.0, 2.0));
         assert!(line.slope().is_none());
     }
     #[test]
     fn test_slope__horizontal() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((5.5, 2.0), (60.0, 2.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((5.5, 2.0), (60.0, 2.0));
         assert_about_eq!(line.slope().unwrap(), 0.0);
     }
     #[test]
     fn test_slope__negative() {
-        let line =
-            TwoDifferentWorldPoints::easy_new_from_two_points_on_line((4.0, 0.0), (0.0, 80.0));
+        let line = TwoDifferentWorldPoints::easy_from_two_points_on_line((4.0, 0.0), (0.0, 80.0));
         assert_about_eq!(line.slope().unwrap(), -20.0);
     }
     #[test]
