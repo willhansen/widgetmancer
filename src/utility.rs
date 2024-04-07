@@ -35,6 +35,8 @@ pub_mod_and_use!(
     reversible,
     two_points,
     try_from_two_points,
+    sign,
+    non_zero_sign,
     line_constructors,
     directed_line_constructors,
     angle,

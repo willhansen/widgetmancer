@@ -70,7 +70,10 @@ impl PartialAngleInterval {
     }
 
     pub fn from_angles(cw: Angle<f32>, ccw: Angle<f32>) -> Self {
-        let (cw, ccw) = (standardize_angle(cw), standardize_angle(ccw));
+        let (cw, ccw) = (
+            standardize_angle_with_zero_mid(cw),
+            standardize_angle_with_zero_mid(ccw),
+        );
         assert_ne!(cw, ccw);
         Self {
             clockwise_end: cw,
@@ -326,7 +329,7 @@ impl PartialAngleInterval {
         angle: Angle<f32>,
         tolerance: Angle<f32>,
     ) -> BoolWithPartial {
-        let angle = standardize_angle(angle);
+        let angle = standardize_angle_with_zero_mid(angle);
 
         if angle == self.cw() || angle == self.ccw() {
             return BoolWithPartial::Partial;

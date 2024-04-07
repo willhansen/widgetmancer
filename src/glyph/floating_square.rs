@@ -251,7 +251,7 @@ pub fn character_map_for_full_square_at_point(
 
             //Tweak offset for effectively double width
             let inward_shifted_x_offset = (offset_from_square_center.x.abs() - 0.5).max(0.0)
-                * sign(offset_from_square_center.x);
+                * sign_f32(offset_from_square_center.x);
             offset_from_square_center.x = inward_shifted_x_offset;
 
             let character_for_square =
@@ -267,9 +267,9 @@ pub fn character_map_for_full_square_at_point(
 pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
     let char_offsets = [-1.0, 1.0].map(|i| {
         let scaled_x_offset = offset.x * 2.0;
-        let shifted_toward_this_side = sign(scaled_x_offset) == i;
+        let shifted_toward_this_side = sign_f32(scaled_x_offset) == i;
         let compensated_x_offset = if shifted_toward_this_side {
-            (scaled_x_offset.abs() - 1.0).max(0.0) * sign(scaled_x_offset)
+            (scaled_x_offset.abs() - 1.0).max(0.0) * sign_f32(scaled_x_offset)
         } else {
             scaled_x_offset
         };

@@ -16,7 +16,7 @@ use hextant_blocks::*;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
 use crate::piece::Upgrade;
-use crate::utility::sign;
+use crate::utility::sign_f32;
 use crate::utility::units::*;
 use crate::utility::*;
 

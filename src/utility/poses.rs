@@ -228,7 +228,7 @@ mod tests {
             (-3, -5, DOWN).into()
         );
 
-        let abs_face: Face = (5, 1, LEFT).into();
+        let abs_face: FaceOfWorldSquare = (5, 1, LEFT).into();
 
         assert_eq!(abs_face.quarter_rotated_ccw_in_place(-1), (5, 1, UP).into());
         assert_eq!(

@@ -100,10 +100,17 @@ pub trait Coordinate:
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
-    fn idx(&self, i: usize) -> Self::DataType {
+    fn nth_component(&self, i: usize) -> Self::DataType {
         match i {
             0 => self.x(),
             1 => self.y(),
+            _ => panic!("bad index: {i}"),
+        }
+    }
+    fn nth_basis_vector(i: usize) -> Self {
+        match i {
+            0 => Self::new(Self::DataType::one(), Self::DataType::zero()),
+            1 => Self::new(Self::DataType::zero(), Self::DataType::one()),
             _ => panic!("bad index: {i}"),
         }
     }
@@ -382,7 +389,7 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     }
     // TODO: Add tolerance?
     fn on_square_border_on_axis(&self, i: usize) -> bool {
-        (self.idx(i) - 0.5) % 0.5 == 0.0
+        (self.nth_component(i) - 0.5) % 0.5 == 0.0
     }
     // TODO: Add tolerance?
     fn on_same_square_face(&self, other: Self) -> bool {
@@ -393,42 +400,32 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     }
     // TODO: Add tolerance?
     fn touched_square_faces(&self) -> HashSet<OrthogonalFacingIntPose<Self::OnGrid>> {
-        if !self.on_a_square_face() {
-            return hash_set![];
-        }
-
-        let coords_and_dirs_by_axis = [0, 1].map(|i| {
-            let on_border = self.on_square_border_on_axis(i);
-            if on_border {
-                [1, -1]
-                    .map(|square_side| {
-                        let square_pos = (self.idx(i) + 0.1 * square_side as f32).round() as i32;
-                        let dir = -square_side;
-                        (square_pos, dir)
-                    })
-                    .into_iter()
-                    .collect()
-            } else {
-                vec![]
-            }
-        });
-
-        // squares_coords_by_axis[0].map()
-
         let on_border_by_axis = [0, 1].map(|i| self.on_square_border_on_axis(i));
         match on_border_by_axis {
-            [true, true] => todo!(),
-            [true, false] => [POSITIVE, NEGATIVE].map(|offset_dir| {
-                let x = (offset_dir * 0.1 + self.x());
-                let y = self.y();
-                let square = point2(x,y);
-                let dir = RIGHT * -offset_dir;
-                (x,y,dir).into()
-
-            })
-        
-            [false, true] => todo!(),
+            [true, true] => [-1, 1]
+                .into_iter()
+                .cartesian_product([-1, 1])
+                .flat_map(|(x_nudge, y_nudge)| {
+                    let nudge_vector = Self::OnGrid::new(x_nudge, y_nudge);
+                    let offset_point = *self + nudge_vector.to_f32() * 0.1;
+                    let square = offset_point.snap_to_grid();
+                    [
+                        (square, NonZeroSign::try_from(-x_nudge).unwrap() * RIGHT).into(),
+                        (square, NonZeroSign::try_from(-y_nudge).unwrap() * UP).into(),
+                    ]
+                })
+                .collect(),
             [false, false] => hash_set![],
+            [x_border, y_border] => {
+                let border_axis_index = if x_border { 0 } else { 1 };
+                let non_border_axis_index = 1 - border_axis_index;
+                let normal_to_border = Self::nth_basis_vector(border_axis_index);
+                let one_face = Face::from_square_and_dir(
+                    (*self + normal_to_border * 0.1).snap_to_grid(),
+                    -normal_to_border.nearest_orthogonal_direction(),
+                );
+                HashSet::from(one_face.both_sides_of_face())
+            }
         }
     }
     fn normalize(&self) -> Self {
@@ -455,6 +452,9 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     }
     fn snap_to_grid(&self) -> Self::OnGrid {
         self.round().to_i32()
+    }
+    fn nearest_orthogonal_direction(&self) -> OrthogonalDirection {
+        OrthogonalDirection::from_angle_hint(self.better_angle_from_x_axis())
     }
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
@@ -483,7 +483,7 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
 impl<T> FloatCoordinate for T where T: SignedCoordinate<_DataType = f32, Floating = T> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    point2(sign(point.x()), sign(point.y()))
+    point2(sign_f32(point.x()), sign_f32(point.y()))
 }
 
 pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
@@ -492,7 +492,7 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 
 pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
     (0..4)
-        .map(|i| standardize_angle(Angle::degrees(45.0 + 90.0 * i as f32)))
+        .map(|i| standardize_angle_with_zero_mid(Angle::degrees(45.0 + 90.0 * i as f32)))
         .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
         .unwrap()
 }
@@ -570,28 +570,6 @@ pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
 pub fn random_unit_vector() -> FVector {
     let angle = random_angle();
     FVector::unit_vector_from_angle(angle)
-}
-
-pub fn standardize_angle(angle: Angle<f32>) -> Angle<f32> {
-    let mut radians = angle.radians;
-    if radians > -PI && radians <= PI {
-        angle
-    } else {
-        radians = radians.rem_euclid(TAU);
-        if radians > PI {
-            radians -= TAU;
-        }
-        Angle::radians(radians)
-    }
-}
-
-pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
-    Angle::radians(
-        standardize_angle(a)
-            .angle_to(standardize_angle(b))
-            .radians
-            .abs(),
-    )
 }
 
 pub fn revolve_square(
@@ -763,7 +741,7 @@ where
 
 impl QuarterTurnRotatable for Angle<f32> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        standardize_angle(Angle::radians(
+        standardize_angle_with_zero_mid(Angle::radians(
             self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
         ))
     }
@@ -967,8 +945,8 @@ mod tests {
     #[test]
     fn test_standardize_angle() {
         assert_about_eq!(
-            standardize_angle(Angle::<f32>::degrees(75.0)).radians,
-            standardize_angle(Angle::<f32>::degrees(75.0 - 360.0)).radians
+            standardize_angle_with_zero_mid(Angle::<f32>::degrees(75.0)).radians,
+            standardize_angle_with_zero_mid(Angle::<f32>::degrees(75.0 - 360.0)).radians
         );
     }
     #[test]

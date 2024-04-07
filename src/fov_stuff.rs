@@ -542,7 +542,7 @@ pub fn sub_octant_field_of_view(
         let mut view_blocking_arc_for_this_square: AngleInterval = AngleInterval::Empty;
         for face_direction in face_directions {
             let relative_face: RelativeFace = (relative_square, face_direction).into();
-            let absolute_face: Face = (absolute_square, face_direction).into();
+            let absolute_face: FaceOfWorldSquare = (absolute_square, face_direction).into();
 
             let face_has_portal = portal_geometry
                 .get_portal_by_entrance(absolute_face)

@@ -1,4 +1,7 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::{
+    f32::consts::{FRAC_PI_2, FRAC_PI_4},
+    ops::{Add, Div, Mul, Neg, Sub},
+};
 
 use crate::utility::*;
 
@@ -121,7 +124,7 @@ pub trait OrthoAngle:
     }
 
     fn rotate_angle(&self, angle: FAngle) -> FAngle {
-        standardize_angle(euclid::Angle::<f32>::degrees(
+        standardize_angle_with_zero_mid(euclid::Angle::<f32>::degrees(
             angle.to_degrees() + 90.0 * (self.quarter_turns() as f32),
         ))
     }
@@ -204,6 +207,19 @@ impl_ops_for_OrthoAngles!(UnNormalizedOrthoAngle);
 // }
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct OrthogonalDirection(NormalizedOrthoAngle);
+
+impl OrthogonalDirection {
+    pub fn from_angle_hint(hint: FAngle) -> Self {
+        let hint = standardize_angle_with_zero_min(hint);
+        let quarter_turns_ccw = ((hint.radians + FRAC_PI_4) / FRAC_PI_2) as i32;
+        Self(NormalizedOrthoAngle::new_from_quarter_turns(
+            quarter_turns_ccw,
+        ))
+    }
+    pub fn from_degrees_hint(deg: f32) -> Self {
+        Self::from_angle_hint(Angle::degrees(deg))
+    }
+}
 
 pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(0));
 pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1));
@@ -312,6 +328,7 @@ where
         self.normalized()
     }
 
+    // TODO: use enum that covers OrthoAngle and Angle<f32>
     fn from_angle(angle: impl OrthoAngle) -> Self {
         todo!()
     }
@@ -335,6 +352,37 @@ impl Direction for OrthogonalDirection {
 // TODO: make member of more general angle trait
 pub fn fangle_dot(a: FAngle, b: FAngle) -> f32 {
     WorldPoint::unit_vector_from_angle(a).dot(WorldPoint::unit_vector_from_angle(b))
+}
+
+pub fn standardize_angle_with_zero_mid(angle: Angle<f32>) -> Angle<f32> {
+    let mut radians = angle.radians;
+    if radians > -PI && radians <= PI {
+        angle
+    } else {
+        radians = radians.rem_euclid(TAU);
+        if radians > PI {
+            radians -= TAU;
+        }
+        Angle::radians(radians)
+    }
+}
+// TODO: make difference in names clearer
+pub fn standardize_angle_with_zero_min(angle: Angle<f32>) -> Angle<f32> {
+    let with_zero_mid = standardize_angle_with_zero_mid(angle);
+    if angle.radians < 0.0 {
+        angle + Angle::two_pi()
+    } else {
+        angle
+    }
+}
+
+pub fn abs_angle_distance(a: Angle<f32>, b: Angle<f32>) -> Angle<f32> {
+    Angle::radians(
+        standardize_angle_with_zero_mid(a)
+            .angle_to(standardize_angle_with_zero_mid(b))
+            .radians
+            .abs(),
+    )
 }
 
 #[cfg(test)]
@@ -391,5 +439,17 @@ mod tests {
                 c
             );
         });
+    }
+    #[test]
+    fn test_orthogonal_direction_from_angle_hint() {
+        let f = OrthogonalDirection::from_degrees_hint;
+        assert_eq!(f(0.0), RIGHT, "zero case");
+        assert_eq!(f(90.0), UP, "simple case");
+        assert_eq!(f(180.0), LEFT, "simple case");
+        assert_eq!(f(-90.0), DOWN, "simple case");
+        assert_eq!(f(46.0), UP, "rounding");
+        assert_eq!(f(44.0), RIGHT, "rounding");
+        assert_eq!(f(-43.0), RIGHT, "rounding");
+        assert_eq!(f(-43.0 + 360.0), RIGHT, "rounding");
     }
 }

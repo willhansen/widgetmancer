@@ -20,7 +20,7 @@ pub use ordered_float::OrderedFloat;
 pub type SimpleResult = Result<(), ()>;
 pub type OkOrMessage = Result<(), String>;
 
-pub fn sign(x: f32) -> f32 {
+pub fn sign_f32(x: f32) -> f32 {
     if x < 0.0 {
         -1.0
     } else if x > 0.0 {

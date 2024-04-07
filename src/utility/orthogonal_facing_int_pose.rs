@@ -206,6 +206,9 @@ where
             *self
         }
     }
+    pub fn both_sides_of_face(&self) -> [Self; 2] {
+        [*self, self.stepped().turned_back()]
+    }
 }
 impl<T: IntCoordinate> Debug for OrthogonalFacingIntPose<T>
 where
