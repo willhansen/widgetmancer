@@ -60,11 +60,11 @@ pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
 pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
 pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
 pub type HalfPlaneCuttingLocalCharacter =
-    HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<LocalCharacterPoint>>;
+    HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalCharacterPoint>>;
 
 // TODO: replace local frame with relative world frame
-pub type LineCuttingLocalSquare = TwoDifferentPointsOnCenteredUnitSquare<LocalSquarePoint>;
-pub type LineCuttingWorldSquare = TwoDifferentPointsOnGridSquare<WorldPoint>;
+pub type LineCuttingLocalSquare = TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalSquarePoint>;
+pub type LineCuttingWorldSquare = TwoPointsOnDifferentFacesOfGridSquare<WorldPoint>;
 pub type HalfPlaneCuttingLocalSquare = HalfPlane<LineCuttingLocalSquare>;
 pub type HalfPlaneCuttingWorldSquare = HalfPlane<LineCuttingWorldSquare>;
 

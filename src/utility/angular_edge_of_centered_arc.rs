@@ -56,7 +56,7 @@ pub trait AngularEdgeOfCenteredArc {
 
         let edge_ray: TwoDifferentPoints<SquareType::Floating> = self.edge_ray();
         let line =
-            TwoDifferentPointsOnGridSquare::<SquareType::Floating>::try_new_from_line_and_square(
+            TwoPointsOnDifferentFacesOfGridSquare::<SquareType::Floating>::try_new_from_line_and_square(
                 edge_ray, rel_square,
             )
             .ok()?;

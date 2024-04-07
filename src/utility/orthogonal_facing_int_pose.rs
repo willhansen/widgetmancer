@@ -340,14 +340,13 @@ where
     }
 }
 
-impl<T, SquareType, IntoDirectionType> From<(T, T, IntoDirectionType)>
-    for OrthogonalFacingIntPose<SquareType>
+impl<T, SquareType, IntoDir> From<(T, T, IntoDir)> for OrthogonalFacingIntPose<SquareType>
 where
     (T, T): Into<SquareType>,
     SquareType: WorldIntCoordinate,
-    IntoDirectionType: Into<OrthogonalDirection>,
+    IntoDir: Into<OrthogonalDirection>,
 {
-    fn from(value: (T, T, IntoDirectionType)) -> Self {
+    fn from(value: (T, T, IntoDir)) -> Self {
         Self::from_square_and_dir((value.0, value.1).into(), value.2)
     }
 }

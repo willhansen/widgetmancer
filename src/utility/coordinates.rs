@@ -1,3 +1,4 @@
+use map_macro::hash_set;
 use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
@@ -99,6 +100,13 @@ pub trait Coordinate:
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
+    fn idx(&self, i: usize) -> Self::DataType {
+        match i {
+            0 => self.x(),
+            1 => self.y(),
+            _ => panic!("bad index: {i}"),
+        }
+    }
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
     // TODO: delete when compiling
     // fn zero() -> Self {
@@ -368,6 +376,61 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
         // NOTE: 0.5 can be exactly represented by floating point numbers
         self.king_length() == 0.5
     }
+    // TODO: Add tolerance?
+    fn on_a_square_face(&self) -> bool {
+        any_true(&[0, 1].map(|i| self.on_square_border_on_axis(i)))
+    }
+    // TODO: Add tolerance?
+    fn on_square_border_on_axis(&self, i: usize) -> bool {
+        (self.idx(i) - 0.5) % 0.5 == 0.0
+    }
+    // TODO: Add tolerance?
+    fn on_same_square_face(&self, other: Self) -> bool {
+        HashSet::<OrthogonalFacingIntPose<Self::OnGrid>>::from_iter(self.touched_square_faces())
+            .union(&HashSet::from_iter(other.touched_square_faces()))
+            .count()
+            > 0
+    }
+    // TODO: Add tolerance?
+    fn touched_square_faces(&self) -> HashSet<OrthogonalFacingIntPose<Self::OnGrid>> {
+        if !self.on_a_square_face() {
+            return hash_set![];
+        }
+
+        let coords_and_dirs_by_axis = [0, 1].map(|i| {
+            let on_border = self.on_square_border_on_axis(i);
+            if on_border {
+                [1, -1]
+                    .map(|square_side| {
+                        let square_pos = (self.idx(i) + 0.1 * square_side as f32).round() as i32;
+                        let dir = -square_side;
+                        (square_pos, dir)
+                    })
+                    .into_iter()
+                    .collect()
+            } else {
+                vec![]
+            }
+        });
+
+        // squares_coords_by_axis[0].map()
+
+        let on_border_by_axis = [0, 1].map(|i| self.on_square_border_on_axis(i));
+        match on_border_by_axis {
+            [true, true] => todo!(),
+            [true, false] => [POSITIVE, NEGATIVE].map(|offset_dir| {
+                let x = (offset_dir * 0.1 + self.x());
+                let y = self.y();
+                let square = point2(x,y);
+                let dir = RIGHT * -offset_dir;
+                (x,y,dir).into()
+
+            })
+        
+            [false, true] => todo!(),
+            [false, false] => hash_set![],
+        }
+    }
     fn normalize(&self) -> Self {
         *self / self.length()
     }
@@ -389,6 +452,9 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
         let start_angle = self.better_angle_from_x_axis();
         let new_angle = start_angle + delta_angle;
         Self::from_angle_and_length(new_angle, self.length())
+    }
+    fn snap_to_grid(&self) -> Self::OnGrid {
+        self.round().to_i32()
     }
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
@@ -1059,5 +1125,77 @@ mod tests {
         let dir = DOWN;
         let out = p.moved(dir.left(), 1);
         assert_eq!(out, point2(4, 5));
+    }
+    #[test]
+    fn test_on_a_square_face() {
+        [
+            (0.0, 0.0, false),             // origin
+            (0.5, 0.0, true),              // a side
+            (0.5, 0.5, true),              // a corner
+            (0.5, 0.51, true),             // near corner
+            (0.49, 0.0, false),            // near_side
+            (-5.5, 4.5, true),             // some other side
+            (-584736.5, 40000.3, true),    // big numbers
+            (-584736.45, 40000.51, false), // big numbers
+        ]
+        .into_iter()
+        .for_each(|(x, y, on_face)| {
+            assert_eq!(default::Point2D::new(x, y).on_a_square_face(), on_face);
+        })
+    }
+    #[test]
+    fn test_on_same_square_face() {
+        [
+            (0.0, 0.0, 0.0, 0.0, false, "same, but not on face"),
+            (0.5, 0.0, 0.5, 0.1, true, "same face"),
+            (0.5, 0.5, 0.5, -0.5, true, "adjacent corners"),
+            (-0.5, 0.5, 0.5, -0.5, false, "opposite corners"),
+            (
+                15.7,
+                12.5,
+                16.3,
+                12.5,
+                true,
+                "same face, further from origin",
+            ),
+            (15.7, 12.5, 15.3, 12.5, false, "adjacent faces"),
+        ]
+        .into_iter()
+        .for_each(|(x1, y1, x2, y2, same_face, case)| {
+            let p1 = default::Point2D::new(x1, y1);
+            let p2 = point2(x2, y2);
+            assert_eq!(
+                p1.on_same_square_face(p2),
+                same_face,
+                "{case}: {p1:?}, {p2:?}"
+            );
+        })
+    }
+    #[test]
+    fn test_touched_square_faces() {
+        [
+            ((0.0, 0.0), hash_set![]),
+            ((0.5, 0.0), hash_set![(0, 0, RIGHT), (1, 0, LEFT)]),
+            ((-8.5, 0.0), hash_set![(-9, 0, RIGHT), (-8, 0, LEFT)]),
+            ((0.2, 0.5), hash_set![(0, 0, UP), (0, 1, DOWN)]),
+            (
+                (0.5, 0.5),
+                hash_set![
+                    (0, 0, RIGHT),
+                    (1, 0, LEFT),
+                    (0, 1, RIGHT),
+                    (1, 1, LEFT),
+                    (0, 0, UP),
+                    (0, 1, DOWN),
+                    (1, 0, UP),
+                    (1, 1, DOWN),
+                ],
+            ),
+        ]
+        .into_iter()
+        .for_each(|((x, y), faces)| {
+            let faces: HashSet<OrthogonalFacingIntPose<WorldSquare>> = map_into(faces).collect();
+            assert_eq!(WorldPoint::new(x, y).touched_square_faces(), faces);
+        })
     }
 }

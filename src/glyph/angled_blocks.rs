@@ -25,7 +25,7 @@ fn local_snap_grid_to_local_character_frame(grid_point: SnapGridPoint) -> LocalC
     )
 }
 
-fn snap_to_grid(local_character_point: LocalCharacterPoint) -> SnapGridPoint {
+fn snap_to_angle_block_grid(local_character_point: LocalCharacterPoint) -> SnapGridPoint {
     point2(
         (local_character_point.x / 0.5 + 1.0).round() as i32,
         (local_character_point.y * 3.0 + 1.5).round() as i32,
@@ -289,8 +289,8 @@ pub fn half_plane_to_angled_block_character(
         }
     } else {
         let mut grid_line = TwoDifferentPoints::from_two_exact_points(
-            snap_to_grid(snapped_points[0]),
-            snap_to_grid(snapped_points[1]),
+            snap_to_angle_block_grid(snapped_points[0]),
+            snap_to_angle_block_grid(snapped_points[1]),
         );
         if !three_points_are_clockwise(
             half_plane.dividing_line().p1(),
@@ -414,17 +414,17 @@ mod tests {
 
     fn test_snap_to_grid() {
         assert_eq!(
-            snap_to_grid(point2(-0.45, -0.51)),
+            snap_to_angle_block_grid(point2(-0.45, -0.51)),
             point2(0, 0),
             "origin in correct place"
         );
         assert_eq!(
-            snap_to_grid(point2(-0.1, 0.1)),
+            snap_to_angle_block_grid(point2(-0.1, 0.1)),
             point2(1, 2),
             "should snap to non-angle-block points"
         );
         assert_eq!(
-            snap_to_grid(point2(0.5, 0.5)),
+            snap_to_angle_block_grid(point2(0.5, 0.5)),
             point2(2, 3),
             "top right corner of character"
         );

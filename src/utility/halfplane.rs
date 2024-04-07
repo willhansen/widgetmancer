@@ -366,12 +366,12 @@ impl<L: DirectedFloatLine> Debug for HalfPlane<L> {
 }
 
 impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
-    for HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>
+    for HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
 {
     type Error = ();
 
     fn try_from(value: HalfPlane<TwoDifferentPoints<P>>) -> Result<Self, Self::Error> {
-        let points: Result<TwoDifferentPointsOnCenteredUnitSquare<P>, _> =
+        let points: Result<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, _> =
             value.dividing_line.try_into();
         match points {
             Ok(x) => Ok(Self::halfplane_from_border_with_inside_on_right(x)),
@@ -379,10 +379,10 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
         }
     }
 }
-impl<P: FloatCoordinate> From<HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>>
+impl<P: FloatCoordinate> From<HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>>
     for HalfPlane<TwoDifferentPoints<P>>
 {
-    fn from(value: HalfPlane<TwoDifferentPointsOnCenteredUnitSquare<P>>) -> Self {
+    fn from(value: HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>) -> Self {
         Self::halfplane_from_border_with_inside_on_right(value.dividing_line.into())
     }
 }
@@ -412,17 +412,17 @@ impl<LineType: DirectedFloatLine> QuarterTurnRotatable for HalfPlane<LineType> {
 }
 
 pub type HalfPlaneCuttingSquare<SquareType: IntCoordinate> =
-    HalfPlane<TwoDifferentPointsOnGridSquare<SquareType::Floating>>;
+    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<SquareType::Floating>>;
 
 // TODO: remove this trait.  functions should be in concrete implementation?
 pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
     // type PointType: FloatCoordinate;
     fn which_square(&self) -> <LineType::PointType as Coordinate>::OnGrid;
-    fn to_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<LineType::PointType>;
+    fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>;
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
         // TODO: tidy this up when halfplane is a trait
-        HalfPlane::<TwoDifferentPointsOnCenteredUnitSquare<LineType::PointType>>::halfplane_from_border_with_inside_on_right(self.to_local().into())
+        HalfPlane::<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>>::halfplane_from_border_with_inside_on_right(self.to_local().into())
             .very_approximate_fraction_coverage_of_centered_unit_square()
     }
 }
@@ -435,7 +435,7 @@ where
         self.dividing_line.which_square()
     }
 
-    fn to_local(&self) -> TwoDifferentPointsOnCenteredUnitSquare<L::PointType> {
+    fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<L::PointType> {
         self.dividing_line.points_relative_to_the_square()
     }
 }

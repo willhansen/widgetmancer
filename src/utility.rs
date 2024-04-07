@@ -417,6 +417,10 @@ where
     }
 }
 
+pub fn map_into<A: Into<B>, B>(a: impl IntoIterator<Item = A>) -> impl Iterator<Item = B> {
+    a.into_iter().map(|x| x.into())
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;
