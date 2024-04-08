@@ -389,12 +389,12 @@ pub trait FloatCoordinate: SignedCoordinate<_DataType = f32, Floating = Self> {
     }
     // TODO: Add tolerance?
     fn on_square_border_on_axis(&self, i: usize) -> bool {
-        (self.nth_component(i) - 0.5) % 0.5 == 0.0
+        (self.nth_component(i) - 0.5) % 1.0 == 0.0
     }
     // TODO: Add tolerance?
     fn on_same_square_face(&self, other: Self) -> bool {
         HashSet::<OrthogonalFacingIntPose<Self::OnGrid>>::from_iter(self.touched_square_faces())
-            .union(&HashSet::from_iter(other.touched_square_faces()))
+            .intersection(&HashSet::from_iter(other.touched_square_faces()))
             .count()
             > 0
     }
@@ -1118,7 +1118,11 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(x, y, on_face)| {
-            assert_eq!(default::Point2D::new(x, y).on_a_square_face(), on_face);
+            assert_eq!(
+                default::Point2D::new(x, y).on_a_square_face(),
+                on_face,
+                "point: {x}, {y}"
+            );
         })
     }
     #[test]
@@ -1128,6 +1132,7 @@ mod tests {
             (0.5, 0.0, 0.5, 0.1, true, "same face"),
             (0.5, 0.5, 0.5, -0.5, true, "adjacent corners"),
             (-0.5, 0.5, 0.5, -0.5, false, "opposite corners"),
+            (0.5, 0.5, -0.5, -0.5, false, "other opposite corners"),
             (
                 15.7,
                 12.5,
@@ -1167,6 +1172,19 @@ mod tests {
                     (0, 1, DOWN),
                     (1, 0, UP),
                     (1, 1, DOWN),
+                ],
+            ),
+            (
+                (-0.5, 0.5),
+                hash_set![
+                    (-1, 0, RIGHT),
+                    (0, 0, LEFT),
+                    (-1, 1, RIGHT),
+                    (0, 1, LEFT),
+                    (-1, 0, UP),
+                    (-1, 1, DOWN),
+                    (0, 0, UP),
+                    (0, 1, DOWN),
                 ],
             ),
         ]
