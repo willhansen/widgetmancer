@@ -70,7 +70,7 @@ impl RecoilingBoardAnimation {
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION_S;
+        // let fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION_S;
         if age < RecoilingBoardAnimation::TIME_TO_PEAK_S {
             RecoilingBoardAnimation::recoil_start(
                 age,
@@ -99,7 +99,7 @@ impl Animation for RecoilingBoardAnimation {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let age = time.duration_since(self.start_time);
 
-        let mut offset_distance_in_squares: f32 =
+        let offset_distance_in_squares: f32 =
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(age.as_secs_f32());
 
         let mut glyph_map = WorldSquareGlyphMap::new();

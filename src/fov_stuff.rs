@@ -1696,66 +1696,60 @@ mod tests {
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
-        // Non-deterministic test
-        // TODO: remove outer loop when deterministic
-        (0..100).foreach(|i| {
-            (0..5).for_each(|dy| {
-                let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
-                let absolute_fov_center_square = point2(5, 5);
-                let absolute_fully_visible_square =
-                    absolute_fov_center_square + relative_fully_visible_square;
-                let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
-                    .iter()
-                    .map(|&rel_face| {
-                        FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
-                    })
-                    .collect_vec();
+        // NOTE: this test used to be non-deterministic. Watch out for that if it fails.
+        (0..5).for_each(|dy| {
+            let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
+            let absolute_fov_center_square = point2(5, 5);
+            let absolute_fully_visible_square =
+                absolute_fov_center_square + relative_fully_visible_square;
+            let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
+                .iter()
+                .map(|&rel_face| {
+                    FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
+                })
+                .collect_vec();
 
-                face_fovs
-                    .iter()
-                    .map(FieldOfView::rasterized)
-                    .for_each(|rasterized_fov| {
-                        assert!(rasterized_fov.relative_square_is_only_partially_visible(
-                            relative_fully_visible_square
-                        ));
-                        assert_eq!(
-                            rasterized_fov
-                                .times_absolute_square_is_visible(absolute_fully_visible_square),
-                            1
-                        );
-                        assert_eq!(
-                            rasterized_fov.times_absolute_square_is_fully_visible(
-                                absolute_fully_visible_square
-                            ),
-                            0
-                        );
-                    });
+            face_fovs
+                .iter()
+                .map(FieldOfView::rasterized)
+                .for_each(|rasterized_fov| {
+                    assert!(rasterized_fov
+                        .relative_square_is_only_partially_visible(relative_fully_visible_square));
+                    assert_eq!(
+                        rasterized_fov
+                            .times_absolute_square_is_visible(absolute_fully_visible_square),
+                        1
+                    );
+                    assert_eq!(
+                        rasterized_fov
+                            .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
+                        0
+                    );
+                });
 
-                let merged_fov = FieldOfView::combine_multiple(face_fovs);
+            let merged_fov = FieldOfView::combine_multiple(face_fovs);
 
-                let merged_rfov = merged_fov.rasterized();
+            let merged_rfov = merged_fov.rasterized();
 
-                let fov_created_whole = FieldOfView::new_empty_fov_at(absolute_fov_center_square)
-                    .with_fully_visible_relative_square(relative_fully_visible_square);
-                let rfov_created_whole = fov_created_whole.rasterized();
+            let fov_created_whole = FieldOfView::new_empty_fov_at(absolute_fov_center_square)
+                .with_fully_visible_relative_square(relative_fully_visible_square);
+            let rfov_created_whole = fov_created_whole.rasterized();
 
-                assert_eq!(merged_fov, fov_created_whole);
-                assert_eq!(merged_rfov, rfov_created_whole);
+            assert_eq!(merged_fov, fov_created_whole);
+            assert_eq!(merged_rfov, rfov_created_whole);
 
-                assert!(
-                    merged_rfov.relative_square_is_fully_visible(relative_fully_visible_square),
-                    "Should be fully visible"
-                );
-                assert_eq!(
-                    merged_rfov.times_absolute_square_is_visible(absolute_fully_visible_square),
-                    1
-                );
-                assert_eq!(
-                    merged_rfov
-                        .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
-                    1
-                );
-            });
+            assert!(
+                merged_rfov.relative_square_is_fully_visible(relative_fully_visible_square),
+                "Should be fully visible"
+            );
+            assert_eq!(
+                merged_rfov.times_absolute_square_is_visible(absolute_fully_visible_square),
+                1
+            );
+            assert_eq!(
+                merged_rfov.times_absolute_square_is_fully_visible(absolute_fully_visible_square),
+                1
+            );
         });
     }
 

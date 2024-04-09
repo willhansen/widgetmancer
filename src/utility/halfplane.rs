@@ -71,6 +71,9 @@ where {
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, (0.0, 0.0))
     }
+    pub fn inside_direction(&self) -> FAngle {
+        self.dividing_line.direction().turned_right()
+    }
     pub fn new_from_point_on_border_and_vector_pointing_inside(
         point_on_border: impl Into<LineType::PointType>,
         normal_direction_into_plane: impl Into<LineType::PointType>,
@@ -357,10 +360,7 @@ impl<L: DirectedFloatLine> Debug for HalfPlane<L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
             .field("dividing_line", &self.dividing_line)
-            .field(
-                "inside_direction",
-                &self.dividing_line.direction().turned_right(),
-            )
+            .field("inside_direction", &self.inside_direction())
             .finish()
     }
 }

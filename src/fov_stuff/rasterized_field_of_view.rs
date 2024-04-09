@@ -35,18 +35,12 @@ where
 
 impl Debug for TopDownPortal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "relative_position: {:?}\n\
-            target: {:?}\n\
-            shape_in_entrance_frame: {:?}\n\
-            shape_in_exit_frame: {:?}\n\
-            ",
-            self.relative_position,
-            self.target,
-            self.absolute_entrance_shape(),
-            self.shape_in_exit_frame
-        )
+        f.debug_struct("TopDownPortal")
+            .field("relative_position", &self.relative_position)
+            .field("target", &self.target)
+            .field("shape_in_entrance_frame", &self.absolute_entrance_shape())
+            .field("shape_in_exit_frame", &self.shape_in_exit_frame)
+            .finish()
     }
 }
 
@@ -1039,7 +1033,12 @@ impl TopDownPortal {
                         .map(|v| [*v[0], *v[1]])
                         .filter(|&portals| {
                             // TODO: check entrance vs exit frame overlap check is correct
-                            portals[0].has_entrance_overlap_with(portals[1])
+                            // portals[0].has_entrance_overlap_with(portals[1])
+                            let a = portals[0].has_entrance_overlap_with(portals[1]);
+                            if a {
+                                dbg!(a, portals.map(|p| p.absolute_entrance_shape()));
+                            }
+                            a
                         })
                         .collect();
                 conflicting_pairs_in_this_square

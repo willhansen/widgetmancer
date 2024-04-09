@@ -3,7 +3,7 @@ use crate::utility::*;
 pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
 // TODO: convert to trait
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
     p2: PointType,
@@ -17,6 +17,13 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
         Self::new_from_points(p1, p2)
     }
 }
+
+impl<P: Coordinate> Debug for TwoDifferentPoints<P> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "p1: {:?}\np2: {:?}", self.p1, self.p2)
+    }
+}
+
 pub trait TwoPointsOnASquareTrait<P: FloatCoordinate> {
     fn which_square(&self) -> P::OnGrid;
     fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>;
@@ -163,7 +170,7 @@ impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
     }
 }
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: Coordinate>(TwoDifferentPoints<P>);
 
 impl<P: FloatCoordinate> TwoPointsWithRestriction<P>
@@ -171,6 +178,27 @@ impl<P: FloatCoordinate> TwoPointsWithRestriction<P>
 {
     fn point_by_index(&self, pi: usize) -> P {
         self.0.point_by_index(pi)
+    }
+}
+impl<P: FloatCoordinate> Debug for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TwoPointsOnDifferentFacesOfCenteredUnitSquare")
+            .field("points", &self.0)
+            .field(
+                "point angles",
+                &self.points().map(|p| {
+                    let a = p.better_angle_from_x_axis();
+                    format!(
+                        "radians: {}\
+                     degrees: {}\
+                     turns:   {}",
+                        a.radians,
+                        a.to_degrees(),
+                        a.radians / TAU
+                    )
+                }),
+            )
+            .finish()
     }
 }
 

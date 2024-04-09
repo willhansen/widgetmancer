@@ -60,7 +60,7 @@ impl Animation for SpearAttackAnimation {
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
-        let sweep_degrees = 10.0;
+        // let sweep_degrees = 10.0;
         let angle = self.direction.step().better_angle_from_x_axis();
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {
