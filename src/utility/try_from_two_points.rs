@@ -21,4 +21,9 @@ pub trait TryFromTwoPoints<P: Coordinate>: Sized {
     fn from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Self {
         Self::try_from_two_points_allowing_snap_along_line(p1, p2).unwrap()
     }
+    fn try_from_two_points_object_allowing_snap_along_line(
+        p: impl TwoPointsWithRestriction<P>,
+    ) -> Result<Self, String> {
+        Self::try_from_two_points_allowing_snap_along_line(p.p1(), p.p2())
+    }
 }

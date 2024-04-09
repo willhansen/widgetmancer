@@ -769,7 +769,7 @@ pub fn debug_print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
 }
 
 pub fn debug_print_square_set<T: IntCoordinate>(squares: &HashSet<T>) {
-    dbg!("TODO: print name of type");
+    // TODO: print name of type
     let xmax = squares.iter().map(|c| c.x()).max().unwrap() + 1;
     let xmin = squares.iter().map(|c| c.x()).min().unwrap() - 1;
     let ymax = squares.iter().map(|c| c.y()).max().unwrap() + 1;

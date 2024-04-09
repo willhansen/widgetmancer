@@ -328,7 +328,7 @@ where {
     }
     fn covers_all_of_these_points_with_tolerance(
         &self,
-        points: Vec<LineType::PointType>,
+        points: impl IntoIterator<Item = LineType::PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -371,8 +371,9 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
     type Error = ();
 
     fn try_from(value: HalfPlane<TwoDifferentPoints<P>>) -> Result<Self, Self::Error> {
+        // TODO: want to explicitly discard hint information of existing point data.  Use a constructor that takes an impl DirectedLineOps instead.
         let points: Result<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, _> =
-            value.dividing_line.try_into();
+            TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_from_two_points_object_allowing_snap_along_line(value.dividing_line);
         match points {
             Ok(x) => Ok(Self::halfplane_from_border_with_inside_on_right(x)),
             _ => Err(()),

@@ -821,11 +821,8 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
 
-pub fn corner_points_of_centered_unit_square<P: FloatCoordinate>() -> Vec<P> {
-    <P::OnGrid as euclid::num::Zero>::zero()
-        .square_corners()
-        .into_iter()
-        .collect_vec()
+pub fn corner_points_of_centered_unit_square<P: FloatCoordinate>() -> [P; 4] {
+    <P::OnGrid as euclid::num::Zero>::zero().square_corners()
 }
 
 #[cfg(test)]

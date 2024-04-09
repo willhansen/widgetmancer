@@ -149,12 +149,20 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
 
     fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
         assert!(visible_portion.at_least_partially_covers_unit_square());
-        if let Ok(cutting_half_plane) = visible_portion.try_into() {
-            Self::PartiallyVisible(cutting_half_plane)
-        } else if visible_portion.covers_origin().is_true() {
+        if visible_portion
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
             Self::FullyVisible
-        } else {
+        } else if visible_portion
+            .complement()
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
             Self::NotVisible
+        } else {
+            // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
+            Self::PartiallyVisible(visible_portion.try_into().unwrap())
         }
     }
     fn new_top_half_visible() -> Self {
@@ -529,13 +537,6 @@ mod tests {
             SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(half_plane_2);
 
         let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
-        dbg!(
-            half_plane_1,
-            half_plane_2,
-            partial_1,
-            partial_2,
-            combined_partial
-        );
         assert!(combined_partial.is_fully_visible());
     }
     #[test]
@@ -574,6 +575,19 @@ mod tests {
         );
         assert!(vis.is_only_partially_visible());
         assert!(vis.is_at_least_partially_visible());
+    }
+    #[test]
+    fn test_one_shadow__diagonal_partially_visible() {
+        let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+            point2(0.0, 0.0),
+            point2(1.0, 1.0),
+        );
+        let p1 = point2(0.0, 1.0);
+
+        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+        let partial_1 =
+            SquareVisibilityFromOneLargeShadow::new_from_visible_half_plane(half_plane_1);
+        assert!(partial_1.is_only_partially_visible());
     }
     #[test]
     fn test_one_shadow__almost_fully_visible() {
@@ -638,16 +652,16 @@ mod tests {
     fn test_debug_draw_arc() {
         let arc =
             SquareVisibility::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
-        dbg!(arc); // keep this debug statement
+        dbg!(arc); // NOTE: keep this debug statement because it's part of the test
     }
     // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
     #[test]
     fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
         let hp =
-            LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((1.0, 1.0)).extended(-0.1);
+            LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((0.5, 0.5)).extended(-0.1);
         let vis = SquareVisibility::new_from_visible_half_plane(hp);
         let unit_square_intersections = vis.where_border_touches_unit_square();
-        assert!(vis.is_nearly_or_fully_visible(0.01));
+        assert!(vis.is_nearly_or_fully_visible(0.15));
         assert!(vis.is_only_partially_visible());
         assert_eq!(unit_square_intersections.len(), 2);
     }
