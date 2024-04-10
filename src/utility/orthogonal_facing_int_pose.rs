@@ -41,6 +41,13 @@ where
             dir: direction.into(),
         }
     }
+    pub fn from_x_y_dir(
+        x: SquareType::DataType,
+        y: SquareType::DataType,
+        dir: OrthogonalDirection,
+    ) -> Self {
+        Self::from_square_and_dir((x, y), dir)
+    }
     pub fn direction(&self) -> OrthogonalDirection {
         self.dir
     }

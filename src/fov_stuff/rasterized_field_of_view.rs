@@ -1038,6 +1038,7 @@ impl TopDownPortal {
                             if a {
                                 dbg!(
                                     "overlap detected",
+                                    rel_square,
                                     portals.map(|p| p.absolute_entrance_shape())
                                 );
                                 panic!();

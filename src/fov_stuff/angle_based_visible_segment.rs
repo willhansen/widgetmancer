@@ -311,7 +311,10 @@ mod tests {
     use ntest::{assert_about_eq, assert_false, assert_true};
 
     use crate::{
-        fov_stuff::{fence::Fence, square_visibility::ViewRoundable},
+        fov_stuff::{
+            fence::Fence,
+            square_visibility::{SquareVisibilityFromOneLargeShadow, ViewRoundable},
+        },
         utility::{
             coordinates::FVector,
             general_utility::{as_set, set_of_keys},
@@ -572,5 +575,27 @@ mod tests {
             assert_eq!(result.len(), 1);
             assert_eq!(result[0], AngleBasedVisibleSegment::new_full_circle(radius));
         });
+    }
+    #[test]
+    fn test_observed_rasterization_failure__narrow_fov_edges() {
+        let test_face = FaceOfWorldSquare::from_x_y_dir(-3, -3, DOWN);
+        let test_square = WorldSquare::new(-1, -1);
+        let segment = AngleBasedVisibleSegment::from_relative_face(test_face);
+        let viz_map = AngleBasedVisibleSegment::to_local_square_visibility_map(&segment);
+        let viz = viz_map.get(&test_square).unwrap();
+        let line = viz.visible_portion().unwrap().dividing_line;
+
+        assert!(
+            line.point_is_approx_on_line((0.5, 0.5).into(), 0.001),
+            "{:?}",
+            line
+        );
+        assert!(
+            line.point_is_approx_on_line((-0.5, -0.5).into(), 0.001),
+            "{:?}",
+            line
+        );
+
+        assert_about_eq!(line.angle_with_positive_x_axis().to_degrees(), 45.0, 0.01);
     }
 }

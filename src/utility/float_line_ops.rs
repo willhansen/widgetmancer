@@ -40,6 +40,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
     }
 
     // TODO: Double check how tolerances are applied here.  Looks like it depends on the points from the line
+    // TODO: fix this.
     fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
         let [p1, p2] = other.two_different_arbitrary_points_on_line();
         self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)

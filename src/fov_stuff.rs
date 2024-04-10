@@ -279,7 +279,7 @@ impl FieldOfView {
     ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────    
     ///              b             b         
     ///                                      
-    /// One case that needs (?) to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
+    /// One case that needs(?) to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
     ///                                            
     ///                                            
     ///                                            
@@ -416,15 +416,21 @@ impl FieldOfView {
         top_level_portal_depth: u32,
         forward_portal_rotation_to_this_depth: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> RasterizedFieldOfView {
+        dbg!(&self.visible_segments_in_main_view_only);
+        let local_visibility_map = &self
+            .visible_segments_in_main_view_only
+            .iter()
+            .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
+            .inspect(|map| {
+                dbg!(map.get(&(-1, -1).into()));
+            })
+            .fold(LocalSquareVisibilityMap::new_empty(), |a, b| {
+                a.combined_while_increasing_visibility(&b)
+            });
+        dbg!(local_visibility_map.get(&(-1, -1).into()));
         let top_down_portals = RasterizedFieldOfView::visibility_map_to_top_down_portals(
             self.view_root,
-            &self
-                .visible_segments_in_main_view_only
-                .iter()
-                .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
-                .fold(LocalSquareVisibilityMap::new_empty(), |a, b| {
-                    a.combined_while_increasing_visibility(&b)
-                }),
+            local_visibility_map,
         )
         .into_iter()
         .map(|td_portal| {
@@ -435,6 +441,7 @@ impl FieldOfView {
             // Compensate for rotated view root, because portal exit is in absolute frame
         })
         .collect_vec();
+
         RasterizedFieldOfView::from_top_down_portals(self.view_root, top_down_portals)
     }
 
@@ -1973,6 +1980,7 @@ mod tests {
 
         fov_1.transformed_sub_fovs.push(sub_fov_1.clone());
 
+        dbg!(&fov_1);
         // debug_print_fov_as_relative(&fov_1, 20);
         // debug_print_fov_as_absolute(&fov_1, 20);
         let rfov = fov_1.rasterized();
