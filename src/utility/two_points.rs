@@ -18,11 +18,11 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
     }
 }
 
-impl<P: Coordinate> Debug for TwoDifferentPoints<P> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "p1: {:?}\np2: {:?}", self.p1, self.p2)
-    }
-}
+// impl<P: Coordinate> Debug for TwoDifferentPoints<P> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "p1: {:?}\tp2: {:?}", self.p1, self.p2)
+//     }
+// }
 
 pub trait TwoPointsOnASquareTrait<P: FloatCoordinate> {
     fn which_square(&self) -> P::OnGrid;
@@ -189,9 +189,7 @@ impl<P: FloatCoordinate> Debug for TwoPointsOnDifferentFacesOfCenteredUnitSquare
                 &self.points().map(|p| {
                     let a = p.better_angle_from_x_axis();
                     format!(
-                        "radians: {}\
-                     degrees: {}\
-                     turns:   {}",
+                        "radians: {}\t degrees: {}\t turns:   {}",
                         a.radians,
                         a.to_degrees(),
                         a.radians / TAU
@@ -227,7 +225,7 @@ impl<P: FloatCoordinate> DirectedLineConstructors<P>
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TwoPointsOnDifferentFacesOfGridSquare<P: Coordinate> {
+pub struct TwoPointsOnDifferentFacesOfGridSquare<P: FloatCoordinate> {
     points_on_the_square: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>,
     the_square: P::OnGrid,
 }
@@ -319,11 +317,11 @@ impl_for_two_different_points!(
 impl_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare, FloatCoordinate);
 
 macro_rules! impl_traits_for_two_points_with_restriction {
-    ($TheStruct:ident) => {
+    ($TheStruct:ident, $CoordTrait:ident) => {
         impl<P> Add<P> for $TheStruct<P>
         where
             Self: TwoPointsWithRestriction<P>,
-            P: Coordinate,
+            P: $CoordTrait,
         {
             type Output = Self;
 
@@ -334,7 +332,7 @@ macro_rules! impl_traits_for_two_points_with_restriction {
         impl<P> Sub<P> for $TheStruct<P>
         where
             Self: TwoPointsWithRestriction<P>,
-            P: Coordinate,
+            P: $CoordTrait,
         {
             type Output = Self;
 
@@ -346,9 +344,15 @@ macro_rules! impl_traits_for_two_points_with_restriction {
 }
 
 // TODO: combine into one macro call
-impl_traits_for_two_points_with_restriction!(TwoDifferentPoints);
-impl_traits_for_two_points_with_restriction!(TwoPointsOnDifferentFacesOfCenteredUnitSquare);
-impl_traits_for_two_points_with_restriction!(TwoPointsOnDifferentFacesOfGridSquare);
+impl_traits_for_two_points_with_restriction!(TwoDifferentPoints, Coordinate);
+impl_traits_for_two_points_with_restriction!(
+    TwoPointsOnDifferentFacesOfCenteredUnitSquare,
+    FloatCoordinate
+);
+impl_traits_for_two_points_with_restriction!(
+    TwoPointsOnDifferentFacesOfGridSquare,
+    FloatCoordinate
+);
 
 impl<PointType: FloatCoordinate> LineOps
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<PointType>
@@ -412,7 +416,8 @@ impl TwoDifferentWorldPoints {
     }
 }
 
-impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
+// TODO: allow for unsigned
+impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -427,6 +432,7 @@ impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
         )
     }
 }
+
 
 impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {

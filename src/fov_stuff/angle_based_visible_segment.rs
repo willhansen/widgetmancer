@@ -186,7 +186,7 @@ impl AngleBasedVisibleSegment {
     pub fn get_touching_relative_squares(&self) -> StepSet {
         self.touched_squares_going_outwards_and_ccw().collect()
     }
-    pub fn visibility_of_single_square(&self, rel_square: WorldStep) -> SquareVisibility {
+    pub fn visibility_of_single_square(&self, _rel_square: WorldStep) -> SquareVisibility {
         todo!()
     }
     pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
@@ -257,7 +257,7 @@ impl AngleBasedVisibleSegment {
     fn rel_square_is_before_end_fence(&self, rel_square: WorldStep) -> bool {
         self.end_fence().is_radially_inside_fence(rel_square)
     }
-    fn rel_square_is_past_furthest_part_of_end_fence(&self, rel_square: WorldStep) -> bool {
+    fn rel_square_is_past_furthest_part_of_end_fence(&self, _rel_square: WorldStep) -> bool {
         todo!()
     }
     // if there are several equally distant, selects one somehow
@@ -387,7 +387,8 @@ mod tests {
     fn test_create_with_invalid_start_face__angle() {
         let end_fence =
             Fence::from_faces_in_ccw_order([((2, -1), STEP_RIGHT), ((2, 0), STEP_RIGHT)]);
-        let segment = AngleBasedVisibleSegment::new_with_start_face(
+
+        AngleBasedVisibleSegment::new_with_start_face(
             end_fence.spanned_angle_from_origin(),
             end_fence,
             ((1, 0), STEP_DOWN),
@@ -417,10 +418,8 @@ mod tests {
         let a_face: RelativeFace = (rel_square, STEP_RIGHT).into();
         let b_face = a_face.strafed_left();
         let start_face = (STEP_RIGHT * 2, STEP_LEFT);
-        let mut a =
-            AngleBasedVisibleSegment::from_relative_face(a_face).with_start_face(start_face);
-        let mut b =
-            AngleBasedVisibleSegment::from_relative_face(b_face).with_start_face(start_face);
+        let a = AngleBasedVisibleSegment::from_relative_face(a_face).with_start_face(start_face);
+        let b = AngleBasedVisibleSegment::from_relative_face(b_face).with_start_face(start_face);
 
         let c: AngleBasedVisibleSegment = a.combined_with(&b).unwrap();
 

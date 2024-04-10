@@ -477,8 +477,8 @@ mod tests {
         let mut edges = vec![];
         let start_square: WorldStep = c + Into::<WorldStep>::into((r, r));
         let mut edge: RelativeFace = (start_square, STEP_UP).into();
-        (0..4).for_each(|i| {
-            (0..d).for_each(|j| {
+        (0..4).for_each(|_i| {
+            (0..d).for_each(|_j| {
                 edges.push(edge);
                 edge = edge.strafed_left();
             });

@@ -3,6 +3,7 @@
 #![allow(unused_imports)] // TODO: later
 #![allow(deprecated)] // TODO: later
 #![allow(dead_code)] // TODO: later
+#![allow(unused_variables)] // TODO: later
 
 extern crate approx;
 extern crate core;

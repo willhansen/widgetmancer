@@ -1772,7 +1772,7 @@ mod tests {
 
         rel_squares_that_should_be_fully_visible
             .iter()
-            .map(|&rel_square| {
+            .for_each(|&rel_square| {
                 let rel_square: WorldStep = rel_square.into();
                 let abs_square = fov_center + rel_square;
                 assert_eq!(
@@ -1928,15 +1928,48 @@ mod tests {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
 
+        // |
+        //5+----------o----------+----------o----------+
+        // |          |          |          |          |
+        // |          |          |          |          |
+        // |          |          |          |          |
+        // |          |          |          |          |
+        //0+-+-+-+-+-|-----------|----------|----------|
+        // 0         5           10         15
+
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
 
         let rel_square = STEP_DOWN_LEFT * 3;
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . x . . |         | . x . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
         let faces_of_rel_square = faces_away_from_center_at_rel_square(rel_square)
             .into_iter()
             .collect_vec();
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . L . . |         | . L . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
         fov_1.add_fully_visible_relative_face(faces_of_rel_square[0]);
         sub_fov_1.add_fully_visible_relative_face(faces_of_rel_square[1]);
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . | . . |         | . _ . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
 
         fov_1.transformed_sub_fovs.push(sub_fov_1.clone());
 

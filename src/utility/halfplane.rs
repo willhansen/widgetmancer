@@ -412,8 +412,8 @@ impl<LineType: DirectedFloatLine> QuarterTurnRotatable for HalfPlane<LineType> {
     // }
 }
 
-pub type HalfPlaneCuttingSquare<SquareType: IntCoordinate> =
-    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<SquareType::Floating>>;
+pub type HalfPlaneCuttingSquare<SquareType> =
+    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<<SquareType as Coordinate>::Floating>>;
 
 // TODO: remove this trait.  functions should be in concrete implementation?
 pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {

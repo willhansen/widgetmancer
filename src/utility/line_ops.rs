@@ -338,7 +338,7 @@ mod tests {
             let further_line = f(0.5 + per_side_extension / 2.0);
             let lines = [exact_line, closer_line, further_line];
             lines.into_iter().for_each(|line| {
-                let string = format!("line: {}", line);
+                let string = format!("line: {:?}", line);
                 assert!(
                     line.intersects_with_expanded_centered_unit_square(per_side_extension),
                     "{}, tolerance: {}",
@@ -796,12 +796,12 @@ mod tests {
         let face_line = square_face_as_line(s, dir);
         assert!(
             face_line.points().contains(&point2(2.5, 7.5)),
-            "{}",
+            "{:?}",
             face_line
         );
         assert!(
             face_line.points().contains(&point2(3.5, 7.5)),
-            "{}",
+            "{:?}",
             face_line
         );
     }

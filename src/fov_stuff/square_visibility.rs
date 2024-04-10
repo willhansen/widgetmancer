@@ -42,13 +42,14 @@ pub trait RelativeSquareVisibilityFunctions: QuarterTurnRotatable + ViewRoundabl
     fn overlaps(&self, other: Self, tolerance: f32) -> bool;
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
     fn as_string(&self) -> String;
+    fn high_res_string(&self, output_diameter: u32) -> String;
     // TODO: add tolerance to these two?
     fn about_equal(&self, other: Self) -> bool;
     fn about_complementary(&self, other: Self) -> bool;
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum SquareVisibilityFromOneLargeShadow {
     FullyVisible,
     // TODO: have more than one half plane (two?)
@@ -338,6 +339,40 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             .to_clean_string()
         }
     }
+    fn high_res_string(&self, output_diameter: u32) -> String {
+        // TODO: Strong typing
+        let dots_per_drawn_square_length = 4;
+        let drawn_squares_per_world_square = output_diameter;
+        let side_length_in_dots = 1 * drawn_squares_per_world_square * dots_per_drawn_square_length;
+        let world_length_of_drawn_square = 1.0/drawn_squares_per_world_square as f32;
+        let world_length_of_half_a_drawn_square = world_length_of_drawn_square/2.0;
+        let dot_to_dot_world_distance = world_length_of_drawn_square /4.0;
+
+        let world_position_of_top_left_drawn_square =  point2(-1.0, 1.0) * (drawn_squares_per_world_square as f32 / 2.0 -world_length_of_half_a_drawn_square);
+        // start top left
+        (0..drawn_squares_per_world_square).flat_map(|square_row| {
+            (0..drawn_squares_per_world_square).flat_map(|square_col| {
+                let drawn_square_center_in_world_coordinates = world_position_of_top_left_drawn_square + point2(square_col as f32, -(square_row as f32)) / drawn_squares_per_world_square as f32;
+
+                let top_left_dot_rel_to_drawn_square_center = point2(-1, 1).to_f32() * 1.5 * dot_to_dot_world_distance;
+
+                let bool_array_for_drawn_square = BoolArray2D::from_array([0,1,2,3].map(|dot_y| {
+                    [0,1,2,3].map(|dot_x| {
+                        let dot_position_rel_to_drawn_square_center_in_world_coordinates = top_left_dot_rel_to_drawn_square_center + (point2(1.0, 0.0)*dot_x as f32   + point2(0.0, -1.0)*dot_y as f32)*dot_to_dot_world_distance;
+                        let dot_position_in_world_coord = drawn_square_center_in_world_coordinates +dot_position_rel_to_drawn_square_center_in_world_coordinates; 
+                        let is_inside_half_plane = self.point_is_visible(dot_position_in_world_coord);
+                        is_inside_half_plane
+                    })
+
+                }));
+                 bool_array_for_drawn_square.chars().into_iter()
+                
+                
+
+            }).chain("\n".chars()).collect_vec()
+            
+        }).collect()
+    }
 
     fn about_equal(&self, other: Self) -> bool {
         match self {
@@ -381,24 +416,27 @@ impl QuarterTurnRotatable for SquareVisibilityFromOneLargeShadow {
     }
 }
 
-// impl Debug for SquareVisibilityFromOneLargeShadow {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             SquareVisibilityFromOneLargeShadow::FullyVisible => write!(f, "Fully Visible"),
+impl Debug for SquareVisibilityFromOneLargeShadow {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use SquareVisibilityFromOneLargeShadow::*;
+        match self {
+            FullyVisible => write!(f, "Fully Visible"),
 
-//             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
-//                 write!(f, "Partially visible: {:#?}", v)
-//             }
-//             SquareVisibilityFromOneLargeShadow::NotVisible => write!(f, "Not Visible"),
-//         }?;
-//         write!(
-//             f,
-//             "\n\
-//              \tchars: '{}'",
-//             self.as_string()
-//         )
-//     }
-// }
+            PartiallyVisible(v) => {
+                write!(f, "Partially visible: {:#?}", v)
+            }
+            NotVisible => write!(f, "Not Visible"),
+        }?;
+        write!(
+            f,
+            "\n\
+             \tchars: '{}'\n\
+             {}",
+            self.as_string(),
+            self.high_res_string(7)
+        )
+    }
+}
 
 pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
     fn is_fully_visible(&self) -> bool;

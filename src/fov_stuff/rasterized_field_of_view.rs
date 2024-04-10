@@ -1036,7 +1036,11 @@ impl TopDownPortal {
                             // portals[0].has_entrance_overlap_with(portals[1])
                             let a = portals[0].has_entrance_overlap_with(portals[1]);
                             if a {
-                                dbg!(a, portals.map(|p| p.absolute_entrance_shape()));
+                                dbg!(
+                                    "overlap detected",
+                                    portals.map(|p| p.absolute_entrance_shape())
+                                );
+                                panic!();
                             }
                             a
                         })
