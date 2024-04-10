@@ -348,7 +348,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
         let world_length_of_half_a_drawn_square = world_length_of_drawn_square/2.0;
         let dot_to_dot_world_distance = world_length_of_drawn_square /4.0;
 
-        let world_position_of_top_left_drawn_square =  point2(-1.0, 1.0) * (drawn_squares_per_world_square as f32 / 2.0 -world_length_of_half_a_drawn_square);
+        let world_position_of_top_left_drawn_square =  point2(-1.0, 1.0) * (0.5 -world_length_of_half_a_drawn_square);
         // start top left
         (0..drawn_squares_per_world_square).flat_map(|square_row| {
             (0..drawn_squares_per_world_square).flat_map(|square_col| {
@@ -395,7 +395,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
     }
 
     fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
-        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial());
+        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial(), "{:?}", point.into());
         match self {
             SquareVisibilityFromOneLargeShadow::FullyVisible => true,
             SquareVisibilityFromOneLargeShadow::PartiallyVisible(v) => {
@@ -430,7 +430,7 @@ impl Debug for SquareVisibilityFromOneLargeShadow {
         write!(
             f,
             "\n\
-             \tchars: '{}'\n\
+             chars: '{}'\n\
              {}",
             self.as_string(),
             self.high_res_string(7)
