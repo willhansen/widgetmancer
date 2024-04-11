@@ -87,18 +87,18 @@ impl PartialAngleInterval {
     pub fn ccw(&self) -> FAngle {
         self.anticlockwise_end
     }
-    pub fn edge(&self, which_edge: AngularDirection) -> ArcEdge {
+    pub fn edge(&self, which_edge: AngularDirection) -> AngularEdge {
         use AngularDirection::*;
         match which_edge {
-            CW => ArcEdge::new(self.cw(), CW),
-            CCW => ArcEdge::new(self.ccw(), CCW),
+            CW => AngularEdge::new(self.cw(), CW),
+            CCW => AngularEdge::new(self.ccw(), CCW),
         }
     }
-    pub fn cw_edge(&self) -> ArcEdge {
+    pub fn cw_edge(&self) -> AngularEdge {
         use AngularDirection::*;
         self.edge(CW)
     }
-    pub fn ccw_edge(&self) -> ArcEdge {
+    pub fn ccw_edge(&self) -> AngularEdge {
         use AngularDirection::*;
         self.edge(CCW)
     }
@@ -271,7 +271,7 @@ impl PartialAngleInterval {
         let contained_in_other = other.num_contained_or_touching_edges(*self);
         contained_in_self >= 1 && contained_in_other >= 1
     }
-    pub fn edge_of_this_overlapped_by(&self, other: PartialAngleInterval) -> ArcEdge {
+    pub fn edge_of_this_overlapped_by(&self, other: PartialAngleInterval) -> AngularEdge {
         if !self.partially_overlaps_other_while_including_edges(other) {
             panic!("no overlap between {} and {}", self, other);
         }
@@ -283,7 +283,7 @@ impl PartialAngleInterval {
             self.ccw_edge()
         }
     }
-    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> ArcEdge {
+    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> AngularEdge {
         assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
         let clockwise_dist =
             PartialAngleInterval::from_angles(other.clockwise_end, self.clockwise_end).width();
@@ -396,7 +396,7 @@ impl PartialAngleInterval {
             .overlaps_partial_arc(other, tolerance)
             .not()
     }
-    pub fn most_overlapped_edge_of_self(&self, other: PartialAngleInterval) -> ArcEdge {
+    pub fn most_overlapped_edge_of_self(&self, other: PartialAngleInterval) -> AngularEdge {
         assert!(self.touches_or_overlaps(other));
 
         // Select edge of self closest to the other's center
@@ -496,7 +496,7 @@ impl PartialAngleInterval {
                 .is_at_least_partial()
         })
     }
-    pub fn edges(&self) -> [ArcEdge; 2] {
+    pub fn edges(&self) -> [AngularEdge; 2] {
         [self.cw_edge(), self.ccw_edge()]
     }
 }
@@ -559,7 +559,7 @@ mod tests {
         assert_eq!(
             PartialAngleInterval::from_degrees(135.0, 90.0)
                 .most_overlapped_edge_of_self(PartialAngleInterval::from_degrees(45.0, 135.0)),
-            ArcEdge::new(Angle::degrees(90.0), AngularDirection::CCW)
+            AngularEdge::new(Angle::degrees(90.0), AngularDirection::CCW)
         );
     }
     #[test]

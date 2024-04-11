@@ -186,7 +186,10 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
             AngleInterval::FullCircle => return Self::FullyVisible,
             AngleInterval::PartialArc(partial) => partial,
         };
-        let view_arc_edges: [ArcEdge; 2] = partial_view_arc.edges();
+        let view_arc_edges: [AngularEdge; 2] = partial_view_arc.edges();
+        if rel_square == point2(-1,-1) {
+            dbg!(&view_arc_edges);
+        }
         let intersections: Vec<HalfPlaneCuttingWorldSquare> = view_arc_edges
             .iter()
             .filter_map(|edge| edge.intersection_with_relative_square(rel_square))
@@ -225,6 +228,7 @@ impl RelativeSquareVisibilityFunctions for SquareVisibilityFromOneLargeShadow {
                     substantial_intersections.iter().min_by_key(key_fn)
                 }
                 .unwrap();
+                dbg!(&selected);
 
                 Self::PartiallyVisible(halfplane_cutting_world_square_to_halfplane_local_square(
                     *selected,
