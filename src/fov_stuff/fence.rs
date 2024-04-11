@@ -3,27 +3,9 @@ use std::fmt::{Debug, Display, Formatter};
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use portrait;
 
-use crate::rotated_to_have_split_at_max;
+use crate::utility::*;
 
-use crate::utility::coordinate_frame_conversions::STEP_UP;
-use crate::utility::coordinates::{about_eq_2d, FAngle, QuarterTurnRotatable, QuarterTurnsCcw};
-use crate::utility::general_utility::{all_true, union};
-use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::poses::{check_faces_in_ccw_order, RelativeFace, SquareWithOrthogonalDir};
-use crate::utility::{
-    angle_interval::AngleInterval,
-    better_angle_from_x_axis,
-    coordinate_frame_conversions::{WorldMove, WorldPoint, WorldStep},
-    RelativeSquareWithOrthogonalDir, RigidlyTransformable,
-};
-use crate::utility::{
-    check_vectors_in_ccw_order, get_by_index, quadrants_of_rel_square, squares_sharing_face,
-    two_in_ccw_order, CoordToString, Quadrant, SimpleResult, STEP_ZERO,
-};
-
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
     edges: Vec<RelativeSquareWithOrthogonalDir>,
@@ -32,7 +14,8 @@ pub struct RelativeFenceFullyVisibleFromOriginGoingCcw {
 pub type Fence = RelativeFenceFullyVisibleFromOriginGoingCcw;
 
 impl QuarterTurnRotatable for RelativeFenceFullyVisibleFromOriginGoingCcw {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_faces_in_ccw_order(
             self.edges
                 .iter()
@@ -74,8 +57,9 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         }
 
         // TODO: standardize tolerance
-        let endpoints_are_connected =
-            about_eq_2d(new_fence.start_point(), new_fence.end_point(), 0.001);
+        let endpoints_are_connected = new_fence
+            .start_point()
+            .about_eq(new_fence.end_point(), 0.001);
         if !endpoints_are_connected {
             return Ok(new_fence);
         }
@@ -103,7 +87,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         first_edge: impl Into<RelativeFace>,
         length: u32,
     ) -> Self {
-        let first_edge = first_edge.into().flipped_to_face_origin();
+        let first_edge = first_edge.into().face_flipped_to_face_origin();
         Fence::from_faces_in_ccw_order((0..length).map(|i| first_edge.strafed_left_n(i as i32)))
     }
     pub fn from_one_edge(edge: impl Into<RelativeFace>) -> Self {
@@ -178,7 +162,7 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         self.try_add_edge(edge).expect("Failed to add edge: ");
     }
     fn try_add_edge(&mut self, edge: impl Into<RelativeFace>) -> Result<(), String> {
-        let edge = edge.into().flipped_to_face_origin();
+        let edge = edge.into().face_flipped_to_face_origin();
 
         if self.edges.is_empty() {
             self.edges.push(edge);
@@ -216,14 +200,15 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.ccw_end_point());
         let edge_is_ccw_of_self =
-            two_in_ccw_order(self.ccw_end_point(), edge.center_point_of_face());
+            two_points_are_ccw_with_origin(self.ccw_end_point(), edge.center_point_of_face());
 
         !overlapping && ends_touch && edge_is_ccw_of_self
     }
     fn can_connect_to_cw_end(&self, edge: RelativeFace) -> bool {
         let overlapping = self.overlaps_edge(edge);
         let ends_touch = edge.face_end_point_approx_touches_point(self.cw_end_point());
-        let edge_is_cw_of_self = two_in_ccw_order(edge.center_point_of_face(), self.cw_end_point());
+        let edge_is_cw_of_self =
+            two_points_are_ccw_with_origin(edge.center_point_of_face(), self.cw_end_point());
 
         !overlapping && ends_touch && edge_is_cw_of_self
     }
@@ -285,7 +270,11 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             .into_iter()
             .map(Into::<RelativeSquareWithOrthogonalDir>::into)
             .sorted_by_key(|edge| {
-                OrderedFloat(better_angle_from_x_axis(edge.center_point_of_face()).radians)
+                OrderedFloat(
+                    edge.center_point_of_face()
+                        .better_angle_from_x_axis()
+                        .radians,
+                )
             })
             .collect_vec();
 
@@ -316,8 +305,8 @@ impl RelativeFenceFullyVisibleFromOriginGoingCcw {
             AngleInterval::FullCircle
         } else {
             AngleInterval::PartialArc(PartialAngleInterval::from_angles(
-                better_angle_from_x_axis(self.cw_end_point()),
-                better_angle_from_x_axis(self.ccw_end_point()),
+                self.cw_end_point().better_angle_from_x_axis(),
+                self.ccw_end_point().better_angle_from_x_axis(),
             ))
         }
     }
@@ -488,8 +477,8 @@ mod tests {
         let mut edges = vec![];
         let start_square: WorldStep = c + Into::<WorldStep>::into((r, r));
         let mut edge: RelativeFace = (start_square, STEP_UP).into();
-        (0..4).for_each(|i| {
-            (0..d).for_each(|j| {
+        (0..4).for_each(|_i| {
+            (0..d).for_each(|_j| {
                 edges.push(edge);
                 edge = edge.strafed_left();
             });
@@ -534,7 +523,7 @@ mod tests {
         let edges = ORTHOGONAL_STEPS.map(|step| ((5, 5), step));
         for edge in edges {
             let fence = Fence::from_one_edge(edge);
-            assert!(two_in_ccw_order(
+            assert!(two_points_are_ccw_with_origin(
                 fence.cw_end_point(),
                 fence.ccw_end_point()
             ));
@@ -915,19 +904,28 @@ mod tests {
             ((0, 0), STEP_RIGHT),
             ((0, 0), STEP_UP),
         ]);
-        let correct_break_point: WorldMove =
-            RelativeFace::from((0, 0, STEP_RIGHT)).cw_end_of_face();
-        check_about_eq_2d(fence.cw_end_point(), correct_break_point).unwrap();
-        check_about_eq_2d(fence.ccw_end_point(), correct_break_point).unwrap();
+        let correct_break_point: WorldMove = RelativeFace::from((0, 0, RIGHT)).cw_end_of_face();
+        fence
+            .cw_end_point()
+            .check_about_eq(correct_break_point)
+            .unwrap();
+        fence
+            .ccw_end_point()
+            .check_about_eq(correct_break_point)
+            .unwrap();
     }
     #[test]
     fn test_sub_fence_in_arc__simple_case() {
-        let fence = Fence::straight_fence_from_cw_end_and_length((5, -2, STEP_RIGHT), 20);
+        let fence = Fence::straight_fence_from_cw_end_and_length((5, -2, RIGHT), 20);
 
         let start_segment = fence.edges[4];
         let end_segment = fence.edges[15];
-        let start_angle = better_angle_from_x_axis(start_segment.middle_point_of_face());
-        let end_angle = better_angle_from_x_axis(end_segment.middle_point_of_face());
+        let start_angle = start_segment
+            .middle_point_of_face()
+            .better_angle_from_x_axis();
+        let end_angle = end_segment
+            .middle_point_of_face()
+            .better_angle_from_x_axis();
 
         let arc = AngleInterval::from_angles(start_angle, end_angle);
 

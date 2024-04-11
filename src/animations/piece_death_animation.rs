@@ -1,10 +1,8 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::EXPLOSION_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
-};
-use euclid::vec2;
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare};
+use crate::vec2;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use std::f32::consts::PI;
@@ -43,7 +41,7 @@ impl Animation for PieceDeathAnimation {
             .to_u64()
             .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        let mut points_to_draw: Vec<WorldPoint> = vec![];
+        // let points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 20;
         let age = time.duration_since(self.start_time);
         let remaining_seconds = self.duration().as_secs_f32() - age.as_secs_f32();

@@ -13,3 +13,5 @@ Cargo.lock
 .project
 
 perf.data*
+
+test_output.log

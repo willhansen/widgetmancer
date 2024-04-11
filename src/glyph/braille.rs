@@ -1,8 +1,7 @@
 use crate::glyph::glyph_constants::SPACE;
 use crate::glyph::DoubleChar;
-use crate::utility::coordinate_frame_conversions::*;
+use crate::utility::units::*;
 use crate::utility::*;
-use euclid::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
 use std::ops::BitXor;
 use std::string::ToString;
@@ -123,7 +122,7 @@ pub fn count_braille_dots(character: char) -> u32 {
     for i in 0..num_good_bits {
         sum += (bits >> i) & 1;
     }
-    return sum as u32;
+    sum as u32
 }
 
 pub fn combine_braille_characters(c1: char, c2: char) -> char {
@@ -251,7 +250,7 @@ pub fn get_chars_for_braille_line(
             braille_square_to_dot_in_character(braille_pos),
         );
     }
-    return char_map;
+    char_map
 }
 pub fn get_braille_arrays_for_braille_line(
     start_pos: WorldPoint,
@@ -610,7 +609,7 @@ mod tests {
             for p in t.1 {
                 assert_eq!(
                     array
-                        .quarter_rotated_ccw(QuarterTurnsCcw::new(t.0))
+                        .quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(t.0))
                         .get_xy(p.0, p.1),
                     true
                 );

@@ -8,10 +8,8 @@ use crate::animations::Animation;
 use crate::glyph::glyph_constants::BLINK_EFFECT_COLOR;
 use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldPoint, WorldSquare,
-};
-use crate::utility::line::Line;
+use crate::line_segment::FloatLineSegmentOps;
+use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -41,9 +39,9 @@ impl Animation for BlinkAnimation {
 
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
         // pretty arbitrary
-        let hash = ((self.start_square.x as f32 * PI + self.start_square.y as f32) * 1000.0
-            + self.end_square.x as f32 * 4.23746287
-            + self.end_square.y as f32 * 87.4736)
+        let hash = ((self.start_square.x() as f32 * PI + self.start_square.y() as f32) * 1000.0
+            + self.end_square.x() as f32 * 4.23746287
+            + self.end_square.y() as f32 * 87.4736)
             .abs()
             .floor()
             .to_u64()
@@ -51,7 +49,7 @@ impl Animation for BlinkAnimation {
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
 
         // the tunable constants
-        let ostensible_blink_duration = 0.2;
+        // let ostensible_blink_duration = 0.2;
         let settling_time = 0.8;
 
         let time_constant = settling_time / 5.0;
@@ -59,26 +57,26 @@ impl Animation for BlinkAnimation {
         let points_per_square_blinked = 1.0;
         let point_spread_radius = 0.5;
 
-        let motion_vector = self.end_square.to_f32() - self.start_square.to_f32();
-        let motion_direction = motion_vector.normalize();
-        let motion_distance = motion_vector.length();
+        // let motion_vector: WorldMove = self.end_square.to_f32() - self.start_square.to_f32();
+        // let motion_direction = motion_vector.normalize();
+        // let motion_distance = motion_vector.length();
 
-        let start_speed = motion_distance / ostensible_blink_duration;
+        // let start_speed = motion_distance / ostensible_blink_duration;
 
-        let start_vel = motion_direction * start_speed;
+        // let start_vel = motion_direction * start_speed;
 
         let end_point = self.end_square.to_f32();
         let start_point = self.start_square.to_f32();
         let end_point_mirrored_over_start_point = start_point - (end_point - start_point);
         let float_line_centered_on_start =
-            Line::new_from_two_points(end_point_mirrored_over_start_point, end_point);
+            TwoDifferentPoints::new(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
-        let total_seconds = self.duration().as_secs_f32();
-        let remaining_seconds = total_seconds - age.as_secs_f32();
+        // let total_seconds = self.duration().as_secs_f32();
+        // let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
-        let lifetime_fraction_remaining = remaining_seconds / total_seconds;
-        let lifetime_fraction_spent = spent_seconds / total_seconds;
+        // let lifetime_fraction_remaining = remaining_seconds / total_seconds;
+        // let lifetime_fraction_spent = spent_seconds / total_seconds;
 
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
@@ -89,7 +87,7 @@ impl Animation for BlinkAnimation {
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
-            .map(|i| {
+            .map(|_i| {
                 float_line_centered_on_start
                     .seeded_random_point_near_line(&mut rng, point_spread_radius)
             })
@@ -99,7 +97,7 @@ impl Animation for BlinkAnimation {
         let moved_points: Vec<WorldPoint> =
             base_points.into_iter().map(|p| p + displacement).collect();
 
-        let blink_line = Line::new_from_two_points(start_point, end_point);
+        let blink_line = TwoDifferentPoints::new(start_point, end_point);
         let visible_points: Vec<WorldPoint> = moved_points
             .into_iter()
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))

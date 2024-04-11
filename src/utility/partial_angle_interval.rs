@@ -4,7 +4,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Neg, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -13,46 +13,8 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, standardize_angle, Octant, OrthogonalWorldStep,
-    QuarterTurnsCcw, RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir, ORTHOGONAL_STEPS,
-    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO,
-};
+use crate::utility::*;
 
-use super::bool_with_partial::BoolWithPartial;
-use super::coordinates::QuarterTurnRotatable;
-use super::poses::RelativeFace;
-use super::{FAngle, RigidTransform, RigidlyTransformable};
-
-#[derive(Default, Debug, Clone, PartialEq, CopyGetters)]
-#[get_copy = "pub"]
-pub struct DirectionalAngularEdge {
-    angle: Angle<f32>,
-    is_clockwise_edge: bool,
-}
-
-impl DirectionalAngularEdge {
-    pub fn new(angle: Angle<f32>, is_clockwise_edge: bool) -> Self {
-        DirectionalAngularEdge {
-            angle: standardize_angle(angle),
-            is_clockwise_edge,
-        }
-    }
-    pub fn flipped(&self) -> Self {
-        DirectionalAngularEdge {
-            angle: self.angle,
-            is_clockwise_edge: !self.is_clockwise_edge,
-        }
-    }
-    pub fn direction_to_inside(&self) -> Angle<f32> {
-        let rotation_sign = if self.is_clockwise_edge { 1.0 } else { -1.0 };
-        standardize_angle(self.angle + Angle::degrees(rotation_sign * 90.0))
-    }
-}
-
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(Copy, Clone, PartialEq, CopyGetters)]
 #[get_copy = "pub"]
 pub struct PartialAngleInterval {
@@ -72,7 +34,8 @@ impl Display for PartialAngleInterval {
 }
 // TODO: have a macro make this code
 impl QuarterTurnRotatable for PartialAngleInterval {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         Self::from_angles(
             self.clockwise_end.quarter_rotated_ccw(quarter_turns_ccw),
             self.anticlockwise_end
@@ -87,7 +50,6 @@ impl RigidlyTransformable for PartialAngleInterval {
     }
 }
 
-// TODO: remove this if portrait works
 // impl QuarterTurnRotatable for PartialAngleInterval {
 //     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw>) -> Self {
 //         let quarter_turns = quarter_turns.into();
@@ -108,7 +70,10 @@ impl PartialAngleInterval {
     }
 
     pub fn from_angles(cw: Angle<f32>, ccw: Angle<f32>) -> Self {
-        let (cw, ccw) = (standardize_angle(cw), standardize_angle(ccw));
+        let (cw, ccw) = (
+            standardize_angle_with_zero_mid(cw),
+            standardize_angle_with_zero_mid(ccw),
+        );
         assert_ne!(cw, ccw);
         Self {
             clockwise_end: cw,
@@ -121,6 +86,21 @@ impl PartialAngleInterval {
     }
     pub fn ccw(&self) -> FAngle {
         self.anticlockwise_end
+    }
+    pub fn edge(&self, which_edge: AngularDirection) -> AngularEdge {
+        use AngularDirection::*;
+        match which_edge {
+            CW => AngularEdge::new(self.cw(), CW),
+            CCW => AngularEdge::new(self.ccw(), CCW),
+        }
+    }
+    pub fn cw_edge(&self) -> AngularEdge {
+        use AngularDirection::*;
+        self.edge(CW)
+    }
+    pub fn ccw_edge(&self) -> AngularEdge {
+        use AngularDirection::*;
+        self.edge(CCW)
     }
     pub fn from_degrees(cw: f32, ccw: f32) -> Self {
         Self::from_angles(Angle::degrees(cw), Angle::degrees(ccw))
@@ -162,10 +142,10 @@ impl PartialAngleInterval {
             rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
         ];
 
-        let center_angle = better_angle_from_x_axis(rel_square_center);
+        let center_angle = rel_square_center.better_angle_from_x_axis();
         let corner_angles: Vec<Angle<f32>> = rel_square_corners
             .iter()
-            .map(|rel_corner_point| better_angle_from_x_axis(*rel_corner_point))
+            .map(|rel_corner_point| rel_corner_point.better_angle_from_x_axis())
             .collect();
 
         let most_clockwise = corner_angles
@@ -183,16 +163,16 @@ impl PartialAngleInterval {
         }
     }
     pub fn from_relative_square_face(rel_face: impl Into<RelativeFace>) -> Self {
-        let (relative_square, face_direction): (WorldStep, OrthogonalWorldStep) =
+        let (relative_square, face_direction): (WorldStep, OrthogonalDirection) =
             rel_face.into().into();
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.step().to_f32() / 2.0;
+        let face_center = square_center + face_direction.to_step::<WorldMove>() / 2.0;
         let face_corners = [1, -1].map(|sign| {
-            face_center + (face_direction.step().to_f32() / 2.0).quarter_rotated_ccw(sign)
+            face_center + (face_direction.to_step::<WorldMove>() / 2.0).quarter_rotated_ccw(sign)
         });
 
-        let center_angle = better_angle_from_x_axis(face_center);
-        let face_corner_angles = face_corners.map(better_angle_from_x_axis);
+        let center_angle = face_center.better_angle_from_x_axis();
+        let face_corner_angles = face_corners.map(|x| x.better_angle_from_x_axis());
 
         let first_corner_angle_is_more_clockwise =
             center_angle.angle_to(face_corner_angles[0]).radians < 0.0;
@@ -221,12 +201,12 @@ impl PartialAngleInterval {
         self.num_contained_or_touching_edges(other) == 2 && self.width() >= other.width()
     }
     pub fn overlaps_partial_arc(&self, other: Self, tolerance: Angle<f32>) -> BoolWithPartial {
-        self.contains_angle(other.cw(), tolerance)
-            .or(self.contains_angle(other.center_angle(), tolerance))
-            .or(self.contains_angle(other.ccw(), tolerance))
-            .or(other.contains_angle(self.cw(), tolerance))
-            .or(other.contains_angle(self.center_angle(), tolerance))
-            .or(other.contains_angle(self.ccw(), tolerance))
+        self.contains_angle_with_tolerance(other.cw(), tolerance)
+            .or(self.contains_angle_with_tolerance(other.center_angle(), tolerance))
+            .or(self.contains_angle_with_tolerance(other.ccw(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.cw(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.center_angle(), tolerance))
+            .or(other.contains_angle_with_tolerance(self.ccw(), tolerance))
     }
 
     #[deprecated(note = "use version with tolerance instead")]
@@ -236,11 +216,11 @@ impl PartialAngleInterval {
             return true;
         }
 
-        self.contains_angle_not_including_edges(other.anticlockwise_end)
-            || (self.contains_angle_not_including_edges(other.clockwise_end)
+        self.contains_angle_exclusive(other.anticlockwise_end)
+            || (self.contains_angle_exclusive(other.clockwise_end)
                 && self.anticlockwise_end != other.clockwise_end)
-            || other.contains_angle_not_including_edges(self.anticlockwise_end)
-            || (other.contains_angle_not_including_edges(self.clockwise_end)
+            || other.contains_angle_exclusive(self.anticlockwise_end)
+            || (other.contains_angle_exclusive(self.clockwise_end)
                 && other.anticlockwise_end != self.clockwise_end)
     }
 
@@ -253,10 +233,10 @@ impl PartialAngleInterval {
     // TODO: Add tolerance
     fn num_contained_or_touching_edges(&self, other: PartialAngleInterval) -> u32 {
         let mut sum = 0;
-        if self.contains_or_touches_angle(other.anticlockwise_end) {
+        if self.contains_angle_inclusive(other.anticlockwise_end) {
             sum += 1;
         }
-        if self.contains_or_touches_angle(other.clockwise_end) {
+        if self.contains_angle_inclusive(other.clockwise_end) {
             sum += 1;
         }
         sum
@@ -264,10 +244,10 @@ impl PartialAngleInterval {
     #[deprecated(note = "use version with tolerance instead")]
     fn num_contained_not_touching_edges(&self, other: PartialAngleInterval) -> u32 {
         let mut sum = 0;
-        if self.contains_angle_not_including_edges(other.anticlockwise_end) {
+        if self.contains_angle_exclusive(other.anticlockwise_end) {
             sum += 1;
         }
-        if self.contains_angle_not_including_edges(other.clockwise_end) {
+        if self.contains_angle_exclusive(other.clockwise_end) {
             sum += 1;
         }
         sum
@@ -277,10 +257,10 @@ impl PartialAngleInterval {
         other: PartialAngleInterval,
         tolerance: FAngle,
     ) -> BoolWithPartial {
-        self.contains_angle(other.cw(), tolerance)
-            .and(self.contains_angle(other.ccw(), tolerance))
-            .and(other.contains_angle(self.cw(), tolerance))
-            .and(other.contains_angle(self.ccw(), tolerance))
+        self.contains_angle_with_tolerance(other.cw(), tolerance)
+            .and(self.contains_angle_with_tolerance(other.ccw(), tolerance))
+            .and(other.contains_angle_with_tolerance(self.cw(), tolerance))
+            .and(other.contains_angle_with_tolerance(self.ccw(), tolerance))
     }
     #[deprecated(note = "use version with tolerance instead")]
     pub fn partially_overlaps_other_while_including_edges(
@@ -291,24 +271,19 @@ impl PartialAngleInterval {
         let contained_in_other = other.num_contained_or_touching_edges(*self);
         contained_in_self >= 1 && contained_in_other >= 1
     }
-    pub fn edge_of_this_overlapped_by(
-        &self,
-        other: PartialAngleInterval,
-    ) -> DirectionalAngularEdge {
+    pub fn edge_of_this_overlapped_by(&self, other: PartialAngleInterval) -> AngularEdge {
         if !self.partially_overlaps_other_while_including_edges(other) {
             panic!("no overlap between {} and {}", self, other);
         }
-        let is_clockwise_end = other.contains_or_touches_angle(self.clockwise_end);
-        DirectionalAngularEdge {
-            angle: if is_clockwise_end {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            is_clockwise_edge: is_clockwise_end,
+        let is_clockwise_end = other.contains_angle_inclusive(self.clockwise_end);
+
+        if is_clockwise_end {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
         }
     }
-    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> DirectionalAngularEdge {
+    pub fn edge_of_this_deeper_in(&self, other: PartialAngleInterval) -> AngularEdge {
         assert!(other.fully_contains_interval_excluding_edge_overlaps(*self));
         let clockwise_dist =
             PartialAngleInterval::from_angles(other.clockwise_end, self.clockwise_end).width();
@@ -316,13 +291,10 @@ impl PartialAngleInterval {
             PartialAngleInterval::from_angles(self.anticlockwise_end, other.anticlockwise_end)
                 .width();
         let clockwise_edge_is_deeper = clockwise_dist.radians > anticlockwise_dist.radians;
-        DirectionalAngularEdge {
-            angle: if clockwise_edge_is_deeper {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            is_clockwise_edge: clockwise_edge_is_deeper,
+        if clockwise_edge_is_deeper {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
         }
     }
     #[deprecated(note = "use version with tolerance instead")]
@@ -330,8 +302,8 @@ impl PartialAngleInterval {
         let edges_touch = self.clockwise_end == other.anticlockwise_end
             || other.clockwise_end == self.anticlockwise_end;
 
-        let contains_other_edge = self.contains_angle_not_including_edges(other.clockwise_end)
-            || self.contains_angle_not_including_edges(other.anticlockwise_end);
+        let contains_other_edge = self.contains_angle_exclusive(other.clockwise_end)
+            || self.contains_angle_exclusive(other.anticlockwise_end);
 
         edges_touch && !contains_other_edge
     }
@@ -340,29 +312,24 @@ impl PartialAngleInterval {
         self.overlapping_but_not_exactly_touching(other) || self.exactly_touches_arc(other)
     }
 
-    #[deprecated(note = "use version with tolerance instead")]
     fn exactly_touches_angle(&self, angle: Angle<f32>) -> bool {
-        self.clockwise_end == angle || angle == self.anticlockwise_end
+        self.contains_angle(angle).is_partial()
     }
-    #[deprecated(note = "use version with tolerance instead")]
-    fn contains_angle_not_including_edges(&self, angle: Angle<f32>) -> bool {
-        if self.exactly_touches_angle(angle) {
-            return false;
-        }
-
-        self.center_angle().angle_to(angle).radians.abs() < self.width().radians / 2.0
+    fn contains_angle_exclusive(&self, angle: Angle<f32>) -> bool {
+        self.contains_angle(angle).is_true()
     }
-    #[deprecated(note = "use version with tolerance instead")]
-    pub fn contains_or_touches_angle(&self, angle: Angle<f32>) -> bool {
-        // both edges count
-        if self.exactly_touches_angle(angle) {
-            return true;
-        }
-
-        self.center_angle().angle_to(angle).radians.abs() <= self.width().radians / 2.0
+    pub fn contains_angle_inclusive(&self, angle: Angle<f32>) -> bool {
+        self.contains_angle(angle).is_at_least_partial()
     }
-    pub fn contains_angle(&self, angle: Angle<f32>, tolerance: Angle<f32>) -> BoolWithPartial {
-        let angle = standardize_angle(angle);
+    pub fn contains_angle(&self, angle: Angle<f32>) -> BoolWithPartial {
+        self.contains_angle_with_tolerance(angle, Angle::zero())
+    }
+    pub fn contains_angle_with_tolerance(
+        &self,
+        angle: Angle<f32>,
+        tolerance: Angle<f32>,
+    ) -> BoolWithPartial {
+        let angle = standardize_angle_with_zero_mid(angle);
 
         if angle == self.cw() || angle == self.ccw() {
             return BoolWithPartial::Partial;
@@ -408,11 +375,11 @@ impl PartialAngleInterval {
         &self,
         other: PartialAngleInterval,
     ) -> bool {
-        let contains_other_edges = self.contains_angle_not_including_edges(other.anticlockwise_end)
-            && self.contains_angle_not_including_edges(other.clockwise_end);
+        let contains_other_edges = self.contains_angle_exclusive(other.anticlockwise_end)
+            && self.contains_angle_exclusive(other.clockwise_end);
         let other_does_not_contain_these_edges = !other
-            .contains_angle_not_including_edges(self.clockwise_end)
-            && !other.contains_angle_not_including_edges(self.anticlockwise_end);
+            .contains_angle_exclusive(self.clockwise_end)
+            && !other.contains_angle_exclusive(self.anticlockwise_end);
 
         contains_other_edges && other_does_not_contain_these_edges
     }
@@ -429,10 +396,7 @@ impl PartialAngleInterval {
             .overlaps_partial_arc(other, tolerance)
             .not()
     }
-    pub fn most_overlapped_edge_of_self(
-        &self,
-        other: PartialAngleInterval,
-    ) -> DirectionalAngularEdge {
+    pub fn most_overlapped_edge_of_self(&self, other: PartialAngleInterval) -> AngularEdge {
         assert!(self.touches_or_overlaps(other));
 
         // Select edge of self closest to the other's center
@@ -440,17 +404,14 @@ impl PartialAngleInterval {
         let dist_from_anticlockwise_edge =
             abs_angle_distance(self.anticlockwise_end, other.center_angle());
         let clockwise_is_closer = dist_from_clockwise_edge < dist_from_anticlockwise_edge;
-        DirectionalAngularEdge::new(
-            if clockwise_is_closer {
-                self.clockwise_end
-            } else {
-                self.anticlockwise_end
-            },
-            clockwise_is_closer,
-        )
+        if clockwise_is_closer {
+            self.cw_edge()
+        } else {
+            self.ccw_edge()
+        }
     }
     // TODO: replace with implementation of QuarterTurnRotatable trait
-    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    pub fn rotated_quarter_turns(&self, quarter_turns: impl Into<NormalizedOrthoAngle>) -> Self {
         self.quarter_rotated_ccw(quarter_turns)
     }
     pub fn rotated_ccw(&self, d_angle: Angle<f32>) -> Self {
@@ -535,6 +496,9 @@ impl PartialAngleInterval {
                 .is_at_least_partial()
         })
     }
+    pub fn edges(&self) -> [AngularEdge; 2] {
+        [self.cw_edge(), self.ccw_edge()]
+    }
 }
 
 impl Debug for PartialAngleInterval {
@@ -552,7 +516,6 @@ impl Debug for PartialAngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
     use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, timeout};
     use num::zero;
@@ -596,7 +559,7 @@ mod tests {
         assert_eq!(
             PartialAngleInterval::from_degrees(135.0, 90.0)
                 .most_overlapped_edge_of_self(PartialAngleInterval::from_degrees(45.0, 135.0)),
-            DirectionalAngularEdge::new(Angle::degrees(90.0), false)
+            AngularEdge::new(Angle::degrees(90.0), AngularDirection::CCW)
         );
     }
     #[test]
@@ -797,7 +760,7 @@ mod tests {
                 ccw_end_of_other: FAngle,
                 correct_overlap_result: BoolWithPartial,
                 case_name: String,
-            };
+            }
 
             let other_cw_ccw_pairs_and_should_be_overlappings: [TestData; 4] = [
                 TestData {
@@ -892,32 +855,32 @@ mod tests {
     fn test_interval_contains_angle() {
         assert!(
             PartialAngleInterval::from_degrees(0.0, 10.0)
-                .contains_or_touches_angle(Angle::degrees(5.0)),
+                .contains_angle_inclusive(Angle::degrees(5.0)),
             "simple case"
         );
         assert!(
             !PartialAngleInterval::from_degrees(0.0, 10.0)
-                .contains_or_touches_angle(Angle::degrees(15.0)),
+                .contains_angle_inclusive(Angle::degrees(15.0)),
             "simple outside bounds case"
         );
         assert!(
             PartialAngleInterval::from_degrees(0.0, 10.0)
-                .contains_or_touches_angle(Angle::degrees(10.0)),
+                .contains_angle_inclusive(Angle::degrees(10.0)),
             "On left bound should be inside"
         );
         assert!(
             PartialAngleInterval::from_degrees(0.0, 10.0)
-                .contains_or_touches_angle(Angle::degrees(0.0)),
+                .contains_angle_inclusive(Angle::degrees(0.0)),
             "On right bound should ALSO be inside"
         );
         assert!(
             !PartialAngleInterval::from_degrees(10.0, 0.0)
-                .contains_or_touches_angle(Angle::degrees(5.0)),
+                .contains_angle_inclusive(Angle::degrees(5.0)),
             "outside a large arc"
         );
         assert!(
             PartialAngleInterval::from_degrees(10.0, 0.0)
-                .contains_or_touches_angle(Angle::degrees(180.0)),
+                .contains_angle_inclusive(Angle::degrees(180.0)),
             "inside a large arc"
         );
     }
@@ -928,7 +891,7 @@ mod tests {
         let t = |low, high, x, tol, result| {
             assert_eq!(
                 PartialAngleInterval::from_degrees(low, high)
-                    .contains_angle(Angle::degrees(x), Angle::degrees(tol)),
+                    .contains_angle_with_tolerance(Angle::degrees(x), Angle::degrees(tol)),
                 result,
                 "\n\nlow: {}\nhigh: {}\nx: {}\ntolerance: {}",
                 low,

@@ -1,5 +1,3 @@
-use euclid::default::Point2D;
-use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
 use crate::game::Game;
@@ -7,9 +5,8 @@ use crate::graphics::screen::{
     ScreenBufferStep, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_LEFT, SCREEN_STEP_DOWN_RIGHT,
     SCREEN_STEP_LEFT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_LEFT, SCREEN_STEP_UP_RIGHT,
 };
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{FVector, IVector};
-use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
+use crate::utility::*;
+use crate::{point2, DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
     prev_mouse_square: WorldSquare,
@@ -113,7 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    
+
     fn test_screen_to_world__lower_left() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 50);
@@ -123,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_to_world__upper_left() {
         // 50 squares x 50 squares
         let input_map = InputMap::new(100, 50);
@@ -134,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_to_world__lower_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 50);
@@ -144,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_to_world__upper_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 1);
@@ -154,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_screen_to_world__two_characters_one_square() {
         let input_map = InputMap::new(100, 50);
         // odd to even, moving right, is same square

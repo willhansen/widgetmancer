@@ -1,5 +1,9 @@
-#![allow(warnings)]
-#![allow(non_snake_case)]
+// #![allow(warnings)]
+#![allow(non_snake_case)] // TODO: later
+#![allow(unused_imports)] // TODO: later
+#![allow(deprecated)] // TODO: later
+#![allow(dead_code)] // TODO: later
+#![allow(unused_variables)] // TODO: later
 
 extern crate approx;
 extern crate core;
@@ -16,8 +20,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use enum_as_inner::EnumAsInner;
-use euclid::default::Point2D;
-use euclid::point2;
 use rand::SeedableRng;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
@@ -59,7 +61,7 @@ fn set_up_input_thread() -> Receiver<Event> {
             tx.send(evt).unwrap();
         }
     });
-    return rx;
+    rx
 }
 
 pub fn do_everything() {

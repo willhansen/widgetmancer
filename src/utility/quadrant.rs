@@ -1,4 +1,4 @@
-use super::{coordinate_frame_conversions::*, coordinates::*, general_utility::*};
+use crate::utility::*;
 
 #[derive(Clone, Hash, Debug, Eq, Copy)]
 pub struct Quadrant(pub i32);
@@ -28,7 +28,7 @@ pub fn rel_square_is_in_quadrant_or_on_adjacent_axis(
     todo!()
 }
 pub fn direction_of_quadrant(quadrant: Quadrant) -> WorldStep {
-    STEP_UP_RIGHT.quarter_rotated_ccw(QuarterTurnsCcw::new(quadrant.0))
+    STEP_UP_RIGHT.quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(quadrant.0))
 }
 #[cfg(test)]
 mod tests {

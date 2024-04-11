@@ -1,16 +1,7 @@
 use ambassador::{delegatable_trait, Delegate};
-use std::collections::HashMap;
-use std::f32::consts::{E, PI, TAU};
-use std::time;
 use std::time::{Duration, Instant};
 
-use dyn_clone::DynClone;
-use euclid::{point2, vec2, Angle, Length};
-use num::{clamp, ToPrimitive};
-use rand::{Rng, SeedableRng};
-use static_board::StaticBoard;
-use termion::color::Black;
-use termion::style::Blink;
+use num::clamp;
 
 use crate::animations::blink_animation::BlinkAnimation;
 use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
@@ -23,15 +14,10 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::animations::simple_laser::SimpleLaserAnimation;
 use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
-use crate::glyph::braille::world_points_for_braille_line;
-use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
-use crate::glyph_constants::*;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::coordinates::{
-    is_orthogonal_king_step, round_to_king_step, DOWN_I, LEFT_I, RIGHT_I, UP_I,
-};
+use crate::utility::units::*;
+
 use crate::utility::*;
-use crate::{lerp, Glyph, Graphics};
+use crate::Glyph;
 
 pub mod blink_animation;
 pub mod burst_explosion_animation;
@@ -109,13 +95,12 @@ pub const DOTS_IN_SELECTOR: u32 = 3;
 
 #[cfg(test)]
 mod tests {
-    use ntest::timeout;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     use crate::animations::floaty_laser::FloatyLaserAnimation;
     use crate::animations::recoiling_board::RecoilingBoardAnimation;
     use crate::animations::simple_laser::SimpleLaserAnimation;
-    use crate::graphics::FloorColorEnum;
+    use crate::graphics::{FloorColorEnum, Graphics};
     use crate::{derivative, glyph_map_to_string};
 
     use super::*;

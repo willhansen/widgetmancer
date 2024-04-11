@@ -2,9 +2,7 @@ use crate::animations::Animation;
 use crate::glyph::braille::world_points_for_braille_line;
 use crate::glyph::glyph_constants::RED;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
 use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
@@ -50,7 +48,7 @@ impl Animation for FloatyLaserAnimation {
         let vertical_drift_speed_blocks_per_s = 3.0;
         let random_drift_speed_blocks_per_s = 1.0;
         let age = time.duration_since(self.start_time);
-        for mut point in &mut line_points {
+        for point in &mut line_points {
             let vertical_displacement: WorldMove =
                 WorldMove::new(0.0, 1.0) * vertical_drift_speed_blocks_per_s * age.as_secs_f32();
             let random_angle = Angle::radians(rng.gen_range(0.0..TAU));

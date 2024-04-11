@@ -1,16 +1,10 @@
 use crate::animations::Animation;
-use crate::glyph::braille::world_points_for_braille_line;
 use crate::glyph::glyph_constants::RED;
 use crate::glyph::{floating_square, DoubleGlyph, Glyph};
-use crate::utility::coordinate_frame_conversions::{
-    world_square_glyph_map_to_world_character_glyph_map, WorldCharacterSquareGlyphMap, WorldMove,
-    WorldPoint, WorldSquare,
+use crate::utility::units::{
+    world_square_glyph_map_to_world_character_glyph_map, WorldCharacterSquareGlyphMap, WorldSquare,
 };
 use crate::utility::STEP_UP;
-use euclid::Angle;
-use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
-use std::f32::consts::{E, PI, TAU};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

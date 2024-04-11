@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
-use euclid::*;
 use ntest::assert_false;
 use pretty_assertions::{assert_eq, assert_ne};
 use rand::SeedableRng;
@@ -11,11 +10,7 @@ use rust_roguelike::game::Game;
 use rust_roguelike::glyph::glyph_constants::*;
 use rust_roguelike::glyph::{DoubleGlyph, DoubleGlyphFunctions};
 use rust_roguelike::piece::{Piece, PieceType};
-use rust_roguelike::utility::coordinate_frame_conversions::*;
-use rust_roguelike::utility::{
-    DOWN_I, LEFT_I, RIGHT_I, STEP_DOWN, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_RIGHT, STEP_UP,
-    STEP_UP_RIGHT, UP_I,
-};
+use rust_roguelike::utility::*;
 use rust_roguelike::utils_for_tests::*;
 
 #[test]
@@ -61,7 +56,7 @@ fn test_player_can_not_move_off_high_edge() {
 
     game.draw_headless_now();
 
-    let bottom_right = point2((game.board_size().width - 1) as i32, 0);
+    let bottom_right = point2((game.board_size().width() - 1) as i32, 0);
 
     game.try_set_player_position(bottom_right)
         .expect("Failed to set player pos");
@@ -370,10 +365,8 @@ fn test_selector() {
     game.draw_headless_now();
 
     let diagonal = WorldStep::new(2, 2);
-    let test_area: Box2D<i32, SquareGridInWorldFrame> = Box2D {
-        min: test_square - diagonal,
-        max: test_square + diagonal,
-    };
+    let test_area: TwoDifferentWorldSquares =
+        TwoDifferentWorldSquares::new(test_square - diagonal, test_square + diagonal);
 
     assert!(
         game.borrow_graphics_mut()

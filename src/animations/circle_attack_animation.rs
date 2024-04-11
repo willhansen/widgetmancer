@@ -1,13 +1,8 @@
 use crate::animations::Animation;
 use crate::glyph::glyph_constants::CYAN;
 use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
+use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
 use euclid::Angle;
-use num::ToPrimitive;
-use rand::{Rng, SeedableRng};
-use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

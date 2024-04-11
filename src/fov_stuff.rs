@@ -3,73 +3,46 @@ pub mod fence;
 pub mod rasterized_field_of_view;
 pub mod square_visibility;
 
-use std::backtrace::Backtrace;
-use std::collections::{HashMap, HashSet};
-use std::f32::consts::PI;
-use std::fmt::{Debug, Formatter};
+use std::collections::HashSet;
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
 use crate::fov_stuff::square_visibility::{
-    LocalSquareVisibilityMap, RelativeSquareVisibilityFunctions, SquareVisibility,
-    SquareVisibilityFromOneLargeShadow, SquareVisibilityFunctions, SquareVisibilityMapFunctions,
+    LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
 };
-use crate::utility::coordinates::{
-    king_step_distance, unit_vector_from_angle, OrthogonalWorldStep,
-};
-use crate::utility::has_origin_pose::HasOriginPose;
-use crate::utility::octant::Octant;
-use crate::utility::partial_angle_interval::PartialAngleInterval;
-use crate::utility::poses::{RelativeSquareWithOrthogonalDir, SquareWithOrthogonalDir};
 use derive_more::Constructor;
-use euclid::{point2, vec2, Angle};
-use getset::CopyGetters;
+use euclid::Angle;
 use itertools::*;
-use num::abs;
-use ordered_float::OrderedFloat;
 
-use crate::glyph::angled_blocks::{
-    angle_block_char_complement, half_plane_to_angled_block_character,
-};
-use crate::glyph::glyph_constants::{
-    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
-};
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::graphics;
-use crate::graphics::drawable::DrawableEnum::SolidColor;
-use crate::graphics::drawable::{
-    Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
-};
+use crate::glyph::glyph_constants::{FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, WHITE};
+use crate::glyph::DoubleGlyphFunctions;
+use crate::graphics::drawable::{Drawable, DrawableEnum, SolidColorDrawable, TextDrawable};
 use crate::graphics::Graphics;
-use crate::piece::MAX_PIECE_RANGE;
-use crate::portal_geometry::{Portal, PortalGeometry};
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::*;
+use crate::portal_geometry::PortalGeometry;
 use crate::utility::*;
 
 use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 
-type Pose = SquareWithOrthogonalDir;
+type Pose = WorldSquareWithOrthogonalDir;
 
 const NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES: f32 = 0.001;
 
-// #[portrait::derive(QuarterTurnRotatable with portrait::derive_delegate)]
 #[derive(PartialEq, Debug, Clone, Constructor)]
 pub struct FieldOfView {
-    view_root: SquareWithOrthogonalDir,
+    view_root: WorldSquareWithOrthogonalDir,
     visible_segments_in_main_view_only: Vec<AngleBasedVisibleSegment>,
     transformed_sub_fovs: Vec<FieldOfView>,
 }
 
 impl HasOriginPose for FieldOfView {
-    fn origin_pose(&self) -> SquareWithOrthogonalDir {
+    fn origin_pose(&self) -> WorldSquareWithOrthogonalDir {
         self.view_root
     }
 }
 
-// TODO: derive_delegate with portrait
 impl QuarterTurnRotatable for FieldOfView {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<QuarterTurnsCcw> + Copy) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
         FieldOfView::new(
             self.view_root
                 .quarter_revolved_ccw_around_origin(quarter_turns_ccw),
@@ -82,7 +55,7 @@ impl QuarterTurnRotatable for FieldOfView {
 }
 
 impl FieldOfView {
-    pub fn new_empty_fov_with_root(root: impl Into<SquareWithOrthogonalDir>) -> Self {
+    pub fn new_empty_fov_with_root(root: impl Into<WorldSquareWithOrthogonalDir>) -> Self {
         FieldOfView {
             view_root: root.into(),
             visible_segments_in_main_view_only: Vec::new(),
@@ -90,7 +63,7 @@ impl FieldOfView {
         }
     }
     pub fn new_empty_fov_at(new_center: impl Into<WorldSquare>) -> Self {
-        Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
+        Self::new_empty_fov_with_root(WorldSquareWithOrthogonalDir::from_square_and_step(
             new_center.into(),
             STEP_UP,
         ))
@@ -119,7 +92,7 @@ impl FieldOfView {
     pub fn root_square(&self) -> WorldSquare {
         self.view_root.square()
     }
-    pub fn root_square_with_direction(&self) -> SquareWithOrthogonalDir {
+    pub fn root_square_with_direction(&self) -> WorldSquareWithOrthogonalDir {
         self.view_root
     }
     pub fn view_transform_to(&self, other: &FieldOfView) -> RigidTransform {
@@ -163,7 +136,7 @@ impl FieldOfView {
     }
     pub fn with_smoothly_replaced_view_root(
         mut self,
-        view_root: impl Into<SquareWithOrthogonalDir>,
+        view_root: impl Into<WorldSquareWithOrthogonalDir>,
     ) -> Self {
         let view_root = view_root.into();
         let tf_to_new_view_root =
@@ -306,7 +279,7 @@ impl FieldOfView {
     ///          ○ ──┨┄┄┄┄┄    ◌ ┄┄┠─────    
     ///              b             b         
     ///                                      
-    /// One case that needs (?) to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
+    /// One case that needs(?) to be accounted for is similar to the previous one, but one of the lines to the destination frame goes through a second intermediate portal to get there, so the end sub-FOVs have the same root, and the main FOVs have the same root, but the end sub-FOVs have different portal-depth.
     ///                                            
     ///                                            
     ///                                            
@@ -368,7 +341,7 @@ impl FieldOfView {
         let combined_by_root: Vec<FieldOfView> = grouped_by_root
             .into_iter()
             .map(
-                |(root, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfView>)| {
+                |(root, fov_list): (WorldSquareWithOrthogonalDir, Vec<FieldOfView>)| {
                     fov_list.iter().fold(
                         Self::new_empty_fov_with_root(root),
                         |acc: FieldOfView, next_fov: &FieldOfView| acc.combined_with(next_fov),
@@ -412,7 +385,7 @@ impl FieldOfView {
     fn rasterized_at_depth(
         &self,
         starting_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<QuarterTurnsCcw>,
+        forward_portal_rotation_to_this_depth: impl Into<NormalizedOrthoAngle>,
     ) -> RasterizedFieldOfView {
         let forward_portal_rotation_to_this_depth = forward_portal_rotation_to_this_depth.into();
         // rasterize top level
@@ -441,17 +414,23 @@ impl FieldOfView {
     fn rasterized_main_view(
         &self,
         top_level_portal_depth: u32,
-        forward_portal_rotation_to_this_depth: impl Into<QuarterTurnsCcw> + Copy,
+        forward_portal_rotation_to_this_depth: impl Into<NormalizedOrthoAngle> + Copy,
     ) -> RasterizedFieldOfView {
+        dbg!(&self.visible_segments_in_main_view_only);
+        let local_visibility_map = &self
+            .visible_segments_in_main_view_only
+            .iter()
+            .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
+            .inspect(|map| {
+                dbg!(map.get(&(-1, -1).into()));
+            })
+            .fold(LocalSquareVisibilityMap::new_empty(), |a, b| {
+                a.combined_while_increasing_visibility(&b)
+            });
+        dbg!(local_visibility_map.get(&(-1, -1).into()));
         let top_down_portals = RasterizedFieldOfView::visibility_map_to_top_down_portals(
             self.view_root,
-            &self
-                .visible_segments_in_main_view_only
-                .iter()
-                .map(AngleBasedVisibleSegment::to_local_square_visibility_map)
-                .fold(LocalSquareVisibilityMap::new_empty(), |a, b| {
-                    a.combined_while_increasing_visibility(&b)
-                }),
+            local_visibility_map,
         )
         .into_iter()
         .map(|td_portal| {
@@ -462,6 +441,7 @@ impl FieldOfView {
             // Compensate for rotated view root, because portal exit is in absolute frame
         })
         .collect_vec();
+
         RasterizedFieldOfView::from_top_down_portals(self.view_root, top_down_portals)
     }
 
@@ -488,8 +468,8 @@ impl RigidlyTransformable for FieldOfView {
 
 #[derive(Clone, PartialEq, Eq, Debug, Copy)]
 pub struct OctantFOVSquareSequenceIter {
-    outward_dir: OrthogonalWorldStep,
-    across_dir: OrthogonalWorldStep,
+    outward_dir: OrthogonalDirection,
+    across_dir: OrthogonalDirection,
     outward_steps: u32,
     across_steps: u32,
 }
@@ -511,7 +491,7 @@ impl OctantFOVSquareSequenceIter {
     }
 
     // todo: change to implementation of QuarterTurnRotatable trait
-    pub fn rotated(&self, quarter_turns: QuarterTurnsCcw) -> Self {
+    pub fn rotated(&self, quarter_turns: NormalizedOrthoAngle) -> Self {
         Self {
             outward_dir: self.outward_dir.quarter_rotated_ccw(quarter_turns),
             across_dir: self.across_dir.quarter_rotated_ccw(quarter_turns),
@@ -524,8 +504,9 @@ impl Iterator for OctantFOVSquareSequenceIter {
     type Item = WorldStep;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let relative_square = self.outward_dir.step() * self.outward_steps as i32
-            + self.across_dir.step() * self.across_steps as i32;
+        let relative_square = WorldSquare::zero()
+            .moved(self.outward_dir, self.outward_steps as i32)
+            .moved(self.across_dir, self.across_steps as i32);
 
         self.across_steps += 1;
         if self.across_steps > self.outward_steps {
@@ -541,7 +522,7 @@ impl Iterator for OctantFOVSquareSequenceIter {
 pub fn sub_octant_field_of_view(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
-    view_root_pose: SquareWithOrthogonalDir,
+    view_root_pose: WorldSquareWithOrthogonalDir,
     radius: u32,
     view_arc: AngleInterval,
     mut steps_in_octant_iter: OctantFOVSquareSequenceIter,
@@ -568,7 +549,7 @@ pub fn sub_octant_field_of_view(
         let mut view_blocking_arc_for_this_square: AngleInterval = AngleInterval::Empty;
         for face_direction in face_directions {
             let relative_face: RelativeFace = (relative_square, face_direction).into();
-            let absolute_face: Face = (absolute_square, face_direction).into();
+            let absolute_face: FaceOfWorldSquare = (absolute_square, face_direction).into();
 
             let face_has_portal = portal_geometry
                 .get_portal_by_entrance(absolute_face)
@@ -713,9 +694,9 @@ pub fn single_octant_field_of_view(
     let fov_result = sub_octant_field_of_view(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_step(
+        WorldSquareWithOrthogonalDir::from_square_and_step(
             center_square,
-            FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+            FieldOfView::DEFAULT_FOV_ROOT_DIRECTION,
         ),
         radius,
         AngleInterval::from_octant(octant),
@@ -747,7 +728,7 @@ pub fn portal_aware_field_of_view_from_square(
 }
 
 fn point_in_view_arc(view_arc: PartialAngleInterval) -> WorldMove {
-    unit_vector_from_angle(view_arc.center_angle()).cast_unit()
+    WorldMove::unit_vector_from_angle(view_arc.center_angle()).cast_unit()
 }
 
 fn print_fov(fov: &FieldOfView, radius: u32, render_portals_with_line_of_sight: bool) {
@@ -794,12 +775,8 @@ pub fn debug_print_fov_as_absolute(fov: &FieldOfView, radius: u32) {
     print_fov(fov, radius, false)
 }
 
-pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
-    if T::IS_RELATIVE {
-        println!("Relative Squares:");
-    } else {
-        println!("Absolute Squares:");
-    }
+pub fn debug_print_square_set<T: IntCoordinate>(squares: &HashSet<T>) {
+    // TODO: print name of type
     let xmax = squares.iter().map(|c| c.x()).max().unwrap() + 1;
     let xmin = squares.iter().map(|c| c.x()).min().unwrap() - 1;
     let ymax = squares.iter().map(|c| c.y()).max().unwrap() + 1;
@@ -883,22 +860,29 @@ pub fn debug_print_square_set<T: GridCoordinate>(squares: &HashSet<T>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::poses::faces_away_from_center_at_rel_square;
-    use euclid::point2;
+    #[allow(non_snake_case)]
+    use crate::glyph_constants::{RED, SPACE};
+    use crate::graphics::drawable::PartialVisibilityDrawable;
+    use crate::portal_geometry::Portal;
+    use crate::utility::*;
+    use crate::DoubleGlyph;
     use itertools::Itertools;
-    use ntest::{assert_about_eq, assert_false, assert_true, timeout};
-    use pretty_assertions::{assert_eq, assert_ne};
-    use rgb::RGB8;
+    use ntest::{assert_about_eq, assert_false, assert_true};
+    use pretty_assertions::assert_eq;
 
+    use std::f32::consts::PI;
+
+    use crate::fov_stuff::WorldSquareWithOrthogonalDir;
     use crate::glyph::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
-        angled_block_char_to_snap_points_map, angled_block_flip_y, SnapGridPoint,
+        angled_block_flip_y,
     };
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{
-        better_angle_from_x_axis, QuarterTurnsCcw, SquareWithKingDir, SquareWithOrthogonalDir,
-        STEP_DOWN, STEP_LEFT, STEP_UP,
+    use crate::utility::*;
+
+    use self::square_visibility::{
+        RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,
     };
 
     use super::*;
@@ -908,8 +892,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__horizontal() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(3, 0));
-        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
-        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
+        let correct_start_angle = WorldMove::new(2.5, 0.5).better_angle_from_x_axis();
+        let correct_end_angle = WorldMove::new(2.5, -0.5).better_angle_from_x_axis();
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,
@@ -924,8 +908,8 @@ mod tests {
     #[test]
     fn test_square_view_angle__diagonalish() {
         let view_angle = PartialAngleInterval::from_relative_square(vec2(5, 3));
-        let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
-        let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
+        let correct_start_angle = WorldMove::new(4.5, 3.5).better_angle_from_x_axis();
+        let correct_end_angle = WorldMove::new(5.5, 2.5).better_angle_from_x_axis();
 
         assert_about_eq!(
             view_angle.anticlockwise_end().radians,
@@ -1108,7 +1092,7 @@ mod tests {
         )
         .rasterized();
         let visible_rel_square = STEP_RIGHT * 5 + STEP_UP * 2;
-        assert!(fov_result.relative_square_is_fully_visible((visible_rel_square + STEP_LEFT)));
+        assert!(fov_result.relative_square_is_fully_visible(visible_rel_square + STEP_LEFT));
         assert!(fov_result.relative_square_is_fully_visible(visible_rel_square));
     }
 
@@ -1164,7 +1148,7 @@ mod tests {
     fn square_visibility_from_block_and_square(
         block_square: WorldStep,
         shadowed_square: WorldStep,
-    ) -> Option<SquareVisibilityFromOneLargeShadow> {
+    ) -> SquareVisibilityFromOneLargeShadow {
         SquareVisibility::from_relative_square_and_view_arc(
             PartialAngleInterval::from_relative_square(block_square).complement(),
             shadowed_square,
@@ -1175,7 +1159,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_1() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)),
             )
             .to_glyphs(),
         );
@@ -1185,7 +1169,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_2() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)),
             )
             .to_glyphs(),
         );
@@ -1195,7 +1179,7 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_3() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)).unwrap(),
+                square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)),
             )
             .to_glyphs(),
         );
@@ -1205,13 +1189,13 @@ mod tests {
     fn test_partial_visibility_of_one_square__observed_discontinuity_4() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)),
             )
             .to_glyphs(),
         );
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
-                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, -3)).unwrap(),
+                square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, -3)),
             )
             .to_glyphs(),
         );
@@ -1223,7 +1207,7 @@ mod tests {
         for i in 0..30 {
             assert_shadow_is_horizontally_continuous(
                 PartialVisibilityDrawable::from_square_visibility(
-                    square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)).unwrap(),
+                    square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)),
                 )
                 .to_glyphs(),
             );
@@ -1234,12 +1218,11 @@ mod tests {
     fn test_vertical_shadow_symmetry() {
         let block_square = STEP_RIGHT * 3;
         let above_glyphs = PartialVisibilityDrawable::from_square_visibility(
-            square_visibility_from_block_and_square(block_square, block_square + STEP_UP).unwrap(),
+            square_visibility_from_block_and_square(block_square, block_square + STEP_UP),
         )
         .to_glyphs();
         let below_glyphs = PartialVisibilityDrawable::from_square_visibility(
-            square_visibility_from_block_and_square(block_square, block_square + STEP_DOWN)
-                .unwrap(),
+            square_visibility_from_block_and_square(block_square, block_square + STEP_DOWN),
         )
         .to_glyphs();
         assert_eq!(
@@ -1286,7 +1269,6 @@ mod tests {
                 assert_eq!(
                     PartialVisibilityDrawable::from_square_visibility(
                         square_visibility_from_block_and_square(block_square, shadow_square)
-                            .unwrap()
                     )
                     .to_glyphs()
                     .to_clean_string(),
@@ -1327,7 +1309,7 @@ mod tests {
         let fov = sub_octant_field_of_view(
             &Default::default(),
             &portal_geometry,
-            SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP),
+            WorldSquareWithOrthogonalDir::from_square_and_step(center, STEP_UP),
             radius,
             narrow_arc_to_right_in_first_octant(),
             OctantFOVSquareSequenceIter::new_from_center(Octant::new(0)),
@@ -1397,9 +1379,9 @@ mod tests {
         sub_octant_field_of_view(
             &Default::default(),
             &portals,
-            SquareWithOrthogonalDir::from_square_and_step(
+            WorldSquareWithOrthogonalDir::from_square_and_step(
                 start,
-                FieldOfView::DEFAULT_FOV_ROOT_DIRECTION_STEP,
+                FieldOfView::DEFAULT_FOV_ROOT_DIRECTION,
             ),
             fov_range,
             narrow_arc_to_right_in_first_octant(),
@@ -1437,7 +1419,7 @@ mod tests {
             range.for_each(|dx| {
                 assert_eq!(
                     rfov.lone_portal_rotation_for_relative_square_or_panic((dx, 0)),
-                    QuarterTurnsCcw::new(turns)
+                    NormalizedOrthoAngle::new_from_quarter_turns(turns)
                 );
             });
         });
@@ -1448,9 +1430,11 @@ mod tests {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
         let portal_entrance =
-            SquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
-        let portal_exit =
-            SquareWithOrthogonalDir::from_square_and_step(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+            WorldSquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit = WorldSquareWithOrthogonalDir::from_square_and_step(
+            center + STEP_DOWN_LEFT * 15,
+            STEP_DOWN,
+        );
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let fov_result = single_octant_field_of_view(
@@ -1477,9 +1461,11 @@ mod tests {
         let mut portal_geometry = PortalGeometry::default();
         let center = point2(-15, 50);
         let portal_entrance =
-            SquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
-        let portal_exit =
-            SquareWithOrthogonalDir::from_square_and_step(center + STEP_DOWN_LEFT * 15, STEP_DOWN);
+            WorldSquareWithOrthogonalDir::from_square_and_step(center + STEP_RIGHT, STEP_RIGHT);
+        let portal_exit = WorldSquareWithOrthogonalDir::from_square_and_step(
+            center + STEP_DOWN_LEFT * 15,
+            STEP_DOWN,
+        );
         portal_geometry.create_portal(portal_entrance, portal_exit);
 
         let angle_based_fov_result = single_octant_field_of_view(
@@ -1512,8 +1498,8 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let x_entrance_pose: SquareWithOrthogonalDir = (1, 0, STEP_UP).into();
-        let y_entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, UP).into();
+        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
 
         (0..4)
             .cartesian_product(0..4)
@@ -1548,10 +1534,10 @@ mod tests {
 
     #[test]
     fn test_sub_fov_view_transform() {
-        let sub_center: SquareWithOrthogonalDir = (3, 1, STEP_RIGHT).into();
+        let sub_center: WorldSquareWithOrthogonalDir = (3, 1, RIGHT).into();
         let mut sub_fov = FieldOfView::new_empty_fov_with_root(sub_center);
 
-        let main_center: SquareWithOrthogonalDir = (50, 10, STEP_UP).into();
+        let main_center: WorldSquareWithOrthogonalDir = (50, 10, UP).into();
         let mut main_fov = FieldOfView::new_empty_fov_with_root(main_center);
 
         let absolute_test_square: WorldSquare = point2(1, 4);
@@ -1595,7 +1581,7 @@ mod tests {
 
         let visibility =
             SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
-        assert!(visibility.unwrap().is_fully_visible());
+        assert!(visibility.is_fully_visible());
     }
 
     #[test]
@@ -1606,7 +1592,7 @@ mod tests {
 
         let visibility =
             SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
-        assert!(visibility.is_none());
+        assert!(visibility.is_not_visible());
     }
 
     #[test]
@@ -1614,31 +1600,32 @@ mod tests {
         let square = vec2(1, -2);
         let arc = PartialAngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
         assert!(
-            SquareVisibility::from_relative_square_and_view_arc(arc, square)
-                .unwrap()
-                .is_fully_visible()
+            SquareVisibility::from_relative_square_and_view_arc(arc, square).is_fully_visible()
         );
     }
 
     #[test]
     fn test_portal_pose_transform() {
-        let entrance = SquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT);
-        let exit = SquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN);
+        let entrance = WorldSquareWithOrthogonalDir::from_square_and_step(point2(3, 4), STEP_RIGHT);
+        let exit = WorldSquareWithOrthogonalDir::from_square_and_step(point2(50, 70), STEP_DOWN);
         let portal = Portal::new(entrance, exit);
 
         let transform = portal.get_transform();
         assert_eq!(transform.translation(), vec2(47, 67));
-        assert_eq!(transform.rotation(), QuarterTurnsCcw::new(3));
+        assert_eq!(
+            transform.rotation(),
+            NormalizedOrthoAngle::new_from_quarter_turns(3)
+        );
 
         let entrance_offset_and_direction_exit_offset_and_direction = vec![
-            (STEP_LEFT, STEP_UP, STEP_UP * 2, STEP_RIGHT),
-            (STEP_LEFT, STEP_RIGHT, STEP_UP * 2, STEP_DOWN),
-            (STEP_ZERO, STEP_RIGHT, STEP_UP, STEP_DOWN),
+            (STEP_LEFT, UP, STEP_UP * 2, RIGHT),
+            (STEP_LEFT, RIGHT, STEP_UP * 2, DOWN),
+            (STEP_ZERO, RIGHT, STEP_UP, DOWN),
             (
                 STEP_UP + STEP_LEFT * 2,
-                STEP_DOWN,
+                DOWN,
                 STEP_RIGHT + STEP_UP * 3,
-                STEP_LEFT,
+                LEFT,
             ),
         ];
         for (
@@ -1716,66 +1703,60 @@ mod tests {
     }
     #[test]
     fn test_combined_fovs_combine_visibility__faces_on_one_square() {
-        // Non-deterministic test
-        // TODO: remove outer loop when deterministic
-        (0..100).foreach(|i| {
-            (0..5).for_each(|dy| {
-                let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
-                let absolute_fov_center_square = point2(5, 5);
-                let absolute_fully_visible_square =
-                    absolute_fov_center_square + relative_fully_visible_square;
-                let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
-                    .iter()
-                    .map(|&rel_face| {
-                        FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
-                    })
-                    .collect_vec();
+        // NOTE: this test used to be non-deterministic. Watch out for that if it fails.
+        (0..5).for_each(|dy| {
+            let relative_fully_visible_square = STEP_LEFT * 7 + STEP_UP * dy;
+            let absolute_fov_center_square = point2(5, 5);
+            let absolute_fully_visible_square =
+                absolute_fov_center_square + relative_fully_visible_square;
+            let face_fovs = faces_away_from_center_at_rel_square(relative_fully_visible_square)
+                .iter()
+                .map(|&rel_face| {
+                    FieldOfView::new_with_visible_face(absolute_fov_center_square, rel_face)
+                })
+                .collect_vec();
 
-                face_fovs
-                    .iter()
-                    .map(FieldOfView::rasterized)
-                    .for_each(|rasterized_fov| {
-                        assert!(rasterized_fov.relative_square_is_only_partially_visible(
-                            relative_fully_visible_square
-                        ));
-                        assert_eq!(
-                            rasterized_fov
-                                .times_absolute_square_is_visible(absolute_fully_visible_square),
-                            1
-                        );
-                        assert_eq!(
-                            rasterized_fov.times_absolute_square_is_fully_visible(
-                                absolute_fully_visible_square
-                            ),
-                            0
-                        );
-                    });
+            face_fovs
+                .iter()
+                .map(FieldOfView::rasterized)
+                .for_each(|rasterized_fov| {
+                    assert!(rasterized_fov
+                        .relative_square_is_only_partially_visible(relative_fully_visible_square));
+                    assert_eq!(
+                        rasterized_fov
+                            .times_absolute_square_is_visible(absolute_fully_visible_square),
+                        1
+                    );
+                    assert_eq!(
+                        rasterized_fov
+                            .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
+                        0
+                    );
+                });
 
-                let merged_fov = FieldOfView::combine_multiple(face_fovs);
+            let merged_fov = FieldOfView::combine_multiple(face_fovs);
 
-                let merged_rfov = merged_fov.rasterized();
+            let merged_rfov = merged_fov.rasterized();
 
-                let fov_created_whole = FieldOfView::new_empty_fov_at(absolute_fov_center_square)
-                    .with_fully_visible_relative_square(relative_fully_visible_square);
-                let rfov_created_whole = fov_created_whole.rasterized();
+            let fov_created_whole = FieldOfView::new_empty_fov_at(absolute_fov_center_square)
+                .with_fully_visible_relative_square(relative_fully_visible_square);
+            let rfov_created_whole = fov_created_whole.rasterized();
 
-                assert_eq!(merged_fov, fov_created_whole);
-                assert_eq!(merged_rfov, rfov_created_whole);
+            assert_eq!(merged_fov, fov_created_whole);
+            assert_eq!(merged_rfov, rfov_created_whole);
 
-                assert!(
-                    merged_rfov.relative_square_is_fully_visible(relative_fully_visible_square),
-                    "Should be fully visible"
-                );
-                assert_eq!(
-                    merged_rfov.times_absolute_square_is_visible(absolute_fully_visible_square),
-                    1
-                );
-                assert_eq!(
-                    merged_rfov
-                        .times_absolute_square_is_fully_visible(absolute_fully_visible_square),
-                    1
-                );
-            });
+            assert!(
+                merged_rfov.relative_square_is_fully_visible(relative_fully_visible_square),
+                "Should be fully visible"
+            );
+            assert_eq!(
+                merged_rfov.times_absolute_square_is_visible(absolute_fully_visible_square),
+                1
+            );
+            assert_eq!(
+                merged_rfov.times_absolute_square_is_fully_visible(absolute_fully_visible_square),
+                1
+            );
         });
     }
 
@@ -1783,10 +1764,10 @@ mod tests {
     fn test_combined_fovs_combine_visibility__full_squares_from_faces() {
         let fov_center = point2(5, 5);
         let visible_rel_faces = [
-            (12, 0, STEP_RIGHT),
-            (12, 1, STEP_RIGHT),
-            (12, 2, STEP_RIGHT),
-            (12, 3, STEP_RIGHT),
+            (12, 0, RIGHT),
+            (12, 1, RIGHT),
+            (12, 2, RIGHT),
+            (12, 3, RIGHT),
         ];
         let rel_squares_that_should_be_fully_visible = [(12, 1), (12, 2)];
         let fovs = visible_rel_faces
@@ -1798,7 +1779,7 @@ mod tests {
 
         rel_squares_that_should_be_fully_visible
             .iter()
-            .map(|&rel_square| {
+            .for_each(|&rel_square| {
                 let rel_square: WorldStep = rel_square.into();
                 let abs_square = fov_center + rel_square;
                 assert_eq!(
@@ -1954,18 +1935,52 @@ mod tests {
         let main_center = point2(5, 5);
         let other_center = point2(15, 5);
 
+        // |
+        //5+----------o----------+----------o----------+
+        // |          |          |          |          |
+        // |          |          |          |          |
+        // |          |          |          |          |
+        // |          |          |          |          |
+        //0+-+-+-+-+-|-----------|----------|----------|
+        // 0         5           10         15
+
         let mut fov_1 = FieldOfView::new_empty_fov_at(main_center);
         let mut sub_fov_1 = FieldOfView::new_empty_fov_at(other_center);
 
         let rel_square = STEP_DOWN_LEFT * 3;
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . x . . |         | . x . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
         let faces_of_rel_square = faces_away_from_center_at_rel_square(rel_square)
             .into_iter()
             .collect_vec();
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . L . . |         | . L . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
         fov_1.add_fully_visible_relative_face(faces_of_rel_square[0]);
         sub_fov_1.add_fully_visible_relative_face(faces_of_rel_square[1]);
+        // |
+        //5+---------o---------+---------o---------+
+        // | . . . . |         | . . . . |         |
+        // | . . . . |         | . . . . |         |
+        // | . | . . |         | . _ . . |         |
+        // | . . . . |         | . . . . |         |
+        //0+-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|-+-+-+-+-|
+        // 0         5         10         15
 
         fov_1.transformed_sub_fovs.push(sub_fov_1.clone());
 
+        dbg!(&fov_1);
         // debug_print_fov_as_relative(&fov_1, 20);
         // debug_print_fov_as_absolute(&fov_1, 20);
         let rfov = fov_1.rasterized();
@@ -2055,7 +2070,7 @@ mod tests {
             the_square_visibility
                 .visible_portion()
                 .unwrap()
-                .dividing_line()
+                .dividing_line
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0
@@ -2074,9 +2089,10 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance_left_end = SquareWithOrthogonalDir::from_square_and_step(center, STEP_RIGHT);
+        let entrance_left_end =
+            WorldSquareWithOrthogonalDir::from_square_and_step(center, STEP_RIGHT);
         let portal_step = STEP_RIGHT * 2;
-        let exit_left_end = SquareWithOrthogonalDir::from_square_and_step(
+        let exit_left_end = WorldSquareWithOrthogonalDir::from_square_and_step(
             entrance_left_end.square() + STEP_RIGHT + portal_step,
             STEP_RIGHT,
         );
@@ -2114,7 +2130,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsCcw::new(0)
+            NormalizedOrthoAngle::new_from_quarter_turns(0)
         );
     }
 
@@ -2123,11 +2139,11 @@ mod tests {
         let center = point2(5, 5);
         let mut portal_geometry = PortalGeometry::default();
 
-        let entrance = SquareWithOrthogonalDir::from_square_and_step(
+        let entrance = WorldSquareWithOrthogonalDir::from_square_and_step(
             center + STEP_RIGHT * 2 + STEP_UP,
             STEP_RIGHT,
         );
-        let exit = SquareWithOrthogonalDir::from_square_and_step(
+        let exit = WorldSquareWithOrthogonalDir::from_square_and_step(
             entrance.square() + STEP_UP_LEFT * 5,
             STEP_UP,
         );
@@ -2177,7 +2193,7 @@ mod tests {
         );
         assert_eq!(
             rasterized_fov.lone_portal_rotation_for_relative_square_or_panic(test_square),
-            QuarterTurnsCcw::new(1)
+            NormalizedOrthoAngle::new_from_quarter_turns(1)
         );
         let the_square_visibility = rasterized_fov
             .lone_absolute_portal_entrance_shape_for_relative_square_or_panic(test_square);
@@ -2213,8 +2229,7 @@ mod tests {
             PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
             STEP_ZERO
         )
-        .is_none())
-        // .is_some_and(|vis| vis.is_fully_visible()))
+        .is_not_visible())
     }
     #[test]
     fn test_rasterize_one_view_segment() {
@@ -2230,7 +2245,7 @@ mod tests {
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(2, 0)));
         assert!(rasterized.relative_square_is_only_partially_visible(vec2(3, 0)));
 
-        assert_eq!(rasterized.view_root, (5, 5, STEP_UP).into());
+        assert_eq!(rasterized.view_root, (5, 5, UP).into());
 
         assert_eq!(
             rasterized.relative_square_to_absolute_square((2, 0)),
@@ -2266,7 +2281,7 @@ mod tests {
                 AngleInterval::from_degrees(0.0, 0.001),
                 5,
             )
-            .with_start_face((3, 0, STEP_RIGHT));
+            .with_start_face((3, 0, RIGHT));
         let mut fov = FieldOfView::new_empty_fov_at((5, 7));
         fov.visible_segments_in_main_view_only.push(view_segment);
         let rfov = fov.rasterized();
@@ -2294,8 +2309,8 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let x_entrance_pose: SquareWithOrthogonalDir = (1, 0, STEP_UP).into();
-        let y_entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let x_entrance_pose: WorldSquareWithOrthogonalDir = (1, 0, UP).into();
+        let y_entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
 
         let portal_geometry = PortalGeometry::new()
             .with_portal(
@@ -2329,7 +2344,7 @@ mod tests {
         let base_square = WorldSquare::new(0, 0);
         let target_rel_square = WorldStep::new(1, 1);
 
-        let entrance_pose: SquareWithOrthogonalDir = (0, 1, STEP_RIGHT).into();
+        let entrance_pose: WorldSquareWithOrthogonalDir = (0, 1, RIGHT).into();
         let portal_geometry = PortalGeometry::new().with_portal(
             entrance_pose,
             entrance_pose
@@ -2352,7 +2367,7 @@ mod tests {
     #[test]
     fn test_rasterize_one_rotated_view() {
         let mut base_fov = FieldOfView::new_empty_fov_at((0, 0));
-        let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, STEP_LEFT));
+        let mut sub_fov = FieldOfView::new_empty_fov_with_root((5, 0, LEFT));
         sub_fov.visible_segments_in_main_view_only.push(
             AngleBasedVisibleSegment::from_arc_and_fence_radius(
                 AngleInterval::from_degrees(0.0, 45.0),
@@ -2368,7 +2383,7 @@ mod tests {
         let entrance = top_down_portal.absolute_entrance_shape();
         let exit = top_down_portal.absolute_exit_shape();
         let l = 0.4;
-        let v = |vector: WorldStep| vector.to_f32().to_point().cast_unit() * l;
+        let v = |vector: WorldStep| vector.to_f32().cast_unit() * l;
         assert_true!(entrance.point_is_visible(v(STEP_UP_LEFT)));
         assert_true!(entrance.point_is_visible(v(STEP_UP_RIGHT)));
         assert_false!(entrance.point_is_visible(v(STEP_DOWN_LEFT)));
@@ -2385,7 +2400,7 @@ mod tests {
             (0, 0),
             3,
             &Default::default(),
-            &PortalGeometry::new_with_portal((2, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((2, 1, RIGHT), (2, 4, UP)),
         )
         .rasterized();
     }
@@ -2395,7 +2410,7 @@ mod tests {
             (0, 0),
             5,
             &Default::default(),
-            &PortalGeometry::new_with_portal((0, 1, STEP_RIGHT), (2, 4, STEP_UP)),
+            &PortalGeometry::new_with_portal((0, 1, RIGHT), (2, 4, UP)),
         )
         .rasterized();
     }

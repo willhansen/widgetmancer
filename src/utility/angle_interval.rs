@@ -4,7 +4,7 @@ use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Neg, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::Angle;
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
@@ -13,19 +13,11 @@ use ordered_float::OrderedFloat;
 use termion::cursor::Left;
 
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
-use crate::utility::coordinate_frame_conversions::{WorldMove, WorldStep};
-use crate::utility::round_robin_iterator::round_robin;
-use crate::utility::{
-    abs_angle_distance, better_angle_from_x_axis, partial_angle_interval, standardize_angle,
-    Octant, OrthogonalWorldStep, QuarterTurnsCcw, RelativeSquareWithOrthogonalDir,
-    SquareWithOrthogonalDir, ORTHOGONAL_STEPS, STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT,
-    STEP_UP_RIGHT, STEP_ZERO,
-};
+use crate::utility::*;
 
 use super::bool_with_partial::BoolWithPartial;
 use super::coordinates::QuarterTurnRotatable;
 use super::partial_angle_interval::PartialAngleInterval;
-use super::poses::RelativeFace;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -180,12 +172,18 @@ impl AngleInterval {
 
         Some(
             PartialAngleInterval {
-                anticlockwise_end: if a.contains_angle(b.ccw(), tolerance).is_at_least_partial() {
+                anticlockwise_end: if a
+                    .contains_angle_with_tolerance(b.ccw(), tolerance)
+                    .is_at_least_partial()
+                {
                     a.ccw()
                 } else {
                     b.ccw()
                 },
-                clockwise_end: if a.contains_angle(b.cw(), tolerance).is_at_least_partial() {
+                clockwise_end: if a
+                    .contains_angle_with_tolerance(b.cw(), tolerance)
+                    .is_at_least_partial()
+                {
                     a.cw()
                 } else {
                     b.cw()
@@ -209,12 +207,14 @@ impl AngleInterval {
 
         if a.overlaps_partial_arc(b, tolerance).is_true() {
             vec![AngleInterval::from_angles(
-                if b.contains_angle(a.cw(), tolerance).is_true() {
+                if b.contains_angle_with_tolerance(a.cw(), tolerance).is_true() {
                     a.cw()
                 } else {
                     b.cw()
                 },
-                if b.contains_angle(a.ccw(), tolerance).is_true() {
+                if b.contains_angle_with_tolerance(a.ccw(), tolerance)
+                    .is_true()
+                {
                     a.ccw()
                 } else {
                     b.ccw()
@@ -251,11 +251,11 @@ impl AngleInterval {
         }
 
         let mut split_results = vec![];
-        if a.contains_or_touches_angle(b.cw()) && a.cw() != b.cw() {
+        if a.contains_angle_inclusive(b.cw()) && a.cw() != b.cw() {
             let below_interval = AngleInterval::from_angles(a.cw(), b.cw());
             split_results.push(below_interval);
         }
-        if a.contains_or_touches_angle(b.ccw()) && a.ccw() != b.ccw() {
+        if a.contains_angle_inclusive(b.ccw()) && a.ccw() != b.ccw() {
             let above_interval = AngleInterval::from_angles(b.ccw(), a.ccw());
             split_results.push(above_interval);
         }
@@ -369,7 +369,7 @@ impl AngleInterval {
         match self {
             Empty => False,
             FullCircle => True,
-            PartialArc(partial_arc) => partial_arc.contains_angle(angle, tolerance),
+            PartialArc(partial_arc) => partial_arc.contains_angle_with_tolerance(angle, tolerance),
         }
     }
 
@@ -423,7 +423,7 @@ impl RigidlyTransformable for AngleInterval {
 impl QuarterTurnRotatable for AngleInterval {
     fn quarter_rotated_ccw(
         &self,
-        quarter_turns_anticlockwise: impl Into<QuarterTurnsCcw> + Copy,
+        quarter_turns_anticlockwise: impl Into<NormalizedOrthoAngle>,
     ) -> Self {
         match self {
             AngleInterval::PartialArc(partial_arc) => partial_arc
@@ -436,7 +436,6 @@ impl QuarterTurnRotatable for AngleInterval {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point2;
     use itertools::iproduct;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use num::zero;
