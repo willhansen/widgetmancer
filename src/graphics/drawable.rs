@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, SquareVisibility};
+use crate::fov_stuff::*;
 use crate::vec2;
 use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::Constructor;
@@ -561,7 +561,6 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
-    use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use crate::glyph::braille::EMPTY_BRAILLE;
     use ntest::timeout;
     use pretty_assertions::{assert_eq, assert_ne};

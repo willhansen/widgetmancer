@@ -24,9 +24,7 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::rasterized_field_of_view::{
     RasterizedFieldOfView, RasterizedFieldOfViewFunctions,
 };
-use crate::fov_stuff::square_visibility::{
-    RelativeSquareVisibilityFunctions, SquareVisibilityFunctions,
-};
+use crate::fov_stuff::square_visibility::{SquareVisibilityFunctions, SquareVisibilityOperations};
 use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
 use crate::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,

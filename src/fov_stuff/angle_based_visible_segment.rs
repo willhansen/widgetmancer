@@ -1,6 +1,4 @@
-use crate::fov_stuff::NormalizedOrthoAngle;
-use crate::fov_stuff::RelativeSquareWithOrthogonalDir;
-use crate::fov_stuff::{LocalSquareVisibilityMap, SquareVisibility};
+use crate::fov_stuff::*;
 use crate::utility::*;
 use euclid::Angle;
 use itertools::{all, Itertools};
@@ -9,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 
 use super::fence::{Fence, RelativeFenceFullyVisibleFromOriginGoingCcw};
-use super::square_visibility::RelativeSquareVisibilityFunctions;
+use super::square_visibility::SquareVisibilityOperations;
 use super::NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES;
 
 #[derive(Clone, PartialEq)]
@@ -308,21 +306,9 @@ impl Debug for AngleBasedVisibleSegment {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ntest::{assert_about_eq, assert_false, assert_true};
 
-    use crate::{
-        fov_stuff::{
-            fence::Fence,
-            square_visibility::{SquareVisibilityFromOneLargeShadow, ViewRoundable},
-        },
-        utility::{
-            coordinates::FVector,
-            general_utility::{as_set, set_of_keys},
-            units::{STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP},
-        },
-    };
-
-    use super::*;
     #[test]
     fn test_squares_touched_by_angle_based_visible_segment__simple_horizontal() {
         let seg = AngleBasedVisibleSegment::from_relative_face((STEP_RIGHT * 5, STEP_RIGHT));

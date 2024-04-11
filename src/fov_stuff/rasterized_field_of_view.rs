@@ -2,7 +2,7 @@ use crate::fov_stuff::debug_print_fov_as_relative;
 use crate::fov_stuff::square_visibility::LocalSquareVisibilityMap;
 use crate::fov_stuff::square_visibility::SquareVisibility;
 use crate::fov_stuff::square_visibility::SquareVisibilityMapFunctions;
-use crate::fov_stuff::square_visibility::{RelativeSquareVisibilityFunctions, ViewRoundable};
+use crate::fov_stuff::square_visibility::{SquareVisibilityOperations, ViewRoundable};
 use crate::glyph::glyph_constants::RED;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable,
@@ -1176,7 +1176,6 @@ impl DirectConnectionToLocalSquare {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fov_stuff::square_visibility::SquareVisibilityFromOneLargeShadow;
     use ntest::{assert_false, assert_true, timeout};
 
     #[ignore = "Maybe don't want this"]

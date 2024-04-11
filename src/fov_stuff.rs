@@ -2,14 +2,14 @@ pub mod angle_based_visible_segment;
 pub mod fence;
 pub mod rasterized_field_of_view;
 pub mod square_visibility;
+pub use self::square_visibility::*;
+pub mod square_visibility_from_one_large_shadow;
+pub use self::square_visibility_from_one_large_shadow::*;
 
 use std::collections::HashSet;
 
 use crate::fov_stuff::angle_based_visible_segment::AngleBasedVisibleSegment;
 use crate::fov_stuff::rasterized_field_of_view::RasterizedFieldOfView;
-use crate::fov_stuff::square_visibility::{
-    LocalSquareVisibilityMap, SquareVisibility, SquareVisibilityMapFunctions,
-};
 use derive_more::Constructor;
 use euclid::Angle;
 use itertools::*;
@@ -880,10 +880,6 @@ mod tests {
     use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use crate::glyph::DoubleGlyphFunctions;
     use crate::utility::*;
-
-    use self::square_visibility::{
-        RelativeSquareVisibilityFunctions, SquareVisibilityFromOneLargeShadow,
-    };
 
     use super::*;
 
