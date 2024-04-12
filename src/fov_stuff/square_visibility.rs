@@ -493,7 +493,7 @@ impl SquareVisibilityMapFunctions for LocalSquareVisibilityMap {
         let mut combined_vis_map = self.clone();
         other.iter().for_each(|entry_to_add| {
             let (key, value_to_add) = entry_to_add;
-            let mut existing_entry = combined_vis_map.entry(*key);
+            let existing_entry = combined_vis_map.entry(*key);
             match existing_entry {
                 std::collections::hash_map::Entry::Occupied(mut e) => {
                     e.insert(e.get().combined_increasing_visibility(value_to_add));

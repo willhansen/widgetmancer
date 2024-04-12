@@ -120,7 +120,7 @@ pub fn pair_up_character_square_map<T: Clone>(
             let position_index = if is_left_value { 0 } else { 1 };
 
             if output_map.contains_key(&world_square) {
-                let mut existing_double_value = output_map.get_mut(&world_square).unwrap();
+                let existing_double_value = output_map.get_mut(&world_square).unwrap();
                 existing_double_value[position_index] = value;
             } else {
                 let mut new_double_value = [default_filler.clone(), default_filler.clone()];

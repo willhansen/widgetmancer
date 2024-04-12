@@ -400,7 +400,7 @@ impl Game {
     ) {
         let floating_entities_at_start: Vec<FloatingEntityEnum> =
             self.take_floating_entities_from_square(start_square);
-        let mut moved_drones = floating_entities_at_start
+        let moved_drones = floating_entities_at_start
             .iter()
             .map(|e| {
                 self.slide_floating_entity_with_portal_awareness(
@@ -1515,11 +1515,11 @@ impl Game {
     }
 
     fn move_red_pawn_at(&mut self, piece_square: WorldSquare) -> Option<WorldSquare> {
-        let mut end_square: Option<WorldSquare>;
+        let end_square: Option<WorldSquare>;
         let piece = self.get_piece_at(piece_square).unwrap().clone();
         assert_eq!(piece.faction, self.red_pawn_faction);
         // Look at surrounding 5x5 square
-        let mut nearby_ally_squares =
+        let nearby_ally_squares =
             self.allies_within_radius_excluding_center(piece_square, 2, piece.faction);
         let nearby_protection_strengths =
             self.protection_strengths_from_given_pawns(nearby_ally_squares.clone());
@@ -1604,7 +1604,7 @@ impl Game {
 
         let piece = self.get_piece_at(piece_square).unwrap().clone();
 
-        let mut end_square: Option<WorldSquare>;
+        let end_square: Option<WorldSquare>;
 
         if piece.faction == self.red_pawn_faction {
             return self.move_red_pawn_at(piece_square);
@@ -1699,7 +1699,7 @@ impl Game {
         };
 
         for move_direction in move_function(piece) {
-            let mut squares_to_collision =
+            let squares_to_collision =
                 self.slide_cast(piece_square, move_direction, pass_through_pieces);
             squares.extend(squares_to_collision);
         }
@@ -1889,7 +1889,7 @@ impl Game {
     }
 
     pub fn do_player_shoot_sniper(&mut self) {
-        let mut graphical_laser_end: WorldSquare;
+        let graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square);
@@ -3636,7 +3636,7 @@ mod tests {
     fn test_rotated_shadows() {
         let player_square = point2(5, 5);
 
-        let mut unrotated_game = set_up_10x10_game();
+        let unrotated_game = set_up_10x10_game();
         let mut rotated_game = set_up_10x10_game();
         rotated_game
             .graphics
@@ -3774,7 +3774,7 @@ mod tests {
         assert!(glyphs.looks_solid());
     }
 
-    fn assert_screen_is_stable(mut game: &mut Game, n: usize) {
+    fn assert_screen_is_stable(game: &mut Game, n: usize) {
         let consecutive_frames = (0..n)
             .map(|_i| {
                 game.draw_headless_now();

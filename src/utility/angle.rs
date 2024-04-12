@@ -369,7 +369,7 @@ pub fn standardize_angle_with_zero_mid(angle: Angle<f32>) -> Angle<f32> {
 // TODO: make difference in names clearer
 pub fn standardize_angle_with_zero_min(angle: Angle<f32>) -> Angle<f32> {
     let with_zero_mid = standardize_angle_with_zero_mid(angle);
-    if angle.radians < 0.0 {
+    if with_zero_mid.radians < 0.0 {
         angle + Angle::two_pi()
     } else {
         angle

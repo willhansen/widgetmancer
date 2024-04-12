@@ -224,7 +224,7 @@ impl Graphics {
                     if let Some(drawable) = self.draw_buffer.get(&point2(x, y)) {
                         drawable.to_glyphs().to_string()
                     } else {
-                        Box::new(TextDrawable::new("**", RED, BLACK, false))
+                        (TextDrawable::new("**", RED, BLACK, false))
                             .to_glyphs()
                             .to_clean_string()
                     }

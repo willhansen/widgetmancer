@@ -149,9 +149,11 @@ impl FieldOfView {
             .iter()
             .map(|x| x.quarter_rotated_ccw(tf_to_new_view_root.inverse().rotation()))
             .collect();
-        self.transformed_sub_fovs
+        self.transformed_sub_fovs = self
+            .transformed_sub_fovs
             .iter()
-            .map(|x| x.apply_rigid_transform(tf_to_new_view_root.inverse()));
+            .map(|x| x.apply_rigid_transform(tf_to_new_view_root.inverse()))
+            .collect();
         self
     }
 
@@ -1059,7 +1061,7 @@ mod tests {
 
     #[test]
     fn test_fov_square_sequence__detailed() {
-        let mut sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
+        let sequence = OctantFOVSquareSequenceIter::new_from_center(Octant::new(1));
         let correct_sequence = vec![
             vec2(0, 0),
             vec2(0, 1),
@@ -1647,9 +1649,8 @@ mod tests {
     #[test]
     fn test_simple_fov_combination() {
         let main_center = point2(5, 5);
-        let mut fov_1 =
-            FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_RIGHT);
-        let mut fov_2 = FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_UP);
+        let fov_1 = FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_RIGHT);
+        let fov_2 = FieldOfView::new_with_fully_visible_relative_square(main_center, STEP_UP);
 
         let combined = fov_1.combined_with(&fov_2).rasterized();
 
@@ -1661,12 +1662,12 @@ mod tests {
     fn test_combine_fovs_to_make_full_circle() {
         let main_center = point2(5, 5);
         let radius = 4;
-        let mut fov_1 = FieldOfView::new_with_arc_and_radius(
+        let fov_1 = FieldOfView::new_with_arc_and_radius(
             main_center,
             AngleInterval::from_degrees(10.0, 55.0),
             radius,
         );
-        let mut fov_2 = FieldOfView::new_with_arc_and_radius(
+        let fov_2 = FieldOfView::new_with_arc_and_radius(
             main_center,
             AngleInterval::from_degrees(55.0, 10.0),
             radius,
@@ -2253,7 +2254,7 @@ mod tests {
     }
     #[test]
     fn test_rasterize_empty_fov() {
-        let mut fov = FieldOfView::new_empty_fov_at(point2(5, 5));
+        let fov = FieldOfView::new_empty_fov_at(point2(5, 5));
 
         assert_eq!(fov.visible_segments_in_main_view_only.len(), 0);
         assert!(fov.transformed_sub_fovs.is_empty());
@@ -2288,7 +2289,7 @@ mod tests {
     #[test]
     fn test_rasterize_fov_with_sub_view__should_have_correct_portal_depths() {
         let mut main_fov = FieldOfView::new_with_fully_visible_relative_square((0, 0), (5, 0));
-        let mut sub_fov = FieldOfView::new_with_fully_visible_relative_square((20, 20), (0, 5))
+        let sub_fov = FieldOfView::new_with_fully_visible_relative_square((20, 20), (0, 5))
             .with_fully_visible_relative_square((0, 5));
         main_fov.transformed_sub_fovs.push(sub_fov);
         let rfov = main_fov.rasterized();

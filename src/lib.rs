@@ -72,7 +72,7 @@ pub fn do_everything() {
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut writable =
+    let writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
             .into_alternate_screen()
             .unwrap();
@@ -86,7 +86,7 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    let rng = rand::rngs::StdRng::seed_from_u64(5);
     game.set_up_test_map();
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();

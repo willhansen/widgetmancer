@@ -312,7 +312,7 @@ impl RasterizedFieldOfViewFunctions for RasterizedFieldOfView {
         vis_map: &LocalSquareVisibilityMap,
     ) -> Vec<TopDownPortal> {
         let root = root.into();
-        let mut new_rfov = Self::new_empty_with_view_root(root);
+        let new_rfov = Self::new_empty_with_view_root(root);
 
         vis_map
             .iter()
@@ -1178,7 +1178,7 @@ mod tests {
     #[ignore = "Maybe don't want this"]
     #[test]
     fn test_center_square_is_always_visible() {
-        let mut rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
+        let rasterized_fov = RasterizedFieldOfView::new_centered_at(point2(5, 5));
         assert_eq!(rasterized_fov.portal_map().len(), 1);
         assert_eq!(
             rasterized_fov

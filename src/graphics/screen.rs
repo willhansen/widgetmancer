@@ -566,7 +566,7 @@ mod tests {
     #[test]
 
     fn test_world_square_is_on_screen() {
-        let mut g = Screen::new(41, 20);
+        let g = Screen::new(41, 20);
         let xmax = 20;
         let ymax = 19;
 

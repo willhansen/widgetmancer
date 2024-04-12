@@ -107,7 +107,7 @@ impl Drawable for TextDrawable {
         self.clone().into()
     }
 
-    fn tinted(&self, color: RGB8, mut strength: f32) -> DrawableEnum {
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
         Self::from_glyphs(self.glyphs.tinted(color, strength)).into()
     }
 }
