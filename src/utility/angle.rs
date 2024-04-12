@@ -11,6 +11,7 @@ pub enum AngleVariety {
     OrthoDiagonal,
     FloatingPoint,
 }
+// TODO: normalized angle enum
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);

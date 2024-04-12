@@ -15,15 +15,14 @@ use std::fmt::{Debug, Formatter};
 #[derive(PartialEq, Clone, Copy)]
 pub enum SquareVisibility<T: PartialSquareVisibilityOps> {
     FullyVisible,
-    // TODO: have more than one half plane (two?)
     PartiallyVisible(T),
-    // PartiallyVisible(LocalSquareHalfPlaneWithBorderOnUnitSquare), // TODO
     NotVisible,
 }
-pub type SquareVisibilityByOneHalfPlane =
+pub type SquareVisibilityFromOneHalfPlane =
     SquareVisibility<PartialSquareVisibilityByOneVisibleHalfPlane>;
+pub type SquareVisibilityFromFovCones = SquareVisibility<PartialSquareVisibilityFromFovCones>;
 
-pub type DefaultSquareVisibilityType = SquareVisibilityByOneHalfPlane;
+pub type DefaultSquareVisibilityType = SquareVisibilityFromOneHalfPlane;
 
 impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     pub fn visible_portion(&self) -> Option<T> {
@@ -46,7 +45,7 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
 }
 
 // TODO: get rid of this
-impl SquareVisibilityByOneHalfPlane {
+impl SquareVisibilityFromOneHalfPlane {
     pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
         match self {
             SquareVisibility::PartiallyVisible(v) => v.where_border_touches_unit_square(),
@@ -75,8 +74,26 @@ pub trait SquareVisibilityOperations: QuarterTurnRotatable + ViewRoundable {
 
     // creators
     fn new_fully_visible() -> Self;
+    fn new_not_visible() -> Self;
     fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self;
-    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self;
+    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self where Self: Sized {
+        assert!(visible_portion.at_least_partially_covers_unit_square());
+        if visible_portion
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
+            Self::new_fully_visible()
+        } else if visible_portion
+            .complement()
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
+            Self::new_not_visible()
+        } else {
+            // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
+            Self::new_partially_visible_from_visible_half_plane(visible_portion.try_into().unwrap())
+        }
+    }
     fn from_partial_viz_type(vis: Self::PartialVizType) -> Self;
     fn new_top_half_visible() -> Self  where Self: Sized{
         Self::from_partial_viz_type(Self::PartialVizType::half_visible(Angle::degrees(270.0)))
@@ -121,7 +138,7 @@ impl ViewRoundable for DefaultSquareVisibilityType {
         }
     }
 }
-impl SquareVisibilityOperations for SquareVisibilityByOneHalfPlane {
+impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
 
     type PartialVizType = PartialSquareVisibilityByOneVisibleHalfPlane;
 
@@ -153,28 +170,14 @@ impl SquareVisibilityOperations for SquareVisibilityByOneHalfPlane {
     fn new_fully_visible() -> Self {
         Self::FullyVisible
     }
+    fn new_not_visible() -> Self {
+        Self::NotVisible
+    }
     fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
         SquareVisibility::PartiallyVisible(Self::PartialVizType::new(visible_portion))
     }
     
-    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self {
-        assert!(visible_portion.at_least_partially_covers_unit_square());
-        if visible_portion
-            .fully_covers_centered_unit_square()
-            .is_at_least_partial()
-        {
-            Self::FullyVisible
-        } else if visible_portion
-            .complement()
-            .fully_covers_centered_unit_square()
-            .is_at_least_partial()
-        {
-            Self::NotVisible
-        } else {
-            // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
-            Self::new_partially_visible_from_visible_half_plane(visible_portion.try_into().unwrap())
-        }
-    }
+    
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
@@ -441,35 +444,7 @@ impl QuarterTurnRotatable for DefaultSquareVisibilityType {
         )
     }
 }
-#[derive(Clone, Constructor, Debug)]
-pub struct PartialSquareVisibilityFromPointSource {
-    visible_at_cw_extreme: bool,
-    visibility_switch_angles_going_ccw: Vec<Angle<f32>>,
-    // TODO: may be redundant information
-    this_square_from_view_center: WorldStep,
-}
 
-impl PartialSquareVisibilityFromPointSource {
-    pub fn is_fully_visible(&self) -> bool {
-        todo!()
-    }
-    pub fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self {
-        todo!()
-    }
-}
-
-impl QuarterTurnRotatable for PartialSquareVisibilityFromPointSource {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        let quarter_turns_ccw = quarter_turns_ccw.into();
-        let mut the_clone = self.clone();
-        the_clone.visibility_switch_angles_going_ccw = the_clone
-            .visibility_switch_angles_going_ccw
-            .iter()
-            .map(|angle: &Angle<f32>| angle.quarter_rotated_ccw(quarter_turns_ccw))
-            .collect_vec();
-        the_clone
-    }
-}
 
 pub type LocalSquareVisibilityMap = HashMap<WorldStep, DefaultSquareVisibilityType>;
 
@@ -528,16 +503,31 @@ mod tests {
     };
     use ntest::{assert_false, timeout};
 
-    #[test]
-    fn test_square_visibility_knows_if_its_fully_visible() {
-        let partial = SquareVisibility::new_from_visible_half_plane(
-            HalfPlane::new_from_line_and_point_on_half_plane(
-                TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
-                point2(-12.061038, -1.3054879),
-            ),
-        );
-        assert!(partial.is_fully_visible());
+    macro_rules! square_viz_tests {
+        ($($name:ident: $type:ty,)*) => {
+            $(
+                mod $name {
+                    use super::*;
+                    #[test]
+                    fn test_square_visibility_knows_if_its_fully_visible() {
+                        let partial = <$type>::new_from_visible_half_plane(
+                            HalfPlane::new_from_line_and_point_on_half_plane(
+                                TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                                point2(-12.061038, -1.3054879),
+                            ),
+                        );
+                        assert!(partial.is_fully_visible());
+                    }
+                }
+        
+            )*
+        }
     }
+    square_viz_tests!(
+        fromhalfplane: SquareVisibilityFromOneHalfPlane,
+        fromfovcones: SquareVisibilityFromFovCones,
+    );
+
     #[test]
     fn test_single_square_is_shadowed_correctly_on_diagonal() {
         let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();

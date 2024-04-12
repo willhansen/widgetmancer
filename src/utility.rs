@@ -34,6 +34,7 @@ pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
     cone,
+    to_and_from_array,
     reversible,
     two_points,
     try_from_two_points,

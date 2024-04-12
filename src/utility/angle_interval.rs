@@ -25,6 +25,11 @@ pub enum AngleInterval {
     Empty,
     FullCircle,
     PartialArc(PartialAngleInterval),
+    // TODO: Cone, // width in (0,180)
+    // TODO: HalfPlane, // width == 180
+    // TODO: InverseCone, // width in (180,360)
+    // TODO: Ray, // width == 0, one angle
+    // TODO: InverseRay, // width == 360, one angle
 }
 
 impl Display for AngleInterval {

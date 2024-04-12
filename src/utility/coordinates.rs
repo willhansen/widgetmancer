@@ -681,6 +681,7 @@ impl RigidlyTransformable for WorldSquare {
     }
 }
 
+// TODO: put in separate file
 pub trait QuarterTurnRotatable {
     // TODO: pass reference?
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self;

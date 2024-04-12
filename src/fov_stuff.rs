@@ -1,11 +1,12 @@
 pub mod angle_based_visible_segment;
 pub mod fence;
 pub mod rasterized_field_of_view;
-pub_mod_and_use!(partial_square_visibility_ops);
-pub mod square_visibility;
-pub use self::square_visibility::*;
-pub mod partial_square_visibility_by_half_plane;
-pub use self::partial_square_visibility_by_half_plane::*;
+pub_mod_and_use!(
+    partial_square_visibility_ops,
+    square_visibility,
+    partial_square_visibility_from_one_half_plane,
+    partial_square_visibility_from_fov_cones
+);
 
 use std::collections::HashSet;
 
