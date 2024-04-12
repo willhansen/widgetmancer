@@ -114,7 +114,8 @@ impl Drawable for TextDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct PartialVisibilityDrawable {
-    visibility: SquareVisibility,
+    // TODO: switch to a partial visibility type
+    visibility: DefaultSquareVisibilityType,
     fg_color: RGB8,
     bg_color: RGB8,
 }
@@ -123,7 +124,7 @@ impl PartialVisibilityDrawable {
     #[deprecated(
         note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
     )]
-    pub fn from_square_visibility(square_viz: SquareVisibility) -> Self {
+    pub fn from_square_visibility(square_viz: DefaultSquareVisibilityType) -> Self {
         assert!(square_viz.is_only_partially_visible());
         PartialVisibilityDrawable {
             visibility: square_viz,
@@ -133,7 +134,7 @@ impl PartialVisibilityDrawable {
     }
     pub fn from_shadowed_drawable<T: Drawable>(
         original_drawable: &T,
-        square_viz: SquareVisibility,
+        square_viz: DefaultSquareVisibilityType,
     ) -> Self {
         assert!(!square_viz.is_fully_visible());
         PartialVisibilityDrawable {
@@ -163,11 +164,16 @@ impl Drawable for PartialVisibilityDrawable {
             .visibility
             .visible_portion()
             .unwrap()
+            .half_plane()
             .direction_away_from_plane();
 
         let character_visible_portions = [0, 1].map(|i| {
             local_square_half_plane_to_local_character_half_plane(
-                self.visibility.visible_portion().unwrap().into(),
+                self.visibility
+                    .visible_portion()
+                    .unwrap()
+                    .half_plane()
+                    .into(),
                 i,
             )
         });
@@ -572,7 +578,7 @@ mod tests {
     #[test]
     fn test_shadow_over_text() {
         let shadow = PartialVisibilityDrawable::from_square_visibility(
-            SquareVisibilityFromOneLargeShadow::new_bottom_half_visible(),
+            SquareVisibility::new_bottom_half_visible(),
         );
         let text = TextDrawable::new("a ", RED, GREEN, false);
 
@@ -606,7 +612,7 @@ mod tests {
     #[test]
     fn test_top_half_visible_glyphs() {
         let base = SolidColorDrawable::new(RED).to_enum();
-        let visibility = SquareVisibilityFromOneLargeShadow::new_partially_visible(
+        let visibility = SquareVisibility::new_partially_visible_from_visible_half_plane(
             HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                 TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_from_two_unordered_points_on_line(
                     point2(0.0, 0.0),

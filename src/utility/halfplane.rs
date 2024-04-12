@@ -7,6 +7,7 @@ use euclid::num::Zero;
 // {
 // }
 
+/// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
@@ -175,7 +176,7 @@ where {
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
     pub fn direction_away_from_plane(&self) -> Angle<f32> {
-        standardize_angle_with_zero_mid(self.dividing_line.direction() + Angle::degrees(90.0))
+        standardize_angle_with_zero_mid(self.dividing_line.direction().turned_left())
     }
     pub fn direction_toward_plane(&self) -> Angle<f32> {
         standardize_angle_with_zero_mid(-self.direction_away_from_plane())

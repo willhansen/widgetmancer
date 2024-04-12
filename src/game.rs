@@ -2432,6 +2432,8 @@ mod tests {
     use crate::utility::*;
     use crate::utils_for_tests::*;
 
+    use self::square_visibility::DefaultSquareVisibilityType;
+
     use super::*;
 
     #[test]
@@ -4016,12 +4018,14 @@ mod tests {
                 fov.rasterized()
                     .absolute_top_down_portal_entrance_shapes_at_relative_square(world_step)
             })
-            .for_each(|visibilities_of_rel_square: Vec<SquareVisibility>| {
-                let vis1: SquareVisibility = visibilities_of_rel_square[0];
-                let vis2: SquareVisibility = visibilities_of_rel_square[1];
-                assert!(vis1.about_complementary(vis2));
-                assert!(vis1.is_visually_complementary_to(vis2));
-            });
+            .for_each(
+                |visibilities_of_rel_square: Vec<DefaultSquareVisibilityType>| {
+                    let vis1: DefaultSquareVisibilityType = visibilities_of_rel_square[0];
+                    let vis2: DefaultSquareVisibilityType = visibilities_of_rel_square[1];
+                    assert!(vis1.about_complementary(vis2));
+                    assert!(vis1.is_visually_complementary_to(vis2));
+                },
+            );
 
         let correct_strings_top_to_bottom = vec!["🭋█", "🭅█", "🭖█", "🭦█"];
 

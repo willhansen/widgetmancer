@@ -30,6 +30,7 @@ macro_rules! pub_mod_and_use {
         )+
     };
 }
+pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
     reversible,

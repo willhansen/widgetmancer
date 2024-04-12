@@ -1,10 +1,11 @@
 pub mod angle_based_visible_segment;
 pub mod fence;
 pub mod rasterized_field_of_view;
+pub_mod_and_use!(partial_square_visibility_ops);
 pub mod square_visibility;
 pub use self::square_visibility::*;
-pub mod square_visibility_from_one_large_shadow;
-pub use self::square_visibility_from_one_large_shadow::*;
+pub mod partial_square_visibility_by_half_plane;
+pub use self::partial_square_visibility_by_half_plane::*;
 
 use std::collections::HashSet;
 
@@ -1110,7 +1111,7 @@ mod tests {
             .iter()
             .filter(|(step, vis)| !vis.is_fully_visible())
             .map(
-                |(step, square_vis): (&WorldStep, &SquareVisibilityFromOneLargeShadow)| {
+                |(step, square_vis): (&WorldStep, &DefaultSquareVisibilityType)| {
                     (
                         step,
                         PartialVisibilityDrawable::from_square_visibility(*square_vis)
@@ -1144,8 +1145,8 @@ mod tests {
     fn square_visibility_from_block_and_square(
         block_square: WorldStep,
         shadowed_square: WorldStep,
-    ) -> SquareVisibilityFromOneLargeShadow {
-        SquareVisibility::from_relative_square_and_view_arc(
+    ) -> DefaultSquareVisibilityType {
+        DefaultSquareVisibilityType::from_relative_square_and_view_arc(
             PartialAngleInterval::from_relative_square(block_square).complement(),
             shadowed_square,
         )
@@ -2066,6 +2067,7 @@ mod tests {
             the_square_visibility
                 .visible_portion()
                 .unwrap()
+                .half_plane()
                 .dividing_line
                 .angle_with_positive_x_axis()
                 .to_degrees(),

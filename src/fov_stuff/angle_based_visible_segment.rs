@@ -184,7 +184,10 @@ impl AngleBasedVisibleSegment {
     pub fn get_touching_relative_squares(&self) -> StepSet {
         self.touched_squares_going_outwards_and_ccw().collect()
     }
-    pub fn visibility_of_single_square(&self, _rel_square: WorldStep) -> SquareVisibility {
+    pub fn visibility_of_single_square(
+        &self,
+        _rel_square: WorldStep,
+    ) -> DefaultSquareVisibilityType {
         todo!()
     }
     pub fn combine_multiple(unsorted_segments: impl IntoIterator<Item = Self>) -> Vec<Self> {
@@ -569,7 +572,7 @@ mod tests {
         let segment = AngleBasedVisibleSegment::from_relative_face(test_face);
         let viz_map = AngleBasedVisibleSegment::to_local_square_visibility_map(&segment);
         let viz = viz_map.get(&test_square).unwrap();
-        let line = viz.visible_portion().unwrap().dividing_line;
+        let line = viz.visible_portion().unwrap().half_plane().dividing_line;
 
         assert!(
             line.point_is_approx_on_line((0.5, 0.5).into(), 0.001),
