@@ -24,8 +24,7 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::rasterized_field_of_view::{
     RasterizedFieldOfView, RasterizedFieldOfViewFunctions,
 };
-use crate::fov_stuff::square_visibility::{SquareVisibilityFunctions, SquareVisibilityOperations};
-use crate::fov_stuff::{portal_aware_field_of_view_from_square, square_visibility, FieldOfView};
+use crate::fov_stuff::*;
 use crate::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
 };
@@ -1632,14 +1631,10 @@ impl Game {
                 }
                 end_square = None;
             }
-        } else if let optional_square =
-            self.highest_priority_capture_square_for_piece_at(piece_square)
-        {
-            end_square = optional_square;
         } else {
-            end_square = None;
+            let optional_square = self.highest_priority_capture_square_for_piece_at(piece_square);
+            end_square = optional_square;
         }
-
         if let Some(move_square) = end_square {
             self.move_piece(piece_square, move_square);
         }

@@ -16,7 +16,6 @@ use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::*;
 
 use super::bool_with_partial::BoolWithPartial;
-use super::coordinates::QuarterTurnRotatable;
 use super::partial_angle_interval::PartialAngleInterval;
 use super::{FAngle, RigidTransform, RigidlyTransformable};
 

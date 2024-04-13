@@ -1,0 +1,83 @@
+use crate::utility::*;
+
+pub trait QuarterTurnRotatable {
+    // TODO: pass reference?
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self;
+    fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
+    where
+        Self: Sized + Debug,
+    {
+        (0..4)
+            .into_iter()
+            .map(|i| self.quarter_rotated_ccw(i))
+            .collect_vec()
+            .try_into()
+            .unwrap()
+    }
+    fn turned_left(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(1)
+    }
+    fn turned_right(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(-1)
+    }
+    fn turned_back(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.quarter_rotated_ccw(2)
+    }
+}
+
+macro_rules! impl_quarter_turn_rotatable_for_newtype {
+    ($type:ty) => {
+        impl QuarterTurnRotatable for $type {
+            fn quarter_rotated_ccw(
+                &self,
+                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
+            ) -> Self {
+                Self(self.0.quarter_rotated_ccw(quarter_turns_ccw))
+            }
+        }
+    };
+}
+pub(crate) use impl_quarter_turn_rotatable_for_newtype;
+
+macro_rules! impl_quarter_turn_rotatable_for_iterable {
+    ($type:ident) => {
+        impl<T> QuarterTurnRotatable for $type<T>
+        where
+            T: QuarterTurnRotatable,
+        {
+            fn quarter_rotated_ccw(
+                &self,
+                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
+            ) -> Self {
+                let quarter_turns_ccw = quarter_turns_ccw.into();
+                self.iter()
+                    .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
+                    .collect()
+            }
+        }
+    };
+}
+pub(crate) use impl_quarter_turn_rotatable_for_iterable;
+
+// TODO: Can use blanket implementation over IntoIterator and FromIterator instead?
+impl_quarter_turn_rotatable_for_iterable!(Vec);
+
+// TODO: generate with macro ("for_mappable"?)
+impl<T> QuarterTurnRotatable for Option<T>
+where
+    T: QuarterTurnRotatable,
+{
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        self.as_ref()
+            .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
+    }
+}

@@ -33,6 +33,7 @@ macro_rules! pub_mod_and_use {
 pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
+    quarter_turn_rotatable,
     cone,
     to_and_from_array,
     reversible,

@@ -454,13 +454,13 @@ impl PartialAngleInterval {
 
         segments_to_return
     }
-    pub fn touched_rel_squares_going_outwards_in_one_octant(
-        &self,
-    ) -> impl Iterator<Item = WorldStep> {
-        assert!(self.is_in_one_octant());
-        todo!();
-        ORTHOGONAL_STEPS.into_iter()
-    }
+    // pub fn touched_rel_squares_going_outwards_in_one_octant(
+    //     &self,
+    // ) -> impl Iterator<Item = WorldStep> {
+    //     assert!(self.is_in_one_octant());
+    //     todo!();
+    //     ORTHOGONAL_STEPS.into_iter()
+    // }
     pub fn touched_rel_squares_going_outwards_in_one_octant_with_placeholders(
         &self,
     ) -> impl Iterator<Item = Option<WorldStep>> {

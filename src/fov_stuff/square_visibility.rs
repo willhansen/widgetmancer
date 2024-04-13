@@ -12,6 +12,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
+// TODO: merge with generalization of BooleanWithPartial (BoolWithQuantifiedPartial?), (via newtype?)
 #[derive(PartialEq, Clone, Copy)]
 pub enum SquareVisibility<T: PartialSquareVisibilityOps> {
     FullyVisible,
@@ -32,6 +33,7 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
         }
     }
 
+    // TODO: complement trait
     pub fn complement(&self) -> Self {
         match self {
             SquareVisibility::FullyVisible => Self::NotVisible,
@@ -40,8 +42,67 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
         }
     }
 
+    pub fn is_fully_visible(&self) -> bool {
+        matches!(self, Self::FullyVisible)
+    }
+    pub fn is_not_visible(&self) -> bool {
+        matches!(self, Self::NotVisible)
+    }
+
+    pub fn is_at_least_partially_visible(&self) -> bool {
+        !self.is_not_visible()
+    }
+    pub fn is_only_partially_visible(&self) -> bool {
+        matches!(self, Self::PartiallyVisible(_))
+    }
+    pub fn new_fully_visible() -> Self {
+        Self::FullyVisible
+    }
+    pub fn new_not_visible() -> Self {
+        Self::NotVisible
+    }
+    pub fn from_partial_viz_type(vis: T) -> Self {
+        Self::PartiallyVisible(vis)
+    }
+
 
     
+    pub fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self where Self: Sized {
+        assert!(visible_portion.at_least_partially_covers_unit_square());
+        if visible_portion
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
+            Self::new_fully_visible()
+        } else if visible_portion
+            .complement()
+            .fully_covers_centered_unit_square()
+            .is_at_least_partial()
+        {
+            Self::new_not_visible()
+        } else {
+
+            // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
+            Self::new_partially_visible_from_visible_half_plane(visible_portion.try_into().unwrap())
+        }
+    }    
+
+    pub fn new_top_half_visible() -> Self{
+        Self::from_partial_viz_type(T::half_visible(Angle::degrees(270.0)))
+    }
+
+    pub fn new_bottom_half_visible() -> Self{
+        Self::from_partial_viz_type(T::half_visible(Angle::degrees(90.0)))
+    }
+
+    
+    pub fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalDirection>) -> Self {
+        Self::from_partial_viz_type(T::new_orthogonal_half_visible(which_half_visible))
+    }
+
+    pub fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
+        Self::from_partial_viz_type(T::new_from_visible_half_plane(visible_portion))
+    }   
 }
 
 // TODO: get rid of this
@@ -61,55 +122,19 @@ pub trait ViewRoundable {
 }
 
 // TODO: should this be a trait? (yes, because the halfplane square visibility is going to be swapped out, with these functions being common between the two)
-pub trait SquareVisibilityOperations: QuarterTurnRotatable + ViewRoundable {
+// Might make more sense to have this not be a trait, and call methods of PartialSquareVisibilityOps
+pub trait SquareVisibilityOperations  {
     type PartialVizType: PartialSquareVisibilityOps;
     // visibility checks
-    fn is_fully_visible(&self) -> bool;
-    fn is_not_visible(&self) -> bool;
-    fn is_at_least_partially_visible(&self) -> bool;
-    fn is_only_partially_visible(&self) -> bool;
     fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool;
     fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool; // should return bool with partial for being on edge?
 
-    // creators
-    fn new_fully_visible() -> Self;
-    fn new_not_visible() -> Self;
-    fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self;
-    fn new_from_visible_half_plane(visible_portion: LocalSquareHalfPlane) -> Self where Self: Sized {
-        assert!(visible_portion.at_least_partially_covers_unit_square());
-        if visible_portion
-            .fully_covers_centered_unit_square()
-            .is_at_least_partial()
-        {
-            Self::new_fully_visible()
-        } else if visible_portion
-            .complement()
-            .fully_covers_centered_unit_square()
-            .is_at_least_partial()
-        {
-            Self::new_not_visible()
-        } else {
-            // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
-            Self::new_partially_visible_from_visible_half_plane(visible_portion.try_into().unwrap())
-        }
-    }
-    fn from_partial_viz_type(vis: Self::PartialVizType) -> Self;
-    fn new_top_half_visible() -> Self  where Self: Sized{
-        Self::from_partial_viz_type(Self::PartialVizType::half_visible(Angle::degrees(270.0)))
-    }
-
-    fn new_bottom_half_visible() -> Self  where Self: Sized{
-        Self::from_partial_viz_type(Self::PartialVizType::half_visible(Angle::degrees(90.0)))
-    }
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,
     ) -> DefaultSquareVisibilityType;
 
-    fn new_orthogonal_half_visible(which_half_visible: impl Into<OrthogonalDirection>) -> Self where Self: Sized {
-        Self::from_partial_viz_type(Self::PartialVizType::new_orthogonal_half_visible(which_half_visible))
-    }
 
 
     // other
@@ -117,19 +142,22 @@ pub trait SquareVisibilityOperations: QuarterTurnRotatable + ViewRoundable {
     fn combined_increasing_visibility(&self, other: &Self) -> Self;
     fn as_string(&self) -> String;
     fn high_res_string(&self, output_diameter: u32) -> String;
+
     // TODO: add tolerance to these two?
     fn about_equal(&self, other: Self) -> bool;
     fn about_complementary(&self, other: Self) -> bool;
+
     fn is_visually_complementary_to(&self, other: Self) -> bool;
 }
 
 // TODO: merge with SquareVisibilityOperations
-pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
-    fn is_fully_visible(&self) -> bool;
-    fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self;
-    fn rounded_toward_full_visibility(&self, tolerance: f32) -> Self;
-}
-impl ViewRoundable for DefaultSquareVisibilityType {
+// pub trait SquareVisibilityFunctions: QuarterTurnRotatable {
+//     fn is_fully_visible(&self) -> bool;
+//     fn from_single_visible_arc(rel_square: WorldStep, visible_arc: AngleInterval) -> Self;
+//     fn rounded_toward_full_visibility(&self, tolerance: f32) -> Self;
+// }
+
+impl<T: PartialSquareVisibilityOps> ViewRoundable for SquareVisibility<T> where Self: SquareVisibilityOperations {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self {
         if self.is_nearly_or_fully_visible(tolerance_length) {
             Self::new_fully_visible()
@@ -142,22 +170,6 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
 
     type PartialVizType = PartialSquareVisibilityByOneVisibleHalfPlane;
 
-    fn from_partial_viz_type(vis: Self::PartialVizType) -> Self {
-        Self::PartiallyVisible(vis)
-    }
-    fn is_fully_visible(&self) -> bool {
-        matches!(self, Self::FullyVisible)
-    }
-    fn is_not_visible(&self) -> bool {
-        matches!(self, Self::NotVisible)
-    }
-
-    fn is_at_least_partially_visible(&self) -> bool {
-        !self.is_not_visible()
-    }
-    fn is_only_partially_visible(&self) -> bool {
-        matches!(self, Self::PartiallyVisible(_))
-    }
     fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
         self.is_fully_visible() || self.is_nearly_fully_visible(tolerance)
     }
@@ -167,15 +179,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
                 v.is_within_distance_of_covering_centered_unit_square(tolerance)
             })
     }
-    fn new_fully_visible() -> Self {
-        Self::FullyVisible
-    }
-    fn new_not_visible() -> Self {
-        Self::NotVisible
-    }
-    fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
-        SquareVisibility::PartiallyVisible(Self::PartialVizType::new(visible_portion))
-    }
+    
     
     
     fn from_relative_square_and_view_arc(
@@ -414,11 +418,11 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
         }
     }
 }
-impl QuarterTurnRotatable for DefaultSquareVisibilityType {
+impl<T> QuarterTurnRotatable for SquareVisibility<T> where T: QuarterTurnRotatable + PartialSquareVisibilityOps {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         match self {
             SquareVisibility::PartiallyVisible(v) => {
-                Self::new_partially_visible_from_visible_half_plane(v.half_plane().quarter_rotated_ccw(quarter_turns_ccw))
+                Self::from_partial_viz_type(v.quarter_rotated_ccw(quarter_turns_ccw))
             }
             _ => *self,
         }
@@ -576,13 +580,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_one_shadow__should_fail_to_make_not_visible() {
-        let non_vis = SquareVisibility::new_partially_visible_from_visible_half_plane(
+        let non_vis = DefaultSquareVisibilityType::new_partially_visible_from_visible_half_plane(
             HalfPlaneCuttingLocalSquare::top_half_plane().extended(-0.6),
         );
     }
     #[test]
     fn test_one_shadow__fully_visible() {
-        let vis = SquareVisibility::new_fully_visible();
+        let vis =DefaultSquareVisibilityType::new_fully_visible();
 
         assert!(!vis.is_only_partially_visible());
         assert!(vis.is_at_least_partially_visible());
@@ -591,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_one_shadow__only_partially_visible() {
-        let vis = SquareVisibility::new_partially_visible_from_visible_half_plane(
+        let vis =DefaultSquareVisibilityType::new_partially_visible_from_visible_half_plane(
             HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
         );
         assert!(vis.is_only_partially_visible());
@@ -606,7 +610,7 @@ mod tests {
         let p1 = point2(0.0, 1.0);
 
         let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let partial_1 = SquareVisibility::new_from_visible_half_plane(half_plane_1);
+        let partial_1 = DefaultSquareVisibilityType::new_from_visible_half_plane(half_plane_1);
         assert!(partial_1.is_only_partially_visible());
     }
     #[test]
