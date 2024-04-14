@@ -282,7 +282,9 @@ impl AngleBasedVisibleSegment {
             .map(|rel_square| {
                 (
                     rel_square,
-                    SquareVisibility::from_relative_square_and_view_arc(self.arc, rel_square),
+                    DefaultSquareVisibilityType::from_relative_square_and_view_arc(
+                        self.arc, rel_square,
+                    ),
                 )
                 //TODO: change shadow type
                 // SquareVisibilityFromPointSource::from_single_visible_arc(
@@ -566,7 +568,7 @@ mod tests {
         });
     }
     #[test]
-    fn test_observed_rasterization_failure__narrow_fov_edges() {
+    fn test_observed_rasterization_failure__narrow_nonmergable_adjacent_fovs() {
         let test_face = FaceOfWorldSquare::from_x_y_dir(-3, -3, DOWN);
         let test_square = WorldSquare::new(-1, -1);
         let segment = AngleBasedVisibleSegment::from_relative_face(test_face);

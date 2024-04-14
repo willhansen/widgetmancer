@@ -1579,8 +1579,10 @@ mod tests {
             PartialAngleInterval::from_relative_square_face((STEP_RIGHT, STEP_RIGHT));
         let square = STEP_RIGHT * 2;
 
-        let visibility =
-            SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
+        let visibility = DefaultSquareVisibilityType::from_relative_square_and_view_arc(
+            view_arc_of_face,
+            square,
+        );
         assert!(visibility.is_fully_visible());
     }
 
@@ -1590,8 +1592,10 @@ mod tests {
             PartialAngleInterval::from_relative_square_face((STEP_UP_RIGHT, STEP_RIGHT));
         let square = STEP_RIGHT * 2;
 
-        let visibility =
-            SquareVisibility::from_relative_square_and_view_arc(view_arc_of_face, square);
+        let visibility = DefaultSquareVisibilityType::from_relative_square_and_view_arc(
+            view_arc_of_face,
+            square,
+        );
         assert!(visibility.is_not_visible());
     }
 
@@ -1600,7 +1604,8 @@ mod tests {
         let square = vec2(1, -2);
         let arc = PartialAngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
         assert!(
-            SquareVisibility::from_relative_square_and_view_arc(arc, square).is_fully_visible()
+            DefaultSquareVisibilityType::from_relative_square_and_view_arc(arc, square)
+                .is_fully_visible()
         );
     }
 
@@ -1925,7 +1930,8 @@ mod tests {
         // These values are from an observed failure.  NOT ARBITRARY
         let arc =
             PartialAngleInterval::from_angles(Angle::radians(0.7853978), Angle::radians(0.7853982));
-        let visibility = SquareVisibility::from_relative_square_and_view_arc(arc, rel_square);
+        let visibility =
+            DefaultSquareVisibilityType::from_relative_square_and_view_arc(arc, rel_square);
     }
 
     #[test]
@@ -2225,11 +2231,13 @@ mod tests {
     }
     #[test]
     fn test_square_is_not_fully_visible_if_view_arc_starts_in_that_square() {
-        assert!(SquareVisibility::from_relative_square_and_view_arc(
-            PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
-            STEP_ZERO
+        assert!(
+            DefaultSquareVisibilityType::from_relative_square_and_view_arc(
+                PartialAngleInterval::from_degrees(0.0, 20.0,), // arbitrary angles
+                STEP_ZERO
+            )
+            .is_not_visible()
         )
-        .is_not_visible())
     }
     #[test]
     fn test_rasterize_one_view_segment() {

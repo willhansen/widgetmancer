@@ -166,6 +166,56 @@ impl<T: PartialSquareVisibilityOps> ViewRoundable for SquareVisibility<T> where 
         }
     }
 }
+impl SquareVisibilityOperations for SquareVisibilityFromFovCones {
+    type PartialVizType = PartialSquareVisibilityFromFovCones;
+
+    fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool {
+        todo!()
+    }
+
+    fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
+        todo!()
+    }
+
+    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
+        todo!()
+    }
+
+    fn from_relative_square_and_view_arc(
+        view_arc: impl Into<AngleInterval>,
+        rel_square: impl Into<WorldStep>,
+    ) -> DefaultSquareVisibilityType {
+        todo!()
+    }
+
+    fn overlaps(&self, other: Self, tolerance: f32) -> bool {
+        todo!()
+    }
+
+    fn combined_increasing_visibility(&self, other: &Self) -> Self {
+        todo!()
+    }
+
+    fn as_string(&self) -> String {
+        todo!()
+    }
+
+    fn high_res_string(&self, output_diameter: u32) -> String {
+        todo!()
+    }
+
+    fn about_equal(&self, other: Self) -> bool {
+        todo!()
+    }
+
+    fn about_complementary(&self, other: Self) -> bool {
+        todo!()
+    }
+
+    fn is_visually_complementary_to(&self, other: Self) -> bool {
+        todo!()
+    }
+    }
 impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
 
     type PartialVizType = PartialSquareVisibilityByOneVisibleHalfPlane;
@@ -508,185 +558,192 @@ mod tests {
     use ntest::{assert_false, timeout};
 
     macro_rules! square_viz_tests {
-        ($($name:ident: $type:ty,)*) => {
-            $(
-                mod $name {
-                    use super::*;
-                    #[test]
-                    fn test_square_visibility_knows_if_its_fully_visible() {
-                        let partial = <$type>::new_from_visible_half_plane(
-                            HalfPlane::new_from_line_and_point_on_half_plane(
-                                TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
-                                point2(-12.061038, -1.3054879),
-                            ),
-                        );
-                        assert!(partial.is_fully_visible());
-                    }
-                }
-        
-            )*
-        }
+($($name:ident: $type:ty,)*) => { $( mod $name {
+            use super::*;
+
+            #[test]
+            fn test_square_visibility_knows_if_its_fully_visible() {
+                let partial = <$type>::new_from_visible_half_plane(
+                    HalfPlane::new_from_line_and_point_on_half_plane(
+                        TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                        point2(-12.061038, -1.3054879),
+                    ),
+                );
+                assert!(partial.is_fully_visible());
+            }
+
+            #[test]
+            fn test_single_square_is_shadowed_correctly_on_diagonal() {
+                let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
+                let square_relative_to_center = vec2(1, 1);
+                let visibility = <$type>::from_relative_square_and_view_arc(
+                    interval,
+                    square_relative_to_center,
+                );
+                let string = PartialVisibilityDrawable::from_square_visibility(visibility)
+                    .to_glyphs()
+                    .to_clean_string();
+                assert_eq!(&string, "🭞🭚");
+            }
+
+            #[test]
+            fn complementary_partial_squares_combine_to_full_visibility() {
+                let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+                    point2(0.0, 0.0),
+                    point2(1.0, 1.0),
+                );
+                let p1 = point2(0.0, 1.0);
+                let p2 = point2(1.0, 0.0);
+
+                let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+                let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
+                assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
+
+                let partial_1 = <$type>::new_from_visible_half_plane(half_plane_1);
+                let partial_2 = <$type>::new_from_visible_half_plane(half_plane_2);
+
+                let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
+                assert!(combined_partial.is_fully_visible());
+            }
+            #[test]
+            fn test_partial_visibility_of_one_square__one_step_up() {
+                let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
+                let square = WorldStep::new(0, 1);
+                let partial = <$type>::from_relative_square_and_view_arc(arc, square);
+                assert!(!partial.is_fully_visible());
+                assert_eq!(
+                    PartialVisibilityDrawable::from_square_visibility(partial)
+                        .to_glyphs()
+                        .to_clean_string(),
+                    [FULL_BLOCK, SPACE].into_iter().collect::<String>()
+                );
+            }
+
+            #[test]
+            #[should_panic]
+            fn test_one_shadow__should_fail_to_make_not_visible() {
+                let non_vis = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::top_half_plane().extended(-0.6),
+                );
+            }
+            #[test]
+            fn test_one_shadow__fully_visible() {
+                let vis =<$type>::new_fully_visible();
+
+                assert!(!vis.is_only_partially_visible());
+                assert!(vis.is_at_least_partially_visible());
+                assert!(vis.is_fully_visible());
+            }
+
+            #[test]
+            fn test_one_shadow__only_partially_visible() {
+                let vis =<$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
+                );
+                assert!(vis.is_only_partially_visible());
+                assert!(vis.is_at_least_partially_visible());
+            }
+            #[test]
+            fn test_one_shadow__diagonal_partially_visible() {
+                let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+                    point2(0.0, 0.0),
+                    point2(1.0, 1.0),
+                );
+                let p1 = point2(0.0, 1.0);
+
+                let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+                let partial_1 = <$type>::new_from_visible_half_plane(half_plane_1);
+                assert!(partial_1.is_only_partially_visible());
+            }
+            #[test]
+            fn test_one_shadow__almost_fully_visible() {
+                let vis = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
+                );
+
+                assert!(!vis.is_nearly_fully_visible(0.0));
+                assert!(!vis.is_nearly_fully_visible(1e-4));
+                assert!(vis.is_nearly_fully_visible(1e-2));
+            }
+            #[test]
+            fn test_square_visibility_overlap__simple_non_overlap() {
+                let up = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                        TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.4),
+                        (0.0, 1.0),
+                    ),
+                );
+                let down = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                        TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.3),
+                        (0.0, -1.0),
+                    ),
+                );
+                assert_false!(up.overlaps(down, 1e-5));
+                assert_false!(down.overlaps(up, 1e-5));
+                assert_false!(up.overlaps(up.complement(), 1e-5));
+            }
+
+            #[test]
+            fn test_square_visibility_overlap__simple_overlap() {
+                let vis1 = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                        TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(-0.3),
+                        (0.0, 1.0),
+                    ),
+                );
+                let vis2 = <$type>::new_partially_visible_from_visible_half_plane(
+                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                        TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.2),
+                        (0.0, -1.0),
+                    ),
+                );
+                assert!(vis1.overlaps(vis2, 1e-5));
+                assert!(vis2.overlaps(vis1, 1e-5));
+            }
+            #[test]
+            fn test_view_arc_source_is_not_visible_by_default() {
+                assert!( <$type>::from_relative_square_and_view_arc(
+                    AngleInterval::from_degrees(0.0, 45.0),
+                    (0, 0)
+                )
+                .is_not_visible());
+            }
+            #[test]
+            fn test_view_arc_source_is_not_visible_by_default__full_circle() {
+                let arc =
+                    <$type>::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
+                assert!(arc.is_not_visible());
+            }
+            #[test]
+            fn test_debug_draw_arc() {
+                let arc =
+                    <$type>::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
+                dbg!(arc); // NOTE: keep this debug statement because it's part of the test
+            }
+            // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
+
+
+
+            
+            #[test]
+            fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
+                let hp =
+                    LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((0.5, 0.5)).extended(-0.1);
+                let vis = <$type>::new_from_visible_half_plane(hp);
+                assert!(vis.is_nearly_or_fully_visible(0.15));
+                assert!(vis.is_only_partially_visible());
+            }
+
+
+            
+        } )* }
     }
+
     square_viz_tests!(
         fromhalfplane: SquareVisibilityFromOneHalfPlane,
         fromfovcones: SquareVisibilityFromFovCones,
     );
 
-    #[test]
-    fn test_single_square_is_shadowed_correctly_on_diagonal() {
-        let interval = PartialAngleInterval::from_degrees(0.0, 45.0).complement();
-        let square_relative_to_center = vec2(1, 1);
-        let visibility = SquareVisibility::from_relative_square_and_view_arc(
-            interval,
-            square_relative_to_center,
-        );
-        let string = PartialVisibilityDrawable::from_square_visibility(visibility)
-            .to_glyphs()
-            .to_clean_string();
-        assert_eq!(&string, "🭞🭚");
-    }
-    #[test]
-    fn complementary_partial_squares_combine_to_full_visibility() {
-        let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
-            point2(0.0, 0.0),
-            point2(1.0, 1.0),
-        );
-        let p1 = point2(0.0, 1.0);
-        let p2 = point2(1.0, 0.0);
-
-        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
-        assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
-
-        let partial_1 = SquareVisibility::new_from_visible_half_plane(half_plane_1);
-        let partial_2 = SquareVisibility::new_from_visible_half_plane(half_plane_2);
-
-        let combined_partial = partial_1.combined_increasing_visibility(&partial_2);
-        assert!(combined_partial.is_fully_visible());
-    }
-    #[test]
-    fn test_partial_visibility_of_one_square__one_step_up() {
-        let arc = PartialAngleInterval::from_degrees(90.0, 135.0);
-        let square = WorldStep::new(0, 1);
-        let partial = SquareVisibility::from_relative_square_and_view_arc(arc, square);
-        assert!(!partial.is_fully_visible());
-        assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(partial)
-                .to_glyphs()
-                .to_clean_string(),
-            [FULL_BLOCK, SPACE].into_iter().collect::<String>()
-        );
-    }
-    #[test]
-    #[should_panic]
-    fn test_one_shadow__should_fail_to_make_not_visible() {
-        let non_vis = DefaultSquareVisibilityType::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::top_half_plane().extended(-0.6),
-        );
-    }
-    #[test]
-    fn test_one_shadow__fully_visible() {
-        let vis =DefaultSquareVisibilityType::new_fully_visible();
-
-        assert!(!vis.is_only_partially_visible());
-        assert!(vis.is_at_least_partially_visible());
-        assert!(vis.is_fully_visible());
-    }
-
-    #[test]
-    fn test_one_shadow__only_partially_visible() {
-        let vis =DefaultSquareVisibilityType::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
-        );
-        assert!(vis.is_only_partially_visible());
-        assert!(vis.is_at_least_partially_visible());
-    }
-    #[test]
-    fn test_one_shadow__diagonal_partially_visible() {
-        let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
-            point2(0.0, 0.0),
-            point2(1.0, 1.0),
-        );
-        let p1 = point2(0.0, 1.0);
-
-        let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let partial_1 = DefaultSquareVisibilityType::new_from_visible_half_plane(half_plane_1);
-        assert!(partial_1.is_only_partially_visible());
-    }
-    #[test]
-    fn test_one_shadow__almost_fully_visible() {
-        let vis = SquareVisibility::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::top_half_plane().extended(0.5 - 1e-3),
-        );
-
-        assert!(!vis.is_nearly_fully_visible(0.0));
-        assert!(!vis.is_nearly_fully_visible(1e-4));
-        assert!(vis.is_nearly_fully_visible(1e-2));
-    }
-    #[test]
-    fn test_square_visibility_overlap__simple_non_overlap() {
-        let up = SquareVisibility::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.4),
-                (0.0, 1.0),
-            ),
-        );
-        let down = SquareVisibility::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.3),
-                (0.0, -1.0),
-            ),
-        );
-        assert_false!(up.overlaps(down, 1e-5));
-        assert_false!(down.overlaps(up, 1e-5));
-        assert_false!(up.overlaps(up.complement(), 1e-5));
-    }
-    #[test]
-    fn test_square_visibility_overlap__simple_overlap() {
-        let vis1 = SquareVisibility::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(-0.3),
-                (0.0, 1.0),
-            ),
-        );
-        let vis2 = SquareVisibility::new_partially_visible_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.2),
-                (0.0, -1.0),
-            ),
-        );
-        assert!(vis1.overlaps(vis2, 1e-5));
-        assert!(vis2.overlaps(vis1, 1e-5));
-    }
-    #[test]
-    fn test_view_arc_source_is_not_visible_by_default() {
-        assert!(SquareVisibility::from_relative_square_and_view_arc(
-            AngleInterval::from_degrees(0.0, 45.0),
-            (0, 0)
-        )
-        .is_not_visible());
-    }
-    #[test]
-    fn test_view_arc_source_is_not_visible_by_default__full_circle() {
-        let arc =
-            SquareVisibility::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
-        assert!(arc.is_not_visible());
-    }
-    #[test]
-    fn test_debug_draw_arc() {
-        let arc =
-            SquareVisibility::from_relative_square_and_view_arc(AngleInterval::FullCircle, (0, 0));
-        dbg!(arc); // NOTE: keep this debug statement because it's part of the test
-    }
-    // TODO: find easier ways to generally get vectors pointing in cardinal directions with any type and unit
-    #[test]
-    fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
-        let hp =
-            LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((0.5, 0.5)).extended(-0.1);
-        let vis = SquareVisibility::new_from_visible_half_plane(hp);
-        let unit_square_intersections = vis.where_border_touches_unit_square();
-        assert!(vis.is_nearly_or_fully_visible(0.15));
-        assert!(vis.is_only_partially_visible());
-        assert_eq!(unit_square_intersections.len(), 2);
-    }
+    
 }
