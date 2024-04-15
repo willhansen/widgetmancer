@@ -31,19 +31,6 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane
     fn complement(&self) -> Self {
         Self(self.0.complement())
     }
-    fn half_visible(shadow_direction: Angle<f32>) -> Self {
-        // TODO: may be backwards
-        let shadow_direction = standardize_angle_with_zero_mid(shadow_direction);
-        let shadow_line = TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_through_origin(
-            LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
-        );
-        Self(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
-                shadow_line,
-                LocalSquarePoint::unit_vector_from_angle(shadow_direction),
-            ),
-        )
-    }
 }
 
 impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);

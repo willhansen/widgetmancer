@@ -33,10 +33,6 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityFromFovCones {
         todo!()
     }
 
-    fn half_visible(shadow_direction: Angle<f32>) -> Self {
-        todo!()
-    }
-
     fn new_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
         todo!()
     }
