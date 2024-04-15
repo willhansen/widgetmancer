@@ -23,7 +23,8 @@ pub type SquareVisibilityFromOneHalfPlane =
     SquareVisibility<PartialSquareVisibilityByOneVisibleHalfPlane>;
 pub type SquareVisibilityFromFovCones = SquareVisibility<PartialSquareVisibilityFromFovCones>;
 
-pub type DefaultSquareVisibilityType = SquareVisibilityFromOneHalfPlane;
+pub type DefaultPartialSquareVisibilityType = PartialSquareVisibilityByOneVisibleHalfPlane;
+pub type DefaultSquareVisibilityType = SquareVisibility<DefaultPartialSquareVisibilityType>;
 
 impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     pub fn visible_portion(&self) -> Option<T> {
