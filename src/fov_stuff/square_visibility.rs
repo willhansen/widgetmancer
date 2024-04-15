@@ -391,16 +391,20 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
         }
     }
     fn as_string(&self) -> String {
-        if self.is_fully_visible() {
-            "  ".to_string()
-        } else {
-            let fg_color = GREY;
-            PartialVisibilityDrawable::from_shadowed_drawable(
-                &SolidColorDrawable::new(fg_color),
-                *self,
-            )
-            .to_glyphs()
-            .to_clean_string()
+        use SquareVisibility::*;
+        match self {
+            FullyVisible => FULL_BLOCK.to_string().repeat(2) ,
+            PartiallyVisible(partial) => {
+                let fg_color = GREY;
+                PartialVisibilityDrawable::from_shadowed_drawable_and_partial(
+                    &SolidColorDrawable::new(fg_color),
+                    *partial,
+                )
+                .to_glyphs()
+                .to_clean_string()
+
+                },
+            NotVisible => "  ".to_string(),
         }
     }
     fn high_res_string(&self, output_diameter: u32) -> String {

@@ -134,8 +134,17 @@ impl PartialVisibilityDrawable {
         original_drawable: &T,
         square_viz: DefaultSquareVisibilityType,
     ) -> Self {
+        Self::from_shadowed_drawable_and_partial(
+            original_drawable,
+            square_viz.visible_portion().unwrap(),
+        )
+    }
+    pub fn from_shadowed_drawable_and_partial<T: Drawable>(
+        original_drawable: &T,
+        square_viz: DefaultPartialSquareVisibilityType,
+    ) -> Self {
         PartialVisibilityDrawable {
-            visibility: square_viz.visible_portion().unwrap(),
+            visibility: square_viz,
             fg_color: original_drawable.color_if_backgroundified(),
             bg_color: OUT_OF_SIGHT_COLOR,
         }
