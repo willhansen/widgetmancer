@@ -114,8 +114,7 @@ impl Drawable for TextDrawable {
 
 #[derive(Debug, Clone, CopyGetters)]
 pub struct PartialVisibilityDrawable {
-    // TODO: switch to a partial visibility type
-    visibility: DefaultSquareVisibilityType,
+    visibility: DefaultPartialSquareVisibilityType,
     fg_color: RGB8,
     bg_color: RGB8,
 }
@@ -125,9 +124,8 @@ impl PartialVisibilityDrawable {
         note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
     )]
     pub fn from_square_visibility(square_viz: DefaultSquareVisibilityType) -> Self {
-        assert!(square_viz.is_only_partially_visible());
         PartialVisibilityDrawable {
-            visibility: square_viz,
+            visibility: square_viz.visible_portion().unwrap(),
             fg_color: GREEN,              // TODO: no default color
             bg_color: OUT_OF_SIGHT_COLOR, // TODO: no default color
         }
@@ -136,9 +134,8 @@ impl PartialVisibilityDrawable {
         original_drawable: &T,
         square_viz: DefaultSquareVisibilityType,
     ) -> Self {
-        assert!(!square_viz.is_fully_visible());
         PartialVisibilityDrawable {
-            visibility: square_viz,
+            visibility: square_viz.visible_portion().unwrap(),
             fg_color: original_drawable.color_if_backgroundified(),
             bg_color: OUT_OF_SIGHT_COLOR,
         }
@@ -160,20 +157,11 @@ impl QuarterTurnRotatable for PartialVisibilityDrawable {
 
 impl Drawable for PartialVisibilityDrawable {
     fn to_glyphs(&self) -> DoubleGlyph {
-        let bias_direction = self
-            .visibility
-            .visible_portion()
-            .unwrap()
-            .half_plane()
-            .direction_away_from_plane();
+        let bias_direction = self.visibility.half_plane().direction_away_from_plane();
 
         let character_visible_portions = [0, 1].map(|i| {
             local_square_half_plane_to_local_character_half_plane(
-                self.visibility
-                    .visible_portion()
-                    .unwrap()
-                    .half_plane()
-                    .into(),
+                self.visibility.half_plane().into(),
                 i,
             )
         });
