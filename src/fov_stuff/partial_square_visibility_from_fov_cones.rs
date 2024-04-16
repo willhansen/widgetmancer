@@ -34,6 +34,18 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityFromFovCones {
     }
 
     fn new_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
+        Self::new(
+            ConeEdgeIntersectionsWithCenteredUnitSquare::from_one_half_plane_cutting_origin_square(
+                visible_portion,
+            ),
+        )
+    }
+
+    fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        todo!()
+    }
+
+    fn is_within_distance_of_covering_centered_unit_square(&self, distance: f32) -> bool {
         todo!()
     }
 }

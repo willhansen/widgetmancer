@@ -24,4 +24,6 @@ pub trait PartialSquareVisibilityOps: Copy {
     {
         Self::half_visible((-which_half_visible.into()).angle().into())
     }
+    fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint>;
+    fn is_within_distance_of_covering_centered_unit_square(&self, distance: f32) -> bool;
 }

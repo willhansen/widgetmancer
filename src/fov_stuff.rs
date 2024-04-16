@@ -1985,7 +1985,7 @@ mod tests {
 
         fov_1.transformed_sub_fovs.push(sub_fov_1.clone());
 
-        dbg!(&fov_1);
+        // dbg!(&fov_1);
         // debug_print_fov_as_relative(&fov_1, 20);
         // debug_print_fov_as_absolute(&fov_1, 20);
         let rfov = fov_1.rasterized();

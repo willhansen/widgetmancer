@@ -1,7 +1,7 @@
 use crate::utility::*;
 
 /// angle is less than 180 degrees only
-pub struct PositionedCone<PointType: Coordinate> {
+pub struct ConeFromPoint<PointType: Coordinate> {
     center: PointType,
     // angle_interval: NarrowAngleInterval,
 }
@@ -12,7 +12,14 @@ pub struct ConeEdgeIntersectionsWithCenteredUnitSquare {
     ccw_edge: Option<HalfPlaneCuttingLocalSquare>,
 }
 
-impl ConeEdgeIntersectionsWithCenteredUnitSquare {}
+impl ConeEdgeIntersectionsWithCenteredUnitSquare {
+    pub fn from_one_half_plane_cutting_origin_square(hp: HalfPlaneCuttingLocalSquare) -> Self {
+        Self {
+            cw_edge: Some(hp),
+            ccw_edge: None,
+        }
+    }
+}
 
 impl ToAndFromArray<Option<HalfPlaneCuttingLocalSquare>, 2>
     for ConeEdgeIntersectionsWithCenteredUnitSquare
@@ -29,11 +36,11 @@ impl ToAndFromArray<Option<HalfPlaneCuttingLocalSquare>, 2>
         out
     }
 }
-impl<P: Coordinate> PositionedCone<P> {}
+impl<P: Coordinate> ConeFromPoint<P> {}
 
 pub trait ConeOps {}
 
-impl<P: Coordinate> ConeOps for PositionedCone<P> {}
+impl<P: Coordinate> ConeOps for ConeFromPoint<P> {}
 
 impl QuarterTurnRotatable for ConeEdgeIntersectionsWithCenteredUnitSquare {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

@@ -13,16 +13,6 @@ impl PartialSquareVisibilityByOneVisibleHalfPlane {
     pub fn half_plane(&self) -> HalfPlaneCuttingLocalSquare {
         self.0
     }
-    pub fn is_within_distance_of_covering_centered_unit_square(&self, distance: f32) -> bool {
-        self.0
-            .fully_covers_centered_unit_square_with_tolerance(distance)
-            .is_partial()
-    }
-    pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
-        self.0
-            .dividing_line()
-            .ordered_line_intersections_with_centered_unit_square()
-    }
 }
 impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane {
     fn new_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
@@ -30,6 +20,16 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane
     }
     fn complement(&self) -> Self {
         Self(self.0.complement())
+    }
+    fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        self.0
+            .dividing_line()
+            .ordered_line_intersections_with_centered_unit_square()
+    }
+    fn is_within_distance_of_covering_centered_unit_square(&self, distance: f32) -> bool {
+        self.0
+            .fully_covers_centered_unit_square_with_tolerance(distance)
+            .is_partial()
     }
 }
 

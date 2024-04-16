@@ -34,6 +34,13 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
         }
     }
 
+    pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
+        match self {
+            SquareVisibility::PartiallyVisible(v) => v.where_border_touches_unit_square(),
+            _ => vec![],
+        }
+    }
+
     // TODO: complement trait
     pub fn complement(&self) -> Self {
         match self {
@@ -48,6 +55,15 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     }
     pub fn is_not_visible(&self) -> bool {
         matches!(self, Self::NotVisible)
+    }
+    pub fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
+        self.is_fully_visible() || self.is_nearly_fully_visible(tolerance)
+    }
+    pub fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
+        self.visible_portion()
+            .is_some_and(|v| {
+                v.is_within_distance_of_covering_centered_unit_square(tolerance_length)
+            })
     }
 
     pub fn is_at_least_partially_visible(&self) -> bool {
@@ -106,16 +122,6 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     }   
 }
 
-// TODO: get rid of this
-impl SquareVisibilityFromOneHalfPlane {
-    pub fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
-        match self {
-            SquareVisibility::PartiallyVisible(v) => v.where_border_touches_unit_square(),
-            _ => vec![],
-        }
-    }
-    
-}
 
 // TODO: merge with SquareVisibilityOperations? rename?
 pub trait ViewRoundable {
@@ -127,7 +133,6 @@ pub trait ViewRoundable {
 pub trait SquareVisibilityOperations  {
     type PartialVizType: PartialSquareVisibilityOps;
     // visibility checks
-    fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool;
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool;
     fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool; // should return bool with partial for being on edge?
 
@@ -169,10 +174,6 @@ impl<T: PartialSquareVisibilityOps> ViewRoundable for SquareVisibility<T> where 
 }
 impl SquareVisibilityOperations for SquareVisibilityFromFovCones {
     type PartialVizType = PartialSquareVisibilityFromFovCones;
-
-    fn is_nearly_or_fully_visible(&self, tolerance_length: f32) -> bool {
-        todo!()
-    }
 
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
         todo!()
@@ -221,15 +222,6 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
 
     type PartialVizType = PartialSquareVisibilityByOneVisibleHalfPlane;
 
-    fn is_nearly_or_fully_visible(&self, tolerance: f32) -> bool {
-        self.is_fully_visible() || self.is_nearly_fully_visible(tolerance)
-    }
-    fn is_nearly_fully_visible(&self, tolerance: f32) -> bool {
-        self.visible_portion()
-            .is_some_and(|v| {
-                v.is_within_distance_of_covering_centered_unit_square(tolerance)
-            })
-    }
     
     
     
@@ -471,6 +463,10 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
             }
             SquareVisibility::NotVisible => false,
         }
+    }
+
+    fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
+        todo!()
     }
 }
 impl<T> QuarterTurnRotatable for SquareVisibility<T> where T: QuarterTurnRotatable + PartialSquareVisibilityOps {
