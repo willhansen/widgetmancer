@@ -569,10 +569,11 @@ pub fn sub_octant_field_of_view(
 
             let visible_arc_of_face = AngleInterval::from_relative_square_face(relative_face);
 
-            let visible_arc_of_face_intersection_result = view_arc.intersection(
-                visible_arc_of_face,
-                Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
-            );
+            let visible_arc_of_face_intersection_result = view_arc
+                .intersection_with_other_angle_interval(
+                    visible_arc_of_face,
+                    Angle::degrees(NARROWEST_VIEW_CONE_ALLOWED_IN_DEGREES),
+                );
 
             match visible_arc_of_face_intersection_result.len() {
                 0 => continue,

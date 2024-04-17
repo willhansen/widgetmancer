@@ -29,7 +29,7 @@ pub type DefaultSquareVisibilityType = SquareVisibility<DefaultPartialSquareVisi
 impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     pub fn visible_portion(&self) -> Option<T> {
         match self {
-            Self::PartiallyVisible(v) => Some(*v),
+            Self::PartiallyVisible(v) => Some(v.clone()),
             _ => None,
         }
     }
@@ -120,6 +120,23 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     pub fn new_partially_visible_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
         Self::from_partial_viz_type(T::new_from_visible_half_plane(visible_portion))
     }   
+
+    pub fn combined_increasing_visibility(&self, other: &Self) -> Self {
+        match self {
+            SquareVisibility::FullyVisible => Self::FullyVisible,
+            SquareVisibility::PartiallyVisible(v1) => match other {
+                SquareVisibility::FullyVisible => self.clone(),
+                SquareVisibility::PartiallyVisible(v2) => {
+                    v1.combined_increasing_visibility(v2)
+
+
+                    
+                }
+                SquareVisibility::NotVisible => self.clone(),
+            },
+            SquareVisibility::NotVisible => other.clone(),
+        }
+    }
 }
 
 
@@ -130,6 +147,7 @@ pub trait ViewRoundable {
 
 // TODO: should this be a trait? (yes, because the halfplane square visibility is going to be swapped out, with these functions being common between the two)
 // Might make more sense to have this not be a trait, and call methods of PartialSquareVisibilityOps
+// TODO: remove.  put variation in the partialvisibility trait
 pub trait SquareVisibilityOperations  {
     type PartialVizType: PartialSquareVisibilityOps;
     // visibility checks
@@ -144,8 +162,7 @@ pub trait SquareVisibilityOperations  {
 
 
     // other
-    fn overlaps(&self, other: Self, tolerance: f32) -> bool;
-    fn combined_increasing_visibility(&self, other: &Self) -> Self;
+    fn overlaps(&self, other: &Self, tolerance: f32) -> bool;
     fn as_string(&self) -> String;
     fn high_res_string(&self, output_diameter: u32) -> String;
 
@@ -190,11 +207,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromFovCones {
         todo!()
     }
 
-    fn overlaps(&self, other: Self, tolerance: f32) -> bool {
-        todo!()
-    }
-
-    fn combined_increasing_visibility(&self, other: &Self) -> Self {
+    fn overlaps(&self, other: &Self, tolerance: f32) -> bool {
         todo!()
     }
 
@@ -341,7 +354,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
         // }
     }
 
-    fn overlaps(&self, other: Self, tolerance: f32) -> bool {
+    fn overlaps(&self, other: &Self, tolerance: f32) -> bool {
         match self {
             SquareVisibility::FullyVisible => match other {
                 SquareVisibility::NotVisible => false,
@@ -358,30 +371,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
             SquareVisibility::NotVisible => false,
         }
     }
-    fn combined_increasing_visibility(&self, other: &Self) -> Self {
-        match self {
-            SquareVisibility::FullyVisible => Self::FullyVisible,
-            SquareVisibility::PartiallyVisible(v1) => match other {
-                SquareVisibility::FullyVisible => *self,
-                SquareVisibility::PartiallyVisible(v2) => {
-                    if v1.half_plane().about_complementary(v2.half_plane(), 1e-6) {
-                        Self::FullyVisible
-                    } else {
-                        let depth_a = v1.half_plane().depth_of_point_in_half_plane(point2(0.0, 0.0));
-                        let depth_b = v2.half_plane().depth_of_point_in_half_plane(point2(0.0, 0.0));
-
-                        if depth_a > depth_b {
-                            *self
-                        } else {
-                            *other
-                        }
-                    }
-                }
-                SquareVisibility::NotVisible => *self,
-            },
-            SquareVisibility::NotVisible => *other,
-        }
-    }
+    
     fn as_string(&self) -> String {
         use SquareVisibility::*;
         match self {
@@ -466,8 +456,10 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
     }
 
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
+        // self.faces()
         todo!()
     }
+
 }
 impl<T> QuarterTurnRotatable for SquareVisibility<T> where T: QuarterTurnRotatable + PartialSquareVisibilityOps {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
@@ -475,7 +467,7 @@ impl<T> QuarterTurnRotatable for SquareVisibility<T> where T: QuarterTurnRotatab
             SquareVisibility::PartiallyVisible(v) => {
                 Self::from_partial_viz_type(v.quarter_rotated_ccw(quarter_turns_ccw))
             }
-            _ => *self,
+            _ => self.clone(),
         }
     }
 }impl Debug for DefaultSquareVisibilityType {
@@ -680,9 +672,9 @@ mod tests {
                         (0.0, -1.0),
                     ),
                 );
-                assert_false!(up.overlaps(down, 1e-5));
-                assert_false!(down.overlaps(up, 1e-5));
-                assert_false!(up.overlaps(up.complement(), 1e-5));
+                assert_false!(up.overlaps(&down, 1e-5));
+                assert_false!(down.overlaps(&up, 1e-5));
+                assert_false!(up.overlaps(&up.complement(), 1e-5));
             }
 
             #[test]
@@ -699,8 +691,8 @@ mod tests {
                         (0.0, -1.0),
                     ),
                 );
-                assert!(vis1.overlaps(vis2, 1e-5));
-                assert!(vis2.overlaps(vis1, 1e-5));
+                assert!(vis1.overlaps(&vis2, 1e-5));
+                assert!(vis2.overlaps(&vis1, 1e-5));
             }
             #[test]
             fn test_view_arc_source_is_not_visible_by_default() {

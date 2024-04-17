@@ -1010,7 +1010,7 @@ impl TopDownPortal {
     fn has_entrance_overlap_with(&self, other: Self) -> bool {
         let tolerance = 1e-5; // TODO: standardize
         self.absolute_entrance_shape()
-            .overlaps(other.absolute_entrance_shape(), tolerance)
+            .overlaps(&other.absolute_entrance_shape(), tolerance)
     }
     fn has_entrance_overlap_with_any(&self, others: impl IntoIterator<Item = Self>) -> bool {
         others

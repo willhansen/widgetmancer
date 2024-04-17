@@ -9,19 +9,20 @@ use euclid::num::Zero;
 
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
-where
-    LineType: DirectedFloatLine,
-    Self: DirectedLineConstructors<LineType::PointType>,
+// where
+//     LineType: DirectedFloatLine,
+//     Self: DirectedLineConstructors<LineType::PointType>,
 {
+    // TODO: flip this convention
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
 }
 
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedFloatLine + TryFromTwoPoints<LineType::PointType> + LineConstructors,
+    LineType: DirectedFloatLineOps + TryFromTwoPoints<LineType::PointType> + LineConstructors,
     Self: DirectedLineConstructors<LineType::PointType>,
 {
     pub fn halfplane_from_border_with_inside_on_right(line: LineType) -> Self
@@ -346,7 +347,7 @@ where {
 
 impl<P, L> DirectedLineConstructors<P> for HalfPlane<L>
 where
-    L: DirectedFloatLine<_PointType = P>,
+    L: DirectedFloatLineOps<_PointType = P>,
     P: FloatCoordinate,
 {
     fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
@@ -357,7 +358,7 @@ where
     }
 }
 
-impl<L: DirectedFloatLine> Debug for HalfPlane<L> {
+impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
             .field("dividing_line", &self.dividing_line)
@@ -389,7 +390,7 @@ impl<P: FloatCoordinate> From<HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitS
     }
 }
 
-impl<LineType: DirectedFloatLine> QuarterTurnRotatable for HalfPlane<LineType> {
+impl<LineType: DirectedFloatLineOps> QuarterTurnRotatable for HalfPlane<LineType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -417,7 +418,7 @@ pub type HalfPlaneCuttingSquare<SquareType> =
     HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<<SquareType as Coordinate>::Floating>>;
 
 // TODO: remove this trait.  functions should be in concrete implementation?
-pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
+pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLineOps> {
     // type PointType: FloatCoordinate;
     fn which_square(&self) -> <LineType::PointType as Coordinate>::OnGrid;
     fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>;
@@ -431,7 +432,7 @@ pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLine> {
 
 impl<L> HalfPlaneCuttingSquareTrait<L> for HalfPlane<L>
 where
-    L: TwoPointsOnASquareTrait<L::PointType> + DirectedFloatLine,
+    L: TwoPointsOnASquareTrait<L::PointType> + DirectedFloatLineOps,
 {
     fn which_square(&self) -> <L::PointType as Coordinate>::OnGrid {
         self.dividing_line.which_square()

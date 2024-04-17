@@ -31,6 +31,28 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane
             .fully_covers_centered_unit_square_with_tolerance(distance)
             .is_partial()
     }
+
+    fn combined_increasing_visibility(&self, other: &Self) -> SquareVisibility<Self> {
+        if self
+            .half_plane()
+            .about_complementary(other.half_plane(), 1e-6)
+        {
+            SquareVisibility::<Self>::FullyVisible
+        } else {
+            let depth_a = self
+                .half_plane()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+            let depth_b = other
+                .half_plane()
+                .depth_of_point_in_half_plane(point2(0.0, 0.0));
+
+            SquareVisibility::<Self>::PartiallyVisible(if depth_a > depth_b {
+                *self
+            } else {
+                *other
+            })
+        }
+    }
 }
 
 impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);

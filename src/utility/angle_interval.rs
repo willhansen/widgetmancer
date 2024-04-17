@@ -24,11 +24,6 @@ pub enum AngleInterval {
     Empty,
     FullCircle,
     PartialArc(PartialAngleInterval),
-    // TODO: Cone, // width in (0,180)
-    // TODO: HalfPlane, // width == 180
-    // TODO: InverseCone, // width in (180,360)
-    // TODO: Ray, // width == 0, one angle
-    // TODO: InverseRay, // width == 360, one angle
 }
 
 impl Display for AngleInterval {
@@ -77,7 +72,11 @@ impl AngleInterval {
             _ => panic!("Angle interval is not partial: {}", self),
         }
     }
-    pub fn intersection(&self, other: Self, tolerance: FAngle) -> Vec<Self> {
+    pub fn intersection_with_other_angle_interval(
+        &self,
+        other: Self,
+        tolerance: FAngle,
+    ) -> Vec<Self> {
         use AngleInterval::*;
         match self {
             Empty => vec![],
@@ -716,7 +715,7 @@ mod tests {
         let a = deg(0.0, 20.0);
         let b = deg(20.0, 40.0);
         let t = FAngle::degrees(1.0);
-        let c = a.intersection(b, t);
+        let c = a.intersection_with_other_angle_interval(b, t);
         assert!(c.is_empty());
     }
 
@@ -727,7 +726,7 @@ mod tests {
         let c = AngleInterval::from_degrees(80.0, 90.0);
 
         assert_eq!(
-            a.intersection(b, default_angle_tolerance_for_tests()),
+            a.intersection_with_other_angle_interval(b, default_angle_tolerance_for_tests()),
             vec![c]
         );
     }
@@ -737,7 +736,7 @@ mod tests {
         let a = AngleInterval::from_degrees(95.0, 100.0);
         let b = AngleInterval::from_degrees(40.0, 90.0);
         assert_eq!(
-            a.intersection(b, default_angle_tolerance_for_tests()),
+            a.intersection_with_other_angle_interval(b, default_angle_tolerance_for_tests()),
             vec![],
         );
     }
@@ -747,11 +746,11 @@ mod tests {
         let small = AngleInterval::from_degrees(80.0, 100.0);
         let big = AngleInterval::from_degrees(60.0, 120.0);
         assert_eq!(
-            big.intersection(small, default_angle_tolerance_for_tests()),
+            big.intersection_with_other_angle_interval(small, default_angle_tolerance_for_tests()),
             vec![small]
         );
         assert_eq!(
-            small.intersection(big, default_angle_tolerance_for_tests()),
+            small.intersection_with_other_angle_interval(big, default_angle_tolerance_for_tests()),
             vec![small]
         );
     }
@@ -760,8 +759,10 @@ mod tests {
     fn test_angle_interval_intersection__wraparound_double_overlap() {
         let big = AngleInterval::from_degrees(60.0, 120.0);
         let really_big = AngleInterval::from_degrees(100.0, 80.0);
-        let result: Vec<AngleInterval> =
-            big.intersection(really_big, default_angle_tolerance_for_tests());
+        let result: Vec<AngleInterval> = big.intersection_with_other_angle_interval(
+            really_big,
+            default_angle_tolerance_for_tests(),
+        );
         assert_eq!(result.len(), 2);
         let expected = [
             AngleInterval::from_degrees(60.0, 80.0),

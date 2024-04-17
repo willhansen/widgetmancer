@@ -15,7 +15,7 @@ pub enum AngleVariety {
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
-impl OrthoAngle for NormalizedOrthoAngle
+impl OrthoAngleOps for NormalizedOrthoAngle
 where
     Self: Sized,
 {
@@ -27,27 +27,30 @@ where
     }
 }
 
-impl From<UnNormalizedOrthoAngle> for NormalizedOrthoAngle {
-    fn from(value: UnNormalizedOrthoAngle) -> Self {
+impl From<OrthoAngle> for NormalizedOrthoAngle {
+    fn from(value: OrthoAngle) -> Self {
         value.normalized()
     }
 }
 
+// TODO: Add a level of relativity here to differentiate it from an absolute position.
+pub type QuarterTurns = OrthoAngle;
+
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
-pub struct UnNormalizedOrthoAngle(i32);
-impl OrthoAngle for UnNormalizedOrthoAngle
+pub struct OrthoAngle(i32);
+impl OrthoAngleOps for OrthoAngle
 where
     Self: Sized,
 {
     fn new_from_quarter_turns(quarter_turns: i32) -> Self {
-        UnNormalizedOrthoAngle(quarter_turns)
+        OrthoAngle(quarter_turns)
     }
     fn quarter_turns(&self) -> i32 {
         self.0
     }
 }
 
-pub trait OrthoAngle:
+pub trait OrthoAngleOps:
     Sized
     + Sub<NormalizedOrthoAngle, Output = Self>
     + Add<NormalizedOrthoAngle, Output = Self>
@@ -139,7 +142,7 @@ pub trait OrthoAngle:
 
 macro_rules! impl_ops_for_OrthoAngles {
     ($Type:ty) => {
-        impl<T: OrthoAngle> Add<T> for $Type {
+        impl<T: OrthoAngleOps> Add<T> for $Type {
             type Output = Self;
 
             fn add(self, rhs: T) -> Self::Output {
@@ -147,7 +150,7 @@ macro_rules! impl_ops_for_OrthoAngles {
             }
         }
 
-        impl<T: OrthoAngle> Sub<T> for $Type {
+        impl<T: OrthoAngleOps> Sub<T> for $Type {
             type Output = Self;
 
             fn sub(self, rhs: T) -> Self::Output {
@@ -198,7 +201,13 @@ macro_rules! impl_ops_for_OrthoAngles {
 }
 
 impl_ops_for_OrthoAngles!(NormalizedOrthoAngle);
-impl_ops_for_OrthoAngles!(UnNormalizedOrthoAngle);
+impl_ops_for_OrthoAngles!(OrthoAngle);
+
+impl From<NormalizedOrthoAngle> for OrthoAngle {
+    fn from(value: NormalizedOrthoAngle) -> Self {
+        value.0.into()
+    }
+}
 
 // impl<T: Coordinate> TryFrom<T> for OrthoAngle {
 //     type Error = ();
@@ -242,7 +251,7 @@ impl Display for OrthogonalDirection {
     }
 }
 
-impl<T: OrthoAngle> From<T> for OrthogonalDirection {
+impl<T: OrthoAngleOps> From<T> for OrthogonalDirection {
     fn from(value: T) -> Self {
         value.dir()
     }
@@ -260,13 +269,13 @@ impl QuarterTurnRotatable for OrthogonalDirection {
 pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
-    fn from_angle(angle: impl OrthoAngle) -> Self;
+    fn from_angle(angle: impl OrthoAngleOps) -> Self;
     fn from_coordinate<T: Coordinate>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
     fn try_from_coordinate<T: Coordinate>(coord: T) -> Result<Self, String> {
         Ok(Self::from_angle(
-            <NormalizedOrthoAngle as OrthoAngle>::try_from_coordinate(coord)?,
+            <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(coord)?,
         ))
     }
     fn left(&self) -> Self {
@@ -323,14 +332,14 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
 
 impl<T> Direction for T
 where
-    T: OrthoAngle,
+    T: OrthoAngleOps,
 {
     fn angle(&self) -> NormalizedOrthoAngle {
         self.normalized()
     }
 
     // TODO: use enum that covers OrthoAngle and Angle<f32>
-    fn from_angle(angle: impl OrthoAngle) -> Self {
+    fn from_angle(angle: impl OrthoAngleOps) -> Self {
         todo!()
     }
 
@@ -345,7 +354,7 @@ impl Direction for OrthogonalDirection {
         self.0
     }
 
-    fn from_angle(angle: impl OrthoAngle) -> Self {
+    fn from_angle(angle: impl OrthoAngleOps) -> Self {
         Self(angle.normalized())
     }
 }

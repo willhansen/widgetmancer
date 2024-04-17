@@ -1,10 +1,14 @@
+use crate::fov_stuff::*;
 use crate::utility::*;
 
 // A trait intended to only be used while replacing one partial square visibility type with another, to allow testing for common functionality in the transition.
-pub trait PartialSquareVisibilityOps: Copy {
+pub trait PartialSquareVisibilityOps: Clone {
     // TODO: make a Complement trait
     fn complement(&self) -> Self;
-    fn half_visible(shadow_direction: Angle<f32>) -> Self {
+    fn half_visible(shadow_direction: Angle<f32>) -> Self
+    where
+        Self: Sized,
+    {
         // TODO: may be backwards
         let shadow_direction = standardize_angle_with_zero_mid(shadow_direction);
         let shadow_line = TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_through_origin(
@@ -26,4 +30,7 @@ pub trait PartialSquareVisibilityOps: Copy {
     }
     fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint>;
     fn is_within_distance_of_covering_centered_unit_square(&self, distance: f32) -> bool;
+    fn combined_increasing_visibility(&self, other: &Self) -> SquareVisibility<Self>
+    where
+        Self: Sized;
 }

@@ -33,6 +33,8 @@ macro_rules! pub_mod_and_use {
 pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
+    categorized_partial_angle_interval,
+    thing_at_coord,
     quarter_turn_rotatable,
     cone,
     to_and_from_array,
@@ -44,6 +46,7 @@ pub_mod_and_use!(
     line_constructors,
     directed_line_constructors,
     angle,
+    unbound_convex_polygon,
     angle_interval,
     angular_direction,
     angular_edge_of_centered_arc,

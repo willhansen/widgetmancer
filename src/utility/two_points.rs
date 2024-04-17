@@ -239,7 +239,7 @@ impl<P> TwoPointsOnDifferentFacesOfGridSquare<P>
 where
     P: FloatCoordinate,
 {
-    pub fn try_new_from_line_and_square<L: DirectedFloatLine<_PointType = P>>(
+    pub fn try_new_from_line_and_square<L: DirectedFloatLineOps<_PointType = P>>(
         line: L,
         square: P::OnGrid,
     ) -> Result<Self, String> {
@@ -432,7 +432,6 @@ impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
         )
     }
 }
-
 
 impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {

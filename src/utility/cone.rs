@@ -1,11 +1,20 @@
 use crate::utility::*;
+use derive_getters::Getters;
+use derive_more::Constructor;
 
-/// angle is less than 180 degrees only
-pub struct ConeFromPoint<PointType: Coordinate> {
-    center: PointType,
-    // angle_interval: NarrowAngleInterval,
+pub type ConeFromSquare = ThingAtCoord<Cone, WorldSquare>;
+
+// TODO: There's got to be a better way to get convenient names for general fields
+impl ConeFromSquare {
+    pub fn square(&self) -> WorldSquare {
+        *self.coord()
+    }
+    pub fn cone(&self) -> Cone {
+        *self.thing()
+    }
 }
 
+// TODO: maybe generalize to ConvexUnboundedPolygon? (just a collection of half planes, where a point is inside if it is on all the half planes)
 #[derive(Clone, Copy, Debug)]
 pub struct ConeEdgeIntersectionsWithCenteredUnitSquare {
     cw_edge: Option<HalfPlaneCuttingLocalSquare>,
@@ -36,11 +45,10 @@ impl ToAndFromArray<Option<HalfPlaneCuttingLocalSquare>, 2>
         out
     }
 }
-impl<P: Coordinate> ConeFromPoint<P> {}
 
 pub trait ConeOps {}
 
-impl<P: Coordinate> ConeOps for ConeFromPoint<P> {}
+impl ConeOps for ConeFromSquare {}
 
 impl QuarterTurnRotatable for ConeEdgeIntersectionsWithCenteredUnitSquare {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

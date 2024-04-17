@@ -280,7 +280,7 @@ pub trait SignedCoordinate:
         self.dot(axis_vector)
     }
     fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
-        <NormalizedOrthoAngle as OrthoAngle>::try_from_coordinate(*self)
+        <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(*self)
     }
 }
 impl<T> SignedCoordinate for T

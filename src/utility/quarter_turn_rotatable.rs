@@ -48,28 +48,18 @@ macro_rules! impl_quarter_turn_rotatable_for_newtype {
 }
 pub(crate) use impl_quarter_turn_rotatable_for_newtype;
 
-macro_rules! impl_quarter_turn_rotatable_for_iterable {
-    ($type:ident) => {
-        impl<T> QuarterTurnRotatable for $type<T>
-        where
-            T: QuarterTurnRotatable,
-        {
-            fn quarter_rotated_ccw(
-                &self,
-                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
-            ) -> Self {
-                let quarter_turns_ccw = quarter_turns_ccw.into();
-                self.iter()
-                    .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
-                    .collect()
-            }
-        }
-    };
-}
-pub(crate) use impl_quarter_turn_rotatable_for_iterable;
-
 // TODO: Can use blanket implementation over IntoIterator and FromIterator instead?
-impl_quarter_turn_rotatable_for_iterable!(Vec);
+impl<T> QuarterTurnRotatable for Vec<T>
+where
+    T: QuarterTurnRotatable,
+{
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        let quarter_turns_ccw = quarter_turns_ccw.into();
+        self.iter()
+            .map(|t| t.quarter_rotated_ccw(quarter_turns_ccw))
+            .collect()
+    }
+}
 
 // TODO: generate with macro ("for_mappable"?)
 impl<T> QuarterTurnRotatable for Option<T>
