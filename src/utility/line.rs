@@ -7,6 +7,9 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
+#[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
+pub struct Line<PointType: Coordinate>(DirectedLine<PointType>);
+
 /// Operations applicable to a traditional line that extends infinitely in both directions
 pub trait LineOps:
     Sized

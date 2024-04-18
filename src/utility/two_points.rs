@@ -3,7 +3,7 @@ use crate::utility::*;
 pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
 // TODO: convert to trait
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TwoDifferentPoints<PointType: Coordinate> {
     p1: PointType,
     p2: PointType,
@@ -417,7 +417,7 @@ impl TwoDifferentWorldPoints {
 }
 
 // TODO: allow for unsigned
-impl<PointType: SignedCoordinate> Debug for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

@@ -1,5 +1,7 @@
 use crate::utility::*;
 
+pub type DirectedFloatLine<UnitType> = DirectedLine<Point2D<f32, UnitType>>;
+
 pub trait DirectedFloatLineOps: DirectedLineOps + FloatLineOps {
     fn points_sorted_by_line_direction(
         &self,

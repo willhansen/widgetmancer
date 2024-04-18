@@ -56,13 +56,13 @@ pub_mod_and_use!(
     coordinates,
     directed_float_line,
     directed_line,
-    float_line_ops,
+    float_line,
     general_utility,
     grid_square,
     halfplane,
     has_origin_pose,
     interval,
-    line_ops,
+    line,
     line_segment,
     octant,
     orthogonal_facing_int_pose,
@@ -84,6 +84,9 @@ pub mod default {
     pub type FloatPoint = Point2D<f32>;
     pub type IntPoint = Point2D<i32>;
     pub type TwoDifferentFloatPoints = super::TwoDifferentFloatPoints<euclid::UnknownUnit>;
+    pub type FloatLine = super::FloatLine<euclid::UnknownUnit>;
+    pub type DirectedFloatLine = super::DirectedFloatLine<euclid::UnknownUnit>;
+    pub type HalfPlane = super::HalfPlane<DirectedFloatLine>;
 }
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {

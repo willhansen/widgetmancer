@@ -10,7 +10,7 @@ use euclid::num::Zero;
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
+pub struct HalfPlane<LineType>
 // where
 //     LineType: DirectedFloatLine,
 //     Self: DirectedLineConstructors<LineType::PointType>,
@@ -20,6 +20,7 @@ pub struct HalfPlane<LineType = TwoDifferentFloatPoints<euclid::UnknownUnit>>
     pub dividing_line: LineType,
 }
 
+// TODO: move most of these functions to HalfPlaneOps
 impl<LineType> HalfPlane<LineType>
 where
     LineType: DirectedFloatLineOps + TryFromTwoPoints<LineType::PointType> + LineConstructors,
@@ -349,6 +350,10 @@ impl<L: DirectedFloatLineOps> Complement for HalfPlane<L> {
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
     type LineType: DirectedLineOps;
+}
+
+impl<L: DirectedFloatLineOps> HalfPlaneOps for HalfPlane<L> {
+    type LineType = L;
 }
 
 // TODO: define in struct impl instead?
@@ -860,12 +865,14 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_inside_unit_square__partial__exact__one_fully_covers__one_just_touches_corner(
     ) {
-        let just_fully_covering: HalfPlane = HalfPlane::new_from_border_line_with_origin_inside(
-            TwoDifferentPoints::new_horizontal(0.5),
-        );
-        let just_touching_corner: HalfPlane = HalfPlane::new_from_border_line_with_origin_outside(
-            TwoDifferentPoints::easy_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
-        );
+        let just_fully_covering: HalfPlane<_> =
+            default::HalfPlane::new_from_border_line_with_origin_inside(
+                TwoDifferentPoints::new_horizontal(0.5),
+            );
+        let just_touching_corner: HalfPlane<_> =
+            default::HalfPlane::new_from_border_line_with_origin_outside(
+                TwoDifferentPoints::easy_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
+            );
         assert!(just_fully_covering
             .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)
             .is_partial());

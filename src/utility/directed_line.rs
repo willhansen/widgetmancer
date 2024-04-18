@@ -1,5 +1,8 @@
 use crate::utility::*;
 
+#[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
+pub struct DirectedLine<PointType: Coordinate>(TwoDifferentPoints<PointType>);
+
 pub trait DirectedLineOps: LineOps + Reversible {
     // TODO: maybe no constructors in these operation collections?
 

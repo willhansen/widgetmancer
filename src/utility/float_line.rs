@@ -1,6 +1,8 @@
 use crate::utility::*;
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
+pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;
+
 pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
     type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
 
