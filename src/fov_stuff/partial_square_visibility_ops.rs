@@ -2,9 +2,7 @@ use crate::fov_stuff::*;
 use crate::utility::*;
 
 // A trait intended to only be used while replacing one partial square visibility type with another, to allow testing for common functionality in the transition.
-pub trait PartialSquareVisibilityOps: Clone {
-    // TODO: make a Complement trait
-    fn complement(&self) -> Self;
+pub trait PartialSquareVisibilityOps: Clone + Complement<Output = Self> {
     fn half_visible(shadow_direction: Angle<f32>) -> Self
     where
         Self: Sized,

@@ -14,12 +14,12 @@ impl PartialSquareVisibilityByOneVisibleHalfPlane {
         self.0
     }
 }
+
+impl_complement_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);
+
 impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane {
     fn new_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
         Self(visible_portion)
-    }
-    fn complement(&self) -> Self {
-        Self(self.0.complement())
     }
     fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
         self.0

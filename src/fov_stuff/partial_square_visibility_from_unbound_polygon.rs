@@ -3,17 +3,14 @@ use derive_more::Constructor;
 
 // TODO: more than one cone
 #[derive(Clone, Constructor, Debug)]
-pub struct PartialSquareVisibilityFromFovCones(UnboundConvexPolygon<LineCuttingLocalSquare>);
+pub struct PartialSquareVisibilityFromUnboundPolygon(UnboundConvexPolygon<LineCuttingLocalSquare>);
 
-impl PartialSquareVisibilityFromFovCones {}
+impl PartialSquareVisibilityFromUnboundPolygon {}
 
-impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityFromFovCones);
+impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
+impl_complement_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
 
-impl PartialSquareVisibilityOps for PartialSquareVisibilityFromFovCones {
-    fn complement(&self) -> Self {
-        todo!()
-    }
-
+impl PartialSquareVisibilityOps for PartialSquareVisibilityFromUnboundPolygon {
     fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {
         todo!()
     }

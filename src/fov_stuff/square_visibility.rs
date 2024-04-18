@@ -21,7 +21,7 @@ pub enum SquareVisibility<T: PartialSquareVisibilityOps> {
 }
 pub type SquareVisibilityFromOneHalfPlane =
     SquareVisibility<PartialSquareVisibilityByOneVisibleHalfPlane>;
-pub type SquareVisibilityFromFovCones = SquareVisibility<PartialSquareVisibilityFromFovCones>;
+pub type SquareVisibilityFromFovCones = SquareVisibility<PartialSquareVisibilityFromUnboundPolygon>;
 
 pub type DefaultPartialSquareVisibilityType = PartialSquareVisibilityByOneVisibleHalfPlane;
 pub type DefaultSquareVisibilityType = SquareVisibility<DefaultPartialSquareVisibilityType>;
@@ -41,14 +41,6 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
         }
     }
 
-    // TODO: complement trait
-    pub fn complement(&self) -> Self {
-        match self {
-            SquareVisibility::FullyVisible => Self::NotVisible,
-            SquareVisibility::PartiallyVisible(v) => Self::PartiallyVisible(v.complement()),
-            SquareVisibility::NotVisible => Self::FullyVisible,
-        }
-    }
 
     pub fn is_fully_visible(&self) -> bool {
         matches!(self, Self::FullyVisible)
@@ -139,6 +131,19 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
     }
 }
 
+impl<T: PartialSquareVisibilityOps> Complement for SquareVisibility<T> {
+    type Output = Self;
+    fn complement(&self) -> Self::Output {
+        match self {
+            SquareVisibility::FullyVisible => Self::NotVisible,
+            SquareVisibility::PartiallyVisible(v) => Self::PartiallyVisible(v.complement()),
+            SquareVisibility::NotVisible => Self::FullyVisible,
+        }
+    }
+
+    
+}
+
 
 // TODO: merge with SquareVisibilityOperations? rename?
 pub trait ViewRoundable {
@@ -190,7 +195,7 @@ impl<T: PartialSquareVisibilityOps> ViewRoundable for SquareVisibility<T> where 
     }
 }
 impl SquareVisibilityOperations for SquareVisibilityFromFovCones {
-    type PartialVizType = PartialSquareVisibilityFromFovCones;
+    type PartialVizType = PartialSquareVisibilityFromUnboundPolygon;
 
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool {
         todo!()

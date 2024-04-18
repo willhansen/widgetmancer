@@ -92,12 +92,6 @@ where {
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
     }
 
-    pub fn complement(&self) -> Self {
-        HalfPlane::new_from_line_and_point_on_half_plane(
-            self.dividing_line,
-            self.point_off_half_plane(),
-        )
-    }
     pub fn dividing_line(&self) -> LineType {
         self.dividing_line
     }
@@ -345,6 +339,19 @@ where {
     }
 }
 
+impl<L: DirectedFloatLineOps> Complement for HalfPlane<L> {
+    type Output = Self;
+
+    fn complement(&self) -> Self::Output {
+        Self::new_from_line_and_point_on_half_plane(self.dividing_line, self.point_off_half_plane())
+    }
+}
+
+pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
+    type LineType: DirectedLineOps;
+}
+
+// TODO: define in struct impl instead?
 impl<P, L> DirectedLineConstructors<P> for HalfPlane<L>
 where
     L: DirectedFloatLineOps<_PointType = P>,

@@ -1,5 +1,6 @@
 use crate::utility::*;
 
+// TODO: Should this be a struct, or put in DirectedLine struct implementation?
 pub trait DirectedLineConstructors<P: SignedCoordinate> {
     fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where

@@ -4,7 +4,7 @@ pub_mod_and_use!(
     partial_square_visibility_ops,
     square_visibility,
     partial_square_visibility_from_one_half_plane,
-    partial_square_visibility_from_fov_cones,
+    partial_square_visibility_from_unbound_polygon,
     rasterized_field_of_view
 );
 

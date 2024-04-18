@@ -3,13 +3,7 @@ use crate::utility::*;
 /// A polygon without the requirement that the shape be closed
 // TODO: enforce order and non-redundancy on creation
 #[derive(Debug, PartialEq, Clone)]
-pub struct UnboundConvexPolygon<LineType>(Vec<HalfPlane<LineType>>);
-
-impl<L: DirectedFloatLineOps> QuarterTurnRotatable for UnboundConvexPolygon<L> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        Self(self.sides().quarter_rotated_ccw(quarter_turns_ccw))
-    }
-}
+pub struct UnboundConvexPolygon<HalfPlaneType>(Vec<HalfPlaneType>);
 
 impl<L> UnboundConvexPolygon<L> {
     pub fn new(sides: Vec<HalfPlane<L>>) -> Self {
@@ -19,11 +13,24 @@ impl<L> UnboundConvexPolygon<L> {
         &self.0
     }
 }
+impl<Hp: HalfPlaneOps> QuarterTurnRotatable for UnboundConvexPolygon<Hp> {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        Self(self.sides().quarter_rotated_ccw(quarter_turns_ccw))
+    }
+}
 
-pub trait UnboundPolygonOps {
+impl<H: HalfPlaneOps> Complement for UnboundConvexPolygon<H> {
+    type Output = Self;
+
+    fn complement(&self) -> Self::Output {
+        Self::new(self.sides().iter().map(|x| x.complement()).collect())
+    }
+}
+
+pub trait UnboundConvexPolygonOps {
     type LineType: LineOps;
 }
 
-impl<L: LineOps> UnboundPolygonOps for UnboundConvexPolygon<L> {
+impl<L: LineOps> UnboundConvexPolygonOps for UnboundConvexPolygon<L> {
     type LineType = L;
 }
