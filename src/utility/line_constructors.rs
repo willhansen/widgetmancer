@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait LineConstructors: LineOps + TryFromTwoPoints<Self::PointType> + Sized {
+pub trait LineConstructors: LineOps + TwoPointsConstructors<Self::PointType> + Sized {
     fn new_from_two_unordered_points_on_line(p1: Self::PointType, p2: Self::PointType) -> Self {
         Self::try_new_from_two_points_on_line(p1, p2).unwrap()
     }
@@ -28,4 +28,4 @@ pub trait LineConstructors: LineOps + TryFromTwoPoints<Self::PointType> + Sized 
     }
 }
 
-impl<L> LineConstructors for L where L: LineOps + TryFromTwoPoints<L::PointType> {}
+impl<L> LineConstructors for L where L: LineOps + TwoPointsConstructors<L::PointType> {}

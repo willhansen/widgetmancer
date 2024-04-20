@@ -3,12 +3,12 @@ use derive_getters::Getters;
 use derive_more::Constructor;
 
 #[derive(Clone, Copy, Debug, Constructor, Getters)]
-pub struct ThingAtCoord<T, P: Coordinate> {
+pub struct ThingAtCoord<T, P: CoordinateOps> {
     thing: T,
     coord: P,
 }
 
-impl<T, P: Coordinate> ThingAtCoord<T, P> {
+impl<T, P: CoordinateOps> ThingAtCoord<T, P> {
     pub fn revolved(&self, angle: QuarterTurns) -> Self
     where
         T: QuarterTurnRotatable,

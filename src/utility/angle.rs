@@ -89,7 +89,7 @@ pub trait OrthoAngleOps:
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.to_step()
     }
-    fn try_from_coordinate<T: Coordinate>(dir: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: CoordinateOps>(dir: T) -> Result<Self, String> {
         if !dir.is_orthogonal() {
             return Err(format!("Not orthogonal: {}", dir.to_string()));
         }
@@ -109,14 +109,14 @@ pub trait OrthoAngleOps:
             },
         ))
     }
-    fn from_coordinate<T: Coordinate>(dir: T) -> Self {
+    fn from_coordinate<T: CoordinateOps>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn quarter_turns_from_x_axis<P: IntCoordinate>(end: P) -> Self {
+    fn quarter_turns_from_x_axis<P: IntCoordinateOps>(end: P) -> Self {
         Self::from_start_and_end_directions(P::right(), end)
     }
 
-    fn from_start_and_end_directions<P: IntCoordinate>(start: P, end: P) -> Self {
+    fn from_start_and_end_directions<P: IntCoordinateOps>(start: P, end: P) -> Self {
         assert!(start.is_king_step());
         assert!(end.is_king_step());
         // needs to be quarter turn, no eighths
@@ -135,7 +135,7 @@ pub trait OrthoAngleOps:
     fn to_float_angle(&self) -> FAngle {
         self.rotate_angle(FAngle::degrees(0.0))
     }
-    fn rotate_vector<PointType: SignedCoordinate>(&self, v: PointType) -> PointType {
+    fn rotate_vector<PointType: SignedCoordinateOps>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(*self)
     }
 }
@@ -270,10 +270,10 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
     fn from_angle(angle: impl OrthoAngleOps) -> Self;
-    fn from_coordinate<T: Coordinate>(dir: T) -> Self {
+    fn from_coordinate<T: CoordinateOps>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn try_from_coordinate<T: Coordinate>(coord: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: CoordinateOps>(coord: T) -> Result<Self, String> {
         Ok(Self::from_angle(
             <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(coord)?,
         ))
@@ -323,7 +323,7 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
         }
     }
     // TODO: find a way to automatically just take whatever type is convenient
-    fn to_step<T: SignedCoordinate>(&self) -> T {
+    fn to_step<T: SignedCoordinateOps>(&self) -> T {
         // let (x, y) = self.xy();
         // T::new(x, y)
         self.xy().into()
@@ -343,7 +343,7 @@ where
         todo!()
     }
 
-    fn try_from_coordinate<P: Coordinate>(coord: P) -> Result<Self, String> {
+    fn try_from_coordinate<P: CoordinateOps>(coord: P) -> Result<Self, String> {
         if coord.is_orthogonal() {}
         todo!()
     }

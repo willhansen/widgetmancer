@@ -211,7 +211,7 @@ pub fn halfplane_cutting_world_square_to_halfplane_local_square(
 ) -> HalfPlaneCuttingLocalSquare {
     let line = world_version.dividing_line.as_local();
     let casted_line: LineCuttingLocalSquare = line.cast_unit();
-    HalfPlaneCuttingLocalSquare::halfplane_from_border_with_inside_on_right(casted_line)
+    HalfPlaneCuttingLocalSquare::from_border_with_inside_on_right(casted_line)
 }
 
 pub fn local_square_half_plane_to_local_character_half_plane(

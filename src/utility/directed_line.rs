@@ -1,7 +1,7 @@
 use crate::utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct DirectedLine<PointType: Coordinate>(TwoDifferentPoints<PointType>);
+pub struct DirectedLine<PointType: CoordinateOps>(TwoDifferentPoints<PointType>);
 
 pub trait DirectedLineOps: LineOps + Reversible {
     // TODO: maybe no constructors in these operation collections?
@@ -26,5 +26,35 @@ pub trait DirectedLineOps: LineOps + Reversible {
     }
     fn arbitrary_point_left_of_line(&self) -> Self::PointType {
         self.arbitrary_point_anticlockwise_of_line()
+    }
+}
+
+impl<P> LineOps for DirectedLine<P>
+where
+    P: CoordinateOps,
+{
+    type PointType = P;
+
+    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+        todo!()
+    }
+}
+
+impl<P> DirectedLineOps for DirectedLine<P>
+where
+    P: CoordinateOps,
+    DirectedLine<P>: LineOps<PointType = P>,
+{
+    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
+        todo!()
+    }
+}
+
+// impl<L> Reversible for L
+// where
+//     L: DirectedLineOps + DirectedLineConstructors,
+impl<P: CoordinateOps> Reversible for DirectedLine<P> {
+    fn reversed(&self) -> Self {
+        todo!()
     }
 }

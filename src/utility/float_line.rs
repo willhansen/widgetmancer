@@ -4,7 +4,7 @@ use crate::utility::*;
 pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;
 
 pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
-    type _PointType: FloatCoordinate; // Dummy type to allow for trait bound propagation
+    type _PointType: FloatCoordinateOps; // Dummy type to allow for trait bound propagation
 
     #[deprecated(note = "use Line::closest_point_to_point instead")]
     fn closest_point_on_extended_line_to_point(
@@ -229,7 +229,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
-    fn depth_in_square(&self, square: <Self::PointType as Coordinate>::OnGrid) -> f32 {
+    fn depth_in_square(&self, square: <Self::PointType as CoordinateOps>::OnGrid) -> f32 {
         let normal_to_line: FAngle = self.perpendicular_directions()[0];
 
         let line_position_on_axis = self
@@ -245,7 +245,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
 impl<L> FloatLineOps for L
 where
     L: LineOps,
-    L::PointType: FloatCoordinate,
+    L::PointType: FloatCoordinateOps,
 {
     type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
 }

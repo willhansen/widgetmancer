@@ -9,7 +9,7 @@ use crate::utility::*;
 #[get_copy = "pub"]
 pub struct OrthogonalFacingIntPose<SquareType>
 where
-    SquareType: IntCoordinate,
+    SquareType: IntCoordinateOps,
 {
     square: SquareType,
     dir: OrthogonalDirection,
@@ -17,7 +17,7 @@ where
 
 impl<SquareType> OrthogonalFacingIntPose<SquareType>
 where
-    SquareType: IntCoordinate,
+    SquareType: IntCoordinateOps,
 {
     pub fn angle(&self) -> NormalizedOrthoAngle {
         self.dir.into()
@@ -175,31 +175,35 @@ where
             && self.direction().is_horizontal()
     }
 
-    pub fn center_point_of_face(&self) -> <SquareType as Coordinate>::Floating {
-        self.square().to_f32() + self.dir().to_step::<<SquareType as Coordinate>::Floating>() * 0.5
+    pub fn center_point_of_face(&self) -> <SquareType as CoordinateOps>::Floating {
+        self.square().to_f32()
+            + self
+                .dir()
+                .to_step::<<SquareType as CoordinateOps>::Floating>()
+                * 0.5
     }
-    pub fn end_points_of_face(&self) -> [<SquareType as Coordinate>::Floating; 2] {
+    pub fn end_points_of_face(&self) -> [<SquareType as CoordinateOps>::Floating; 2] {
         [self.left(), self.right()].map(|dir| {
             self.center_point_of_face()
-                + dir.to_step::<<SquareType as Coordinate>::Floating>() * 0.5
+                + dir.to_step::<<SquareType as CoordinateOps>::Floating>() * 0.5
         })
     }
-    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as Coordinate>::Floating; 2] {
+    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as CoordinateOps>::Floating; 2] {
         let mut ps = self.end_points_of_face();
         if !two_points_are_ccw_with_origin(ps[0], ps[1]) {
             ps.reverse();
         }
         ps
     }
-    pub fn cw_end_of_face(&self) -> <SquareType as Coordinate>::Floating {
+    pub fn cw_end_of_face(&self) -> <SquareType as CoordinateOps>::Floating {
         self.end_points_of_face_in_ccw_order()[0]
     }
-    pub fn ccw_end_of_face(&self) -> <SquareType as Coordinate>::Floating {
+    pub fn ccw_end_of_face(&self) -> <SquareType as CoordinateOps>::Floating {
         self.end_points_of_face_in_ccw_order()[1]
     }
     pub fn face_end_point_approx_touches_point(
         &self,
-        point: <SquareType as Coordinate>::Floating,
+        point: <SquareType as CoordinateOps>::Floating,
     ) -> bool {
         let tolerance = 1e-6;
         self.end_points_of_face()
@@ -217,7 +221,7 @@ where
         [*self, self.stepped().turned_back()]
     }
 }
-impl<T: IntCoordinate> Debug for OrthogonalFacingIntPose<T>
+impl<T: IntCoordinateOps> Debug for OrthogonalFacingIntPose<T>
 where
     Self: Display,
 {
@@ -225,7 +229,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: IntCoordinate> Display for OrthogonalFacingIntPose<T> {
+impl<T: IntCoordinateOps> Display for OrthogonalFacingIntPose<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -310,7 +314,7 @@ impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
     }
 }
 
-impl<T: IntCoordinate> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
+impl<T: IntCoordinateOps> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
     type Output = Self;
 
     fn add(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
@@ -321,7 +325,7 @@ impl<T: IntCoordinate> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
     }
 }
 
-impl<T: IntCoordinate> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
+impl<T: IntCoordinateOps> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
     type Output = Self;
 
     fn sub(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
@@ -338,7 +342,7 @@ impl<T: IntCoordinate> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPo
 impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
     for OrthogonalFacingIntPose<SquareType>
 where
-    SquareType: IntCoordinate,
+    SquareType: IntCoordinateOps,
     IntoSquareType: Into<SquareType>,
     IntoStepType: Into<SquareType>,
 {

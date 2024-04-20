@@ -7,10 +7,10 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
+/// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct Line<PointType: Coordinate>(DirectedLine<PointType>);
+pub struct Line<PointType: CoordinateOps>(DirectedLine<PointType>);
 
-/// Operations applicable to a traditional line that extends infinitely in both directions
 pub trait LineOps:
     Sized
     + Copy
@@ -18,9 +18,8 @@ pub trait LineOps:
     + Debug
     + Sub<Self::PointType, Output = Self>
     + Add<Self::PointType, Output = Self>
-    + TryFromTwoPoints<Self::PointType>
 {
-    type PointType: SignedCoordinate;
+    type PointType: SignedCoordinateOps;
     // type P: SignedCoordinate; // shorthand for PointType
 
     // type DataType = <Self::PointType as Coordinate>::DataType;
@@ -90,16 +89,16 @@ pub trait LineOps:
         on_line(p1, p2, point.into())
     }
     // // fn try_new_from_line(line: impl Line<PointType = Self::PointType>) -> Result<Self, String>;
-    fn new_horizontal(y: <Self::PointType as Coordinate>::DataType) -> Self {
+    fn new_horizontal(y: <Self::PointType as CoordinateOps>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            Self::PointType::new(<Self::PointType as Coordinate>::DataType::zero(), y),
-            Self::PointType::new(<Self::PointType as Coordinate>::DataType::one(), y),
+            Self::PointType::new(<Self::PointType as CoordinateOps>::DataType::zero(), y),
+            Self::PointType::new(<Self::PointType as CoordinateOps>::DataType::one(), y),
         )
     }
-    fn new_vertical(x: <Self::PointType as Coordinate>::DataType) -> Self {
+    fn new_vertical(x: <Self::PointType as CoordinateOps>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::zero()),
-            Self::PointType::new(x, <Self::PointType as Coordinate>::DataType::one()),
+            Self::PointType::new(x, <Self::PointType as CoordinateOps>::DataType::zero()),
+            Self::PointType::new(x, <Self::PointType as CoordinateOps>::DataType::one()),
         )
     }
     fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
@@ -222,7 +221,7 @@ pub fn does_ray_hit_oriented_square_face(
 ) -> bool {
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
-pub fn naive_ray_endpoint<P: FloatCoordinate>(start: P, angle: Angle<f32>, length: f32) -> P {
+pub fn naive_ray_endpoint<P: FloatCoordinateOps>(start: P, angle: Angle<f32>, length: f32) -> P {
     start + P::unit_vector_from_angle(angle) * length
 }
 

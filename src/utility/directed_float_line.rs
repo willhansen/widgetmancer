@@ -32,7 +32,7 @@ pub trait DirectedFloatLineOps: DirectedLineOps + FloatLineOps {
     }
     fn ordered_line_intersections_with_square(
         &self,
-        square: <Self::PointType as Coordinate>::OnGrid,
+        square: <Self::PointType as CoordinateOps>::OnGrid,
     ) -> Vec<Self::PointType> {
         let offset = square.to_f32();
         let relative_self = *self - offset;

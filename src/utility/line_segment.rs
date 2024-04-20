@@ -3,13 +3,13 @@ use rand::{rngs::StdRng, Rng};
 use crate::utility::*;
 
 pub trait LineSegmentOps: LineOps {
-    fn square_length(&self) -> <Self::PointType as Coordinate>::DataType {
+    fn square_length(&self) -> <Self::PointType as CoordinateOps>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];
 }
-impl<P: SignedCoordinate> LineSegmentOps for TwoDifferentPoints<P> {
+impl<P: SignedCoordinateOps> LineSegmentOps for TwoDifferentPoints<P> {
     fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }

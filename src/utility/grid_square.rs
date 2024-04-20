@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait GridSquare: IntCoordinate {
+pub trait GridSquare: IntCoordinateOps {
     fn square_corners(&self) -> [Self::Floating; 4] {
         Self::Floating::new(0.5, 0.5)
             .quadrant_rotations_going_ccw()
@@ -12,7 +12,7 @@ pub trait GridSquare: IntCoordinate {
     fn projected_onto_axis(
         &self,
         axis: FAngle,
-    ) -> ClosedInterval<<Self::Floating as Coordinate>::DataType> {
+    ) -> ClosedInterval<<Self::Floating as CoordinateOps>::DataType> {
         let all_square_corners_on_axis: [f32; 4] =
             self.square_corners().map(|p| p.position_on_axis(axis));
 
@@ -31,4 +31,4 @@ pub trait GridSquare: IntCoordinate {
     }
 }
 
-impl<T: IntCoordinate> GridSquare for T {}
+impl<T: IntCoordinateOps> GridSquare for T {}

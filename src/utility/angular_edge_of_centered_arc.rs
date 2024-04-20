@@ -39,7 +39,7 @@ pub trait AngularEdgeOfCenteredArc {
     fn is_ccw_edge(&self) -> bool {
         !self.is_cw_edge()
     }
-    fn intersection_with_relative_square<SquareType: IntCoordinate>(
+    fn intersection_with_relative_square<SquareType: IntCoordinateOps>(
         &self,
         rel_square: SquareType,
     ) -> Option<HalfPlaneCuttingSquare<SquareType>> {

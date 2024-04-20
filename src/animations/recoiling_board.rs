@@ -3,7 +3,7 @@ use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
 use crate::size_2d::Size2D;
 use crate::utility::*;
-use crate::IntCoordinate;
+use crate::IntCoordinateOps;
 use euclid::Length;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};

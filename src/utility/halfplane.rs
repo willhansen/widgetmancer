@@ -15,7 +15,7 @@ pub struct HalfPlane<LineType>
 //     LineType: DirectedFloatLine,
 //     Self: DirectedLineConstructors<LineType::PointType>,
 {
-    // TODO: flip this convention
+    // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     pub dividing_line: LineType,
 }
@@ -23,15 +23,8 @@ pub struct HalfPlane<LineType>
 // TODO: move most of these functions to HalfPlaneOps
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedFloatLineOps + TryFromTwoPoints<LineType::PointType> + LineConstructors,
-    Self: DirectedLineConstructors<LineType::PointType>,
+    LineType: DirectedLineOps + DirectedLineConstructors,
 {
-    pub fn halfplane_from_border_with_inside_on_right(line: LineType) -> Self
-where {
-        Self {
-            dividing_line: line,
-        }
-    }
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl Into<LineType>,
         point_on_half_plane: impl Into<LineType::PointType>,
@@ -202,7 +195,7 @@ where {
         point_transform_function: F,
     ) -> HalfPlane<TwoDifferentPoints<P>>
     where
-        P: FloatCoordinate,
+        P: FloatCoordinateOps,
         F: Fn(LineType::PointType) -> P,
     {
         let [p1, p2] = self
@@ -212,9 +205,7 @@ where {
         let transformed_line: TwoDifferentPoints<P> =
             TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<TwoDifferentPoints<P>>::halfplane_from_border_with_inside_on_right(
-            transformed_line,
-        )
+        HalfPlane::<TwoDifferentPoints<P>>::from_border_with_inside_on_right(transformed_line)
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
@@ -340,11 +331,30 @@ where {
     }
 }
 
-impl<L: DirectedFloatLineOps> Complement for HalfPlane<L> {
+pub trait HalfPlaneConstructors<LineType>
+where
+    LineType: DirectedLineOps + DirectedLineConstructors,
+{
+    fn from_border_with_inside_on_right(line: LineType) -> Self;
+}
+
+impl<LineType> HalfPlaneConstructors<LineType> for HalfPlane<LineType>
+where
+    LineType: DirectedLineOps + DirectedLineConstructors,
+{
+    fn from_border_with_inside_on_right(line: LineType) -> Self
+where {
+        Self {
+            dividing_line: line,
+        }
+    }
+}
+
+impl<L: DirectedLineOps> Complement for HalfPlane<L> {
     type Output = Self;
 
     fn complement(&self) -> Self::Output {
-        Self::new_from_line_and_point_on_half_plane(self.dividing_line, self.point_off_half_plane())
+        Self::from_border_with_inside_on_right(self.dividing_line.reversed())
     }
 }
 
@@ -352,22 +362,8 @@ pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
     type LineType: DirectedLineOps;
 }
 
-impl<L: DirectedFloatLineOps> HalfPlaneOps for HalfPlane<L> {
+impl<L: DirectedLineOps> HalfPlaneOps for HalfPlane<L> {
     type LineType = L;
-}
-
-// TODO: define in struct impl instead?
-impl<P, L> DirectedLineConstructors<P> for HalfPlane<L>
-where
-    L: DirectedFloatLineOps<_PointType = P>,
-    P: FloatCoordinate,
-{
-    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
 }
 
 impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
@@ -379,7 +375,7 @@ impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
     }
 }
 
-impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
+impl<P: FloatCoordinateOps> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
     for HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
 {
     type Error = ();
@@ -389,20 +385,20 @@ impl<P: FloatCoordinate> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
         let points: Result<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, _> =
             TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_from_two_points_object_allowing_snap_along_line(value.dividing_line);
         match points {
-            Ok(x) => Ok(Self::halfplane_from_border_with_inside_on_right(x)),
+            Ok(x) => Ok(Self::from_border_with_inside_on_right(x)),
             _ => Err(()),
         }
     }
 }
-impl<P: FloatCoordinate> From<HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>>
+impl<P: FloatCoordinateOps> From<HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>>
     for HalfPlane<TwoDifferentPoints<P>>
 {
     fn from(value: HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>) -> Self {
-        Self::halfplane_from_border_with_inside_on_right(value.dividing_line.into())
+        Self::from_border_with_inside_on_right(value.dividing_line.into())
     }
 }
 
-impl<LineType: DirectedFloatLineOps> QuarterTurnRotatable for HalfPlane<LineType> {
+impl<LineType: DirectedLineOps> QuarterTurnRotatable for HalfPlane<LineType> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         let quarter_turns_ccw = quarter_turns_ccw.into();
         let line = self.dividing_line();
@@ -427,26 +423,26 @@ impl<LineType: DirectedFloatLineOps> QuarterTurnRotatable for HalfPlane<LineType
 }
 
 pub type HalfPlaneCuttingSquare<SquareType> =
-    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<<SquareType as Coordinate>::Floating>>;
+    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<<SquareType as CoordinateOps>::Floating>>;
 
 // TODO: remove this trait.  functions should be in concrete implementation?
 pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLineOps> {
     // type PointType: FloatCoordinate;
-    fn which_square(&self) -> <LineType::PointType as Coordinate>::OnGrid;
+    fn which_square(&self) -> <LineType::PointType as CoordinateOps>::OnGrid;
     fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>;
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
         // TODO: tidy this up when halfplane is a trait
-        HalfPlane::<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>>::halfplane_from_border_with_inside_on_right(self.to_local().into())
+        HalfPlane::<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>>::from_border_with_inside_on_right(self.to_local().into())
             .very_approximate_fraction_coverage_of_centered_unit_square()
     }
 }
 
 impl<L> HalfPlaneCuttingSquareTrait<L> for HalfPlane<L>
 where
-    L: TwoPointsOnASquareTrait<L::PointType> + DirectedFloatLineOps,
+    L: TwoPointsOnDifferentFacesOfGridSquareOps<L::PointType> + DirectedFloatLineOps,
 {
-    fn which_square(&self) -> <L::PointType as Coordinate>::OnGrid {
+    fn which_square(&self) -> <L::PointType as CoordinateOps>::OnGrid {
         self.dividing_line.which_square()
     }
 

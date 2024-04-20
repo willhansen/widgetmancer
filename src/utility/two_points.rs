@@ -2,16 +2,15 @@ use crate::utility::*;
 
 pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
-// TODO: convert to trait
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TwoDifferentPoints<PointType: Coordinate> {
+pub struct TwoDifferentPoints<PointType: CoordinateOps> {
     p1: PointType,
     p2: PointType,
 }
-impl<P: Coordinate> TwoDifferentPoints<P> {
-    pub fn reversed(&self) -> Self {
-        Self::try_new_from_points(self.p2, self.p1).unwrap()
-    }
+impl<P: CoordinateOps> TwoDifferentPoints<P> {
+    // TODO: this impl should be empty
+
+    // TODO: move to constructor trait
     fn new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Self {
         let [p1, p2] = line.two_points_on_line_in_order();
         Self::new_from_points(p1, p2)
@@ -24,12 +23,12 @@ impl<P: Coordinate> TwoDifferentPoints<P> {
 //     }
 // }
 
-pub trait TwoPointsOnASquareTrait<P: FloatCoordinate> {
+pub trait TwoPointsOnDifferentFacesOfGridSquareOps<P: FloatCoordinateOps> {
     fn which_square(&self) -> P::OnGrid;
     fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>;
 }
 
-impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P>
+impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfGridSquareOps<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     fn which_square(&self) -> P::OnGrid {
@@ -39,7 +38,9 @@ impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P>
         *self
     }
 }
-impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfGridSquareOps<P>
+    for TwoPointsOnDifferentFacesOfGridSquare<P>
+{
     fn which_square(&self) -> P::OnGrid {
         self.the_square()
     }
@@ -49,8 +50,8 @@ impl<P: FloatCoordinate> TwoPointsOnASquareTrait<P> for TwoPointsOnDifferentFace
 }
 
 // TODO: Switch from template to associated point type
-pub trait TwoPointsWithRestriction<P: Coordinate>:
-    Sized + Copy + PartialEq + TryFromTwoPoints<P>
+pub trait TwoPointsWithRestriction<P: CoordinateOps>:
+    Sized + Copy + PartialEq + TwoPointsConstructors<P>
 {
     #[deprecated(note = "use TryFromTwoPoints::try_from_two_points instead")]
     fn try_new_from_points(p1: P, p2: P) -> Result<Self, String> {
@@ -69,14 +70,14 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
         length: f32,
     ) -> Result<Self, String>
     where
-        P: FloatCoordinate,
+        P: FloatCoordinateOps,
     {
         let p1 = p1.into();
         Self::try_new_from_points(p1, naive_ray_endpoint(p1, angle, length))
     }
     fn new_from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
     where
-        P: FloatCoordinate,
+        P: FloatCoordinateOps,
     {
         Self::try_new_from_point_and_radial(p1, angle, length).unwrap()
     }
@@ -92,7 +93,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     fn cast_unit<Other, OtherPointType>(&self) -> Other
     where
         Other: TwoPointsWithRestriction<OtherPointType>,
-        OtherPointType: Coordinate<DataType = P::DataType>,
+        OtherPointType: CoordinateOps<DataType = P::DataType>,
     {
         Other::from_array(self.to_array().map(|p| p.cast_unit()))
     }
@@ -122,16 +123,7 @@ pub trait TwoPointsWithRestriction<P: Coordinate>:
     }
 }
 
-impl<P: SignedCoordinate> DirectedLineConstructors<P> for TwoDifferentPoints<P> {
-    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        let [p1, p2] = line.two_points_on_line_in_order();
-        Ok(Self::new_from_points(p1, p2))
-    }
-}
-impl<P: Coordinate> TryFromTwoPoints<P> for TwoDifferentPoints<P> {
+impl<P: CoordinateOps> TwoPointsConstructors<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
@@ -141,7 +133,7 @@ impl<P: Coordinate> TryFromTwoPoints<P> for TwoDifferentPoints<P> {
     }
 }
 
-impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
+impl<P: CoordinateOps> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {
         match pi {
             0 => self.p1,
@@ -150,12 +142,12 @@ impl<P: Coordinate> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
         }
     }
 }
-impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
+impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
     type PointType = P;
 
     fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self
     where
-        P: FloatCoordinate,
+        P: FloatCoordinateOps,
     {
         Self::new(point, point + Self::PointType::unit_vector_from_angle(dir))
     }
@@ -170,17 +162,17 @@ impl<P: FloatCoordinate> Ray for TwoDifferentPoints<P> {
     }
 }
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
-#[derive(Clone, Copy, PartialEq)]
-pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: Coordinate>(TwoDifferentPoints<P>);
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: CoordinateOps>(TwoDifferentPoints<P>);
 
-impl<P: FloatCoordinate> TwoPointsWithRestriction<P>
+impl<P: FloatCoordinateOps> TwoPointsWithRestriction<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     fn point_by_index(&self, pi: usize) -> P {
         self.0.point_by_index(pi)
     }
 }
-impl<P: FloatCoordinate> Debug for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+impl<P: FloatCoordinateOps> Display for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TwoPointsOnDifferentFacesOfCenteredUnitSquare")
             .field("points", &self.0)
@@ -200,20 +192,24 @@ impl<P: FloatCoordinate> Debug for TwoPointsOnDifferentFacesOfCenteredUnitSquare
     }
 }
 
-impl<P: FloatCoordinate> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     fn points_are_valid(p1: P, p2: P) -> bool {
         p1.on_centered_unit_square() && p2.on_centered_unit_square() && !p1.on_same_square_face(p2)
     }
 }
 
-impl<P: FloatCoordinate> DirectedLineConstructors<P>
+impl<P: FloatCoordinateOps> DirectedLineConstructors
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
-    fn try_new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Result<Self, String>
+    type _PointType = P;
+    fn try_new_from_directed_line(
+        line: impl DirectedLineOps<PointType = Self::_PointType>,
+    ) -> Result<Self, String>
     where
         Self: Sized,
     {
-        let points: Vec<P> = line.ordered_line_intersections_with_centered_unit_square();
+        let points: Vec<Self::_PointType> =
+            line.ordered_line_intersections_with_centered_unit_square();
         if points.len() < 2 {
             Err(format!(
                 "Wrong number of intersection points: {:?},",
@@ -225,19 +221,21 @@ impl<P: FloatCoordinate> DirectedLineConstructors<P>
     }
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TwoPointsOnDifferentFacesOfGridSquare<P: FloatCoordinate> {
+pub struct TwoPointsOnDifferentFacesOfGridSquare<P: FloatCoordinateOps> {
     points_on_the_square: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>,
     the_square: P::OnGrid,
 }
 
-impl<P: FloatCoordinate> TwoPointsWithRestriction<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: FloatCoordinateOps> TwoPointsWithRestriction<P>
+    for TwoPointsOnDifferentFacesOfGridSquare<P>
+{
     fn point_by_index(&self, point_index: usize) -> P {
         self.points_on_the_square.point_by_index(point_index) + self.square_center()
     }
 }
 impl<P> TwoPointsOnDifferentFacesOfGridSquare<P>
 where
-    P: FloatCoordinate,
+    P: FloatCoordinateOps,
 {
     pub fn try_new_from_line_and_square<L: DirectedFloatLineOps<_PointType = P>>(
         line: L,
@@ -268,7 +266,7 @@ where
         self.points_on_the_square
     }
 }
-impl<PointType: SignedCoordinate> LineOps for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinateOps> LineOps for TwoDifferentPoints<PointType> {
     type PointType = PointType;
     // type P = Self::PointType;
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
@@ -309,12 +307,12 @@ macro_rules! impl_for_two_different_points {
 
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
-impl_for_two_different_points!(TwoDifferentPoints, SignedCoordinate);
+impl_for_two_different_points!(TwoDifferentPoints, SignedCoordinateOps);
 impl_for_two_different_points!(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare,
-    FloatCoordinate
+    FloatCoordinateOps
 );
-impl_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare, FloatCoordinate);
+impl_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare, FloatCoordinateOps);
 
 macro_rules! impl_traits_for_two_points_with_restriction {
     ($TheStruct:ident, $CoordTrait:ident) => {
@@ -344,17 +342,17 @@ macro_rules! impl_traits_for_two_points_with_restriction {
 }
 
 // TODO: combine into one macro call
-impl_traits_for_two_points_with_restriction!(TwoDifferentPoints, Coordinate);
+impl_traits_for_two_points_with_restriction!(TwoDifferentPoints, CoordinateOps);
 impl_traits_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare,
-    FloatCoordinate
+    FloatCoordinateOps
 );
 impl_traits_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfGridSquare,
-    FloatCoordinate
+    FloatCoordinateOps
 );
 
-impl<PointType: FloatCoordinate> LineOps
+impl<PointType: FloatCoordinateOps> LineOps
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<PointType>
 {
     type PointType = PointType;
@@ -368,7 +366,7 @@ impl<PointType: FloatCoordinate> LineOps
         self.0.two_different_arbitrary_points_on_line()
     }
 }
-impl<PointType: FloatCoordinate> LineOps for TwoPointsOnDifferentFacesOfGridSquare<PointType> {
+impl<PointType: FloatCoordinateOps> LineOps for TwoPointsOnDifferentFacesOfGridSquare<PointType> {
     type PointType = PointType;
     // type P = Self::PointType;
 
@@ -376,7 +374,7 @@ impl<PointType: FloatCoordinate> LineOps for TwoPointsOnDifferentFacesOfGridSqua
         [0, 1].map(|i| self.point_by_index(i))
     }
 }
-impl<PointType: SignedCoordinate, CanBePointType> From<(CanBePointType, CanBePointType)>
+impl<PointType: SignedCoordinateOps, CanBePointType> From<(CanBePointType, CanBePointType)>
     for TwoDifferentPoints<PointType>
 where
     CanBePointType: Into<PointType>,
@@ -387,7 +385,7 @@ where
 }
 
 // TODO: Can generalize to any line from any line?
-impl<P: FloatCoordinate> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
+impl<P: FloatCoordinateOps> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
     for TwoDifferentPoints<P>
 {
     fn from(value: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>) -> Self {
@@ -395,7 +393,7 @@ impl<P: FloatCoordinate> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
     }
 }
 
-impl<P: FloatCoordinate> TryFrom<TwoDifferentPoints<P>>
+impl<P: FloatCoordinateOps> TryFrom<TwoDifferentPoints<P>>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     type Error = String;
@@ -417,7 +415,7 @@ impl TwoDifferentWorldPoints {
 }
 
 // TODO: allow for unsigned
-impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
+impl<PointType: SignedCoordinateOps> Display for TwoDifferentPoints<PointType> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -433,7 +431,9 @@ impl<PointType: SignedCoordinate> Display for TwoDifferentPoints<PointType> {
     }
 }
 
-impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+impl<P: FloatCoordinateOps> TwoPointsConstructors<P>
+    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
+{
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
         if Self::points_are_valid(p1, p2) {
@@ -449,7 +449,7 @@ impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoPointsOnDifferentFacesOfCent
         Self::try_new_from_two_ordered_points_on_line(p1, p2)
     }
 }
-impl<P: FloatCoordinate> TryFromTwoPoints<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: FloatCoordinateOps> TwoPointsConstructors<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();
         let centered_p1 = p1 - square_center;

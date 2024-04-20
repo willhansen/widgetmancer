@@ -41,7 +41,7 @@ pub_mod_and_use!(
     to_and_from_array,
     reversible,
     two_points,
-    try_from_two_points,
+    two_points_constructors,
     sign,
     non_zero_sign,
     line_constructors,
