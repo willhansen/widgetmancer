@@ -1,5 +1,5 @@
 use crate::utility::*;
-pub trait TwoPointsConstructors<P: CoordinateOps>: Sized {
+pub trait TwoPointsConstructors<P: PointReqsForTwoDifferentPoints>: Sized {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String>;
     fn from_two_exact_points(p1: P, p2: P) -> Self {
         Self::try_from_two_exact_points(p1, p2).unwrap()

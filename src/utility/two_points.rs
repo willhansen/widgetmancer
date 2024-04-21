@@ -2,12 +2,14 @@ use crate::utility::*;
 
 pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
+trait_alias_macro!(pub trait PointReqsForTwoDifferentPoints = SignedCoordinateOps);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TwoDifferentPoints<PointType: CoordinateOps> {
+pub struct TwoDifferentPoints<PointType: PointReqsForTwoDifferentPoints> {
     p1: PointType,
     p2: PointType,
 }
-impl<P: CoordinateOps> TwoDifferentPoints<P> {
+impl<P: PointReqsForTwoDifferentPoints> TwoDifferentPoints<P> {
     // TODO: this impl should be empty
 
     // TODO: move to constructor trait
@@ -50,7 +52,7 @@ impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfGridSquareOps<P>
 }
 
 // TODO: Switch from template to associated point type
-pub trait TwoPointsWithRestriction<P: CoordinateOps>:
+pub trait TwoPointsWithRestriction<P: PointReqsForTwoDifferentPoints>:
     Sized + Copy + PartialEq + TwoPointsConstructors<P>
 {
     #[deprecated(note = "use TryFromTwoPoints::try_from_two_points instead")]
@@ -93,7 +95,7 @@ pub trait TwoPointsWithRestriction<P: CoordinateOps>:
     fn cast_unit<Other, OtherPointType>(&self) -> Other
     where
         Other: TwoPointsWithRestriction<OtherPointType>,
-        OtherPointType: CoordinateOps<DataType = P::DataType>,
+        OtherPointType: PointReqsForTwoDifferentPoints<DataType = P::DataType>,
     {
         Other::from_array(self.to_array().map(|p| p.cast_unit()))
     }
@@ -123,7 +125,7 @@ pub trait TwoPointsWithRestriction<P: CoordinateOps>:
     }
 }
 
-impl<P: CoordinateOps> TwoPointsConstructors<P> for TwoDifferentPoints<P> {
+impl<P: PointReqsForTwoDifferentPoints> TwoPointsConstructors<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
@@ -133,7 +135,7 @@ impl<P: CoordinateOps> TwoPointsConstructors<P> for TwoDifferentPoints<P> {
     }
 }
 
-impl<P: CoordinateOps> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
+impl<P: PointReqsForTwoDifferentPoints> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {
         match pi {
             0 => self.p1,
@@ -142,6 +144,7 @@ impl<P: CoordinateOps> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
         }
     }
 }
+// TODO: separate file and also int rays
 impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
     type PointType = P;
 
@@ -163,7 +166,9 @@ impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
 }
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: CoordinateOps>(TwoDifferentPoints<P>);
+pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>(
+    TwoDifferentPoints<P>,
+);
 
 impl<P: FloatCoordinateOps> TwoPointsWithRestriction<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
@@ -342,7 +347,7 @@ macro_rules! impl_traits_for_two_points_with_restriction {
 }
 
 // TODO: combine into one macro call
-impl_traits_for_two_points_with_restriction!(TwoDifferentPoints, CoordinateOps);
+impl_traits_for_two_points_with_restriction!(TwoDifferentPoints, PointReqsForTwoDifferentPoints);
 impl_traits_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare,
     FloatCoordinateOps

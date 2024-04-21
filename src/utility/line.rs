@@ -7,7 +7,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias_macro!(pub trait LinePointReqs = CoordinateOps);
+trait_alias_macro!(pub trait LinePointReqs = DirectedLinePointReqs);
 
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
@@ -104,6 +104,7 @@ pub trait LineOps:
             second_point.into(),
         )
     }
+    // TODO: maybe move to DirectedLineConstructors
     fn from_point_and_vector(
         point: impl Into<Self::PointType>,
         direction: impl Into<Self::PointType>,
