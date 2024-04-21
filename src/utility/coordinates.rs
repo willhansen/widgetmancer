@@ -115,7 +115,7 @@ pub trait CoordinateOps:
         }
     }
     fn new(x: Self::DataType, y: Self::DataType) -> Self;
-    // TODO: delete when compiling
+    // TODO: delete commented code
     // fn zero() -> Self {
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
@@ -285,6 +285,7 @@ pub trait SignedCoordinateOps:
         <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(*self)
     }
 }
+
 impl<T> SignedCoordinateOps for T
 where
     T: CoordinateOps + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,

@@ -34,6 +34,7 @@ pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
     complement,
+    translatable,
     categorized_partial_angle_interval,
     thing_at_coord,
     quarter_turn_rotatable,
@@ -45,7 +46,6 @@ pub_mod_and_use!(
     sign,
     non_zero_sign,
     line_constructors,
-    directed_line_constructors,
     angle,
     unbound_convex_polygon,
     angle_interval,

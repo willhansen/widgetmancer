@@ -7,19 +7,16 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
+trait_alias_macro!(pub trait LinePointReqs = CoordinateOps);
+
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct Line<PointType: CoordinateOps>(DirectedLine<PointType>);
+pub struct Line<PointType: LinePointReqs>(DirectedLine<PointType>);
 
 pub trait LineOps:
-    Sized
-    + Copy
-    + QuarterTurnRotatable
-    + Debug
-    + Sub<Self::PointType, Output = Self>
-    + Add<Self::PointType, Output = Self>
+    Sized + Copy + QuarterTurnRotatable + Debug + Translatable<Self::PointType>
 {
-    type PointType: SignedCoordinateOps;
+    type PointType: LinePointReqs;
     // type P: SignedCoordinate; // shorthand for PointType
 
     // type DataType = <Self::PointType as Coordinate>::DataType;
