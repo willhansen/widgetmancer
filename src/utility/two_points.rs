@@ -95,7 +95,8 @@ pub trait TwoPointsWithRestriction<P: PointReqsForTwoDifferentPoints>:
     fn cast_unit<Other, OtherPointType>(&self) -> Other
     where
         Other: TwoPointsWithRestriction<OtherPointType>,
-        OtherPointType: PointReqsForTwoDifferentPoints<DataType = P::DataType>,
+        // TODO: find a way around not being able to restrict the base DataType associated type
+        OtherPointType: PointReqsForTwoDifferentPoints<_DataType = P::DataType>,
     {
         Other::from_array(self.to_array().map(|p| p.cast_unit()))
     }
@@ -164,13 +165,18 @@ impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
         dir.better_angle_from_x_axis()
     }
 }
+
+trait_alias_macro!(pub trait PointReqsForTwoPointsOnDifferentFaces = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
+// pub trait PointReqsForTwoPointsOnDifferentFaces: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
+// impl<T> PointReqsForTwoPointsOnDifferentFaces for T where T: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
+
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>(
+pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqsForTwoPointsOnDifferentFaces>(
     TwoDifferentPoints<P>,
 );
 
-impl<P: FloatCoordinateOps> TwoPointsWithRestriction<P>
+impl<P: PointReqsForTwoPointsOnDifferentFaces> TwoPointsWithRestriction<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     fn point_by_index(&self, pi: usize) -> P {

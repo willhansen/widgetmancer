@@ -7,7 +7,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias_macro!(pub trait LinePointReqs = DirectedLinePointReqs);
+trait_alias_macro!(pub trait LinePointReqs = PointReqsForDirectedLine);
 
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]

@@ -1,31 +1,31 @@
 use crate::utility::*;
 
 // TODO: macro or something to not have to rewrite this trait everywhere
-trait_alias_macro!(pub trait DirectedLinePointReqs = PointReqsForTwoDifferentPoints);
+trait_alias_macro!(pub trait PointReqsForDirectedLine = PointReqsForTwoDifferentPoints);
 
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct DirectedLine<PointType: DirectedLinePointReqs>(TwoDifferentPoints<PointType>);
+pub struct DirectedLine<PointType: PointReqsForDirectedLine>(TwoDifferentPoints<PointType>);
 
-impl<P: DirectedLinePointReqs> DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> DirectedLine<P> {
     fn new(value: TwoDifferentPoints<P>) -> Self {
         Self(value)
     }
 }
 
-impl<P: DirectedLinePointReqs> From<TwoDifferentPoints<P>> for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> From<TwoDifferentPoints<P>> for DirectedLine<P> {
     fn from(value: TwoDifferentPoints<P>) -> Self {
         Self::new(value)
     }
 }
 
-impl<P: DirectedLinePointReqs> Add<P> for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> Add<P> for DirectedLine<P> {
     type Output = Self;
 
     fn add(self, rhs: P) -> Self::Output {
         self.0.add(rhs).into()
     }
 }
-impl<P: DirectedLinePointReqs> Sub<P> for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> Sub<P> for DirectedLine<P> {
     type Output = Self;
 
     fn sub(self, rhs: P) -> Self::Output {
@@ -59,7 +59,7 @@ pub trait DirectedLineOps: LineOps + Reversible {
 
 impl<P> LineOps for DirectedLine<P>
 where
-    P: DirectedLinePointReqs,
+    P: PointReqsForDirectedLine,
 {
     type PointType = P;
 
@@ -70,7 +70,7 @@ where
 
 impl<P> DirectedLineOps for DirectedLine<P>
 where
-    P: DirectedLinePointReqs,
+    P: PointReqsForDirectedLine,
     DirectedLine<P>: LineOps<PointType = P>,
 {
     fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
@@ -81,14 +81,14 @@ where
 // impl<L> Reversible for L
 // where
 //     L: DirectedLineOps + DirectedLineConstructors,
-impl<P: DirectedLinePointReqs> Reversible for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> Reversible for DirectedLine<P> {
     fn reversed(&self) -> Self {
         todo!()
     }
 }
 
 pub trait DirectedLineConstructors {
-    type _PointType: DirectedLinePointReqs;
+    type _PointType: PointReqsForDirectedLine;
 
     fn new_from_two_ordered_points_on_line(p1: Self::_PointType, p2: Self::_PointType) -> Self
     where
@@ -132,7 +132,7 @@ pub trait DirectedLineConstructors {
     }
 }
 
-impl<P: DirectedLinePointReqs> DirectedLineConstructors for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> DirectedLineConstructors for DirectedLine<P> {
     type _PointType = P;
 
     fn try_new_from_directed_line(
@@ -145,7 +145,7 @@ impl<P: DirectedLinePointReqs> DirectedLineConstructors for DirectedLine<P> {
     }
 }
 
-impl<P: DirectedLinePointReqs> QuarterTurnRotatable for DirectedLine<P> {
+impl<P: PointReqsForDirectedLine> QuarterTurnRotatable for DirectedLine<P> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
     }

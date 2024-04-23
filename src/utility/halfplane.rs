@@ -7,13 +7,17 @@ use euclid::num::Zero;
 // {
 // }
 
+trait_alias_macro!(pub trait LineReqsForHalfPlane = DirectedLineOps);
+// pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
+// impl<T> LineReqsForHalfPlane for T where T: DirectedLine
+
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlane<LineType>
-// where
-//     LineType: DirectedFloatLine,
-//     Self: DirectedLineConstructors<LineType::PointType>,
+where
+    LineType: LineReqsForHalfPlane,
+    // Self: DirectedLineConstructors<LineType::PointType>,
 {
     // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
@@ -23,7 +27,7 @@ pub struct HalfPlane<LineType>
 // TODO: move most of these functions to HalfPlaneOps
 impl<LineType> HalfPlane<LineType>
 where
-    LineType: DirectedLineOps + DirectedLineConstructors,
+    LineType: LineReqsForHalfPlane,
 {
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl Into<LineType>,
@@ -359,10 +363,10 @@ impl<L: DirectedLineOps> Complement for HalfPlane<L> {
 }
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
-    type LineType: DirectedLineOps;
+    type LineType: LineReqsForHalfPlane;
 }
 
-impl<L: DirectedLineOps> HalfPlaneOps for HalfPlane<L> {
+impl<L: LineReqsForHalfPlane> HalfPlaneOps for HalfPlane<L> {
     type LineType = L;
 }
 
@@ -375,12 +379,12 @@ impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
     }
 }
 
-impl<P: FloatCoordinateOps> TryFrom<HalfPlane<TwoDifferentPoints<P>>>
-    for HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
+impl<P: PointReqsForTwoPointsOnDifferentFaces> TryFrom<HalfPlane<DirectedLine<P>>>
+    for HalfPlane<DirectedLineCuttingLocalSquare<P>>
 {
     type Error = ();
 
-    fn try_from(value: HalfPlane<TwoDifferentPoints<P>>) -> Result<Self, Self::Error> {
+    fn try_from(value: HalfPlane<DirectedLine<P>>) -> Result<Self, Self::Error> {
         // TODO: want to explicitly discard hint information of existing point data.  Use a constructor that takes an impl DirectedLineOps instead.
         let points: Result<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, _> =
             TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_from_two_points_object_allowing_snap_along_line(value.dividing_line);

@@ -33,6 +33,7 @@ macro_rules! pub_mod_and_use {
 pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
+    directed_line_cutting_local_square,
     complement,
     translatable,
     categorized_partial_angle_interval,

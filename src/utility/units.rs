@@ -56,10 +56,14 @@ pub type FaceOfWorldSquare = WorldSquareWithOrthogonalDir;
 pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
 pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
-pub type WorldHalfPlane = HalfPlane<TwoDifferentWorldPoints>;
+pub type WorldDirectedLine = DirectedLine<WorldPoint>;
+pub type WorldHalfPlane = HalfPlane<WorldDirectedLine>;
+// TODO: make relative
+pub type LocalSquareDirectedLine = DirectedLine<LocalSquarePoint>;
+pub type LocalSquareHalfPlane = HalfPlane<LocalSquareDirectedLine>;
+pub type LocalCharacterDirectedLine = DirectedLine<LocalCharacterPoint>;
+pub type LocalCharacterHalfPlane = HalfPlane<LocalCharacterDirectedLine>;
 
-pub type LocalSquareHalfPlane = HalfPlane<TwoDifferentPoints<LocalSquarePoint>>;
-pub type LocalCharacterHalfPlane = HalfPlane<TwoDifferentPoints<LocalCharacterPoint>>;
 pub type HalfPlaneCuttingLocalCharacter =
     HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalCharacterPoint>>;
 
