@@ -1,5 +1,6 @@
 use crate::utility::*;
 
+#[derive(Debug, Clone, Copy)]
 pub struct DirectedLineCuttingLocalSquare<P>(TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>)
 where
     P: PointReqsForTwoPointsOnDifferentFaces;
@@ -10,9 +11,8 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> DirectedLineCuttingLocalSquare<P>
     }
 }
 
-impl_quarter_turn_rotatable_for_newtype_with_parameter!(
-    DirectedLineCuttingLocalSquare,
-    PointReqsForTwoPointsOnDifferentFaces
+impl_quarter_turn_rotatable_for_newtype!(
+    DirectedLineCuttingLocalSquare<T: PointReqsForTwoPointsOnDifferentFaces>
 );
 
 // TODO Switch to TryAdd and avoid panic?
