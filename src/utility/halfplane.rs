@@ -380,24 +380,18 @@ impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
 }
 
 impl<P: PointReqsForTwoPointsOnDifferentFaces> TryFrom<HalfPlane<DirectedLine<P>>>
-    for HalfPlane<DirectedLineCuttingLocalSquare<P>>
+    for HalfPlane<DirectedLineCuttingCenteredUnitSquare<P>>
 {
     type Error = ();
 
     fn try_from(value: HalfPlane<DirectedLine<P>>) -> Result<Self, Self::Error> {
-        // TODO: want to explicitly discard hint information of existing point data.  Use a constructor that takes an impl DirectedLineOps instead.
-        let points: Result<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, _> =
-            TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_from_two_points_object_allowing_snap_along_line(value.dividing_line);
-        match points {
-            Ok(x) => Ok(Self::from_border_with_inside_on_right(x)),
-            _ => Err(()),
-        }
+        Self::from_border_with_inside_on_right(value.try_into()?)
     }
 }
-impl<P: FloatCoordinateOps> From<HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>>
-    for HalfPlane<TwoDifferentPoints<P>>
+impl<P: PointReqsForTwoPointsOnDifferentFaces> From<HalfPlane<DirectedLineCuttingGridSquare<P>>>
+    for HalfPlane<DirectedLine<P>>
 {
-    fn from(value: HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>) -> Self {
+    fn from(value: HalfPlane<DirectedLineCuttingGridSquare<P>>) -> Self {
         Self::from_border_with_inside_on_right(value.dividing_line.into())
     }
 }

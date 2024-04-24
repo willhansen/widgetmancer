@@ -18,6 +18,21 @@ impl<P: PointReqsForDirectedLine> From<TwoDifferentPoints<P>> for DirectedLine<P
     }
 }
 
+impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingCenteredUnitSquare<P>>
+    for DirectedLine<P>
+{
+    fn from(value: DirectedLineCuttingCenteredUnitSquare<P>) -> Self {
+        todo!()
+    }
+}
+impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingGridSquare<P>>
+    for DirectedLine<P>
+{
+    fn from(value: DirectedLineCuttingGridSquare<P>) -> Self {
+        todo!()
+    }
+}
+
 impl<P: PointReqsForDirectedLine> Add<P> for DirectedLine<P> {
     type Output = Self;
 

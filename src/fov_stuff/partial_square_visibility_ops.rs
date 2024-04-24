@@ -9,7 +9,7 @@ pub trait PartialSquareVisibilityOps: Clone + Complement<Output = Self> {
     {
         // TODO: may be backwards
         let shadow_direction = standardize_angle_with_zero_mid(shadow_direction);
-        let shadow_line = TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_through_origin(
+        let shadow_line = LineCuttingCenteredUnitSquare::new_through_origin(
             LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
         );
         Self::new_from_visible_half_plane(

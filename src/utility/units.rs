@@ -65,13 +65,17 @@ pub type LocalCharacterDirectedLine = DirectedLine<LocalCharacterPoint>;
 pub type LocalCharacterHalfPlane = HalfPlane<LocalCharacterDirectedLine>;
 
 pub type HalfPlaneCuttingLocalCharacter =
-    HalfPlane<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalCharacterPoint>>;
+    HalfPlane<DirectedLine<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalCharacterPoint>>>;
 
 // TODO: replace local frame with relative world frame and a newtype enforcing the restriction
-pub type LineCuttingLocalSquare = TwoPointsOnDifferentFacesOfCenteredUnitSquare<LocalSquarePoint>;
-pub type LineCuttingWorldSquare = TwoPointsOnDifferentFacesOfGridSquare<WorldPoint>;
-pub type HalfPlaneCuttingLocalSquare = HalfPlane<LineCuttingLocalSquare>;
-pub type HalfPlaneCuttingWorldSquare = HalfPlane<LineCuttingWorldSquare>;
+
+pub type LineCuttingLocalSquare = LineCuttingCenteredUnitSquare<LocalSquarePoint>;
+pub type LineCuttingWorldSquare = LineCuttingGridSquare<WorldPoint>;
+
+pub type DirectedLineCuttingLocalSquare = DirectedLineCuttingCenteredUnitSquare<LocalSquarePoint>;
+pub type DirectedLineCuttingWorldSquare = DirectedLineCuttingGridSquare<WorldPoint>;
+pub type HalfPlaneCuttingLocalSquare = HalfPlane<DirectedLineCuttingLocalSquare>;
+pub type HalfPlaneCuttingWorldSquare = HalfPlane<DirectedLineCuttingWorldSquare>;
 
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;

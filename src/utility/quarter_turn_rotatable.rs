@@ -34,7 +34,7 @@ pub trait QuarterTurnRotatable {
     }
 }
 
-// TODO: generalize to any trait
+// TODO: generalize to any trait?
 macro_rules! impl_quarter_turn_rotatable_for_newtype {
     ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
         impl$(<$T$(: $traitparam)?>)? QuarterTurnRotatable for $type$(<$T>)? {
@@ -42,7 +42,7 @@ macro_rules! impl_quarter_turn_rotatable_for_newtype {
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
             ) -> Self {
-                Self(self.0.quarter_rotated_ccw(quarter_turns_ccw))
+                Self::new(self.0.quarter_rotated_ccw(quarter_turns_ccw))
             }
         }
     };

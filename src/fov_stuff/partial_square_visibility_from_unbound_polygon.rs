@@ -3,7 +3,9 @@ use derive_more::Constructor;
 
 // TODO: more than one cone
 #[derive(Clone, Constructor, Debug)]
-pub struct PartialSquareVisibilityFromUnboundPolygon(UnboundConvexPolygon<LineCuttingLocalSquare>);
+pub struct PartialSquareVisibilityFromUnboundPolygon(
+    UnboundConvexPolygon<HalfPlaneCuttingLocalSquare>,
+);
 
 impl PartialSquareVisibilityFromUnboundPolygon {}
 

@@ -4,6 +4,7 @@ pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
 trait_alias_macro!(pub trait PointReqsForTwoDifferentPoints = SignedCoordinateOps);
 
+// TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TwoDifferentPoints<PointType: PointReqsForTwoDifferentPoints> {
     p1: PointType,

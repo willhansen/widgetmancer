@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait GridSquare: IntCoordinateOps {
+pub trait GridSquareOps: IntCoordinateOps {
     fn square_corners(&self) -> [Self::Floating; 4] {
         Self::Floating::new(0.5, 0.5)
             .quadrant_rotations_going_ccw()
@@ -31,4 +31,4 @@ pub trait GridSquare: IntCoordinateOps {
     }
 }
 
-impl<T: IntCoordinateOps> GridSquare for T {}
+impl<T: IntCoordinateOps> GridSquareOps for T {}

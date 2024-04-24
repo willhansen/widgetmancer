@@ -4,8 +4,8 @@ pub trait Complement {
 }
 
 macro_rules! impl_complement_for_newtype {
-    ($type:ty) => {
-        impl Complement for $type {
+    ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
+        impl$(<$T$(: $traitparam)?>)? Complement for $type$(<$T>)? {
             type Output = Self;
             fn complement(&self) -> Self::Output {
                 Self(self.0.complement())

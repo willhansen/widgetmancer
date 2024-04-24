@@ -14,7 +14,7 @@ trait_alias_macro!(pub trait LinePointReqs = PointReqsForDirectedLine);
 pub struct Line<PointType: LinePointReqs>(DirectedLine<PointType>);
 
 pub trait LineOps:
-    Sized + Copy + QuarterTurnRotatable + Debug + Translatable<Self::PointType>
+    Sized + Copy + QuarterTurnRotatable + Debug + Translate<Self::PointType>
 {
     type PointType: LinePointReqs;
     // type P: SignedCoordinate; // shorthand for PointType

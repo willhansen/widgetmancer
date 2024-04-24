@@ -7,6 +7,7 @@ use ambassador::delegatable_trait;
 use try_partialord::*;
 
 use approx::AbsDiffEq;
+pub use derive_more::Constructor;
 use euclid::approxeq::ApproxEq;
 use euclid::num::{One, Zero};
 use line_drawing::{Bresenham, Point, Supercover};
@@ -33,7 +34,10 @@ macro_rules! pub_mod_and_use {
 pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
-    directed_line_cutting_local_square,
+    refinement,
+    directed_line_cutting_centered_unit_square,
+    directed_line_cutting_grid_square,
+    line_cutting_centered_unit_square,
     complement,
     translatable,
     categorized_partial_angle_interval,

@@ -92,7 +92,7 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
         } else {
 
             // NOTE: possibility of overlap check misalignment with full coverage check above, leading to panic on unwrap.
-            Self::new_partially_visible_from_visible_half_plane(visible_portion.try_into().unwrap())
+            Self::new_partially_visible_from_visible_half_plane(HalfPlaneCuttingLocalSquare::try_from(visible_portion).unwrap())
         }
     }    
 
