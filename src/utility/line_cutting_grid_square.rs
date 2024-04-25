@@ -15,3 +15,6 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> LineOps for LineCuttingGridSquare
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<T: PointReqsForTwoPointsOnDifferentFaces>);
+impl_quarter_turn_rotatable_for_newtype!(
+    LineCuttingGridSquare<T: PointReqsForTwoPointsOnDifferentFaces>
+);

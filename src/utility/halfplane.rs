@@ -7,21 +7,17 @@ use euclid::num::Zero;
 // {
 // }
 
-trait_alias_macro!(pub trait LineReqsForHalfPlane = DirectedLineOps);
+trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
 // pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
 // impl<T> LineReqsForHalfPlane for T where T: DirectedLine
 
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<LineType>
-where
-    LineType: LineReqsForHalfPlane,
-    // Self: DirectedLineConstructors<LineType::PointType>,
-{
+pub struct HalfPlane<PointType: PointReqsForHalfPlane> {
     // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
-    pub dividing_line: LineType,
+    dividing_line: DirectedLine<PointType>,
 }
 
 // TODO: move most of these functions to HalfPlaneOps

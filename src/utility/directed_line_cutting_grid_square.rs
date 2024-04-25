@@ -1,7 +1,7 @@
 use crate::utility::*;
 use derive_more::Constructor;
 
-#[derive(Debug, Clone, Copy, Constructor)]
+#[derive(Debug, PartialEq, Clone, Copy, Constructor)]
 pub struct DirectedLineCuttingGridSquare<P>(TwoPointsOnDifferentFacesOfGridSquare<P>)
 where
     P: PointReqsForTwoPointsOnDifferentFaces;
