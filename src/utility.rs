@@ -38,6 +38,7 @@ pub_mod_and_use!(
     directed_line_cutting_centered_unit_square,
     directed_line_cutting_grid_square,
     line_cutting_centered_unit_square,
+    line_cutting_grid_square,
     complement,
     translatable,
     categorized_partial_angle_interval,

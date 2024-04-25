@@ -17,3 +17,6 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> LineOps for LineCuttingCenteredUn
 impl_translate_for_newtype!(
     LineCuttingCenteredUnitSquare<T: PointReqsForTwoPointsOnDifferentFaces>
 );
+impl_quarter_turn_rotatable_for_newtype!(
+    LineCuttingGridSquare<T: PointReqsForTwoPointsOnDifferentFaces>
+);
