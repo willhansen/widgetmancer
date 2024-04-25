@@ -8,6 +8,7 @@ use euclid::num::Zero;
 // }
 
 trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
+
 // pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
 // impl<T> LineReqsForHalfPlane for T where T: DirectedLine
 
@@ -17,20 +18,21 @@ trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
 pub struct HalfPlane<PointType: PointReqsForHalfPlane> {
     // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
+    // TODO: parameterize this line type?
     dividing_line: DirectedLine<PointType>,
 }
 
 // TODO: move most of these functions to HalfPlaneOps
-impl<LineType> HalfPlane<LineType>
+impl<PointType> HalfPlane<PointType>
 where
-    LineType: LineReqsForHalfPlane,
+    PointType: PointReqsForHalfPlane,
 {
     pub fn new_from_line_and_point_on_half_plane(
-        dividing_line: impl Into<LineType>,
-        point_on_half_plane: impl Into<LineType::PointType>,
+        dividing_line: impl LineOps<PointType = PointType>,
+        point_on_half_plane: PointType,
     ) -> Self {
         // let dividing_line = LineType::from_other_line(dividing_line);
-        let dividing_line = dividing_line.into();
+        // let dividing_line = dividing_line.into();
         let point_on_half_plane = point_on_half_plane.into();
         let [p1, p2] = dividing_line.two_points_on_line_in_order();
         HalfPlane {
@@ -45,25 +47,23 @@ where
         Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
     }
     pub fn new_from_border_line_with_origin_outside(
-        can_be_dividing_line: impl Into<LineType>,
+        line: impl DirectedLineOps<PointType = PointType>,
     ) -> Self {
-        let line: LineType = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     pub fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
-        vector_to_outside: impl Into<LineType::PointType>,
+        vector_to_outside: impl DirectedLineOps<PointType = PointType>,
     ) -> Self {
         let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
-            LineType::PointType::zero() + vector_to_outside,
+            PointType::zero() + vector_to_outside,
             -vector_to_outside,
         )
     }
     pub fn new_from_border_line_with_origin_inside(
-        can_be_dividing_line: impl Into<LineType>,
+        line: impl DirectedLineOps<PointType = PointType>,
     ) -> Self {
-        let line: LineType = can_be_dividing_line.into();
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, (0.0, 0.0))
     }
@@ -71,30 +71,33 @@ where
         self.dividing_line.direction().turned_right()
     }
     pub fn new_from_point_on_border_and_vector_pointing_inside(
-        point_on_border: impl Into<LineType::PointType>,
-        normal_direction_into_plane: impl Into<LineType::PointType>,
+        point_on_border: PointType,
+        // TODO: make relative
+        normal_direction_into_plane: PointType,
     ) -> Self {
         let p = point_on_border.into();
         let v = normal_direction_into_plane.into();
         assert_ne!(v.square_length(), 0.0);
         let direction_along_edge_with_inside_on_right = v.turned_left();
 
-        let border_line =
-            LineType::try_from_two_points_allowing_snap_along_line(p, p + v.quarter_rotated_ccw(1))
-                .unwrap();
+        let border_line = DirectedLine::<PointType>::try_from_two_points_allowing_snap_along_line(
+            p,
+            p + v.quarter_rotated_ccw(1),
+        )
+        .unwrap();
         let point_on_half_plane = p + v;
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
     }
 
-    pub fn dividing_line(&self) -> LineType {
+    pub fn dividing_line(&self) -> DirectedLine<PointType> {
         self.dividing_line
     }
 
-    pub fn point_on_half_plane(&self) -> LineType::PointType {
+    pub fn point_on_half_plane(&self) -> PointType {
         self.dividing_line.arbitrary_point_right_of_line()
     }
 
-    pub fn point_off_half_plane(&self) -> LineType::PointType {
+    pub fn point_off_half_plane(&self) -> PointType {
         self.dividing_line
             .reflect_point_over_line(self.point_on_half_plane())
     }
@@ -111,22 +114,15 @@ where
         self.about_equal(other.complement(), tolerance)
     }
 
-    pub fn covers_point(&self, point: impl Into<LineType::PointType> + Copy) -> BoolWithPartial {
+    pub fn covers_point(&self, point: PointType) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
-    pub fn covers_point_with_tolerance(
-        &self,
-        point: impl Into<LineType::PointType> + Copy,
-        tolerance: f32,
-    ) -> BoolWithPartial {
+    pub fn covers_point_with_tolerance(&self, point: PointType, tolerance: f32) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
         let depth = self.depth_of_point_in_half_plane(point);
         BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
-    pub fn at_least_partially_covers_point(
-        &self,
-        point: impl Into<LineType::PointType> + Copy,
-    ) -> bool {
+    pub fn at_least_partially_covers_point(&self, point: PointType) -> bool {
         self.covers_point(point).is_at_least_partial()
     }
     pub fn covers_origin(&self) -> BoolWithPartial {
@@ -149,14 +145,14 @@ where
     }
     pub fn extended(&self, extended_distance: f32) -> Self {
         let direction = self.direction_away_from_plane();
-        let move_vector = LineType::PointType::from_angle_and_length(direction, extended_distance);
+        let move_vector = PointType::from_angle_and_length(direction, extended_distance);
 
         let line = self.dividing_line();
         let point = self.point_on_half_plane();
 
         let shifted_point = point + move_vector;
         let [p1, p2] = line.two_points_on_line_in_order();
-        let shifted_line = LineType::try_from_two_points_allowing_snap_along_line(
+        let shifted_line = DirectedLine::<PointType>::try_from_two_points_allowing_snap_along_line(
             p1 + move_vector,
             p2 + move_vector,
         )
@@ -196,7 +192,7 @@ where
     ) -> HalfPlane<TwoDifferentPoints<P>>
     where
         P: FloatCoordinateOps,
-        F: Fn(LineType::PointType) -> P,
+        F: Fn(PointType) -> P,
     {
         let [p1, p2] = self
             .dividing_line
@@ -209,14 +205,11 @@ where
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            LineType::easy_from_two_points_on_line((1.0, 0.0), (-1.0, 0.0)),
-            LineType::PointType::new(0.0, 1.0),
+            DirectedLine::<PointType>::easy_from_two_points_on_line((1.0, 0.0), (-1.0, 0.0)),
+            DirectedLine::<PointType>::PointType::new(0.0, 1.0),
         )
     }
-    pub fn depth_of_point_in_half_plane(
-        &self,
-        point: impl Into<LineType::PointType> + Copy,
-    ) -> f32 {
+    pub fn depth_of_point_in_half_plane(&self, point: PointType) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
@@ -227,7 +220,7 @@ where
             -dist
         }
     }
-    pub fn distance_of_point_from_half_plane(&self, point: LineType::PointType) -> f32 {
+    pub fn distance_of_point_from_half_plane(&self, point: PointType) -> f32 {
         -self.depth_of_point_in_half_plane(point)
     }
     // TODO: change output type to guarantee value in normalized range ( [0.0,1.0] )
@@ -299,7 +292,7 @@ where
     fn at_least_partially_covered_corner_points_of_centered_unit_square(
         &self,
         tolerance: f32,
-    ) -> Vec<LineType::PointType> {
+    ) -> Vec<PointType> {
         corner_points_of_centered_unit_square()
             .into_iter()
             .filter(|&p| self.covers_point(p).is_at_least_partial())
@@ -307,7 +300,7 @@ where
     }
     fn covers_any_of_these_points_with_tolerance(
         &self,
-        points: Vec<LineType::PointType>,
+        points: Vec<PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -319,7 +312,7 @@ where
     }
     fn covers_all_of_these_points_with_tolerance(
         &self,
-        points: impl IntoIterator<Item = LineType::PointType>,
+        points: impl IntoIterator<Item = PointType>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -359,11 +352,12 @@ impl<L: DirectedLineOps> Complement for HalfPlane<L> {
 }
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
-    type LineType: LineReqsForHalfPlane;
+    type PointType: PointReqsForHalfPlane;
 }
 
-impl<L: LineReqsForHalfPlane> HalfPlaneOps for HalfPlane<L> {
-    type LineType = L;
+// TODO: move functions from base type impl to here
+impl<P: PointReqsForHalfPlane> HalfPlaneOps for HalfPlane<P> {
+    type PointType = P;
 }
 
 impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {

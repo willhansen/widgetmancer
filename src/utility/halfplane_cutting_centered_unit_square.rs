@@ -6,14 +6,19 @@ pub struct HalfPlaneCuttingCenteredUnitSquare<P>(DirectedLineCuttingCenteredUnit
 where
     P: PointReqsForHalfPlaneCuttingCenteredUnitSquare;
 
-impl<P> SemanticNewtype<DirectedLineCuttingCenteredUnitSquare>
-    for HalfPlaneCuttingCenteredUnitSquare<P>
+impl<P> NewType for HalfPlaneCuttingCenteredUnitSquare<P>
 where
     P: PointReqsForHalfPlaneCuttingCenteredUnitSquare,
 {
+    type BaseOfNewType = DirectedLineCuttingCenteredUnitSquare<P>;
 }
 
-impl<P> Refinement<HalfPlane<P>> for PointReqsForHalfPlaneCuttingCenteredUnitSquare<P>
+impl<P> SemanticNewtype for HalfPlaneCuttingCenteredUnitSquare<P> where
+    P: PointReqsForHalfPlaneCuttingCenteredUnitSquare
+{
+}
+
+impl<P> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P>
 where
     P: PointReqsForHalfPlaneCuttingCenteredUnitSquare,
 {

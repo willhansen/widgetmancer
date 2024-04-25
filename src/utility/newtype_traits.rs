@@ -13,7 +13,7 @@ pub trait NewType {
     type BaseOfNewType;
 }
 
-// TODO: enforce the newtype sub-traits being mutually exclusive
+// TODO: enforce the newtype sub-traits being mutually exclusive.  Need negative trait bounds?
 
 pub trait RefinementNewType: NewType + Refinement<Self::BaseOfNewType> {}
 
