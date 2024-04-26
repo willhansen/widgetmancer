@@ -8,6 +8,7 @@ use euclid::num::Zero;
 // }
 
 trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
+trait_alias_macro!(trait PointReqs = PointReqsForHalfPlane);
 
 // pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
 // impl<T> LineReqsForHalfPlane for T where T: DirectedLine
@@ -15,18 +16,19 @@ trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<PointType: PointReqsForHalfPlane> {
+pub struct HalfPlane<PointType: PointReqs>(
     // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     // TODO: parameterize this line type?
-    dividing_line: DirectedLine<PointType>,
-}
+    DirectedLine<PointType>,
+);
 
 // TODO: move most of these functions to HalfPlaneOps
-impl<PointType> HalfPlane<PointType>
-where
-    PointType: PointReqsForHalfPlane,
-{
+impl<PointType: PointReqs> HalfPlane<PointType> {
+    fn new(line: DirectedLine<PointType>) -> Self {
+        Self(line)
+    }
+
     pub fn new_from_line_and_point_on_half_plane(
         dividing_line: impl LineOps<PointType = PointType>,
         point_on_half_plane: PointType,
@@ -35,13 +37,13 @@ where
         // let dividing_line = dividing_line.into();
         let point_on_half_plane = point_on_half_plane.into();
         let [p1, p2] = dividing_line.two_points_on_line_in_order();
-        HalfPlane {
-            dividing_line: if three_points_are_clockwise(p1, p2, point_on_half_plane) {
+        Self::from_border_with_inside_on_right(
+            if three_points_are_clockwise(p1, p2, point_on_half_plane) {
                 dividing_line
             } else {
                 dividing_line.reversed()
             },
-        }
+        )
     }
     pub fn new_with_inside_down(y: f32) -> Self {
         Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
@@ -186,22 +188,24 @@ where
 
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    pub fn with_transformed_points<F, P>(
+    pub fn with_transformed_points<F, OutputPointType>(
         &self,
         point_transform_function: F,
-    ) -> HalfPlane<TwoDifferentPoints<P>>
+    ) -> HalfPlane<OutputPointType>
     where
-        P: FloatCoordinateOps,
-        F: Fn(PointType) -> P,
+        OutputPointType: PointReqs, // + FloatCoordinateOps,
+        F: Fn(PointType) -> OutputPointType,
     {
         let [p1, p2] = self
             .dividing_line
             .two_points_on_line_in_order()
             .map(point_transform_function);
-        let transformed_line: TwoDifferentPoints<P> =
+        let transformed_line: TwoDifferentPoints<OutputPointType> =
             TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<TwoDifferentPoints<P>>::from_border_with_inside_on_right(transformed_line)
+        HalfPlane::<TwoDifferentPoints<OutputPointType>>::from_border_with_inside_on_right(
+            transformed_line,
+        )
     }
     pub fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
@@ -324,118 +328,42 @@ where
     }
 }
 
-pub trait HalfPlaneConstructors<LineType>
-where
-    LineType: DirectedLineOps + DirectedLineConstructors,
-{
-    fn from_border_with_inside_on_right(line: LineType) -> Self;
+pub trait HalfPlaneConstructors<P: PointReqs> {
+    fn from_border_with_inside_on_right(line: DirectedLine<P>) -> Self;
 }
 
-impl<LineType> HalfPlaneConstructors<LineType> for HalfPlane<LineType>
-where
-    LineType: DirectedLineOps + DirectedLineConstructors,
-{
-    fn from_border_with_inside_on_right(line: LineType) -> Self
+impl<P: PointReqs> HalfPlaneConstructors<P> for HalfPlane<P> {
+    fn from_border_with_inside_on_right(line: DirectedLine<P>) -> Self
 where {
-        Self {
-            dividing_line: line,
-        }
+        Self::new(line)
     }
 }
 
-impl<L: DirectedLineOps> Complement for HalfPlane<L> {
+impl<P: PointReqs> Complement for HalfPlane<P> {
     type Output = Self;
 
     fn complement(&self) -> Self::Output {
-        Self::from_border_with_inside_on_right(self.dividing_line.reversed())
+        Self::from_border_with_inside_on_right(self.dividing_line().reversed())
     }
 }
+
+impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
     type PointType: PointReqsForHalfPlane;
 }
 
 // TODO: move functions from base type impl to here
-impl<P: PointReqsForHalfPlane> HalfPlaneOps for HalfPlane<P> {
+impl<P: PointReqs> HalfPlaneOps for HalfPlane<P> {
     type PointType = P;
 }
 
-impl<L: DirectedFloatLineOps> Display for HalfPlane<L> {
+impl<P: PointReqs> Display for HalfPlane<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
             .field("dividing_line", &self.dividing_line)
             .field("inside_direction", &self.inside_direction())
             .finish()
-    }
-}
-
-impl<P: PointReqsForTwoPointsOnDifferentFaces> TryFrom<HalfPlane<DirectedLine<P>>>
-    for HalfPlane<DirectedLineCuttingCenteredUnitSquare<P>>
-{
-    type Error = ();
-
-    fn try_from(value: HalfPlane<DirectedLine<P>>) -> Result<Self, Self::Error> {
-        Self::from_border_with_inside_on_right(value.try_into()?)
-    }
-}
-impl<P: PointReqsForTwoPointsOnDifferentFaces> From<HalfPlane<DirectedLineCuttingGridSquare<P>>>
-    for HalfPlane<DirectedLine<P>>
-{
-    fn from(value: HalfPlane<DirectedLineCuttingGridSquare<P>>) -> Self {
-        Self::from_border_with_inside_on_right(value.dividing_line.into())
-    }
-}
-
-impl<LineType: DirectedLineOps> QuarterTurnRotatable for HalfPlane<LineType> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        let quarter_turns_ccw = quarter_turns_ccw.into();
-        let line = self.dividing_line();
-        let point = self.point_on_half_plane();
-        let new_point = point.quarter_rotated_ccw(quarter_turns_ccw);
-        let new_line = line.quarter_rotated_ccw(quarter_turns_ccw);
-        Self::new_from_line_and_point_on_half_plane(new_line, new_point)
-    }
-
-    // #[cfg(all())]
-    // fn quadrant_rotations_going_ccw(&self) -> [Self; 4]
-    // where
-    //     Self: Sized + Debug,
-    // {
-    //     (0..4)
-    //         .into_iter()
-    //         .map(|i| self.quarter_rotated_ccw(i))
-    //         .collect_vec()
-    //         .try_into()
-    //         .unwrap()
-    // }
-}
-
-pub type HalfPlaneCuttingSquare<SquareType> =
-    HalfPlane<TwoPointsOnDifferentFacesOfGridSquare<<SquareType as CoordinateOps>::Floating>>;
-
-// TODO: remove this trait.  functions should be in concrete implementation?
-pub trait HalfPlaneCuttingSquareTrait<LineType: DirectedFloatLineOps> {
-    // type PointType: FloatCoordinate;
-    fn which_square(&self) -> <LineType::PointType as CoordinateOps>::OnGrid;
-    fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>;
-    // TODO: change output to normalized float
-    fn fraction_of_square_covered(&self) -> f32 {
-        // TODO: tidy this up when halfplane is a trait
-        HalfPlane::<TwoPointsOnDifferentFacesOfCenteredUnitSquare<LineType::PointType>>::from_border_with_inside_on_right(self.to_local().into())
-            .very_approximate_fraction_coverage_of_centered_unit_square()
-    }
-}
-
-impl<L> HalfPlaneCuttingSquareTrait<L> for HalfPlane<L>
-where
-    L: TwoPointsOnDifferentFacesOfGridSquareOps<L::PointType> + DirectedFloatLineOps,
-{
-    fn which_square(&self) -> <L::PointType as CoordinateOps>::OnGrid {
-        self.dividing_line.which_square()
-    }
-
-    fn to_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<L::PointType> {
-        self.dividing_line.points_relative_to_the_square()
     }
 }
 

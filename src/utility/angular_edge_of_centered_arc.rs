@@ -42,7 +42,7 @@ pub trait AngularEdgeOfCenteredArc {
     fn intersection_with_relative_square<SquareType: IntCoordinateOps>(
         &self,
         rel_square: SquareType,
-    ) -> Option<HalfPlaneCuttingSquare<SquareType>> {
+    ) -> Option<HalfPlaneCuttingGridSquare<SquareType::Floating>> {
         if rel_square.is_zero() {
             return None;
         }
@@ -55,14 +55,11 @@ pub trait AngularEdgeOfCenteredArc {
             SquareType::Floating::unit_vector_from_angle(self.inside_direction());
 
         let edge_ray: TwoDifferentPoints<SquareType::Floating> = self.edge_ray();
-        let line =
-            TwoPointsOnDifferentFacesOfGridSquare::<SquareType::Floating>::try_new_from_line_and_square(
-                edge_ray, rel_square,
-            )
+        let line = Line::<SquareType::Floating>::try_new_from_line_and_square(edge_ray, rel_square)
             .ok()?;
 
         Some(
-            HalfPlaneCuttingSquare::<SquareType>::new_from_line_and_point_on_half_plane(
+            HalfPlaneCuttingGridSquare::<SquareType::Floating>::new_from_line_and_point_on_half_plane(
                 line,
                 point_on_inside_of_edge,
             ),

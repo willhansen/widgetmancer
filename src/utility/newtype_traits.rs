@@ -10,17 +10,22 @@ pub trait Refinement<RefinementBase>: TryFrom<RefinementBase> + Into<RefinementB
 
 // This trait is needed so newtypes can access the contained type generally, because apparently `Self::0` isn't a type analog to `self.0`
 pub trait NewType {
+    // NOTE: Base type intentionally not revealed here
+}
+
+pub trait NewTypeWithKnownBaseType: NewType {
     type BaseOfNewType;
 }
 
 // TODO: enforce the newtype sub-traits being mutually exclusive.  Need negative trait bounds?
 
-pub trait RefinementNewType: NewType + Refinement<Self::BaseOfNewType> {}
+pub trait RefinementNewType: NewTypeWithKnownBaseType + Refinement<Self::BaseOfNewType> {}
 
 /// Hides some information of the base type
-pub trait AbstractionNewType: NewType + From<Self::BaseOfNewType> {}
+pub trait AbstractionNewType: NewTypeWithKnownBaseType + From<Self::BaseOfNewType> {}
 
 /// The type is being used in a new way, and all known semantics are discarded
+// TODO: This kind of feels like the default use of a newtype, and maybe does not need a dedicated trait...  Only use I can think of is to block implementation of the other two newtype traits
 pub trait SemanticNewtype: NewType {}
 
 // TODO: implement The `From` and `TryFrom` traits with macros

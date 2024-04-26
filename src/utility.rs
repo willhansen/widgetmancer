@@ -53,6 +53,7 @@ pub_mod_and_use!(
     grid_square,
     halfplane,
     halfplane_cutting_centered_unit_square,
+    halfplane_cutting_grid_square,
     has_origin_pose,
     interval,
     line,

@@ -211,16 +211,16 @@ pub fn local_square_point_to_local_character_point(
 
 // TODO: make this more general
 pub fn world_half_plane_to_local_square_half_plane(
-    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
+    world_half_plane: WorldHalfPlane,
     ref_square: WorldSquare,
-) -> HalfPlane<TwoDifferentLocalSquarePoints> {
+) -> LocalSquareHalfPlane {
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
 pub fn halfplane_cutting_world_square_to_halfplane_local_square(
     world_version: HalfPlaneCuttingWorldSquare,
 ) -> HalfPlaneCuttingLocalSquare {
-    let line = world_version.dividing_line.as_local();
+    let line = world_version.dividing_line().as_local();
     let casted_line: LineCuttingLocalSquare = line.cast_unit();
     HalfPlaneCuttingLocalSquare::from_border_with_inside_on_right(casted_line)
 }
@@ -235,9 +235,9 @@ pub fn local_square_half_plane_to_local_character_half_plane(
 }
 
 pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<TwoDifferentWorldPoints>,
+    world_half_plane: WorldHalfPlane,
     ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<TwoDifferentLocalCharacterPoints> {
+) -> LocalCharacterHalfPlane {
     world_half_plane
         .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
 }

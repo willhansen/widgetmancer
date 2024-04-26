@@ -231,7 +231,7 @@ fn get_character_from_snap_points(
 }
 
 pub fn half_plane_to_angled_block_character(
-    half_plane: HalfPlane<TwoDifferentLocalCharacterPoints>,
+    half_plane: HalfPlane<LocalCharacterPoint>,
     bias_direction: Angle<f32>,
 ) -> char {
     // angle blocks have important edge points
