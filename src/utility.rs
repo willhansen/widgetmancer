@@ -80,7 +80,6 @@ pub_mod_and_use!(
     trait_alias_macro,
     translatable,
     two_points,
-    two_points_constructors,
     unbound_convex_polygon,
     units
 );

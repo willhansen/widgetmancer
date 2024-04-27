@@ -12,6 +12,7 @@ pub trait Refinement<RefinementBase>: TryFrom<RefinementBase> + Into<RefinementB
 pub trait NewType {
     // NOTE: Base type intentionally not revealed here
 }
+impl<T> NewType for T where T: NewTypeWithKnownBaseType {}
 
 pub trait NewTypeWithKnownBaseType: NewType {
     type BaseOfNewType;

@@ -30,27 +30,26 @@ impl<PointType: PointReqs> HalfPlane<PointType> {
     }
 
     pub fn new_from_line_and_point_on_half_plane(
-        dividing_line: impl LineOps<PointType = PointType>,
+        dividing_line: Line<PointType>,
         point_on_half_plane: PointType,
     ) -> Self {
-        // let dividing_line = LineType::from_other_line(dividing_line);
-        // let dividing_line = dividing_line.into();
-        let point_on_half_plane = point_on_half_plane.into();
-        let [p1, p2] = dividing_line.two_points_on_line_in_order();
+        let directed_dividing_line: DirectedLine<PointType> =
+            dividing_line.with_arbitrary_direction();
         Self::from_border_with_inside_on_right(
-            if three_points_are_clockwise(p1, p2, point_on_half_plane) {
-                dividing_line
+            if directed_dividing_line.point_is_on_right(point_on_half_plane) {
+                directed_dividing_line
             } else {
-                dividing_line.reversed()
+                directed_dividing_line.reversed()
             },
         )
     }
     pub fn new_with_inside_down(y: f32) -> Self {
-        Self::new_from_point_on_border_and_vector_pointing_inside((0.0, y), (0.0, -1.0))
+        Self::new_from_point_on_border_and_vector_pointing_inside(
+            (0.0, y).into(),
+            (0.0, -1.0).into(),
+        )
     }
-    pub fn new_from_border_line_with_origin_outside(
-        line: impl DirectedLineOps<PointType = PointType>,
-    ) -> Self {
+    pub fn new_from_border_line_with_origin_outside(line: Line<PointType>) -> Self {
         assert_false!(line.point_is_on_line((0.0, 0.0)));
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
@@ -89,19 +88,6 @@ impl<PointType: PointReqs> HalfPlane<PointType> {
         .unwrap();
         let point_on_half_plane = p + v;
         Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
-    }
-
-    pub fn dividing_line(&self) -> DirectedLine<PointType> {
-        self.dividing_line
-    }
-
-    pub fn point_on_half_plane(&self) -> PointType {
-        self.dividing_line.arbitrary_point_right_of_line()
-    }
-
-    pub fn point_off_half_plane(&self) -> PointType {
-        self.dividing_line
-            .reflect_point_over_line(self.point_on_half_plane())
     }
 
     pub fn about_equal(&self, other: Self, tolerance: f32) -> bool {
@@ -351,11 +337,32 @@ impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
     type PointType: PointReqsForHalfPlane;
+    type BorderType: DirectedLineOps<PointType = Self::PointType>;
+
+    fn border_line(&self) -> Self::BorderType;
+
+    #[deprecated(note = "use HalfPlane::border_line instead")]
+    fn dividing_line(&self) -> Self::BorderType {
+        self.border_line()
+    }
+    fn point_on_half_plane(&self) -> Self::PointType {
+        self.dividing_line().arbitrary_point_right_of_line()
+    }
+
+    fn point_off_half_plane(&self) -> Self::PointType {
+        self.dividing_line()
+            .reflect_point_over_line(self.point_on_half_plane())
+    }
 }
 
 // TODO: move functions from base type impl to here
 impl<P: PointReqs> HalfPlaneOps for HalfPlane<P> {
     type PointType = P;
+    type BorderType = DirectedLine<P>;
+
+    fn border_line(&self) -> Self::BorderType {
+        self.0
+    }
 }
 
 impl<P: PointReqs> Display for HalfPlane<P> {

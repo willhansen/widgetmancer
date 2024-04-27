@@ -6,7 +6,7 @@ trait_alias_macro!(trait Reqs = PointReqsForHalfPlaneCuttingGridSquare);
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlaneCuttingGridSquare<P: Reqs>(DirectedLineCuttingGridSquare<P>);
 
-impl<P: Reqs> NewType for HalfPlaneCuttingGridSquare<P> {
+impl<P: Reqs> NewTypeWithKnownBaseType for HalfPlaneCuttingGridSquare<P> {
     type BaseOfNewType = DirectedLineCuttingGridSquare<P>;
 }
 
@@ -34,7 +34,6 @@ impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-// TODO: remove this trait.  functions should be in concrete implementation?
 pub trait HalfPlaneCuttingGridSquareOps<P: Reqs> {
     // type PointType: FloatCoordinate;
     // fn which_square(&self) -> <P as CoordinateOps>::OnGrid; // TODO: delete

@@ -6,7 +6,12 @@ trait_alias_macro!(trait Reqs =  PointReqsForHalfPlaneCuttingCenteredUnitSquare)
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlaneCuttingCenteredUnitSquare<P: Reqs>(DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl<P: Reqs> NewType for HalfPlaneCuttingCenteredUnitSquare<P> {}
+impl<P: Reqs> HalfPlaneCuttingCenteredUnitSquare<P> {
+    fn new(val: DirectedLineCuttingCenteredUnitSquare<P>) -> Self {
+        Self(val)
+    }
+}
+
 impl<P: Reqs> NewTypeWithKnownBaseType for HalfPlaneCuttingCenteredUnitSquare<P> {
     type BaseOfNewType = DirectedLineCuttingCenteredUnitSquare<P>;
 }
@@ -32,6 +37,18 @@ impl<P: Reqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P>
     }
 }
 
-pub trait OpsForHalfPlaneCuttingCenteredUnitSqare<P: Reqs> {}
+impl_complement_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: Reqs>);
+impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: Reqs>);
+
+impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingCenteredUnitSquare<P> {
+    type PointType = P;
+    type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
+
+    fn border_line(&self) -> Self::BorderType {
+        self.0
+    }
+}
+
+pub trait OpsForHalfPlaneCuttingCenteredUnitSqare<P: Reqs>: HalfPlaneOps<PointType = P> {}
 
 impl<P: Reqs> OpsForHalfPlaneCuttingCenteredUnitSqare<P> for HalfPlaneCuttingCenteredUnitSquare<P> {}

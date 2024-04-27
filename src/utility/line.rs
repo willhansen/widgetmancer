@@ -7,16 +7,23 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias_macro!(pub trait LinePointReqs = PointReqsForDirectedLine);
+trait_alias_macro!(pub trait PointReqsForLine = PointReqsForDirectedLine);
+trait_alias_macro!(trait PointReqs = PointReqsForLine);
 
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct Line<PointType: LinePointReqs>(DirectedLine<PointType>);
+pub struct Line<PointType: PointReqsForLine>(DirectedLine<PointType>);
+
+impl<P: PointReqs> Line<P> {
+    fn new(l: DirectedLine<P>) -> Self {
+        Self(l)
+    }
+}
 
 pub trait LineOps:
     Sized + Copy + QuarterTurnRotatable + Debug + Translate<Self::PointType>
 {
-    type PointType: LinePointReqs;
+    type PointType: PointReqsForLine;
     // type P: SignedCoordinate; // shorthand for PointType
 
     // type DataType = <Self::PointType as Coordinate>::DataType;
@@ -135,6 +142,30 @@ pub trait LineOps:
     }
     fn with_arbitrary_direction(&self) -> impl DirectedLineOps<PointType = Self::PointType> {
         self.with_direction(self.parallel_directions()[1])
+    }
+}
+impl<P: PointReqs> Add<P> for Line<P> {
+    type Output = Self;
+
+    fn add(self, rhs: P) -> Self::Output {
+        self.0.add(rhs).into()
+    }
+}
+impl<P: PointReqs> Sub<P> for Line<P> {
+    type Output = Self;
+
+    fn sub(self, rhs: P) -> Self::Output {
+        self.0.sub(rhs).into()
+    }
+}
+
+impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
+
+impl<P: PointReqs> LineOps for Line<P> {
+    type PointType = P;
+
+    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+        self.0.array()
     }
 }
 

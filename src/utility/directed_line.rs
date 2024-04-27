@@ -70,6 +70,10 @@ pub trait DirectedLineOps: LineOps + Reversible {
     fn arbitrary_point_left_of_line(&self) -> Self::PointType {
         self.arbitrary_point_anticlockwise_of_line()
     }
+    fn point_is_on_right(&self, p: Self::PointType) -> bool {
+        let [p1, p2] = self.two_points_on_line_in_order();
+        three_points_are_clockwise(p1, p2, p)
+    }
 }
 
 impl<P> LineOps for DirectedLine<P>
