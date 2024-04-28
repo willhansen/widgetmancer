@@ -1,11 +1,12 @@
 use crate::utility::*;
 
-#[derive(PartialEq, Debug, Clone, Copy, Constructor)]
-pub struct LineCuttingCenteredUnitSquare<P>(DirectedLineCuttingCenteredUnitSquare<P>)
-where
-    P: PointReqsForTwoPointsOnDifferentFaces;
+trait_alias_macro!(pub trait PointReqsForLineCuttingCenteredUnitSquare = PointReqsForDirectedLineCuttingCenteredUnitSquare);
+trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingCenteredUnitSquare);
 
-impl<P: PointReqsForTwoPointsOnDifferentFaces> LineOps for LineCuttingCenteredUnitSquare<P> {
+#[derive(PartialEq, Debug, Clone, Copy, Constructor)]
+pub struct LineCuttingCenteredUnitSquare<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);
+
+impl<P: PointReqs> LineOps for LineCuttingCenteredUnitSquare<P> {
     type PointType = P;
 
     fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
@@ -15,8 +16,8 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> LineOps for LineCuttingCenteredUn
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(
-    LineCuttingCenteredUnitSquare<T: PointReqsForTwoPointsOnDifferentFaces>
+    LineCuttingCenteredUnitSquare<T: PointReqs>
 );
 impl_quarter_turn_rotatable_for_newtype!(
-    LineCuttingCenteredUnitSquare<T: PointReqsForTwoPointsOnDifferentFaces>
+    LineCuttingCenteredUnitSquare<T: PointReqs>
 );

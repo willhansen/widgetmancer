@@ -49,6 +49,27 @@ impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingCenteredUnitSquare<P> {
     }
 }
 
+impl<P: Reqs> HalfPlaneConstructors for HalfPlaneCuttingCenteredUnitSquare<P> {
+    type PointType = P;
+
+    type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
+
+    fn from_border_with_inside_on_right(line: Self::BorderType) -> Self {
+        todo!()
+    }
+}
+
+// TODO: This feels like It only exists to explicitly require the base type's constructors.
+pub trait ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P: Reqs>:
+    HalfPlaneConstructors
+{
+}
+
+impl<P: Reqs> ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P>
+    for HalfPlaneCuttingCenteredUnitSquare<P>
+{
+}
+
 pub trait OpsForHalfPlaneCuttingCenteredUnitSqare<P: Reqs>: HalfPlaneOps<PointType = P> {}
 
 impl<P: Reqs> OpsForHalfPlaneCuttingCenteredUnitSqare<P> for HalfPlaneCuttingCenteredUnitSquare<P> {}
