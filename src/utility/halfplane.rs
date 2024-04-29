@@ -103,7 +103,10 @@ where {
     }
 }
 
-impl<P: PointReqs> Complement for HalfPlane<P> {
+impl<P: PointReqs, H> Complement for H
+where
+    H: HalfPlaneOps<PointType = P>,
+{
     type Output = Self;
 
     fn complement(&self) -> Self::Output {

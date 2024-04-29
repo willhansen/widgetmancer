@@ -240,9 +240,6 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
 
     type PartialVizType = PartialSquareVisibilityByOneVisibleHalfPlane;
 
-    
-    
-    
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
         rel_square: impl Into<WorldStep>,

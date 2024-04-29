@@ -10,8 +10,6 @@ impl<P: Reqs> NewTypeWithKnownBaseType for HalfPlaneCuttingGridSquare<P> {
     type BaseOfNewType = DirectedLineCuttingGridSquare<P>;
 }
 
-impl<P: Reqs> SemanticNewtype for HalfPlaneCuttingGridSquare<P> {}
-
 impl<P: Reqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
     P: Reqs,
@@ -22,7 +20,7 @@ where
 }
 impl<P: Reqs> From<HalfPlaneCuttingGridSquare<P>> for HalfPlane<P> {
     fn from(value: HalfPlaneCuttingGridSquare<P>) -> Self {
-        Self::from_border_with_inside_on_right(value.dividing_line.into())
+        Self::from_border_with_inside_on_right(value.dividing_line().into())
     }
 }
 
@@ -34,7 +32,17 @@ impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-pub trait HalfPlaneCuttingGridSquareOps<P: Reqs> {
+impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
+    type PointType = P;
+
+    type BorderType = DirectedLineCuttingGridSquare<P>;
+
+    fn border_line(&self) -> Self::BorderType {
+        todo!()
+    }
+}
+
+pub trait HalfPlaneCuttingGridSquareOps<P: Reqs>: HalfPlaneOps<PointType = P> {
     // type PointType: FloatCoordinate;
     // fn which_square(&self) -> <P as CoordinateOps>::OnGrid; // TODO: delete
     fn which_square(&self) -> P::OnGrid;

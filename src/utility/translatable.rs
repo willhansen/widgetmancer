@@ -6,6 +6,7 @@ impl<T, MoveType> Translate<MoveType> for T where
 {
 }
 
+//
 macro_rules! impl_translate_for_newtype {
     // TODO: $P doesn't really need to be a metavariable.  Can I make it just part of the regex match?
     ($type:ident<$P:ident: $traitparam:ident>) => {

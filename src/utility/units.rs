@@ -78,7 +78,7 @@ pub type DirectedLineCuttingLocalSquare = DirectedLineCuttingCenteredUnitSquare<
 pub type DirectedLineCuttingWorldSquare = DirectedLineCuttingGridSquare<WorldPoint>;
 
 pub type HalfPlaneCuttingLocalSquare = HalfPlaneCuttingCenteredUnitSquare<LocalSquarePoint>;
-pub type HalfPlaneCuttingWorldSquare = HalfPlaneCuttingCenteredUnitSquare<WorldPoint>;
+pub type HalfPlaneCuttingWorldSquare = HalfPlaneCuttingGridSquare<WorldPoint>;
 
 #[deprecated(note = "Obselete since screen rotation")]
 pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;

@@ -4,6 +4,7 @@ use crate::utility::*;
 
 /// The type is being used as a subset of the base type.  Can be a refinement of multiple other types.
 // TODO: is this more of a conceptual refinement than the actual type system version?
+// TODO: how require that implements OperationsFor<RefinementBase>
 pub trait Refinement<RefinementBase>: TryFrom<RefinementBase> + Into<RefinementBase> {
     fn valid_refinement(base: RefinementBase) -> bool;
 }

@@ -80,6 +80,7 @@ pub_mod_and_use!(
     trait_alias_macro,
     translatable,
     two_points,
+    two_points_on_different_faces_of_centered_unit_square,
     unbound_convex_polygon,
     units
 );

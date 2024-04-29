@@ -37,7 +37,6 @@ impl<P: Reqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P>
     }
 }
 
-impl_complement_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: Reqs>);
 impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: Reqs>);
 
 impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingCenteredUnitSquare<P> {

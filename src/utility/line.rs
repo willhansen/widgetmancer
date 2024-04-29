@@ -111,16 +111,6 @@ pub trait LineOps:
             second_point.into(),
         )
     }
-    // TODO: maybe move to DirectedLineConstructors
-    fn from_point_and_vector(
-        point: impl Into<Self::PointType>,
-        direction: impl Into<Self::PointType>,
-    ) -> Self {
-        let p1 = point.into();
-        let v = direction.into();
-        let p2 = p1 + v;
-        Self::from_two_points_allowing_snap_along_line(p1, p2)
-    }
     fn with_direction(
         &self,
         direction_hint: FAngle,
