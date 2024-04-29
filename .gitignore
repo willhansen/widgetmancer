@@ -15,3 +15,5 @@ Cargo.lock
 perf.data*
 
 test_output.log
+
+*.bkp
