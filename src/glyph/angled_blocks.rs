@@ -292,13 +292,6 @@ pub fn half_plane_to_angled_block_character(
             snap_to_angle_block_grid(snapped_points[0]),
             snap_to_angle_block_grid(snapped_points[1]),
         );
-        if !three_points_are_clockwise(
-            half_plane.dividing_line().p1(),
-            half_plane.dividing_line().p2(),
-            half_plane.point_on_half_plane(),
-        ) {
-            grid_line = grid_line.reversed();
-        }
         get_character_from_snap_points(grid_line)
     }
 }

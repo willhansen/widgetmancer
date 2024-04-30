@@ -10,6 +10,13 @@ pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqsForTwoPoint
     TwoDifferentPoints<P>,
 );
 
+impls_for_two_different_points!(
+    TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>
+);
+impl_translate_for_two_points_with_restriction!(
+    TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>
+);
+
 impl<P: PointReqsForTwoPointsOnDifferentFaces> TwoPointsWithRestriction<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
@@ -77,5 +84,23 @@ impl<PointType: FloatCoordinateOps> LineOps
 
     fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
         self.0.two_different_arbitrary_points_on_line()
+    }
+}
+impl<P: FloatCoordinateOps> ConstructorsForTwoDifferentPoints<P>
+    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
+{
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
+        if Self::points_are_valid(p1, p2) {
+            Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
+        } else {
+            Err(format!(
+                "At least one point not on centered unit square: {:?}, {:?}",
+                p1, p2
+            ))
+        }
+    }
+    fn try_from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Result<Self, String> {
+        Self::try_new_from_two_ordered_points_on_line(p1, p2)
     }
 }

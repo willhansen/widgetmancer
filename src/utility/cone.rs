@@ -2,13 +2,10 @@ use crate::utility::*;
 use derive_getters::Getters;
 use derive_more::Constructor;
 
-pub type ConeFromSquare = ThingAtCoord<Cone, WorldSquare>;
+pub type ConeFromSquare = ThingAtSquare<Cone, WorldSquare>;
 
 // TODO: There's got to be a better way to get convenient names for general fields
 impl ConeFromSquare {
-    pub fn square(&self) -> WorldSquare {
-        *self.coord()
-    }
     pub fn cone(&self) -> Cone {
         *self.thing()
     }

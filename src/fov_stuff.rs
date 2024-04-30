@@ -2077,7 +2077,7 @@ mod tests {
                 .visible_portion()
                 .unwrap()
                 .half_plane()
-                .dividing_line
+                .dividing_line()
                 .angle_with_positive_x_axis()
                 .to_degrees(),
             0.0

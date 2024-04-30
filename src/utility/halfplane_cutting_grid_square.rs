@@ -1,30 +1,30 @@
 use crate::utility::*;
 
 trait_alias_macro!(pub trait PointReqsForHalfPlaneCuttingGridSquare = PointReqsForDirectedLineCuttingGridSquare);
-trait_alias_macro!(trait Reqs = PointReqsForHalfPlaneCuttingGridSquare);
+trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlaneCuttingGridSquare<P: Reqs>(DirectedLineCuttingGridSquare<P>);
+pub struct HalfPlaneCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
 
-impl<P: Reqs> NewTypeWithKnownBaseType for HalfPlaneCuttingGridSquare<P> {
+impl<P: PointReqs> NewTypeWithKnownBaseType for HalfPlaneCuttingGridSquare<P> {
     type BaseOfNewType = DirectedLineCuttingGridSquare<P>;
 }
 
-impl<P: Reqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
+impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
-    P: Reqs,
+    P: PointReqs,
 {
     fn valid_refinement(base: HalfPlane<P>) -> bool {
         todo!()
     }
 }
-impl<P: Reqs> From<HalfPlaneCuttingGridSquare<P>> for HalfPlane<P> {
+impl<P: PointReqs> From<HalfPlaneCuttingGridSquare<P>> for HalfPlane<P> {
     fn from(value: HalfPlaneCuttingGridSquare<P>) -> Self {
         Self::from_border_with_inside_on_right(value.dividing_line().into())
     }
 }
 
-impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
+impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
     type Error = String;
 
     fn try_from(value: HalfPlane<P>) -> Result<Self, Self::Error> {
@@ -32,7 +32,9 @@ impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
+impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<P: PointReqs>);
+
+impl<P: PointReqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
     type PointType = P;
 
     type BorderType = DirectedLineCuttingGridSquare<P>;
@@ -42,7 +44,7 @@ impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-pub trait HalfPlaneCuttingGridSquareOps<P: Reqs>: HalfPlaneOps<PointType = P> {
+pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<PointType = P> {
     // type PointType: FloatCoordinate;
     // fn which_square(&self) -> <P as CoordinateOps>::OnGrid; // TODO: delete
     fn which_square(&self) -> P::OnGrid;
@@ -55,7 +57,7 @@ pub trait HalfPlaneCuttingGridSquareOps<P: Reqs>: HalfPlaneOps<PointType = P> {
     }
 }
 
-impl<P: Reqs> HalfPlaneCuttingGridSquareOps<P> for HalfPlaneCuttingGridSquare<P> {
+impl<P: PointReqs> HalfPlaneCuttingGridSquareOps<P> for HalfPlaneCuttingGridSquare<P> {
     fn which_square(&self) -> P::OnGrid {
         self.dividing_line().which_square()
     }

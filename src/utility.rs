@@ -75,12 +75,13 @@ pub_mod_and_use!(
     round_robin_iterator,
     sign,
     size_2d,
-    thing_at_coord,
+    thing_at_square,
     to_and_from_array,
     trait_alias_macro,
-    translatable,
+    translate,
     two_points,
     two_points_on_different_faces_of_centered_unit_square,
+    two_points_on_different_faces_of_grid_square,
     unbound_convex_polygon,
     units
 );

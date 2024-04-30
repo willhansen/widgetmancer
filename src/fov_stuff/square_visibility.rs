@@ -157,7 +157,7 @@ pub trait SquareVisibilityOperations  {
     type PartialVizType: PartialSquareVisibilityOps;
     // visibility checks
     fn is_nearly_fully_visible(&self, tolerance_length: f32) -> bool;
-    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool; // should return bool with partial for being on edge?
+    fn point_is_visible(&self, point: LocalSquarePoint) -> bool; // should return bool with partial for being on edge?
 
     fn from_relative_square_and_view_arc(
         view_arc: impl Into<AngleInterval>,
@@ -201,7 +201,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromFovCones {
         todo!()
     }
 
-    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
+    fn point_is_visible(&self, point: LocalSquarePoint) -> bool {
         todo!()
     }
 
@@ -446,8 +446,8 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
     }
 
-    fn point_is_visible(&self, point: impl Into<LocalSquarePoint> + Copy) -> bool {
-        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial(), "{:?}", point.into());
+    fn point_is_visible(&self, point: LocalSquarePoint) -> bool {
+        assert!(point_is_in_centered_unit_square_with_tolerance(point, 0.0).is_at_least_partial(), "{:?}", point);
         match self {
             SquareVisibility::FullyVisible => true,
             SquareVisibility::PartiallyVisible(v) => {
@@ -665,13 +665,13 @@ mod tests {
                 let up = <$type>::new_partially_visible_from_visible_half_plane(
                     HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.4),
-                        (0.0, 1.0),
+                        (0.0, 1.0).into(),
                     ),
                 );
                 let down = <$type>::new_partially_visible_from_visible_half_plane(
                     HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.3),
-                        (0.0, -1.0),
+                        (0.0, -1.0).into(),
                     ),
                 );
                 assert_false!(up.overlaps(&down, 1e-5));
@@ -684,13 +684,13 @@ mod tests {
                 let vis1 = <$type>::new_partially_visible_from_visible_half_plane(
                     HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(-0.3),
-                        (0.0, 1.0),
+                        (0.0, 1.0).into(),
                     ),
                 );
                 let vis2 = <$type>::new_partially_visible_from_visible_half_plane(
                     HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.2),
-                        (0.0, -1.0),
+                        (0.0, -1.0).into(),
                     ),
                 );
                 assert!(vis1.overlaps(&vis2, 1e-5));
@@ -724,7 +724,7 @@ mod tests {
             #[test]
             fn test_square_visibility__if_visible_should_have_intersections_with_unit_square() {
                 let hp =
-                    LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((0.5, 0.5)).extended(-0.1);
+                    LocalSquareHalfPlane::new_from_normal_vector_going_from_origin_to_inside_edge_of_border((0.5, 0.5).into()).extended(-0.1);
                 let vis = <$type>::new_from_visible_half_plane(hp);
                 assert!(vis.is_nearly_or_fully_visible(0.15));
                 assert!(vis.is_only_partially_visible());

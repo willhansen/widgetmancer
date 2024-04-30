@@ -53,9 +53,8 @@ pub trait HalfPlaneConstructors: Sized {
         Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
-        vector_to_outside: impl DirectedLineOps<PointType = Self::PointType>,
+        vector_to_outside: Self::PointType,
     ) -> Self {
-        let vector_to_outside = vector_to_outside.into();
         Self::new_from_point_on_border_and_vector_pointing_inside(
             Self::PointType::zero() + vector_to_outside,
             -vector_to_outside,
@@ -64,8 +63,8 @@ pub trait HalfPlaneConstructors: Sized {
     fn new_from_border_line_with_origin_inside(
         line: impl DirectedLineOps<PointType = Self::PointType>,
     ) -> Self {
-        assert_false!(line.point_is_on_line((0.0, 0.0)));
-        Self::new_from_line_and_point_on_half_plane(line, (0.0, 0.0))
+        assert_false!(line.point_is_on_line(Self::PointType::zero()));
+        Self::new_from_line_and_point_on_half_plane(line, Self::PointType::zero())
     }
     fn new_from_point_on_border_and_vector_pointing_inside(
         point_on_border: Self::PointType,
@@ -113,8 +112,24 @@ where
         Self::from_border_with_inside_on_right(self.dividing_line().reversed())
     }
 }
+// TODO: replace with blanket impl when negative trait bounds are stabilized
+macro_rules! impl_quarter_turn_rotatable_for_impl_half_plane_ops {
+    ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
+        impl$(<$T$(: $traitparam)?>)? QuarterTurnRotatable for $type$(<$T>)? {
+            fn quarter_rotated_ccw(
+                &self,
+                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
+            ) -> Self {
+                Self::from_border_with_inside_on_right(self.border_line().quarter_rotated_ccw(quarter_turns_ccw))
+            }
+        }
+    };
+}
+pub(crate) use impl_quarter_turn_rotatable_for_impl_half_plane_ops;
 
-impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
+impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
+
+// impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
 pub trait HalfPlaneOps: Complement + QuarterTurnRotatable {
     type PointType: PointReqs;

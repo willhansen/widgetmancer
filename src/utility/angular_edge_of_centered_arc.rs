@@ -1,5 +1,6 @@
 use crate::utility::*;
 
+// TODO: make a struct for this
 pub trait AngularEdgeOfCenteredArc {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self;
     fn angle(&self) -> FAngle;
@@ -55,8 +56,10 @@ pub trait AngularEdgeOfCenteredArc {
             SquareType::Floating::unit_vector_from_angle(self.inside_direction());
 
         let edge_ray: TwoDifferentPoints<SquareType::Floating> = self.edge_ray();
-        let line = Line::<SquareType::Floating>::try_new_from_line_and_square(edge_ray, rel_square)
-            .ok()?;
+        let line = LineCuttingGridSquare::<SquareType::Floating>::try_new_from_line_and_square(
+            edge_ray, rel_square,
+        )
+        .ok()?;
 
         Some(
             HalfPlaneCuttingGridSquare::<SquareType::Floating>::new_from_line_and_point_on_half_plane(
