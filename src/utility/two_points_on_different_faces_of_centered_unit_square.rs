@@ -50,7 +50,7 @@ impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     }
 }
 
-impl<P: FloatCoordinateOps> DirectedLineConstructors
+impl<P: FloatCoordinateOps> ConstructorsForDirectedLine
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     type _PointType = P;

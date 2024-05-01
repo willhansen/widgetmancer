@@ -33,7 +33,8 @@ pub trait HalfPlaneConstructors: Sized {
         dividing_line: impl LineOps<PointType = Self::PointType>,
         point_on_half_plane: Self::PointType,
     ) -> Self {
-        let directed_dividing_line: Self::BorderType = dividing_line.with_arbitrary_direction();
+        let directed_dividing_line: Self::BorderType =
+            Self::BorderType::choose_arbitrary_direction_for_line(dividing_line);
         Self::from_border_with_inside_on_right(
             if directed_dividing_line.point_is_on_right(point_on_half_plane) {
                 directed_dividing_line
