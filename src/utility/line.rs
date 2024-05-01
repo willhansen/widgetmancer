@@ -20,16 +20,13 @@ impl<P: PointReqs> Line<P> {
     }
 }
 
-pub trait LineOps:
-    Sized + Copy + QuarterTurnRotatable + Debug + Translate<Self::PointType>
+pub trait LineOps<P: PointReqs>:
+    Sized + Copy + QuarterTurnRotatable + Debug + Translate<P>
 {
-    type PointType: PointReqsForLine;
-    // type P: SignedCoordinate; // shorthand for PointType
+    // type DataType = <P as Coordinate>::DataType;
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2];
 
-    // type DataType = <Self::PointType as Coordinate>::DataType;
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2];
-
-    fn arbitrary_point_on_shape(&self) -> Self::PointType {
+    fn arbitrary_point_on_shape(&self) -> P {
         self.two_different_arbitrary_points_on_line()[0]
     }
 
@@ -72,7 +69,7 @@ pub trait LineOps:
         let (l, r) = if p1.x() < p2.x() { (p1, p2) } else { (p2, p1) };
         Some((r.y() - l.y()) / (r.x() - l.x()))
     }
-    fn parallel_directions_as_vectors(&self) -> [Self::PointType; 2] {
+    fn parallel_directions_as_vectors(&self) -> [P; 2] {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         [p2 - p1, p1 - p2]
     }
@@ -85,36 +82,33 @@ pub trait LineOps:
     }
 
     // TODO: Delete
-    // fn from_point_array(points: [Self::PointType; 2]) -> Self {
+    // fn from_point_array(points: [P; 2]) -> Self {
     //     Self::from_array_of_two_exact_points(points)
     // }
-    fn point_is_on_line(&self, point: impl Into<Self::PointType>) -> bool {
+    fn point_is_on_line(&self, point: impl Into<P>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         on_line(p1, p2, point.into())
     }
-    // // fn try_new_from_line(line: impl Line<PointType = Self::PointType>) -> Result<Self, String>;
-    fn new_horizontal(y: <Self::PointType as CoordinateOps>::DataType) -> Self {
+    // // fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>;
+    fn new_horizontal(y: <P as CoordinateOps>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            Self::PointType::new(<Self::PointType as CoordinateOps>::DataType::zero(), y),
-            Self::PointType::new(<Self::PointType as CoordinateOps>::DataType::one(), y),
+            P::new(<P as CoordinateOps>::DataType::zero(), y),
+            P::new(<P as CoordinateOps>::DataType::one(), y),
         )
     }
-    fn new_vertical(x: <Self::PointType as CoordinateOps>::DataType) -> Self {
+    fn new_vertical(x: <P as CoordinateOps>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            Self::PointType::new(x, <Self::PointType as CoordinateOps>::DataType::zero()),
-            Self::PointType::new(x, <Self::PointType as CoordinateOps>::DataType::one()),
+            P::new(x, <P as CoordinateOps>::DataType::zero()),
+            P::new(x, <P as CoordinateOps>::DataType::one()),
         )
     }
-    fn new_through_origin(second_point: impl Into<Self::PointType>) -> Self {
+    fn new_through_origin(second_point: impl Into<P>) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            <Self::PointType as euclid::num::Zero>::zero(),
+            <P as euclid::num::Zero>::zero(),
             second_point.into(),
         )
     }
-    fn with_direction(
-        &self,
-        direction_hint: FAngle,
-    ) -> impl DirectedLineOps<PointType = Self::PointType> {
+    fn with_direction(&self, direction_hint: FAngle) -> impl DirectedLineOps<P> {
         let p = self.arbitrary_point_on_shape();
         let dirs = self.parallel_directions_as_vectors();
 
@@ -130,7 +124,7 @@ pub trait LineOps:
         let p2 = p + *good_dir;
         TwoDifferentPoints::new(p, p2)
     }
-    fn with_arbitrary_direction(&self) -> impl DirectedLineOps<PointType = Self::PointType> {
+    fn with_arbitrary_direction(&self) -> impl DirectedLineOps<P> {
         self.with_direction(self.parallel_directions()[1])
     }
 }
@@ -151,12 +145,40 @@ impl<P: PointReqs> Sub<P> for Line<P> {
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
-impl<P: PointReqs> LineOps for Line<P> {
-    type PointType = P;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> LineOps<P> for Line<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         self.0.array()
     }
+}
+
+pub trait LineConstructors<P: PointReqs>:
+    LineOps<P> + ConstructorsForTwoDifferentPoints<P> + Sized
+{
+    fn new_from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
+        Self::try_new_from_two_points_on_line(p1, p2).unwrap()
+    }
+    fn try_from_array_of_two_points_on_line(p: [P; 2]) -> Result<Self, String> {
+        Self::try_new_from_two_points_on_line(p[0], p[1])
+    }
+    fn easy_from_two_points_on_line(p1: impl Into<P>, p2: impl Into<P>) -> Self {
+        Self::new_from_two_unordered_points_on_line(p1.into(), p2.into())
+    }
+    fn try_new_from_two_points_on_line(p1: P, p2: P) -> Result<Self, String> {
+        Self::try_from_two_points_allowing_snap_along_line(p1, p2)
+    }
+    fn new_from_line(line: impl LineOps<P>) -> Self {
+        Self::try_new_from_line(line).unwrap()
+    }
+    fn try_new_from_line(line: impl LineOps<P>) -> Result<Self, String> {
+        let p = line.two_different_arbitrary_points_on_line();
+        Self::try_from_array_of_two_points_on_line(p)
+    }
+}
+
+// TODO: double check the bounds on L
+impl<L, P: PointReqs> LineConstructors<P> for L where
+    L: LineOps<P> + ConstructorsForTwoDifferentPoints<P>
+{
 }
 
 pub fn first_inside_square_face_hit_by_ray(

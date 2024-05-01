@@ -48,11 +48,11 @@ impl<P: PointReqs> Sub<P> for DirectedLine<P> {
     }
 }
 
-pub trait DirectedLineOps:
-    LineOps + Reversible + ConstructorsForDirectedLine<_PointType = Self::PointType>
+pub trait DirectedLineOps<P: PointReqs>:
+    LineOps<P> + Reversible + ConstructorsForDirectedLine<P>
 {
-    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2];
-    fn arbitrary_vector_along_line(&self) -> Self::PointType {
+    fn two_points_on_line_in_order(&self) -> [P; 2];
+    fn arbitrary_vector_along_line(&self) -> P {
         let [p1, p2] = self.two_points_on_line_in_order();
         p2 - p1
     }
@@ -60,34 +60,32 @@ pub trait DirectedLineOps:
         self.arbitrary_vector_along_line()
             .better_angle_from_x_axis()
     }
-    fn arbitrary_point_clockwise_of_line(&self) -> Self::PointType {
+    fn arbitrary_point_clockwise_of_line(&self) -> P {
         self.arbitrary_point_on_shape() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
     }
-    fn arbitrary_point_anticlockwise_of_line(&self) -> Self::PointType {
+    fn arbitrary_point_anticlockwise_of_line(&self) -> P {
         self.arbitrary_point_on_shape() + self.arbitrary_vector_along_line().quarter_rotated_ccw(1)
     }
-    fn arbitrary_point_right_of_line(&self) -> Self::PointType {
+    fn arbitrary_point_right_of_line(&self) -> P {
         self.arbitrary_point_clockwise_of_line()
     }
-    fn arbitrary_point_left_of_line(&self) -> Self::PointType {
+    fn arbitrary_point_left_of_line(&self) -> P {
         self.arbitrary_point_anticlockwise_of_line()
     }
-    fn point_is_on_right(&self, p: Self::PointType) -> bool {
+    fn point_is_on_right(&self, p: P) -> bool {
         let [p1, p2] = self.two_points_on_line_in_order();
         three_points_are_clockwise(p1, p2, p)
     }
 }
 
-impl<P: PointReqs> LineOps for DirectedLine<P> {
-    type PointType = P;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> LineOps<P> for DirectedLine<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         todo!()
     }
 }
 
-impl<P: PointReqs> DirectedLineOps for DirectedLine<P> {
-    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> DirectedLineOps<P> for DirectedLine<P> {
+    fn two_points_on_line_in_order(&self) -> [P; 2] {
         todo!()
     }
 }
@@ -101,62 +99,47 @@ impl<P: PointReqs> Reversible for DirectedLine<P> {
     }
 }
 
-pub trait ConstructorsForDirectedLine:
-    Sized + ConstructorsForTwoDifferentPoints<Self::_PointType>
+pub trait ConstructorsForDirectedLine<P: PointReqs>:
+    Sized + ConstructorsForTwoDifferentPoints<P>
 {
-    // TODO: necessary? or go back to templates?
-    type _PointType: PointReqs;
-
-    fn new_from_two_ordered_points_on_line(p1: Self::_PointType, p2: Self::_PointType) -> Self
+    fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_two_ordered_points_on_line(p1, p2).unwrap()
     }
-    fn try_new_from_two_ordered_points_on_line(
-        p1: Self::_PointType,
-        p2: Self::_PointType,
-    ) -> Result<Self, String>
+    fn try_new_from_two_ordered_points_on_line(p1: P, p2: P) -> Result<Self, String>
     where
         Self: Sized,
     {
-        let line = TwoDifferentPoints::<Self::_PointType>::new(p1, p2);
+        let line = TwoDifferentPoints::<P>::new(p1, p2);
         Self::try_new_from_directed_line(line)
     }
-    fn new_from_directed_line(line: impl DirectedLineOps<PointType = Self::_PointType>) -> Self
+    fn new_from_directed_line(line: impl DirectedLineOps<P>) -> Self
     where
         Self: Sized,
     {
         Self::try_new_from_directed_line(line).unwrap()
     }
-    fn choose_arbitrary_direction_for_line(
-        line: impl LineOps<PointType = Self::_PointType>,
-    ) -> Self {
-        todo!()
+    fn choose_arbitrary_direction_for_line(line: impl LineOps<P>) -> Self {
+        let [p1, p2] = line.two_different_arbitrary_points_on_line();
+        Self::from_two_exact_points(p1, p2)
     }
-    fn try_new_from_directed_line(
-        line: impl DirectedLineOps<PointType = Self::_PointType>,
-    ) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
     where
         Self: Sized;
-    fn from_point_and_angle(
-        point: impl Into<Self::_PointType>,
-        direction: impl Into<FAngle>,
-    ) -> Self
+    fn from_point_and_angle(point: impl Into<P>, direction: impl Into<FAngle>) -> Self
     where
-        Self: TwoPointsWithRestriction<Self::_PointType>,
-        Self::_PointType: FloatCoordinateOps,
+        Self: TwoPointsWithRestriction<P>,
+        P: FloatCoordinateOps,
     {
         let p1 = point.into();
-        let v = Self::_PointType::unit_vector_from_angle(direction.into());
+        let v = P::unit_vector_from_angle(direction.into());
         let p2 = p1 + v;
         Self::new_from_two_ordered_points_on_line(p1, p2)
     }
     // TODO: maybe move to DirectedLineConstructors
-    fn from_point_and_vector(
-        point: impl Into<Self::_PointType>,
-        direction: impl Into<Self::_PointType>,
-    ) -> Self {
+    fn from_point_and_vector(point: impl Into<P>, direction: impl Into<P>) -> Self {
         let p1 = point.into();
         let v = direction.into();
         let p2 = p1 + v;
@@ -172,12 +155,8 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for DirectedLine<P> {
     }
 }
 
-impl<P: PointReqs> ConstructorsForDirectedLine for DirectedLine<P> {
-    type _PointType = P;
-
-    fn try_new_from_directed_line(
-        line: impl DirectedLineOps<PointType = Self::_PointType>,
-    ) -> Result<Self, String>
+impl<P: PointReqs> ConstructorsForDirectedLine<P> for DirectedLine<P> {
+    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
     where
         Self: Sized,
     {

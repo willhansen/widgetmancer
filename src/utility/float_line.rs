@@ -1,32 +1,30 @@
 use crate::utility::*;
 
+trait_alias_macro!(pub trait PointReqsForFloatLine = FloatCoordinateOps);
+trait_alias_macro!(trait PointReqs = PointReqsForFloatLine);
+
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
 pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;
 
-pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
-    type _PointType: FloatCoordinateOps; // Dummy type to allow for trait bound propagation
-
+pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
     #[deprecated(note = "use Line::closest_point_to_point instead")]
-    fn closest_point_on_extended_line_to_point(
-        &self,
-        point: impl Into<Self::PointType>,
-    ) -> Self::PointType {
+    fn closest_point_on_extended_line_to_point(&self, point: impl Into<P>) -> P {
         self.closest_point_on_line_to_point(point)
     }
-    fn normal_vector_to_point(&self, point: impl Into<Self::PointType>) -> Self::PointType {
+    fn normal_vector_to_point(&self, point: impl Into<P>) -> P {
         let point = point.into();
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn normal_vector_from_origin(&self) -> Self::PointType {
+    fn normal_vector_from_origin(&self) -> P {
         -self.normal_vector_to_point((0.0, 0.0))
     }
-    fn normal_distance_to_point(&self, point: impl Into<Self::PointType>) -> f32 {
+    fn normal_distance_to_point(&self, point: impl Into<P>) -> f32 {
         self.normal_vector_to_point(point).length()
     }
     fn distance_from_origin(&self) -> f32 {
         self.normal_vector_from_origin().length()
     }
-    fn point_is_on_or_normal_to_line_segment(&self, point: Self::PointType) -> bool {
+    fn point_is_on_or_normal_to_line_segment(&self, point: P) -> bool {
         let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
         let point_relative_to_start_point = point - start_point;
@@ -57,7 +55,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         }
     }
 
-    fn reflect_point_over_line(&self, point: impl Into<Self::PointType>) -> Self::PointType {
+    fn reflect_point_over_line(&self, point: impl Into<P>) -> P {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_p = point.into() - p1;
         let p1_to_p2 = p2 - p1;
@@ -67,7 +65,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         p1 + p1_to_reflected_p
     }
 
-    fn same_side_of_line(&self, point_c: Self::PointType, point_d: Self::PointType) -> bool {
+    fn same_side_of_line(&self, point_c: P, point_d: P) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let point_a = p1;
         let point_b = p2;
@@ -87,7 +85,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
     fn unordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,
-    ) -> Vec<Self::PointType> {
+    ) -> Vec<P> {
         let regular_intersections = self.unordered_line_intersections_with_centered_unit_square();
         if !regular_intersections.is_empty() {
             return regular_intersections;
@@ -122,7 +120,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
     fn unordered_line_intersections_with_expanded_centered_unit_square(
         &self,
         expansion_length: f32,
-    ) -> Vec<Self::PointType> {
+    ) -> Vec<P> {
         let [line_point_a, line_point_b] = self.two_different_arbitrary_points_on_line();
         let half_side_length = 0.5 + expansion_length;
 
@@ -153,7 +151,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
 
             let side_positions = vec![half_side_length, -half_side_length];
 
-            let mut candidate_intersections: Vec<Self::PointType> = vec![];
+            let mut candidate_intersections: Vec<P> = vec![];
             for &x in &side_positions {
                 let y = m * x + b;
                 if y.abs() <= half_side_length {
@@ -183,7 +181,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
             }
         }
     }
-    fn unordered_line_intersections_with_centered_unit_square(&self) -> Vec<Self::PointType> {
+    fn unordered_line_intersections_with_centered_unit_square(&self) -> Vec<P> {
         self.unordered_line_intersections_with_expanded_centered_unit_square(0.0)
     }
     fn line_intersects_with_centered_unit_square(&self) -> bool {
@@ -195,10 +193,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
             .is_empty()
     }
 
-    fn intersection_point_with_other_extended_line(
-        &self,
-        other: impl LineOps<PointType = Self::PointType>,
-    ) -> Option<Self::PointType> {
+    fn intersection_point_with_other_extended_line(&self, other: impl LineOps<P>) -> Option<P> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
 
@@ -218,10 +213,10 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
         Some((final_x, final_y).into())
     }
-    fn point_is_approx_on_line(&self, point: Self::PointType, tolerance: f32) -> bool {
+    fn point_is_approx_on_line(&self, point: P, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
-    fn closest_point_on_line_to_point(&self, point: impl Into<Self::PointType>) -> Self::PointType {
+    fn closest_point_on_line_to_point(&self, point: impl Into<P>) -> P {
         let point = point.into();
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_point = point - p1;
@@ -229,7 +224,7 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
         p1 + parallel_part_of_p1_to_point
     }
-    fn depth_in_square(&self, square: <Self::PointType as CoordinateOps>::OnGrid) -> f32 {
+    fn depth_in_square(&self, square: <P as CoordinateOps>::OnGrid) -> f32 {
         let normal_to_line: FAngle = self.perpendicular_directions()[0];
 
         let line_position_on_axis = self
@@ -242,10 +237,5 @@ pub trait FloatLineOps: LineOps<PointType = Self::_PointType> {
         square_projected_onto_axis.depth_of(line_position_on_axis)
     }
 }
-impl<L> FloatLineOps for L
-where
-    L: LineOps,
-    L::PointType: FloatCoordinateOps,
-{
-    type _PointType = L::PointType; // Dummy type to allow for trait bound propagation
-}
+
+impl<L, P: PointReqs> FloatLineOps<P> for L where L: LineOps<P> {}

@@ -34,9 +34,7 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
 
 impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<P: PointReqs>);
 
-impl<P: PointReqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
-    type PointType = P;
-
+impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingGridSquare<P> {
     type BorderType = DirectedLineCuttingGridSquare<P>;
 
     fn border_line(&self) -> Self::BorderType {
@@ -44,7 +42,7 @@ impl<P: PointReqs> HalfPlaneOps for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<PointType = P> {
+pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<P> {
     // type PointType: FloatCoordinate;
     // fn which_square(&self) -> <P as CoordinateOps>::OnGrid; // TODO: delete
     fn which_square(&self) -> P::OnGrid;

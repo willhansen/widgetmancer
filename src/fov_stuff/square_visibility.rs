@@ -134,10 +134,11 @@ impl<T: PartialSquareVisibilityOps> SquareVisibility<T> {
 impl<T: PartialSquareVisibilityOps> Complement for SquareVisibility<T> {
     type Output = Self;
     fn complement(&self) -> Self::Output {
+        use SquareVisibility::*;
         match self {
-            SquareVisibility::FullyVisible => Self::NotVisible,
-            SquareVisibility::PartiallyVisible(v) => Self::PartiallyVisible(v.complement()),
-            SquareVisibility::NotVisible => Self::FullyVisible,
+            FullyVisible => Self::NotVisible,
+            PartiallyVisible(v) => Self::PartiallyVisible(v.complement()),
+            NotVisible => Self::FullyVisible,
         }
     }
 

@@ -34,16 +34,14 @@ impl<P: PointReqs> Sub<P> for DirectedLineCuttingGridSquare<P> {
     }
 }
 
-impl<P: PointReqs> LineOps for DirectedLineCuttingGridSquare<P> {
-    type PointType = P;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> LineOps<P> for DirectedLineCuttingGridSquare<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         todo!()
     }
 }
 
-impl<P: PointReqs> DirectedLineOps for DirectedLineCuttingGridSquare<P> {
-    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> DirectedLineOps<P> for DirectedLineCuttingGridSquare<P> {
+    fn two_points_on_line_in_order(&self) -> [P; 2] {
         self.0.to_array()
     }
 }

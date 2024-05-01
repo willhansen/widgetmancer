@@ -1,6 +1,7 @@
 use crate::utility::*;
 
 trait_alias_macro!(pub trait PointReqsForDirectedLineCuttingCenteredUnitSquare = PointReqsForDirectedLine + PointReqsForTwoPointsOnDifferentFaces);
+trait_alias_macro!(trait PointReqs =PointReqsForDirectedLineCuttingCenteredUnitSquare );
 
 // TODO: create a RefinedDirectedLine trait?
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
@@ -8,39 +9,37 @@ pub struct DirectedLineCuttingCenteredUnitSquare<P>(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>,
 )
 where
-    P: PointReqsForDirectedLineCuttingCenteredUnitSquare;
+    P: PointReqs;
 
 impl_quarter_turn_rotatable_for_newtype!(
-    DirectedLineCuttingCenteredUnitSquare<T: PointReqsForDirectedLineCuttingCenteredUnitSquare>
+    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );
 impl_reversible_for_newtype!(
-    DirectedLineCuttingCenteredUnitSquare<T: PointReqsForDirectedLineCuttingCenteredUnitSquare>
+    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(
-    DirectedLineCuttingCenteredUnitSquare<T: PointReqsForDirectedLineCuttingCenteredUnitSquare>
+    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );
 
-impl<P: PointReqsForDirectedLineCuttingCenteredUnitSquare> LineOps
+impl<P: PointReqs> LineOps<P>
     for DirectedLineCuttingCenteredUnitSquare<P>
 {
-    type PointType = P;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         todo!()
     }
 }
 
-impl<P: PointReqsForDirectedLineCuttingCenteredUnitSquare> DirectedLineOps
+impl<P: PointReqs> DirectedLineOps<P>
     for DirectedLineCuttingCenteredUnitSquare<P>
 {
-    fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
+    fn two_points_on_line_in_order(&self) -> [P; 2] {
         self.0.to_array()
     }
 }
 
-impl<P: PointReqsForDirectedLineCuttingCenteredUnitSquare> TryFrom<DirectedLine<P>>
+impl<P: PointReqs> TryFrom<DirectedLine<P>>
     for DirectedLineCuttingCenteredUnitSquare<P>
 {
     type Error = ();

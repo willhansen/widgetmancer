@@ -1,23 +1,25 @@
 use crate::utility::*;
 
 trait_alias_macro!(pub trait PointReqsForHalfPlaneCuttingCenteredUnitSquare = PointReqsForDirectedLineCuttingCenteredUnitSquare);
-trait_alias_macro!(trait Reqs =  PointReqsForHalfPlaneCuttingCenteredUnitSquare);
+trait_alias_macro!(trait PointReqs =  PointReqsForHalfPlaneCuttingCenteredUnitSquare);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlaneCuttingCenteredUnitSquare<P: Reqs>(DirectedLineCuttingCenteredUnitSquare<P>);
+pub struct HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>(
+    DirectedLineCuttingCenteredUnitSquare<P>,
+);
 
-impl<P: Reqs> HalfPlaneCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> HalfPlaneCuttingCenteredUnitSquare<P> {
     fn new(val: DirectedLineCuttingCenteredUnitSquare<P>) -> Self {
         Self(val)
     }
 }
 
-impl<P: Reqs> NewTypeWithKnownBaseType for HalfPlaneCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> NewTypeWithKnownBaseType for HalfPlaneCuttingCenteredUnitSquare<P> {
     type BaseOfNewType = DirectedLineCuttingCenteredUnitSquare<P>;
 }
 
-impl<P: Reqs> SemanticNewtype for HalfPlaneCuttingCenteredUnitSquare<P> {}
-impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> SemanticNewtype for HalfPlaneCuttingCenteredUnitSquare<P> {}
+impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
     type Error = ();
 
     fn try_from(value: HalfPlane<P>) -> Result<Self, Self::Error> {
@@ -25,22 +27,21 @@ impl<P: Reqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl<P: Reqs> From<HalfPlaneCuttingCenteredUnitSquare<P>> for HalfPlane<P> {
+impl<P: PointReqs> From<HalfPlaneCuttingCenteredUnitSquare<P>> for HalfPlane<P> {
     fn from(value: HalfPlaneCuttingCenteredUnitSquare<P>) -> Self {
         todo!()
     }
 }
 
-impl<P: Reqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
     fn valid_refinement(base: HalfPlane<P>) -> bool {
         todo!()
     }
 }
 
-impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: Reqs>);
+impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 
-impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type PointType = P;
+impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingCenteredUnitSquare<P> {
     type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
 
     fn border_line(&self) -> Self::BorderType {
@@ -48,9 +49,7 @@ impl<P: Reqs> HalfPlaneOps for HalfPlaneCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl<P: Reqs> HalfPlaneConstructors for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type PointType = P;
-
+impl<P: PointReqs> HalfPlaneConstructors<P> for HalfPlaneCuttingCenteredUnitSquare<P> {
     type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
 
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self {
@@ -59,16 +58,19 @@ impl<P: Reqs> HalfPlaneConstructors for HalfPlaneCuttingCenteredUnitSquare<P> {
 }
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.
-pub trait ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P: Reqs>:
-    HalfPlaneConstructors
+pub trait ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P: PointReqs>:
+    HalfPlaneConstructors<P>
 {
 }
 
-impl<P: Reqs> ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P>
+impl<P: PointReqs> ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P>
     for HalfPlaneCuttingCenteredUnitSquare<P>
 {
 }
 
-pub trait OpsForHalfPlaneCuttingCenteredUnitSqare<P: Reqs>: HalfPlaneOps<PointType = P> {}
+pub trait OpsForHalfPlaneCuttingCenteredUnitSqare<P: PointReqs>: HalfPlaneOps<P> {}
 
-impl<P: Reqs> OpsForHalfPlaneCuttingCenteredUnitSqare<P> for HalfPlaneCuttingCenteredUnitSquare<P> {}
+impl<P: PointReqs> OpsForHalfPlaneCuttingCenteredUnitSqare<P>
+    for HalfPlaneCuttingCenteredUnitSquare<P>
+{
+}

@@ -57,7 +57,6 @@ pub_mod_and_use!(
     has_origin_pose,
     interval,
     line,
-    line_constructors,
     line_cutting_centered_unit_square,
     line_cutting_grid_square,
     line_segment,

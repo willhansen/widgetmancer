@@ -33,10 +33,8 @@ pub trait OpsForLineCuttingGridSquare<P: PointReqs> {}
 
 impl<P: PointReqs> OpsForLineCuttingGridSquare<P> for LineCuttingGridSquare<P> {}
 
-impl<P: PointReqs> LineOps for LineCuttingGridSquare<P> {
-    type PointType = P;
-
-    fn two_different_arbitrary_points_on_line(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> LineOps<P> for LineCuttingGridSquare<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         self.0.two_different_arbitrary_points_on_line()
     }
 }
