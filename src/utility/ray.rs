@@ -1,24 +1,21 @@
 use crate::utility::*;
 
-pub trait Ray {
+pub trait Ray<P: FloatCoordinateOps> {
     // TODO: allow for intCoordinate-based rays
-    type PointType: FloatCoordinateOps;
-    fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self;
-    fn point(&self) -> Self::PointType;
+    fn new_from_point_and_dir(point: P, dir: FAngle) -> Self;
+    fn point(&self) -> P;
     fn angle(&self) -> FAngle;
     fn point_on_ray(
         &self,
-        dist_from_start: <Self::PointType as CoordinateOps>::DataType,
-    ) -> Self::PointType
-    where
-        Self::PointType: FloatCoordinateOps,
+        dist_from_start: <P as CoordinateOps>::DataType,
+    ) -> P
     {
-        self.point() + Self::PointType::from_angle_and_length(self.angle(), dist_from_start)
+        self.point() + P::from_angle_and_length(self.angle(), dist_from_start)
     }
-    fn line<T: DirectedLineOps<PointType = Self::PointType>>(&self) -> T {
+    fn line<T: DirectedLineOps<P>>(&self) -> T {
         T::from_point_and_vector(
             self.point(),
-            Self::PointType::unit_vector_from_angle(self.angle()),
+            P::unit_vector_from_angle(self.angle()),
         )
     }
 }

@@ -7,9 +7,9 @@ trait_alias_macro!(trait PointReqs = PointReqsForTwoDifferentPoints);
 
 // TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TwoDifferentPoints<PointType: PointReqs> {
-    p1: PointType,
-    p2: PointType,
+pub struct TwoDifferentPoints<P: PointReqs> {
+    p1: P,
+    p2: P,
 }
 impl<P: PointReqs> TwoDifferentPoints<P> {
     // TODO: this impl should be empty
@@ -184,15 +184,15 @@ macro_rules! impls_for_two_different_points {
         }
 
         // TODO: Delete
-        // impl<PointType: $point_trait> LineOps for $TheStruct<PointType> {}
+        // impl<P: $point_trait> LineOps for $TheStruct<P> {}
 
-        impl<PointType: $point_trait> Reversible for $TheStruct<PointType> {
+        impl<P: $point_trait> Reversible for $TheStruct<P> {
             fn reversed(&self) -> Self {
                 Self::new_from_points(self.p2(), self.p1())
             }
         }
 
-        impl<PointType: $point_trait> QuarterTurnRotatable for $TheStruct<PointType> {
+        impl<P: $point_trait> QuarterTurnRotatable for $TheStruct<P> {
             fn quarter_rotated_ccw(
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
@@ -243,10 +243,10 @@ pub(crate) use impl_translate_for_two_points_with_restriction;
 // TODO: combine into one macro call
 impl_translate_for_two_points_with_restriction!(TwoDifferentPoints<P: PointReqsForTwoDifferentPoints>);
 
-impl<PointType: SignedCoordinateOps, CanBePointType> From<(CanBePointType, CanBePointType)>
-    for TwoDifferentPoints<PointType>
+impl<P: SignedCoordinateOps, CanBePointType> From<(CanBePointType, CanBePointType)>
+    for TwoDifferentPoints<P>
 where
-    CanBePointType: Into<PointType>,
+    CanBePointType: Into<P>,
 {
     fn from(value: (CanBePointType, CanBePointType)) -> Self {
         Self::easy_from_two_exact_points(value.0, value.1)
@@ -283,7 +283,7 @@ impl TwoDifferentWorldPoints {
 }
 
 // TODO: allow for unsigned
-impl<PointType: SignedCoordinateOps> Display for TwoDifferentPoints<PointType> {
+impl<P: SignedCoordinateOps> Display for TwoDifferentPoints<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

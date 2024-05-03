@@ -4,8 +4,8 @@ use crate::utility::*;
 pub trait AngularEdgeOfCenteredArc {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self;
     fn angle(&self) -> FAngle;
-    fn edge_ray<R: Ray>(&self) -> R {
-        R::new_from_point_and_dir(R::PointType::zero(), self.angle())
+    fn edge_ray<P, R: Ray<P>>(&self) -> R {
+        R::new_from_point_and_dir(P::zero(), self.angle())
     }
     // fn border_as_halfplane<T: HalfPlane>(&self) -> T;
     fn outside_angular_direction(&self) -> AngularDirection;
