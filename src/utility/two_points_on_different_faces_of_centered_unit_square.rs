@@ -1,12 +1,13 @@
 use crate::utility::*;
 
 trait_alias_macro!(pub trait PointReqsForTwoPointsOnDifferentFaces = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
+trait_alias_macro!(trait PointReqs = PointReqsForTwoPointsOnDifferentFaces);
 // pub trait PointReqsForTwoPointsOnDifferentFaces: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 // impl<T> PointReqsForTwoPointsOnDifferentFaces for T where T: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqsForTwoPointsOnDifferentFaces>(
+pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqs>(
     TwoDifferentPoints<P>,
 );
 
@@ -50,17 +51,16 @@ impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     }
 }
 
-impl<P: FloatCoordinateOps> ConstructorsForDirectedLine
+impl<P: PointReqs> ConstructorsForDirectedLine<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
-    type _PointType = P;
     fn try_new_from_directed_line(
-        line: impl DirectedLineOps<PointType = Self::_PointType>,
+        line: impl DirectedLineOps<P>,
     ) -> Result<Self, String>
     where
         Self: Sized,
     {
-        let points: Vec<Self::_PointType> =
+        let points: Vec<P> =
             line.ordered_line_intersections_with_centered_unit_square();
         if points.len() < 2 {
             Err(format!(
@@ -72,17 +72,16 @@ impl<P: FloatCoordinateOps> ConstructorsForDirectedLine
         }
     }
 }
-impl<PointType: FloatCoordinateOps> LineOps
-    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<PointType>
+impl<P: PointReqs> LineOps<P>
+    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
-    type PointType = PointType;
     // type P = Self::PointType;
     // fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
     //     let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
     //     Self::try_from_line(less_constrained_line).unwrap()
     // }
 
-    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         self.0.two_different_arbitrary_points_on_line()
     }
 }

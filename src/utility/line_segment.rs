@@ -2,36 +2,38 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-pub trait LineSegmentOps: LineOps {
-    fn square_length(&self) -> <Self::PointType as CoordinateOps>::DataType {
+trait_alias_macro!(pub trait PointReqsForLineSegment = SignedCoordinateOps);
+trait_alias_macro!(trait PointReqs = PointReqsForLineSegment);
+
+pub trait LineSegmentOps<P: PointReqs>: LineOps<P> {
+    fn square_length(&self) -> <P as CoordinateOps>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
-    fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2];
+    fn endpoints_in_arbitrary_order(&self) -> [P; 2];
 }
-impl<P: SignedCoordinateOps> LineSegmentOps for TwoDifferentPoints<P> {
-    fn endpoints_in_arbitrary_order(&self) -> [Self::PointType; 2] {
+impl<P: PointReqs> LineSegmentOps<P> for TwoDifferentPoints<P> {
+    fn endpoints_in_arbitrary_order(&self) -> [P; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }
 }
-pub trait FloatLineSegmentOps: FloatLineOps + LineSegmentOps {
+pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P> {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
     }
-    fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> Self::PointType {
+    fn seeded_random_point_on_line(&self, rng: &mut StdRng) -> P {
         let t = rng.gen_range(0.0..=1.0);
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         p1.lerp2d(p2, t)
     }
 
-    fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> Self::PointType {
+    fn seeded_random_point_near_line(&self, rng: &mut StdRng, radius: f32) -> P {
         // TODO: make more uniform
-        self.seeded_random_point_on_line(rng)
-            + seeded_rand_radial_offset::<Self::PointType>(rng, radius)
+        self.seeded_random_point_on_line(rng) + seeded_rand_radial_offset::<P>(rng, radius)
     }
 
-    fn random_point_near_line(&self, radius: f32) -> Self::PointType {
+    fn random_point_near_line(&self, radius: f32) -> P {
         self.seeded_random_point_near_line(&mut get_new_rng(), radius)
     }
 
@@ -63,8 +65,8 @@ pub trait FloatLineSegmentOps: FloatLineOps + LineSegmentOps {
 
     fn line_segment_intersection_point(
         &self,
-        other: impl LineSegmentOps<PointType = Self::PointType>,
-    ) -> Option<Self::PointType> {
+        other: impl LineSegmentOps<PointType = P>,
+    ) -> Option<P> {
         let [a1, a2] = self.endpoints_in_arbitrary_order();
         let [b1, b2] = other.endpoints_in_arbitrary_order();
 
@@ -131,34 +133,34 @@ pub trait FloatLineSegmentOps: FloatLineOps + LineSegmentOps {
         }
     }
 }
-impl<T> FloatLineSegmentOps for T where T: FloatLineOps + LineSegmentOps {}
+impl<T, P: PointReqs> FloatLineSegmentOps<P> for T where T: FloatLineOps<P> + LineSegmentOps<P> {}
 
-pub trait DirectedLineSegment: DirectedLineOps + LineSegmentOps {
-    fn endpoints_in_order(&self) -> [Self::PointType; 2] {
-        Self::PointType::points_sorted_along_axis(
-            self.endpoints_in_arbitrary_order(),
-            self.direction(),
-        )
-        .into_iter()
-        .collect_vec()
-        .try_into()
-        .unwrap()
+pub trait DirectedLineSegmentOps<P: PointReqs>: DirectedLineOps<P> + LineSegmentOps<P> {
+    fn endpoints_in_order(&self) -> [P; 2] {
+        P::points_sorted_along_axis(self.endpoints_in_arbitrary_order(), self.direction())
+            .into_iter()
+            .collect_vec()
+            .try_into()
+            .unwrap()
     }
-    fn start(&self) -> Self::PointType {
+    fn start(&self) -> P {
         self.endpoints_in_order()[0]
     }
-    fn end(&self) -> Self::PointType {
+    fn end(&self) -> P {
         self.endpoints_in_order()[1]
     }
 }
-impl<T> DirectedLineSegment for T where T: DirectedLineOps + LineSegmentOps {}
+impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where T: DirectedLineOps<P> + LineSegmentOps<P>
+{}
 
-pub trait DirectedFloatLineSegment: DirectedLineOps + FloatLineSegmentOps {
-    fn lerp(&self, t: f32) -> Self::PointType {
+pub trait DirectedFloatLineSegmentOps<P: PointReqs>:
+    DirectedLineOps<P> + FloatLineSegmentOps<P>
+{
+    fn lerp(&self, t: f32) -> P {
         self.start().lerp2d(self.end(), t)
     }
 }
-impl<T> DirectedFloatLineSegment for T where T: DirectedLineOps + FloatLineSegmentOps {}
+impl<T> DirectedFloatLineSegmentOps for T where T: DirectedLineOps + FloatLineSegmentOps {}
 #[cfg(test)]
 mod tests {
 

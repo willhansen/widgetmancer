@@ -12,7 +12,7 @@ impl_abstraction_skip_level!(LineCuttingGridSquare<P: PointReqs> --> DirectedLin
 impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
     for LineCuttingGridSquare<P>
 {
-    fn try_new_from_line_and_square<L: DirectedFloatLineOps<_PointType = P>>(
+    fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
         line: L,
         square: <P>::OnGrid,
     ) -> Result<Self, String> {

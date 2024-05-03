@@ -15,7 +15,7 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
     // TODO: this impl should be empty
 
     // TODO: Should already be implied by the Abstraction implementation
-    fn new_from_directed_line(line: impl DirectedLineOps<PointType = P>) -> Self {
+    fn new_from_directed_line(line: impl DirectedLineOps<P>) -> Self {
         let [p1, p2] = line.two_points_on_line_in_order();
         Self::new_from_points(p1, p2)
     }
@@ -152,16 +152,15 @@ impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
 }
 // TODO: separate file and also int rays
 impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
-    type PointType = P;
 
-    fn new_from_point_and_dir(point: Self::PointType, dir: FAngle) -> Self
+    fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
         P: FloatCoordinateOps,
     {
-        Self::new(point, point + Self::PointType::unit_vector_from_angle(dir))
+        Self::new(point, point + P::unit_vector_from_angle(dir))
     }
 
-    fn point(&self) -> Self::PointType {
+    fn point(&self) -> P {
         self.p1()
     }
 
@@ -171,18 +170,16 @@ impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
     }
 }
 
-impl<PointType: SignedCoordinateOps> LineOps for TwoDifferentPoints<PointType> {
-    type PointType = PointType;
-    // type P = Self::PointType;
-    fn two_different_arbitrary_points_on_line(&self) -> [PointType; 2] {
+impl<P: SignedCoordinateOps> LineOps<P> for TwoDifferentPoints<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         [self.p2, self.p1] // order chosen by coin flip
     }
 }
 macro_rules! impls_for_two_different_points {
     ($TheStruct:ident<P: $point_trait:ident>) => {
-        impl<PointType: $point_trait> DirectedLineOps for $TheStruct<PointType> {
-            fn two_points_on_line_in_order(&self) -> [Self::PointType; 2] {
-                <Self as TwoPointsWithRestriction<PointType>>::to_array(self)
+        impl<P: $point_trait> DirectedLineOps<P> {
+            fn two_points_on_line_in_order(&self) -> [P; 2] {
+                <Self as TwoPointsWithRestriction<P>>::to_array(self)
             }
         }
 

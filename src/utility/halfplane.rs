@@ -99,16 +99,14 @@ where {
     }
 }
 
-impl<P: PointReqs, H> Complement for H
-where
-    H: HalfPlaneOps<P>,
-{
+impl<P: PointReqs> Complement for HalfPlane<P> {
     type Output = Self;
 
     fn complement(&self) -> Self::Output {
         Self::from_border_with_inside_on_right(self.dividing_line().reversed())
     }
 }
+
 // TODO: replace with blanket impl when negative trait bounds are stabilized
 macro_rules! impl_quarter_turn_rotatable_for_impl_half_plane_ops {
     ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
