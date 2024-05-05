@@ -40,7 +40,7 @@ impl<P: PointReqs> LineOps<P> for LineCuttingGridSquare<P> {
 }
 
 // TODO: Switch to TryTranslate to avoid panics
-impl_translate_for_newtype!(LineCuttingGridSquare<T: PointReqs>);
+impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);
 impl_quarter_turn_rotatable_for_newtype!(
     LineCuttingGridSquare<T: PointReqs>
 );

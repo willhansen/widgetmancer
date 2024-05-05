@@ -86,11 +86,6 @@ impl<P: PointReqs> OperationsForTwoPointsOnDifferentFacesOfGridSquare<P>
         self.as_local()
     }
 }
-impl<P: PointReqs> LineOps<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        [0, 1].map(|i| self.point_by_index(i))
-    }
-}
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();

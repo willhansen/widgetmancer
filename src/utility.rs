@@ -34,6 +34,7 @@ macro_rules! pub_mod_and_use {
 pub(crate) use pub_mod_and_use;
 
 pub_mod_and_use!(
+    geometry,
     angle,
     angle_interval,
     angular_direction,

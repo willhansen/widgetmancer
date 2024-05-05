@@ -72,19 +72,6 @@ impl<P: PointReqs> ConstructorsForDirectedLine<P>
         }
     }
 }
-impl<P: PointReqs> LineOps<P>
-    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
-{
-    // type P = Self::PointType;
-    // fn new_from_two_points_on_line(p1: impl Into<PointType>, p2: impl Into<PointType>) -> Self {
-    //     let less_constrained_line = TwoDifferentPoints::new_from_two_points_on_line(p1, p2);
-    //     Self::try_from_line(less_constrained_line).unwrap()
-    // }
-
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        self.0.two_different_arbitrary_points_on_line()
-    }
-}
 impl<P: FloatCoordinateOps> ConstructorsForTwoDifferentPoints<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {

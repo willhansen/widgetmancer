@@ -6,9 +6,6 @@ trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlaneCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
 
-impl<P: PointReqs> NewTypeWithKnownBaseType for HalfPlaneCuttingGridSquare<P> {
-    type BaseOfNewType = DirectedLineCuttingGridSquare<P>;
-}
 
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
@@ -33,6 +30,8 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
 }
 
 impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<P: PointReqs>);
+
+impl_complement_for_newtype!(HalfPlaneCuttingGridSquare<P: PointReqs>);
 
 impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingGridSquare<P> {
     type BorderType = DirectedLineCuttingGridSquare<P>;

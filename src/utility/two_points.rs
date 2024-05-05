@@ -133,6 +133,7 @@ pub trait ConstructorsForTwoDifferentPoints<P: PointReqs>: Sized {
 }
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        // TODO: put in restriction validation function
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
         } else {
@@ -140,6 +141,18 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
         }
     }
 }
+macro_rules! impl_constructors_for_two_different_points_for_abstraction_newtype {
+
+    ($type:ident<P: $reqs:ident>) => {
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
+            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+            Ok(Self::try_from_two_exact_points(p1,p2)?.into())
+            }
+        }
+
+    }
+}
+pub(crate) use impl_constructors_for_two_different_points_for_abstraction_newtype;
 
 impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {
@@ -151,7 +164,7 @@ impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     }
 }
 // TODO: separate file and also int rays
-impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
+impl<P: FloatCoordinateOps> Ray<P> for TwoDifferentPoints<P> {
 
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
@@ -170,21 +183,19 @@ impl<P: FloatCoordinateOps> Ray for TwoDifferentPoints<P> {
     }
 }
 
-impl<P: SignedCoordinateOps> LineOps<P> for TwoDifferentPoints<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        [self.p2, self.p1] // order chosen by coin flip
-    }
-}
 macro_rules! impls_for_two_different_points {
     ($TheStruct:ident<P: $point_trait:ident>) => {
-        impl<P: $point_trait> DirectedLineOps<P> {
+        impl<P: $point_trait> DirectedLineOps<P> for $TheStruct<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
                 <Self as TwoPointsWithRestriction<P>>::to_array(self)
             }
         }
-
-        // TODO: Delete
-        // impl<P: $point_trait> LineOps for $TheStruct<P> {}
+        impl<P: $point_trait> LineOps<P> for $TheStruct<P> {
+            fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+                self.to_array()
+            }
+        }
+        impl<P: $point_trait> LineConstructors<P> for $TheStruct<P> {}
 
         impl<P: $point_trait> Reversible for $TheStruct<P> {
             fn reversed(&self) -> Self {
@@ -210,7 +221,7 @@ pub(crate) use impls_for_two_different_points;
 
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
-impls_for_two_different_points!(TwoDifferentPoints<P: SignedCoordinateOps>);
+impls_for_two_different_points!(TwoDifferentPoints<P: PointReqs>);
 
 macro_rules! impl_translate_for_two_points_with_restriction {
     ($TheStruct:ident<P: $CoordTrait:ident>) => {
@@ -241,9 +252,9 @@ macro_rules! impl_translate_for_two_points_with_restriction {
 pub(crate) use impl_translate_for_two_points_with_restriction;
 
 // TODO: combine into one macro call
-impl_translate_for_two_points_with_restriction!(TwoDifferentPoints<P: PointReqsForTwoDifferentPoints>);
+impl_translate_for_two_points_with_restriction!(TwoDifferentPoints<P: PointReqs>);
 
-impl<P: SignedCoordinateOps, CanBePointType> From<(CanBePointType, CanBePointType)>
+impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)>
     for TwoDifferentPoints<P>
 where
     CanBePointType: Into<P>,
@@ -283,7 +294,7 @@ impl TwoDifferentWorldPoints {
 }
 
 // TODO: allow for unsigned
-impl<P: SignedCoordinateOps> Display for TwoDifferentPoints<P> {
+impl<P: PointReqs> Display for TwoDifferentPoints<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

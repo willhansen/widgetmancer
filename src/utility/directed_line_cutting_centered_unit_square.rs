@@ -19,9 +19,7 @@ impl_reversible_for_newtype!(
 );
 
 // TODO: Switch to TryTranslate to avoid panics
-impl_translate_for_newtype!(
-    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
-);
+impl_translate_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
 
 impl<P: PointReqs> LineOps<P>
     for DirectedLineCuttingCenteredUnitSquare<P>
@@ -45,6 +43,19 @@ impl<P: PointReqs> TryFrom<DirectedLine<P>>
     type Error = ();
 
     fn try_from(value: DirectedLine<P>) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
+
+impl<P: PointReqs> ConstructorsForDirectedLine<P> for DirectedLineCuttingCenteredUnitSquare<P> {
+    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
+    where
+        Self: Sized {
+        todo!()
+    }
+}
+impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for DirectedLineCuttingCenteredUnitSquare<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         todo!()
     }
 }

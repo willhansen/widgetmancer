@@ -14,11 +14,7 @@ impl<P: PointReqs> HalfPlaneCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl<P: PointReqs> NewTypeWithKnownBaseType for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type BaseOfNewType = DirectedLineCuttingCenteredUnitSquare<P>;
-}
 
-impl<P: PointReqs> SemanticNewtype for HalfPlaneCuttingCenteredUnitSquare<P> {}
 impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
     type Error = ();
 

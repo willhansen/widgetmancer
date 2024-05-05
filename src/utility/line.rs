@@ -128,20 +128,7 @@ pub trait LineOps<P: PointReqs>:
         self.with_direction(self.parallel_directions()[1])
     }
 }
-impl<P: PointReqs> Add<P> for Line<P> {
-    type Output = Self;
-
-    fn add(self, rhs: P) -> Self::Output {
-        self.0.add(rhs).into()
-    }
-}
-impl<P: PointReqs> Sub<P> for Line<P> {
-    type Output = Self;
-
-    fn sub(self, rhs: P) -> Self::Output {
-        self.0.sub(rhs).into()
-    }
-}
+impl_translate_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
@@ -175,11 +162,6 @@ pub trait LineConstructors<P: PointReqs>:
     }
 }
 
-// TODO: double check the bounds on L
-impl<L, P: PointReqs> LineConstructors<P> for L where
-    L: LineOps<P> + ConstructorsForTwoDifferentPoints<P>
-{
-}
 
 pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,

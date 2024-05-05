@@ -15,8 +15,8 @@ impl<P: PointReqs> LineOps<P> for LineCuttingCenteredUnitSquare<P> {
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(
-    LineCuttingCenteredUnitSquare<T: PointReqs>
+    LineCuttingCenteredUnitSquare<P: PointReqs>
 );
 impl_quarter_turn_rotatable_for_newtype!(
-    LineCuttingCenteredUnitSquare<T: PointReqs>
+    LineCuttingCenteredUnitSquare<P: PointReqs>
 );

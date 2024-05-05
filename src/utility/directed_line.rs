@@ -33,20 +33,7 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingGridSquar
     }
 }
 
-impl<P: PointReqs> Add<P> for DirectedLine<P> {
-    type Output = Self;
-
-    fn add(self, rhs: P) -> Self::Output {
-        self.0.add(rhs).into()
-    }
-}
-impl<P: PointReqs> Sub<P> for DirectedLine<P> {
-    type Output = Self;
-
-    fn sub(self, rhs: P) -> Self::Output {
-        self.0.sub(rhs).into()
-    }
-}
+impl_translate_for_newtype!(DirectedLine<P: PointReqs>);
 
 pub trait DirectedLineOps<P: PointReqs>:
     LineOps<P> + Reversible + ConstructorsForDirectedLine<P>
@@ -155,14 +142,24 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for DirectedLine<P> {
     }
 }
 
-impl<P: PointReqs> ConstructorsForDirectedLine<P> for DirectedLine<P> {
-    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        todo!()
+macro_rules! impl_constructors_for_directed_line_for_newtype {
+
+    ($type:ident<P: $traitparam:ident>) => {
+        impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {
+            fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
+            where
+                Self: Sized,
+            {
+                todo!()
+            }
+        }
     }
 }
+pub(crate) use impl_constructors_for_directed_line_for_newtype;
+
+
+impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>);
+
 
 impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

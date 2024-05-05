@@ -10,11 +10,14 @@ pub struct DirectedLineCuttingGridSquare<P: PointReqs>(TwoPointsOnDifferentFaces
 impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>(TwoPointsOnDifferentFacesOfGridSquare<P>));
 
 impl_quarter_turn_rotatable_for_newtype!(
-    DirectedLineCuttingGridSquare<T: PointReqs>
+    DirectedLineCuttingGridSquare<P: PointReqs>
 );
 impl_reversible_for_newtype!(
-    DirectedLineCuttingGridSquare<T: PointReqs>
+    DirectedLineCuttingGridSquare<P: PointReqs>
 );
+
+impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_two_different_points_for_abstraction_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 
 // TODO Switch to TryAdd and avoid panic?
 // TODO: define with a macro?
