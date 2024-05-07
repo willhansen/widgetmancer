@@ -51,27 +51,6 @@ impl<P: FloatCoordinateOps> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     }
 }
 
-impl<P: PointReqs> ConstructorsForDirectedLine<P>
-    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
-{
-    fn try_new_from_directed_line(
-        line: impl DirectedLineOps<P>,
-    ) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        let points: Vec<P> =
-            line.ordered_line_intersections_with_centered_unit_square();
-        if points.len() < 2 {
-            Err(format!(
-                "Wrong number of intersection points: {:?},",
-                points
-            ))
-        } else {
-            Self::try_new_from_points(points[0], points[1])
-        }
-    }
-}
 impl<P: FloatCoordinateOps> ConstructorsForTwoDifferentPoints<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {

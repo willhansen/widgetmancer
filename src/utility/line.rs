@@ -132,11 +132,18 @@ impl_translate_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
-impl<P: PointReqs> LineOps<P> for Line<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        self.0.array()
+macro_rules! impl_line_ops_for_newtype {
+    ($type:ident<P: $traitparam:ident>) => {
+        impl<P: $traitparam> LineOps<P> for $type<P> {
+            fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+                self.0.two_different_arbitrary_points_on_line()
+            }
+        }
     }
 }
+pub(crate) use impl_line_ops_for_newtype;
+
+impl_line_ops_for_newtype!(Line<P: PointReqs>);
 
 pub trait LineConstructors<P: PointReqs>:
     LineOps<P> + ConstructorsForTwoDifferentPoints<P> + Sized

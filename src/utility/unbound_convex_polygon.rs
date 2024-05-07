@@ -3,13 +3,15 @@ use crate::utility::*;
 trait_alias_macro!(pub trait PointReqsForUnboundConvexPolygon = PointReqsForHalfPlane);
 trait_alias_macro!(trait PointReqs = PointReqsForUnboundConvexPolygon);
 
-trait HalfPlaneReqs<P: PointReqs>: HalfPlaneOps<P> {}
-impl<P: PointReqs, T> HalfPlaneReqs<P> for T where T: HalfPlaneOps<P> {}
+trait HalfPlaneReqs<P: PointReqsForUnboundConvexPolygon>: HalfPlaneOps<P> {
+}
+impl<P: PointReqsForUnboundConvexPolygon, T> HalfPlaneReqs<P> for T where T: HalfPlaneOps<P> {
+}
 
 /// A polygon without the requirement that the shape be closed
 // TODO: enforce order and non-redundancy on creation
 #[derive(Debug, PartialEq, Clone)]
-pub struct UnboundConvexPolygon<P, H>(Vec<H>);
+pub struct UnboundConvexPolygon<P, H: HalfPlaneReqs<P>>(Vec<H>);
 
 impl<P: PointReqs, H: HalfPlaneReqs<P>> UnboundConvexPolygon<P, H> {
     pub fn new(sides: Vec<H>) -> Self {

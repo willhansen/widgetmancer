@@ -30,12 +30,13 @@ impl<P: PointReqs> From<HalfPlaneCuttingCenteredUnitSquare<P>> for HalfPlane<P> 
 }
 
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    fn valid_refinement(base: HalfPlane<P>) -> bool {
+    type RefinementBase = HalfPlane<P>;
+    fn valid_refinement(base: Self::RefinementBase) -> bool {
         todo!()
     }
 }
 
-impl_complement_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
+impl_complement_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 
 impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingCenteredUnitSquare<P> {

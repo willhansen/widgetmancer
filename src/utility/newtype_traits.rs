@@ -6,7 +6,8 @@ use crate::utility::*;
 // TODO: is this more of a conceptual refinement than the actual type system version?
 // TODO: how require that implements OperationsFor<RefinementBase>
 pub trait Refinement<RefinementBase>: TryFrom<RefinementBase> + Into<RefinementBase> {
-    fn valid_refinement(base: RefinementBase) -> bool;
+    type RefinementBase;
+    fn valid_refinement(base: Self::RefinementBase) -> bool;
 }
 
 /// Indicates that the implementing type has less information visible than the base type.

@@ -47,15 +47,6 @@ impl<P: PointReqs> TryFrom<DirectedLine<P>>
     }
 }
 
-impl<P: PointReqs> ConstructorsForDirectedLine<P> for DirectedLineCuttingCenteredUnitSquare<P> {
-    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
-    where
-        Self: Sized {
-        todo!()
-    }
-}
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for DirectedLineCuttingCenteredUnitSquare<P> {
-    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        todo!()
-    }
-}
+impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
+impl_constructors_for_two_different_points_for_abstraction_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
+

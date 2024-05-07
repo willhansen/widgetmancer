@@ -11,7 +11,8 @@ impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
     P: PointReqs,
 {
-    fn valid_refinement(base: HalfPlane<P>) -> bool {
+    type RefinementBase = HalfPlane<P>;
+    fn valid_refinement(base: Self::RefinementBase) -> bool {
         todo!()
     }
 }
@@ -31,7 +32,7 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
 
 impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<P: PointReqs>);
 
-impl_complement_for_newtype!(HalfPlaneCuttingGridSquare<P: PointReqs>);
+impl_complement_for_refinement!(HalfPlaneCuttingGridSquare<P: PointReqs>);
 
 impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingGridSquare<P> {
     type BorderType = DirectedLineCuttingGridSquare<P>;

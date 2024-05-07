@@ -190,6 +190,27 @@ macro_rules! impls_for_two_different_points {
                 <Self as TwoPointsWithRestriction<P>>::to_array(self)
             }
         }
+
+        impl<P: $point_trait> ConstructorsForDirectedLine<P> for $TheStruct<P> {
+        fn try_new_from_directed_line(
+        line: impl DirectedLineOps<P>,
+        ) -> Result<Self, String>
+        where
+        Self: Sized,
+        {
+        let points: Vec<P> =
+        line.ordered_line_intersections_with_centered_unit_square();
+        if points.len() < 2 {
+        Err(format!(
+        "Wrong number of intersection points: {:?},",
+        points
+        ))
+        } else {
+        Self::try_new_from_points(points[0], points[1])
+        }
+        }
+        }
+
         impl<P: $point_trait> LineOps<P> for $TheStruct<P> {
             fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
                 self.to_array()
