@@ -1,34 +1,28 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForUnboundConvexPolygon = PointReqsForHalfPlane);
+trait_alias_macro!(pub trait PointReqsForUnboundConvexPolygon = PointReqsForHalfPlaneCuttingCenteredUnitSquare);
 trait_alias_macro!(trait PointReqs = PointReqsForUnboundConvexPolygon);
 
-trait HalfPlaneReqs<P: PointReqsForUnboundConvexPolygon>: HalfPlaneOps<P> {
-}
-impl<P: PointReqsForUnboundConvexPolygon, T> HalfPlaneReqs<P> for T where T: HalfPlaneOps<P> {
-}
-
 /// A polygon without the requirement that the shape be closed
-// TODO: enforce order and non-redundancy on creation
+// TODO: enforce side order and non-redundancy on creation
+//      - sides should be going ccw 
+//      - some sides may actually not affect the resulting shape
 #[derive(Debug, PartialEq, Clone)]
-pub struct UnboundConvexPolygon<P, H: HalfPlaneReqs<P>>(Vec<H>);
+pub struct UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>(Vec<HalfPlaneCuttingCenteredUnitSquare<P>>);
 
-impl<P: PointReqs, H: HalfPlaneReqs<P>> UnboundConvexPolygon<P, H> {
-    pub fn new(sides: Vec<H>) -> Self {
+impl<P: PointReqs> UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
+    pub fn new(sides: Vec<P>) -> Self {
         Self(sides)
     }
-    pub fn sides(&self) -> &Vec<H> {
+    pub fn sides(&self) -> &Vec<P> {
         &self.0
     }
 }
-impl<P: PointReqs, H: HalfPlaneReqs<P>> QuarterTurnRotatable for UnboundConvexPolygon<P, H> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        Self::new(self.sides().quarter_rotated_ccw(quarter_turns_ccw))
-    }
-}
+
+impl_quarter_turn_rotatable_for_newtype!(UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>);
 
 // TODO: define with macro
-impl<P: PointReqs, H: HalfPlaneReqs<P>> Complement for UnboundConvexPolygon<P, H> {
+impl<P: PointReqs> Complement for UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
     type Output = Self;
 
     fn complement(&self) -> Self::Output {
@@ -36,6 +30,8 @@ impl<P: PointReqs, H: HalfPlaneReqs<P>> Complement for UnboundConvexPolygon<P, H
     }
 }
 
-pub trait OpsForUnboundConvexPolygon {}
+pub trait OpsForUnboundConvexPolygon<P: PointReqs> {
+}
 
-impl<P: PointReqs, H: HalfPlaneReqs<P>> OpsForUnboundConvexPolygon for UnboundConvexPolygon<P, H> {}
+impl<P: PointReqs> OpsForUnboundConvexPolygon<P> for UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
+}

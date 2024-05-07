@@ -216,7 +216,7 @@ macro_rules! impls_for_two_different_points {
                 self.to_array()
             }
         }
-        impl<P: $point_trait> LineConstructors<P> for $TheStruct<P> {}
+        impl<P: $point_trait> ConstructorsForLine<P> for $TheStruct<P> {}
 
         impl<P: $point_trait> Reversible for $TheStruct<P> {
             fn reversed(&self) -> Self {

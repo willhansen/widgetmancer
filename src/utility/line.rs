@@ -21,7 +21,7 @@ impl<P: PointReqs> Line<P> {
 }
 
 pub trait LineOps<P: PointReqs>:
-    Sized + Copy + QuarterTurnRotatable + Debug + Translate<P>
+    Sized + Copy + QuarterTurnRotatable + Debug + Translate<P> + ConstructorsForLine<P>
 {
     // type DataType = <P as Coordinate>::DataType;
     fn two_different_arbitrary_points_on_line(&self) -> [P; 2];
@@ -145,8 +145,7 @@ pub(crate) use impl_line_ops_for_newtype;
 
 impl_line_ops_for_newtype!(Line<P: PointReqs>);
 
-pub trait LineConstructors<P: PointReqs>:
-    LineOps<P> + ConstructorsForTwoDifferentPoints<P> + Sized
+pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized
 {
     fn new_from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
         Self::try_new_from_two_points_on_line(p1, p2).unwrap()
@@ -166,6 +165,32 @@ pub trait LineConstructors<P: PointReqs>:
     fn try_new_from_line(line: impl LineOps<P>) -> Result<Self, String> {
         let p = line.two_different_arbitrary_points_on_line();
         Self::try_from_array_of_two_points_on_line(p)
+    }
+}
+
+impl<P: PointReqs> ConstructorsForLine<P> for Line<P> {
+
+}
+
+
+// TODO: maybe implement for `Abstraction<DirectedLine<P>>`?
+impl<P: PointReqs> ConstructorsForDirectedLine<P> for Line<P> {
+    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
+    where
+        Self: Sized {
+        // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>
+        Ok(DirectedLine::<P>::try_new_from_directed_line(line).into())
+
+        // let [p1, p2] = line.two_points_on_line_in_order();
+        // Ok(Self::new_from_two_ordered_points_on_line(p1, p2))
+    }
+}
+
+// TODO: maybe implement for `Abstraction<TwoDifferentPoints<P>>`?
+impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Line<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>
+        Ok(TwoDifferentPoints::<P>::try_from_two_exact_points(p1,p2).into())
     }
 }
 
