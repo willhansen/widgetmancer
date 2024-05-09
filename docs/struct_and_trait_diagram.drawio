@@ -1,6 +1,6 @@
-<mxfile host="Electron" modified="2024-05-09T15:55:00.679Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/122.0.6261.156 Electron/29.3.2 Safari/537.36" etag="ioejwJoCAZU6UFyrvRtq" version="24.2.5" type="device">
+<mxfile host="Electron" modified="2024-05-09T17:35:40.026Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/122.0.6261.156 Electron/29.3.2 Safari/537.36" etag="hPA5Z0VVlZ7PAfjwZbaY" version="24.2.5" type="device">
   <diagram id="R2lEEEUBdFMjLlhIrx00" name="Page-1">
-    <mxGraphModel dx="1656" dy="1625" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" extFonts="Permanent Marker^https://fonts.googleapis.com/css?family=Permanent+Marker">
+    <mxGraphModel dx="2086" dy="1905" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" extFonts="Permanent Marker^https://fonts.googleapis.com/css?family=Permanent+Marker">
       <root>
         <mxCell id="0" />
         <object label="background" id="v2eCrjNbCVR9gLbqSEYK-68">
@@ -10,7 +10,7 @@
           <mxCell style="" parent="0" />
         </object>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-152" value="How traits are implemented for abstraction newtype relation" style="shape=table;childLayout=tableLayout;startSize=40;collapsible=0;recursiveResize=0;expand=0;fontSize=18;labelBackgroundColor=none;swimlaneFillColor=default;fillColor=#26A269;" parent="1" vertex="1">
-          <mxGeometry x="310" y="960" width="720" height="586" as="geometry" />
+          <mxGeometry x="80" y="960" width="720" height="586" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-153" value="" style="shape=tableRow;horizontal=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;strokeColor=inherit;bottom=0;right=0;dropTarget=0;fontStyle=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;startSize=0;collapsible=0;recursiveResize=0;expand=0;" parent="Tf14-MGwDYPlrDCEWGdf-152" vertex="1">
           <mxGeometry y="40" width="720" height="80" as="geometry" />
@@ -178,7 +178,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-25" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=default;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-164">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-25" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-164">
           <mxGeometry x="-94.38" y="140" width="194.38" height="64" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-165" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-161" vertex="1">
@@ -211,8 +211,8 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-11" value="Because easier to auto impl for abstraction than base" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=default;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-166">
-          <mxGeometry x="-107" y="126" width="227" height="70" as="geometry" />
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-11" value="Because easier to auto impl for abstraction than base" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-166">
+          <mxGeometry x="-107" y="140" width="227" height="70" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-169" value="" style="shape=tableRow;horizontal=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;strokeColor=inherit;bottom=0;right=0;dropTarget=0;fontStyle=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;startSize=0;collapsible=0;recursiveResize=0;expand=0;" parent="Tf14-MGwDYPlrDCEWGdf-152" vertex="1">
           <mxGeometry y="335" width="720" height="251" as="geometry" />
@@ -262,8 +262,8 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-12" value="&lt;div&gt;Missing concepts&lt;/div&gt;eg: DirectedLine does not know about scaling, while Base does" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=default;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-171">
-          <mxGeometry x="-12.5" y="131" width="130" height="91.5" as="geometry" />
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-12" value="&lt;div&gt;Missing concepts&lt;/div&gt;eg: DirectedLine does not know about scaling, while Base does" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-171">
+          <mxGeometry x="-30" y="131" width="147.5" height="91.5" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-172" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-169" vertex="1">
           <mxGeometry x="380" width="110" height="251" as="geometry">
@@ -1466,7 +1466,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-246" value="How traits are implemented for refinement newtype relation" style="shape=table;childLayout=tableLayout;startSize=40;collapsible=0;recursiveResize=0;expand=0;fontSize=18;fillColor=#cf6658;" parent="1" vertex="1">
-          <mxGeometry x="325" y="1610" width="705" height="509" as="geometry" />
+          <mxGeometry x="850" y="960" width="705" height="509" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-247" value="" style="shape=tableRow;horizontal=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;strokeColor=inherit;bottom=0;right=0;dropTarget=0;fontStyle=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;startSize=0;collapsible=0;recursiveResize=0;expand=0;" parent="Tf14-MGwDYPlrDCEWGdf-246" vertex="1">
           <mxGeometry y="40" width="705" height="80" as="geometry" />
@@ -1664,7 +1664,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-23" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=default;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-292">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-23" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-292">
           <mxGeometry x="-323" y="130" width="432.5" height="64" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-298" value="" style="shape=tableRow;horizontal=0;swimlaneHead=0;swimlaneBody=0;top=0;left=0;strokeColor=inherit;bottom=0;right=0;dropTarget=0;fontStyle=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;startSize=0;collapsible=0;recursiveResize=0;expand=0;" parent="Tf14-MGwDYPlrDCEWGdf-246" vertex="1">
@@ -1730,7 +1730,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-22" value="Modifiers and constructors may fail, otherwise no difference" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=40;spacingRight=30;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=default;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-308">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-22" value="Modifiers and constructors may fail, otherwise no difference" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=40;spacingRight=30;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-308">
           <mxGeometry x="-119" y="108.5" width="227" height="70" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-310" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-298" vertex="1">
@@ -1763,7 +1763,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-24" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=default;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-312">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-24" value="Not interesting" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=33;spacingRight=26;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;opacity=50;textOpacity=50;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-312">
           <mxGeometry x="-92.38" y="112" width="194.38" height="64" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-338" value="" style="endArrow=classic;html=1;rounded=1;noEdgeStyle=1;orthogonal=0;" parent="Tf14-MGwDYPlrDCEWGdf-246" source="Tf14-MGwDYPlrDCEWGdf-285" target="Tf14-MGwDYPlrDCEWGdf-305" edge="1">
