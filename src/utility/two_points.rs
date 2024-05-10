@@ -141,7 +141,7 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
         }
     }
 }
-macro_rules! impl_constructors_for_two_different_points_for_abstraction_newtype {
+macro_rules! impl_constructors_for_two_different_points_for_abstraction {
 
     ($type:ident<P: $reqs:ident>) => {
         impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
@@ -152,7 +152,7 @@ macro_rules! impl_constructors_for_two_different_points_for_abstraction_newtype 
 
     }
 }
-pub(crate) use impl_constructors_for_two_different_points_for_abstraction_newtype;
+pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
 
 impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {

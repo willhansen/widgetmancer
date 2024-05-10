@@ -132,7 +132,7 @@ impl_translate_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
-macro_rules! impl_line_ops_for_newtype {
+macro_rules! impl_operations_for_line_for_newtype {
     ($type:ident<P: $traitparam:ident>) => {
         impl<P: $traitparam> LineOps<P> for $type<P> {
             fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
@@ -141,9 +141,9 @@ macro_rules! impl_line_ops_for_newtype {
         }
     }
 }
-pub(crate) use impl_line_ops_for_newtype;
+pub(crate) use impl_operations_for_line_for_newtype;
 
-impl_line_ops_for_newtype!(Line<P: PointReqs>);
+impl_operations_for_line_for_newtype!(Line<P: PointReqs>);
 
 pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized
 {
@@ -168,10 +168,15 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
     }
 }
 
-impl<P: PointReqs> ConstructorsForLine<P> for Line<P> {
-
+macro_rules! impl_constructors_for_line_for_newtype {
+    ($type:ident<P: $traitparam:ident>) => {
+        impl<P: $traitparam> ConstructorsForLine<P> for $type<P> {
+        }
+    }
 }
+pub(crate) use impl_constructors_for_line_for_newtype;
 
+impl_constructors_for_line_for_newtype!(Line<P: PointReqs>);
 
 // TODO: maybe implement for `Abstraction<DirectedLine<P>>`?
 impl<P: PointReqs> ConstructorsForDirectedLine<P> for Line<P> {

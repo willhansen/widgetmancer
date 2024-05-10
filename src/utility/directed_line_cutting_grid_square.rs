@@ -16,35 +16,16 @@ impl_reversible_for_newtype!(
     DirectedLineCuttingGridSquare<P: PointReqs>
 );
 
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>);
+
+
+// TODO Switch to TryTranslate and avoid panic?
+impl_translate_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+
+
+impl_operations_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+
+impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
-impl_constructors_for_two_different_points_for_abstraction_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 
-// TODO Switch to TryAdd and avoid panic?
-// TODO: define with a macro?
-impl<P: PointReqs> Add<P> for DirectedLineCuttingGridSquare<P> {
-    type Output = Self;
-
-    fn add(self, rhs: P) -> Self::Output {
-        Self::new(self.0.add(rhs))
-    }
-}
-// TODO Switch to Try version and avoid panic?
-impl<P: PointReqs> Sub<P> for DirectedLineCuttingGridSquare<P> {
-    type Output = Self;
-
-    fn sub(self, rhs: P) -> Self::Output {
-        Self::new(self.0.sub(rhs))
-    }
-}
-
-impl<P: PointReqs> LineOps<P> for DirectedLineCuttingGridSquare<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        todo!()
-    }
-}
-
-impl<P: PointReqs> DirectedLineOps<P> for DirectedLineCuttingGridSquare<P> {
-    fn two_points_on_line_in_order(&self) -> [P; 2] {
-        self.0.to_array()
-    }
-}
