@@ -1,6 +1,6 @@
-<mxfile host="Electron" modified="2024-05-10T15:14:21.032Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/122.0.6261.156 Electron/29.3.2 Safari/537.36" etag="LsGM5ie6i3TsgU9ZR2YS" version="24.2.5" type="device">
+<mxfile host="Electron" modified="2024-05-11T23:19:51.721Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/122.0.6261.156 Electron/29.3.2 Safari/537.36" etag="frHRbHTw0y7S89P2AFIt" version="24.2.5" type="device">
   <diagram id="R2lEEEUBdFMjLlhIrx00" name="Page-1">
-    <mxGraphModel dx="2704" dy="2308" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" extFonts="Permanent Marker^https://fonts.googleapis.com/css?family=Permanent+Marker">
+    <mxGraphModel dx="1777" dy="1704" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" extFonts="Permanent Marker^https://fonts.googleapis.com/css?family=Permanent+Marker">
       <root>
         <mxCell id="0" />
         <object label="background" id="v2eCrjNbCVR9gLbqSEYK-68">
@@ -191,8 +191,8 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-8" value="&lt;div&gt;Ops for Abstraction&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-165" vertex="1">
-          <mxGeometry x="13" y="10" width="90" height="30" as="geometry">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-8" value="&lt;div&gt;Ops for Abstracted&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-165" vertex="1">
+          <mxGeometry x="14" y="10" width="90" height="30" as="geometry">
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
@@ -201,12 +201,12 @@
             <mxRectangle width="120" height="215" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Tf14-MGwDYPlrDCEWGdf-228" value="&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;Implement&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Directly&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-166" vertex="1">
-          <mxGeometry x="15" y="60" width="90" height="60" as="geometry">
+        <mxCell id="Tf14-MGwDYPlrDCEWGdf-228" value="&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;Implement&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Directly&lt;/div&gt;&lt;div&gt;(choose defaults for degrees of freedom)&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-166" vertex="1">
+          <mxGeometry x="15" y="50" width="90" height="80" as="geometry">
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-7" value="&lt;div&gt;Cons for Abstraction&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-166" vertex="1">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-7" value="&lt;div&gt;Cons for Abstracted&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-166" vertex="1">
           <mxGeometry x="15" y="10" width="90" height="30" as="geometry">
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
@@ -280,6 +280,9 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
+        <mxCell id="I2QAo2QG33v4h4c7EpdR-1" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-172">
+          <mxGeometry x="5" y="145" width="100" height="41.5" as="geometry" />
+        </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-173" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-169" vertex="1">
           <mxGeometry x="490" width="110" height="215" as="geometry">
             <mxRectangle width="110" height="215" as="alternateBounds" />
@@ -295,7 +298,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="wBkZvkQhSaHvGdAiCT7p-80" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-173">
+        <mxCell id="wBkZvkQhSaHvGdAiCT7p-80" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" parent="Tf14-MGwDYPlrDCEWGdf-173" vertex="1">
           <mxGeometry x="5" y="145" width="100" height="41.5" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-174" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-169" vertex="1">
@@ -313,7 +316,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="wBkZvkQhSaHvGdAiCT7p-76" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-174">
+        <mxCell id="wBkZvkQhSaHvGdAiCT7p-76" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" parent="Tf14-MGwDYPlrDCEWGdf-174" vertex="1">
           <mxGeometry y="145" width="100" height="41.5" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-210" value="" style="endArrow=classic;html=1;rounded=1;noEdgeStyle=1;orthogonal=0;" parent="Tf14-MGwDYPlrDCEWGdf-152" source="Tf14-MGwDYPlrDCEWGdf-209" target="Tf14-MGwDYPlrDCEWGdf-208" edge="1">
@@ -1650,7 +1653,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-15" value="&lt;div&gt;Ops for Refinement&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-290" vertex="1">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-15" value="&lt;div&gt;Ops for Refined&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-290" vertex="1">
           <mxGeometry x="8" y="10" width="90" height="30" as="geometry">
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
@@ -1665,7 +1668,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="Hov7pTeKHOUxiJYiTZTO-16" value="&lt;div&gt;Cons for Refinement&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-292" vertex="1">
+        <mxCell id="Hov7pTeKHOUxiJYiTZTO-16" value="&lt;div&gt;Cons for Refined&lt;/div&gt;" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=default;top=0;left=0;bottom=0;right=0;pointerEvents=1;spacing=0;" parent="Tf14-MGwDYPlrDCEWGdf-292" vertex="1">
           <mxGeometry x="13.5" y="10" width="90" height="30" as="geometry">
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
@@ -1721,7 +1724,7 @@
             <mxRectangle width="79" height="77" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="wBkZvkQhSaHvGdAiCT7p-82" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-306">
+        <mxCell id="wBkZvkQhSaHvGdAiCT7p-82" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" parent="Tf14-MGwDYPlrDCEWGdf-306" vertex="1">
           <mxGeometry x="1.6199999999998909" y="192" width="100" height="41.5" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-308" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-298" vertex="1">
@@ -1742,7 +1745,7 @@
         <mxCell id="Hov7pTeKHOUxiJYiTZTO-22" value="Modifiers and constructors may fail, otherwise no difference" style="shape=cloud;fontSize=9;spacing=0;html=1;whiteSpace=wrap;fontColor=default;labelBorderColor=none;textShadow=0;perimeter=ellipsePerimeter;spacingLeft=40;spacingRight=30;spacingTop=-7;spacingBottom=-7;labelBackgroundColor=none;" parent="Tf14-MGwDYPlrDCEWGdf-308" vertex="1">
           <mxGeometry x="-119" y="108.5" width="227" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="wBkZvkQhSaHvGdAiCT7p-81" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" vertex="1" parent="Tf14-MGwDYPlrDCEWGdf-308">
+        <mxCell id="wBkZvkQhSaHvGdAiCT7p-81" value="TODO: double check&lt;div&gt;&lt;/div&gt;" style="shape=step;fontSize=9;spacing=0;html=1;whiteSpace=wrap;labelBorderColor=none;textShadow=0;spacingLeft=33;spacingRight=26;spacingTop=-4;spacingBottom=-3;labelBackgroundColor=none;fillColor=#fff2cc;perimeter=stepPerimeter;fixedSize=1;strokeColor=#d6b656;" parent="Tf14-MGwDYPlrDCEWGdf-308" vertex="1">
           <mxGeometry x="9" y="192" width="100" height="41.5" as="geometry" />
         </mxCell>
         <mxCell id="Tf14-MGwDYPlrDCEWGdf-310" value="" style="swimlane;swimlaneHead=0;swimlaneBody=0;fontStyle=0;connectable=0;strokeColor=inherit;fillColor=none;startSize=0;collapsible=0;recursiveResize=0;expand=0;swimlaneFillColor=#B3B3B3;" parent="Tf14-MGwDYPlrDCEWGdf-298" vertex="1">
