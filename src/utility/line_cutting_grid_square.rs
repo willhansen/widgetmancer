@@ -33,11 +33,12 @@ pub trait OpsForLineCuttingGridSquare<P: PointReqs> {}
 
 impl<P: PointReqs> OpsForLineCuttingGridSquare<P> for LineCuttingGridSquare<P> {}
 
-impl<P: PointReqs> LineOps<P> for LineCuttingGridSquare<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        self.0.two_different_arbitrary_points_on_line()
-    }
-}
+impl_operations_for_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+
+impl_constructors_for_directed_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+
+impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);

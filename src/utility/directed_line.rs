@@ -83,7 +83,7 @@ pub(crate) use impl_operations_for_directed_line_for_newtype;
 impl_operations_for_line_for_newtype!(DirectedLine<P: PointReqs>);
 impl_operations_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>);
 
-impl_constructors_for_line_for_newtype!(DirectedLine<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
 
 // impl<L> Reversible for L
 // where
@@ -142,17 +142,17 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     }
 }
 
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLine<P: PointReqs>);
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
 
 macro_rules! impl_constructors_for_directed_line_for_newtype {
 
-    ($type:ident<P: $traitparam:ident>) => {
+    ($type:ident<P: $traitparam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {
             fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
             where
                 Self: Sized,
             {
-                Ok(Self::try_new_from_directed_line(line)?.into())
+                Ok($BaseType::<P>::try_new_from_directed_line(line)?.into())
             }
         }
     }
@@ -160,7 +160,7 @@ macro_rules! impl_constructors_for_directed_line_for_newtype {
 pub(crate) use impl_constructors_for_directed_line_for_newtype;
 
 
-impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>);
+impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 
 impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {

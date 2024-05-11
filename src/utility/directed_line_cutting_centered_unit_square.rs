@@ -22,7 +22,7 @@ impl_reversible_for_newtype!(
 impl_translate_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
 
 impl_operations_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
-impl_constructors_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
 impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
 
@@ -38,6 +38,6 @@ impl<P: PointReqs> TryFrom<DirectedLine<P>>
     }
 }
 
-impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
+impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 

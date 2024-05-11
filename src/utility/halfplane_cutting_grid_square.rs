@@ -11,8 +11,8 @@ impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
     P: PointReqs,
 {
-    type RefinementBase = HalfPlane<P>;
-    fn valid_refinement(base: Self::RefinementBase) -> bool {
+    type Base = HalfPlane<P>;
+    fn valid_refinement(base: Self::Base) -> bool {
         todo!()
     }
 }

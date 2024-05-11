@@ -169,14 +169,14 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
 }
 
 macro_rules! impl_constructors_for_line_for_newtype {
-    ($type:ident<P: $traitparam:ident>) => {
+    ($type:ident<P: $traitparam:ident>, base=$BaseType:ident<P>) => {
         impl<P: $traitparam> ConstructorsForLine<P> for $type<P> {
         }
     }
 }
 pub(crate) use impl_constructors_for_line_for_newtype;
 
-impl_constructors_for_line_for_newtype!(Line<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(Line<P: PointReqs>, base= DirectedLine<P>);
 
 // TODO: maybe implement for `Abstraction<DirectedLine<P>>`?
 impl<P: PointReqs> ConstructorsForDirectedLine<P> for Line<P> {

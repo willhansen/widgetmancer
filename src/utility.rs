@@ -61,7 +61,7 @@ pub_mod_and_use!(
     line_cutting_centered_unit_square,
     line_cutting_grid_square,
     line_segment,
-    newtype_traits,
+    struct_relation_traits,
     non_zero_sign,
     octant,
     orthogonal_facing_int_pose,

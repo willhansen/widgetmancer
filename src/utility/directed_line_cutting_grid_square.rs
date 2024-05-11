@@ -16,7 +16,7 @@ impl_reversible_for_newtype!(
     DirectedLineCuttingGridSquare<P: PointReqs>
 );
 
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 
 // TODO Switch to TryTranslate and avoid panic?
@@ -24,8 +24,8 @@ impl_translate_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 
 
 impl_operations_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
-impl_constructors_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
-impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 

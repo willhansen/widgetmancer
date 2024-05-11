@@ -30,8 +30,8 @@ impl<P: PointReqs> From<HalfPlaneCuttingCenteredUnitSquare<P>> for HalfPlane<P> 
 }
 
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type RefinementBase = HalfPlane<P>;
-    fn valid_refinement(base: Self::RefinementBase) -> bool {
+    type Base = HalfPlane<P>;
+    fn valid_refinement(base: Self::Base) -> bool {
         todo!()
     }
 }

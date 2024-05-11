@@ -142,17 +142,30 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
     }
 }
 macro_rules! impl_constructors_for_two_different_points_for_abstraction {
-
-    ($type:ident<P: $reqs:ident>) => {
-        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
+    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> where Self: Abstraction<$BaseType::<P>>
+        {
             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-            Ok(Self::try_from_two_exact_points(p1,p2)?.into())
+                Ok($BaseType::<P>::try_from_two_exact_points(p1,p2)?.into())
             }
         }
 
     }
 }
 pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
+
+macro_rules! impl_constructors_for_two_different_points_for_newtype {
+
+    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
+            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+            Self::new($BaseType::<P>::try_from_two_exact_points(p1,p2).unwrap())
+            }
+        }
+
+    }
+}
+pub(crate) use impl_constructors_for_two_different_points_for_newtype;
 
 impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {

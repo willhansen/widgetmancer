@@ -15,8 +15,8 @@ impl_quarter_turn_rotatable_for_newtype!(
 );
 
 impl_operations_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>);
-impl_constructors_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>);
+impl_constructors_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl_constructors_for_directed_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>);
-impl_constructors_for_two_different_points_for_abstraction!(LineCuttingCenteredUnitSquare<P: PointReqs>);
+impl_constructors_for_directed_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+impl_constructors_for_two_different_points_for_abstraction!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
