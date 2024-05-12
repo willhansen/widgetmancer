@@ -12,11 +12,6 @@ impl<P: PointReqs> DirectedLine<P> {
     }
 }
 
-impl<P: PointReqs> From<TwoDifferentPoints<P>> for DirectedLine<P> {
-    fn from(value: TwoDifferentPoints<P>) -> Self {
-        Self::new(value)
-    }
-}
 
 impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingCenteredUnitSquare<P>>
     for DirectedLine<P>
@@ -32,6 +27,8 @@ impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingGridSquar
         todo!()
     }
 }
+
+impl_abstraction_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl_translate_for_newtype!(DirectedLine<P: PointReqs>);
 

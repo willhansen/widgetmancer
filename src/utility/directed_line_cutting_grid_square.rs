@@ -7,7 +7,7 @@ trait_alias_macro!(trait PointReqs =PointReqsForDirectedLineCuttingGridSquare);
 #[derive(Debug, PartialEq, Clone, Copy, Constructor)]
 pub struct DirectedLineCuttingGridSquare<P: PointReqs>(TwoPointsOnDifferentFacesOfGridSquare<P>);
 
-impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>(TwoPointsOnDifferentFacesOfGridSquare<P>));
+impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl_quarter_turn_rotatable_for_newtype!(
     DirectedLineCuttingGridSquare<P: PointReqs>
@@ -16,7 +16,7 @@ impl_reversible_for_newtype!(
     DirectedLineCuttingGridSquare<P: PointReqs>
 );
 
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 
 // TODO Switch to TryTranslate and avoid panic?

@@ -6,6 +6,8 @@ trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingCenteredUnitSquare);
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct LineCuttingCenteredUnitSquare<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);
 
+impl_abstraction_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>

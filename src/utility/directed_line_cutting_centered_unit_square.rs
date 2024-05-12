@@ -11,12 +11,15 @@ pub struct DirectedLineCuttingCenteredUnitSquare<P>(
 where
     P: PointReqs;
 
+impl_abstraction_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+
 impl_quarter_turn_rotatable_for_newtype!(
     DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );
 impl_reversible_for_newtype!(
     DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );
+
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
@@ -25,6 +28,7 @@ impl_operations_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: P
 impl_constructors_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
 impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
+
 
 
 

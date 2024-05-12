@@ -18,14 +18,14 @@ pub trait Abstraction<Base>: From<Self::Base> {
 }
 
 macro_rules! impl_abstraction_for_newtype {
-    ($abstract_type:ident<P: $point_trait:ident>($base_type:ident<P>)) => {
-        impl<PointType: $point_trait> Abstraction<$base_type<PointType>>
+    ($abstract_type:ident<P: $PointTrait:ident>, base= $BaseType:ident<P>) => {
+        impl<PointType: $PointTrait> Abstraction<$BaseType<PointType>>
             for $abstract_type<PointType>
         {
-            type Base = $base_type<PointType>;
+            type Base = $BaseType<PointType>;
         }
-        impl<PointType: $point_trait> From<$base_type<PointType>> for $abstract_type<PointType> {
-            fn from(value: $base_type<PointType>) -> Self {
+        impl<PointType: $PointTrait> From<$BaseType<PointType>> for $abstract_type<PointType> {
+            fn from(value: $BaseType<PointType>) -> Self {
                 Self(value)
             }
         }
@@ -37,22 +37,23 @@ pub(crate) use impl_abstraction_for_newtype;
 // TODO: analogous chain for refinement
 // TODO: adapt macro to arbitrary chain length?
 macro_rules! impl_abstraction_skip_level {
-    ($abstract_type:ident<P: $point_trait:ident> --> $base_type:ident<P> --> $baser_type:ident<P>) => {
-        impl<PointType: $point_trait> Abstraction<$baser_type<PointType>>
+    // TODO: better base indication syntax
+    ($abstract_type:ident<P: $PointTrait:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
+        impl<PointType: $PointTrait> Abstraction<$BaserType<PointType>>
             for $abstract_type<PointType>
         where
-            Self: Abstraction<$base_type<PointType>>,
-            $base_type<PointType>: Abstraction<$baser_type<PointType>>,
+            Self: Abstraction<$BaseType<PointType>>,
+            $BaseType<PointType>: Abstraction<$BaserType<PointType>>,
         {
-            type Base = $baser_type<PointType>;
+            type Base = $BaserType<PointType>;
         }
-        impl<PointType: $point_trait> From<$baser_type<PointType>> for $abstract_type<PointType>
+        impl<PointType: $PointTrait> From<$BaserType<PointType>> for $abstract_type<PointType>
         where
-            Self: From<$base_type<PointType>>,
-            $base_type<PointType>: From<$baser_type<PointType>>,
+            Self: From<$BaseType<PointType>>,
+            $BaseType<PointType>: From<$BaserType<PointType>>,
         {
-            fn from(value: $baser_type<PointType>) -> Self {
-                Self::from($base_type::<PointType>::from(value))
+            fn from(value: $BaserType<PointType>) -> Self {
+                Self::from($BaseType::<PointType>::from(value))
             }
         }
     };

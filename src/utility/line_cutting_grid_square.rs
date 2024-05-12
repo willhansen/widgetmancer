@@ -6,7 +6,7 @@ trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingGridSquare);
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct LineCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
 
-impl_abstraction_for_newtype!(LineCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>));
+impl_abstraction_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 impl_abstraction_skip_level!(LineCuttingGridSquare<P: PointReqs> --> DirectedLineCuttingGridSquare<P> --> TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
