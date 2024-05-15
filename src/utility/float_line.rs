@@ -55,15 +55,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
         }
     }
 
-    fn reflect_point_over_line(&self, point: impl Into<P>) -> P {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let p1_to_p = point.into() - p1;
-        let p1_to_p2 = p2 - p1;
-        let parallel_part = p1_to_p.projected_onto(p1_to_p2);
-        let perpendicular_part = p1_to_p - parallel_part;
-        let p1_to_reflected_p = parallel_part - perpendicular_part;
-        p1 + p1_to_reflected_p
-    }
 
     fn same_side_of_line(&self, point_c: P, point_d: P) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();

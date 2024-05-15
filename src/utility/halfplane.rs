@@ -24,7 +24,7 @@ impl<P: PointReqs> HalfPlane<P> {
     }
 }
 
-pub trait HalfPlaneConstructors<P: PointReqs>: Sized {
+pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
     type BorderType: DirectedLineOps<P>;
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self;
 
@@ -42,15 +42,15 @@ pub trait HalfPlaneConstructors<P: PointReqs>: Sized {
             },
         )
     }
-    fn new_with_inside_down(y: f32) -> Self {
+    fn new_with_inside_down(y: P::_DataType) -> Self {
         Self::new_from_point_on_border_and_vector_pointing_inside(
-            (0.0, y).into(),
-            (0.0, -1.0).into(),
+            P::right() * y,
+            P::down(),
         )
     }
     fn new_from_border_line_with_origin_outside(line: Line<P>) -> Self {
-        assert_false!(line.point_is_on_line((0.0, 0.0)));
-        Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line((0.0, 0.0)))
+        assert_false!(line.point_is_on_line(P::zero()));
+        Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line(P::zero()))
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
         vector_to_outside: P,
@@ -71,7 +71,7 @@ pub trait HalfPlaneConstructors<P: PointReqs>: Sized {
     ) -> Self {
         let p = point_on_border;
         let v = normal_direction_into_plane;
-        assert_ne!(v.square_length(), 0.0);
+        assert_ne!(v.square_length(), P::_DataType::zero());
         let direction_along_edge_with_inside_on_right = v.turned_left();
 
         let border_line = Self::BorderType::try_from_two_points_allowing_snap_along_line(
@@ -85,19 +85,31 @@ pub trait HalfPlaneConstructors<P: PointReqs>: Sized {
 
     fn top_half_plane() -> Self {
         Self::new_from_line_and_point_on_half_plane(
-            DirectedLine::<P>::easy_from_two_points_on_line((1.0, 0.0), (-1.0, 0.0)),
-            DirectedLine::<P>::PointType::new(0.0, 1.0),
+            Self::BorderType::easy_from_two_points_on_line(P::right(), P::left()),
+            P::up(),
         )
     }
 }
 
-impl<P: PointReqs> HalfPlaneConstructors<P> for HalfPlane<P> {
+impl<P: PointReqs> ConstructorsForHalfPlane<P> for HalfPlane<P> {
     type BorderType = DirectedLine<P>;
     fn from_border_with_inside_on_right(line: DirectedLine<P>) -> Self
 where {
         Self::new(line)
     }
 }
+macro_rules! impl_constructors_for_half_plane_for_refinement {
+    ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $TraitParam> ConstructorsForHalfPlane<P> for $Type<P> {
+            type BorderType = $BaseType<P>;
+            fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
+        where {
+                $BaseType::<P>::from_border_with_inside_on_right(border).into()
+            }
+        }
+    }
+}
+pub(crate) use impl_constructors_for_half_plane_for_refinement;
 
 impl<P: PointReqs> Complement for HalfPlane<P> {
     type Output = Self;
@@ -126,7 +138,7 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
 
 // impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
-pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable {
+pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized {
     type BorderType: DirectedLineOps<P>;
 
     fn border_line(&self) -> Self::BorderType;
@@ -361,14 +373,20 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable {
     }
 }
 
-// TODO: move functions from base type impl to here
-impl<P: PointReqs> HalfPlaneOps<P> for HalfPlane<P> {
-    type BorderType = DirectedLine<P>;
+impl_half_plane_ops_for_newtype!(HalfPlane<P: PointReqs>, base= DirectedLine<P>);
 
-    fn border_line(&self) -> Self::BorderType {
-        self.0
+macro_rules! impl_half_plane_ops_for_newtype {
+    ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $TraitParam> HalfPlaneOps<P> for $Type<P> {
+            type BorderType = $BaseType<P>;
+            fn border_line(&self) -> Self::BorderType {
+                self.0
+            }
+        }
     }
 }
+pub(crate) use impl_half_plane_ops_for_newtype;
+use num::Float;
 
 impl<P: PointReqs> Display for HalfPlane<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

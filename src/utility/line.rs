@@ -127,6 +127,16 @@ pub trait LineOps<P: PointReqs>:
     fn with_arbitrary_direction(&self) -> impl DirectedLineOps<P> {
         self.with_direction(self.parallel_directions()[1])
     }
+
+    fn reflect_point_over_line(&self, point: impl Into<P>) -> P {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let p1_to_p = point.into() - p1;
+        let p1_to_p2 = p2 - p1;
+        let parallel_part = p1_to_p.projected_onto(p1_to_p2);
+        let perpendicular_part = p1_to_p - parallel_part;
+        let p1_to_reflected_p = parallel_part - perpendicular_part;
+        p1 + p1_to_reflected_p
+    }
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);
 

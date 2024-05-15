@@ -251,7 +251,7 @@ pub trait SignedCoordinateOps:
     + From<OrthogonalDirection>
     + From<(Self::_DataType, Self::_DataType)>
 {
-    type _DataType: num::Signed + Copy + PartialOrd;
+    type _DataType: num::Signed + Copy + PartialOrd + Debug;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
     }

@@ -39,25 +39,14 @@ impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSqua
 impl_complement_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 
-impl<P: PointReqs> HalfPlaneOps<P> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
+impl_half_plane_ops_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-    fn border_line(&self) -> Self::BorderType {
-        self.0
-    }
-}
+impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl<P: PointReqs> HalfPlaneConstructors<P> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type BorderType = DirectedLineCuttingCenteredUnitSquare<P>;
-
-    fn from_border_with_inside_on_right(line: Self::BorderType) -> Self {
-        todo!()
-    }
-}
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.
 pub trait ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P: PointReqs>:
-    HalfPlaneConstructors<P>
+    ConstructorsForHalfPlane<P>
 {
 }
 
