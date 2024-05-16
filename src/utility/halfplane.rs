@@ -99,12 +99,20 @@ where {
     }
 }
 macro_rules! impl_constructors_for_half_plane_for_refinement {
-    ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
+    ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
+        // static assert prerequisite trait is implemented
         impl<P: $TraitParam> ConstructorsForHalfPlane<P> for $Type<P> {
-            type BorderType = $BaseType<P>;
+            type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
-        where {
-                $BaseType::<P>::from_border_with_inside_on_right(border).into()
+            // where 
+            //     // is refinement
+            //     Self: Refinement<$BaseType<P>>,
+            //     // refinement base is constructor
+            //     <Self as Refinement<$BaseType<P>>>::Base: ConstructorsForHalfPlane<P>,
+            //     // border type is refinement of the refinement base's border
+            //     Self::BorderType: Refinement<<<Self as Refinement<$BaseType<P>>>::Base as ConstructorsForHalfPlane<P>>::BorderType>,
+            {
+                $BaseType::<P>::from_border_with_inside_on_right(border.into()).into()
             }
         }
     }

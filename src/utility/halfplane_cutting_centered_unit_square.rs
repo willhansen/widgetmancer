@@ -41,7 +41,7 @@ impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: P
 
 impl_half_plane_ops_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, border= DirectedLineCuttingCenteredUnitSquare<P>, base=HalfPlane<P>);
 
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.

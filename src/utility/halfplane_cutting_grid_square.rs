@@ -35,7 +35,7 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<
 impl_complement_for_refinement!(HalfPlaneCuttingGridSquare<P: PointReqs>);
 
 impl_half_plane_ops_for_newtype!(HalfPlaneCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
-impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingGridSquare<P: PointReqs>, border= DirectedLineCuttingGridSquare<P>, base= HalfPlane<P>);
 
 pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<P> {
     // type PointType: FloatCoordinate;
