@@ -11,19 +11,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
     fn closest_point_on_extended_line_to_point(&self, point: impl Into<P>) -> P {
         self.closest_point_on_line_to_point(point)
     }
-    fn normal_vector_to_point(&self, point: impl Into<P>) -> P {
-        let point = point.into();
-        point - self.closest_point_on_extended_line_to_point(point)
-    }
-    fn normal_vector_from_origin(&self) -> P {
-        -self.normal_vector_to_point((0.0, 0.0))
-    }
-    fn normal_distance_to_point(&self, point: impl Into<P>) -> f32 {
-        self.normal_vector_to_point(point).length()
-    }
-    fn distance_from_origin(&self) -> f32 {
-        self.normal_vector_from_origin().length()
-    }
     fn point_is_on_or_normal_to_line_segment(&self, point: P) -> bool {
         let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
@@ -39,12 +26,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
         point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
     }
 
-    // TODO: Double check how tolerances are applied here.  Looks like it depends on the points from the line
-    // TODO: fix this.
-    fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
-        let [p1, p2] = other.two_different_arbitrary_points_on_line();
-        self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)
-    }
 
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
         let [angle_a, angle_b] = self.parallel_directions();
@@ -203,9 +184,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
         let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
         let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
         Some((final_x, final_y).into())
-    }
-    fn point_is_approx_on_line(&self, point: P, tolerance: f32) -> bool {
-        self.normal_distance_to_point(point) < tolerance
     }
     fn closest_point_on_line_to_point(&self, point: impl Into<P>) -> P {
         let point = point.into();

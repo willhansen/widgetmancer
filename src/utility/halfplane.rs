@@ -48,9 +48,9 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
             P::down(),
         )
     }
-    fn new_from_border_line_with_origin_outside(line: Line<P>) -> Self {
+    fn new_from_border_line_with_origin_outside(line: impl LineOps<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
-        Self::new_from_line_and_point_on_half_plane(line, line.reflect_point_over_line(P::zero()))
+        Self::new_from_line_and_point_on_half_plane(line, line.point_same_distance_from_line_on_opposite_side(P::zero()))
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
         vector_to_outside: P,
@@ -158,7 +158,7 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized 
     fn inside_direction(&self) -> FAngle {
         self.dividing_line().direction().turned_right()
     }
-    fn about_equal(&self, other: Self, tolerance: f32) -> bool {
+    fn about_equal(&self, other: Self, tolerance: P::_DataType) -> bool {
         self.dividing_line()
             .approx_on_same_line(other.dividing_line(), tolerance)
             && self

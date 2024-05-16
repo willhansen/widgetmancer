@@ -108,6 +108,12 @@ pub trait LineOps<P: PointReqs>:
             second_point.into(),
         )
     }
+    fn normal_vector_from_origin(&self) -> <P as CoordinateOps>::Floating {
+        -self.normal_vector_to_point(P::zero())
+    }
+    fn distance_from_origin(&self) -> f32 {
+        self.normal_vector_from_origin().length()
+    }
     fn with_direction(&self, direction_hint: FAngle) -> impl DirectedLineOps<P> {
         let p = self.arbitrary_point_on_shape();
         let dirs = self.parallel_directions_as_vectors();
@@ -128,15 +134,37 @@ pub trait LineOps<P: PointReqs>:
         self.with_direction(self.parallel_directions()[1])
     }
 
-    fn reflect_point_over_line(&self, point: impl Into<P>) -> P {
+
+    fn reflect_point_over_line(&self, point: Floating<P>) -> Floating<P> 
+    {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let p1_to_p = point.into() - p1;
-        let p1_to_p2 = p2 - p1;
-        let parallel_part = p1_to_p.projected_onto(p1_to_p2);
+        let p1_to_p: Floating<P> = point - p1.to_f32();
+        let p1_to_p2: Floating<P> = (p2 - p1).to_f32();
+        let parallel_part: Floating<P> = p1_to_p.projected_onto(p1_to_p2);
         let perpendicular_part = p1_to_p - parallel_part;
         let p1_to_reflected_p = parallel_part - perpendicular_part;
-        p1 + p1_to_reflected_p
+        p1.to_f32() + p1_to_reflected_p
     }
+
+    fn approx_on_same_line(&self, other: Self, tolerance: f32) -> bool {
+        let [p1, p2] = other.two_different_arbitrary_points_on_line();
+        self.point_is_approx_on_line(p1, tolerance) && self.point_is_approx_on_line(p2, tolerance)
+    }
+    fn point_is_approx_on_line(&self, point: P, tolerance: f32) -> bool {
+        self.normal_distance_to_point(point) < tolerance
+    }
+    fn normal_distance_to_point(&self, point: impl Into<P>) -> f32 {
+        self.normal_vector_to_point(point).length()
+    }
+    fn normal_vector_to_point(&self, point: P) -> <P as CoordinateOps>::Floating {
+        point - self.closest_point_on_extended_line_to_point(point)
+    }
+    fn point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let p1_to_point = point - p1; 
+        p2 + p1_to_point*-1
+    }
+
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);
 

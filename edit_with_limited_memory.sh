@@ -1,3 +1,5 @@
 #! /usr/bin/env sh
 
-systemd-run --scope -p MemoryHigh=8G -p MemoryMax=10G --user hx src/utility/coordinates.rs
+CMD="nvim src/utility/coordinates.rs"
+
+systemd-run --scope -p MemoryHigh=8G -p MemoryMax=10G --user ${CMD}

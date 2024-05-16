@@ -48,6 +48,16 @@ pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 // TODO: fix relativity
 pub type Vector2D<T, U> = Point2D<T, U>;
 
+// TODO: there's got to be a better way
+pub type Floating<P> =<P as CoordinateOps>::Floating;  
+pub type OnGrid<P> =<P as CoordinateOps>::OnGrid;  
+pub type DataType<P> =<P as CoordinateOps>::DataType;  
+pub type UnitType<P> =<P as CoordinateOps>::UnitType;  
+
+pub type OnGridDataType<P> = DataType<OnGrid<P>>;
+pub type FloatDataType<P> = DataType<Floating<P>>;
+
+
 // TODO: is this the right place for these two functions?
 /// Intended to be a drop-in replacement for the `euclid` equivalent
 pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>
@@ -83,6 +93,7 @@ pub trait CoordinateOps:
     + PartialEq
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
+    // + Mul<OnGridDataType<Self>, Output = Self> // TODO: stricter trait bounds
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
