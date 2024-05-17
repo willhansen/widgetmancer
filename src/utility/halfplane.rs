@@ -1,7 +1,7 @@
 use crate::utility::*;
 use euclid::num::Zero;
 
-trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine);
+trait_alias_macro!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine + PointReqsForFloatLine);
 trait_alias_macro!(trait PointReqs = PointReqsForHalfPlane);
 
 // pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
@@ -50,7 +50,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
     }
     fn new_from_border_line_with_origin_outside(line: impl LineOps<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
-        Self::new_from_line_and_point_on_half_plane(line, line.point_same_distance_from_line_on_opposite_side(P::zero()))
+        Self::new_from_line_and_point_on_half_plane(line, line.get_point_same_distance_from_line_on_opposite_side(P::zero()))
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
         vector_to_outside: P,
@@ -146,10 +146,12 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
 
 // impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
-pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized {
+type BorderTypeOf<T> = <T as HalfPlaneOps>::BorderType;
+
+pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<Output=Self> + QuarterTurnRotatable + Sized {
     type BorderType: DirectedLineOps<P>;
 
-    fn border_line(&self) -> Self::BorderType;
+    fn border_line(&self) -> BorderTypeOf<Self>;
 
     #[deprecated(note = "use HalfPlane::border_line instead")]
     fn dividing_line(&self) -> Self::BorderType {
@@ -161,35 +163,35 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized 
 
     fn point_off_half_plane(&self) -> P {
         self.dividing_line()
-            .reflect_point_over_line(self.point_on_half_plane())
+            .get_point_same_distance_from_line_on_opposite_side(self.point_on_half_plane())
     }
     fn inside_direction(&self) -> FAngle {
         self.dividing_line().direction().turned_right()
     }
-    fn about_equal(&self, other: Self, tolerance: P::_DataType) -> bool {
+    fn about_equal(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line()
             .approx_on_same_line(other.dividing_line(), tolerance)
             && self
                 .dividing_line()
-                .same_side_of_line(self.point_on_half_plane(), other.point_on_half_plane())
+                .same_side_of_line(self.point_on_half_plane().to_f32(), other.point_on_half_plane().to_f32())
     }
     fn about_complementary(&self, other: Self, tolerance: f32) -> bool {
         self.about_equal(other.complement(), tolerance)
     }
 
-    fn covers_point(&self, point: P) -> BoolWithPartial {
+    fn covers_point(&self, point: Floating<P>) -> BoolWithPartial {
         self.covers_point_with_tolerance(point, 0.0)
     }
-    fn covers_point_with_tolerance(&self, point: P, tolerance: f32) -> BoolWithPartial {
+    fn covers_point_with_tolerance(&self, point: Floating<P>, tolerance: f32) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
         let depth = self.depth_of_point_in_half_plane(point);
         BoolWithPartial::from_less_than_with_tolerance(0.0, depth, tolerance)
     }
-    fn at_least_partially_covers_point(&self, point: P) -> bool {
+    fn at_least_partially_covers_point(&self, point: Floating<P>) -> bool {
         self.covers_point(point).is_at_least_partial()
     }
     fn covers_origin(&self) -> BoolWithPartial {
-        self.covers_point((0.0, 0.0))
+        self.covers_point(Floating::<P>::zero())
     }
     fn fully_covers_centered_unit_square(&self) -> BoolWithPartial {
         self.fully_covers_centered_unit_square_with_tolerance(0.0)
@@ -265,7 +267,7 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized 
             transformed_line,
         )
     }
-    fn depth_of_point_in_half_plane(&self, point: P) -> f32 {
+    fn depth_of_point_in_half_plane(&self, point: Floating<P>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
             .dividing_line
@@ -369,7 +371,7 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized 
     }
     fn covers_all_of_these_points_with_tolerance(
         &self,
-        points: impl IntoIterator<Item = P>,
+        points: impl IntoIterator<Item = Floating<P>>,
         tolerance: f32,
     ) -> BoolWithPartial {
         assert!(tolerance >= 0.0);
@@ -379,6 +381,7 @@ pub trait HalfPlaneOps<P: PointReqs>: Complement + QuarterTurnRotatable + Sized 
                 .map(|p| self.covers_point_with_tolerance(p, tolerance)),
         )
     }
+
 }
 
 impl_half_plane_ops_for_newtype!(HalfPlane<P: PointReqs>, base= DirectedLine<P>);

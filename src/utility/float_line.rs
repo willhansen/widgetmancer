@@ -37,23 +37,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
     }
 
 
-    fn same_side_of_line(&self, point_c: P, point_d: P) -> bool {
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let point_a = p1;
-        let point_b = p2;
-        let c_on_line = self.point_is_on_line(point_c);
-        let d_on_line = self.point_is_on_line(point_d);
-
-        if c_on_line {
-            return if d_on_line { true } else { false };
-        }
-        if d_on_line {
-            return false;
-        }
-
-        three_points_are_clockwise(point_a, point_b, point_c.into())
-            == three_points_are_clockwise(point_a, point_b, point_d.into())
-    }
     fn unordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
         tolerance: f32,

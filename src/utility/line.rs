@@ -85,9 +85,9 @@ pub trait LineOps<P: PointReqs>:
     // fn from_point_array(points: [P; 2]) -> Self {
     //     Self::from_array_of_two_exact_points(points)
     // }
-    fn point_is_on_line(&self, point: impl Into<P>) -> bool {
+    fn point_is_on_line(&self, point: P) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        on_line(p1, p2, point.into())
+        on_line(p1, p2, point)
     }
     // // fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>;
     fn new_horizontal(y: <P as CoordinateOps>::DataType) -> Self {
@@ -159,12 +159,29 @@ pub trait LineOps<P: PointReqs>:
     fn normal_vector_to_point(&self, point: P) -> <P as CoordinateOps>::Floating {
         point - self.closest_point_on_extended_line_to_point(point)
     }
-    fn point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
+    fn get_point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_point = point - p1; 
         p2 + p1_to_point*-1
     }
 
+    fn same_side_of_line(&self, point_c: Floating<P>, point_d: Floating<P>) -> bool {
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let point_a = p1;
+        let point_b = p2;
+        let c_on_line = self.point_is_on_line(point_c);
+        let d_on_line = self.point_is_on_line(point_d);
+
+        if c_on_line {
+            return if d_on_line { true } else { false };
+        }
+        if d_on_line {
+            return false;
+        }
+
+        three_points_are_clockwise(point_a, point_b, point_c.into())
+            == three_points_are_clockwise(point_a, point_b, point_d.into())
+    }
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);
 
@@ -904,5 +921,14 @@ mod tests {
             "{:?}",
             face_line
         );
+    }
+    fn test_point_on_opposite_side_but_same_distance__float_line() {
+        let line_p1 = (3.0, 0.0).into();
+        let line_p2 = (4.0, 2.0).into();
+        let line = default::FloatLine::new_from_two_unordered_points_on_line(line_p1, line_p2);
+        let test_point = (4.0, 0.0).into(); 
+        let result_point = line.get_point_same_distance_from_line_on_opposite_side(test_point);
+        assert_about_eq!(line.normal_distance_to_point(result_point), line.normal_distance_to_point(test_point));
+        assert_false!(line.same_side_of_line(test_point, result_point));
     }
 }
