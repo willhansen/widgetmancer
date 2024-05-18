@@ -5,26 +5,70 @@ use crate::utility::*;
 /// The type is being used as a subset of the base type.  Can be a refinement of multiple other types.
 // TODO: is this more of a conceptual refinement than the actual type system version?
 // TODO: how require that implements OperationsFor<RefinementBase>
-pub trait Refinement<Base>: TryFrom<Self::Base> + Into<Self::Base> {
-    type Base;
-    fn valid_refinement(base: Self::Base) -> bool;
+pub trait Refinement<Base>: TryFrom<Base> + Into<Base> {
+    fn valid_refinement(base: Base) -> bool;
 }
+// For when you want to automatically propagate a refinement relation down a pair of newtypes
+// TODO: abstraction rather than newtype?
+
+
+///     v--refinement
+/// A------------>B
+/// |             |
+/// |             |
+/// |<--newtype   |<--newtype
+/// |             |
+/// v             v
+/// C- - - - - - >D
+///      ^--new refinement
+///
+/// A = DiagonalBase
+/// B = NewtypeBase
+/// C = RefinementBase
+/// D = Self
+macro_rules! impl_parallel_refinement_for_newtype {
+    ($Self:ident<P: $PointReqs:ident>, newtype_base= $NewtypeBase:ident<P>, refinement_base= $RefinementBase:ident<P>, diagonal_base= $DiagonalBase:ident<P>) => {
+
+    impl<P: PointReqs> Refinement<$RefinementBase<P>> for $Self<P> {
+        fn valid_refinement(base: $RefinementBase<P>) -> bool {
+            $DiagonalBase::<P>::valid_refinement(base.0)
+        }
+    }
+
+    impl<P: $PointReqs> TryFrom<$NewtypeBase<P>> for $Self<P> {
+        type Error = ();
+
+        fn try_from(value: $RefinementBase<P>) -> Result<Self, Self::Error> {
+        
+            Ok(Self::new(value.0.try_into()?))
+        }
+    }
+
+    impl<P: PointReqs> From<$Self<P>> for $RefinementBase<P> {
+        fn from(value: $Self<P>) -> Self {
+            $RefinementBase::<P>::new(value.0.into())
+        }
+    }
+
+
+
+    }
+}
+pub(crate) use impl_parallel_refinement_for_newtype;
 
 /// Indicates that the implementing type has less information visible than the base type.
 /// - Can be created with same constructors as base (TODO: enforce)
 /// - Operations on this type can be applied to the base type as well (TODO: enforce)
-pub trait Abstraction<Base>: From<Self::Base> {
-    type Base;
+pub trait Abstraction<Base>: From<Base> {
 }
 
 macro_rules! impl_abstraction_for_newtype {
-    ($abstract_type:ident<P: $PointTrait:ident>, base= $BaseType:ident<P>) => {
-        impl<PointType: $PointTrait> Abstraction<$BaseType<PointType>>
+    ($abstract_type:ident<P: $PointReqs:ident>, base= $BaseType:ident<P>) => {
+        impl<PointType: $PointReqs> Abstraction<$BaseType<PointType>>
             for $abstract_type<PointType>
         {
-            type Base = $BaseType<PointType>;
         }
-        impl<PointType: $PointTrait> From<$BaseType<PointType>> for $abstract_type<PointType> {
+        impl<PointType: $PointReqs> From<$BaseType<PointType>> for $abstract_type<PointType> {
             fn from(value: $BaseType<PointType>) -> Self {
                 Self(value)
             }
@@ -38,16 +82,15 @@ pub(crate) use impl_abstraction_for_newtype;
 // TODO: adapt macro to arbitrary chain length?
 macro_rules! impl_abstraction_skip_level {
     // TODO: better base indication syntax
-    ($abstract_type:ident<P: $PointTrait:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
-        impl<PointType: $PointTrait> Abstraction<$BaserType<PointType>>
+    ($abstract_type:ident<P: $PointReqs:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
+        impl<PointType: $PointReqs> Abstraction<$BaserType<PointType>>
             for $abstract_type<PointType>
         where
             Self: Abstraction<$BaseType<PointType>>,
             $BaseType<PointType>: Abstraction<$BaserType<PointType>>,
         {
-            type Base = $BaserType<PointType>;
         }
-        impl<PointType: $PointTrait> From<$BaserType<PointType>> for $abstract_type<PointType>
+        impl<PointType: $PointReqs> From<$BaserType<PointType>> for $abstract_type<PointType>
         where
             Self: From<$BaseType<PointType>>,
             $BaseType<PointType>: From<$BaserType<PointType>>,

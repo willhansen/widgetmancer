@@ -14,27 +14,8 @@ impl<P: PointReqs> HalfPlaneCuttingCenteredUnitSquare<P> {
     }
 }
 
+impl_parallel_refinement_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, newtype_base= DirectedLineCuttingCenteredUnitSquare<P>, refinement_base= HalfPlane<P>, diagonal_base= DirectedLine<P>);
 
-impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type Error = ();
-
-    fn try_from(value: HalfPlane<P>) -> Result<Self, Self::Error> {
-        Ok(Self::from_border_with_inside_on_right(value.try_into()?))
-    }
-}
-
-impl<P: PointReqs> From<HalfPlaneCuttingCenteredUnitSquare<P>> for HalfPlane<P> {
-    fn from(value: HalfPlaneCuttingCenteredUnitSquare<P>) -> Self {
-        todo!()
-    }
-}
-
-impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
-    type Base = HalfPlane<P>;
-    fn valid_refinement(base: Self::Base) -> bool {
-        todo!()
-    }
-}
 
 impl_complement_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);

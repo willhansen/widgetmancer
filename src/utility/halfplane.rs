@@ -146,15 +146,16 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
 
 // impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
 
-type BorderTypeOf<T> = <T as HalfPlaneOps>::BorderType;
+// TODO: Switch to associated point type
+type BorderTypeOf<T, P> = <T as HalfPlaneOps<P>>::BorderType;
 
 pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<Output=Self> + QuarterTurnRotatable + Sized {
     type BorderType: DirectedLineOps<P>;
 
-    fn border_line(&self) -> BorderTypeOf<Self>;
+    fn border_line(&self) -> BorderTypeOf<Self, P>;
 
     #[deprecated(note = "use HalfPlane::border_line instead")]
-    fn dividing_line(&self) -> Self::BorderType {
+    fn dividing_line(&self) -> BorderTypeOf<Self, P> {
         self.border_line()
     }
     fn point_on_half_plane(&self) -> P {
@@ -223,7 +224,7 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
         Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
     fn direction_away_from_plane(&self) -> Angle<f32> {
-        standardize_angle_with_zero_mid(self.dividing_line.direction().turned_left())
+        standardize_angle_with_zero_mid(self.dividing_line().direction().turned_left())
     }
     fn direction_toward_plane(&self) -> Angle<f32> {
         standardize_angle_with_zero_mid(-self.direction_away_from_plane())
@@ -246,31 +247,32 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
             .not()
     }
 
+    // TODO: convert into shape-agnostic trait
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    fn with_transformed_points<F, OutputPointType>(
+    fn with_transformed_points<F, P_OUT>(
         &self,
         point_transform_function: F,
-    ) -> HalfPlane<OutputPointType>
+    ) -> HalfPlane<P_OUT>
     where
-        OutputPointType: PointReqs, // + FloatCoordinateOps,
-        F: Fn(P) -> OutputPointType,
+        P_OUT: PointReqs, // + FloatCoordinateOps,
+        F: Fn(P) -> P_OUT,
     {
         let [p1, p2] = self
-            .dividing_line
+            .dividing_line()
             .two_points_on_line_in_order()
             .map(point_transform_function);
-        let transformed_line: TwoDifferentPoints<OutputPointType> =
-            TwoDifferentPoints::try_from_two_exact_points(p1, p2).unwrap();
+        let transformed_line: DirectedLine<P_OUT> =
+            DirectedLine::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<TwoDifferentPoints<OutputPointType>>::from_border_with_inside_on_right(
+        HalfPlane::<P_OUT>::from_border_with_inside_on_right(
             transformed_line,
         )
     }
     fn depth_of_point_in_half_plane(&self, point: Floating<P>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
         let is_on_half_plane = self
-            .dividing_line
+            .dividing_line()
             .same_side_of_line(self.point_on_half_plane(), point.into());
         if is_on_half_plane {
             dist
@@ -284,8 +286,8 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
     }
     // TODO: change output type to guarantee value in normalized range ( [0.0,1.0] )
     fn very_approximate_fraction_coverage_of_centered_unit_square(&self) -> f32 {
-        let dist = self.dividing_line.distance_from_origin();
-        let corner_dist = 2.0.sqrt() * 0.5;
+        let dist = self.dividing_line().distance_from_origin();
+        let corner_dist = (2.0f32).sqrt() * 0.5;
         let side_dist = 0.5;
 
         // TODO: Do the actual math instead of lerp
@@ -332,7 +334,7 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
         //     - As long as tolerance refers to circles, and expanded square refers to squares, it can stay visible, at least
 
         let other_border_cut_points = other
-            .dividing_line
+            .dividing_line()
             .unordered_line_intersections_with_centered_unit_square_with_tolerance(tolerance);
 
         let other_covered_square_corner_points =
@@ -390,7 +392,7 @@ macro_rules! impl_half_plane_ops_for_newtype {
     ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $TraitParam> HalfPlaneOps<P> for $Type<P> {
             type BorderType = $BaseType<P>;
-            fn border_line(&self) -> Self::BorderType {
+            fn border_line(&self) -> <Self as HalfPlaneOps<P>>::BorderType {
                 self.0
             }
         }
@@ -402,7 +404,7 @@ use num::Float;
 impl<P: PointReqs> Display for HalfPlane<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
-            .field("dividing_line", &self.dividing_line)
+            .field("dividing_line", &self.dividing_line())
             .field("inside_direction", &self.inside_direction())
             .finish()
     }
