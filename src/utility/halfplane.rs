@@ -93,9 +93,9 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
 
 impl<P: PointReqs> ConstructorsForHalfPlane<P> for HalfPlane<P> {
     type BorderType = DirectedLine<P>;
-    fn from_border_with_inside_on_right(line: DirectedLine<P>) -> Self
-where {
-        Self::new(line)
+    fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
+    where {
+        Self::new(border)
     }
 }
 macro_rules! impl_constructors_for_half_plane_for_refinement {
@@ -108,11 +108,13 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
             //     // is refinement
             //     Self: Refinement<$BaseType<P>>,
             //     // refinement base is constructor
-            //     <Self as Refinement<$BaseType<P>>>::Base: ConstructorsForHalfPlane<P>,
+            //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
             //     // border type is refinement of the refinement base's border
-            //     Self::BorderType: Refinement<<<Self as Refinement<$BaseType<P>>>::Base as ConstructorsForHalfPlane<P>>::BorderType>,
+            //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
             {
-                $BaseType::<P>::from_border_with_inside_on_right(border.into()).into()
+                let border_of_base:  <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType  = border.into();
+                let base: $BaseType<P> = $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
+                base.into()
             }
         }
     }
@@ -491,8 +493,8 @@ mod tests {
     #[test]
     fn test_depth_of_point_in_half_plane() {
         let horizontal = WorldHalfPlane::new_from_line_and_point_on_half_plane(
-            ((0.0, 0.0), (1.0, 0.0)),
-            (0.0, 5.0),
+            ((0.0, 0.0), (1.0, 0.0)).into(),
+            (0.0, 5.0).into(),
         );
 
         assert_about_eq!(

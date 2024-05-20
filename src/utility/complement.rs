@@ -16,13 +16,13 @@ macro_rules! impl_complement_for_newtype {
 pub(crate) use impl_complement_for_newtype;
 
 macro_rules! impl_complement_for_refinement {
-    ($type:ident<P: $PointReqs:ident>) => {
+    ($type:ident<P: $PointReqs:ident>, refinement_base= $RefinementBase:ident<P>) => {
         // TODO: double check the prerequisite trait is implemented for the macro (at compile time)
         // const {assert_impl!($type<P>, Refinement<$RefinementBase<P>>);}
         impl<P: $PointReqs> Complement for $type<P> {
             type Output = Self;
             fn complement(&self) -> Self::Output {
-                Into::<Self::RefinementBase>::into(self).complement().try_into().unwrap()
+                Into::<$RefinementBase>::into(self).complement().try_into().unwrap()
             }
         }
     };
