@@ -5,7 +5,7 @@ trait_alias_macro!(trait PointReqs =PointReqsForDirectedFloatLine );
 
 pub type DirectedFloatLine<UnitType> = DirectedLine<Point2D<f32, UnitType>>;
 
-pub trait DirectedFloatLineOps<P: PointReqs>: DirectedLineOps<P> + FloatLineOps<P> {
+pub trait DirectedFloatLineOps<P: PointReqs>: OperationsForDirectedLine<P> + FloatLineOps<P> {
     fn points_sorted_by_line_direction(&self, mut points: Vec<P>) -> Vec<P> {
         let normalized_line_direction = P::unit_vector_from_angle(self.direction());
         points.sort_by_key(|&point| OrderedFloat(normalized_line_direction.dot(point)));
@@ -45,4 +45,4 @@ pub trait DirectedFloatLineOps<P: PointReqs>: DirectedLineOps<P> + FloatLineOps<
     }
 }
 
-impl<L, P: PointReqs> DirectedFloatLineOps<P> for L where L: FloatLineOps<P> + DirectedLineOps<P> {}
+impl<L, P: PointReqs> DirectedFloatLineOps<P> for L where L: FloatLineOps<P> + OperationsForDirectedLine<P> {}

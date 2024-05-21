@@ -13,26 +13,11 @@ impl<P: PointReqs> DirectedLine<P> {
 }
 
 
-impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingCenteredUnitSquare<P>>
-    for DirectedLine<P>
-{
-    fn from(value: DirectedLineCuttingCenteredUnitSquare<P>) -> Self {
-        todo!()
-    }
-}
-impl<P: PointReqsForTwoPointsOnDifferentFaces> From<DirectedLineCuttingGridSquare<P>>
-    for DirectedLine<P>
-{
-    fn from(value: DirectedLineCuttingGridSquare<P>) -> Self {
-        todo!()
-    }
-}
-
 impl_abstraction_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl_translate_for_newtype!(DirectedLine<P: PointReqs>);
 
-pub trait DirectedLineOps<P: PointReqs>:
+pub trait OperationsForDirectedLine<P: PointReqs>:
     LineOps<P> + Reversible + ConstructorsForDirectedLine<P>
 {
     fn two_points_on_line_in_order(&self) -> [P; 2];
@@ -67,7 +52,7 @@ pub trait DirectedLineOps<P: PointReqs>:
 //macro_rules! impl_directed_line_ops_for_abstraction 
 macro_rules! impl_operations_for_directed_line_for_newtype {
     ($type:ident<P: $traitparam:ident>) => {
-        impl<P: $traitparam> DirectedLineOps<P> for $type<P> {
+        impl<P: $traitparam> OperationsForDirectedLine<P> for $type<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
                 self.0.two_points_on_line_in_order()
             }
@@ -84,7 +69,7 @@ impl_constructors_for_line_for_newtype!(DirectedLine<P: PointReqs>, base= TwoDif
 
 // impl<L> Reversible for L
 // where
-//     L: DirectedLineOps + DirectedLineConstructors,
+//     L: OperationsForDirectedLine + DirectedLineConstructors,
 impl<P: PointReqs> Reversible for DirectedLine<P> {
     fn reversed(&self) -> Self {
         todo!()
@@ -107,7 +92,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let line = TwoDifferentPoints::<P>::new(p1, p2);
         Self::try_new_from_directed_line(line)
     }
-    fn new_from_directed_line(line: impl DirectedLineOps<P>) -> Self
+    fn new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Self
     where
         Self: Sized,
     {
@@ -117,7 +102,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let [p1, p2] = line.two_different_arbitrary_points_on_line();
         Self::from_two_exact_points(p1, p2)
     }
-    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
     where
         Self: Sized;
     fn from_point_and_angle(point: impl Into<P>, direction: impl Into<FAngle>) -> Self
@@ -145,7 +130,7 @@ macro_rules! impl_constructors_for_directed_line_for_newtype {
 
     ($type:ident<P: $traitparam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {
-            fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
+            fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
             where
                 Self: Sized,
             {

@@ -9,10 +9,10 @@ in
       rustc
       cargo-watch
       rustfmt
-      #rust-analyzer
+      rust-analyzer
       clippy
       lldb
       gdb
-      vscode-extensions.vadimcn.vscode-lldb.adapter
+      # vscode-extensions.vadimcn.vscode-lldb.adapter
     ];
   }

@@ -12,68 +12,6 @@ pub trait Refinement<Base>: TryFrom<Base> + Into<Base> {
 // TODO: abstraction rather than newtype?
 
 
-///     v--refinement
-/// A------------------>B
-/// |                   |
-/// |   abstraction     |   abstraction
-/// |<--newtype         |<--newtype
-/// |                   |
-/// v                   v
-/// C- - - - - - - - - >D
-///      ^--new refinement
-///
-/// A = DiagonalBase
-/// B = NewtypeBase
-/// C = RefinementBase
-/// D = Self
-macro_rules! impl_parallel_refinement_for_newtype {
-    ($Self:ident<P: $PointReqs:ident>, newtype_base= $NewtypeBase:ident<P>, refinement_base= $RefinementBase:ident<P>, diagonal_base= $DiagonalBase:ident<P>) => {
-
-        impl<P: PointReqs> Refinement<$RefinementBase<P>> for $Self<P> 
-        where 
-            $NewtypeBase<P>: Refinement<$DiagonalBase<P>>,
-            $RefinementBase<P>: Abstraction<$DiagonalBase<P>>,
-            Self: Abstraction<$NewtypeBase<P>>
-
-        {
-            fn valid(&self) -> bool {
-                self.0.valid()
-            }
-        }
-
-        impl<P: $PointReqs> TryFrom<$RefinementBase<P>> for $Self<P> {
-            type Error = String;
-
-            fn try_from(value: $RefinementBase<P>) -> Result<Self, Self::Error> {
-            
-                let maybe_valid = Self(value.0.try_into()?);
-                if !maybe_valid.valid() {
-                    Err(format!("NOT VALID: {:?}", maybe_valid))
-                }
-                else {
-                    Ok(maybe_valid)
-                }
-            
-            }
-        }
-
-        impl<P: PointReqs> From<$Self<P>> for $RefinementBase<P> {
-            fn from(value: $Self<P>) -> Self {
-                // up abstraction
-                let newtype_base: $NewtypeBase<P> = value.0;
-                let diagonal_base: $DiagonalBase<P> = newtype_base.into();
-                let refinement_base: $RefinementBase<P> = diagonal_base.into();
-                refinement_base
-                
-            }
-        }
-
-
-
-    }
-}
-pub(crate) use impl_parallel_refinement_for_newtype;
-
 /// Indicates that the implementing type has less information visible than the base type.
 /// - Can be created with same constructors as base (TODO: enforce)
 /// - Operations on this type can be applied to the base type as well (TODO: enforce)

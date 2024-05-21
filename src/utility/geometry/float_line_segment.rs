@@ -123,10 +123,10 @@ pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P>
 impl<T, P: PointReqs> FloatLineSegmentOps<P> for T where T: FloatLineOps<P> + LineSegmentOps<P> {}
 
 pub trait DirectedFloatLineSegmentOps<P: PointReqs>:
-    DirectedLineOps<P> + FloatLineSegmentOps<P>
+    OperationsForDirectedLine<P> + FloatLineSegmentOps<P>
 {
     fn lerp(&self, t: f32) -> P {
         self.start().lerp2d(self.end(), t)
     }
 }
-impl<T, P: PointReqs> DirectedFloatLineSegmentOps<P> for T where T: DirectedLineOps<P> + FloatLineSegmentOps<P> {}
+impl<T, P: PointReqs> DirectedFloatLineSegmentOps<P> for T where T: OperationsForDirectedLine<P> + FloatLineSegmentOps<P> {}

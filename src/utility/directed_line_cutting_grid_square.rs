@@ -29,3 +29,12 @@ impl_constructors_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointRe
 impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
+impl<P: PointReqs> Into<DirectedLine<P>>
+    for DirectedLineCuttingGridSquare<P>
+{
+    fn into(self) -> DirectedLine<P> {
+        DirectedLine::<P>::new_from_directed_line(self)
+    }
+}
+
+

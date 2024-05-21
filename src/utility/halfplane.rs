@@ -25,7 +25,7 @@ impl<P: PointReqs> HalfPlane<P> {
 }
 
 pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
-    type BorderType: DirectedLineOps<P>;
+    type BorderType: OperationsForDirectedLine<P>;
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self;
 
     fn new_from_line_and_point_on_half_plane(
@@ -60,7 +60,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
             -vector_to_outside,
         )
     }
-    fn new_from_border_line_with_origin_inside(line: impl DirectedLineOps<P>) -> Self {
+    fn new_from_border_line_with_origin_inside(line: impl OperationsForDirectedLine<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
         Self::new_from_line_and_point_on_half_plane(line, P::zero())
     }
@@ -152,7 +152,7 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
 type BorderTypeOf<T, P> = <T as HalfPlaneOps<P>>::BorderType;
 
 pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<Output=Self> + QuarterTurnRotatable + Sized {
-    type BorderType: DirectedLineOps<P>;
+    type BorderType: OperationsForDirectedLine<P>;
 
     fn border_line(&self) -> BorderTypeOf<Self, P>;
 

@@ -30,18 +30,32 @@ impl_constructors_for_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P:
 impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
 
 
+impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
 
 impl<P: PointReqs> TryFrom<DirectedLine<P>>
     for DirectedLineCuttingCenteredUnitSquare<P>
 {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: DirectedLine<P>) -> Result<Self, Self::Error> {
         todo!()
     }
 }
+impl<P: PointReqs> Into<DirectedLine<P>>
+    for DirectedLineCuttingCenteredUnitSquare<P>
+{
+    fn into(self) -> DirectedLine<P> {
+        DirectedLine::<P>::new_from_directed_line(self)
+    }
+}
 
-impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl<P: PointReqs> Refinement<DirectedLine<P>> for DirectedLineCuttingCenteredUnitSquare<P> {
+    fn valid(&self) -> bool {
+        // Non-valid states non-representable
+        true
+    }
+}
+
 

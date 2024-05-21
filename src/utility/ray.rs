@@ -12,7 +12,7 @@ pub trait Ray<P: FloatCoordinateOps> {
     {
         self.point() + P::from_angle_and_length(self.angle(), dist_from_start)
     }
-    fn line<T: DirectedLineOps<P>>(&self) -> T {
+    fn line<T: OperationsForDirectedLine<P>>(&self) -> T {
         T::from_point_and_vector(
             self.point(),
             P::unit_vector_from_angle(self.angle()),

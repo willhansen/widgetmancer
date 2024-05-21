@@ -114,7 +114,7 @@ pub trait LineOps<P: PointReqs>:
     fn distance_from_origin(&self) -> f32 {
         self.normal_vector_from_origin().length()
     }
-    fn with_direction(&self, direction_hint: FAngle) -> impl DirectedLineOps<P> {
+    fn with_direction(&self, direction_hint: FAngle) -> impl OperationsForDirectedLine<P> {
         let p = self.arbitrary_point_on_shape();
         let dirs = self.parallel_directions_as_vectors();
 
@@ -130,7 +130,7 @@ pub trait LineOps<P: PointReqs>:
         let p2 = p + *good_dir;
         TwoDifferentPoints::new(p, p2)
     }
-    fn with_arbitrary_direction(&self) -> impl DirectedLineOps<P> {
+    fn with_arbitrary_direction(&self) -> impl OperationsForDirectedLine<P> {
         self.with_direction(self.parallel_directions()[1])
     }
 
@@ -232,19 +232,10 @@ macro_rules! impl_constructors_for_line_for_newtype {
 pub(crate) use impl_constructors_for_line_for_newtype;
 
 impl_constructors_for_line_for_newtype!(Line<P: PointReqs>, base= DirectedLine<P>);
+impl_constructors_for_directed_line_for_newtype!(Line<P: PointReqs>, base= DirectedLine<P>);
 
-// TODO: maybe implement for `Abstraction<DirectedLine<P>>`?
-impl<P: PointReqs> ConstructorsForDirectedLine<P> for Line<P> {
-    fn try_new_from_directed_line(line: impl DirectedLineOps<P>) -> Result<Self, String>
-    where
-        Self: Sized {
-        // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>
-        Ok(DirectedLine::<P>::try_new_from_directed_line(line).into())
+impl_abstraction_for_newtype!(Line<P: PointReqs>, base=DirectedLine<P>);
 
-        // let [p1, p2] = line.two_points_on_line_in_order();
-        // Ok(Self::new_from_two_ordered_points_on_line(p1, p2))
-    }
-}
 
 // TODO: maybe implement for `Abstraction<TwoDifferentPoints<P>>`?
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Line<P> {

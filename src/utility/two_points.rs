@@ -15,7 +15,7 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
     // TODO: this impl should be empty
 
     // TODO: Should already be implied by the Abstraction implementation
-    fn new_from_directed_line(line: impl DirectedLineOps<P>) -> Self {
+    fn new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Self {
         let [p1, p2] = line.two_points_on_line_in_order();
         Self::new_from_points(p1, p2)
     }
@@ -198,7 +198,7 @@ impl<P: FloatCoordinateOps> Ray<P> for TwoDifferentPoints<P> {
 
 macro_rules! impls_for_two_different_points {
     ($TheStruct:ident<P: $point_trait:ident>) => {
-        impl<P: $point_trait> DirectedLineOps<P> for $TheStruct<P> {
+        impl<P: $point_trait> OperationsForDirectedLine<P> for $TheStruct<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
                 <Self as TwoPointsWithRestriction<P>>::to_array(self)
             }
@@ -206,7 +206,7 @@ macro_rules! impls_for_two_different_points {
 
         impl<P: $point_trait> ConstructorsForDirectedLine<P> for $TheStruct<P> {
         fn try_new_from_directed_line(
-        line: impl DirectedLineOps<P>,
+        line: impl OperationsForDirectedLine<P>,
         ) -> Result<Self, String>
         where
         Self: Sized,

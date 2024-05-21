@@ -18,7 +18,7 @@ impl<P: PointReqs> LineSegmentOps<P> for TwoDifferentPoints<P> {
     }
 }
 
-pub trait DirectedLineSegmentOps<P: PointReqs>: DirectedLineOps<P> + LineSegmentOps<P> {
+pub trait DirectedLineSegmentOps<P: PointReqs>: OperationsForDirectedLine<P> + LineSegmentOps<P> {
     fn endpoints_in_order(&self) -> [P; 2] {
         P::points_sorted_along_axis(self.endpoints_in_arbitrary_order(), self.direction())
             .into_iter()
@@ -33,7 +33,7 @@ pub trait DirectedLineSegmentOps<P: PointReqs>: DirectedLineOps<P> + LineSegment
         self.endpoints_in_order()[1]
     }
 }
-impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where T: DirectedLineOps<P> + LineSegmentOps<P>
+impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where T: OperationsForDirectedLine<P> + LineSegmentOps<P>
 {}
 
 #[cfg(test)]
