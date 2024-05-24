@@ -37,8 +37,8 @@ pub type TwoDifferentLocalSquarePoints =
 pub type TwoDifferentLocalCharacterPoints =
     TwoDifferentPoints<Point2D<f32, CharacterGridInLocalCharacterFrame>>;
 // TODO: put in some kind of default module like euclid does?
-pub type WorldLine = TwoDifferentWorldPoints;
-pub type LocalSquareLine = TwoDifferentLocalSquarePoints;
+pub type WorldLine = Line<WorldPoint>;
+pub type LocalSquareLine = Line<LocalSquarePoint>;
 
 pub type SquareList = Vec<WorldSquare>;
 pub type StepList = Vec<WorldStep>;
@@ -278,6 +278,11 @@ pub fn is_world_character_square_left_square_of_world_square(
         character_square,
     )) == character_square
 }
+
+// TODO: this should be more concise
+pub fn world_line(p1: WorldPoint ,p2: WorldPoint) -> WorldLine {
+    line(p1,p2)
+} 
 
 #[cfg(test)]
 mod tests {

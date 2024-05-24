@@ -95,7 +95,7 @@ pub mod default {
     pub type TwoDifferentFloatPoints = super::TwoDifferentFloatPoints<euclid::UnknownUnit>;
     pub type FloatLine = super::FloatLine<euclid::UnknownUnit>;
     pub type DirectedFloatLine = super::DirectedFloatLine<euclid::UnknownUnit>;
-    pub type HalfPlane = super::HalfPlane<DirectedFloatLine>;
+    pub type HalfPlane = super::HalfPlane<FloatPoint>;
 }
 
 pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {

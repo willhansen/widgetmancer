@@ -1865,7 +1865,7 @@ impl Game {
                     .rotate_vect(Angle::radians(rotation_if_uniform))
                     .cast_unit()
                 + rand_radial_offset(random_spread_radius).cast_unit();
-            let line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            let line = TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 line_start.to_f32(),
                 line_end,
             );

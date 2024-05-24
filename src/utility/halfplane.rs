@@ -28,7 +28,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
     type BorderType: OperationsForDirectedLine<P>;
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self;
 
-    fn new_from_line_and_point_on_half_plane(
+    fn from_line_and_point_on_half_plane(
         dividing_line: impl LineOps<P>,
         point_on_half_plane: P,
     ) -> Self {
@@ -43,28 +43,28 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
         )
     }
     fn new_with_inside_down(y: P::_DataType) -> Self {
-        Self::new_from_point_on_border_and_vector_pointing_inside(
+        Self::from_point_on_border_and_vector_pointing_inside(
             P::right() * y,
             P::down(),
         )
     }
     fn new_from_border_line_with_origin_outside(line: impl LineOps<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
-        Self::new_from_line_and_point_on_half_plane(line, line.get_point_same_distance_from_line_on_opposite_side(P::zero()))
+        Self::from_line_and_point_on_half_plane(line, line.get_point_same_distance_from_line_on_opposite_side(P::zero()))
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
         vector_to_outside: P,
     ) -> Self {
-        Self::new_from_point_on_border_and_vector_pointing_inside(
+        Self::from_point_on_border_and_vector_pointing_inside(
             P::zero() + vector_to_outside,
             -vector_to_outside,
         )
     }
     fn new_from_border_line_with_origin_inside(line: impl OperationsForDirectedLine<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
-        Self::new_from_line_and_point_on_half_plane(line, P::zero())
+        Self::from_line_and_point_on_half_plane(line, P::zero())
     }
-    fn new_from_point_on_border_and_vector_pointing_inside(
+    fn from_point_on_border_and_vector_pointing_inside(
         point_on_border: P,
         // TODO: make relative
         normal_direction_into_plane: P,
@@ -80,11 +80,11 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
         )
         .unwrap();
         let point_on_half_plane = p + v;
-        Self::new_from_line_and_point_on_half_plane(border_line, point_on_half_plane)
+        Self::from_line_and_point_on_half_plane(border_line, point_on_half_plane)
     }
 
     fn top_half_plane() -> Self {
-        Self::new_from_line_and_point_on_half_plane(
+        Self::from_line_and_point_on_half_plane(
             Self::BorderType::easy_from_two_points_on_line(P::right(), P::left()),
             P::up(),
         )
@@ -113,8 +113,8 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
             //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
             {
                 let border_of_base:  <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType  = border.into();
-                let base: $BaseType<P> = $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
-                base.into()
+                let refinement_base: $BaseType<P> = $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
+                refinement_base.try_into().unwrap()
             }
         }
     }
@@ -223,7 +223,7 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
         )
         .unwrap();
 
-        Self::new_from_line_and_point_on_half_plane(shifted_line, shifted_point)
+        Self::from_line_and_point_on_half_plane(shifted_line, shifted_point)
     }
     fn direction_away_from_plane(&self) -> Angle<f32> {
         standardize_angle_with_zero_mid(self.dividing_line().direction().turned_left())
@@ -252,22 +252,22 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
     // TODO: convert into shape-agnostic trait
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    fn with_transformed_points<F, P_OUT>(
+    fn with_transformed_points<F, POut>(
         &self,
         point_transform_function: F,
-    ) -> HalfPlane<P_OUT>
+    ) -> HalfPlane<POut>
     where
-        P_OUT: PointReqs, // + FloatCoordinateOps,
-        F: Fn(P) -> P_OUT,
+        POut: PointReqs, // + FloatCoordinateOps,
+        F: Fn(P) -> POut,
     {
         let [p1, p2] = self
             .dividing_line()
             .two_points_on_line_in_order()
             .map(point_transform_function);
-        let transformed_line: DirectedLine<P_OUT> =
+        let transformed_line: DirectedLine<POut> =
             DirectedLine::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<P_OUT>::from_border_with_inside_on_right(
+        HalfPlane::<POut>::from_border_with_inside_on_right(
             transformed_line,
         )
     }
@@ -433,11 +433,11 @@ mod tests {
         let right_point = WorldPoint::new(1.0, 0.0);
 
         let good_half_plane_upwards =
-            WorldHalfPlane::new_from_line_and_point_on_half_plane(good_line, upper_point);
+            WorldHalfPlane::from_line_and_point_on_half_plane(good_line, upper_point);
         let good_half_plane_downwards =
-            WorldHalfPlane::new_from_line_and_point_on_half_plane(good_line, right_point);
+            WorldHalfPlane::from_line_and_point_on_half_plane(good_line, right_point);
         let bad_half_plane =
-            WorldHalfPlane::new_from_line_and_point_on_half_plane(bad_line, right_point);
+            WorldHalfPlane::from_line_and_point_on_half_plane(bad_line, right_point);
 
         assert!(good_half_plane_upwards.about_complementary(good_half_plane_downwards, 1e-6));
         assert!(good_half_plane_downwards.about_complementary(good_half_plane_upwards, 1e-6));
@@ -455,8 +455,8 @@ mod tests {
         let p1 = WorldPoint::new(0.0, 1.0);
         let p2 = WorldPoint::new(1.0, 0.0);
 
-        let half_plane_1 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-        let half_plane_2 = WorldHalfPlane::new_from_line_and_point_on_half_plane(line2, p2);
+        let half_plane_1 = WorldHalfPlane::from_line_and_point_on_half_plane(line, p1);
+        let half_plane_2 = WorldHalfPlane::from_line_and_point_on_half_plane(line2, p2);
 
         assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
     }
@@ -464,9 +464,9 @@ mod tests {
     #[test]
     fn test_halfplane_fully_covers_centered_unit_square_with_tolerance() {
         let f = |x, tolerance| {
-            let the_plane = WorldHalfPlane::new_from_point_on_border_and_vector_pointing_inside(
-                (x, 0.0),
-                (-1.0, 0.0),
+            let the_plane = WorldHalfPlane::from_point_on_border_and_vector_pointing_inside(
+                (x, 0.0).into(),
+                (-1.0, 0.0).into(),
             );
 
             the_plane.fully_covers_centered_unit_square_with_tolerance(tolerance)
@@ -492,9 +492,9 @@ mod tests {
     }
     #[test]
     fn test_depth_of_point_in_half_plane() {
-        let horizontal = WorldHalfPlane::new_from_line_and_point_on_half_plane(
-            ((0.0, 0.0), (1.0, 0.0)).into(),
-            (0.0, 5.0).into(),
+        let horizontal = WorldHalfPlane::from_line_and_point_on_half_plane(
+            line((0.0, 0.0), (1.0, 0.0)),
+            point2(0.0, 5.0),
         );
 
         assert_about_eq!(
@@ -512,9 +512,9 @@ mod tests {
             -1.0
         );
 
-        let diag = WorldHalfPlane::new_from_line_and_point_on_half_plane(
-            ((0.0, 0.0), (-1.0, 1.0)),
-            (0.0, 5.0),
+        let diag = WorldHalfPlane::from_line_and_point_on_half_plane(
+            line((0.0, 0.0), (-1.0, 1.0)),
+            point2(0.0, 5.0),
         );
         assert_about_eq!(
             diag.depth_of_point_in_half_plane(point2(1.0, 0.0)),
@@ -545,15 +545,15 @@ mod tests {
         let g = (-0.6, 0.4);
 
         let up: LocalSquareHalfPlane =
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((a, b), (0.0, 5.0));
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(line(a, b), point2(0.0, 5.0));
         let up_right =
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((b, c), (1.0, 1.0)).into();
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(line(b, c), point2(1.0, 1.0));
         let down_right =
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((c, d), (1.0, -1.0)).into();
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(line(c, d), point2(1.0, -1.0));
         let down =
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((d, e), (0.0, -5.0)).into();
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(line(d, e), point2(0.0, -5.0));
         let left =
-            LocalSquareHalfPlane::new_from_line_and_point_on_half_plane((f, g), (-5.0, 0.0)).into();
+            LocalSquareHalfPlane::from_line_and_point_on_half_plane(line(f, g), point2(-5.0, 0.0));
 
         let tolerance = 1e-5;
 
@@ -823,12 +823,10 @@ mod tests {
     fn test_halfplane_overlap_inside_unit_square__partial__exact__one_fully_covers__one_just_touches_corner(
     ) {
         let just_fully_covering: HalfPlane<_> =
-            default::HalfPlane::new_from_border_line_with_origin_inside(
-                TwoDifferentPoints::new_horizontal(0.5),
-            );
+            default::HalfPlane::new_from_border_line_with_origin_inside( DirectedLine::new_horizontal(0.5),);
         let just_touching_corner: HalfPlane<_> =
             default::HalfPlane::new_from_border_line_with_origin_outside(
-                TwoDifferentPoints::easy_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
+                DirectedLine::easy_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),
             );
         assert!(just_fully_covering
             .overlaps_other_inside_centered_unit_square_with_tolerance(&just_touching_corner, 0.01)
@@ -837,7 +835,7 @@ mod tests {
     #[test]
     fn test_halfplane_overlap_unit_square() {
         let f = |top_y: f32, tolerance: f32| {
-            HalfPlane::<TwoDifferentWorldPoints>::new_with_inside_down(top_y)
+            WorldHalfPlane::new_with_inside_down(top_y)
                 .coverage_of_centered_unit_square_with_tolerance(tolerance)
         };
         use RelativeIntervalLocation::*;
@@ -864,9 +862,9 @@ mod tests {
     #[test]
     fn test_halfplane_at_least_partially_covers_point() {
         let hp: LocalSquareHalfPlane = HalfPlane::new_with_inside_down(0.0);
-        assert!(hp.at_least_partially_covers_point((0.0, 0.0)));
-        assert!(hp.at_least_partially_covers_point((0.0, -0.1)));
-        assert_false!(hp.at_least_partially_covers_point((0.0, 0.1)));
+        assert!(hp.at_least_partially_covers_point(point2(0.0, 0.0)));
+        assert!(hp.at_least_partially_covers_point(point2(0.0, -0.1)));
+        assert_false!(hp.at_least_partially_covers_point(point2(0.0, 0.1)));
     }
     #[ignore = "Just very approximate for now"]
     #[test]

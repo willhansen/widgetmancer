@@ -368,7 +368,7 @@ mod tests {
     fn test_initilize_from_unordered_points_on_line() {
         let a = point2(5.0, 5.0);
         let b = point2(10.0, 5.0);
-        let line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(a, b);
+        let line = TwoDifferentWorldPoints::from_two_unordered_points_on_line(a, b);
         assert!(line.point_is_on_line(a));
         assert!(line.point_is_on_line(b));
     }

@@ -25,9 +25,9 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<
     type Error = String;
 
     fn try_from(value: HalfPlane<P>) -> Result<Self, Self::Error> {
-        let unrefined_border = value.border_line();
-        let refined_border: LineCuttingCenteredUnitSquare<P> = unrefined_border.try_into()?;
-        Ok(Self(refined_border))
+        let unrefined_border  = value.border_line();
+        let refined_border: DirectedLineCuttingCenteredUnitSquare<P> = unrefined_border.try_into()?;
+        Ok(Self::from_border_with_inside_on_right(refined_border))
     }
 }
 

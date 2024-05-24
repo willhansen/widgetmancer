@@ -560,7 +560,7 @@ mod tests {
             #[test]
             fn test_square_visibility_knows_if_its_fully_visible() {
                 let partial = <$type>::new_from_visible_half_plane(
-                    HalfPlane::new_from_line_and_point_on_half_plane(
+                    HalfPlane::from_line_and_point_on_half_plane(
                         TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
                         point2(-12.061038, -1.3054879),
                     ),
@@ -584,15 +584,15 @@ mod tests {
 
             #[test]
             fn complementary_partial_squares_combine_to_full_visibility() {
-                let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+                let line = TwoDifferentPoints::from_two_unordered_points_on_line(
                     point2(0.0, 0.0),
                     point2(1.0, 1.0),
                 );
                 let p1 = point2(0.0, 1.0);
                 let p2 = point2(1.0, 0.0);
 
-                let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
-                let half_plane_2 = HalfPlane::new_from_line_and_point_on_half_plane(line, p2);
+                let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
+                let half_plane_2 = HalfPlane::from_line_and_point_on_half_plane(line, p2);
                 assert!(half_plane_1.about_complementary(half_plane_2, 1e-6));
 
                 let partial_1 = <$type>::new_from_visible_half_plane(half_plane_1);
@@ -641,13 +641,13 @@ mod tests {
             }
             #[test]
             fn test_one_shadow__diagonal_partially_visible() {
-                let line = TwoDifferentPoints::new_from_two_unordered_points_on_line(
+                let line = TwoDifferentPoints::from_two_unordered_points_on_line(
                     point2(0.0, 0.0),
                     point2(1.0, 1.0),
                 );
                 let p1 = point2(0.0, 1.0);
 
-                let half_plane_1 = HalfPlane::new_from_line_and_point_on_half_plane(line, p1);
+                let half_plane_1 = HalfPlane::from_line_and_point_on_half_plane(line, p1);
                 let partial_1 = <$type>::new_from_visible_half_plane(half_plane_1);
                 assert!(partial_1.is_only_partially_visible());
             }
@@ -664,13 +664,13 @@ mod tests {
             #[test]
             fn test_square_visibility_overlap__simple_non_overlap() {
                 let up = <$type>::new_partially_visible_from_visible_half_plane(
-                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                    HalfPlaneCuttingLocalSquare::from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.4),
                         (0.0, 1.0).into(),
                     ),
                 );
                 let down = <$type>::new_partially_visible_from_visible_half_plane(
-                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                    HalfPlaneCuttingLocalSquare::from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.3),
                         (0.0, -1.0).into(),
                     ),
@@ -683,13 +683,13 @@ mod tests {
             #[test]
             fn test_square_visibility_overlap__simple_overlap() {
                 let vis1 = <$type>::new_partially_visible_from_visible_half_plane(
-                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                    HalfPlaneCuttingLocalSquare::from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(-0.3),
                         (0.0, 1.0).into(),
                     ),
                 );
                 let vis2 = <$type>::new_partially_visible_from_visible_half_plane(
-                    HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+                    HalfPlaneCuttingLocalSquare::from_line_and_point_on_half_plane(
                         TwoPointsOnDifferentFacesOfCenteredUnitSquare::new_horizontal(0.2),
                         (0.0, -1.0).into(),
                     ),

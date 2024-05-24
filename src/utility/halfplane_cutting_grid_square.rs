@@ -15,6 +15,7 @@ where
         todo!()
     }
 }
+
 impl<P: PointReqs> From<HalfPlaneCuttingGridSquare<P>> for HalfPlane<P> {
     fn from(value: HalfPlaneCuttingGridSquare<P>) -> Self {
         Self::from_border_with_inside_on_right(value.dividing_line().into())

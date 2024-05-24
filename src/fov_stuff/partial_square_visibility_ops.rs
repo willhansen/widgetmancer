@@ -13,7 +13,7 @@ pub trait PartialSquareVisibilityOps: Clone + Complement<Output = Self> {
             LocalSquarePoint::unit_vector_from_angle(shadow_direction.turned_left()),
         );
         Self::new_from_visible_half_plane(
-            HalfPlaneCuttingLocalSquare::new_from_line_and_point_on_half_plane(
+            HalfPlaneCuttingLocalSquare::from_line_and_point_on_half_plane(
                 shadow_line,
                 LocalSquarePoint::unit_vector_from_angle(shadow_direction),
             ),

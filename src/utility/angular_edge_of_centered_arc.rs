@@ -63,7 +63,7 @@ pub trait AngularEdgeOfCenteredArc {
         .ok()?;
 
         Some(
-            HalfPlaneCuttingGridSquare::<SquareType::Floating>::new_from_line_and_point_on_half_plane(
+            HalfPlaneCuttingGridSquare::<SquareType::Floating>::from_line_and_point_on_half_plane(
                 line,
                 point_on_inside_of_edge,
             ),

@@ -36,6 +36,7 @@ pub(crate) use impl_abstraction_for_newtype;
 // abstractions chain together
 // TODO: analogous chain for refinement
 // TODO: adapt macro to arbitrary chain length?
+// TODO: update notation for consistency with other parameterized impl macros
 macro_rules! impl_abstraction_skip_level {
     // TODO: better base indication syntax
     ($abstract_type:ident<P: $PointReqs:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
@@ -58,6 +59,27 @@ macro_rules! impl_abstraction_skip_level {
     };
 }
 pub(crate) use impl_abstraction_skip_level;
+
+macro_rules! impl_try_from_skip_level {
+    // TODO: better base indication syntax
+    ($EndType:ident<P: $PointReqs:ident> --> $MidType:ident<P> --> $StartType:ident<P>) => {
+        impl<PointType: $PointReqs> TryFrom<$StartType<PointType>>
+            for $EndType<PointType>
+        where
+            Self: TryFrom<$MidType<PointType>>,
+            $MidType<PointType>: TryFrom<$StartType<PointType>>,
+        {
+            // TODO 
+            type Error = String;
+            fn try_from(value: )
+            
+        }
+    };
+}
+pub(crate) use impl_try_from_skip_level;
+
+
+
 // The type is being used in a new way, and all known semantics are discarded
 // TODO: This kind of feels like the default use of a newtype, and maybe does not need a dedicated trait...  Only use I can think of is to block implementation of the other two newtype traits
 

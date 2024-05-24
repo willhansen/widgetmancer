@@ -88,12 +88,12 @@ mod tests {
     #[test]
     fn test_intersection__miss() {
         assert!(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(0.0, 0.0),
                 point2(1.0, 1.0)
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     point2(100.0, 1000.0),
                     point2(10.0, 10.0),
                 )
@@ -153,12 +153,12 @@ mod tests {
     #[test]
     fn test_intersection__parallel_miss() {
         assert!(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(10.0, 5.0)
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     point2(11.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -169,12 +169,12 @@ mod tests {
     #[test]
     fn test_intersection__parallel_overlap_does_not_count() {
         assert!(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(10.0, 5.0)
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     point2(9.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -185,12 +185,12 @@ mod tests {
     #[test]
     fn test_intersection__parallel_full_overlap_does_not_count() {
         assert!(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(10.0, 5.0)
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     point2(0.0, 5.0),
                     point2(20.0, 5.0),
                 )
@@ -201,12 +201,12 @@ mod tests {
     #[test]
     fn test_intersection__parallel_exact_overlap_does_not_count() {
         assert!(
-            TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(10.0, 5.0)
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     point2(5.0, 5.0),
                     point2(10.0, 5.0),
                 )

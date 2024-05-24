@@ -10,6 +10,17 @@ use crate::utility::*;
 trait_alias_macro!(pub trait PointReqsForLine = PointReqsForDirectedLine);
 trait_alias_macro!(trait PointReqs = PointReqsForLine);
 
+macro_rules! line {
+    (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
+       line() 
+
+    }
+}
+
+pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Line<P> {
+    Line::from_two_unordered_points_on_line(p1.into(), p2.into())
+}
+
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
 pub struct Line<PointType: PointReqsForLine>(DirectedLine<PointType>);
@@ -153,16 +164,17 @@ pub trait LineOps<P: PointReqs>:
     fn point_is_approx_on_line(&self, point: P, tolerance: f32) -> bool {
         self.normal_distance_to_point(point) < tolerance
     }
-    fn normal_distance_to_point(&self, point: impl Into<P>) -> f32 {
+    fn normal_distance_to_point(&self, point: P) -> f32 {
         self.normal_vector_to_point(point).length()
     }
     fn normal_vector_to_point(&self, point: P) -> <P as CoordinateOps>::Floating {
+        let point = point.to_f32();
         point - self.closest_point_on_extended_line_to_point(point)
     }
     fn get_point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_point = point - p1; 
-        p2 + p1_to_point*-1
+        p2 - p1_to_point
     }
 
     fn same_side_of_line(&self, point_c: Floating<P>, point_d: Floating<P>) -> bool {
@@ -202,22 +214,22 @@ impl_operations_for_line_for_newtype!(Line<P: PointReqs>);
 
 pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized
 {
-    fn new_from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
-        Self::try_new_from_two_points_on_line(p1, p2).unwrap()
+    fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
+        Self::try_from_two_points_on_line(p1, p2).unwrap()
     }
     fn try_from_array_of_two_points_on_line(p: [P; 2]) -> Result<Self, String> {
-        Self::try_new_from_two_points_on_line(p[0], p[1])
+        Self::try_from_two_points_on_line(p[0], p[1])
     }
     fn easy_from_two_points_on_line(p1: impl Into<P>, p2: impl Into<P>) -> Self {
-        Self::new_from_two_unordered_points_on_line(p1.into(), p2.into())
+        Self::from_two_unordered_points_on_line(p1.into(), p2.into())
     }
-    fn try_new_from_two_points_on_line(p1: P, p2: P) -> Result<Self, String> {
+    fn try_from_two_points_on_line(p1: P, p2: P) -> Result<Self, String> {
         Self::try_from_two_points_allowing_snap_along_line(p1, p2)
     }
-    fn new_from_line(line: impl LineOps<P>) -> Self {
-        Self::try_new_from_line(line).unwrap()
+    fn from_line(line: impl LineOps<P>) -> Self {
+        Self::try_from_line(line).unwrap()
     }
-    fn try_new_from_line(line: impl LineOps<P>) -> Result<Self, String> {
+    fn try_from_line(line: impl LineOps<P>) -> Result<Self, String> {
         let p = line.two_different_arbitrary_points_on_line();
         Self::try_from_array_of_two_points_on_line(p)
     }
@@ -343,7 +355,7 @@ mod tests {
         let input_line =
             TwoDifferentWorldPoints::easy_from_two_points_on_line((-1.5, -1.0), (0.0, 0.0));
         let output_points = input_line.ordered_line_intersections_with_centered_unit_square();
-        let output_line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+        let output_line = TwoDifferentWorldPoints::from_two_unordered_points_on_line(
             output_points[0],
             output_points[1],
         );
@@ -400,7 +412,7 @@ mod tests {
     }
     #[test]
     fn test_same_side_of_line() {
-        let line = TwoDifferentPoints::<WorldPoint>::new_from_two_unordered_points_on_line(
+        let line = TwoDifferentPoints::<WorldPoint>::from_two_unordered_points_on_line(
             point2(1.0, 1.0),
             point2(2.0, 1.0),
         );
@@ -426,7 +438,7 @@ mod tests {
     #[test]
     fn test_horizontal_line_intersection_with_square() {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentPoints::from_two_unordered_points_on_line(
                 point2(0.5, 0.0),
                 point2(-1.5, 0.0),
             );
@@ -466,7 +478,7 @@ mod tests {
     #[test]
     fn test_vertical_line_intersection_with_square() {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_unordered_points_on_line(
+            TwoDifferentPoints::from_two_unordered_points_on_line(
                 point2(0.0, 0.5),
                 point2(0.0, -1.5),
             );
@@ -916,7 +928,7 @@ mod tests {
     fn test_point_on_opposite_side_but_same_distance__float_line() {
         let line_p1 = (3.0, 0.0).into();
         let line_p2 = (4.0, 2.0).into();
-        let line = default::FloatLine::new_from_two_unordered_points_on_line(line_p1, line_p2);
+        let line = default::FloatLine::from_two_unordered_points_on_line(line_p1, line_p2);
         let test_point = (4.0, 0.0).into(); 
         let result_point = line.get_point_same_distance_from_line_on_opposite_side(test_point);
         assert_about_eq!(line.normal_distance_to_point(result_point), line.normal_distance_to_point(test_point));

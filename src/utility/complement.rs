@@ -22,7 +22,8 @@ macro_rules! impl_complement_for_refinement {
         impl<P: $PointReqs> Complement for $type<P> {
             type Output = Self;
             fn complement(&self) -> Self::Output {
-                Into::<$RefinementBase>::into(self).complement().try_into().unwrap()
+                let base: $RefinementBase::<P> = (*self).into();
+                base.complement().try_into().unwrap()
             }
         }
     };

@@ -277,7 +277,7 @@ impl PortalGeometry {
                 let stepped_back_intersection_point =
                     naive_ray_endpoint(intersection_point, angle, -STEP_BACK_DISTANCE);
 
-                let new_line = TwoDifferentWorldPoints::new_from_two_unordered_points_on_line(
+                let new_line = TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     start,
                     stepped_back_intersection_point,
                 );
