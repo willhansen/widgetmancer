@@ -268,7 +268,7 @@ impl SquareOfTopDownPortals {
 //     }
 // }
 impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: RasterizedFieldOfView) -> Result<Self, Self::Error> {
         if value
@@ -279,7 +279,7 @@ impl TryFrom<RasterizedFieldOfView> for SquareOfTopDownPortals {
         {
             Ok(Self(value))
         } else {
-            Err(())
+            Err(format!("relative positions do not match"))
         }
     }
 }

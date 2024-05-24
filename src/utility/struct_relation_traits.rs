@@ -63,15 +63,18 @@ pub(crate) use impl_abstraction_skip_level;
 macro_rules! impl_try_from_skip_level {
     // TODO: better base indication syntax
     ($EndType:ident<P: $PointReqs:ident> --> $MidType:ident<P> --> $StartType:ident<P>) => {
-        impl<PointType: $PointReqs> TryFrom<$StartType<PointType>>
-            for $EndType<PointType>
+        impl<P: $PointReqs> TryFrom<$StartType<P>>
+            for $EndType<P>
         where
-            Self: TryFrom<$MidType<PointType>>,
-            $MidType<PointType>: TryFrom<$StartType<PointType>>,
+            Self: TryFrom<$MidType<P>>,
+            $MidType<P>: TryFrom<$StartType<P>>,
         {
             // TODO 
             type Error = String;
-            fn try_from(value: )
+            fn try_from(value: $StartType<P>) -> Result<$EndType<P>, Self::Error> {
+                let mid: $MidType<P> = value.try_into()?;
+                mid.try_into()
+            }
             
         }
     };
