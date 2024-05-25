@@ -143,27 +143,26 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
 }
 macro_rules! impl_constructors_for_two_different_points_for_abstraction {
     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> where Self: Abstraction<$BaseType::<P>>
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
+        where
+            Self: Abstraction<$BaseType<P>>,
         {
             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                Ok($BaseType::<P>::try_from_two_exact_points(p1,p2)?.into())
+                Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
             }
         }
-
-    }
+    };
 }
 pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
 
 macro_rules! impl_constructors_for_two_different_points_for_newtype {
-
     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
         impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-            Self::new($BaseType::<P>::try_from_two_exact_points(p1,p2).unwrap())
+                Self::new($BaseType::<P>::try_from_two_exact_points(p1, p2).unwrap())
             }
         }
-
-    }
+    };
 }
 pub(crate) use impl_constructors_for_two_different_points_for_newtype;
 
@@ -178,7 +177,6 @@ impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
 }
 // TODO: separate file and also int rays
 impl<P: FloatCoordinateOps> Ray<P> for TwoDifferentPoints<P> {
-
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
         P: FloatCoordinateOps,
@@ -205,23 +203,22 @@ macro_rules! impls_for_two_different_points {
         }
 
         impl<P: $point_trait> ConstructorsForDirectedLine<P> for $TheStruct<P> {
-        fn try_new_from_directed_line(
-        line: impl OperationsForDirectedLine<P>,
-        ) -> Result<Self, String>
-        where
-        Self: Sized,
-        {
-        let points: Vec<P> =
-        line.ordered_line_intersections_with_centered_unit_square();
-        if points.len() < 2 {
-        Err(format!(
-        "Wrong number of intersection points: {:?},",
-        points
-        ))
-        } else {
-        Self::try_new_from_points(points[0], points[1])
-        }
-        }
+            fn try_new_from_directed_line(
+                line: impl OperationsForDirectedLine<P>,
+            ) -> Result<Self, String>
+            where
+                Self: Sized,
+            {
+                let points: Vec<P> = line.ordered_line_intersections_with_centered_unit_square();
+                if points.len() < 2 {
+                    Err(format!(
+                        "Wrong number of intersection points: {:?},",
+                        points
+                    ))
+                } else {
+                    Self::try_new_from_points(points[0], points[1])
+                }
+            }
         }
 
         impl<P: $point_trait> LineOps<P> for $TheStruct<P> {
@@ -288,8 +285,7 @@ pub(crate) use impl_translate_for_two_points_with_restriction;
 // TODO: combine into one macro call
 impl_translate_for_two_points_with_restriction!(TwoDifferentPoints<P: PointReqs>);
 
-impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)>
-    for TwoDifferentPoints<P>
+impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for TwoDifferentPoints<P>
 where
     CanBePointType: Into<P>,
 {

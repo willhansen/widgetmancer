@@ -12,9 +12,8 @@ trait_alias_macro!(trait PointReqs = PointReqsForLine);
 
 macro_rules! line {
     (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
-       line() 
-
-    }
+        line()
+    };
 }
 
 pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Line<P> {
@@ -145,9 +144,7 @@ pub trait LineOps<P: PointReqs>:
         self.with_direction(self.parallel_directions()[1])
     }
 
-
-    fn reflect_point_over_line(&self, point: Floating<P>) -> Floating<P> 
-    {
+    fn reflect_point_over_line(&self, point: Floating<P>) -> Floating<P> {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         let p1_to_p: Floating<P> = point - p1.to_f32();
         let p1_to_p2: Floating<P> = (p2 - p1).to_f32();
@@ -173,7 +170,7 @@ pub trait LineOps<P: PointReqs>:
     }
     fn get_point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let p1_to_point = point - p1; 
+        let p1_to_point = point - p1;
         p2 - p1_to_point
     }
 
@@ -206,14 +203,13 @@ macro_rules! impl_operations_for_line_for_newtype {
                 self.0.two_different_arbitrary_points_on_line()
             }
         }
-    }
+    };
 }
 pub(crate) use impl_operations_for_line_for_newtype;
 
 impl_operations_for_line_for_newtype!(Line<P: PointReqs>);
 
-pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized
-{
+pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized {
     fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
         Self::try_from_two_points_on_line(p1, p2).unwrap()
     }
@@ -237,9 +233,8 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
 
 macro_rules! impl_constructors_for_line_for_newtype {
     ($type:ident<P: $traitparam:ident>, base=$BaseType:ident<P>) => {
-        impl<P: $traitparam> ConstructorsForLine<P> for $type<P> {
-        }
-    }
+        impl<P: $traitparam> ConstructorsForLine<P> for $type<P> {}
+    };
 }
 pub(crate) use impl_constructors_for_line_for_newtype;
 
@@ -248,15 +243,13 @@ impl_constructors_for_directed_line_for_newtype!(Line<P: PointReqs>, base= Direc
 
 impl_abstraction_for_newtype!(Line<P: PointReqs>, base=DirectedLine<P>);
 
-
 // TODO: maybe implement for `Abstraction<TwoDifferentPoints<P>>`?
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Line<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>
-        Ok(TwoDifferentPoints::<P>::try_from_two_exact_points(p1,p2).into())
+        Ok(TwoDifferentPoints::<P>::try_from_two_exact_points(p1, p2).into())
     }
 }
-
 
 pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,
@@ -929,9 +922,12 @@ mod tests {
         let line_p1 = (3.0, 0.0).into();
         let line_p2 = (4.0, 2.0).into();
         let line = default::FloatLine::from_two_unordered_points_on_line(line_p1, line_p2);
-        let test_point = (4.0, 0.0).into(); 
+        let test_point = (4.0, 0.0).into();
         let result_point = line.get_point_same_distance_from_line_on_opposite_side(test_point);
-        assert_about_eq!(line.normal_distance_to_point(result_point), line.normal_distance_to_point(test_point));
+        assert_about_eq!(
+            line.normal_distance_to_point(result_point),
+            line.normal_distance_to_point(test_point)
+        );
         assert_false!(line.same_side_of_line(test_point, result_point));
     }
 }
