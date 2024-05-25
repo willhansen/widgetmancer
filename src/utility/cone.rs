@@ -2,7 +2,7 @@ use crate::utility::*;
 use derive_getters::Getters;
 use derive_more::Constructor;
 
-pub type ConeFromSquare = ThingAtSquare<Cone, WorldSquare>;
+pub type ConeFromSquare = ThingRelToSquare<Cone, WorldSquare>;
 
 // TODO: There's got to be a better way to get convenient names for general fields
 impl ConeFromSquare {

@@ -19,6 +19,7 @@ impl_translate_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>
 );
 
+
 pub trait ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>: Sized {
     fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
         line: L,
@@ -49,7 +50,7 @@ impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
 }
 
 pub trait OperationsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> {
-    fn which_square(&self) -> P::OnGrid;
+    fn which_square(&self) -> OnGrid<P>;
     fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>;
 }
 

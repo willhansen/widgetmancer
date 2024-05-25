@@ -7,6 +7,16 @@ trait_alias_macro!(trait PointReqs =PointReqsForDirectedLineCuttingGridSquare);
 #[derive(Debug, PartialEq, Clone, Copy, Constructor)]
 pub struct DirectedLineCuttingGridSquare<P: PointReqs>(TwoPointsOnDifferentFacesOfGridSquare<P>);
 
+impl<P: PointReqs> DirectedLineCuttingGridSquare<P> {
+pub fn which_square(&self) -> OnGrid<P> {
+        self.0.which_square()
+    }
+}
+
+// pub trait OperationsForDirectedLineCuttingGridSquare<P: PointReqs> {
+// }
+
+
 impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl_quarter_turn_rotatable_for_newtype!(

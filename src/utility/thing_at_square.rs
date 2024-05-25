@@ -6,12 +6,12 @@ trait_alias_macro!(pub trait PointReqsForThingAtSquare = IntCoordinateOps);
 trait_alias_macro!(trait PointReqs = PointReqsForThingAtSquare);
 
 #[derive(Clone, Copy, Debug, Constructor, Getters)]
-pub struct ThingAtSquare<T, P: PointReqs> {
+pub struct ThingRelToSquare<T, P: PointReqs> {
     thing: T,
     square: P,
 }
 
-impl<T, P: PointReqs> ThingAtSquare<T, P> {
+impl<T, P: PointReqs> ThingRelToSquare<T, P> {
     pub fn revolved(&self, angle: QuarterTurns) -> Self
     where
         T: QuarterTurnRotatable,

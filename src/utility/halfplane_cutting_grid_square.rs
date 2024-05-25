@@ -5,6 +5,8 @@ trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct HalfPlaneCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
+// TODO
+// pub type HalfPlaneCuttingGridSquare<P: PointReqs> = RelativeToSquare<OnGrid<P>, HalfPlaneCuttingCenteredUnitSquare<P>>;
 
 
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
@@ -56,6 +58,6 @@ impl<P: PointReqs> HalfPlaneCuttingGridSquareOps<P> for HalfPlaneCuttingGridSqua
     }
 
     fn to_local(&self) -> HalfPlaneCuttingCenteredUnitSquare<P> {
-        self.dividing_line().points_relative_to_the_square()
+        self.dividing_line().to_local()
     }
 }
