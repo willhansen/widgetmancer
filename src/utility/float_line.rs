@@ -7,10 +7,6 @@ trait_alias_macro!(trait PointReqs = PointReqsForFloatLine);
 pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;
 
 pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
-    #[deprecated(note = "use Line::closest_point_to_point instead")]
-    fn closest_point_on_extended_line_to_point(&self, point: impl Into<P>) -> P {
-        self.closest_point_on_line_to_point(point)
-    }
     fn point_is_on_or_normal_to_line_segment(&self, point: P) -> bool {
         let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
@@ -26,7 +22,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
         point_is_on_end_side_of_start_point && point_is_on_start_side_of_end_point
     }
 
-
     fn angle_with_positive_x_axis(&self) -> Angle<f32> {
         let [angle_a, angle_b] = self.parallel_directions();
         if angle_a.radians.cos() < 0.0 {
@@ -35,7 +30,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
             angle_a
         }
     }
-
 
     fn unordered_line_intersections_with_centered_unit_square_with_tolerance(
         &self,
@@ -167,26 +161,6 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
         let final_x = (a * (x3 - x4) - (x1 - x2) * b) / denominator;
         let final_y = (a * (y3 - y4) - (y1 - y2) * b) / denominator;
         Some((final_x, final_y).into())
-    }
-    fn closest_point_on_line_to_point(&self, point: impl Into<P>) -> P {
-        let point = point.into();
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let p1_to_point = point - p1;
-        let p1_to_p2 = p2 - p1;
-        let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
-        p1 + parallel_part_of_p1_to_point
-    }
-    fn depth_in_square(&self, square: <P as CoordinateOps>::OnGrid) -> f32 {
-        let normal_to_line: FAngle = self.perpendicular_directions()[0];
-
-        let line_position_on_axis = self
-            .arbitrary_point_on_shape()
-            .position_on_axis(normal_to_line);
-
-        let square_projected_onto_axis: ClosedInterval<f32> =
-            square.projected_onto_axis(normal_to_line);
-
-        square_projected_onto_axis.depth_of(line_position_on_axis)
     }
 }
 

@@ -8,7 +8,6 @@ pub struct HalfPlaneCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquar
 // TODO
 // pub type HalfPlaneCuttingGridSquare<P: PointReqs> = RelativeToSquare<OnGrid<P>, HalfPlaneCuttingCenteredUnitSquare<P>>;
 
-
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
     P: PointReqs,

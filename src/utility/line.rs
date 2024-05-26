@@ -166,7 +166,7 @@ pub trait LineOps<P: PointReqs>:
     }
     fn normal_vector_to_point(&self, point: P) -> <P as CoordinateOps>::Floating {
         let point = point.to_f32();
-        point - self.closest_point_on_extended_line_to_point(point)
+        point - self.closest_point_on_line_to_point(point)
     }
     fn get_point_same_distance_from_line_on_opposite_side(&self, point: P) -> P {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
@@ -190,6 +190,26 @@ pub trait LineOps<P: PointReqs>:
 
         three_points_are_clockwise(point_a, point_b, point_c.into())
             == three_points_are_clockwise(point_a, point_b, point_d.into())
+    }
+    fn closest_point_on_line_to_point(&self, point: impl Into<P>) -> Floating<P> {
+        let point = point.into();
+        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let p1_to_point = point - p1;
+        let p1_to_p2 = p2 - p1;
+        let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
+        p1 + parallel_part_of_p1_to_point
+    }
+    fn depth_in_square(&self, square: OnGrid<P>) -> f32 {
+        let normal_to_line: FAngle = self.perpendicular_directions()[0];
+
+        let line_position_on_axis = self
+            .arbitrary_point_on_shape()
+            .position_on_axis(normal_to_line);
+
+        let square_projected_onto_axis: ClosedInterval<f32> =
+            square.projected_onto_axis(normal_to_line);
+
+        square_projected_onto_axis.depth_of(line_position_on_axis)
     }
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);

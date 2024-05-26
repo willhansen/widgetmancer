@@ -3,14 +3,17 @@ use crate::utility::*;
 trait_alias_macro!(pub trait PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare = FloatCoordinateOps);
 trait_alias_macro!(trait PointReqs =PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> {
-    points_on_the_square: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>,
-    the_square: P::OnGrid,
+pub type TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> =
+    ThingRelToSquare<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, OnGrid<P>>;
+
+impl<P: PointReqs> TwoPointsOnDifferentFacesOfGridSquare<P> {
+    pub fn points_on_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+        *self.thing()
+    }
 }
 impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
     fn point_by_index(&self, point_index: usize) -> P {
-        self.points_on_the_square.point_by_index(point_index) + self.square_center()
+        self.points_on_the_square().point_by_index(point_index) + self.square_center()
     }
 }
 
@@ -18,7 +21,6 @@ impls_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare<P: PointRe
 impl_translate_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>
 );
-
 
 pub trait ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>: Sized {
     fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
@@ -56,7 +58,7 @@ pub trait OperationsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> {
 
 impl<P: PointReqs> TwoPointsOnDifferentFacesOfGridSquare<P> {
     pub fn the_square(&self) -> P::OnGrid {
-        self.the_square
+        self.square()
     }
 
     pub fn square_center(&self) -> P {
@@ -84,22 +86,23 @@ impl<P: PointReqs> OperationsForTwoPointsOnDifferentFacesOfGridSquare<P>
         self.the_square()
     }
     fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
-        self.as_local()
+        *self.to_local()
     }
 }
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P>
+    for TwoPointsOnDifferentFacesOfGridSquare<P>
+{
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();
         let centered_p1 = p1 - square_center;
         let centered_p2 = p2 - square_center;
-        Ok(Self {
-            points_on_the_square:
-                TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_new_from_points(
-                    centered_p1,
-                    centered_p2,
-                )?,
-            the_square: square_center.to_i32(),
-        })
+        Ok(Self::new(
+            TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_new_from_points(
+                centered_p1,
+                centered_p2,
+            )?,
+            square_center.to_i32(),
+        ))
     }
     fn try_from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();

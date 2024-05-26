@@ -3,10 +3,19 @@ use crate::utility::*;
 trait_alias_macro!(pub trait PointReqsForLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFaces);
 trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingGridSquare);
 
-#[derive(PartialEq, Debug, Clone, Copy, Constructor)]
-pub struct LineCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
+pub type LineCuttingGridSquare<P: PointReqs> =
+    ThingRelToSquare<LineCuttingCenteredUnitSquare<P>, OnGrid<P>>;
 
-impl_abstraction_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+impl_abstraction_for_wrapped_thing!(LineCuttingCenteredUnitSquare<P: PointReqs>, abstraction_base= LineCuttingGridSquare<P>);
+
+// TODO: macro for impl_parallel_abstraction_connected_by_wrapper
+impl<P: PointReqs> Abstraction<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {}
+impl<P: PointReqs> From<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {
+    fn from(value: DirectedLineCuttingGridSquare<P>) -> Self {
+        Self::new((*value.thing()).into(), value.square())
+    }
+}
+
 impl_abstraction_skip_level!(LineCuttingGridSquare<P: PointReqs> --> DirectedLineCuttingGridSquare<P> --> TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>

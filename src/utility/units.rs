@@ -220,7 +220,7 @@ pub fn world_half_plane_to_local_square_half_plane(
 pub fn halfplane_cutting_world_square_to_halfplane_local_square(
     world_version: HalfPlaneCuttingWorldSquare,
 ) -> HalfPlaneCuttingLocalSquare {
-    let line = world_version.dividing_line().as_local();
+    let line = *world_version.dividing_line().to_local();
     let casted_line: LineCuttingLocalSquare = line.cast_unit();
     HalfPlaneCuttingLocalSquare::from_border_with_inside_on_right(casted_line)
 }
@@ -280,9 +280,9 @@ pub fn is_world_character_square_left_square_of_world_square(
 }
 
 // TODO: this should be more concise
-pub fn world_line(p1: WorldPoint ,p2: WorldPoint) -> WorldLine {
-    line(p1,p2)
-} 
+pub fn world_line(p1: WorldPoint, p2: WorldPoint) -> WorldLine {
+    line(p1, p2)
+}
 
 #[cfg(test)]
 mod tests {

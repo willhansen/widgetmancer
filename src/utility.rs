@@ -75,7 +75,7 @@ pub_mod_and_use!(
     round_robin_iterator,
     sign,
     size_2d,
-    thing_at_square,
+    thing_relative_to_square,
     to_and_from_array,
     trait_alias_macro,
     translate,
