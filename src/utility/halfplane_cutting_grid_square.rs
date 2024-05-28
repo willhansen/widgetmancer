@@ -3,10 +3,8 @@ use crate::utility::*;
 trait_alias_macro!(pub trait PointReqsForHalfPlaneCuttingGridSquare = PointReqsForDirectedLineCuttingGridSquare);
 trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlaneCuttingGridSquare<P: PointReqs>(DirectedLineCuttingGridSquare<P>);
-// TODO
-// pub type HalfPlaneCuttingGridSquare<P: PointReqs> = RelativeToSquare<OnGrid<P>, HalfPlaneCuttingCenteredUnitSquare<P>>;
+pub type HalfPlaneCuttingGridSquare<P: PointReqs> =
+    ThingRelToSquare<HalfPlaneCuttingCenteredUnitSquare<P>, OnGrid<P>>;
 
 impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
@@ -40,9 +38,6 @@ impl_constructors_for_half_plane_for_refinement!(HalfPlaneCuttingGridSquare<P: P
 
 pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<P> {
     // type PointType: FloatCoordinate;
-    // fn which_square(&self) -> <P as CoordinateOps>::OnGrid; // TODO: delete
-    fn which_square(&self) -> P::OnGrid;
-    fn to_local(&self) -> HalfPlaneCuttingCenteredUnitSquare<P>;
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
         // TODO: tidy this up when halfplane is a trait
@@ -51,12 +46,4 @@ pub trait HalfPlaneCuttingGridSquareOps<P: PointReqs>: HalfPlaneOps<P> {
     }
 }
 
-impl<P: PointReqs> HalfPlaneCuttingGridSquareOps<P> for HalfPlaneCuttingGridSquare<P> {
-    fn which_square(&self) -> P::OnGrid {
-        self.dividing_line().which_square()
-    }
-
-    fn to_local(&self) -> HalfPlaneCuttingCenteredUnitSquare<P> {
-        self.dividing_line().to_local()
-    }
-}
+impl<P: PointReqs> HalfPlaneCuttingGridSquareOps<P> for HalfPlaneCuttingGridSquare<P> {}

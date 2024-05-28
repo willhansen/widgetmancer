@@ -5,10 +5,12 @@ trait_alias_macro!(trait PointReqs = PointReqsForUnboundConvexPolygon);
 
 /// A polygon without the requirement that the shape be closed
 // TODO: enforce side order and non-redundancy on creation
-//      - sides should be going ccw 
+//      - sides should be going ccw
 //      - some sides may actually not affect the resulting shape
 #[derive(Debug, PartialEq, Clone)]
-pub struct UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>(Vec<HalfPlaneCuttingCenteredUnitSquare<P>>);
+pub struct UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>(
+    Vec<HalfPlaneCuttingCenteredUnitSquare<P>>,
+);
 
 impl<P: PointReqs> UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
     pub fn new(sides: Vec<P>) -> Self {
@@ -19,7 +21,7 @@ impl<P: PointReqs> UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl_quarter_turn_rotatable_for_newtype!(UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>);
+impl_quarter_turn_rotatable_for_delegate!(UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
 
 // TODO: define with macro
 impl<P: PointReqs> Complement for UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
@@ -30,8 +32,9 @@ impl<P: PointReqs> Complement for UnboundConvexPolygonCuttingCenteredUnitSquare<
     }
 }
 
-pub trait OpsForUnboundConvexPolygon<P: PointReqs> {
-}
+pub trait OpsForUnboundConvexPolygon<P: PointReqs> {}
 
-impl<P: PointReqs> OpsForUnboundConvexPolygon<P> for UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> OpsForUnboundConvexPolygon<P>
+    for UnboundConvexPolygonCuttingCenteredUnitSquare<P>
+{
 }

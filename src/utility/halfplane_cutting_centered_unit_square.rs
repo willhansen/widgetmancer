@@ -15,7 +15,7 @@ impl<P: PointReqs> HalfPlaneCuttingCenteredUnitSquare<P> {
 }
 
 impl_complement_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, refinement_base= HalfPlane<P>);
-impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
+impl_quarter_turn_rotatable_for_delegate!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
 
 impl_half_plane_ops_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
@@ -25,8 +25,9 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<
     type Error = String;
 
     fn try_from(value: HalfPlane<P>) -> Result<Self, Self::Error> {
-        let unrefined_border  = value.border_line();
-        let refined_border: DirectedLineCuttingCenteredUnitSquare<P> = unrefined_border.try_into()?;
+        let unrefined_border = value.border_line();
+        let refined_border: DirectedLineCuttingCenteredUnitSquare<P> =
+            unrefined_border.try_into()?;
         Ok(Self::from_border_with_inside_on_right(refined_border))
     }
 }
@@ -42,7 +43,6 @@ impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSqua
         self.0.valid()
     }
 }
-
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.
 pub trait ConstructorsForHalfPlaneCuttingCenteredUnitSquare<P: PointReqs>:

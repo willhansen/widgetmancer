@@ -12,7 +12,6 @@ impl<P: PointReqs> DirectedLine<P> {
     }
 }
 
-
 impl_abstraction_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl_translate_for_newtype!(DirectedLine<P: PointReqs>);
@@ -47,23 +46,22 @@ pub trait OperationsForDirectedLine<P: PointReqs>:
     }
 }
 
-
-// TODO: abstraction instead of newtype
-//macro_rules! impl_directed_line_ops_for_abstraction 
-macro_rules! impl_operations_for_directed_line_for_newtype {
-    ($type:ident<P: $traitparam:ident>) => {
+// TODO: abstraction instead of newtype (why?)
+//macro_rules! impl_directed_line_ops_for_abstraction
+// NOTE: The `$($accessor)+` thing is to generalize over a member (like `self.0`) and a getter (like `self.thing()`)
+macro_rules! impl_operations_for_directed_line_for_delegate {
+    ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {
         impl<P: $traitparam> OperationsForDirectedLine<P> for $type<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
-                self.0.two_points_on_line_in_order()
+                self.$($accessor)+.two_points_on_line_in_order()
             }
         }
-    }
+    };
 }
-pub(crate) use impl_operations_for_directed_line_for_newtype;
+pub(crate) use impl_operations_for_directed_line_for_delegate;
 
-
-impl_operations_for_line_for_newtype!(DirectedLine<P: PointReqs>);
-impl_operations_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>);
+impl_operations_for_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
+impl_operations_for_directed_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
 
 impl_constructors_for_line_for_newtype!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
 
@@ -127,23 +125,22 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
 impl_constructors_for_two_different_points_for_abstraction!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
 
 macro_rules! impl_constructors_for_directed_line_for_newtype {
-
     ($type:ident<P: $traitparam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {
-            fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
+            fn try_new_from_directed_line(
+                line: impl OperationsForDirectedLine<P>,
+            ) -> Result<Self, String>
             where
                 Self: Sized,
             {
                 Ok($BaseType::<P>::try_new_from_directed_line(line)?.into())
             }
         }
-    }
+    };
 }
 pub(crate) use impl_constructors_for_directed_line_for_newtype;
 
-
 impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
-
 
 impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

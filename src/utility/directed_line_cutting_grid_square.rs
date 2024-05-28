@@ -12,8 +12,8 @@ pub type DirectedLineCuttingGridSquare<P: PointReqs> =
 
 impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
-impl_quarter_turn_rotatable_for_newtype!(
-    DirectedLineCuttingGridSquare<P: PointReqs>
+impl_quarter_turn_rotatable_for_delegate!(
+    DirectedLineCuttingGridSquare<P: PointReqs>, accessor=thing()
 );
 impl_reversible_for_newtype!(
     DirectedLineCuttingGridSquare<P: PointReqs>
@@ -24,10 +24,10 @@ impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingG
 // TODO Switch to TryTranslate and avoid panic?
 impl_translate_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
 
-impl_operations_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_operations_for_line_for_delegate!(DirectedLineCuttingGridSquare<P: PointReqs>, accessor=thing());
 impl_constructors_for_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
-impl_operations_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>);
+impl_operations_for_directed_line_for_delegate!(DirectedLineCuttingGridSquare<P: PointReqs>, accessor=thing());
 impl_constructors_for_directed_line_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl<P: PointReqs> Into<DirectedLine<P>> for DirectedLineCuttingGridSquare<P> {

@@ -11,12 +11,10 @@ pub trait Refinement<Base>: TryFrom<Base> + Into<Base> {
 // For when you want to automatically propagate a refinement relation down a pair of newtypes
 // TODO: abstraction rather than newtype?
 
-
 /// Indicates that the implementing type has less information visible than the base type.
 /// - Can be created with same constructors as base (TODO: enforce)
 /// - Operations on this type can be applied to the base type as well (TODO: enforce)
-pub trait Abstraction<Base>: From<Base> {
-}
+pub trait Abstraction<Base>: From<Base> {}
 
 macro_rules! impl_abstraction_for_newtype {
     ($abstract_type:ident<P: $PointReqs:ident>, base= $BaseType:ident<P>) => {
@@ -40,8 +38,7 @@ pub(crate) use impl_abstraction_for_newtype;
 macro_rules! impl_abstraction_skip_level {
     // TODO: better base indication syntax
     ($abstract_type:ident<P: $PointReqs:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
-        impl<PointType: $PointReqs> Abstraction<$BaserType<PointType>>
-            for $abstract_type<PointType>
+        impl<PointType: $PointReqs> Abstraction<$BaserType<PointType>> for $abstract_type<PointType>
         where
             Self: Abstraction<$BaseType<PointType>>,
             $BaseType<PointType>: Abstraction<$BaserType<PointType>>,
@@ -60,28 +57,24 @@ macro_rules! impl_abstraction_skip_level {
 }
 pub(crate) use impl_abstraction_skip_level;
 
-macro_rules! impl_try_from_skip_level {
+macro_rules! impl_skip_level_try_from {
     // TODO: better base indication syntax
     ($EndType:ident<P: $PointReqs:ident> --> $MidType:ident<P> --> $StartType:ident<P>) => {
-        impl<P: $PointReqs> TryFrom<$StartType<P>>
-            for $EndType<P>
+        impl<P: $PointReqs> TryFrom<$StartType<P>> for $EndType<P>
         where
             Self: TryFrom<$MidType<P>>,
             $MidType<P>: TryFrom<$StartType<P>>,
         {
-            // TODO 
+            // TODO
             type Error = String;
             fn try_from(value: $StartType<P>) -> Result<$EndType<P>, Self::Error> {
                 let mid: $MidType<P> = value.try_into()?;
                 mid.try_into()
             }
-            
         }
     };
 }
-pub(crate) use impl_try_from_skip_level;
-
-
+pub(crate) use impl_skip_level_try_from;
 
 // The type is being used in a new way, and all known semantics are discarded
 // TODO: This kind of feels like the default use of a newtype, and maybe does not need a dedicated trait...  Only use I can think of is to block implementation of the other two newtype traits

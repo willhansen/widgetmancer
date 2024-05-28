@@ -42,7 +42,7 @@ pub trait OpsForLineCuttingGridSquare<P: PointReqs> {}
 
 impl<P: PointReqs> OpsForLineCuttingGridSquare<P> for LineCuttingGridSquare<P> {}
 
-impl_operations_for_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>);
+impl_operations_for_line_for_delegate!(LineCuttingGridSquare<P: PointReqs>, accessor=thing());
 impl_constructors_for_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 impl_constructors_for_directed_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
@@ -51,6 +51,6 @@ impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P:
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);
-impl_quarter_turn_rotatable_for_newtype!(
-    LineCuttingGridSquare<T: PointReqs>
+impl_quarter_turn_rotatable_for_delegate!(
+    LineCuttingGridSquare<T: PointReqs>, accessor=thing()
 );

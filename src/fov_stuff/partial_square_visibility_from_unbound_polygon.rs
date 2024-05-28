@@ -9,7 +9,7 @@ pub struct PartialSquareVisibilityFromUnboundPolygon(
 
 impl PartialSquareVisibilityFromUnboundPolygon {}
 
-impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
+impl_quarter_turn_rotatable_for_delegate!(PartialSquareVisibilityFromUnboundPolygon, accessor = 0);
 impl_complement_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
 
 impl PartialSquareVisibilityOps for PartialSquareVisibilityFromUnboundPolygon {

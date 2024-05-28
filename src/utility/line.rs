@@ -164,7 +164,7 @@ pub trait LineOps<P: PointReqs>:
     fn normal_distance_to_point(&self, point: P) -> f32 {
         self.normal_vector_to_point(point).length()
     }
-    fn normal_vector_to_point(&self, point: P) -> <P as CoordinateOps>::Floating {
+    fn normal_vector_to_point(&self, point: P) -> Floating<P> {
         let point = point.to_f32();
         point - self.closest_point_on_line_to_point(point)
     }
@@ -176,8 +176,8 @@ pub trait LineOps<P: PointReqs>:
 
     fn same_side_of_line(&self, point_c: Floating<P>, point_d: Floating<P>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        let point_a = p1;
-        let point_b = p2;
+        let point_a = p1.to_f32();
+        let point_b = p2.to_f32();
         let c_on_line = self.point_is_on_line(point_c);
         let d_on_line = self.point_is_on_line(point_d);
 
@@ -191,9 +191,9 @@ pub trait LineOps<P: PointReqs>:
         three_points_are_clockwise(point_a, point_b, point_c.into())
             == three_points_are_clockwise(point_a, point_b, point_d.into())
     }
-    fn closest_point_on_line_to_point(&self, point: impl Into<P>) -> Floating<P> {
+    fn closest_point_on_line_to_point(&self, point: Floating<P>) -> Floating<P> {
         let point = point.into();
-        let [p1, p2] = self.two_different_arbitrary_points_on_line();
+        let [p1, p2] = self.two_different_arbitrary_points_on_line().map(P::to_f32);
         let p1_to_point = point - p1;
         let p1_to_p2 = p2 - p1;
         let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
@@ -214,20 +214,20 @@ pub trait LineOps<P: PointReqs>:
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);
 
-impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
+impl_quarter_turn_rotatable_for_delegate!(Line<P: PointReqs>, accessor=0);
 
-macro_rules! impl_operations_for_line_for_newtype {
-    ($type:ident<P: $traitparam:ident>) => {
+macro_rules! impl_operations_for_line_for_delegate {
+    ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {
         impl<P: $traitparam> LineOps<P> for $type<P> {
             fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-                self.0.two_different_arbitrary_points_on_line()
+                self.$($accessor)+.two_different_arbitrary_points_on_line()
             }
         }
     };
 }
-pub(crate) use impl_operations_for_line_for_newtype;
+pub(crate) use impl_operations_for_line_for_delegate;
 
-impl_operations_for_line_for_newtype!(Line<P: PointReqs>);
+impl_operations_for_line_for_delegate!(Line<P: PointReqs>, accessor=0);
 
 pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized {
     fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
