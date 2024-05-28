@@ -79,7 +79,7 @@ pub_mod_and_use!(
     to_and_from_array,
     trait_alias_macro,
     translate,
-    two_points,
+    two_different_points,
     two_points_on_different_faces_of_centered_unit_square,
     two_points_on_different_faces_of_grid_square,
     unbound_convex_polygon,

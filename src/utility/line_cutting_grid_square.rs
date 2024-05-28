@@ -51,6 +51,3 @@ impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P:
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);
-impl_quarter_turn_rotatable_for_delegate!(
-    LineCuttingGridSquare<T: PointReqs>, accessor=thing()
-);

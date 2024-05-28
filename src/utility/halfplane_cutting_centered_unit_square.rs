@@ -15,7 +15,7 @@ impl<P: PointReqs> HalfPlaneCuttingCenteredUnitSquare<P> {
 }
 
 impl_complement_for_refinement!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, refinement_base= HalfPlane<P>);
-impl_quarter_turn_rotatable_for_delegate!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
+impl_quarter_turn_rotatable_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>);
 
 impl_half_plane_ops_for_newtype!(HalfPlaneCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 

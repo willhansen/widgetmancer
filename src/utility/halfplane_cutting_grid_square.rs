@@ -29,8 +29,6 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P> {
     }
 }
 
-impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlaneCuttingGridSquare<P: PointReqs>);
-
 impl_complement_for_refinement!(HalfPlaneCuttingGridSquare<P: PointReqs>, refinement_base= HalfPlane<P>);
 
 impl_half_plane_ops_for_newtype!(HalfPlaneCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);

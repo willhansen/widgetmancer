@@ -43,14 +43,14 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
         )
     }
     fn new_with_inside_down(y: P::_DataType) -> Self {
-        Self::from_point_on_border_and_vector_pointing_inside(
-            P::right() * y,
-            P::down(),
-        )
+        Self::from_point_on_border_and_vector_pointing_inside(P::right() * y, P::down())
     }
     fn new_from_border_line_with_origin_outside(line: impl LineOps<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
-        Self::from_line_and_point_on_half_plane(line, line.get_point_same_distance_from_line_on_opposite_side(P::zero()))
+        Self::from_line_and_point_on_half_plane(
+            line,
+            line.get_point_same_distance_from_line_on_opposite_side(P::zero()),
+        )
     }
     fn new_from_normal_vector_going_from_origin_to_inside_edge_of_border(
         vector_to_outside: P,
@@ -94,7 +94,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
 impl<P: PointReqs> ConstructorsForHalfPlane<P> for HalfPlane<P> {
     type BorderType = DirectedLine<P>;
     fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
-    where {
+where {
         Self::new(border)
     }
 }
@@ -104,20 +104,22 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
         impl<P: $TraitParam> ConstructorsForHalfPlane<P> for $Type<P> {
             type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
-            // where 
-            //     // is refinement
-            //     Self: Refinement<$BaseType<P>>,
-            //     // refinement base is constructor
-            //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
-            //     // border type is refinement of the refinement base's border
-            //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
+        // where
+                    //     // is refinement
+                    //     Self: Refinement<$BaseType<P>>,
+                    //     // refinement base is constructor
+                    //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
+                    //     // border type is refinement of the refinement base's border
+                    //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
             {
-                let border_of_base:  <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType  = border.into();
-                let refinement_base: $BaseType<P> = $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
+                let border_of_base: <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType =
+                    border.into();
+                let refinement_base: $BaseType<P> =
+                    $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
                 refinement_base.try_into().unwrap()
             }
         }
-    }
+    };
 }
 pub(crate) use impl_constructors_for_half_plane_for_refinement;
 
@@ -151,7 +153,9 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
 // TODO: Switch to associated point type
 type BorderTypeOf<T, P> = <T as HalfPlaneOps<P>>::BorderType;
 
-pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<Output=Self> + QuarterTurnRotatable + Sized {
+pub trait HalfPlaneOps<P: PointReqs>:
+    ConstructorsForHalfPlane<P> + Complement<Output = Self> + QuarterTurnRotatable + Sized
+{
     type BorderType: OperationsForDirectedLine<P>;
 
     fn border_line(&self) -> BorderTypeOf<Self, P>;
@@ -174,9 +178,10 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
     fn about_equal(&self, other: Self, tolerance: f32) -> bool {
         self.dividing_line()
             .approx_on_same_line(other.dividing_line(), tolerance)
-            && self
-                .dividing_line()
-                .same_side_of_line(self.point_on_half_plane().to_f32(), other.point_on_half_plane().to_f32())
+            && self.dividing_line().same_side_of_line(
+                self.point_on_half_plane().to_f32(),
+                other.point_on_half_plane().to_f32(),
+            )
     }
     fn about_complementary(&self, other: Self, tolerance: f32) -> bool {
         self.about_equal(other.complement(), tolerance)
@@ -252,10 +257,7 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
     // TODO: convert into shape-agnostic trait
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    fn with_transformed_points<F, POut>(
-        &self,
-        point_transform_function: F,
-    ) -> HalfPlane<POut>
+    fn with_transformed_points<F, POut>(&self, point_transform_function: F) -> HalfPlane<POut>
     where
         POut: PointReqs, // + FloatCoordinateOps,
         F: Fn(P) -> POut,
@@ -267,9 +269,7 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
         let transformed_line: DirectedLine<POut> =
             DirectedLine::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<POut>::from_border_with_inside_on_right(
-            transformed_line,
-        )
+        HalfPlane::<POut>::from_border_with_inside_on_right(transformed_line)
     }
     fn depth_of_point_in_half_plane(&self, point: Floating<P>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
@@ -385,7 +385,6 @@ pub trait HalfPlaneOps<P: PointReqs>: ConstructorsForHalfPlane<P> + Complement<O
                 .map(|p| self.covers_point_with_tolerance(p, tolerance)),
         )
     }
-
 }
 
 impl_half_plane_ops_for_newtype!(HalfPlane<P: PointReqs>, base= DirectedLine<P>);
@@ -398,7 +397,7 @@ macro_rules! impl_half_plane_ops_for_newtype {
                 self.0
             }
         }
-    }
+    };
 }
 pub(crate) use impl_half_plane_ops_for_newtype;
 use num::Float;
@@ -823,7 +822,9 @@ mod tests {
     fn test_halfplane_overlap_inside_unit_square__partial__exact__one_fully_covers__one_just_touches_corner(
     ) {
         let just_fully_covering: HalfPlane<_> =
-            default::HalfPlane::new_from_border_line_with_origin_inside( DirectedLine::new_horizontal(0.5),);
+            default::HalfPlane::new_from_border_line_with_origin_inside(
+                DirectedLine::new_horizontal(0.5),
+            );
         let just_touching_corner: HalfPlane<_> =
             default::HalfPlane::new_from_border_line_with_origin_outside(
                 DirectedLine::easy_from_two_points_on_line((0.0, 1.0), (0.5, 0.5)),

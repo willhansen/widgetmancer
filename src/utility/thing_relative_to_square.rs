@@ -5,7 +5,7 @@ use derive_more::Constructor;
 trait_alias_macro!(pub trait PointReqsForThingAtSquare = IntCoordinateOps);
 trait_alias_macro!(trait PointReqs = PointReqsForThingAtSquare);
 
-#[derive(Clone, Copy, Debug, Constructor, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Constructor, PartialEq, Eq, Hash)]
 pub struct ThingRelToSquare<T, P: PointReqs> {
     thing: T,
     square: P,
@@ -50,3 +50,24 @@ macro_rules! impl_abstraction_for_wrapped_thing {
     };
 }
 pub(crate) use impl_abstraction_for_wrapped_thing;
+
+impl<T, P> QuarterTurnRotatable for ThingRelToSquare<T, P>
+where
+    T: QuarterTurnRotatable,
+    P: QuarterTurnRotatable,
+{
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        Self::new(
+            self.thing.quarter_rotated_ccw(quarter_turns_ccw),
+            self.square.quarter_rotated_ccw(quarter_turns_ccw),
+        )
+    }
+}
+impl<T, P> Reversible for ThingRelToSquare<T, P>
+where
+    T: Reversible,
+{
+    fn reversed(&self) -> Self {
+        Self::new(self.thing.reversed(), self.square)
+    }
+}

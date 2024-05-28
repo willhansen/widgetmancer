@@ -13,9 +13,8 @@ where
 
 impl_abstraction_for_newtype!(DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
-impl_quarter_turn_rotatable_for_delegate!(
-    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0
-);
+impl_quarter_turn_rotatable_for_newtype!(
+    DirectedLineCuttingCenteredUnitSquare<P: PointReqs>);
 impl_reversible_for_newtype!(
     DirectedLineCuttingCenteredUnitSquare<P: PointReqs>
 );

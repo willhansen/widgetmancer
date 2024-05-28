@@ -214,7 +214,7 @@ pub trait LineOps<P: PointReqs>:
 }
 impl_translate_for_newtype!(Line<P: PointReqs>);
 
-impl_quarter_turn_rotatable_for_delegate!(Line<P: PointReqs>, accessor=0);
+impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
 macro_rules! impl_operations_for_line_for_delegate {
     ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {

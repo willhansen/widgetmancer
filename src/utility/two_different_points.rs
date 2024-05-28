@@ -27,21 +27,21 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
 //     }
 // }
 
-// TODO: Switch from template to associated point type
+// TODO: This is just Refinement<TwoDifferentPoints>
 pub trait TwoPointsWithRestriction<P: PointReqs>:
     Sized + Copy + PartialEq + ConstructorsForTwoDifferentPoints<P>
 {
-    #[deprecated(note = "use TryFromTwoPoints::try_from_two_points instead")]
-    fn try_new_from_points(p1: P, p2: P) -> Result<Self, String> {
-        Self::try_from_two_exact_points(p1, p2)
-    }
+    // TODO: delete.  This case is covered by refinements having access to base operations
     fn point_by_index(&self, point_index: usize) -> P;
+    // TODO: delete.  This case is covered by refinements having access to base constructors
     fn new(p1: P, p2: P) -> Self {
-        Self::try_new_from_points(p1, p2).unwrap()
+        Self::try_from_two_exact_points(p1, p2).unwrap()
     }
+    // TODO: delete.  This case is covered by refinements having access to base constructors
     fn new_from_points(p1: P, p2: P) -> Self {
         Self::new(p1, p2)
     }
+    // TODO: delete.  This case is covered by refinements having access to base constructors
     fn try_new_from_point_and_radial(
         p1: impl Into<P>,
         angle: FAngle,
@@ -51,8 +51,9 @@ pub trait TwoPointsWithRestriction<P: PointReqs>:
         P: FloatCoordinateOps,
     {
         let p1 = p1.into();
-        Self::try_new_from_points(p1, naive_ray_endpoint(p1, angle, length))
+        Self::try_from_two_exact_points(p1, naive_ray_endpoint(p1, angle, length))
     }
+    // TODO: delete.  This case is covered by refinements having access to base constructors
     fn new_from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
     where
         P: FloatCoordinateOps,
@@ -80,7 +81,7 @@ pub trait TwoPointsWithRestriction<P: PointReqs>:
         [0, 1].map(|i| self.point_by_index(i))
     }
     fn from_array(arr: [P; 2]) -> Self {
-        Self::try_new_from_points(arr[0], arr[1]).unwrap()
+        Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
     fn x_min(&self) -> P::DataType {
         min_for_partial_ord(self.p1().x(), self.p2().x())
@@ -308,7 +309,7 @@ impl<P: FloatCoordinateOps> TryFrom<TwoDifferentPoints<P>>
     type Error = String;
 
     fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
-        Self::try_new_from_points(value.p1, value.p2)
+        Self::try_from_two_exact_points(value.p1, value.p2)
     }
 }
 impl TwoDifferentWorldPoints {

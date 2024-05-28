@@ -16,9 +16,8 @@ impl_skip_level_try_from!(LineCuttingCenteredUnitSquare<P: PointReqs> --> Direct
 impl_translate_for_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>
 );
-impl_quarter_turn_rotatable_for_delegate!(
-    LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0
-);
+impl_quarter_turn_rotatable_for_newtype!(
+    LineCuttingCenteredUnitSquare<P: PointReqs>);
 
 impl_operations_for_line_for_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
 impl_constructors_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);

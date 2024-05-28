@@ -55,7 +55,4 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane
     }
 }
 
-impl_quarter_turn_rotatable_for_delegate!(
-    PartialSquareVisibilityByOneVisibleHalfPlane,
-    accessor = 0
-);
+impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);

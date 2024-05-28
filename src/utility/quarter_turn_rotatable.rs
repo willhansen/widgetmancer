@@ -35,20 +35,20 @@ pub trait QuarterTurnRotatable {
 }
 
 // TODO: generalize to any trait?
-macro_rules! impl_quarter_turn_rotatable_for_delegate {
+macro_rules! impl_quarter_turn_rotatable_for_newtype {
     // TODO: is the dummy $T metavariable required for the optional parts with only it?
-    ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?, accessor=$($accessor:tt)+) => {
+    ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
         impl$(<$T$(: $traitparam)?>)? QuarterTurnRotatable for $type$(<$T>)? {
             fn quarter_rotated_ccw(
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
             ) -> Self {
-                Self::new(self.$($accessor)+.quarter_rotated_ccw(quarter_turns_ccw))
+                Self::new(self.0.quarter_rotated_ccw(quarter_turns_ccw))
             }
         }
     };
 }
-pub(crate) use impl_quarter_turn_rotatable_for_delegate;
+pub(crate) use impl_quarter_turn_rotatable_for_newtype;
 
 // TODO: Can use blanket implementation over IntoIterator and FromIterator instead?
 impl<T> QuarterTurnRotatable for Vec<T>

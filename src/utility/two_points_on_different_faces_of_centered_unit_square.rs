@@ -7,9 +7,7 @@ trait_alias_macro!(trait PointReqs = PointReqsForTwoPointsOnDifferentFaces);
 
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqs>(
-    TwoDifferentPoints<P>,
-);
+pub struct TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: PointReqs>(TwoDifferentPoints<P>);
 
 impls_for_two_different_points!(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>
@@ -57,7 +55,7 @@ impl<P: FloatCoordinateOps> ConstructorsForTwoDifferentPoints<P>
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
         if Self::points_are_valid(p1, p2) {
-            Ok(Self(TwoDifferentPoints::try_new_from_points(p1, p2)?))
+            Ok(Self(TwoDifferentPoints::try_from_two_exact_points(p1, p2)?))
         } else {
             Err(format!(
                 "At least one point not on centered unit square: {:?}, {:?}",

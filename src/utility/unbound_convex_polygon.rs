@@ -21,7 +21,7 @@ impl<P: PointReqs> UnboundConvexPolygonCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl_quarter_turn_rotatable_for_delegate!(UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
+impl_quarter_turn_rotatable_for_newtype!(UnboundConvexPolygonCuttingCenteredUnitSquare<P: PointReqs>);
 
 // TODO: define with macro
 impl<P: PointReqs> Complement for UnboundConvexPolygonCuttingCenteredUnitSquare<P> {

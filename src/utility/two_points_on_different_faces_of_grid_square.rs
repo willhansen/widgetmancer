@@ -17,7 +17,7 @@ impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoPointsOnDifferentFacesOfGr
     }
 }
 
-impls_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>);
+// impls_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>);
 impl_translate_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>
 );
@@ -44,7 +44,7 @@ impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
             ));
         }
 
-        Ok(Self::try_new_from_points(
+        Ok(Self::try_from_two_exact_points(
             intersection_points[0],
             intersection_points[1],
         )?)
@@ -97,7 +97,7 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P>
         let centered_p1 = p1 - square_center;
         let centered_p2 = p2 - square_center;
         Ok(Self::new(
-            TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_new_from_points(
+            TwoPointsOnDifferentFacesOfCenteredUnitSquare::try_from_two_exact_points(
                 centered_p1,
                 centered_p2,
             )?,
