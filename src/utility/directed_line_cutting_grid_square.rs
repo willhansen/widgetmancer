@@ -1,7 +1,7 @@
 use crate::utility::*;
 use derive_more::Constructor;
 
-trait_alias_macro!(pub trait PointReqsForDirectedLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFaces);
+trait_alias_macro!(pub trait PointReqsForDirectedLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 trait_alias_macro!(trait PointReqs =PointReqsForDirectedLineCuttingGridSquare);
 
 pub type DirectedLineCuttingGridSquare<P: PointReqs> =
@@ -10,7 +10,10 @@ pub type DirectedLineCuttingGridSquare<P: PointReqs> =
 // pub trait OperationsForDirectedLineCuttingGridSquare<P: PointReqs> {
 // }
 
-impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+// not an abstraction of two points on g
+// impl_abstraction_for_newtype!(DirectedLineCuttingGridSquare<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+// TODO: maybe instead blanket implement through the wrapper type
+// impl<P: PointReqs> Abstraction<TwoPointsOnDifferentFacesOfGridSquare<P>> for DirectedLineCuttingGridSquare<P> { }
 
 impl_constructors_for_two_different_points_for_abstraction!(DirectedLineCuttingGridSquare<P: PointReqs>, base= TwoPointsOnDifferentFacesOfGridSquare<P>);
 

@@ -17,7 +17,7 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
     // TODO: Should already be implied by the Abstraction implementation
     fn new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Self {
         let [p1, p2] = line.two_points_on_line_in_order();
-        Self::new_from_points(p1, p2)
+        Self::from_two_points(p1, p2)
     }
 }
 
@@ -27,39 +27,10 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
 //     }
 // }
 
-// TODO: This is just Refinement<TwoDifferentPoints>
-pub trait TwoPointsWithRestriction<P: PointReqs>:
+pub trait OperationsForTwoDifferentPoints<P: PointReqs>:
     Sized + Copy + PartialEq + ConstructorsForTwoDifferentPoints<P>
 {
-    // TODO: delete.  This case is covered by refinements having access to base operations
     fn point_by_index(&self, point_index: usize) -> P;
-    // TODO: delete.  This case is covered by refinements having access to base constructors
-    fn new(p1: P, p2: P) -> Self {
-        Self::try_from_two_exact_points(p1, p2).unwrap()
-    }
-    // TODO: delete.  This case is covered by refinements having access to base constructors
-    fn new_from_points(p1: P, p2: P) -> Self {
-        Self::new(p1, p2)
-    }
-    // TODO: delete.  This case is covered by refinements having access to base constructors
-    fn try_new_from_point_and_radial(
-        p1: impl Into<P>,
-        angle: FAngle,
-        length: f32,
-    ) -> Result<Self, String>
-    where
-        P: FloatCoordinateOps,
-    {
-        let p1 = p1.into();
-        Self::try_from_two_exact_points(p1, naive_ray_endpoint(p1, angle, length))
-    }
-    // TODO: delete.  This case is covered by refinements having access to base constructors
-    fn new_from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
-    where
-        P: FloatCoordinateOps,
-    {
-        Self::try_new_from_point_and_radial(p1, angle, length).unwrap()
-    }
     fn p1(&self) -> P {
         self.point_by_index(0)
     }
@@ -71,7 +42,7 @@ pub trait TwoPointsWithRestriction<P: PointReqs>:
     }
     fn cast_unit<Other, OtherPointType>(&self) -> Other
     where
-        Other: TwoPointsWithRestriction<OtherPointType>,
+        Other: OperationsForTwoDifferentPoints<OtherPointType>,
         // TODO: find a way around not being able to restrict the base DataType associated type
         OtherPointType: PointReqsForTwoDifferentPoints<_DataType = P::DataType>,
     {
@@ -79,9 +50,6 @@ pub trait TwoPointsWithRestriction<P: PointReqs>:
     }
     fn to_array(&self) -> [P; 2] {
         [0, 1].map(|i| self.point_by_index(i))
-    }
-    fn from_array(arr: [P; 2]) -> Self {
-        Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
     fn x_min(&self) -> P::DataType {
         min_for_partial_ord(self.p1().x(), self.p2().x())
@@ -106,7 +74,7 @@ pub trait TwoPointsWithRestriction<P: PointReqs>:
 pub trait ConstructorsForTwoDifferentPoints<P: PointReqs>: Sized {
     // entrypoint
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String>;
-    fn from_two_exact_points(p1: P, p2: P) -> Self {
+    fn from_two_points(p1: P, p2: P) -> Self {
         Self::try_from_two_exact_points(p1, p2).unwrap()
     }
     fn from_array_of_two_exact_points(p: [P; 2]) -> Self {
@@ -116,7 +84,7 @@ pub trait ConstructorsForTwoDifferentPoints<P: PointReqs>: Sized {
         Self::try_from_two_exact_points(p[0], p[1])
     }
     fn easy_from_two_exact_points(p1: impl Into<P>, p2: impl Into<P>) -> Self {
-        Self::from_two_exact_points(p1.into(), p2.into())
+        Self::from_two_points(p1.into(), p2.into())
     }
     /// NOTE: This is a very similar use case as TryFromDirectedLine::from_two_ordered_points_on_line.
     /// There is a difference between "allow snapping along one axis" and "define a line, and then use the line" though.  in the second case, the hinting power of giving specific points is intentionally discarded.
@@ -127,14 +95,34 @@ pub trait ConstructorsForTwoDifferentPoints<P: PointReqs>: Sized {
         Self::try_from_two_points_allowing_snap_along_line(p1, p2).unwrap()
     }
     fn try_from_two_points_object_allowing_snap_along_line(
-        p: impl TwoPointsWithRestriction<P>,
+        p: impl OperationsForTwoDifferentPoints<P>,
     ) -> Result<Self, String> {
         Self::try_from_two_points_allowing_snap_along_line(p.p1(), p.p2())
+    }
+    fn try_from_point_and_radial(
+        p1: impl Into<P>,
+        angle: FAngle,
+        length: f32,
+    ) -> Result<Self, String>
+    where
+        P: FloatCoordinateOps,
+    {
+        let p1 = p1.into();
+        Self::try_from_two_exact_points(p1, naive_ray_endpoint(p1, angle, length))
+    }
+    fn from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
+    where
+        P: FloatCoordinateOps,
+    {
+        Self::try_from_point_and_radial(p1, angle, length).unwrap()
+    }
+    fn from_array(arr: [P; 2]) -> Self {
+        Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
 }
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        // TODO: put in restriction validation function
+        // TODO: move this check to refinement validation function
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
         } else {
@@ -142,19 +130,29 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
         }
     }
 }
-macro_rules! impl_constructors_for_two_different_points_for_abstraction {
-    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
-        where
-            Self: Abstraction<$BaseType<P>>,
-        {
-            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
-            }
-        }
-    };
+
+impl<P: PointReqs, T> ConstructorsForTwoDifferentPoints<P> for T
+where
+    T: Abstraction<TwoDifferentPoints<P>>,
+{
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        TwoDifferentPoints::try_from_two_exact_points(p1, p2).into()
+    }
 }
-pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
+
+// macro_rules! impl_constructors_for_two_different_points_for_abstraction {
+//     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
+//         impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
+//         where
+//             Self: Abstraction<$BaseType<P>>,
+//         {
+//             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+//                 Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
+//             }
+//         }
+//     };
+// }
+// pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
 
 macro_rules! impl_constructors_for_two_different_points_for_newtype {
     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
@@ -167,7 +165,7 @@ macro_rules! impl_constructors_for_two_different_points_for_newtype {
 }
 pub(crate) use impl_constructors_for_two_different_points_for_newtype;
 
-impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoDifferentPoints<P> {
+impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {
         match pi {
             0 => self.p1,
@@ -199,7 +197,7 @@ macro_rules! impls_for_two_different_points {
     ($TheStruct:ident<P: $point_trait:ident>) => {
         impl<P: $point_trait> OperationsForDirectedLine<P> for $TheStruct<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
-                <Self as TwoPointsWithRestriction<P>>::to_array(self)
+                Self::to_array(self)
             }
         }
 
@@ -259,7 +257,7 @@ macro_rules! impl_translate_for_two_points_with_restriction {
     ($TheStruct:ident<P: $CoordTrait:ident>) => {
         impl<P> Add<P> for $TheStruct<P>
         where
-            Self: TwoPointsWithRestriction<P>,
+            Self: OperationsForTwoDifferentPoints<P>,
             P: $CoordTrait,
         {
             type Output = Self;
@@ -270,7 +268,7 @@ macro_rules! impl_translate_for_two_points_with_restriction {
         }
         impl<P> Sub<P> for $TheStruct<P>
         where
-            Self: TwoPointsWithRestriction<P>,
+            Self: OperationsForTwoDifferentPoints<P>,
             P: $CoordTrait,
         {
             type Output = Self;

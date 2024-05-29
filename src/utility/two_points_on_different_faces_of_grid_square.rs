@@ -11,7 +11,7 @@ impl<P: PointReqs> TwoPointsOnDifferentFacesOfGridSquare<P> {
         *self.thing()
     }
 }
-impl<P: PointReqs> TwoPointsWithRestriction<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
     fn point_by_index(&self, point_index: usize) -> P {
         self.points_on_the_square().point_by_index(point_index) + self.square_center()
     }
@@ -107,7 +107,7 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P>
     fn try_from_two_points_allowing_snap_along_line(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();
         let square: P::OnGrid = square_center.to_i32();
-        let line = TwoDifferentPoints::<P>::from_two_exact_points(p1, p2);
+        let line = TwoDifferentPoints::<P>::from_two_points(p1, p2);
         let intersections = line.ordered_line_intersections_with_square(square);
         let Ok(two_points): Result<[P; 2], _> = intersections.clone().try_into() else {
             return Err(format!(

@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForTwoPointsOnDifferentFaces = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForTwoPointsOnDifferentFaces);
+trait_alias_macro!(pub trait PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
+trait_alias_macro!(trait PointReqs = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 // pub trait PointReqsForTwoPointsOnDifferentFaces: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 // impl<T> PointReqsForTwoPointsOnDifferentFaces for T where T: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 
@@ -16,7 +16,7 @@ impl_translate_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfCenteredUnitSquare<P: FloatCoordinateOps>
 );
 
-impl<P: PointReqsForTwoPointsOnDifferentFaces> TwoPointsWithRestriction<P>
+impl<P: PointReqs> OperationsForTwoDifferentPoints<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
     fn point_by_index(&self, pi: usize) -> P {

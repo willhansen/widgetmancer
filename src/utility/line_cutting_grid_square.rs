@@ -1,12 +1,12 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFaces);
+trait_alias_macro!(pub trait PointReqsForLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingGridSquare);
 
 pub type LineCuttingGridSquare<P: PointReqs> =
     ThingRelToSquare<LineCuttingCenteredUnitSquare<P>, OnGrid<P>>;
 
-impl_abstraction_for_wrapped_thing!(LineCuttingCenteredUnitSquare<P: PointReqs>, abstraction_base= LineCuttingGridSquare<P>);
+impl_abstraction_for_wrapped_thing!(LineCuttingCenteredUnitSquare<P: PointReqs>, abstraction_base= LineCuttingGridSquare<P>, accessor=thing());
 
 // TODO: macro for impl_parallel_abstraction_connected_by_wrapper
 impl<P: PointReqs> Abstraction<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {}
@@ -47,7 +47,13 @@ impl_constructors_for_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, bas
 
 impl_constructors_for_directed_line_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
-impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+// TODO: this could be generally implemented for anything convertible from twodifferentpoints
+impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for LineCuttingGridSquare<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        TwoDifferentPoints::try_from_two_exact_points(p1, p2).try_into()
+    }
+}
+// impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);

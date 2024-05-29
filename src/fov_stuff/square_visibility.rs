@@ -561,7 +561,7 @@ mod tests {
             fn test_square_visibility_knows_if_its_fully_visible() {
                 let partial = <$type>::new_from_visible_half_plane(
                     HalfPlane::from_line_and_point_on_half_plane(
-                        TwoDifferentPoints::new(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
+                        TwoDifferentPoints::from_two_points(point2(-5.0, 2.0), point2(5.0, 2.2928933)),
                         point2(-12.061038, -1.3054879),
                     ),
                 );

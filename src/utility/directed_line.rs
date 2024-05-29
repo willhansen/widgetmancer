@@ -87,7 +87,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     where
         Self: Sized,
     {
-        let line = TwoDifferentPoints::<P>::new(p1, p2);
+        let line = TwoDifferentPoints::<P>::from_two_points(p1, p2);
         Self::try_new_from_directed_line(line)
     }
     fn new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Self
@@ -98,14 +98,14 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     }
     fn choose_arbitrary_direction_for_line(line: impl LineOps<P>) -> Self {
         let [p1, p2] = line.two_different_arbitrary_points_on_line();
-        Self::from_two_exact_points(p1, p2)
+        Self::from_two_points(p1, p2)
     }
     fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
     where
         Self: Sized;
     fn from_point_and_angle(point: impl Into<P>, direction: impl Into<FAngle>) -> Self
     where
-        Self: TwoPointsWithRestriction<P>,
+        Self: OperationsForTwoDifferentPoints<P>,
         P: FloatCoordinateOps,
     {
         let p1 = point.into();

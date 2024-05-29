@@ -18,7 +18,9 @@ impl<P: PointReqs> LineSegmentOps<P> for TwoDifferentPoints<P> {
     }
 }
 
-pub trait DirectedLineSegmentOps<P: PointReqs>: OperationsForDirectedLine<P> + LineSegmentOps<P> {
+pub trait DirectedLineSegmentOps<P: PointReqs>:
+    OperationsForDirectedLine<P> + LineSegmentOps<P>
+{
     fn endpoints_in_order(&self) -> [P; 2] {
         P::points_sorted_along_axis(self.endpoints_in_arbitrary_order(), self.direction())
             .into_iter()
@@ -33,8 +35,10 @@ pub trait DirectedLineSegmentOps<P: PointReqs>: OperationsForDirectedLine<P> + L
         self.endpoints_in_order()[1]
     }
 }
-impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where T: OperationsForDirectedLine<P> + LineSegmentOps<P>
-{}
+impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where
+    T: OperationsForDirectedLine<P> + LineSegmentOps<P>
+{
+}
 
 #[cfg(test)]
 mod tests {
@@ -43,9 +47,8 @@ mod tests {
 
     #[test]
     fn test_intersection__perpendicular_endpoints_touch() {
-        let a = TwoDifferentWorldPoints::from_two_exact_points(point2(5.0, 5.0), point2(10.0, 5.0));
-        let b =
-            TwoDifferentWorldPoints::from_two_exact_points(point2(10.0, 5.0), point2(10.0, 10.0));
+        let a = TwoDifferentWorldPoints::from_two_points(point2(5.0, 5.0), point2(10.0, 5.0));
+        let b = TwoDifferentWorldPoints::from_two_points(point2(10.0, 5.0), point2(10.0, 10.0));
         assert_about_eq_2d(
             a.line_segment_intersection_point(b).unwrap(),
             point2(10.0, 5.0),
@@ -87,19 +90,17 @@ mod tests {
     }
     #[test]
     fn test_intersection__miss() {
-        assert!(
-            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                point2(0.0, 0.0),
-                point2(1.0, 1.0)
-            )
-            .line_segment_intersection_point(
-                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                    point2(100.0, 1000.0),
-                    point2(10.0, 10.0),
-                )
-            )
-            .is_none()
+        assert!(TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+            point2(0.0, 0.0),
+            point2(1.0, 1.0)
         )
+        .line_segment_intersection_point(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+                point2(100.0, 1000.0),
+                point2(10.0, 10.0),
+            )
+        )
+        .is_none())
     }
     #[test]
     fn test_intersection__endpoint_touch_mid_counts() {
@@ -121,10 +122,8 @@ mod tests {
 
     #[test]
     fn test_intersection__parallel_endpoints_touch() {
-        let line1 =
-            TwoDifferentWorldPoints::from_two_exact_points(point2(5.0, 5.0), point2(10.0, 5.0));
-        let line2 =
-            TwoDifferentWorldPoints::from_two_exact_points(point2(10.0, 5.0), point2(20.0, 5.0));
+        let line1 = TwoDifferentWorldPoints::from_two_points(point2(5.0, 5.0), point2(10.0, 5.0));
+        let line2 = TwoDifferentWorldPoints::from_two_points(point2(10.0, 5.0), point2(20.0, 5.0));
         assert_about_eq_2d(
             line1.line_segment_intersection_point(line2).unwrap(),
             point2(10.0, 5.0),
@@ -152,66 +151,58 @@ mod tests {
     }
     #[test]
     fn test_intersection__parallel_miss() {
-        assert!(
-            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                point2(5.0, 5.0),
-                point2(10.0, 5.0)
-            )
-            .line_segment_intersection_point(
-                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                    point2(11.0, 5.0),
-                    point2(20.0, 5.0),
-                )
-            )
-            .is_none(),
+        assert!(TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .line_segment_intersection_point(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+                point2(11.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_intersection__parallel_overlap_does_not_count() {
-        assert!(
-            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                point2(5.0, 5.0),
-                point2(10.0, 5.0)
-            )
-            .line_segment_intersection_point(
-                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                    point2(9.0, 5.0),
-                    point2(20.0, 5.0),
-                )
-            )
-            .is_none(),
+        assert!(TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .line_segment_intersection_point(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+                point2(9.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_intersection__parallel_full_overlap_does_not_count() {
-        assert!(
-            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                point2(5.0, 5.0),
-                point2(10.0, 5.0)
-            )
-            .line_segment_intersection_point(
-                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                    point2(0.0, 5.0),
-                    point2(20.0, 5.0),
-                )
-            )
-            .is_none(),
+        assert!(TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
         )
+        .line_segment_intersection_point(
+            TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+                point2(0.0, 5.0),
+                point2(20.0, 5.0),
+            )
+        )
+        .is_none(),)
     }
     #[test]
     fn test_intersection__parallel_exact_overlap_does_not_count() {
-        assert!(
+        assert!(TwoDifferentWorldPoints::from_two_unordered_points_on_line(
+            point2(5.0, 5.0),
+            point2(10.0, 5.0)
+        )
+        .line_segment_intersection_point(
             TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                 point2(5.0, 5.0),
-                point2(10.0, 5.0)
+                point2(10.0, 5.0),
             )
-            .line_segment_intersection_point(
-                TwoDifferentWorldPoints::from_two_unordered_points_on_line(
-                    point2(5.0, 5.0),
-                    point2(10.0, 5.0),
-                )
-            )
-            .is_none(),
         )
+        .is_none(),)
     }
 }

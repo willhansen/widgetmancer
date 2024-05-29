@@ -772,7 +772,8 @@ mod tests {
         let mut g = set_up_graphics();
         let test_square = point2(5, 5);
         let diag = vec2(1, 1);
-        let test_rectangle = WorldSquareRect::new(test_square - diag, test_square + diag);
+        let test_rectangle =
+            WorldSquareRect::from_two_points(test_square - diag, test_square + diag);
         let test_point = test_square.to_f32();
 
         g.draw_braille_point(test_point, RED);

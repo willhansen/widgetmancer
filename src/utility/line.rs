@@ -138,7 +138,7 @@ pub trait LineOps<P: PointReqs>:
             );
         };
         let p2 = p + *good_dir;
-        TwoDifferentPoints::new(p, p2)
+        TwoDifferentPoints::from_two_points(p, p2)
     }
     fn with_arbitrary_direction(&self) -> impl OperationsForDirectedLine<P> {
         self.with_direction(self.parallel_directions()[1])
@@ -324,7 +324,7 @@ pub fn square_face_as_line<P: SignedIntCoordinate>(
 ) -> TwoDifferentPoints<P::Floating> {
     let square_center = square.to_f32();
     let face_center = square_center.moved(face_direction, 0.5);
-    TwoDifferentPoints::from_two_exact_points(
+    TwoDifferentPoints::from_two_points(
         face_center.moved(face_direction.left(), 0.5),
         face_center.moved(face_direction.right(), 0.5),
     )
@@ -341,7 +341,7 @@ pub fn ray_intersection_point_with_oriented_square_face(
         return None;
     }
     let face_line_segment = square_face_as_line(face.square(), face.dir());
-    let ray_line_segment = TwoDifferentWorldPoints::new_from_point_and_radial(start, angle, range);
+    let ray_line_segment = TwoDifferentWorldPoints::from_point_and_radial(start, angle, range);
     ray_line_segment.line_segment_intersection_point(face_line_segment)
 }
 pub fn does_ray_hit_oriented_square_face(

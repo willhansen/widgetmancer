@@ -10,6 +10,7 @@ in
       cargo-watch
       rustfmt
       rust-analyzer
+      cargo-expand
       clippy
       lldb
       gdb

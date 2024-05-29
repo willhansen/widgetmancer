@@ -40,11 +40,11 @@ impl<T, P: PointReqs> ThingRelToSquare<T, P> {
 }
 
 macro_rules! impl_abstraction_for_wrapped_thing {
-    ($Unwrapped:ident<P: $PointReqs:ident>, abstraction_base= $Wrapped:ident<P>) => {
+    ($Unwrapped:ident<P: $PointReqs:ident>, abstraction_base= $Wrapped:ident<P>, accessor=$accessor:ident()) => {
         impl<PointType: $PointReqs> Abstraction<$Wrapped<PointType>> for $Unwrapped<PointType> {}
         impl<PointType: $PointReqs> From<$Wrapped<PointType>> for $Unwrapped<PointType> {
             fn from(value: $Wrapped<PointType>) -> Self {
-                *value.thing()
+                *value.$accessor()
             }
         }
     };
@@ -54,7 +54,7 @@ pub(crate) use impl_abstraction_for_wrapped_thing;
 impl<T, P> QuarterTurnRotatable for ThingRelToSquare<T, P>
 where
     T: QuarterTurnRotatable,
-    P: QuarterTurnRotatable,
+    P: PointReqs + QuarterTurnRotatable,
 {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         Self::new(
@@ -66,6 +66,7 @@ where
 impl<T, P> Reversible for ThingRelToSquare<T, P>
 where
     T: Reversible,
+    P: PointReqs,
 {
     fn reversed(&self) -> Self {
         Self::new(self.thing.reversed(), self.square)
