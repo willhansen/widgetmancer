@@ -1,11 +1,25 @@
 #! /usr/bin/env bash
 
-setopt -e
+# TODO: make this graph actually useful
 
-dotfile="/tmp/dotfile.dot"
+set -o errexit pipefail
+
+dotfile="/tmp/reqgraph.gv"
 
 echo "digraph {" > $dotfile
 
-cargo check |& rg 'required for.*to implement' | sd -p '.*`(.*)`.*`(.*)`.*' '$1 -> $2' >> $dotfile 
+cargo check \
+  |& rg 'required for.*to implement' \
+  | sd '.*`(.*)`.*`(.*)`.*' '"$1" -> "$2"' \
+  | sd '::' '::\n\t' \
+  >> $dotfile 
 
 echo "}" >> $dotfile
+
+nop $dotfile > "/tmp/pretty_dotfile.gv"
+
+output="/tmp/reqs.png"
+
+dot -T png -K dot $dotfile -o $output
+
+xdg-open $output
