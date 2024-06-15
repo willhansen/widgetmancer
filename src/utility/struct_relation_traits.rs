@@ -5,7 +5,7 @@ use crate::utility::*;
 /// The type is being used as a subset of the base type.  Can be a refinement of multiple other types.
 // TODO: is this more of a conceptual refinement than the actual type system version?
 // TODO: how require that implements OperationsFor<RefinementBase>
-pub trait RefinementOf<Base>: TryFrom<Base> + Into<Base> {
+pub trait RefinementOf<RawType>: TryFrom<RawType> + Into<RawType> {
     fn valid(&self) -> bool;
 }
 // For when you want to automatically propagate a refinement relation down a pair of newtypes
@@ -16,7 +16,9 @@ pub trait RefinementOf<Base>: TryFrom<Base> + Into<Base> {
 /// - Operations on this type can be applied to the base type as well (TODO: enforce)
 pub trait AbstractionOf<BaseType>: From<BaseType> {}
 
-pub trait AbstractsTo<AbstractType>: Into<AbstractType> {}
+pub trait AbstractsTo<AbstractType>: Into<AbstractType> {
+    fn set_with_abstraction(&self, val: &AbstractType) -> Self;
+}
 
 macro_rules! impl_abstraction_for_newtype {
     ($abstract_type:ident<P: $PointReqs:ident>, base= $BaseType:ident<P>) => {

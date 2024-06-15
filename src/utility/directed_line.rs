@@ -138,6 +138,18 @@ macro_rules! impl_constructors_for_directed_line_for_newtype {
 }
 pub(crate) use impl_constructors_for_directed_line_for_newtype;
 
+impl<P: PointReqs, T> ConstructorsForDirectedLine<P> for T
+where
+    T: AbstractionOf<DirectedLine<P>>,
+{
+    fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        Ok(DirectedLine::<P>::try_new_from_directed_line(line)?.into())
+    }
+}
+
 impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {

@@ -95,9 +95,9 @@ pub trait LineOps<P: PointReqs>:
     // fn from_point_array(points: [P; 2]) -> Self {
     //     Self::from_array_of_two_exact_points(points)
     // }
-    fn point_is_on_line(&self, point: P) -> bool {
+    fn point_is_on_line(&self, point: Floating<P>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
-        on_line(p1, p2, point)
+        on_line(p1.to_f32(), p2.to_f32(), point)
     }
     // // fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>;
     fn new_horizontal(y: <P as CoordinateOps>::DataType) -> Self {
@@ -216,6 +216,17 @@ impl_translate_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
+impl<P, T> LineOps<P> for T
+where
+    P: PointReqs,
+    T: AbstractsTo<Line<P>> + Copy,
+{
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+        let line: Line<P> = *self.into();
+        line.two_different_arbitrary_points_on_line()
+    }
+}
+
 macro_rules! impl_operations_for_line_for_delegate {
     ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {
         impl<P: $traitparam> LineOps<P> for $type<P> {
@@ -258,8 +269,25 @@ macro_rules! impl_constructors_for_line_for_newtype {
 }
 pub(crate) use impl_constructors_for_line_for_newtype;
 
-impl_constructors_for_line_for_newtype!(Line<P: PointReqs>, base= DirectedLine<P>);
-impl_constructors_for_directed_line_for_newtype!(Line<P: PointReqs>, base= DirectedLine<P>);
+// TODO: generate default data?
+// create Default instance (if implemented), then set with abstraction?
+//
+// Strictly speaking, it doesn't need to have an entire default.  For example, a set of two
+// points could have a default distance between themselves of one unit, but have no default
+// absolute positions or angles
+// - Calls for new trait of Default orthogonalToAbstraction<AbstractType>?  No.  At that point
+// just define the constructor from abstract type in the base type file itself.
+//
+// impl<P, T> ConstructorsForLine<P> for T
+// where
+//     P: PointReqs,
+//     T: AbstractsTo<Line<P>> + Default,
+// {
+// }
+//
+impl<P: PointReqs> AbstractionOf<DirectedLine<P>> For Line<P> {
+
+}
 
 impl_abstraction_for_newtype!(Line<P: PointReqs>, base=DirectedLine<P>);
 
