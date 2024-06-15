@@ -38,7 +38,7 @@ impl<P: PointReqs> Into<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> 
     }
 }
 
-impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> RefinementOf<HalfPlane<P>> for HalfPlaneCuttingCenteredUnitSquare<P> {
     fn valid(&self) -> bool {
         self.0.valid()
     }

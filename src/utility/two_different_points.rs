@@ -133,26 +133,41 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P
 
 impl<P: PointReqs, T> ConstructorsForTwoDifferentPoints<P> for T
 where
-    T: Abstraction<TwoDifferentPoints<P>>,
+    T: AbstractionOf<TwoDifferentPoints<P>>,
 {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         TwoDifferentPoints::try_from_two_exact_points(p1, p2).into()
     }
 }
 
-// macro_rules! impl_constructors_for_two_different_points_for_abstraction {
-//     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-//         impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
-//         where
-//             Self: Abstraction<$BaseType<P>>,
-//         {
-//             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-//                 Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
-//             }
-//         }
-//     };
-// }
-// pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
+// TODO: combine implementation macros, with multiple possible matches
+macro_rules! impl_constructors_for_two_different_points_for_abstraction {
+    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
+        where
+            Self: AbstractionOf<$BaseType<P>>,
+        {
+            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+                Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
+            }
+        }
+    };
+}
+pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
+
+macro_rules! impl_constructors_for_two_different_points_for_refinement {
+    ($SelfType:ident<P: $reqs:ident>, unrefined= $BaseType:ident<P>) => {
+        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $SelfType<P>
+        where
+            Self: RefinementOf<$BaseType<P>>,
+        {
+            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+                $BaseType::<P>::try_from_two_exact_points(p1, p2)?.try_into()
+            }
+        }
+    };
+}
+pub(crate) use impl_constructors_for_two_different_points_for_refinement;
 
 macro_rules! impl_constructors_for_two_different_points_for_newtype {
     ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {

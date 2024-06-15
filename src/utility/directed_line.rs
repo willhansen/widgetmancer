@@ -122,8 +122,6 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     }
 }
 
-impl_constructors_for_two_different_points_for_abstraction!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
-
 macro_rules! impl_constructors_for_directed_line_for_newtype {
     ($type:ident<P: $traitparam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {

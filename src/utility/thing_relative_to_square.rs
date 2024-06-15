@@ -41,7 +41,7 @@ impl<T, P: PointReqs> ThingRelToSquare<T, P> {
 
 macro_rules! impl_abstraction_for_wrapped_thing {
     ($Unwrapped:ident<P: $PointReqs:ident>, abstraction_base= $Wrapped:ident<P>, accessor=$accessor:ident()) => {
-        impl<PointType: $PointReqs> Abstraction<$Wrapped<PointType>> for $Unwrapped<PointType> {}
+        impl<PointType: $PointReqs> AbstractionOf<$Wrapped<PointType>> for $Unwrapped<PointType> {}
         impl<PointType: $PointReqs> From<$Wrapped<PointType>> for $Unwrapped<PointType> {
             fn from(value: $Wrapped<PointType>) -> Self {
                 *value.$accessor()

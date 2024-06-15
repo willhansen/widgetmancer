@@ -263,7 +263,7 @@ impl_constructors_for_directed_line_for_newtype!(Line<P: PointReqs>, base= Direc
 
 impl_abstraction_for_newtype!(Line<P: PointReqs>, base=DirectedLine<P>);
 
-// TODO: maybe implement for `Abstraction<TwoDifferentPoints<P>>`?
+// TODO: maybe implement for `AbstractionOf<TwoDifferentPoints<P>>`?
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Line<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>

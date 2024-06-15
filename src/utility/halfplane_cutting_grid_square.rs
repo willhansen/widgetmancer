@@ -6,7 +6,7 @@ trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 pub type HalfPlaneCuttingGridSquare<P: PointReqs> =
     ThingRelToSquare<HalfPlaneCuttingCenteredUnitSquare<P>, OnGrid<P>>;
 
-impl<P: PointReqs> Refinement<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
+impl<P: PointReqs> RefinementOf<HalfPlane<P>> for HalfPlaneCuttingGridSquare<P>
 where
     P: PointReqs,
 {

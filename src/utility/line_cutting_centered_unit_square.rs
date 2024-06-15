@@ -23,7 +23,6 @@ impl_operations_for_line_for_delegate!(LineCuttingCenteredUnitSquare<P: PointReq
 impl_constructors_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl_constructors_for_directed_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
-// impl_constructors_for_two_different_points_for_abstraction!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl<P: PointReqs> Into<Line<P>> for LineCuttingCenteredUnitSquare<P> {
     fn into(self) -> Line<P> {
@@ -38,7 +37,7 @@ impl<P: PointReqs> TryFrom<Line<P>> for LineCuttingCenteredUnitSquare<P> {
     }
 }
 
-impl<P: PointReqs> Refinement<Line<P>> for LineCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> RefinementOf<Line<P>> for LineCuttingCenteredUnitSquare<P> {
     fn valid(&self) -> bool {
         // Non-valid states non-representable
         true

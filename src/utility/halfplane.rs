@@ -105,12 +105,12 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
             type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
         // where
-                    //     // is refinement
-                    //     Self: Refinement<$BaseType<P>>,
-                    //     // refinement base is constructor
-                    //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
-                    //     // border type is refinement of the refinement base's border
-                    //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
+                            //     // is refinement
+                            //     Self: Refinement<$BaseType<P>>,
+                            //     // refinement base is constructor
+                            //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
+                            //     // border type is refinement of the refinement base's border
+                            //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
             {
                 let border_of_base: <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType =
                     border.into();

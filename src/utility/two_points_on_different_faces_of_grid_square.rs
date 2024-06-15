@@ -22,6 +22,8 @@ impl_translate_for_two_points_with_restriction!(
     TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>
 );
 
+impl_constructors_for_two_different_points_for_refinement!(TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
+
 pub trait ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>: Sized {
     fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
         line: L,

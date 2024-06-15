@@ -9,7 +9,7 @@ pub type LineCuttingGridSquare<P: PointReqs> =
 impl_abstraction_for_wrapped_thing!(LineCuttingCenteredUnitSquare<P: PointReqs>, abstraction_base= LineCuttingGridSquare<P>, accessor=thing());
 
 // TODO: macro for impl_parallel_abstraction_connected_by_wrapper
-impl<P: PointReqs> Abstraction<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {}
+impl<P: PointReqs> AbstractionOf<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {}
 impl<P: PointReqs> From<DirectedLineCuttingGridSquare<P>> for LineCuttingGridSquare<P> {
     fn from(value: DirectedLineCuttingGridSquare<P>) -> Self {
         Self::new((*value.thing()).into(), value.square())
@@ -53,7 +53,6 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for LineCuttingGridSquar
         TwoDifferentPoints::try_from_two_exact_points(p1, p2).try_into()
     }
 }
-// impl_constructors_for_two_different_points_for_newtype!(LineCuttingGridSquare<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
 impl_translate_for_newtype!(LineCuttingGridSquare<P: PointReqs>);

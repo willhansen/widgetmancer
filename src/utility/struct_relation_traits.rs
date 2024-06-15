@@ -5,7 +5,7 @@ use crate::utility::*;
 /// The type is being used as a subset of the base type.  Can be a refinement of multiple other types.
 // TODO: is this more of a conceptual refinement than the actual type system version?
 // TODO: how require that implements OperationsFor<RefinementBase>
-pub trait Refinement<Base>: TryFrom<Base> + Into<Base> {
+pub trait RefinementOf<Base>: TryFrom<Base> + Into<Base> {
     fn valid(&self) -> bool;
 }
 // For when you want to automatically propagate a refinement relation down a pair of newtypes
@@ -14,11 +14,13 @@ pub trait Refinement<Base>: TryFrom<Base> + Into<Base> {
 /// Indicates that the implementing type has less information visible than the base type.
 /// - Can be created with same constructors as base (TODO: enforce)
 /// - Operations on this type can be applied to the base type as well (TODO: enforce)
-pub trait Abstraction<Base>: From<Base> {}
+pub trait AbstractionOf<BaseType>: From<BaseType> {}
+
+pub trait AbstractsTo<AbstractType>: Into<AbstractType> {}
 
 macro_rules! impl_abstraction_for_newtype {
     ($abstract_type:ident<P: $PointReqs:ident>, base= $BaseType:ident<P>) => {
-        impl<PointType: $PointReqs> Abstraction<$BaseType<PointType>>
+        impl<PointType: $PointReqs> AbstractionOf<$BaseType<PointType>>
             for $abstract_type<PointType>
         {
         }
@@ -38,10 +40,11 @@ pub(crate) use impl_abstraction_for_newtype;
 macro_rules! impl_abstraction_skip_level {
     // TODO: better base indication syntax
     ($abstract_type:ident<P: $PointReqs:ident> --> $BaseType:ident<P> --> $BaserType:ident<P>) => {
-        impl<PointType: $PointReqs> Abstraction<$BaserType<PointType>> for $abstract_type<PointType>
+        impl<PointType: $PointReqs> AbstractionOf<$BaserType<PointType>>
+            for $abstract_type<PointType>
         where
-            Self: Abstraction<$BaseType<PointType>>,
-            $BaseType<PointType>: Abstraction<$BaserType<PointType>>,
+            Self: AbstractionOf<$BaseType<PointType>>,
+            $BaseType<PointType>: AbstractionOf<$BaserType<PointType>>,
         {
         }
         impl<PointType: $PointReqs> From<$BaserType<PointType>> for $abstract_type<PointType>

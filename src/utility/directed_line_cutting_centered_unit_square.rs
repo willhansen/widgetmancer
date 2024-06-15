@@ -43,7 +43,7 @@ impl<P: PointReqs> Into<DirectedLine<P>> for DirectedLineCuttingCenteredUnitSqua
     }
 }
 
-impl<P: PointReqs> Refinement<DirectedLine<P>> for DirectedLineCuttingCenteredUnitSquare<P> {
+impl<P: PointReqs> RefinementOf<DirectedLine<P>> for DirectedLineCuttingCenteredUnitSquare<P> {
     fn valid(&self) -> bool {
         // Non-valid states non-representable
         true
