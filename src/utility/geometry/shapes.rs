@@ -38,9 +38,9 @@ macro_rules! verify_abstraction_relation {
         static_assertions::assert_impl_all!($abstract_module::Shape<$point_type>: AbstractionOf <$concrete_module::Shape<$point_type>>);
 
         // Confirm the concrete type's operations can use the abstract type's operations
-        static_assertions::assert_trait_sub_all!($concrete_module::Operations: $abstract_module::Operations<$point_type>);
+        static_assertions::assert_trait_sub_all!($concrete_module::Operations<$point_type>: $abstract_module::Operations<$point_type>);
         // Confirm the abstraction can be constructed with the new module's constructors
-        static_assertions::assert_trait_sub_all!($abstract_module::Constructors: $concrete_module::Constructors<$point_type>);
+        static_assertions::assert_trait_sub_all!($abstract_module::Constructors<$point_type>: $concrete_module::Constructors<$point_type>);
     };
 }
 
@@ -87,9 +87,10 @@ macro_rules! new_shape {
 	}
 }
 
-new_shape!(line, Line, abstraction of: directed_line,; point type: WorldPoint);
-new_shape!(directed_line, DirectedLine, abstracts to: line,; abstraction of: two_different_points,; point type: WorldPoint);
-new_shape!(two_different_points, TwoDifferentPoints, abstracts to: directed_line,; point type: WorldPoint);
+// TODO: should not need to pick a point type to verify.  Ideally would validate schema generally)
+new_shape!(line, Line, abstraction of: directed_line,; point type: default::FloatPoint);
+new_shape!(directed_line, DirectedLine, abstracts to: line,; abstraction of: two_different_points,; point type: default::FloatPoint);
+new_shape!(two_different_points, TwoDifferentPoints, abstracts to: directed_line,; point type: default::FloatPoint);
 
 // Traits to help keep all the conversion requirements between newtypes straight
 

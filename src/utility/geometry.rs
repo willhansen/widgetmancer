@@ -20,6 +20,7 @@ pub_use!(
     quadrant,
     quarter_turn_rotatable,
     reversible,
+    shapes,
     size_2d,
     translate,
 );

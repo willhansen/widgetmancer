@@ -126,7 +126,7 @@ pub trait Operatations<P: PointReqs>:
     fn distance_from_origin(&self) -> f32 {
         self.normal_vector_from_origin().length()
     }
-    fn with_direction(&self, direction_hint: FAngle) -> impl OperationsForDirectedLine<P> {
+    fn with_direction(&self, direction_hint: FAngle) -> impl Operations<P> {
         let p = self.arbitrary_point_on_shape();
         let dirs = self.parallel_directions_as_vectors();
 
@@ -142,7 +142,7 @@ pub trait Operatations<P: PointReqs>:
         let p2 = p + *good_dir;
         TwoDifferentPoints::from_two_points(p, p2)
     }
-    fn with_arbitrary_direction(&self) -> impl OperationsForDirectedLine<P> {
+    fn with_arbitrary_direction(&self) -> impl Operations<P> {
         self.with_direction(self.parallel_directions()[1])
     }
 

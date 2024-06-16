@@ -32,6 +32,7 @@ macro_rules! pub_mod_and_use {
     };
 }
 pub(crate) use pub_mod_and_use;
+
 macro_rules! pub_use {
     ($($module:ident,)+) => {
         $(
@@ -55,7 +56,6 @@ pub_use!(
     sign,
     to_and_from_array,
     trait_alias_macro,
-    units,
 );
 
 pub mod default {
