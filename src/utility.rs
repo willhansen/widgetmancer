@@ -32,58 +32,30 @@ macro_rules! pub_mod_and_use {
     };
 }
 pub(crate) use pub_mod_and_use;
+macro_rules! pub_use {
+    ($($module:ident,)+) => {
+        $(
+            pub use self::$module::*;
+        )+
+    };
+}
+pub(crate) use pub_use;
 
-pub_mod_and_use!(
+automod::dir!("src/utility");
+
+pub_use!(
     geometry,
-    angle,
-    angle_interval,
-    angular_direction,
-    angular_edge_of_centered_arc,
     bool_with_partial,
-    categorized_partial_angle_interval,
-    circular_interval,
-    complement,
-    cone,
-    coordinates,
-    directed_float_line,
-    directed_line,
-    directed_line_cutting_centered_unit_square,
-    directed_line_cutting_grid_square,
-    float_line,
     general_utility,
-    grid_square,
-    halfplane,
-    halfplane_cutting_centered_unit_square,
-    halfplane_cutting_grid_square,
-    has_origin_pose,
     interval,
-    line,
-    line_cutting_centered_unit_square,
-    line_cutting_grid_square,
-    line_segment,
-    struct_relation_traits,
     non_zero_sign,
     octant,
-    orthogonal_facing_int_pose,
-    partial_angle_interval, // TODO: make private and contained within angle_interval?
-    poses,
-    quadrant,
-    quarter_turn_rotatable,
-    ray,
     relative_interval_location,
-    reversible,
     round_robin_iterator,
     sign,
-    size_2d,
-    thing_relative_to_square,
     to_and_from_array,
     trait_alias_macro,
-    translate,
-    two_different_points,
-    two_points_on_different_faces_of_centered_unit_square,
-    two_points_on_different_faces_of_grid_square,
-    unbound_convex_polygon,
-    units
+    units,
 );
 
 pub mod default {

@@ -1,0 +1,23 @@
+automod::dir!("src/utility/geometry/shapes");
+
+// cone,
+// directed_float_line,
+// directed_line,
+// directed_line_cutting_centered_unit_square,
+// directed_line_cutting_grid_square,
+// float_line,
+// grid_square,
+// halfplane,
+// halfplane_cutting_centered_unit_square,
+// halfplane_cutting_grid_square,
+// line,
+// line_cutting_centered_unit_square,
+// line_cutting_grid_square,
+// line_segment,
+// struct_relation_traits,
+// ray,
+// thing_relative_to_square,
+// two_different_points,
+// two_points_on_different_faces_of_centered_unit_square,
+// two_points_on_different_faces_of_grid_square,
+// unbound_convex_polygon
