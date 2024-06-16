@@ -1,17 +1,16 @@
 use crate::utility::*;
 
-pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
+pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
 
-trait_alias!(pub trait PointReqsForTwoDifferentPoints = SignedCoordinateOps);
-trait_alias!(trait PointReqs = PointReqsForTwoDifferentPoints);
+trait_alias!(pub trait PointReqs = SignedCoordinateOps);
 
 // TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TwoDifferentPoints<P: PointReqs> {
+pub struct Shape<P: PointReqs> {
     p1: P,
     p2: P,
 }
-impl<P: PointReqs> TwoDifferentPoints<P> {
+impl<P: PointReqs> Shape<P> {
     // TODO: this impl should be empty
 
     // TODO: Should already be implied by the Abstraction implementation
@@ -21,7 +20,7 @@ impl<P: PointReqs> TwoDifferentPoints<P> {
     }
 }
 
-// impl<P: Coordinate> Debug for TwoDifferentPoints<P> {
+// impl<P: Coordinate> Debug for Shape<P> {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         write!(f, "p1: {:?}\tp2: {:?}", self.p1, self.p2)
 //     }
@@ -120,23 +119,23 @@ pub trait ConstructorsForTwoDifferentPoints<P: PointReqs>: Sized {
         Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
 }
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
+impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Shape<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: move this check to refinement validation function
         if p1 == p2 {
             Err(format!("Points are equal: {:?}, {:?}", p1, p2))
         } else {
-            Ok(TwoDifferentPoints { p1, p2 })
+            Ok(Shape { p1, p2 })
         }
     }
 }
 
 impl<P: PointReqs, T> ConstructorsForTwoDifferentPoints<P> for T
 where
-    T: AbstractionOf<TwoDifferentPoints<P>>,
+    T: AbstractionOf<Shape<P>>,
 {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        TwoDifferentPoints::try_from_two_exact_points(p1, p2).into()
+        Shape::try_from_two_exact_points(p1, p2).into()
     }
 }
 
@@ -154,13 +153,13 @@ macro_rules! impl_constructors_for_two_different_points_for_refinement {
 }
 pub(crate) use impl_constructors_for_two_different_points_for_refinement;
 
-impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for TwoDifferentPoints<P> {
+impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
     }
 }
 
-impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
+impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for Shape<P> {
     fn point_by_index(&self, pi: usize) -> P {
         match pi {
             0 => self.p1,
@@ -170,7 +169,7 @@ impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoDifferentPoints<P> 
     }
 }
 // TODO: separate file and also int rays
-impl<P: FloatCoordinateOps> Ray<P> for TwoDifferentPoints<P> {
+impl<P: FloatCoordinateOps> Ray<P> for Shape<P> {
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
         P: FloatCoordinateOps,
@@ -246,7 +245,7 @@ pub(crate) use impls_for_two_different_points;
 
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
-impls_for_two_different_points!(TwoDifferentPoints<P: PointReqs>);
+impls_for_two_different_points!(Shape<P: PointReqs>);
 
 macro_rules! impl_translate_for_two_points_with_restriction {
     ($TheStruct:ident<P: $CoordTrait:ident>) => {
@@ -277,9 +276,9 @@ macro_rules! impl_translate_for_two_points_with_restriction {
 pub(crate) use impl_translate_for_two_points_with_restriction;
 
 // TODO: combine into one macro call
-impl_translate_for_two_points_with_restriction!(TwoDifferentPoints<P: PointReqs>);
+impl_translate_for_two_points_with_restriction!(Shape<P: PointReqs>);
 
-impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for TwoDifferentPoints<P>
+impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for Shape<P>
 where
     CanBePointType: Into<P>,
 {
@@ -288,20 +287,16 @@ where
     }
 }
 
-impl<P: FloatCoordinateOps> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>>
-    for TwoDifferentPoints<P>
-{
+impl<P: FloatCoordinateOps> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>> for Shape<P> {
     fn from(value: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>) -> Self {
         Self::from_array(value.points())
     }
 }
 
-impl<P: FloatCoordinateOps> TryFrom<TwoDifferentPoints<P>>
-    for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
-{
+impl<P: FloatCoordinateOps> TryFrom<Shape<P>> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     type Error = String;
 
-    fn try_from(value: TwoDifferentPoints<P>) -> Result<Self, Self::Error> {
+    fn try_from(value: Shape<P>) -> Result<Self, Self::Error> {
         Self::try_from_two_exact_points(value.p1, value.p2)
     }
 }
@@ -318,7 +313,7 @@ impl TwoDifferentWorldPoints {
 }
 
 // TODO: allow for unsigned
-impl<P: PointReqs> Display for TwoDifferentPoints<P> {
+impl<P: PointReqs> Display for Shape<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

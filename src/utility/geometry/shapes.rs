@@ -59,36 +59,37 @@ macro_rules! new_shape {
 	($new_module:ident,
     $shape_name:ident,
 		// rename to abstracted_type?
-		$(abstracts to: $($abstracts_to:ident,)+)?
+		$(abstracts to: $($abstracts_to:ident,)+;)?
 		// rename to concrete_type?
-		$(abstraction of: $($abstraction_of:ident,)+)?
+		$(abstraction of: $($abstraction_of:ident,)+;)?
 		// rename to raw_type?
-		$(refinement of: $($refinement_of:ident,)+)?) => {
+		$(refinement of: $($refinement_of:ident,)+;)?
+    point type: $point_type:ty
+    ) => {
 
         pub type $shape_name<P> = $new_module::Shape<P>;
 
 
-        static_assertions::assert_impl_all!($new_module::Shape: $new_module::Operations, $new_module::Constructors);
-        static_assertions::assert_trait_sub_all!($new_module::Operations: $new_module::Constructors);
+        static_assertions::assert_impl_all!($new_module::Shape<$point_type>: $new_module::Operations<$point_type>, $new_module::Constructors<$point_type>);
+        static_assertions::assert_trait_sub_all!($new_module::Operations<$point_type>: $new_module::Constructors<$point_type>);
         // abstracts to
         $($(
-            verify_abstraction_relation!(concrete: $new_module, abstract: $abstracts_to);
+            verify_abstraction_relation!(concrete: $new_module, abstract: $abstracts_to, point type: $point_type);
         )+)?
         // abstraction of
         $($(
-            verify_abstraction_relation!(concrete: $abstraction_of, abstract: $new_module);
+            verify_abstraction_relation!(concrete: $abstraction_of, abstract: $new_module, point type: $point_type);
         )+)?
         // refinement of
         $($(
-            verify_refinement_relation!(raw: $refinement_of, refined: $new_module);
+            verify_refinement_relation!(raw: $refinement_of, refined: $new_module, point type: $point_type);
         )+)?
 	}
 }
 
-pub type TwoDifferentPoints<P> = two_different_points::Shape<P>;
-
-new_shape!(line, Line, abstraction of: directed_line,);
-new_shape!(directed_line, DirectedLine, abstracts to: line, abstraction of: two_different_points,);
+new_shape!(line, Line, abstraction of: directed_line,; point type: WorldPoint);
+new_shape!(directed_line, DirectedLine, abstracts to: line,; abstraction of: two_different_points,; point type: WorldPoint);
+new_shape!(two_different_points, TwoDifferentPoints, abstracts to: directed_line,; point type: WorldPoint);
 
 // Traits to help keep all the conversion requirements between newtypes straight
 
