@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForLineCuttingCenteredUnitSquare = PointReqsForDirectedLineCuttingCenteredUnitSquare);
-trait_alias_macro!(trait PointReqs = PointReqsForLineCuttingCenteredUnitSquare);
+trait_alias!(pub trait PointReqsForLineCuttingCenteredUnitSquare = PointReqsForDirectedLineCuttingCenteredUnitSquare);
+trait_alias!(trait PointReqs = PointReqsForLineCuttingCenteredUnitSquare);
 
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct LineCuttingCenteredUnitSquare<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);

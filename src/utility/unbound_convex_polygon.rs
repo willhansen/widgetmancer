@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForUnboundConvexPolygon = PointReqsForHalfPlaneCuttingCenteredUnitSquare);
-trait_alias_macro!(trait PointReqs = PointReqsForUnboundConvexPolygon);
+trait_alias!(pub trait PointReqsForUnboundConvexPolygon = PointReqsForHalfPlaneCuttingCenteredUnitSquare);
+trait_alias!(trait PointReqs = PointReqsForUnboundConvexPolygon);
 
 /// A polygon without the requirement that the shape be closed
 // TODO: enforce side order and non-redundancy on creation

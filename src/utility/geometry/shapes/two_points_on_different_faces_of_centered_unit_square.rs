@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
+trait_alias!(pub trait PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare = PointReqsForTwoDifferentPoints + FloatCoordinateOps);
+trait_alias!(trait PointReqs = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 // pub trait PointReqsForTwoPointsOnDifferentFaces: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 // impl<T> PointReqsForTwoPointsOnDifferentFaces for T where T: PointReqsForTwoDifferentPoints + FloatCoordinateOps { }
 

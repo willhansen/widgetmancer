@@ -2,8 +2,8 @@ use crate::utility::*;
 
 pub type TwoDifferentFloatPoints<U> = TwoDifferentPoints<Point2D<f32, U>>;
 
-trait_alias_macro!(pub trait PointReqsForTwoDifferentPoints = SignedCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForTwoDifferentPoints);
+trait_alias!(pub trait PointReqsForTwoDifferentPoints = SignedCoordinateOps);
+trait_alias!(trait PointReqs = PointReqsForTwoDifferentPoints);
 
 // TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -140,21 +140,6 @@ where
     }
 }
 
-// TODO: combine implementation macros, with multiple possible matches
-macro_rules! impl_constructors_for_two_different_points_for_abstraction {
-    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P>
-        where
-            Self: AbstractionOf<$BaseType<P>>,
-        {
-            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                Ok($BaseType::<P>::try_from_two_exact_points(p1, p2)?.into())
-            }
-        }
-    };
-}
-pub(crate) use impl_constructors_for_two_different_points_for_abstraction;
-
 macro_rules! impl_constructors_for_two_different_points_for_refinement {
     ($SelfType:ident<P: $reqs:ident>, unrefined= $BaseType:ident<P>) => {
         impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $SelfType<P>
@@ -169,16 +154,11 @@ macro_rules! impl_constructors_for_two_different_points_for_refinement {
 }
 pub(crate) use impl_constructors_for_two_different_points_for_refinement;
 
-macro_rules! impl_constructors_for_two_different_points_for_newtype {
-    ($type:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $reqs> ConstructorsForTwoDifferentPoints<P> for $type<P> {
-            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                Self::new($BaseType::<P>::try_from_two_exact_points(p1, p2).unwrap())
-            }
-        }
-    };
+impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for TwoDifferentPoints<P> {
+    fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
+        Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
+    }
 }
-pub(crate) use impl_constructors_for_two_different_points_for_newtype;
 
 impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoDifferentPoints<P> {
     fn point_by_index(&self, pi: usize) -> P {

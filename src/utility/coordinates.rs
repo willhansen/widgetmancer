@@ -74,7 +74,7 @@ where
 }
 
 // TODO: is this just a scalar?
-trait_alias_macro!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
+trait_alias!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
 macro_rules! make_coordinate_datatype_cast_function {
     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -388,9 +388,9 @@ pub trait IntCoordinateOps:
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
 impl<T> IntCoordinateOps for T where T: SignedCoordinateOps<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
-trait_alias_macro!(pub trait WorldIntCoordinate = IntCoordinateOps< UnitType = SquareGridInWorldFrame>);
+trait_alias!(pub trait WorldIntCoordinate = IntCoordinateOps< UnitType = SquareGridInWorldFrame>);
 
-trait_alias_macro!(pub trait SignedIntCoordinate = IntCoordinateOps + SignedCoordinateOps);
+trait_alias!(pub trait SignedIntCoordinate = IntCoordinateOps + SignedCoordinateOps);
 
 pub trait FloatCoordinateOps: SignedCoordinateOps<_DataType = f32, Floating = Self> {
     // TODO: Add tolerance?

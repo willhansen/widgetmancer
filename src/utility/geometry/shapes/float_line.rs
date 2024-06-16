@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForFloatLine = FloatCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForFloatLine);
+trait_alias!(pub trait PointReqsForFloatLine = FloatCoordinateOps);
+trait_alias!(trait PointReqs = PointReqsForFloatLine);
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
 pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;

@@ -1,8 +1,8 @@
 use crate::utility::*;
 use derive_more::Constructor;
 
-trait_alias_macro!(pub trait PointReqsForDirectedLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
-trait_alias_macro!(trait PointReqs =PointReqsForDirectedLineCuttingGridSquare);
+trait_alias!(pub trait PointReqsForDirectedLineCuttingGridSquare = PointReqsForTwoPointsOnDifferentFacesOfCenteredUnitSquare);
+trait_alias!(trait PointReqs =PointReqsForDirectedLineCuttingGridSquare);
 
 pub type DirectedLineCuttingGridSquare<P: PointReqs> =
     ThingRelToSquare<DirectedLineCuttingCenteredUnitSquare<P>, OnGrid<P>>;

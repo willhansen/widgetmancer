@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForHalfPlaneCuttingGridSquare = PointReqsForDirectedLineCuttingGridSquare);
-trait_alias_macro!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
+trait_alias!(pub trait PointReqsForHalfPlaneCuttingGridSquare = PointReqsForDirectedLineCuttingGridSquare);
+trait_alias!(trait PointReqs = PointReqsForHalfPlaneCuttingGridSquare);
 
 pub type HalfPlaneCuttingGridSquare<P: PointReqs> =
     ThingRelToSquare<HalfPlaneCuttingCenteredUnitSquare<P>, OnGrid<P>>;

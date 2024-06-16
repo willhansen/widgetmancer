@@ -4,9 +4,9 @@ use std::ops::{Add, Div, Mul, Sub};
 use typenum::*;
 
 use crate::utility::coordinates::{Coordinate, CoordinateDataTypeTrait};
-use crate::utility::trait_alias_macro::trait_alias_macro;
+use crate::utility::trait_alias_macro::trait_alias;
 
-trait_alias_macro!(trait RelativityLevelTrait = Unsigned + Add<U1>);
+trait_alias!(trait RelativityLevelTrait = Unsigned + Add<U1>);
 
 #[derive(Hash, Clone, Copy, Eq)]
 pub struct ThingWithRelativity<THING_TYPE, RELATIVITY_LEVEL>

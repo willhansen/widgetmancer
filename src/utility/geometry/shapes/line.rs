@@ -7,8 +7,8 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForLine = PointReqsForDirectedLine);
-trait_alias_macro!(trait PointReqs = PointReqsForLine);
+trait_alias!(pub trait PointReqsForLine = PointReqsForDirectedLine);
+trait_alias!(trait PointReqs = PointReqsForLine);
 
 macro_rules! line {
     (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
@@ -17,7 +17,7 @@ macro_rules! line {
 }
 
 pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Line<P> {
-    Line::from_two_unordered_points_on_line(p1.into(), p2.into())
+    Line::<P>::from_two_unordered_points_on_line(p1.into(), p2.into())
 }
 
 /// A traditional line that extends infinitely in both directions
@@ -95,6 +95,9 @@ pub trait LineOps<P: PointReqs>:
     // fn from_point_array(points: [P; 2]) -> Self {
     //     Self::from_array_of_two_exact_points(points)
     // }
+
+    // TODO: For lines defined by two integer points, there should be checks for both integer and
+    // floating points given
     fn point_is_on_line(&self, point: Floating<P>) -> bool {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         on_line(p1.to_f32(), p2.to_f32(), point)
@@ -193,7 +196,9 @@ pub trait LineOps<P: PointReqs>:
     }
     fn closest_point_on_line_to_point(&self, point: Floating<P>) -> Floating<P> {
         let point = point.into();
-        let [p1, p2] = self.two_different_arbitrary_points_on_line().map(P::to_f32);
+        let [p1, p2]: [Floating<P>; 2] = self
+            .two_different_arbitrary_points_on_line()
+            .map(|p| p.to_f32());
         let p1_to_point = point - p1;
         let p1_to_p2 = p2 - p1;
         let parallel_part_of_p1_to_point = p1_to_point.projected_onto(p1_to_p2);
@@ -216,29 +221,18 @@ impl_translate_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
+impl<P> AbstractionOf<DirectedLine<P>> for Line<P> {}
+
 impl<P, T> LineOps<P> for T
 where
     P: PointReqs,
     T: AbstractsTo<Line<P>> + Copy,
 {
     fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        let line: Line<P> = *self.into();
+        let line: Line<P> = Into::<Line<P>>::into(*self);
         line.two_different_arbitrary_points_on_line()
     }
 }
-
-macro_rules! impl_operations_for_line_for_delegate {
-    ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {
-        impl<P: $traitparam> LineOps<P> for $type<P> {
-            fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-                self.$($accessor)+.two_different_arbitrary_points_on_line()
-            }
-        }
-    };
-}
-pub(crate) use impl_operations_for_line_for_delegate;
-
-impl_operations_for_line_for_delegate!(Line<P: PointReqs>, accessor=0);
 
 pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized {
     fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
@@ -262,19 +256,15 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
     }
 }
 
-macro_rules! impl_constructors_for_line_for_newtype {
-    ($type:ident<P: $traitparam:ident>, base=$BaseType:ident<P>) => {
-        impl<P: $traitparam> ConstructorsForLine<P> for $type<P> {}
-    };
-}
-pub(crate) use impl_constructors_for_line_for_newtype;
-
-// TODO: generate default data?
+// TODO: generate default data? (in the form of using Line constructors on types that abstract to
+// lines (like TwoDifferentPoints)
+//
 // create Default instance (if implemented), then set with abstraction?
 //
 // Strictly speaking, it doesn't need to have an entire default.  For example, a set of two
 // points could have a default distance between themselves of one unit, but have no default
 // absolute positions or angles
+//
 // - Calls for new trait of Default orthogonalToAbstraction<AbstractType>?  No.  At that point
 // just define the constructor from abstract type in the base type file itself.
 //
@@ -285,19 +275,10 @@ pub(crate) use impl_constructors_for_line_for_newtype;
 // {
 // }
 //
-impl<P: PointReqs> AbstractionOf<DirectedLine<P>> For Line<P> {
 
-}
+impl<P: PointReqs> AbstractionOf<DirectedLine<P>> for Line<P> {}
 
-impl_abstraction_for_newtype!(Line<P: PointReqs>, base=DirectedLine<P>);
-
-// TODO: maybe implement for `AbstractionOf<TwoDifferentPoints<P>>`?
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Line<P> {
-    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        // TODO: double check that Result<T,E> implements Into<Result<impl Into<T>, E>>
-        Ok(TwoDifferentPoints::<P>::try_from_two_exact_points(p1, p2).into())
-    }
-}
+impl<P: PointReqs> ConstructorsForLine<P> for Line<P> {}
 
 pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,
@@ -380,6 +361,7 @@ pub fn does_ray_hit_oriented_square_face(
 ) -> bool {
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
+
 pub fn naive_ray_endpoint<P: FloatCoordinateOps>(start: P, angle: Angle<f32>, length: f32) -> P {
     start + P::unit_vector_from_angle(angle) * length
 }
@@ -411,7 +393,7 @@ mod tests {
     fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
     ) {
         let input_line: TwoDifferentPoints<WorldPoint> =
-            TwoDifferentPoints::new_from_two_ordered_points_on_line(
+            TwoDifferentPoints::from_two_ordered_points_on_line(
                 point2(-0.5, -0.5),
                 point2(-0.5, 0.5),
             );

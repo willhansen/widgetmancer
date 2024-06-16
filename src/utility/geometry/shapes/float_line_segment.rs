@@ -1,10 +1,9 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForFloatLineSegment = FloatCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForFloatLineSegment);
+trait_alias!(pub trait PointReqsForFloatLineSegment = FloatCoordinateOps);
+trait_alias!(trait PointReqs = PointReqsForFloatLineSegment);
 
-pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P> 
-{
+pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P> {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
@@ -50,10 +49,7 @@ pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P>
         )
     }
 
-    fn line_segment_intersection_point(
-        &self,
-        other: impl LineSegmentOps<P>,
-    ) -> Option<P> {
+    fn line_segment_intersection_point(&self, other: impl LineSegmentOps<P>) -> Option<P> {
         let [a1, a2] = self.endpoints_in_arbitrary_order();
         let [b1, b2] = other.endpoints_in_arbitrary_order();
 
@@ -129,4 +125,7 @@ pub trait DirectedFloatLineSegmentOps<P: PointReqs>:
         self.start().lerp2d(self.end(), t)
     }
 }
-impl<T, P: PointReqs> DirectedFloatLineSegmentOps<P> for T where T: OperationsForDirectedLine<P> + FloatLineSegmentOps<P> {}
+impl<T, P: PointReqs> DirectedFloatLineSegmentOps<P> for T where
+    T: OperationsForDirectedLine<P> + FloatLineSegmentOps<P>
+{
+}

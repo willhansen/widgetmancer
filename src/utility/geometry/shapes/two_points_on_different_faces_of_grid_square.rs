@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare = FloatCoordinateOps);
-trait_alias_macro!(trait PointReqs =PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare);
+trait_alias!(pub trait PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare = FloatCoordinateOps);
+trait_alias!(trait PointReqs =PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare);
 
 pub type TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> =
     ThingRelToSquare<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, OnGrid<P>>;

@@ -8,8 +8,6 @@ use crate::utility::*;
 pub trait RefinementOf<RawType>: TryFrom<RawType> + Into<RawType> {
     fn valid(&self) -> bool;
 }
-// For when you want to automatically propagate a refinement relation down a pair of newtypes
-// TODO: abstraction rather than newtype?
 
 /// Indicates that the implementing type has less information visible than the base type.
 /// - Can be created with same constructors as base (TODO: enforce)
@@ -83,10 +81,3 @@ pub(crate) use impl_skip_level_try_from;
 
 // The type is being used in a new way, and all known semantics are discarded
 // TODO: This kind of feels like the default use of a newtype, and maybe does not need a dedicated trait...  Only use I can think of is to block implementation of the other two newtype traits
-
-// TODO: implement The `From` and `TryFrom` traits with macros
-// macro_rules! impl_refinement_conversions {
-//     ($base:ident, $refinement:ident) => {
-//         impl
-//     };
-// }

@@ -1,7 +1,7 @@
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForDirectedLine = PointReqsForTwoDifferentPoints);
-trait_alias_macro!(trait PointReqs = PointReqsForDirectedLine);
+trait_alias!(pub trait PointReqsForDirectedLine = PointReqsForTwoDifferentPoints);
+trait_alias!(trait PointReqs = PointReqsForDirectedLine);
 
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
 pub struct DirectedLine<PointType: PointReqs>(TwoDifferentPoints<PointType>);
@@ -46,20 +46,6 @@ pub trait OperationsForDirectedLine<P: PointReqs>:
     }
 }
 
-// TODO: abstraction instead of newtype (why?)
-//macro_rules! impl_directed_line_ops_for_abstraction
-// NOTE: The `$($accessor)+` thing is to generalize over a member (like `self.0`) and a getter (like `self.thing()`)
-macro_rules! impl_operations_for_directed_line_for_delegate {
-    ($type:ident<P: $traitparam:ident>, accessor=$($accessor:tt)+) => {
-        impl<P: $traitparam> OperationsForDirectedLine<P> for $type<P> {
-            fn two_points_on_line_in_order(&self) -> [P; 2] {
-                self.$($accessor)+.two_points_on_line_in_order()
-            }
-        }
-    };
-}
-pub(crate) use impl_operations_for_directed_line_for_delegate;
-
 impl_operations_for_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
 impl_operations_for_directed_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
 
@@ -77,7 +63,7 @@ impl<P: PointReqs> Reversible for DirectedLine<P> {
 pub trait ConstructorsForDirectedLine<P: PointReqs>:
     Sized + ConstructorsForTwoDifferentPoints<P>
 {
-    fn new_from_two_ordered_points_on_line(p1: P, p2: P) -> Self
+    fn from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
     {
@@ -103,7 +89,10 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
     where
         Self: Sized;
-    fn from_point_and_angle(point: impl Into<P>, direction: impl Into<FAngle>) -> Self
+    fn from_point_and_unit_step_in_direction(
+        point: impl Into<P>,
+        direction: impl Into<FAngle>,
+    ) -> Self
     where
         Self: OperationsForTwoDifferentPoints<P>,
         P: FloatCoordinateOps,
@@ -111,7 +100,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let p1 = point.into();
         let v = P::unit_vector_from_angle(direction.into());
         let p2 = p1 + v;
-        Self::new_from_two_ordered_points_on_line(p1, p2)
+        Self::from_two_ordered_points_on_line(p1, p2)
     }
     // TODO: maybe move to DirectedLineConstructors
     fn from_point_and_vector(point: impl Into<P>, direction: impl Into<P>) -> Self {
@@ -122,21 +111,14 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     }
 }
 
-macro_rules! impl_constructors_for_directed_line_for_newtype {
-    ($type:ident<P: $traitparam:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $traitparam> ConstructorsForDirectedLine<P> for $type<P> {
-            fn try_new_from_directed_line(
-                line: impl OperationsForDirectedLine<P>,
-            ) -> Result<Self, String>
-            where
-                Self: Sized,
-            {
-                Ok($BaseType::<P>::try_new_from_directed_line(line)?.into())
-            }
-        }
-    };
+impl<P: PointReqs> AbstractsTo<Line<P>> for DirectedLine<P> {
+    fn set_with_abstraction(&self, val: &Line<P>) -> Self {
+        // TODO: round trip conversion tests: Convert from base type to abstract type, then set the
+        // base type from the abstract type again.  Should be unchanged in all cases
+        todo!()
+    }
 }
-pub(crate) use impl_constructors_for_directed_line_for_newtype;
+impl<P: PointReqs> AbstractionOf<TwoDifferentPoints<P>> for DirectedLine<P> {}
 
 impl<P: PointReqs, T> ConstructorsForDirectedLine<P> for T
 where
@@ -149,8 +131,6 @@ where
         Ok(DirectedLine::<P>::try_new_from_directed_line(line)?.into())
     }
 }
-
-impl_constructors_for_directed_line_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

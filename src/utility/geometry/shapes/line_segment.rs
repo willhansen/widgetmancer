@@ -2,8 +2,8 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias_macro!(pub trait PointReqsForLineSegment = SignedCoordinateOps);
-trait_alias_macro!(trait PointReqs = PointReqsForLineSegment);
+trait_alias!(pub trait PointReqsForLineSegment = SignedCoordinateOps);
+trait_alias!(trait PointReqs = PointReqsForLineSegment);
 
 pub trait LineSegmentOps<P: PointReqs>: LineOps<P> {
     fn square_length(&self) -> <P as CoordinateOps>::DataType {
@@ -57,12 +57,12 @@ mod tests {
     #[test]
     fn test_intersection__easy_orthogonal_hit() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                 point2(0.0, 0.0),
                 point2(0.0, 4.0),
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                     point2(-1.0, 1.0),
                     point2(1.0, 1.0),
                 ),
@@ -74,12 +74,12 @@ mod tests {
     #[test]
     fn test_intersection__diagonal_intersection() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                 point2(0.0, 0.0),
                 point2(1.0, 1.0),
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                     point2(1.0, 0.0),
                     point2(0.0, 1.0),
                 ),
@@ -105,12 +105,12 @@ mod tests {
     #[test]
     fn test_intersection__endpoint_touch_mid_counts() {
         assert_about_eq_2d(
-            TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+            TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                 point2(5.0, 5.0),
                 point2(7.0, 5.0),
             )
             .line_segment_intersection_point(
-                TwoDifferentWorldPoints::new_from_two_ordered_points_on_line(
+                TwoDifferentWorldPoints::from_two_ordered_points_on_line(
                     point2(5.5, 5.0),
                     point2(10.0, 10.0),
                 ),
