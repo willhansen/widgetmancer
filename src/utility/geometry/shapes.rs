@@ -24,6 +24,72 @@ automod::dir!("src/utility/geometry/shapes");
 
 use crate::utility::*;
 
+// TODO: put this in the new_shape macro
+// alias for the type
+
+macro_rules! verify_abstraction_relation {
+    (concrete: $concrete_module:ident, abstract: $abstract_module:ident, point type: $point_type:ty) => {
+        // Confirm the concrete type knows about the abstract type
+        static_assertions::assert_impl_all!(
+            $concrete_module::Shape<$point_type>:
+            AbstractsTo<$abstract_module::Shape<$point_type>>
+        );
+        // Confirm the abstracted type knows about the concrete type
+        static_assertions::assert_impl_all!($abstract_module::Shape<$point_type>: AbstractionOf <$concrete_module::Shape<$point_type>>);
+
+        // Confirm the concrete type's operations can use the abstract type's operations
+        static_assertions::assert_trait_sub_all!($concrete_module::Operations: $abstract_module::Operations<$point_type>);
+        // Confirm the abstraction can be constructed with the new module's constructors
+        static_assertions::assert_trait_sub_all!($abstract_module::Constructors: $concrete_module::Constructors<$point_type>);
+    };
+}
+
+macro_rules! verify_refinement_relation {
+    (raw: $raw_module:ident, refined: $refined_module:ident, point type: $point_type:ty) => {
+        // Confirm the new module knows about the raw type it is a refinement of
+        static_assertions::assert_impl_all!($refined_module::Shape<$point_type>: RefinementOf<$raw_module::Shape<$point_type>>);
+        // Confirm the new module can use the operations and constructors of the raw type
+        static_assertions::assert_trait_sub_all!($refined_module::Operations<$point_type>: $raw_module::Operations<$point_type>);
+        static_assertions::assert_trait_sub_all!($refined_module::Constructors<$point_type>: $raw_module::Constructors<$point_type>);
+
+    };
+}
+
+macro_rules! new_shape {
+	($new_module:ident,
+    $shape_name:ident,
+		// rename to abstracted_type?
+		$(abstracts to: $($abstracts_to:ident,)+)?
+		// rename to concrete_type?
+		$(abstraction of: $($abstraction_of:ident,)+)?
+		// rename to raw_type?
+		$(refinement of: $($refinement_of:ident,)+)?) => {
+
+        pub type $shape_name<P> = $new_module::Shape<P>;
+
+
+        static_assertions::assert_impl_all!($new_module::Shape: $new_module::Operations, $new_module::Constructors);
+        static_assertions::assert_trait_sub_all!($new_module::Operations: $new_module::Constructors);
+        // abstracts to
+        $($(
+            verify_abstraction_relation!(concrete: $new_module, abstract: $abstracts_to);
+        )+)?
+        // abstraction of
+        $($(
+            verify_abstraction_relation!(concrete: $abstraction_of, abstract: $new_module);
+        )+)?
+        // refinement of
+        $($(
+            verify_refinement_relation!(raw: $refinement_of, refined: $new_module);
+        )+)?
+	}
+}
+
+pub type TwoDifferentPoints<P> = two_different_points::Shape<P>;
+
+new_shape!(line, Line, abstraction of: directed_line,);
+new_shape!(directed_line, DirectedLine, abstracts to: line, abstraction of: two_different_points,);
+
 // Traits to help keep all the conversion requirements between newtypes straight
 
 /// The type is being used as a subset of the base type.  Can be a refinement of multiple other types.

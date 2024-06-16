@@ -7,8 +7,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForLine = PointReqsForDirectedLine);
-trait_alias!(trait PointReqs = PointReqsForLine);
+trait_alias!(pub trait PointReqs = directed_line::PointReqs);
 
 macro_rules! line {
     (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
@@ -16,22 +15,22 @@ macro_rules! line {
     };
 }
 
-pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Line<P> {
-    Line::<P>::from_two_unordered_points_on_line(p1.into(), p2.into())
+pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Shape<P> {
+    Constructors::<P>::from_two_unordered_points_on_line(p1.into(), p2.into())
 }
 
 /// A traditional line that extends infinitely in both directions
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct Line<PointType: PointReqsForLine>(DirectedLine<PointType>);
+pub struct Shape<PointType: PointReqs>(DirectedLine<PointType>);
 
-impl<P: PointReqs> Line<P> {
+impl<P: PointReqs> Shape<P> {
     fn new(l: DirectedLine<P>) -> Self {
         Self(l)
     }
 }
 
-pub trait LineOps<P: PointReqs>:
-    Sized + Copy + QuarterTurnRotatable + Debug + Translate<P> + ConstructorsForLine<P>
+pub trait Operatations<P: PointReqs>:
+    Sized + Copy + QuarterTurnRotatable + Debug + Translate<P> + Constructors<P>
 {
     // type DataType = <P as Coordinate>::DataType;
     fn two_different_arbitrary_points_on_line(&self) -> [P; 2];
@@ -223,18 +222,21 @@ impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
 impl<P> AbstractionOf<DirectedLine<P>> for Line<P> {}
 
-impl<P, T> LineOps<P> for T
+impl<P, T> Operations<P> for T
 where
     P: PointReqs,
-    T: AbstractsTo<Line<P>> + Copy,
+    T: AbstractsTo<Shape<P>> + Copy,
 {
+    type TargetShape = T;
     fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        let line: Line<P> = Into::<Line<P>>::into(*self);
+        let line: Shape<P> = Into::<Shape<P>>::into(*self);
         line.two_different_arbitrary_points_on_line()
     }
 }
 
-pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Sized {
+pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
+    type TargetShape;
+
     fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
         Self::try_from_two_points_on_line(p1, p2).unwrap()
     }
@@ -247,10 +249,10 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
     fn try_from_two_points_on_line(p1: P, p2: P) -> Result<Self, String> {
         Self::try_from_two_points_allowing_snap_along_line(p1, p2)
     }
-    fn from_line(line: impl LineOps<P>) -> Self {
+    fn from_line(line: impl Operations<P>) -> Self {
         Self::try_from_line(line).unwrap()
     }
-    fn try_from_line(line: impl LineOps<P>) -> Result<Self, String> {
+    fn try_from_line(line: impl Operations<P>) -> Result<Self, String> {
         let p = line.two_different_arbitrary_points_on_line();
         Self::try_from_array_of_two_points_on_line(p)
     }
@@ -268,7 +270,7 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
 // - Calls for new trait of Default orthogonalToAbstraction<AbstractType>?  No.  At that point
 // just define the constructor from abstract type in the base type file itself.
 //
-// impl<P, T> ConstructorsForLine<P> for T
+// impl<P, T> Constructors<P> for T
 // where
 //     P: PointReqs,
 //     T: AbstractsTo<Line<P>> + Default,
@@ -276,9 +278,11 @@ pub trait ConstructorsForLine<P: PointReqs>: ConstructorsForDirectedLine<P> + Si
 // }
 //
 
-impl<P: PointReqs> AbstractionOf<DirectedLine<P>> for Line<P> {}
+impl<P: PointReqs> AbstractionOf<directed_line::Shape<P>> for Shape<P> {}
 
-impl<P: PointReqs> ConstructorsForLine<P> for Line<P> {}
+impl<P: PointReqs> Constructors<P> for Shape<P> {
+    type TargetShape = Shape<P>;
+}
 
 pub fn first_inside_square_face_hit_by_ray(
     start: WorldPoint,

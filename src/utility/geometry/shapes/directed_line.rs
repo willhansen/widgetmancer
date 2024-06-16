@@ -1,24 +1,21 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForDirectedLine = PointReqsForTwoDifferentPoints);
-trait_alias!(trait PointReqs = PointReqsForDirectedLine);
+trait_alias!(pub trait PointReqs = two_different_points::PointReqs);
 
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
-pub struct DirectedLine<PointType: PointReqs>(TwoDifferentPoints<PointType>);
+pub struct Shape<PointType: PointReqs>(TwoDifferentPoints<PointType>);
 
-impl<P: PointReqs> DirectedLine<P> {
+impl<P: PointReqs> Shape<P> {
     fn new(value: TwoDifferentPoints<P>) -> Self {
         Self(value)
     }
 }
 
-impl_abstraction_for_newtype!(DirectedLine<P: PointReqs>, base=TwoDifferentPoints<P>);
+impl_abstraction_for_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
 
-impl_translate_for_newtype!(DirectedLine<P: PointReqs>);
+impl_translate_for_newtype!(Shape<P: PointReqs>);
 
-pub trait OperationsForDirectedLine<P: PointReqs>:
-    LineOps<P> + Reversible + ConstructorsForDirectedLine<P>
-{
+pub trait Operations<P: PointReqs>: LineOps<P> + Reversible + Constructors<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2];
     fn arbitrary_vector_along_line(&self) -> P {
         let [p1, p2] = self.two_points_on_line_in_order();
@@ -46,23 +43,21 @@ pub trait OperationsForDirectedLine<P: PointReqs>:
     }
 }
 
-impl_operations_for_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
-impl_operations_for_directed_line_for_delegate!(DirectedLine<P: PointReqs>, accessor=0);
+impl_operations_for_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
+impl_operations_for_directed_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
 
-impl_constructors_for_line_for_newtype!(DirectedLine<P: PointReqs>, base= TwoDifferentPoints<P>);
+impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
 
 // impl<L> Reversible for L
 // where
-//     L: OperationsForDirectedLine + DirectedLineConstructors,
-impl<P: PointReqs> Reversible for DirectedLine<P> {
+//     L: Operations + Constructors,
+impl<P: PointReqs> Reversible for Shape<P> {
     fn reversed(&self) -> Self {
         todo!()
     }
 }
 
-pub trait ConstructorsForDirectedLine<P: PointReqs>:
-    Sized + ConstructorsForTwoDifferentPoints<P>
-{
+pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors<P> {
     fn from_two_ordered_points_on_line(p1: P, p2: P) -> Self
     where
         Self: Sized,
@@ -76,7 +71,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let line = TwoDifferentPoints::<P>::from_two_points(p1, p2);
         Self::try_new_from_directed_line(line)
     }
-    fn new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Self
+    fn new_from_directed_line(line: impl Operations<P>) -> Self
     where
         Self: Sized,
     {
@@ -86,7 +81,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let [p1, p2] = line.two_different_arbitrary_points_on_line();
         Self::from_two_points(p1, p2)
     }
-    fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where
         Self: Sized;
     fn from_point_and_unit_step_in_direction(
@@ -102,7 +97,7 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
         let p2 = p1 + v;
         Self::from_two_ordered_points_on_line(p1, p2)
     }
-    // TODO: maybe move to DirectedLineConstructors
+    // TODO: maybe move to Constructors
     fn from_point_and_vector(point: impl Into<P>, direction: impl Into<P>) -> Self {
         let p1 = point.into();
         let v = direction.into();
@@ -111,28 +106,28 @@ pub trait ConstructorsForDirectedLine<P: PointReqs>:
     }
 }
 
-impl<P: PointReqs> AbstractsTo<Line<P>> for DirectedLine<P> {
+impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &Line<P>) -> Self {
         // TODO: round trip conversion tests: Convert from base type to abstract type, then set the
         // base type from the abstract type again.  Should be unchanged in all cases
         todo!()
     }
 }
-impl<P: PointReqs> AbstractionOf<TwoDifferentPoints<P>> for DirectedLine<P> {}
+impl<P: PointReqs> AbstractionOf<TwoDifferentPoints<P>> for Shape<P> {}
 
-impl<P: PointReqs, T> ConstructorsForDirectedLine<P> for T
+impl<P: PointReqs, T> Constructors<P> for T
 where
-    T: AbstractionOf<DirectedLine<P>>,
+    T: AbstractionOf<Shape<P>>,
 {
-    fn try_new_from_directed_line(line: impl OperationsForDirectedLine<P>) -> Result<Self, String>
+    fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where
         Self: Sized,
     {
-        Ok(DirectedLine::<P>::try_new_from_directed_line(line)?.into())
+        Ok(Shape::<P>::try_new_from_directed_line(line)?.into())
     }
 }
 
-impl<P: PointReqs> QuarterTurnRotatable for DirectedLine<P> {
+impl<P: PointReqs> QuarterTurnRotatable for Shape<P> {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
         self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
     }
