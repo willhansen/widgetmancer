@@ -29,7 +29,7 @@ impl<P: PointReqs> Shape<P> {
     }
 }
 
-pub trait Operatations<P: PointReqs>:
+pub trait Operations<P: PointReqs>:
     Sized + Copy + QuarterTurnRotatable + Debug + Translate<P> + Constructors<P>
 {
     // type DataType = <P as Coordinate>::DataType;

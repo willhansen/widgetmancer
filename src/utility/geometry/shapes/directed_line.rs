@@ -15,7 +15,7 @@ impl_abstraction_for_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
 
 impl_translate_for_newtype!(Shape<P: PointReqs>);
 
-pub trait Operations<P: PointReqs>: LineOps<P> + Reversible + Constructors<P> {
+pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Constructors<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2];
     fn arbitrary_vector_along_line(&self) -> P {
         let [p1, p2] = self.two_points_on_line_in_order();
@@ -113,7 +113,6 @@ impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
         todo!()
     }
 }
-impl<P: PointReqs> AbstractionOf<TwoDifferentPoints<P>> for Shape<P> {}
 
 impl<P: PointReqs, T> Constructors<P> for T
 where

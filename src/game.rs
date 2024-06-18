@@ -38,8 +38,6 @@ use crate::portal_geometry::PortalGeometry;
 use crate::utility::*;
 use crate::{lerp, rand_radial_offset, round_to_king_step, Glyph, IPoint, IVector, LEFT_I};
 
-use self::size_2d::Size2D;
-
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
 

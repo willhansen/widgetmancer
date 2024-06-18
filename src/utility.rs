@@ -56,6 +56,7 @@ pub_use!(
     sign,
     to_and_from_array,
     trait_alias_macro,
+    units,
 );
 
 pub mod default {

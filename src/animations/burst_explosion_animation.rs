@@ -1,9 +1,7 @@
 use crate::animations::Animation;
-use crate::coordinates::CoordinateOps;
 use crate::glyph::glyph_constants::EXPLOSION_COLOR;
 use crate::glyph::Glyph;
-use crate::utility::coordinates::SignedCoordinateOps;
-use crate::utility::units::{WorldCharacterSquareGlyphMap, WorldMove, WorldPoint};
+use crate::utility::*;
 use euclid::Angle;
 use num::ToPrimitive;
 use rand::{Rng, SeedableRng};

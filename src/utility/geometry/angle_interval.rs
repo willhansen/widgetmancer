@@ -15,10 +15,6 @@ use termion::cursor::Left;
 use crate::fov_stuff::OctantFOVSquareSequenceIter;
 use crate::utility::*;
 
-use super::bool_with_partial::BoolWithPartial;
-use super::partial_angle_interval::PartialAngleInterval;
-use super::{FAngle, RigidTransform, RigidlyTransformable};
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AngleInterval {
     Empty,

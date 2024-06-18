@@ -1,7 +1,6 @@
 use crate::animations::Animation;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
-use crate::size_2d::Size2D;
 use crate::utility::*;
 use crate::IntCoordinateOps;
 use euclid::Length;

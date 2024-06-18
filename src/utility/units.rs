@@ -2,8 +2,6 @@ use crate::graphics::drawable::{Drawable, DrawableEnum};
 use crate::piece::NStep;
 use crate::utility::*;
 
-use self::size_2d::Size2D;
-
 // TODO: Utility modules shouldn't know about world class, should use default like euclid::UnknownUnit, and be compatible with any.
 
 // empty enums for euclid typing

@@ -55,20 +55,17 @@ macro_rules! verify_refinement_relation {
     };
 }
 
-macro_rules! new_shape {
+macro_rules! validate_new_shape_for_specific_point_type {
 	($new_module:ident,
     $shape_name:ident,
 		// rename to abstracted_type?
-		$(abstracts to: $($abstracts_to:ident,)+;)?
+		$(abstracts_to: $($abstracts_to:ident,)+;)?
 		// rename to concrete_type?
-		$(abstraction of: $($abstraction_of:ident,)+;)?
+		$(abstraction_of: $($abstraction_of:ident,)+;)?
 		// rename to raw_type?
-		$(refinement of: $($refinement_of:ident,)+;)?
+		$(refinement_of: $($refinement_of:ident,)+;)?
     point type: $point_type:ty
     ) => {
-
-        pub type $shape_name<P> = $new_module::Shape<P>;
-
 
         static_assertions::assert_impl_all!($new_module::Shape<$point_type>: $new_module::Operations<$point_type>, $new_module::Constructors<$point_type>);
         static_assertions::assert_trait_sub_all!($new_module::Operations<$point_type>: $new_module::Constructors<$point_type>);
@@ -86,11 +83,56 @@ macro_rules! new_shape {
         )+)?
 	}
 }
+macro_rules! validate_shape {
+	($new_module:ident,
+    $shape_name:ident,
+		// rename to abstracted_type?
+		$(abstracts_to: $($abstracts_to:ident,)+;)?
+		// rename to concrete_type?
+		$(abstraction_of: $($abstraction_of:ident,)+;)?
+		// rename to raw_type?
+		$(refinement_of: $($refinement_of:ident,)+;)?
+    ) => {
 
-// TODO: should not need to pick a point type to verify.  Ideally would validate schema generally)
-new_shape!(line, Line, abstraction of: directed_line,; point type: default::FloatPoint);
-new_shape!(directed_line, DirectedLine, abstracts to: line,; abstraction of: two_different_points,; point type: default::FloatPoint);
-new_shape!(two_different_points, TwoDifferentPoints, abstracts to: directed_line,; point type: default::FloatPoint);
+        pub type $shape_name<P> = $new_module::Shape<P>;
+
+        validate_new_shape_for_specific_point_type!(
+            $new_module,
+            $shape_name,
+            // rename to abstracted_type?
+            $(abstracts_to: $($abstracts_to,)+;)?
+            // rename to concrete_type?
+            $(abstraction_of: $($abstraction_of,)+;)?
+            // rename to raw_type?
+            $(refinement_of: $($refinement_of,)+;)?
+            point type: default::FloatPoint // TODO: should not need to pick a point type to verify.  Ideally would validate schema generally)
+        );
+    }
+}
+
+validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line,; );
+validate_shape!(directed_line, DirectedLine, abstracts_to: line,; abstraction_of: two_different_points,; );
+validate_shape!(line, Line, abstraction_of: directed_line,;);
+
+validate_shape!(
+    two_points_on_different_faces_of_centered_unit_square,
+    TwoPointsOnDifferentFacesOfCenteredUnitSquare,
+    abstracts_to: directed_line_cutting_centered_unit_square,;
+    refinement_of: two_different_points,;
+);
+validate_shape!(
+    directed_line_cutting_centered_unit_square,
+    DirectedLineCuttingCenteredUnitSquare,
+    abstracts_to: line_cutting_centered_unit_square,;
+    abstraction_of: two_points_on_different_faces_of_centered_unit_square,;
+    refinement_of: directed_line,;
+);
+validate_shape!(
+    line_cutting_centered_unit_square,
+    LineCuttingCenteredUnitSquare,
+    abstraction_of: directed_line_cutting_centered_unit_square,;
+    refinement_of: line,;
+);
 
 // Traits to help keep all the conversion requirements between newtypes straight
 

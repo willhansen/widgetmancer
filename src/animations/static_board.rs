@@ -2,11 +2,7 @@ use crate::animations::Animation;
 use crate::glyph::glyph_constants::BLACK;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
-use crate::size_2d::Size2D;
-use crate::utility::units::{
-    world_square_to_left_world_character_square, BoardSize, WorldCharacterSquareGlyphMap,
-    WorldSquare,
-};
+use crate::utility::*;
 use crate::vec2;
 use std::time::{Duration, Instant};
 
