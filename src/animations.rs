@@ -14,7 +14,6 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::animations::simple_laser::SimpleLaserAnimation;
 use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
-use crate::utility::units::*;
 
 use crate::utility::*;
 use crate::Glyph;

@@ -1,13 +1,12 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForLineCuttingCenteredUnitSquare = PointReqsForDirectedLineCuttingCenteredUnitSquare);
-trait_alias!(trait PointReqs = PointReqsForLineCuttingCenteredUnitSquare);
+trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::PointReqs);
 
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct LineCuttingCenteredUnitSquare<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl_abstraction_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
-impl_abstraction_skip_level!(LineCuttingCenteredUnitSquare<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
 // Is the arrow direction confusing?
 impl_skip_level_try_from!(LineCuttingCenteredUnitSquare<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> DirectedLine<P>);

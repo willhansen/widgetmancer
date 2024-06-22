@@ -89,7 +89,7 @@ pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors
         direction: impl Into<FAngle>,
     ) -> Self
     where
-        Self: OperationsForTwoDifferentPoints<P>,
+        Self: two_different_points::Operations<P>,
         P: FloatCoordinateOps,
     {
         let p1 = point.into();

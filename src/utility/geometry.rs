@@ -2,7 +2,7 @@
 // pub use float_line_segment::Shape as FloatLineSegment;
 // pub use float_line_segment::Operations as OperationsForFloatLineSegment;
 // pub use float_line_segment::Constructors as ConstructorsForFloatLineSegment;
-automod::dir!("src/utility/geometry");
+automod::dir!(pub "src/utility/geometry");
 
 pub_use!(
     angle,

@@ -42,7 +42,7 @@ macro_rules! pub_use {
 }
 pub(crate) use pub_use;
 
-automod::dir!("src/utility");
+automod::dir!(pub "src/utility");
 
 pub_use!(
     geometry,

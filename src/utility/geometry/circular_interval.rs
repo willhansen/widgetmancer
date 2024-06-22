@@ -1,9 +1,7 @@
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display, Formatter};
+use crate::utility::*;
 
-use super::{
-    bool_with_partial::BoolWithPartial, relative_interval_location::RelativeIntervalLocation,
-};
 
 /// Combines elements in a circular fashion
 /// Order independent

@@ -1,4 +1,4 @@
-automod::dir!("src/utility/geometry/shapes");
+automod::dir!(pub "src/utility/geometry/shapes");
 
 // cone,
 // directed_float_line,
