@@ -8,12 +8,12 @@ impl<T, MoveType> Translate<MoveType> for T where
 
 //
 macro_rules! impl_translate_for_newtype {
-    // TODO: $P doesn't really need to be a metavariable.  Can I make it just part of the regex match?
     ($type:ident<P: $traitparam:ident>) => {
         impl<P: $traitparam> Add<P> for $type<P> {
             type Output = Self;
 
             fn add(self, rhs: P) -> Self::Output {
+                // TODO: relies on specific constructor: bad
                 Self::new(self.0.add(rhs))
             }
         }
@@ -27,3 +27,37 @@ macro_rules! impl_translate_for_newtype {
     };
 }
 pub(crate) use impl_translate_for_newtype;
+
+// TODO
+macro_rules! impl_translate_for_refined_type {
+    ($TheStruct:ident<P: $CoordTrait:ident>, refinement_base= $RefinementBase:ident<P>) => {
+
+        // TODO: statically assert the $RefinementBase implements translate
+
+        impl<P> Add<P> for $TheStruct<P>
+        where
+            Self: Operations<P> + Translate<P>,
+            P: $CoordTrait,
+        {
+            type Output = Self;
+
+            fn add(self, rhs: P) -> Self::Output {
+                let base: $RefinementBase<P> = self.try_into().unwrap();
+                base.add(rhs).into()
+            }
+        }
+        impl<P> Sub<P> for $TheStruct<P>
+        where
+            Self: Operations<P>,
+            P: $CoordTrait,
+        {
+            type Output = Self;
+
+            fn sub(self, rhs: P) -> Self::Output {
+                let base: $RefinementBase<P> = self.try_into().unwrap();
+                base.sub(rhs).into()
+            }
+        }
+    };
+}
+pub(crate) use impl_translate_for_refined_type;

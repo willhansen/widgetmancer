@@ -1,12 +1,11 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForFloatLine = FloatCoordinateOps);
-trait_alias!(trait PointReqs = PointReqsForFloatLine);
+trait_alias!(pub trait PointReqs = FloatCoordinateOps);
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
-pub type FloatLine<UnitType> = Line<Point2D<f32, UnitType>>;
+pub type Shape<UnitType> = Line<Point2D<f32, UnitType>>;
 
-pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
+pub trait Operations<P: PointReqs>: line::Operations<P> {
     fn point_is_on_or_normal_to_line_segment(&self, point: P) -> bool {
         let [start_point, end_point] = self.two_different_arbitrary_points_on_line();
 
@@ -142,7 +141,7 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
             .is_empty()
     }
 
-    fn intersection_point_with_other_extended_line(&self, other: impl LineOps<P>) -> Option<P> {
+    fn intersection_point_with_other_extended_line(&self, other: impl line::Operations<P>) -> Option<P> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
 
@@ -164,4 +163,4 @@ pub trait FloatLineOps<P: PointReqs>: LineOps<P> {
     }
 }
 
-impl<L, P: PointReqs> FloatLineOps<P> for L where L: LineOps<P> {}
+impl<L, P: PointReqs> Operations<P> for L where L: line::Operations<P> {}

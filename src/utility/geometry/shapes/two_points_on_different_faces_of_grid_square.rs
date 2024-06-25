@@ -1,38 +1,35 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare = FloatCoordinateOps);
-trait_alias!(trait PointReqs =PointReqsTwoPointsOnDifferentFacesOfCenteredUnitSquare);
+trait_alias!(pub trait PointReqs = FloatCoordinateOps);
 
-pub type TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> =
+pub type Shape<P: PointReqs> =
     ThingRelToSquare<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, OnGrid<P>>;
 
-impl<P: PointReqs> TwoPointsOnDifferentFacesOfGridSquare<P> {
+impl<P: PointReqs> Shape<P> {
     pub fn points_on_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
         *self.thing()
     }
 }
-impl<P: PointReqs> OperationsForTwoDifferentPoints<P> for TwoPointsOnDifferentFacesOfGridSquare<P> {
+// TODO: why is this implemented here?
+impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
     fn point_by_index(&self, point_index: usize) -> P {
         self.points_on_the_square().point_by_index(point_index) + self.square_center()
     }
 }
 
-// impls_for_two_different_points!(TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>);
-impl_translate_for_two_points_with_restriction!(
-    TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>
-);
+impl_translate_for_refined_type!(Shape<P: PointReqs>, refinement_base= two_different_points::Shape<P>);
 
-impl_constructors_for_two_different_points_for_refinement!(TwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
+impl_constructors_for_two_different_points_for_refinement!(Shape<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
 
-pub trait ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs>: Sized {
-    fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
+pub trait Constructors<P: PointReqs>: Sized {
+    fn try_new_from_line_and_square<L: directed_float_line::Operations<P>>(
         line: L,
         square: P::OnGrid,
     ) -> Result<Self, String>;
 }
 
-impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
-    for TwoPointsOnDifferentFacesOfGridSquare<P>
+impl<P: PointReqs> Constructors<P>
+    for Shape<P>
 {
     fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
         line: L,
@@ -53,46 +50,27 @@ impl<P: PointReqs> ConstructorsForTwoPointsOnDifferentFacesOfGridSquare<P>
     }
 }
 
-pub trait OperationsForTwoPointsOnDifferentFacesOfGridSquare<P: PointReqs> {
-    fn which_square(&self) -> OnGrid<P>;
-    fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>;
+pub trait Operations<P: PointReqs> {
 }
 
-impl<P: PointReqs> TwoPointsOnDifferentFacesOfGridSquare<P> {
-    pub fn the_square(&self) -> P::OnGrid {
-        self.square()
-    }
+impl<P: PointReqs> Shape<P> {
 
     pub fn square_center(&self) -> P {
-        self.the_square().to_f32()
+        self.square().to_f32()
     }
 
-    pub fn as_local(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
-        self.points_on_the_square
-    }
 }
-impl<P: PointReqs> OperationsForTwoPointsOnDifferentFacesOfGridSquare<P>
+// TODO: why is this implemented here?
+impl<P: PointReqs> Operations<P>
     for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>
 {
-    fn which_square(&self) -> P::OnGrid {
-        <P::OnGrid as euclid::num::Zero>::zero()
-    }
-    fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
-        *self
-    }
 }
-impl<P: PointReqs> OperationsForTwoPointsOnDifferentFacesOfGridSquare<P>
-    for TwoPointsOnDifferentFacesOfGridSquare<P>
+impl<P: PointReqs> Operations<P>
+    for Shape<P>
 {
-    fn which_square(&self) -> P::OnGrid {
-        self.the_square()
-    }
-    fn points_relative_to_the_square(&self) -> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
-        *self.to_local()
-    }
 }
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P>
-    for TwoPointsOnDifferentFacesOfGridSquare<P>
+    for Shape<P>
 {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         let square_center = p1.lerp2d(p2, 0.5).round();

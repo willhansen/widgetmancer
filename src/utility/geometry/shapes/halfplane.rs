@@ -1,16 +1,15 @@
 use crate::utility::*;
 use euclid::num::Zero;
 
-trait_alias!(pub trait PointReqsForHalfPlane = PointReqsForDirectedLine + PointReqsForFloatLine);
-trait_alias!(trait PointReqs = PointReqsForHalfPlane);
+trait_alias!(pub trait PointReqs = directed_line::PointReqs + float_line::PointReqs);
 
-// pub trait<P: DirectedLinePointReqs> LineReqsForHalfPlane: DirectedLineOps {}
-// impl<T> LineReqsForHalfPlane for T where T: DirectedLine
+// pub trait<P: DirectedLinePointReqs> LineReqs: DirectedLineOps {}
+// impl<T> LineReqs for T where T: DirectedLine
 
 /// The 2D version of a half-space (TODO: rename?)
 // TODO: allow non-floating-point-based half planes
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct HalfPlane<P: PointReqs>(
+pub struct Shape<P: PointReqs>(
     // TODO: flip this convention so ccw motion around an object keeps the inside on the left.
     // Internal convention is that the half plane is clockwise of the vector from p1 to p2 of the dividing line
     // TODO: parameterize this line type?
@@ -18,14 +17,14 @@ pub struct HalfPlane<P: PointReqs>(
 );
 
 // TODO: move most of these functions to HalfPlaneOps
-impl<P: PointReqs> HalfPlane<P> {
+impl<P: PointReqs> Shape<P> {
     fn new(line: DirectedLine<P>) -> Self {
         Self(line)
     }
 }
 
-pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
-    type BorderType: OperationsForDirectedLine<P>;
+pub trait Constructors<P: PointReqs>: Sized {
+    type BorderType: directed_line::Operations<P>;
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self;
 
     fn from_line_and_point_on_half_plane(
@@ -60,7 +59,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
             -vector_to_outside,
         )
     }
-    fn new_from_border_line_with_origin_inside(line: impl OperationsForDirectedLine<P>) -> Self {
+    fn new_from_border_line_with_origin_inside(line: impl directed_line::Operations<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
         Self::from_line_and_point_on_half_plane(line, P::zero())
     }
@@ -91,7 +90,7 @@ pub trait ConstructorsForHalfPlane<P: PointReqs>: Sized {
     }
 }
 
-impl<P: PointReqs> ConstructorsForHalfPlane<P> for HalfPlane<P> {
+impl<P: PointReqs> Constructors<P> for Shape<P> {
     type BorderType = DirectedLine<P>;
     fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
 where {
@@ -101,18 +100,18 @@ where {
 macro_rules! impl_constructors_for_half_plane_for_refinement {
     ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
         // static assert prerequisite trait is implemented
-        impl<P: $TraitParam> ConstructorsForHalfPlane<P> for $Type<P> {
+        impl<P: $TraitParam> Constructors<P> for $Type<P> {
             type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
         // where
                                     //     // is refinement
                                     //     Self: Refinement<$BaseType<P>>,
                                     //     // refinement base is constructor
-                                    //     $BaseType::<P>: ConstructorsForHalfPlane<P>,
+                                    //     $BaseType::<P>: Constructors<P>,
                                     //     // border type is refinement of the refinement base's border
-                                    //     Self::BorderType: Refinement< <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType >,
+                                    //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
             {
-                let border_of_base: <$BaseType<P> as ConstructorsForHalfPlane<P>>::BorderType =
+                let border_of_base: <$BaseType<P> as Constructors<P>>::BorderType =
                     border.into();
                 let refinement_base: $BaseType<P> =
                     $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
@@ -123,7 +122,7 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
 }
 pub(crate) use impl_constructors_for_half_plane_for_refinement;
 
-impl<P: PointReqs> Complement for HalfPlane<P> {
+impl<P: PointReqs> Complement for Shape<P> {
     type Output = Self;
 
     fn complement(&self) -> Self::Output {
@@ -146,21 +145,21 @@ macro_rules! impl_quarter_turn_rotatable_for_impl_half_plane_ops {
 }
 pub(crate) use impl_quarter_turn_rotatable_for_impl_half_plane_ops;
 
-impl_quarter_turn_rotatable_for_impl_half_plane_ops!(HalfPlane<P: PointReqs>);
+impl_quarter_turn_rotatable_for_impl_half_plane_ops!(Shape<P: PointReqs>);
 
-// impl_quarter_turn_rotatable_for_newtype!(HalfPlane<P: PointReqs>);
+// impl_quarter_turn_rotatable_for_newtype!(Shape<P: PointReqs>);
 
 // TODO: Switch to associated point type
 type BorderTypeOf<T, P> = <T as HalfPlaneOps<P>>::BorderType;
 
 pub trait HalfPlaneOps<P: PointReqs>:
-    ConstructorsForHalfPlane<P> + Complement<Output = Self> + QuarterTurnRotatable + Sized
+    Constructors<P> + Complement<Output = Self> + QuarterTurnRotatable + Sized
 {
-    type BorderType: OperationsForDirectedLine<P>;
+    type BorderType: directed_line::Operations<P>;
 
     fn border_line(&self) -> BorderTypeOf<Self, P>;
 
-    #[deprecated(note = "use HalfPlane::border_line instead")]
+    #[deprecated(note = "use Shape::border_line instead")]
     fn dividing_line(&self) -> BorderTypeOf<Self, P> {
         self.border_line()
     }
@@ -257,7 +256,7 @@ pub trait HalfPlaneOps<P: PointReqs>:
     // TODO: convert into shape-agnostic trait
     //Fn(LineType::PointType) -> Point2D<f32, V>,
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
-    fn with_transformed_points<F, POut>(&self, point_transform_function: F) -> HalfPlane<POut>
+    fn with_transformed_points<F, POut>(&self, point_transform_function: F) -> Shape<POut>
     where
         POut: PointReqs, // + FloatCoordinateOps,
         F: Fn(P) -> POut,
@@ -269,7 +268,7 @@ pub trait HalfPlaneOps<P: PointReqs>:
         let transformed_line: DirectedLine<POut> =
             DirectedLine::try_from_two_exact_points(p1, p2).unwrap();
 
-        HalfPlane::<POut>::from_border_with_inside_on_right(transformed_line)
+        Shape::<POut>::from_border_with_inside_on_right(transformed_line)
     }
     fn depth_of_point_in_half_plane(&self, point: Floating<P>) -> f32 {
         let dist = self.dividing_line().normal_distance_to_point(point);
@@ -387,7 +386,7 @@ pub trait HalfPlaneOps<P: PointReqs>:
     }
 }
 
-impl_half_plane_ops_for_newtype!(HalfPlane<P: PointReqs>, base= DirectedLine<P>);
+impl_half_plane_ops_for_newtype!(Shape<P: PointReqs>, base= DirectedLine<P>);
 
 macro_rules! impl_half_plane_ops_for_newtype {
     ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
@@ -402,7 +401,7 @@ macro_rules! impl_half_plane_ops_for_newtype {
 pub(crate) use impl_half_plane_ops_for_newtype;
 use num::Float;
 
-impl<P: PointReqs> Display for HalfPlane<P> {
+impl<P: PointReqs> Display for Shape<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HalfPlane")
             .field("dividing_line", &self.dividing_line())
@@ -862,7 +861,7 @@ mod tests {
     }
     #[test]
     fn test_halfplane_at_least_partially_covers_point() {
-        let hp: LocalSquareHalfPlane = HalfPlane::new_with_inside_down(0.0);
+        let hp: LocalSquareHalfPlane = Shape::new_with_inside_down(0.0);
         assert!(hp.at_least_partially_covers_point(point2(0.0, 0.0)));
         assert!(hp.at_least_partially_covers_point(point2(0.0, -0.1)));
         assert_false!(hp.at_least_partially_covers_point(point2(0.0, 0.1)));

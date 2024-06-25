@@ -22,5 +22,6 @@ pub_use!(
     reversible,
     shapes,
     size_2d,
+    thing_relative_to_square,
     translate,
 );

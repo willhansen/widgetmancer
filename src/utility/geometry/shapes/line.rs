@@ -222,12 +222,11 @@ impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
 impl<P> AbstractionOf<DirectedLine<P>> for Line<P> {}
 
-impl<P, T> Operations<P> for T
+impl<P: PointReqs, T> Operations<P> for T
 where
-    P: PointReqs,
     T: AbstractsTo<Shape<P>> + Copy,
 {
-    type TargetShape = T;
+    // type TargetShape = T;
     fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
         let line: Shape<P> = Into::<Shape<P>>::into(*self);
         line.two_different_arbitrary_points_on_line()

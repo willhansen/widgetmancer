@@ -114,6 +114,12 @@ impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     }
 }
 
+impl<P: PointReqs> Into<Line<P>> for Shape<P> {
+    fn into(self) -> Line<P> {
+        Line::<P>::from_line(self)
+    }
+}
+
 impl<P: PointReqs, T> Constructors<P> for T
 where
     T: AbstractionOf<Shape<P>>,

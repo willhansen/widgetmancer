@@ -166,6 +166,20 @@ impl<P: PointReqs> Operations<P> for Shape<P> {
         }
     }
 }
+
+// TODO: operations for refinements should be failable
+impl<P: PointReqs, T> Operations<P> for T
+where
+    T: RefinementOf<Shape<P>>,
+{
+    fn point_by_index(&self, point_index: usize) -> P {
+        let intermediate: Shape<P> = self.into();
+        intermediate.point_by_index(point_index)
+    }
+}
+
+
+
 // TODO: separate file and also int rays
 impl<P: FloatCoordinateOps> Ray<P> for Shape<P> {
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
@@ -241,37 +255,27 @@ macro_rules! impls_for_two_different_points {
 }
 pub(crate) use impls_for_two_different_points;
 
+
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
 impls_for_two_different_points!(Shape<P: PointReqs>);
 
-macro_rules! impl_translate_for_two_points_with_restriction {
-    ($TheStruct:ident<P: $CoordTrait:ident>) => {
-        impl<P> Add<P> for $TheStruct<P>
-        where
-            Self: Operations<P>,
-            P: $CoordTrait,
-        {
-            type Output = Self;
+impl<P: PointReqs> Add<P> for Shape<P>
+{
+    type Output = Self;
 
-            fn add(self, rhs: P) -> Self::Output {
-                Self::try_new_from_points(self.p1() + rhs, self.p2() + rhs).unwrap()
-            }
-        }
-        impl<P> Sub<P> for $TheStruct<P>
-        where
-            Self: Operations<P>,
-            P: $CoordTrait,
-        {
-            type Output = Self;
-
-            fn sub(self, rhs: P) -> Self::Output {
-                Self::try_new_from_points(self.p1() - rhs, self.p2() - rhs).unwrap()
-            }
-        }
-    };
+    fn add(self, rhs: P) -> Self::Output {
+        Self::try_new_from_points(self.p1() + rhs, self.p2() + rhs).unwrap()
+    }
 }
-pub(crate) use impl_translate_for_two_points_with_restriction;
+impl<P: PointReqs> Sub<P> for Shape<P>
+{
+    type Output = Self;
+
+    fn sub(self, rhs: P) -> Self::Output {
+        Self::try_new_from_points(self.p1() - rhs, self.p2() - rhs).unwrap()
+    }
+}
 
 // TODO: combine into one macro call
 impl_translate_for_two_points_with_restriction!(Shape<P: PointReqs>);

@@ -3,7 +3,7 @@ use crate::utility::*;
 trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::PointReqs);
 
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
-pub struct LineCuttingCenteredUnitSquare<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);
+pub struct Shape<P: PointReqs>(directed_line_cutting_centered_unit_square::Shape<P>);
 
 impl_abstraction_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
@@ -42,3 +42,9 @@ impl<P: PointReqs> RefinementOf<Line<P>> for LineCuttingCenteredUnitSquare<P> {
         true
     }
 }
+
+pub trait Constructors<P: PointReqs>: directed_line_cutting_centered_unit_square::Constructors<P> {
+
+}
+
+impl<P: PointReqs> Constructors<P> for Shape<P> {}
