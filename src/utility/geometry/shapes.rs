@@ -110,10 +110,28 @@ macro_rules! validate_shape {
     }
 }
 
-validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line,; );
+validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line, ray, directed_line_segment,; );
 validate_shape!(directed_line, DirectedLine, abstracts_to: line,; abstraction_of: two_different_points,; );
 validate_shape!(line, Line, abstraction_of: directed_line,;);
+validate_shape!(
+    halfplane,
+    HalfPlane,
+    // TODO: direction as abstractable module
+    abstracts_to: line,;// direction,;
+    // abstraction_of: ,;
+    // refinement_of: ,;
+);
+validate_shape!(
+    ray,
+    Ray,
+    // TODO: points and directions as abstractable module
+    abstracts_to: line,;// direction, point,;
+    abstraction_of: two_different_points,;
+    // refinement_of: ,;
+);
 
+// Centered unit square refinement
+//==================================================
 validate_shape!(
     two_points_on_different_faces_of_centered_unit_square,
     TwoPointsOnDifferentFacesOfCenteredUnitSquare,
@@ -133,6 +151,9 @@ validate_shape!(
     abstraction_of: directed_line_cutting_centered_unit_square,;
     refinement_of: line,;
 );
+
+// Grid square refinement
+//==================================================
 
 // Traits to help keep all the conversion requirements between newtypes straight
 
