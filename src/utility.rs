@@ -65,7 +65,8 @@ pub mod default {
 
     pub type FloatPoint = Point2D<f32>;
     pub type IntPoint = Point2D<i32>;
-    pub type TwoDifferentFloatPoints = super::TwoDifferentFloatPoints<euclid::UnknownUnit>;
+    pub type TwoDifferentFloatPoints =
+        super::two_different_points::TwoDifferentFloatPoints<euclid::UnknownUnit>;
     pub type FloatLine = super::FloatLine<euclid::UnknownUnit>;
     pub type DirectedFloatLine = super::DirectedFloatLine<euclid::UnknownUnit>;
     pub type HalfPlane = super::HalfPlane<FloatPoint>;

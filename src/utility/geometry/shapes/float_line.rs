@@ -141,7 +141,10 @@ pub trait Operations<P: PointReqs>: line::Operations<P> {
             .is_empty()
     }
 
-    fn intersection_point_with_other_extended_line(&self, other: impl line::Operations<P>) -> Option<P> {
+    fn intersection_point_with_other_extended_line(
+        &self,
+        other: impl line::Operations<P>,
+    ) -> Option<P> {
         let [self_p1, self_p2] = self.two_different_arbitrary_points_on_line();
         let [other_p1, other_p2] = other.two_different_arbitrary_points_on_line();
 

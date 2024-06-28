@@ -1,12 +1,11 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForDirectedFloatLine = PointReqsForDirectedLine + PointReqsForFloatLine);
-trait_alias!(trait PointReqs =PointReqsForDirectedFloatLine );
+trait_alias!(pub trait PointReqs = directed_line::PointReqs + float_line::PointReqs);
 
-pub type DirectedFloatLine<UnitType> = DirectedLine<Point2D<f32, UnitType>>;
+pub type Shape<UnitType> = DirectedLine<Point2D<f32, UnitType>>;
 
-pub trait DirectedFloatLineOps<P: PointReqs>:
-    OperationsForDirectedLine<P> + FloatLineOps<P>
+pub trait Operations<P: PointReqs>:
+    directed_line::Operations<P> + float_line::Operations<P>
 {
     fn points_sorted_by_line_direction(&self, mut points: Vec<P>) -> Vec<P> {
         let normalized_line_direction = P::unit_vector_from_angle(self.direction());
@@ -47,7 +46,7 @@ pub trait DirectedFloatLineOps<P: PointReqs>:
     }
 }
 
-impl<L, P: PointReqs> DirectedFloatLineOps<P> for L where
-    L: FloatLineOps<P> + OperationsForDirectedLine<P>
+impl<L, P: PointReqs> Operations<P> for L where
+    L: float_line::Operations<P> + directed_line::Operations<P>
 {
 }

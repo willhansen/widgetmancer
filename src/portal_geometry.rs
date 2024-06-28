@@ -275,7 +275,7 @@ impl PortalGeometry {
             {
                 // Step back so the line doesn't end exactly on the border between squares
                 let stepped_back_intersection_point =
-                    naive_ray_endpoint(intersection_point, angle, -STEP_BACK_DISTANCE);
+                    floating_point_step(intersection_point, angle, -STEP_BACK_DISTANCE);
 
                 let new_line = TwoDifferentWorldPoints::from_two_unordered_points_on_line(
                     start,
@@ -289,7 +289,7 @@ impl PortalGeometry {
                 start = intersection_point;
                 (start, angle) = portal.get_transform().transform_ray(start, angle);
                 // Step forward so the line doesn't start exactly on the border between squares
-                let stepped_forward_start = naive_ray_endpoint(start, angle, STEP_BACK_DISTANCE);
+                let stepped_forward_start = floating_point_step(start, angle, STEP_BACK_DISTANCE);
                 start = stepped_forward_start;
             } else {
                 naive_line_segments.push(TwoDifferentWorldPoints::from_point_and_radial(
@@ -308,7 +308,7 @@ impl PortalGeometry {
     ) -> Option<(WorldSquareWithOrthogonalDir, WorldPoint)> {
         let all_entrances: HashSet<WorldSquareWithOrthogonalDir> =
             self.portal_exits_by_entrance.keys().cloned().collect();
-        first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
+        line::first_inside_square_face_hit_by_ray(start, angle, range, &all_entrances)
     }
 }
 

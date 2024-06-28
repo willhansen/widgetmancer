@@ -130,30 +130,70 @@ validate_shape!(
     // refinement_of: ,;
 );
 
+// Float points
+//==================================================
+// TODO: the abstraction relation is defined redundantly here and with the base lines.
+validate_shape!(directed_float_line, DirectedFloatLine, abstracts_to: float_line,; refinement_of: directed_line,;);
+validate_shape!(float_line, FloatLine, abstraction_of: directed_float_line,; refinement_of: line,;);
+
 // Centered unit square refinement
 //==================================================
 validate_shape!(
     two_points_on_different_faces_of_centered_unit_square,
     TwoPointsOnDifferentFacesOfCenteredUnitSquare,
     abstracts_to: directed_line_cutting_centered_unit_square,;
+    abstraction_of: two_points_on_different_faces_of_grid_square,;
     refinement_of: two_different_points,;
 );
 validate_shape!(
     directed_line_cutting_centered_unit_square,
     DirectedLineCuttingCenteredUnitSquare,
     abstracts_to: line_cutting_centered_unit_square,;
-    abstraction_of: two_points_on_different_faces_of_centered_unit_square,;
+    abstraction_of: two_points_on_different_faces_of_centered_unit_square, directed_line_cutting_grid_square,;
     refinement_of: directed_line,;
 );
 validate_shape!(
     line_cutting_centered_unit_square,
     LineCuttingCenteredUnitSquare,
-    abstraction_of: directed_line_cutting_centered_unit_square,;
+    abstraction_of: directed_line_cutting_centered_unit_square, line_cutting_grid_square,;
     refinement_of: line,;
+);
+validate_shape!(
+    halfplane_cutting_centered_unit_square,
+    HalfPlaneCuttingCenteredUnitSquare,
+    abstracts_to: line_cutting_centered_unit_square,;
+    abstraction_of: halfplane_cutting_grid_square,;
+    refinement_of: halfplane,;
 );
 
 // Grid square refinement
 //==================================================
+validate_shape!(
+    two_points_on_different_faces_of_grid_square,
+    TwoPointsOnDifferentFacesOfGridSquare,
+    abstracts_to: directed_line_cutting_grid_square, two_points_on_different_faces_of_centered_unit_square,;
+    refinement_of: two_different_points,;
+);
+validate_shape!(
+    directed_line_cutting_grid_square,
+    DirectedLineCuttingGridSquare,
+    abstracts_to: line_cutting_grid_square, directed_line_cutting_centered_unit_square,;
+    abstraction_of: two_points_on_different_faces_of_grid_square,;
+    refinement_of: directed_line,;
+);
+validate_shape!(
+    line_cutting_grid_square,
+    LineCuttingGridSquare,
+    abstraction_of: directed_line_cutting_grid_square, directed_line_cutting_centered_unit_square,;
+    refinement_of: line,;
+);
+// TODO
+validate_shape!(
+    halfplane_cutting_grid_square,
+    HalfPlaneCuttingGridSquare,
+    abstracts_to: line_cutting_grid_square, line_cutting_centered_unit_square,;
+    refinement_of: halfplane,;
+);
 
 // Traits to help keep all the conversion requirements between newtypes straight
 

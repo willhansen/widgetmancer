@@ -105,7 +105,7 @@ pub trait Constructors<P: PointReqs>: Sized {
         P: FloatCoordinateOps,
     {
         let p1 = p1.into();
-        Self::try_from_two_exact_points(p1, naive_ray_endpoint(p1, angle, length))
+        Self::try_from_two_exact_points(p1, floating_point_step(p1, angle, length))
     }
     fn from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
     where
@@ -177,8 +177,6 @@ where
         intermediate.point_by_index(point_index)
     }
 }
-
-
 
 // TODO: separate file and also int rays
 impl<P: FloatCoordinateOps> Ray<P> for Shape<P> {
@@ -255,21 +253,18 @@ macro_rules! impls_for_two_different_points {
 }
 pub(crate) use impls_for_two_different_points;
 
-
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
 impls_for_two_different_points!(Shape<P: PointReqs>);
 
-impl<P: PointReqs> Add<P> for Shape<P>
-{
+impl<P: PointReqs> Add<P> for Shape<P> {
     type Output = Self;
 
     fn add(self, rhs: P) -> Self::Output {
         Self::try_new_from_points(self.p1() + rhs, self.p2() + rhs).unwrap()
     }
 }
-impl<P: PointReqs> Sub<P> for Shape<P>
-{
+impl<P: PointReqs> Sub<P> for Shape<P> {
     type Output = Self;
 
     fn sub(self, rhs: P) -> Self::Output {

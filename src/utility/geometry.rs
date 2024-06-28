@@ -25,3 +25,7 @@ pub_use!(
     thing_relative_to_square,
     translate,
 );
+
+pub fn floating_point_step<P: FloatCoordinateOps>(start: P, angle: Angle<f32>, length: f32) -> P {
+    start + P::unit_vector_from_angle(angle) * length
+}

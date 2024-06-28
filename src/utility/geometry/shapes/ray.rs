@@ -2,7 +2,9 @@ use crate::utility::*;
 
 trait_alias!(pub trait PointReqs = FloatCoordinateOps);
 
-pub trait Shape<P: PointReqs> {
+pub struct Shape<PointType: PointReqs>(TwoDifferentPoints<PointType>);
+
+pub trait Operations<P: PointReqs>: Constructors<P> {
     // TODO: allow for intCoordinate-based rays
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self;
     fn point(&self) -> P;
@@ -14,5 +16,4 @@ pub trait Shape<P: PointReqs> {
         T::from_point_and_vector(self.point(), P::unit_vector_from_angle(self.angle()))
     }
 }
-pub trait Operations<P: PointReqs>: Constructors<P> {}
 pub trait Constructors<P: PointReqs> {}
