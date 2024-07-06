@@ -161,8 +161,8 @@ where
     ) -> bool {
         *self == other_face.into() || *self == other_face.into().stepped().turned_back()
     }
-    pub fn face_line_segment(&self) -> impl LineSegmentOps<SquareType::Floating> {
-        square_face_as_line(self.square, self.dir)
+    pub fn face_line_segment(&self) -> impl line_segment::Operations<SquareType::Floating> {
+        line::square_face_as_line(self.square, self.dir)
     }
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {

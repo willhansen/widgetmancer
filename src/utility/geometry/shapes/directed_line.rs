@@ -77,26 +77,13 @@ pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors
     {
         Self::try_new_from_directed_line(line).unwrap()
     }
-    fn choose_arbitrary_direction_for_line(line: impl LineOps<P>) -> Self {
+    fn choose_arbitrary_direction_for_line(line: impl line::Operations<P>) -> Self {
         let [p1, p2] = line.two_different_arbitrary_points_on_line();
         Self::from_two_points(p1, p2)
     }
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where
         Self: Sized;
-    fn from_point_and_unit_step_in_direction(
-        point: impl Into<P>,
-        direction: impl Into<FAngle>,
-    ) -> Self
-    where
-        Self: two_different_points::Operations<P>,
-        P: FloatCoordinateOps,
-    {
-        let p1 = point.into();
-        let v = P::unit_vector_from_angle(direction.into());
-        let p2 = p1 + v;
-        Self::from_two_ordered_points_on_line(p1, p2)
-    }
     // TODO: maybe move to Constructors
     fn from_point_and_vector(point: impl Into<P>, direction: impl Into<P>) -> Self {
         let p1 = point.into();

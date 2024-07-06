@@ -28,7 +28,7 @@ pub trait Constructors<P: PointReqs>: Sized {
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self;
 
     fn from_line_and_point_on_half_plane(
-        dividing_line: impl LineOps<P>,
+        dividing_line: impl line::Operations<P>,
         point_on_half_plane: P,
     ) -> Self {
         let directed_dividing_line: Self::BorderType =
@@ -104,15 +104,14 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
             type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
         // where
-                                    //     // is refinement
-                                    //     Self: Refinement<$BaseType<P>>,
-                                    //     // refinement base is constructor
-                                    //     $BaseType::<P>: Constructors<P>,
-                                    //     // border type is refinement of the refinement base's border
-                                    //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
+                                                    //     // is refinement
+                                                    //     Self: Refinement<$BaseType<P>>,
+                                                    //     // refinement base is constructor
+                                                    //     $BaseType::<P>: Constructors<P>,
+                                                    //     // border type is refinement of the refinement base's border
+                                                    //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
             {
-                let border_of_base: <$BaseType<P> as Constructors<P>>::BorderType =
-                    border.into();
+                let border_of_base: <$BaseType<P> as Constructors<P>>::BorderType = border.into();
                 let refinement_base: $BaseType<P> =
                     $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
                 refinement_base.try_into().unwrap()

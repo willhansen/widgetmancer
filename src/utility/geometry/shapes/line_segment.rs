@@ -2,42 +2,19 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForLineSegment = SignedCoordinateOps);
-trait_alias!(trait PointReqs = PointReqsForLineSegment);
+trait_alias!(pub trait PointReqs = SignedCoordinateOps);
 
-pub trait LineSegmentOps<P: PointReqs>: LineOps<P> {
+pub trait Operations<P: PointReqs>: line::Operations<P> {
     fn square_length(&self) -> <P as CoordinateOps>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }
     fn endpoints_in_arbitrary_order(&self) -> [P; 2];
 }
-impl<P: PointReqs> LineSegmentOps<P> for TwoDifferentPoints<P> {
+impl<P: PointReqs> Operations<P> for TwoDifferentPoints<P> {
     fn endpoints_in_arbitrary_order(&self) -> [P; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
     }
-}
-
-pub trait DirectedLineSegmentOps<P: PointReqs>:
-    OperationsForDirectedLine<P> + LineSegmentOps<P>
-{
-    fn endpoints_in_order(&self) -> [P; 2] {
-        P::points_sorted_along_axis(self.endpoints_in_arbitrary_order(), self.direction())
-            .into_iter()
-            .collect_vec()
-            .try_into()
-            .unwrap()
-    }
-    fn start(&self) -> P {
-        self.endpoints_in_order()[0]
-    }
-    fn end(&self) -> P {
-        self.endpoints_in_order()[1]
-    }
-}
-impl<T, P: PointReqs> DirectedLineSegmentOps<P> for T where
-    T: OperationsForDirectedLine<P> + LineSegmentOps<P>
-{
 }
 
 #[cfg(test)]

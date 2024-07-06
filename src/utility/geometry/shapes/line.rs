@@ -329,7 +329,7 @@ pub fn first_inside_square_face_hit_by_ray(
         .map(|(face, point)| (face, point.unwrap()))
         .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
 }
-// Move to gridsquare file
+// TODO: Move to gridsquare file
 pub fn square_face_as_line<P: SignedIntCoordinate>(
     square: P,
     face_direction: OrthogonalDirection,

@@ -113,6 +113,15 @@ pub trait Constructors<P: PointReqs>: Sized {
     {
         Self::try_from_point_and_radial(p1, angle, length).unwrap()
     }
+    fn from_point_and_unit_step_in_direction(
+        point: impl Into<P>,
+        direction: impl Into<FAngle>,
+    ) -> Self
+    where
+        P: FloatCoordinateOps,
+    {
+        Self::from_point_and_radial(point.into(), direction.into(), 1.0)
+    }
     fn from_array(arr: [P; 2]) -> Self {
         Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
@@ -153,6 +162,11 @@ pub(crate) use impl_constructors_for_two_different_points_for_refinement;
 
 impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
+        Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
+    }
+}
+impl<P: PointReqs> AbstractsTo<Ray<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &Ray<P>) -> Self {
         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
     }
 }

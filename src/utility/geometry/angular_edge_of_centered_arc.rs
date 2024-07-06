@@ -5,7 +5,7 @@ pub trait AngularEdgeOfCenteredArc {
     fn new(edge_angle: FAngle, which_edge: AngularDirection) -> Self;
     fn angle(&self) -> FAngle;
     // TODO: move to Ray constructors?
-    fn edge_ray<P: FloatCoordinateOps, R: Ray<P>>(&self) -> R {
+    fn edge_ray<P: FloatCoordinateOps, R: ray::Operations<P>>(&self) -> R {
         R::new_from_point_and_dir(P::zero(), self.angle())
     }
     // fn border_as_halfplane<T: HalfPlane>(&self) -> T;
