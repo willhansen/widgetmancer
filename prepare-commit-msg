@@ -8,6 +8,9 @@
 #
 # To enable this hook, rename this file to "prepare-commit-msg".
 
+#disabled
+return 0
+
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
 SHA1=$3
