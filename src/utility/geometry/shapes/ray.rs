@@ -17,3 +17,9 @@ pub trait Operations<P: PointReqs>: Constructors<P> {
     }
 }
 pub trait Constructors<P: PointReqs> {}
+
+impl<P: PointReqs> From<two_different_points::Shape<P>> for Shape<P> {
+    fn from(value: two_different_points::Shape<P>) -> Self {
+        todo!()
+    }
+}

@@ -1,3 +1,6 @@
+automod::dir!(pub "src/utility/geometry/coordinates");
+
+
 use map_macro::hash_set;
 use std::{
     collections::{HashMap, HashSet},
@@ -87,7 +90,7 @@ macro_rules! make_coordinate_datatype_cast_function {
     };
 }
 
-pub trait coordinate::Operations:
+pub trait Operations:
     Copy
     + PartialEq
     + Add<Self, Output = Self>
@@ -153,7 +156,7 @@ pub trait coordinate::Operations:
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
-    fn cast_unit<Other: coordinate::Operations<DataType = Self::DataType>>(&self) -> Other {
+    fn cast_unit<Other: Operations<DataType = Self::DataType>>(&self) -> Other {
         Other::new(self.x(), self.y())
     }
     // euclid uses fast and imprecise trig for this by default for some reason
@@ -222,7 +225,7 @@ where
     }
 }
 
-impl<T, U> coordinate::Operations for Vector2D<T, U>
+impl<T, U> Operations for Vector2D<T, U>
 where
     T: CoordinateDataTypeTrait,
 {
@@ -245,64 +248,7 @@ where
     }
 }
 
-pub trait UnsignedCoordinate: coordinate::Operations {}
-impl<T> UnsignedCoordinate for T
-where
-    T: coordinate::Operations,
-    T::DataType: num::Unsigned,
-{
-}
 
-pub trait Signedcoordinate::Operations:
-    coordinate::Operations<DataType = Self::_DataType>
-    + Neg<Output = Self>
-    // TODO: put on the SignedCoordinateConstructor trait instead
-    + From<NormalizedOrthoAngle>
-    + From<OrthogonalDirection>
-    + From<(Self::_DataType, Self::_DataType)>
-{
-    type _DataType: num::Signed + Copy + PartialOrd + Debug;
-    fn flip_x(&self) -> Self {
-        Self::new(-self.x(), self.y())
-    }
-    fn flip_y(&self) -> Self {
-        Self::new(self.x(), -self.y())
-    }
-    fn right() -> Self {
-        Self::new(Self::DataType::one(), Self::DataType::zero())
-    }
-    fn left() -> Self {
-        Self::new(-Self::DataType::one(), Self::DataType::zero())
-    }
-    fn up() -> Self {
-        Self::new(Self::DataType::zero(), Self::DataType::one())
-    }
-    fn down() -> Self {
-        Self::new(Self::DataType::zero(), -Self::DataType::one())
-    }
-    // TODO: allow non-orthogonal directions
-    fn stepped(&self, dir: OrthogonalDirection) -> Self {
-        self.moved(dir, Self::DataType::one())
-    }
-    fn moved(&self, dir: OrthogonalDirection, length: Self::DataType) -> Self {
-        *self + dir.to_step::<Self>() * length
-    }
-    fn position_on_orthogonal_axis(&self, axis: impl Into<OrthogonalDirection>) -> Self::DataType {
-        let axis_vector: Self = axis.into().to_step();
-        self.dot(axis_vector)
-    }
-    fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
-        <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(*self)
-    }
-}
-
-impl<T> Signedcoordinate::Operations for T
-where
-    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
-    T::DataType: num::Signed,
-{
-    type _DataType = T::DataType;
-}
 
 // TODO: uncomment when newtyping Vector2D and Point2D
 // macro_rules! impl_from_tuple {
@@ -364,138 +310,7 @@ where
 // {
 // }
 
-pub trait int_coordinate::Operations:
-    Signedcoordinate::Operations<_DataType = i32, OnGrid = Self> + Hash + Eq
-{
-    fn is_orthogonal_king_step(&self) -> bool {
-        self.square_length() == 1
-    }
 
-    fn is_diagonal_king_step(&self) -> bool {
-        self.square_length() == 2
-    }
-    fn is_king_step(&self) -> bool {
-        self.is_orthogonal_king_step() || self.is_diagonal_king_step()
-    }
-    fn is_even(&self) -> bool {
-        (self.x() + self.y()) % 2 == 0
-    }
-    fn is_odd(&self) -> bool {
-        !self.is_even()
-    }
-}
-// TODO: convert to auto trait when stable
-// TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> int_coordinate::Operations for T where T: Signedcoordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
-
-trait_alias!(pub trait WorldIntCoordinate = int_coordinate::Operations< UnitType = SquareGridInWorldFrame>);
-
-trait_alias!(pub trait SignedIntCoordinate = int_coordinate::Operations + Signedcoordinate::Operations);
-
-pub trait float_coordinate::Operations: Signedcoordinate::Operations<_DataType = f32, Floating = Self> {
-    // TODO: Add tolerance?
-    fn on_centered_unit_square(&self) -> bool {
-        // NOTE: 0.5 can be exactly represented by floating point numbers
-        self.king_length() == 0.5
-    }
-    // TODO: Add tolerance?
-    fn on_a_square_face(&self) -> bool {
-        any_true(&[0, 1].map(|i| self.on_square_border_on_axis(i)))
-    }
-    // TODO: Add tolerance?
-    fn on_square_border_on_axis(&self, i: usize) -> bool {
-        (self.nth_component(i) - 0.5) % 1.0 == 0.0
-    }
-    // TODO: Add tolerance?
-    fn on_same_square_face(&self, other: Self) -> bool {
-        HashSet::<OrthogonalFacingIntPose<Self::OnGrid>>::from_iter(self.touched_square_faces())
-            .intersection(&HashSet::from_iter(other.touched_square_faces()))
-            .count()
-            > 0
-    }
-    // TODO: Add tolerance?
-    fn touched_square_faces(&self) -> HashSet<OrthogonalFacingIntPose<Self::OnGrid>> {
-        let on_border_by_axis = [0, 1].map(|i| self.on_square_border_on_axis(i));
-        match on_border_by_axis {
-            [true, true] => [-1, 1]
-                .into_iter()
-                .cartesian_product([-1, 1])
-                .flat_map(|(x_nudge, y_nudge)| {
-                    let nudge_vector = Self::OnGrid::new(x_nudge, y_nudge);
-                    let offset_point = *self + nudge_vector.to_f32() * 0.1;
-                    let square = offset_point.snap_to_grid();
-                    [
-                        (square, NonZeroSign::try_from(-x_nudge).unwrap() * RIGHT).into(),
-                        (square, NonZeroSign::try_from(-y_nudge).unwrap() * UP).into(),
-                    ]
-                })
-                .collect(),
-            [false, false] => hash_set![],
-            [x_border, y_border] => {
-                let border_axis_index = if x_border { 0 } else { 1 };
-                let non_border_axis_index = 1 - border_axis_index;
-                let normal_to_border = Self::nth_basis_vector(border_axis_index);
-                let one_face = Face::from_square_and_dir(
-                    (*self + normal_to_border * 0.1).snap_to_grid(),
-                    -normal_to_border.nearest_orthogonal_direction(),
-                );
-                HashSet::from(one_face.both_sides_of_face())
-            }
-        }
-    }
-    fn normalize(&self) -> Self {
-        *self / self.length()
-    }
-    fn round(&self) -> Self {
-        Self::new(self.x().round(), self.y().round())
-    }
-    fn from_angle_and_length(angle: Angle<f32>, length: f32) -> Self {
-        Self::new(length * angle.radians.cos(), length * angle.radians.sin())
-    }
-
-    fn rotate_around_point(&self, axis_point: Self, angle: Angle<f32>) -> Self {
-        axis_point + (*self - axis_point).rotate_vect(angle)
-    }
-
-    fn unit_vector_from_angle(angle: Angle<f32>) -> Self {
-        Self::new(angle.radians.cos(), angle.radians.sin())
-    }
-    fn rotate_vect(&self, delta_angle: Angle<f32>) -> Self {
-        let start_angle = self.better_angle_from_x_axis();
-        let new_angle = start_angle + delta_angle;
-        Self::from_angle_and_length(new_angle, self.length())
-    }
-    fn snap_to_grid(&self) -> Self::OnGrid {
-        self.round().to_i32()
-    }
-    fn nearest_orthogonal_direction(&self) -> OrthogonalDirection {
-        OrthogonalDirection::from_angle_hint(self.better_angle_from_x_axis())
-    }
-    fn lerp2d(&self, target: Self, t: f32) -> Self {
-        Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
-    }
-    fn angle_to(&self, other: Self) -> Angle<f32> {
-        self.better_angle_from_x_axis()
-            .angle_to(other.better_angle_from_x_axis())
-    }
-    fn about_eq(&self, other: Self, tolerance: Self::DataType) -> bool {
-        (*self - other).length() < tolerance
-    }
-    fn check_about_eq(&self, other: Self) -> OkOrMessage {
-        let tolerance = 0.001; // TODO: make parameter
-        if self.about_eq(other, tolerance) {
-            Ok(())
-        } else {
-            Err(format!(
-                "\nPoints too far apart:\n\tp1: {:?}\n\tp2: {:?}\n",
-                self, other
-            ))
-        }
-    }
-}
-
-// TODO: convert to auto trait when stable
-impl<T> float_coordinate::Operations for T where T: Signedcoordinate::Operations<_DataType = f32, Floating = T> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign_f32(point.x()), sign_f32(point.y()))
@@ -522,21 +337,6 @@ pub fn get_8_octant_transforms_of<PointType: Signedcoordinate::Operations>(v: Po
         .collect()
 }
 
-impl<V> QuarterTurnRotatable for V
-where
-    V: Signedcoordinate::Operations,
-{
-    fn quarter_rotated_ccw(&self, angle: impl Into<NormalizedOrthoAngle>) -> Self {
-        // if self.is_absolute() {
-        //     return *self;
-        // }
-        let angle = angle.into();
-        Self::new(
-            self.x() * angle.cos() - self.y() * angle.sin(),
-            self.x() * angle.sin() + self.y() * angle.cos(),
-        )
-    }
-}
 
 pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     let mut new_v = v.clone();
@@ -622,45 +422,6 @@ pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirec
     }
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
-pub struct KingWorldStep {
-    step: WorldStep,
-}
-
-impl KingWorldStep {
-    pub fn new(dir: WorldStep) -> Self {
-        assert!(dir.is_king_step());
-        KingWorldStep { step: dir }
-    }
-    pub fn step(&self) -> WorldStep {
-        self.step
-    }
-}
-
-impl From<OrthogonalDirection> for KingWorldStep {
-    fn from(value: OrthogonalDirection) -> Self {
-        KingWorldStep::new(value.to_step())
-    }
-}
-
-// TODO: generate with macro
-impl QuarterTurnRotatable for KingWorldStep {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
-    }
-}
-
-impl From<WorldStep> for KingWorldStep {
-    fn from(value: WorldStep) -> Self {
-        KingWorldStep::new(value)
-    }
-}
-
-impl From<KingWorldStep> for WorldStep {
-    fn from(value: KingWorldStep) -> Self {
-        value.step
-    }
-}
 
 pub fn cross_correlate_squares_with_steps(
     squares: SquareSet,

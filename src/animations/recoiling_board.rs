@@ -2,7 +2,6 @@ use crate::animations::Animation;
 use crate::glyph::Glyph;
 use crate::graphics::FloorColorEnum;
 use crate::utility::*;
-use crate::IntCoordinateOps;
 use euclid::Length;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};

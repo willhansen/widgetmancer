@@ -44,10 +44,12 @@ pub(crate) use pub_use;
 
 automod::dir!(pub "src/utility");
 
+
 pub_use!(
-    geometry,
     bool_with_partial,
+    coordinates,
     general_utility,
+    geometry,
     interval,
     non_zero_sign,
     octant,
