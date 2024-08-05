@@ -43,9 +43,9 @@ impl ToAndFromArray<Option<HalfPlaneCuttingLocalSquare>, 2>
     }
 }
 
-pub trait ConeOps {}
+pub trait cone::Operations {}
 
-impl ConeOps for ConeFromSquare {}
+impl cone::Operations for ConeFromSquare {}
 
 impl QuarterTurnRotatable for ConeEdgeIntersectionsWithCenteredUnitSquare {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {

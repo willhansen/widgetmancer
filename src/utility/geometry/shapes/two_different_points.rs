@@ -2,7 +2,7 @@ use crate::utility::*;
 
 pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
 
-trait_alias!(pub trait PointReqs = SignedCoordinateOps);
+trait_alias!(pub trait PointReqs = Signedcoordinate::Operations);
 
 // TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -102,14 +102,14 @@ pub trait Constructors<P: PointReqs>: Sized {
         length: f32,
     ) -> Result<Self, String>
     where
-        P: FloatCoordinateOps,
+        P: float_coordinate::Operations,
     {
         let p1 = p1.into();
         Self::try_from_two_exact_points(p1, floating_point_step(p1, angle, length))
     }
     fn from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
     where
-        P: FloatCoordinateOps,
+        P: float_coordinate::Operations,
     {
         Self::try_from_point_and_radial(p1, angle, length).unwrap()
     }
@@ -118,7 +118,7 @@ pub trait Constructors<P: PointReqs>: Sized {
         direction: impl Into<FAngle>,
     ) -> Self
     where
-        P: FloatCoordinateOps,
+        P: float_coordinate::Operations,
     {
         Self::from_point_and_radial(point.into(), direction.into(), 1.0)
     }
@@ -193,10 +193,10 @@ where
 }
 
 // TODO: separate file and also int rays
-impl<P: FloatCoordinateOps> Ray<P> for Shape<P> {
+impl<P: float_coordinate::Operations> Ray<P> for Shape<P> {
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
-        P: FloatCoordinateOps,
+        P: float_coordinate::Operations,
     {
         Self::new(point, point + P::unit_vector_from_angle(dir))
     }
@@ -238,7 +238,7 @@ macro_rules! impls_for_two_different_points {
             }
         }
 
-        impl<P: $point_trait> LineOps<P> for $TheStruct<P> {
+        impl<P: $point_trait> line::Operations<P> for $TheStruct<P> {
             fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
                 self.to_array()
             }
@@ -298,13 +298,13 @@ where
     }
 }
 
-impl<P: FloatCoordinateOps> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>> for Shape<P> {
+impl<P: float_coordinate::Operations> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>> for Shape<P> {
     fn from(value: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>) -> Self {
         Self::from_array(value.points())
     }
 }
 
-impl<P: FloatCoordinateOps> TryFrom<Shape<P>> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+impl<P: float_coordinate::Operations> TryFrom<Shape<P>> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
     type Error = String;
 
     fn try_from(value: Shape<P>) -> Result<Self, Self::Error> {

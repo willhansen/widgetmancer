@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = SignedCoordinateOps);
+trait_alias!(pub trait PointReqs = Signedcoordinate::Operations);
 
 #[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
 pub struct Shape<PointType: PointReqs>(TwoDifferentPoints<PointType>);

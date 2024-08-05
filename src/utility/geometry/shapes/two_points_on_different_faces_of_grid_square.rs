@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = FloatCoordinateOps);
+trait_alias!(pub trait PointReqs = float_coordinate::Operations);
 
 pub type Shape<P: PointReqs> =
     ThingRelToSquare<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>, OnGrid<P>>;
@@ -31,7 +31,7 @@ pub trait Constructors<P: PointReqs>: Sized {
 impl<P: PointReqs> Constructors<P>
     for Shape<P>
 {
-    fn try_new_from_line_and_square<L: DirectedFloatLineOps<P>>(
+    fn try_new_from_line_and_square<L: Directedfloat_line::Operations<P>>(
         line: L,
         square: P::OnGrid,
     ) -> Result<Self, String> {

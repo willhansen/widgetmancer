@@ -15,7 +15,7 @@ pub enum AngleVariety {
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
-impl OrthoAngleOps for NormalizedOrthoAngle
+impl ortho_angle::Operations for NormalizedOrthoAngle
 where
     Self: Sized,
 {
@@ -38,7 +38,7 @@ pub type QuarterTurns = OrthoAngle;
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct OrthoAngle(i32);
-impl OrthoAngleOps for OrthoAngle
+impl ortho_angle::Operations for OrthoAngle
 where
     Self: Sized,
 {
@@ -50,7 +50,7 @@ where
     }
 }
 
-pub trait OrthoAngleOps:
+pub trait ortho_angle::Operations:
     Sized
     + Sub<NormalizedOrthoAngle, Output = Self>
     + Add<NormalizedOrthoAngle, Output = Self>
@@ -89,7 +89,7 @@ pub trait OrthoAngleOps:
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.to_step()
     }
-    fn try_from_coordinate<T: CoordinateOps>(dir: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: coordinate::Operations>(dir: T) -> Result<Self, String> {
         if !dir.is_orthogonal() {
             return Err(format!("Not orthogonal: {}", dir.to_string()));
         }
@@ -109,14 +109,14 @@ pub trait OrthoAngleOps:
             },
         ))
     }
-    fn from_coordinate<T: CoordinateOps>(dir: T) -> Self {
+    fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn quarter_turns_from_x_axis<P: IntCoordinateOps>(end: P) -> Self {
+    fn quarter_turns_from_x_axis<P: int_coordinate::Operations>(end: P) -> Self {
         Self::from_start_and_end_directions(P::right(), end)
     }
 
-    fn from_start_and_end_directions<P: IntCoordinateOps>(start: P, end: P) -> Self {
+    fn from_start_and_end_directions<P: int_coordinate::Operations>(start: P, end: P) -> Self {
         assert!(start.is_king_step());
         assert!(end.is_king_step());
         // needs to be quarter turn, no eighths
@@ -135,14 +135,14 @@ pub trait OrthoAngleOps:
     fn to_float_angle(&self) -> FAngle {
         self.rotate_angle(FAngle::degrees(0.0))
     }
-    fn rotate_vector<PointType: SignedCoordinateOps>(&self, v: PointType) -> PointType {
+    fn rotate_vector<PointType: Signedcoordinate::Operations>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(*self)
     }
 }
 
 macro_rules! impl_ops_for_OrthoAngles {
     ($Type:ty) => {
-        impl<T: OrthoAngleOps> Add<T> for $Type {
+        impl<T: ortho_angle::Operations> Add<T> for $Type {
             type Output = Self;
 
             fn add(self, rhs: T) -> Self::Output {
@@ -150,7 +150,7 @@ macro_rules! impl_ops_for_OrthoAngles {
             }
         }
 
-        impl<T: OrthoAngleOps> Sub<T> for $Type {
+        impl<T: ortho_angle::Operations> Sub<T> for $Type {
             type Output = Self;
 
             fn sub(self, rhs: T) -> Self::Output {
@@ -251,7 +251,7 @@ impl Display for OrthogonalDirection {
     }
 }
 
-impl<T: OrthoAngleOps> From<T> for OrthogonalDirection {
+impl<T: ortho_angle::Operations> From<T> for OrthogonalDirection {
     fn from(value: T) -> Self {
         value.dir()
     }
@@ -269,13 +269,13 @@ impl QuarterTurnRotatable for OrthogonalDirection {
 pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
-    fn from_angle(angle: impl OrthoAngleOps) -> Self;
-    fn from_coordinate<T: CoordinateOps>(dir: T) -> Self {
+    fn from_angle(angle: impl ortho_angle::Operations) -> Self;
+    fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn try_from_coordinate<T: CoordinateOps>(coord: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: coordinate::Operations>(coord: T) -> Result<Self, String> {
         Ok(Self::from_angle(
-            <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(coord)?,
+            <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(coord)?,
         ))
     }
     fn left(&self) -> Self {
@@ -323,7 +323,7 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
         }
     }
     // TODO: find a way to automatically just take whatever type is convenient
-    fn to_step<T: SignedCoordinateOps>(&self) -> T {
+    fn to_step<T: Signedcoordinate::Operations>(&self) -> T {
         // let (x, y) = self.xy();
         // T::new(x, y)
         self.xy().into()
@@ -332,18 +332,18 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
 
 impl<T> Direction for T
 where
-    T: OrthoAngleOps,
+    T: ortho_angle::Operations,
 {
     fn angle(&self) -> NormalizedOrthoAngle {
         self.normalized()
     }
 
     // TODO: use enum that covers OrthoAngle and Angle<f32>
-    fn from_angle(angle: impl OrthoAngleOps) -> Self {
+    fn from_angle(angle: impl ortho_angle::Operations) -> Self {
         todo!()
     }
 
-    fn try_from_coordinate<P: CoordinateOps>(coord: P) -> Result<Self, String> {
+    fn try_from_coordinate<P: coordinate::Operations>(coord: P) -> Result<Self, String> {
         if coord.is_orthogonal() {}
         todo!()
     }
@@ -354,7 +354,7 @@ impl Direction for OrthogonalDirection {
         self.0
     }
 
-    fn from_angle(angle: impl OrthoAngleOps) -> Self {
+    fn from_angle(angle: impl ortho_angle::Operations) -> Self {
         Self(angle.normalized())
     }
 }

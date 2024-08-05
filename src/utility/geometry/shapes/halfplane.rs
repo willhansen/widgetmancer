@@ -3,7 +3,7 @@ use euclid::num::Zero;
 
 trait_alias!(pub trait PointReqs = directed_line::PointReqs + float_line::PointReqs);
 
-// pub trait<P: DirectedLinePointReqs> LineReqs: DirectedLineOps {}
+// pub trait<P: DirectedLinePointReqs> LineReqs: Directedline::Operations {}
 // impl<T> LineReqs for T where T: DirectedLine
 
 /// The 2D version of a half-space (TODO: rename?)
@@ -16,7 +16,7 @@ pub struct Shape<P: PointReqs>(
     DirectedLine<P>,
 );
 
-// TODO: move most of these functions to HalfPlaneOps
+// TODO: move most of these functions to half_plane::Operations
 impl<P: PointReqs> Shape<P> {
     fn new(line: DirectedLine<P>) -> Self {
         Self(line)
@@ -44,7 +44,7 @@ pub trait Constructors<P: PointReqs>: Sized {
     fn new_with_inside_down(y: P::_DataType) -> Self {
         Self::from_point_on_border_and_vector_pointing_inside(P::right() * y, P::down())
     }
-    fn new_from_border_line_with_origin_outside(line: impl LineOps<P>) -> Self {
+    fn new_from_border_line_with_origin_outside(line: impl line::Operations<P>) -> Self {
         assert_false!(line.point_is_on_line(P::zero()));
         Self::from_line_and_point_on_half_plane(
             line,
@@ -149,9 +149,9 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(Shape<P: PointReqs>);
 // impl_quarter_turn_rotatable_for_newtype!(Shape<P: PointReqs>);
 
 // TODO: Switch to associated point type
-type BorderTypeOf<T, P> = <T as HalfPlaneOps<P>>::BorderType;
+type BorderTypeOf<T, P> = <T as half_plane::Operations<P>>::BorderType;
 
-pub trait HalfPlaneOps<P: PointReqs>:
+pub trait half_plane::Operations<P: PointReqs>:
     Constructors<P> + Complement<Output = Self> + QuarterTurnRotatable + Sized
 {
     type BorderType: directed_line::Operations<P>;
@@ -257,7 +257,7 @@ pub trait HalfPlaneOps<P: PointReqs>:
     //fun: Box<dyn Fn<LineType::PointType, Output = Point2D<f32, V>>>,
     fn with_transformed_points<F, POut>(&self, point_transform_function: F) -> Shape<POut>
     where
-        POut: PointReqs, // + FloatCoordinateOps,
+        POut: PointReqs, // + float_coordinate::Operations,
         F: Fn(P) -> POut,
     {
         let [p1, p2] = self
@@ -389,9 +389,9 @@ impl_half_plane_ops_for_newtype!(Shape<P: PointReqs>, base= DirectedLine<P>);
 
 macro_rules! impl_half_plane_ops_for_newtype {
     ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $TraitParam> HalfPlaneOps<P> for $Type<P> {
+        impl<P: $TraitParam> half_plane::Operations<P> for $Type<P> {
             type BorderType = $BaseType<P>;
-            fn border_line(&self) -> <Self as HalfPlaneOps<P>>::BorderType {
+            fn border_line(&self) -> <Self as half_plane::Operations<P>>::BorderType {
                 self.0
             }
         }

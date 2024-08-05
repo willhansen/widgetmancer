@@ -49,10 +49,10 @@ pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 pub type Vector2D<T, U> = Point2D<T, U>;
 
 // TODO: there's got to be a better way
-pub type Floating<P> = <P as CoordinateOps>::Floating;
-pub type OnGrid<P> = <P as CoordinateOps>::OnGrid;
-pub type DataType<P> = <P as CoordinateOps>::DataType;
-pub type UnitType<P> = <P as CoordinateOps>::UnitType;
+pub type Floating<P> = <P as coordinate::Operations>::Floating;
+pub type OnGrid<P> = <P as coordinate::Operations>::OnGrid;
+pub type DataType<P> = <P as coordinate::Operations>::DataType;
+pub type UnitType<P> = <P as coordinate::Operations>::UnitType;
 
 pub type OnGridDataType<P> = DataType<OnGrid<P>>;
 pub type FloatDataType<P> = DataType<Floating<P>>;
@@ -87,7 +87,7 @@ macro_rules! make_coordinate_datatype_cast_function {
     };
 }
 
-pub trait CoordinateOps:
+pub trait coordinate::Operations:
     Copy
     + PartialEq
     + Add<Self, Output = Self>
@@ -105,8 +105,8 @@ pub trait CoordinateOps:
     type DataType: CoordinateDataTypeTrait;
     type UnitType;
 
-    type Floating: FloatCoordinateOps<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
-    type OnGrid: IntCoordinateOps<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
+    type Floating: float_coordinate::Operations<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
+    type OnGrid: int_coordinate::Operations<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
@@ -153,7 +153,7 @@ pub trait CoordinateOps:
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
     // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
-    fn cast_unit<Other: CoordinateOps<DataType = Self::DataType>>(&self) -> Other {
+    fn cast_unit<Other: coordinate::Operations<DataType = Self::DataType>>(&self) -> Other {
         Other::new(self.x(), self.y())
     }
     // euclid uses fast and imprecise trig for this by default for some reason
@@ -222,7 +222,7 @@ where
     }
 }
 
-impl<T, U> CoordinateOps for Vector2D<T, U>
+impl<T, U> coordinate::Operations for Vector2D<T, U>
 where
     T: CoordinateDataTypeTrait,
 {
@@ -245,16 +245,16 @@ where
     }
 }
 
-pub trait UnsignedCoordinate: CoordinateOps {}
+pub trait UnsignedCoordinate: coordinate::Operations {}
 impl<T> UnsignedCoordinate for T
 where
-    T: CoordinateOps,
+    T: coordinate::Operations,
     T::DataType: num::Unsigned,
 {
 }
 
-pub trait SignedCoordinateOps:
-    CoordinateOps<DataType = Self::_DataType>
+pub trait Signedcoordinate::Operations:
+    coordinate::Operations<DataType = Self::_DataType>
     + Neg<Output = Self>
     // TODO: put on the SignedCoordinateConstructor trait instead
     + From<NormalizedOrthoAngle>
@@ -292,13 +292,13 @@ pub trait SignedCoordinateOps:
         self.dot(axis_vector)
     }
     fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
-        <NormalizedOrthoAngle as OrthoAngleOps>::try_from_coordinate(*self)
+        <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(*self)
     }
 }
 
-impl<T> SignedCoordinateOps for T
+impl<T> Signedcoordinate::Operations for T
 where
-    T: CoordinateOps + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
+    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -364,8 +364,8 @@ where
 // {
 // }
 
-pub trait IntCoordinateOps:
-    SignedCoordinateOps<_DataType = i32, OnGrid = Self> + Hash + Eq
+pub trait int_coordinate::Operations:
+    Signedcoordinate::Operations<_DataType = i32, OnGrid = Self> + Hash + Eq
 {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
@@ -386,13 +386,13 @@ pub trait IntCoordinateOps:
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> IntCoordinateOps for T where T: SignedCoordinateOps<_DataType = i32, OnGrid = T> + Hash + Eq {}
+impl<T> int_coordinate::Operations for T where T: Signedcoordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
-trait_alias!(pub trait WorldIntCoordinate = IntCoordinateOps< UnitType = SquareGridInWorldFrame>);
+trait_alias!(pub trait WorldIntCoordinate = int_coordinate::Operations< UnitType = SquareGridInWorldFrame>);
 
-trait_alias!(pub trait SignedIntCoordinate = IntCoordinateOps + SignedCoordinateOps);
+trait_alias!(pub trait SignedIntCoordinate = int_coordinate::Operations + Signedcoordinate::Operations);
 
-pub trait FloatCoordinateOps: SignedCoordinateOps<_DataType = f32, Floating = Self> {
+pub trait float_coordinate::Operations: Signedcoordinate::Operations<_DataType = f32, Floating = Self> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
         // NOTE: 0.5 can be exactly represented by floating point numbers
@@ -495,7 +495,7 @@ pub trait FloatCoordinateOps: SignedCoordinateOps<_DataType = f32, Floating = Se
 }
 
 // TODO: convert to auto trait when stable
-impl<T> FloatCoordinateOps for T where T: SignedCoordinateOps<_DataType = f32, Floating = T> {}
+impl<T> float_coordinate::Operations for T where T: Signedcoordinate::Operations<_DataType = f32, Floating = T> {}
 
 pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point2(sign_f32(point.x()), sign_f32(point.y()))
@@ -513,7 +513,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
 }
 
 // TODO: make a coordinate method
-pub fn get_8_octant_transforms_of<PointType: SignedCoordinateOps>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: Signedcoordinate::Operations>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
@@ -524,7 +524,7 @@ pub fn get_8_octant_transforms_of<PointType: SignedCoordinateOps>(v: PointType) 
 
 impl<V> QuarterTurnRotatable for V
 where
-    V: SignedCoordinateOps,
+    V: Signedcoordinate::Operations,
 {
     fn quarter_rotated_ccw(&self, angle: impl Into<NormalizedOrthoAngle>) -> Self {
         // if self.is_absolute() {
@@ -571,7 +571,7 @@ pub fn round_to_king_step(step: WorldStep) -> WorldStep {
     float_step.to_i32()
 }
 
-pub fn seeded_rand_radial_offset<P: FloatCoordinateOps>(rng: &mut StdRng, radius: f32) -> P {
+pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdRng, radius: f32) -> P {
     let mut v = P::new(10.0, 10.0);
     while v.square_length() > 1.0 {
         v = P::new(rng.gen_range(-1.0..=1.0), rng.gen_range(-1.0..=1.0));
@@ -609,7 +609,7 @@ pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalDirection) -
     step.project_onto_vector(axis.to_step()).dot(axis.to_step())
 }
 
-pub fn assert_about_eq_2d<P: FloatCoordinateOps>(p1: P, p2: P) {
+pub fn assert_about_eq_2d<P: float_coordinate::Operations>(p1: P, p2: P) {
     p1.check_about_eq(p2).unwrap();
 }
 pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
@@ -703,7 +703,7 @@ impl QuarterTurnRotatable for Angle<f32> {
         ))
     }
 }
-pub fn furthest_apart_points<P: FloatCoordinateOps>(points: Vec<P>) -> [P; 2] {
+pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) -> [P; 2] {
     assert!(points.len() >= 2);
     let furthest = points
         .iter()
@@ -716,7 +716,7 @@ pub fn furthest_apart_points<P: FloatCoordinateOps>(points: Vec<P>) -> [P; 2] {
 
 pub fn three_points_are_clockwise<P>(a: P, b: P, c: P) -> bool
 where
-    P: SignedCoordinateOps,
+    P: Signedcoordinate::Operations,
     P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
 {
     let ab = b - a;
@@ -724,7 +724,7 @@ where
     ab.cross(ac) < P::DataType::zero()
 }
 
-pub fn two_points_are_ccw_with_origin<P: SignedCoordinateOps>(a: P, b: P) -> bool
+pub fn two_points_are_ccw_with_origin<P: Signedcoordinate::Operations>(a: P, b: P) -> bool
 where
     P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
 {
@@ -759,13 +759,13 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<P: CoordinateOps>(a: P, b: P, c: P) -> bool {
+pub fn on_line<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == P::DataType::zero()
 }
 
-pub fn on_line_in_this_order<P: FloatCoordinateOps>(a: P, b: P, c: P) -> bool {
+pub fn on_line_in_this_order<P: float_coordinate::Operations>(a: P, b: P, c: P) -> bool {
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
@@ -778,7 +778,7 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
     BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
 }
 
-pub fn corner_points_of_centered_unit_square<P: FloatCoordinateOps>() -> [P; 4] {
+pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
     <P::OnGrid as euclid::num::Zero>::zero().square_corners()
 }
 

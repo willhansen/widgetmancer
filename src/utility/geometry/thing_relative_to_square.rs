@@ -2,7 +2,7 @@ use crate::utility::*;
 use derive_getters::Getters;
 use derive_more::Constructor;
 
-trait_alias!(pub trait PointReqsForThingAtSquare = IntCoordinateOps);
+trait_alias!(pub trait PointReqsForThingAtSquare = int_coordinate::Operations);
 trait_alias!(trait PointReqs = PointReqsForThingAtSquare);
 
 #[derive(Clone, Copy, Debug, Constructor, PartialEq, Eq, Hash)]

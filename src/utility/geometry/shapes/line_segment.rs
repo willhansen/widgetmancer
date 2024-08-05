@@ -2,10 +2,10 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = SignedCoordinateOps);
+trait_alias!(pub trait PointReqs = Signedcoordinate::Operations);
 
 pub trait Operations<P: PointReqs>: line::Operations<P> {
-    fn square_length(&self) -> <P as CoordinateOps>::DataType {
+    fn square_length(&self) -> <P as coordinate::Operations>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }

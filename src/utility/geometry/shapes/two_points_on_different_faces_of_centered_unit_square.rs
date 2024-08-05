@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = two_different_points::PointReqs + FloatCoordinateOps);
+trait_alias!(pub trait PointReqs = two_different_points::PointReqs + float_coordinate::Operations);
 
 // TODO: Make this just a special case for TwoDifferentPointsOnGridSquare, where the grid square is (0,0)?
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,10 +15,10 @@ pub trait Operations<P: PointReqs>:
 pub trait Constructors<P: PointReqs>: two_different_points::Constructors<P> {}
 
 impls_for_two_different_points!(
-    Shape<P: FloatCoordinateOps>
+    Shape<P: float_coordinate::Operations>
 );
 impl_translate_for_two_points_with_restriction!(
-    Shape<P: FloatCoordinateOps>
+    Shape<P: float_coordinate::Operations>
 );
 
 impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
@@ -26,7 +26,7 @@ impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
         self.0.point_by_index(pi)
     }
 }
-impl<P: FloatCoordinateOps> Display for Shape<P> {
+impl<P: float_coordinate::Operations> Display for Shape<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TwoPointsOnDifferentFacesOfCenteredUnitSquare")
             .field("points", &self.0)
@@ -46,13 +46,13 @@ impl<P: FloatCoordinateOps> Display for Shape<P> {
     }
 }
 
-impl<P: FloatCoordinateOps> Shape<P> {
+impl<P: float_coordinate::Operations> Shape<P> {
     fn points_are_valid(p1: P, p2: P) -> bool {
         p1.on_centered_unit_square() && p2.on_centered_unit_square() && !p1.on_same_square_face(p2)
     }
 }
 
-impl<P: FloatCoordinateOps> two_different_points::Constructors<P> for Shape<P> {
+impl<P: float_coordinate::Operations> two_different_points::Constructors<P> for Shape<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         // TODO: Add a tolerance to this check, or maybe snap to square along angle from origin
         if Self::points_are_valid(p1, p2) {

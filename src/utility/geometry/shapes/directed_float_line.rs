@@ -33,7 +33,7 @@ pub trait Operations<P: PointReqs>:
     }
     fn ordered_line_intersections_with_square(
         &self,
-        square: <P as CoordinateOps>::OnGrid,
+        square: <P as coordinate::Operations>::OnGrid,
     ) -> Vec<P> {
         let offset = square.to_f32();
         let relative_self = *self - offset;

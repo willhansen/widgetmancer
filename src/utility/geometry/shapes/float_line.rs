@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = FloatCoordinateOps);
+trait_alias!(pub trait PointReqs = float_coordinate::Operations);
 
 /// A traditional line that extends infinitely in both directions, now with floating point coordinates
 pub type Shape<UnitType> = Line<Point2D<f32, UnitType>>;
