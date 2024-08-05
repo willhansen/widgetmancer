@@ -1,9 +1,8 @@
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqsForFloatLineSegment = FloatCoordinateOps);
-trait_alias!(trait PointReqs = PointReqsForFloatLineSegment);
+trait_alias!(pub trait PointReqs = FloatCoordinateOps);
 
-pub trait FloatLineSegmentOps<P: PointReqs>: FloatLineOps<P> + LineSegmentOps<P> {
+pub trait FloatLineSegmentOps<P: PointReqs>: float_line::Operations<P> + line_segment::Operations<P> {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
