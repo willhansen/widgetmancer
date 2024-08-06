@@ -31,7 +31,7 @@ pub trait Constructors<P: PointReqs>: Sized {
 impl<P: PointReqs> Constructors<P>
     for Shape<P>
 {
-    fn try_new_from_line_and_square<L: Directedfloat_line::Operations<P>>(
+    fn try_new_from_line_and_square<L: directed_float_line::Operations<P>>(
         line: L,
         square: P::OnGrid,
     ) -> Result<Self, String> {
