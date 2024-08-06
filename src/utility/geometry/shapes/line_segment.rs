@@ -2,7 +2,7 @@ use rand::{rngs::StdRng, Rng};
 
 use crate::utility::*;
 
-trait_alias!(pub trait PointReqs = Signedcoordinate::Operations);
+trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
 
 pub trait Operations<P: PointReqs>: line::Operations<P> {
     fn square_length(&self) -> <P as coordinate::Operations>::DataType {

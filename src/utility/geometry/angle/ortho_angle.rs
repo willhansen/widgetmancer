@@ -99,7 +99,7 @@ pub trait Operations:
     fn to_float_angle(&self) -> FAngle {
         self.rotate_angle(FAngle::degrees(0.0))
     }
-    fn rotate_vector<PointType: Signedcoordinate::Operations>(&self, v: PointType) -> PointType {
+    fn rotate_vector<PointType: signed_coordinate::Operations>(&self, v: PointType) -> PointType {
         v.quarter_rotated_ccw(*self)
     }
 }

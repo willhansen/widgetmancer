@@ -328,7 +328,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
 }
 
 // TODO: make a coordinate method
-pub fn get_8_octant_transforms_of<PointType: Signedcoordinate::Operations>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: signed_coordinate::Operations>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
@@ -477,7 +477,7 @@ pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) ->
 
 pub fn three_points_are_clockwise<P>(a: P, b: P, c: P) -> bool
 where
-    P: Signedcoordinate::Operations,
+    P: signed_coordinate::Operations,
     P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
 {
     let ab = b - a;
@@ -485,7 +485,7 @@ where
     ab.cross(ac) < P::DataType::zero()
 }
 
-pub fn two_points_are_ccw_with_origin<P: Signedcoordinate::Operations>(a: P, b: P) -> bool
+pub fn two_points_are_ccw_with_origin<P: signed_coordinate::Operations>(a: P, b: P) -> bool
 where
     P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
 {

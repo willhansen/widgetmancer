@@ -130,7 +130,7 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
         }
     }
     // TODO: find a way to automatically just take whatever type is convenient
-    fn to_step<T: Signedcoordinate::Operations>(&self) -> T {
+    fn to_step<T: signed_coordinate::Operations>(&self) -> T {
         // let (x, y) = self.xy();
         // T::new(x, y)
         self.xy().into()
