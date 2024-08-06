@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait signed_coordinate::Operations:
+pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
     + Neg<Output = Self>
     // TODO: put on the SignedCoordinateConstructor trait instead

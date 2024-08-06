@@ -1,6 +1,6 @@
 use crate::utility::*;
 
-pub trait int_coordinate::Operations:
+pub trait Operations:
     signed_coordinate::Operations<_DataType = i32, OnGrid = Self> + Hash + Eq
 {
     fn is_orthogonal_king_step(&self) -> bool {

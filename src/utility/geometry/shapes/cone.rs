@@ -43,7 +43,7 @@ impl ToAndFromArray<Option<HalfPlaneCuttingLocalSquare>, 2>
     }
 }
 
-pub trait cone::Operations {}
+pub trait Operations {}
 
 impl cone::Operations for ConeFromSquare {}
 

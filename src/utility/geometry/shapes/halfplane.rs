@@ -151,7 +151,7 @@ impl_quarter_turn_rotatable_for_impl_half_plane_ops!(Shape<P: PointReqs>);
 // TODO: Switch to associated point type
 type BorderTypeOf<T, P> = <T as half_plane::Operations<P>>::BorderType;
 
-pub trait half_plane::Operations<P: PointReqs>:
+pub trait Operations<P: PointReqs>:
     Constructors<P> + Complement<Output = Self> + QuarterTurnRotatable + Sized
 {
     type BorderType: directed_line::Operations<P>;

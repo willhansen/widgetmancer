@@ -2,7 +2,7 @@ use crate::utility::*;
 
 trait_alias!(pub trait PointReqs = float_coordinate::Operations);
 
-pub trait float_line_segment::Operations<P: PointReqs>: float_line::Operations<P> + line_segment::Operations<P> {
+pub trait Operations<P: PointReqs>: float_line::Operations<P> + line_segment::Operations<P> {
     fn length(&self) -> f32 {
         let [p1, p2] = self.endpoints_in_arbitrary_order();
         (p1 - p2).length()
