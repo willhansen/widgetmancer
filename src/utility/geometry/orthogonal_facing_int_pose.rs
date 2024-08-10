@@ -357,7 +357,7 @@ where
 impl<T, SquareType, IntoDir> From<(T, T, IntoDir)> for OrthogonalFacingIntPose<SquareType>
 where
     (T, T): Into<SquareType>,
-    SquareType: WorldIntCoordinate,
+    SquareType: WorldIntCoordinateOps,
     IntoDir: Into<OrthogonalDirection>,
 {
     fn from(value: (T, T, IntoDir)) -> Self {
@@ -367,7 +367,7 @@ where
 
 impl<SquareType> From<OrthogonalFacingIntPose<SquareType>> for (SquareType, OrthogonalDirection)
 where
-    SquareType: WorldIntCoordinate,
+    SquareType: WorldIntCoordinateOps,
 {
     fn from(value: OrthogonalFacingIntPose<SquareType>) -> (SquareType, OrthogonalDirection) {
         (value.square, value.direction())

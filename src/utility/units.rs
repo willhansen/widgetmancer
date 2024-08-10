@@ -19,7 +19,6 @@ pub struct CharacterGridInLocalCharacterFrame;
 pub struct SquareGridInLocalSquareFrame;
 
 pub type WorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
-pub type WorldIntCoordinate = IntCoordinate<SquareGridInWorldFrame>;
 
 pub type WorldSquare = WorldCoordinate<i32>;
 pub type WorldPoint = WorldCoordinate<f32>;
@@ -282,7 +281,7 @@ pub fn is_world_character_square_left_square_of_world_square(
 
 // TODO: this should be more concise
 pub fn world_line(p1: WorldPoint, p2: WorldPoint) -> WorldLine {
-    line(p1, p2)
+    Line(p1, p2)
 }
 
 #[cfg(test)]

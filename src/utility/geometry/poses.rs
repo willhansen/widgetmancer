@@ -55,7 +55,7 @@ pub struct TranslationAndRotationTransform {
 }
 impl<SquareType> RigidlyTransformable for OrthogonalFacingIntPose<SquareType>
 where
-    SquareType: Copy + RigidlyTransformable + WorldIntCoordinate,
+    SquareType: Copy + RigidlyTransformable + WorldIntCoordinateOps,
 {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::from_square_and_step(
@@ -75,7 +75,7 @@ pub fn faces_away_from_center_at_rel_square(
         .collect()
 }
 
-pub fn squares_sharing_face<SquareType: WorldIntCoordinate>(
+pub fn squares_sharing_face<SquareType: WorldIntCoordinateOps>(
     face: OrthogonalFacingIntPose<SquareType>,
 ) -> [SquareType; 2] {
     [face.square(), face.stepped().square()]
