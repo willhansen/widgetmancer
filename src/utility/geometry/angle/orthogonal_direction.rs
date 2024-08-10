@@ -6,7 +6,7 @@ pub struct OrthogonalDirection(NormalizedOrthoAngle);
 impl OrthogonalDirection {
     pub fn from_angle_hint(hint: FAngle) -> Self {
         let hint = standardize_angle_with_zero_min(hint);
-        let quarter_turns_ccw = ((hint.radians + FRAC_PI_4) / FRAC_PI_2) as i32;
+        let quarter_turns_ccw = ((hint.radians + std::f32::consts::FRAC_PI_4) / std::f32::consts::FRAC_PI_2) as i32;
         Self(NormalizedOrthoAngle::new_from_quarter_turns(
             quarter_turns_ccw,
         ))
@@ -16,10 +16,10 @@ impl OrthogonalDirection {
     }
 }
 
-pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(0));
-pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1));
-pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(2));
-pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(3));
+pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::new_from_quarter_turns(0));
+pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::new_from_quarter_turns(1));
+pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::new_from_quarter_turns(2));
+pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::new_from_quarter_turns(3));
 
 // Behavior of negative is the main difference between orthogonaldirection and normalizedorthoangle
 impl Neg for OrthogonalDirection {

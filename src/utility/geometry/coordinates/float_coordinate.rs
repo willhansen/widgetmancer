@@ -1,3 +1,5 @@
+use map_macro::hash_set;
+
 use crate::utility::*;
 
 pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = Self> {

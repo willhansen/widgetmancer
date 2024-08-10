@@ -19,6 +19,7 @@ pub struct CharacterGridInLocalCharacterFrame;
 pub struct SquareGridInLocalSquareFrame;
 
 pub type WorldCoordinate<DataType> = Vector2D<DataType, SquareGridInWorldFrame>;
+pub type WorldIntCoordinate = IntCoordinate<SquareGridInWorldFrame>;
 
 pub type WorldSquare = WorldCoordinate<i32>;
 pub type WorldPoint = WorldCoordinate<f32>;
@@ -27,6 +28,8 @@ pub type BoardSize = Vector2D<u32, SquareGridInWorldFrame>;
 
 pub type WorldStep = WorldCoordinate<i32>;
 pub type WorldMove = WorldCoordinate<f32>;
+
+trait_alias!(pub trait WorldIntCoordinateOps = int_coordinate::Operations< UnitType = SquareGridInWorldFrame>);
 
 pub type TwoDifferentWorldPoints = TwoDifferentPoints<WorldPoint>;
 pub type TwoDifferentWorldSquares = TwoDifferentPoints<WorldSquare>;
