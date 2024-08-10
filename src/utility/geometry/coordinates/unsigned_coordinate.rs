@@ -1,8 +1,8 @@
 
-pub trait UnsignedCoordinate: coordinate::Operations {}
+pub trait UnsignedCoordinate: coordinates::Operations {}
 impl<T> UnsignedCoordinate for T
 where
-    T: coordinate::Operations,
+    T: coordinates::Operations,
     T::DataType: num::Unsigned,
 {
 }

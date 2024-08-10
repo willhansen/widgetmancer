@@ -53,7 +53,7 @@ pub trait Operations:
     fn to_orthogonal_direction(&self) -> WorldStep {
         self.to_step()
     }
-    fn try_from_coordinate<T: coordinate::Operations>(dir: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: coordinates::Operations>(dir: T) -> Result<Self, String> {
         if !dir.is_orthogonal() {
             return Err(format!("Not orthogonal: {}", dir.to_string()));
         }
@@ -73,7 +73,7 @@ pub trait Operations:
             },
         ))
     }
-    fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
+    fn from_coordinate<T: coordinates::Operations>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
     fn quarter_turns_from_x_axis<P: int_coordinate::Operations>(end: P) -> Self {

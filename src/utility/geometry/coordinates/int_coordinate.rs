@@ -22,8 +22,8 @@ pub trait Operations:
 }
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> int_coordinate::Operations for T where T: signed_coordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
+impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
-trait_alias!(pub trait WorldIntCoordinate = int_coordinate::Operations< UnitType = SquareGridInWorldFrame>);
+trait_alias!(pub trait WorldIntCoordinate = Operations< UnitType = SquareGridInWorldFrame>);
 
-trait_alias!(pub trait SignedIntCoordinate = int_coordinate::Operations + signed_coordinate::Operations);
+trait_alias!(pub trait SignedIntCoordinate = Operations + signed_coordinate::Operations);

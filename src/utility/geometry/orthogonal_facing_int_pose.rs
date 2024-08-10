@@ -175,35 +175,35 @@ where
             && self.direction().is_horizontal()
     }
 
-    pub fn center_point_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
+    pub fn center_point_of_face(&self) -> <SquareType as coordinates::Operations>::Floating {
         self.square().to_f32()
             + self
                 .dir()
-                .to_step::<<SquareType as coordinate::Operations>::Floating>()
+                .to_step::<<SquareType as coordinates::Operations>::Floating>()
                 * 0.5
     }
-    pub fn end_points_of_face(&self) -> [<SquareType as coordinate::Operations>::Floating; 2] {
+    pub fn end_points_of_face(&self) -> [<SquareType as coordinates::Operations>::Floating; 2] {
         [self.left(), self.right()].map(|dir| {
             self.center_point_of_face()
-                + dir.to_step::<<SquareType as coordinate::Operations>::Floating>() * 0.5
+                + dir.to_step::<<SquareType as coordinates::Operations>::Floating>() * 0.5
         })
     }
-    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as coordinate::Operations>::Floating; 2] {
+    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as coordinates::Operations>::Floating; 2] {
         let mut ps = self.end_points_of_face();
         if !two_points_are_ccw_with_origin(ps[0], ps[1]) {
             ps.reverse();
         }
         ps
     }
-    pub fn cw_end_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
+    pub fn cw_end_of_face(&self) -> <SquareType as coordinates::Operations>::Floating {
         self.end_points_of_face_in_ccw_order()[0]
     }
-    pub fn ccw_end_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
+    pub fn ccw_end_of_face(&self) -> <SquareType as coordinates::Operations>::Floating {
         self.end_points_of_face_in_ccw_order()[1]
     }
     pub fn face_end_point_approx_touches_point(
         &self,
-        point: <SquareType as coordinate::Operations>::Floating,
+        point: <SquareType as coordinates::Operations>::Floating,
     ) -> bool {
         let tolerance = 1e-6;
         self.end_points_of_face()

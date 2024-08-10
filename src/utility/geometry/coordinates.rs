@@ -1,5 +1,12 @@
 automod::dir!(pub "src/utility/geometry/coordinates");
 
+pub_use!(
+    // float_coordinate,
+    // int_coordinate,
+    king_world_step,
+    // signed_coordinate,
+    // unsigned_coordinate,
+);
 
 use map_macro::hash_set;
 use std::{
@@ -52,10 +59,10 @@ pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 pub type Vector2D<T, U> = Point2D<T, U>;
 
 // TODO: there's got to be a better way
-pub type Floating<P> = <P as coordinate::Operations>::Floating;
-pub type OnGrid<P> = <P as coordinate::Operations>::OnGrid;
-pub type DataType<P> = <P as coordinate::Operations>::DataType;
-pub type UnitType<P> = <P as coordinate::Operations>::UnitType;
+pub type Floating<P> = <P as coordinates::Operations>::Floating;
+pub type OnGrid<P> = <P as coordinates::Operations>::OnGrid;
+pub type DataType<P> = <P as coordinates::Operations>::DataType;
+pub type UnitType<P> = <P as coordinates::Operations>::UnitType;
 
 pub type OnGridDataType<P> = DataType<OnGrid<P>>;
 pub type FloatDataType<P> = DataType<Floating<P>>;
@@ -154,8 +161,8 @@ pub trait Operations:
         self.to_f32().square_length().sqrt()
     }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
-    // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinate<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
-    // fn cast<C,T,U>(&self) -> C where C: Coordinate<DataType=T, UnitType=U> { }
+    // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinates<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
+    // fn cast<C,T,U>(&self) -> C where C: Coordinates<DataType=T, UnitType=U> { }
     fn cast_unit<Other: Operations<DataType = Self::DataType>>(&self) -> Other {
         Other::new(self.x(), self.y())
     }
@@ -255,7 +262,7 @@ where
 //     ($type:ident) => {
 //         impl<T, U> From<(T, T)> for $type<T, U>
 //         where
-//             $type<T,U>: Coordinate<DataType = T>,
+//             $type<T,U>: Coordinates<DataType = T>,
 //         {
 //             fn from(value: (T, T)) -> Self {
 //                 <$type<T,U>>::new(value.0, value.1)
@@ -297,16 +304,16 @@ where
 // TODO: delete commented code
 // TODO: clean these up (with the trait alias macro?)
 // TODO: convert to auto trait when stable
-// pub trait AbsoluteCoordinate: Coordinate {}
+// pub trait AbsoluteCoordinate: coordinates {}
 // impl<COORD> AbsoluteCoordinate for COORD where
-//     COORD: Coordinate<RelativityComplement = Self::RelativeVersionOfSelf>
+//     COORD: Coordinates<RelativityComplement = Self::RelativeVersionOfSelf>
 // {
 // }
 
 // // TODO: convert to auto trait when stable
-// pub trait RelativeCoordinate: Coordinate {}
+// pub trait RelativeCoordinate: coordinates {}
 // impl<COORD> RelativeCoordinate for COORD where
-//     COORD: Coordinate<RelativityComplement = Self::AbsoluteVersionOfSelf>
+//     COORD: Coordinates<RelativityComplement = Self::AbsoluteVersionOfSelf>
 // {
 // }
 
@@ -327,7 +334,7 @@ pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
         .unwrap()
 }
 
-// TODO: make a coordinate method
+// TODO: make a coordinates method
 pub fn get_8_octant_transforms_of<PointType: signed_coordinate::Operations>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
@@ -343,11 +350,11 @@ pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     new_v.reverse();
     new_v
 }
-#[deprecated(note = "Coordinate::king_length instead")]
+#[deprecated(note = "coordinates::king_length instead")]
 pub fn king_step_distance<U>(step: Vector2D<i32, U>) -> u32 {
     step.x().abs().max(step.y().abs()) as u32
 }
-#[deprecated(note = "Coordinate::king_length instead")]
+#[deprecated(note = "coordinates::king_length instead")]
 pub fn king_move_distance<U>(step: Vector2D<f32, U>) -> f32 {
     step.x().abs().max(step.y().abs())
 }
@@ -520,7 +527,7 @@ pub fn check_vectors_in_ccw_order(
         })
         .collect()
 }
-pub fn on_line<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
+pub fn on_line<P: coordinates::Operations>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == P::DataType::zero()

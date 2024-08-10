@@ -1,7 +1,7 @@
 use crate::utility::*;
 
 pub trait Operations:
-    coordinate::Operations<DataType = Self::_DataType>
+    coordinates::Operations<DataType = Self::_DataType>
     + Neg<Output = Self>
     // TODO: put on the SignedCoordinateConstructor trait instead
     + From<NormalizedOrthoAngle>
@@ -43,9 +43,9 @@ pub trait Operations:
     }
 }
 
-impl<T> signed_coordinate::Operations for T
+impl<T> Operations for T
 where
-    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
+    T: coordinates::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -53,7 +53,7 @@ where
 
 impl<V> QuarterTurnRotatable for V
 where
-    V: signed_coordinate::Operations,
+    V: Operations,
 {
     fn quarter_rotated_ccw(&self, angle: impl Into<NormalizedOrthoAngle>) -> Self {
         // if self.is_absolute() {

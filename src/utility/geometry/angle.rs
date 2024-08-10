@@ -1,5 +1,11 @@
 automod::dir!(pub "src/utility/geometry/angle");
 
+pub_use!(
+    orthogonal_direction,
+    normalized_ortho_angle,
+    ortho_angle,
+);
+
 use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_4},
     ops::{Add, Div, Mul, Neg, Sub},
@@ -22,65 +28,14 @@ pub enum AngleVariety {
 // TODO: Add a level of relativity here to differentiate it from an absolute position.
 pub type QuarterTurns = OrthoAngle;
 
-#[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub struct OrthogonalDirection(NormalizedOrthoAngle);
-
-impl OrthogonalDirection {
-    pub fn from_angle_hint(hint: FAngle) -> Self {
-        let hint = standardize_angle_with_zero_min(hint);
-        let quarter_turns_ccw = ((hint.radians + FRAC_PI_4) / FRAC_PI_2) as i32;
-        Self(NormalizedOrthoAngle::new_from_quarter_turns(
-            quarter_turns_ccw,
-        ))
-    }
-    pub fn from_degrees_hint(deg: f32) -> Self {
-        Self::from_angle_hint(Angle::degrees(deg))
-    }
-}
-
-pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(0));
-pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(1));
-pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(2));
-pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle(3));
-
-// Behavior of negative is the main difference between orthogonaldirection and normalizedorthoangle
-impl Neg for OrthogonalDirection {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        self.reversed()
-    }
-}
-
-impl Display for OrthogonalDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.dir_name())
-    }
-}
-
-impl<T: ortho_angle::Operations> From<T> for OrthogonalDirection {
-    fn from(value: T) -> Self {
-        value.dir()
-    }
-}
-impl From<OrthogonalDirection> for NormalizedOrthoAngle {
-    fn from(value: OrthogonalDirection) -> Self {
-        value.angle()
-    }
-}
-impl QuarterTurnRotatable for OrthogonalDirection {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
-    }
-}
 pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
     fn from_angle(angle: impl ortho_angle::Operations) -> Self;
-    fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
+    fn from_coordinate<T: coordinates::Operations>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn try_from_coordinate<T: coordinate::Operations>(coord: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: coordinates::Operations>(coord: T) -> Result<Self, String> {
         Ok(Self::from_angle(
             <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(coord)?,
         ))
@@ -150,7 +105,7 @@ where
         todo!()
     }
 
-    fn try_from_coordinate<P: coordinate::Operations>(coord: P) -> Result<Self, String> {
+    fn try_from_coordinate<P: coordinates::Operations>(coord: P) -> Result<Self, String> {
         if coord.is_orthogonal() {}
         todo!()
     }
