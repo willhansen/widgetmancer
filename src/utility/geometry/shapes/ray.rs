@@ -23,3 +23,8 @@ impl<P: PointReqs> From<two_different_points::Shape<P>> for Shape<P> {
         todo!()
     }
 }
+impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &Line<P>) -> Self {
+        todo!()
+    }
+}

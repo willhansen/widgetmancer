@@ -409,6 +409,13 @@ impl<P: PointReqs> Display for Shape<P> {
     }
 }
 
+impl<P:PointReqs> AbstractsTo<Line<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &Line<P>) -> Self {
+        todo!()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
 

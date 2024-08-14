@@ -2,8 +2,7 @@ use crate::utility::*;
 use derive_getters::Getters;
 use derive_more::Constructor;
 
-trait_alias!(pub trait PointReqsForThingAtSquare = int_coordinate::Operations);
-trait_alias!(trait PointReqs = PointReqsForThingAtSquare);
+trait_alias!(pub trait PointReqs = int_coordinate::Operations);
 
 #[derive(Clone, Copy, Debug, Constructor, PartialEq, Eq, Hash)]
 pub struct ThingRelToSquare<T, P: PointReqs> {

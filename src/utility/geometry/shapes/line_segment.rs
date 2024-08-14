@@ -4,6 +4,10 @@ use crate::utility::*;
 
 trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
 
+/// A line segment between two points, without direction bias toward either point
+#[derive(Clone, PartialEq, Debug, Copy, Hash, Eq)]
+pub struct Shape<PointType: PointReqs>(DirectedLineSegment<PointType>);
+
 pub trait Operations<P: PointReqs>: line::Operations<P> {
     fn square_length(&self) -> <P as coordinates::Operations>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
@@ -14,6 +18,11 @@ pub trait Operations<P: PointReqs>: line::Operations<P> {
 impl<P: PointReqs> Operations<P> for TwoDifferentPoints<P> {
     fn endpoints_in_arbitrary_order(&self) -> [P; 2] {
         [self.p2(), self.p1()] // Order chosen by coin flip
+    }
+}
+impl<P: PointReqs> From<DirectedLineSegment<P>> for Shape<P> {
+    fn from(value: DirectedLineSegment<P>) -> Self {
+        Self(value)
     }
 }
 

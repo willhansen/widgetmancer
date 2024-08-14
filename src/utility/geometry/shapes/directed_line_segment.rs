@@ -26,3 +26,14 @@ impl<T, P: PointReqs> Operations<P> for T where
     T: directed_line::Operations<P> + line_segment::Operations<P>
 {
 }
+
+impl<P: PointReqs> From<TwoDifferentPoints<P>> for Shape<P> {
+    fn from(value: TwoDifferentPoints<P>) -> Self {
+        Self(value)
+    }
+}
+impl<P: PointReqs> AbstractsTo<LineSegment<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &LineSegment<P>) -> Self {
+        todo!()
+    }
+}

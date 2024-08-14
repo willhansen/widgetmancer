@@ -3,9 +3,7 @@ use crate::utility::*;
 trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::PointReqs);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub struct Shape<P: PointReqs>(
-    DirectedLineCuttingCenteredUnitSquare<P>,
-);
+pub struct Shape<P: PointReqs>(DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl<P: PointReqs> Shape<P> {
     fn new(val: DirectedLineCuttingCenteredUnitSquare<P>) -> Self {
@@ -44,19 +42,11 @@ impl<P: PointReqs> RefinementOf<HalfPlane<P>> for Shape<P> {
 }
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.
-pub trait Constructors<P: PointReqs>:
-    halfplane::Constructors<P>
-{
-}
+pub trait Constructors<P: PointReqs>: halfplane::Constructors<P> {}
 
-impl<P: PointReqs> Constructors<P>
-    for Shape<P>
-{
-}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}
+impl<P: PointReqs> halfplane::Constructors<P> for Shape<P> {}
 
 pub trait Operations<P: PointReqs>: halfplane::Operations<P> {}
 
-impl<P: PointReqs> Operations<P>
-    for Shape<P>
-{
-}
+impl<P: PointReqs> Operations<P> for Shape<P> {}

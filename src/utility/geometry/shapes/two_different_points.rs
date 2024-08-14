@@ -170,6 +170,11 @@ impl<P: PointReqs> AbstractsTo<Ray<P>> for Shape<P> {
         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
     }
 }
+impl<P: PointReqs> AbstractsTo<DirectedLineSegment<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &DirectedLineSegment<P>) -> Self {
+        Self::from_two_points(val.start(), val.end())
+    }
+}
 
 impl<P: PointReqs> Operations<P> for Shape<P> {
     fn point_by_index(&self, pi: usize) -> P {

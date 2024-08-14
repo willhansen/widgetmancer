@@ -43,7 +43,11 @@ pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Construct
     }
 }
 
-impl_operations_for_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
+impl<P: PointReqs> line::Operations<P> for Shape<P> {
+    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+        self.two_points_on_line_in_order()
+    }
+}
 impl_operations_for_directed_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
 
 impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);

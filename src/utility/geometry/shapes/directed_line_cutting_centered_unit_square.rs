@@ -47,3 +47,23 @@ pub trait Constructors<P: PointReqs>: two_points_on_different_faces_of_centered_
 }
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
+impl<P: PointReqs> two_different_points::Constructors<P> for Shape<P> {
+    fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+        todo!()
+    }
+}
+
+impl<P: PointReqs> two_points_on_different_faces_of_centered_unit_square::Constructors<P> for Shape<P> {}
+
+impl<P: PointReqs> AbstractsTo<LineCuttingCenteredUnitSquare<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &LineCuttingCenteredUnitSquare<P>) -> Self {
+        todo!()
+    }
+}
+
+impl<P: PointReqs, S: thing_relative_to_square::PointReqs> AbstractsTo<ThingRelToSquare<LineCuttingCenteredUnitSquare<P>, S>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &ThingRelToSquare<LineCuttingCenteredUnitSquare<P>, S>) -> Self {
+        todo!()
+    }
+}
+

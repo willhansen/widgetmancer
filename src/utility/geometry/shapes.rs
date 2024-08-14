@@ -115,6 +115,7 @@ macro_rules! validate_shape {
 validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line, ray, directed_line_segment,; );
 validate_shape!(directed_line, DirectedLine, abstracts_to: line,; abstraction_of: two_different_points,; );
 validate_shape!(directed_line_segment, DirectedLineSegment, abstracts_to: line_segment,;  );
+validate_shape!(line_segment, LineSegment, abstraction_of: directed_line_segment,;  );
 validate_shape!(line, Line, abstraction_of: directed_line,;);
 validate_shape!(
     halfplane,
