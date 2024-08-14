@@ -17,7 +17,7 @@ impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
     }
 }
 
-impl_translate_for_refined_type!(Shape<P: PointReqs>, refinement_base= two_different_points::Shape<P>);
+impl_translate_for_refined_type!(Shape<P: PointReqs>, refinement_base= TwoDifferentPoints<P>);
 
 impl_constructors_for_two_different_points_for_refinement!(Shape<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
 

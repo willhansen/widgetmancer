@@ -45,7 +45,13 @@ impl<P: PointReqs> RefinementOf<HalfPlane<P>> for Shape<P> {
 pub trait Constructors<P: PointReqs>: halfplane::Constructors<P> {}
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
-impl<P: PointReqs> halfplane::Constructors<P> for Shape<P> {}
+impl<P: PointReqs> halfplane::Constructors<P> for Shape<P> {
+    type BorderType = DirectedLine<P>;
+
+    fn from_border_with_inside_on_right(line: Self::BorderType) -> Self {
+        todo!()
+    }
+}
 
 pub trait Operations<P: PointReqs>: halfplane::Operations<P> {}
 

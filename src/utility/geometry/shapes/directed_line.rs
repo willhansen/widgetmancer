@@ -48,9 +48,24 @@ impl<P: PointReqs> line::Operations<P> for Shape<P> {
         self.two_points_on_line_in_order()
     }
 }
-impl_operations_for_directed_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
+impl<P: PointReqs> Operations<P> for Shape<P> {
+    fn two_points_on_line_in_order(&self) -> [P; 2] {
+        [self.0.p1(), self.0.p2()]
+    }
+}
+// impl_operations_for_directed_line_for_newtype!(Shape<P: PointReqs>);
 
-impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+// impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+impl<P: PointReqs> Constructors<P> for Shape<P> {
+    fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
+    where
+        Self: Sized {
+        todo!()
+    }
+}
+// impl<P: PointReqs> line::Constructors<P> for Shape<P> {
+//     type TargetShape;
+// }
 
 // impl<L> Reversible for L
 // where
