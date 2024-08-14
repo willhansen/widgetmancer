@@ -14,10 +14,10 @@ pub trait Operations<P: PointReqs>:
 }
 pub trait Constructors<P: PointReqs>: two_different_points::Constructors<P> {}
 
-impls_for_two_different_points!(
+two_different_points::impls_for_two_different_points!(
     Shape<P: float_coordinate::Operations>
 );
-impl_translate_for_two_points_with_restriction!(
+translate::impl_translate_for_two_points_with_restriction!(
     Shape<P: float_coordinate::Operations>
 );
 

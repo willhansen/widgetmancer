@@ -1,4 +1,4 @@
-use crate::UnsignedCoordinate;
+use crate::unsigned_coordinate::UnsignedCoordinate;
 
 pub trait Size2D: UnsignedCoordinate {
     // TODO: make an `UnsignedCoordinate` trait

@@ -146,9 +146,9 @@ where
     }
 }
 
-macro_rules! impl_constructors_for_two_different_points_for_refinement {
+macro_rules! impl_constructors_for_refinement {
     ($SelfType:ident<P: $reqs:ident>, unrefined= $BaseType:ident<P>) => {
-        impl<P: $reqs> Constructors<P> for $SelfType<P>
+        impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
         where
             Self: RefinementOf<$BaseType<P>>,
         {
@@ -158,7 +158,7 @@ macro_rules! impl_constructors_for_two_different_points_for_refinement {
         }
     };
 }
-pub(crate) use impl_constructors_for_two_different_points_for_refinement;
+pub(crate) use impl_constructors_for_refinement;
 
 impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
@@ -292,7 +292,7 @@ impl<P: PointReqs> Sub<P> for Shape<P> {
 }
 
 // TODO: combine into one macro call
-impl_translate_for_two_points_with_restriction!(Shape<P: PointReqs>);
+translate::impl_translate_for_two_points_with_restriction!(Shape<P: PointReqs>);
 
 impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for Shape<P>
 where

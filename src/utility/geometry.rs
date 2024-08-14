@@ -23,8 +23,8 @@ pub_use!(
     shapes,
     size_2d,
     thing_relative_to_square,
-    translate,
 );
+pub use self::translate::Translate;
 
 pub fn floating_point_step<P: float_coordinate::Operations>(start: P, angle: Angle<f32>, length: f32) -> P {
     start + P::unit_vector_from_angle(angle) * length
