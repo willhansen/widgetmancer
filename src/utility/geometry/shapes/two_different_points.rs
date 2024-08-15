@@ -216,7 +216,7 @@ impl<P: float_coordinate::Operations> Ray<P> for Shape<P> {
     }
 }
 
-macro_rules! impls_for_two_different_points {
+macro_rules! impls {
     ($TheStruct:ident<P: $PointReqs:path>) => {
         impl<P: $PointReqs> directed_line::Operations<P> for $TheStruct<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
@@ -270,11 +270,11 @@ macro_rules! impls_for_two_different_points {
         }
     };
 }
-pub(crate) use impls_for_two_different_points;
+pub(crate) use impls;
 
 // TODO: combine with other macros
 // TODO: remove coordinate trait parameter
-impls_for_two_different_points!(Shape<P: PointReqs>);
+impls!(Shape<P: PointReqs>);
 
 impl<P: PointReqs> Add<P> for Shape<P> {
     type Output = Self;
@@ -291,8 +291,6 @@ impl<P: PointReqs> Sub<P> for Shape<P> {
     }
 }
 
-// TODO: combine into one macro call
-translate::impl_for_two_points_with_restriction!(Shape<P: PointReqs>);
 
 impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for Shape<P>
 where
