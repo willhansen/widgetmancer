@@ -53,9 +53,9 @@ impl<P: PointReqs> Operations<P> for Shape<P> {
         [self.0.p1(), self.0.p2()]
     }
 }
-// impl_operations_for_directed_line_for_newtype!(Shape<P: PointReqs>);
+// directed_line::impl_operations_for_newtype!(Shape<P: PointReqs>);
 
-// impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+// line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
 impl<P: PointReqs> Constructors<P> for Shape<P> {
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where

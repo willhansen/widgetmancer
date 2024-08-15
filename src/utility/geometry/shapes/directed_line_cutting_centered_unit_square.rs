@@ -21,7 +21,7 @@ impl_reversible_for_newtype!(
 // TODO: Switch to TryTranslate to avoid panics
 translate::impl_for_newtype!(Shape<P: PointReqs>);
 
-// impl_operations_for_directed_line_for_delegate!(Shape<P: PointReqs>, accessor=0);
+// directed_line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=0);
 
 impl<P: PointReqs> TryFrom<DirectedLine<P>> for Shape<P> {
     type Error = String;

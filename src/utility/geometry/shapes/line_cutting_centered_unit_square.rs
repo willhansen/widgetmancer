@@ -18,10 +18,10 @@ translate::impl_for_newtype!(
 impl_quarter_turn_rotatable_for_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>);
 
-impl_operations_for_line_for_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
-impl_constructors_for_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+line::impl_operations_for_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
+line::impl_constructors_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl_constructors_for_directed_line_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+directed_line::impl_constructors_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl<P: PointReqs> Into<Line<P>> for LineCuttingCenteredUnitSquare<P> {
     fn into(self) -> Line<P> {

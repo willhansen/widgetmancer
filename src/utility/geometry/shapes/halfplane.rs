@@ -97,7 +97,7 @@ where {
         Self::new(border)
     }
 }
-macro_rules! impl_constructors_for_half_plane_for_refinement {
+macro_rules! impl_constructors_for_refinement {
     ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
         // static assert prerequisite trait is implemented
         impl<P: $TraitParam> Constructors<P> for $Type<P> {
@@ -119,7 +119,7 @@ macro_rules! impl_constructors_for_half_plane_for_refinement {
         }
     };
 }
-pub(crate) use impl_constructors_for_half_plane_for_refinement;
+pub(crate) use impl_constructors_for_refinement;
 
 impl<P: PointReqs> Complement for Shape<P> {
     type Output = Self;

@@ -30,7 +30,7 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for Shape<P> {
 impl_complement_for_refinement!(Shape<P: PointReqs>, refinement_base= HalfPlane<P>);
 
 impl_half_plane_ops_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
-impl_constructors_for_half_plane_for_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingGridSquare<P>, base= HalfPlane<P>);
+half_plane::impl_constructors_for_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingGridSquare<P>, base= HalfPlane<P>);
 
 pub trait Operations<P: PointReqs>: halfplane::Operations<P> {
     // type PointType: FloatCoordinate;

@@ -38,10 +38,10 @@ pub trait Operations<P: PointReqs> {}
 
 impl<P: PointReqs> Operations<P> for Shape<P> {}
 
-impl_operations_for_line_for_delegate!(Shape<P: PointReqs>, accessor=thing());
-impl_constructors_for_line_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=thing());
+line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
-impl_constructors_for_directed_line_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+directed_line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 // TODO: this could be generally implemented for anything convertible from twodifferentpoints
 impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Shape<P> {

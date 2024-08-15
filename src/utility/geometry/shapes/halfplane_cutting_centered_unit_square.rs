@@ -16,7 +16,7 @@ impl_quarter_turn_rotatable_for_newtype!(Shape<P: PointReqs>);
 
 impl_half_plane_ops_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-impl_constructors_for_half_plane_for_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingCenteredUnitSquare<P>, base=HalfPlane<P>);
+half_plane::impl_constructors_for_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingCenteredUnitSquare<P>, base=HalfPlane<P>);
 
 impl<P: PointReqs> TryFrom<HalfPlane<P>> for Shape<P> {
     type Error = String;
