@@ -217,14 +217,14 @@ impl<P: float_coordinate::Operations> Ray<P> for Shape<P> {
 }
 
 macro_rules! impls_for_two_different_points {
-    ($TheStruct:ident<P: $point_trait:ident>) => {
-        impl<P: $point_trait> directed_line::Operations<P> for $TheStruct<P> {
+    ($TheStruct:ident<P: $PointReqs:path>) => {
+        impl<P: $PointReqs> directed_line::Operations<P> for $TheStruct<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
                 Self::to_array(self)
             }
         }
 
-        impl<P: $point_trait> directed_line::Constructors<P> for $TheStruct<P> {
+        impl<P: $PointReqs> directed_line::Constructors<P> for $TheStruct<P> {
             fn try_new_from_directed_line(
                 line: impl directed_line::Operations<P>,
             ) -> Result<Self, String>
@@ -243,20 +243,20 @@ macro_rules! impls_for_two_different_points {
             }
         }
 
-        impl<P: $point_trait> line::Operations<P> for $TheStruct<P> {
+        impl<P: $PointReqs> line::Operations<P> for $TheStruct<P> {
             fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
                 self.to_array()
             }
         }
-        impl<P: $point_trait> ConstructorsForLine<P> for $TheStruct<P> {}
+        impl<P: $PointReqs> ConstructorsForLine<P> for $TheStruct<P> {}
 
-        impl<P: $point_trait> Reversible for $TheStruct<P> {
+        impl<P: $PointReqs> Reversible for $TheStruct<P> {
             fn reversed(&self) -> Self {
                 Self::new_from_points(self.p2(), self.p1())
             }
         }
 
-        impl<P: $point_trait> QuarterTurnRotatable for $TheStruct<P> {
+        impl<P: $PointReqs> QuarterTurnRotatable for $TheStruct<P> {
             fn quarter_rotated_ccw(
                 &self,
                 quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
