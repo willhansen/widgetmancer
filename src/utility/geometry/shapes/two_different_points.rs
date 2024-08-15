@@ -292,7 +292,7 @@ impl<P: PointReqs> Sub<P> for Shape<P> {
 }
 
 // TODO: combine into one macro call
-translate::impl_translate_for_two_points_with_restriction!(Shape<P: PointReqs>);
+translate::impl_for_two_points_with_restriction!(Shape<P: PointReqs>);
 
 impl<P: PointReqs, CanBePointType> From<(CanBePointType, CanBePointType)> for Shape<P>
 where

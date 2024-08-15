@@ -51,4 +51,4 @@ impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Shape<P> {
 }
 
 // TODO: Switch to TryTranslate to avoid panics
-impl_translate_for_newtype!(Shape<P: PointReqs>);
+translate::impl_for_newtype!(Shape<P: PointReqs>);

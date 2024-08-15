@@ -216,7 +216,7 @@ pub trait Operations<P: PointReqs>:
         square_projected_onto_axis.depth_of(line_position_on_axis)
     }
 }
-impl_translate_for_newtype!(Line<P: PointReqs>);
+translate::impl_for_newtype!(Line<P: PointReqs>);
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 

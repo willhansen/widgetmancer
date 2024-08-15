@@ -13,7 +13,7 @@ impl<P: PointReqs> Shape<P> {
 
 impl_abstraction_for_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
 
-impl_translate_for_newtype!(Shape<P: PointReqs>);
+translate::impl_for_newtype!(Shape<P: PointReqs>);
 
 pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Constructors<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2];

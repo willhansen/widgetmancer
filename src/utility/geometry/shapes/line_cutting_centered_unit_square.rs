@@ -12,7 +12,7 @@ impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCentered
 impl_skip_level_try_from!(LineCuttingCenteredUnitSquare<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> DirectedLine<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
-impl_translate_for_newtype!(
+translate::impl_for_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>
 );
 impl_quarter_turn_rotatable_for_newtype!(

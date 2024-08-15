@@ -7,7 +7,7 @@ impl<T, MoveType> Translate<MoveType> for T where
 }
 
 //
-macro_rules! impl_translate_for_newtype {
+macro_rules! impl_for_newtype {
     ($type:ident<P: $traitparam:ident>) => {
         impl<P: $traitparam> Add<P> for $type<P> {
             type Output = Self;
@@ -26,10 +26,10 @@ macro_rules! impl_translate_for_newtype {
         }
     };
 }
-pub(crate) use impl_translate_for_newtype;
+pub(crate) use impl_for_newtype;
 
 // TODO
-macro_rules! impl_translate_for_refined_type {
+macro_rules! impl_for_refined_type {
     ($TheStruct:ident<P: $CoordTrait:ident>, refinement_base= $RefinementBase:ident<P>) => {
 
         // TODO: statically assert the $RefinementBase implements translate
@@ -60,4 +60,4 @@ macro_rules! impl_translate_for_refined_type {
         }
     };
 }
-pub(crate) use impl_translate_for_refined_type;
+pub(crate) use impl_for_refined_type;
