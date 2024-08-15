@@ -160,6 +160,20 @@ macro_rules! impl_constructors_for_refinement {
 }
 pub(crate) use impl_constructors_for_refinement;
 
+macro_rules! impl_constructors_for_abstraction {
+    ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
+        impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
+        where
+            Self: AbstractionOf<$BaseType<P>>,
+        {
+            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
+                $BaseType::<P>::try_from_two_exact_points(p1, p2)?.try_into()
+            }
+        }
+    };
+}
+pub(crate) use impl_constructors_for_abstraction;
+
 impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
