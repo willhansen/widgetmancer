@@ -218,6 +218,18 @@ pub trait Operations<P: PointReqs>:
 }
 translate::impl_for_newtype!(Line<P: PointReqs>);
 
+macro_rules! impl_operations_for_delegate {
+    // NOTE: good macro reference
+    ($type:ident<P: $traitparam:path>, accessor= $accessor:expr) => {
+        impl<P: $traitparam> line::Operations<P> for $type<P> {
+            fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+                $accessor(self).two_different_arbitrary_points_on_line()
+            }
+        }
+    }
+}
+pub(crate) use impl_operations_for_delegate;
+
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
 impl<P> AbstractionOf<DirectedLine<P>> for Line<P> {}

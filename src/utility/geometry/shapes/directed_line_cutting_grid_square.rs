@@ -17,8 +17,8 @@ pub type Shape<P: PointReqs> =
 // TODO Switch to TryTranslate and avoid panic?
 translate::impl_for_newtype!(Shape<P: PointReqs>);
 
-line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=thing());
-impl<P: PointReqs> ConstructorsForLine<P> for Shape<P> {}
+line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
+
 
 directed_line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=thing());
 directed_line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
