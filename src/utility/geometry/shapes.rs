@@ -7,9 +7,9 @@ automod::dir!(pub "src/utility/geometry/shapes");
 // directed_line_cutting_grid_square,
 // float_line,
 // grid_square,
-// halfplane,
-// halfplane_cutting_centered_unit_square,
-// halfplane_cutting_grid_square,
+// half_plane,
+// half_plane_cutting_centered_unit_square,
+// half_plane_cutting_grid_square,
 // line,
 // line_cutting_centered_unit_square,
 // line_cutting_grid_square,
@@ -118,7 +118,7 @@ validate_shape!(directed_line_segment, DirectedLineSegment, abstracts_to: line_s
 validate_shape!(line_segment, LineSegment, abstraction_of: directed_line_segment,;  );
 validate_shape!(line, Line, abstraction_of: directed_line,;);
 validate_shape!(
-    halfplane,
+    half_plane,
     HalfPlane,
     // TODO: direction as abstractable module
     abstracts_to: line,;// direction,;
@@ -163,11 +163,11 @@ validate_shape!(
     refinement_of: line,;
 );
 validate_shape!(
-    halfplane_cutting_centered_unit_square,
+    half_plane_cutting_centered_unit_square,
     HalfPlaneCuttingCenteredUnitSquare,
     abstracts_to: line_cutting_centered_unit_square,;
-    abstraction_of: halfplane_cutting_grid_square,;
-    refinement_of: halfplane,;
+    abstraction_of: half_plane_cutting_grid_square,;
+    refinement_of: half_plane,;
 );
 
 // Grid square refinement
@@ -193,10 +193,10 @@ validate_shape!(
 );
 // TODO
 validate_shape!(
-    halfplane_cutting_grid_square,
+    half_plane_cutting_grid_square,
     HalfPlaneCuttingGridSquare,
     abstracts_to: line_cutting_grid_square, line_cutting_centered_unit_square,;
-    refinement_of: halfplane,;
+    refinement_of: half_plane,;
 );
 
 // Traits to help keep all the conversion requirements between newtypes straight

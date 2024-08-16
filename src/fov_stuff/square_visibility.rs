@@ -151,7 +151,7 @@ pub trait ViewRoundable {
     fn rounded_towards_full_visibility(&self, tolerance_length: f32) -> Self;
 }
 
-// TODO: should this be a trait? (yes, because the halfplane square visibility is going to be swapped out, with these functions being common between the two)
+// TODO: should this be a trait? (yes, because the half_plane square visibility is going to be swapped out, with these functions being common between the two)
 // Might make more sense to have this not be a trait, and call methods of PartialSquareVisibilityOps
 // TODO: remove.  put variation in the partialvisibility trait
 pub trait SquareVisibilityOperations  {
@@ -278,7 +278,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
                     Self::NotVisible
                 }
             }
-            1 => Self::new_partially_visible_from_visible_half_plane(halfplane_cutting_world_square_to_halfplane_local_square(
+            1 => Self::new_partially_visible_from_visible_half_plane(half_plane_cutting_world_square_to_half_plane_local_square(
                 substantial_intersections[0],
             )),
             2 => {
@@ -298,7 +298,7 @@ impl SquareVisibilityOperations for SquareVisibilityFromOneHalfPlane {
                 .unwrap();
                 dbg!(&selected);
 
-                Self::new_partially_visible_from_visible_half_plane(halfplane_cutting_world_square_to_halfplane_local_square(
+                Self::new_partially_visible_from_visible_half_plane(half_plane_cutting_world_square_to_half_plane_local_square(
                     *selected,
                 ))
             }
@@ -737,7 +737,7 @@ mod tests {
     }
 
     square_viz_tests!(
-        fromhalfplane: SquareVisibilityFromOneHalfPlane,
+        fromhalf_plane: SquareVisibilityFromOneHalfPlane,
         fromfovcones: SquareVisibilityFromFovCones,
     );
 

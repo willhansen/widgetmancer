@@ -3,7 +3,7 @@ use strum_macros::EnumIter;
 
 use super::bool_with_partial::{self, *};
 
-/// Intended for determining how much a halfplane overlaps a shape.
+/// Intended for determining how much a half_plane overlaps a shape.
 /// Needs to account for exact points at start and end of coverage
 /// All the sections of a closed intervals
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Display, Copy, EnumIter)]

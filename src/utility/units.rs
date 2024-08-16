@@ -217,7 +217,7 @@ pub fn world_half_plane_to_local_square_half_plane(
     world_half_plane.with_transformed_points(|p| world_point_to_local_square_point(p, ref_square))
 }
 
-pub fn halfplane_cutting_world_square_to_halfplane_local_square(
+pub fn half_plane_cutting_world_square_to_half_plane_local_square(
     world_version: HalfPlaneCuttingWorldSquare,
 ) -> HalfPlaneCuttingLocalSquare {
     let line = *world_version.dividing_line().to_local();

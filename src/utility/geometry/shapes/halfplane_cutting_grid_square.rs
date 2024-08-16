@@ -29,14 +29,14 @@ impl<P: PointReqs> TryFrom<HalfPlane<P>> for Shape<P> {
 
 impl_complement_via_refinement!(Shape<P: PointReqs>, refinement_base= HalfPlane<P>);
 
-impl_half_plane_ops_via_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
+half_plane::impl_operations_via_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 half_plane::impl_constructors_via_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingGridSquare<P>, base= HalfPlane<P>);
 
-pub trait Operations<P: PointReqs>: halfplane::Operations<P> {
+pub trait Operations<P: PointReqs>: half_plane::Operations<P> {
     // type PointType: FloatCoordinate;
     // TODO: change output to normalized float
     fn fraction_of_square_covered(&self) -> f32 {
-        // TODO: tidy this up when halfplane is a trait
+        // TODO: tidy this up when half_plane is a trait
         self.to_local()
             .very_approximate_fraction_coverage_of_centered_unit_square()
     }

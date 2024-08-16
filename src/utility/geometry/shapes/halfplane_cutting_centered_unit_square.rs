@@ -42,10 +42,10 @@ impl<P: PointReqs> RefinementOf<HalfPlane<P>> for Shape<P> {
 }
 
 // TODO: This feels like It only exists to explicitly require the base type's constructors.
-pub trait Constructors<P: PointReqs>: halfplane::Constructors<P> {}
+pub trait Constructors<P: PointReqs>: half_plane::Constructors<P> {}
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
-impl<P: PointReqs> halfplane::Constructors<P> for Shape<P> {
+impl<P: PointReqs> half_plane::Constructors<P> for Shape<P> {
     type BorderType = DirectedLine<P>;
 
     fn from_border_with_inside_on_right(line: Self::BorderType) -> Self {
@@ -53,6 +53,6 @@ impl<P: PointReqs> halfplane::Constructors<P> for Shape<P> {
     }
 }
 
-pub trait Operations<P: PointReqs>: halfplane::Operations<P> {}
+pub trait Operations<P: PointReqs>: half_plane::Operations<P> {}
 
 impl<P: PointReqs> Operations<P> for Shape<P> {}

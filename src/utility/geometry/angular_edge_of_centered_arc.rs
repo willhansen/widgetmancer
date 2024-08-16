@@ -8,7 +8,7 @@ pub trait AngularEdgeOfCenteredArc {
     fn edge_ray<P: float_coordinate::Operations, R: ray::Operations<P>>(&self) -> R {
         R::new_from_point_and_dir(P::zero(), self.angle())
     }
-    // fn border_as_halfplane<T: HalfPlane>(&self) -> T;
+    // fn border_as_half_plane<T: HalfPlane>(&self) -> T;
     fn outside_angular_direction(&self) -> AngularDirection;
     fn flipped(&self) -> Self
     where
