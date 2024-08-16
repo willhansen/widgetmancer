@@ -38,7 +38,7 @@ pub trait Operations<P: PointReqs> {}
 
 impl<P: PointReqs> Operations<P> for Shape<P> {}
 
-line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=thing());
+line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=thing());
 line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 directed_line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);

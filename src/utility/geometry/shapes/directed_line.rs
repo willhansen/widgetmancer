@@ -54,8 +54,19 @@ impl<P: PointReqs> Operations<P> for Shape<P> {
     }
 }
 // directed_line::impl_operations_for_newtype!(Shape<P: PointReqs>);
+macro_rules! impl_operations_for_delegate {
+    ($type:ident<P: $traitparam:path>, accessor= $accessor:expr) => {
+        impl<P: $traitparam> directed_line::Operations<P> for $type<P> {
+            fn two_points_on_line_in_order(&self) -> [P; 2] {
+                $accessor(self).two_points_on_line_in_order()
+            }
+        }
+    }
+}
+pub(crate) use impl_operations_for_delegate;
 
 // line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+
 impl<P: PointReqs> Constructors<P> for Shape<P> {
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where
@@ -111,6 +122,17 @@ pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors
         Self::from_two_points_allowing_snap_along_line(p1, p2)
     }
 }
+
+macro_rules! impl_constructors_for {
+    ($type:ident<P: $traitparam:path>, base= $basetype:ident<P>) => {
+        impl<P: $traitparam> directed_line::Constructors<P> for $type<P> {
+            fn try_new_from_directed_line(line: impl directed_line::Operations<P>) -> Result<Self, String> {
+                $basetype::<P>::try_new_from_directed_line(line)?.try_into()
+            }
+        }
+    }
+}
+pub(crate) use impl_constructors_for;
 
 impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &Line<P>) -> Self {

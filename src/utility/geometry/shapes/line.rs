@@ -218,7 +218,7 @@ pub trait Operations<P: PointReqs>:
 }
 translate::impl_for_newtype!(Line<P: PointReqs>);
 
-macro_rules! impl_operations_for_delegate {
+macro_rules! impl_operations_via_delegate {
     // NOTE: good macro reference
     ($type:ident<P: $traitparam:path>, accessor= $accessor:expr) => {
         impl<P: $traitparam> line::Operations<P> for $type<P> {
@@ -228,7 +228,7 @@ macro_rules! impl_operations_for_delegate {
         }
     }
 }
-pub(crate) use impl_operations_for_delegate;
+pub(crate) use impl_operations_via_delegate;
 
 impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
 
@@ -246,7 +246,9 @@ where
 }
 
 pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
-    type TargetShape;
+
+    // TODO: what was this for??
+    // type TargetShape;
 
     fn from_two_unordered_points_on_line(p1: P, p2: P) -> Self {
         Self::try_from_two_points_on_line(p1, p2).unwrap()
@@ -268,6 +270,13 @@ pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
         Self::try_from_array_of_two_points_on_line(p)
     }
 }
+macro_rules! impl_constructors_via_base {
+    ($type:ident<P: $traitparam:path>, base= $basetype:ident<P>) => {
+        impl<P: $traitparam> line::Constructors<P> for $type<P> {
+        }
+    }
+}
+pub(crate) use impl_constructors_via_base;
 
 // TODO: generate default data? (in the form of using Line constructors on types that abstract to
 // lines (like TwoDifferentPoints)
@@ -292,7 +301,8 @@ pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
 impl<P: PointReqs> AbstractionOf<directed_line::Shape<P>> for Shape<P> {}
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {
-    type TargetShape = Shape<P>;
+    // TODO: what was this for??
+    // type TargetShape = Shape<P>;
 }
 
 pub fn first_inside_square_face_hit_by_ray(
