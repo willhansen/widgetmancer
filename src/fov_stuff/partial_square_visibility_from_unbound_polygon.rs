@@ -9,8 +9,8 @@ pub struct PartialSquareVisibilityFromUnboundPolygon(
 
 impl PartialSquareVisibilityFromUnboundPolygon {}
 
-impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
-impl_complement_for_newtype!(PartialSquareVisibilityFromUnboundPolygon);
+impl_quarter_turn_rotatable_via_newtype!(PartialSquareVisibilityFromUnboundPolygon);
+impl_complement_via_newtype!(PartialSquareVisibilityFromUnboundPolygon);
 
 impl PartialSquareVisibilityOps for PartialSquareVisibilityFromUnboundPolygon {
     fn where_border_touches_unit_square(&self) -> Vec<LocalSquarePoint> {

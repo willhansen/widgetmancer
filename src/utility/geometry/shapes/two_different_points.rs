@@ -146,7 +146,7 @@ where
     }
 }
 
-macro_rules! impl_constructors_for_refinement {
+macro_rules! impl_constructors_via_refinement {
     ($SelfType:ident<P: $reqs:ident>, unrefined= $BaseType:ident<P>) => {
         impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
         where
@@ -158,7 +158,7 @@ macro_rules! impl_constructors_for_refinement {
         }
     };
 }
-pub(crate) use impl_constructors_for_refinement;
+pub(crate) use impl_constructors_via_refinement;
 
 macro_rules! impl_constructors_for_abstraction {
     ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {

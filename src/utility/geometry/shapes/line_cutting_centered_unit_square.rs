@@ -5,23 +5,23 @@ trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::P
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct Shape<P: PointReqs>(directed_line_cutting_centered_unit_square::Shape<P>);
 
-impl_abstraction_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+impl_abstraction_via_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
 // Is the arrow direction confusing?
 impl_skip_level_try_from!(LineCuttingCenteredUnitSquare<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> DirectedLine<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
-translate::impl_for_newtype!(
+translate::impl_via_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>
 );
-impl_quarter_turn_rotatable_for_newtype!(
+impl_quarter_turn_rotatable_via_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>);
 
 line::impl_operations_via_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
 line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-directed_line::impl_constructors_for_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
+directed_line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 impl<P: PointReqs> Into<Line<P>> for LineCuttingCenteredUnitSquare<P> {
     fn into(self) -> Line<P> {

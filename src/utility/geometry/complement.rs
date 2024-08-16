@@ -3,7 +3,7 @@ pub trait Complement {
     fn complement(&self) -> Self::Output;
 }
 
-macro_rules! impl_complement_for_newtype {
+macro_rules! impl_complement_via_newtype {
     ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
         impl$(<$T$(: $traitparam)?>)? Complement for $type$(<$T>)? {
             type Output = Self;
@@ -13,9 +13,9 @@ macro_rules! impl_complement_for_newtype {
         }
     };
 }
-pub(crate) use impl_complement_for_newtype;
+pub(crate) use impl_complement_via_newtype;
 
-macro_rules! impl_complement_for_refinement {
+macro_rules! impl_complement_via_refinement {
     ($type:ident<P: $PointReqs:ident>, refinement_base= $RefinementBase:ident<P>) => {
         // TODO: double check the prerequisite trait is implemented for the macro (at compile time)
         // const {assert_impl!($type<P>, Refinement<$RefinementBase<P>>);}
@@ -28,4 +28,4 @@ macro_rules! impl_complement_for_refinement {
         }
     };
 }
-pub(crate) use impl_complement_for_refinement;
+pub(crate) use impl_complement_via_refinement;

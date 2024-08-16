@@ -5,7 +5,7 @@ pub trait Reversible {
     fn reversed(&self) -> Self;
 }
 
-macro_rules! impl_reversible_for_newtype {
+macro_rules! impl_reversible_via_newtype {
     ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
         impl$(<$T$(: $traitparam)?>)? Reversible for $type$(<$T>)? {
             fn reversed(
@@ -16,4 +16,4 @@ macro_rules! impl_reversible_for_newtype {
         }
     };
 }
-pub(crate) use impl_reversible_for_newtype;
+pub(crate) use impl_reversible_via_newtype;

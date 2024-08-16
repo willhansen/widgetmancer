@@ -10,18 +10,18 @@ pub struct Shape<P>(
 where
     P: PointReqs;
 
-impl_abstraction_for_newtype!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl_abstraction_via_newtype!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
-impl_quarter_turn_rotatable_for_newtype!(
+impl_quarter_turn_rotatable_via_newtype!(
     Shape<P: PointReqs>);
-impl_reversible_for_newtype!(
+impl_reversible_via_newtype!(
     Shape<P: PointReqs>
 );
 
 // TODO: Switch to TryTranslate to avoid panics
-translate::impl_for_newtype!(Shape<P: PointReqs>);
+translate::impl_via_newtype!(Shape<P: PointReqs>);
 
-// directed_line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=0);
+// directed_line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=0);
 
 impl<P: PointReqs> TryFrom<DirectedLine<P>> for Shape<P> {
     type Error = String;

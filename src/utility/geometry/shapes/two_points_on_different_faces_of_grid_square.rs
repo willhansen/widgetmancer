@@ -19,7 +19,7 @@ impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
 
 translate::impl_for_refined_type!(Shape<P: PointReqs>, refinement_base= TwoDifferentPoints<P>);
 
-two_different_points::impl_constructors_for_refinement!(Shape<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
+two_different_points::impl_constructors_via_refinement!(Shape<P: PointReqs>, unrefined= TwoDifferentPoints<P>);
 
 pub trait Constructors<P: PointReqs>: Sized {
     fn try_new_from_line_and_square<L: directed_float_line::Operations<P>>(

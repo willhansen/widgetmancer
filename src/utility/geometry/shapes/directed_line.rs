@@ -11,9 +11,9 @@ impl<P: PointReqs> Shape<P> {
     }
 }
 
-impl_abstraction_for_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
+impl_abstraction_via_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
 
-translate::impl_for_newtype!(Shape<P: PointReqs>);
+translate::impl_via_newtype!(Shape<P: PointReqs>);
 
 pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Constructors<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2];
@@ -53,8 +53,8 @@ impl<P: PointReqs> Operations<P> for Shape<P> {
         [self.0.p1(), self.0.p2()]
     }
 }
-// directed_line::impl_operations_for_newtype!(Shape<P: PointReqs>);
-macro_rules! impl_operations_for_delegate {
+// directed_line::impl_operations_via_newtype!(Shape<P: PointReqs>);
+macro_rules! impl_operations_via_delegate {
     ($type:ident<P: $traitparam:path>, accessor= $accessor:expr) => {
         impl<P: $traitparam> directed_line::Operations<P> for $type<P> {
             fn two_points_on_line_in_order(&self) -> [P; 2] {
@@ -63,9 +63,9 @@ macro_rules! impl_operations_for_delegate {
         }
     }
 }
-pub(crate) use impl_operations_for_delegate;
+pub(crate) use impl_operations_via_delegate;
 
-// line::impl_constructors_for_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+// line::impl_constructors_via_newtype!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
@@ -123,7 +123,7 @@ pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors
     }
 }
 
-macro_rules! impl_constructors_for {
+macro_rules! impl_constructors_via_base {
     ($type:ident<P: $traitparam:path>, base= $basetype:ident<P>) => {
         impl<P: $traitparam> directed_line::Constructors<P> for $type<P> {
             fn try_new_from_directed_line(line: impl directed_line::Operations<P>) -> Result<Self, String> {
@@ -132,7 +132,7 @@ macro_rules! impl_constructors_for {
         }
     }
 }
-pub(crate) use impl_constructors_for;
+pub(crate) use impl_constructors_via_base;
 
 impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &Line<P>) -> Self {

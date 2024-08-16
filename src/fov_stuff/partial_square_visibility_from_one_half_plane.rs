@@ -15,7 +15,7 @@ impl PartialSquareVisibilityByOneVisibleHalfPlane {
     }
 }
 
-impl_complement_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);
+impl_complement_via_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);
 
 impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane {
     fn new_from_visible_half_plane(visible_portion: HalfPlaneCuttingLocalSquare) -> Self {
@@ -55,4 +55,4 @@ impl PartialSquareVisibilityOps for PartialSquareVisibilityByOneVisibleHalfPlane
     }
 }
 
-impl_quarter_turn_rotatable_for_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);
+impl_quarter_turn_rotatable_via_newtype!(PartialSquareVisibilityByOneVisibleHalfPlane);

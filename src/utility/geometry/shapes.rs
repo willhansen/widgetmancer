@@ -217,7 +217,7 @@ pub trait AbstractsTo<AbstractType>: Into<AbstractType> {
     fn set_with_abstraction(&self, val: &AbstractType) -> Self;
 }
 
-macro_rules! impl_abstraction_for_newtype {
+macro_rules! impl_abstraction_via_newtype {
     ($abstract_type:ident<P: $PointReqs:ident>, base= $BaseType:ident<P>) => {
         impl<PointType: $PointReqs> AbstractionOf<$BaseType<PointType>>
             for $abstract_type<PointType>
@@ -230,7 +230,7 @@ macro_rules! impl_abstraction_for_newtype {
         }
     };
 }
-pub(crate) use impl_abstraction_for_newtype;
+pub(crate) use impl_abstraction_via_newtype;
 
 // abstractions chain together
 // TODO: analogous chain for refinement

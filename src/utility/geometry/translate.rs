@@ -7,7 +7,7 @@ impl<T, MoveType> Translate<MoveType> for T where
 }
 
 //
-macro_rules! impl_for_newtype {
+macro_rules! impl_via_newtype {
     ($type:ident<P: $traitparam:ident>) => {
         impl<P: $traitparam> Add<P> for $type<P> {
             type Output = Self;
@@ -26,7 +26,7 @@ macro_rules! impl_for_newtype {
         }
     };
 }
-pub(crate) use impl_for_newtype;
+pub(crate) use impl_via_newtype;
 
 // TODO
 macro_rules! impl_for_refined_type {

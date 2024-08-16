@@ -216,7 +216,7 @@ pub trait Operations<P: PointReqs>:
         square_projected_onto_axis.depth_of(line_position_on_axis)
     }
 }
-translate::impl_for_newtype!(Line<P: PointReqs>);
+translate::impl_via_newtype!(Line<P: PointReqs>);
 
 macro_rules! impl_operations_via_delegate {
     // NOTE: good macro reference
@@ -230,7 +230,7 @@ macro_rules! impl_operations_via_delegate {
 }
 pub(crate) use impl_operations_via_delegate;
 
-impl_quarter_turn_rotatable_for_newtype!(Line<P: PointReqs>);
+impl_quarter_turn_rotatable_via_newtype!(Line<P: PointReqs>);
 
 impl<P> AbstractionOf<DirectedLine<P>> for Line<P> {}
 

@@ -20,7 +20,7 @@ impl<P: PointReqs> Shape<P> {
     }
 }
 
-impl_quarter_turn_rotatable_for_newtype!(Shape<P: PointReqs>);
+impl_quarter_turn_rotatable_via_newtype!(Shape<P: PointReqs>);
 
 // TODO: define with macro
 impl<P: PointReqs> Complement for Shape<P> {

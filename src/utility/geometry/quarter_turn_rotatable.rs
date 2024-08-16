@@ -35,7 +35,7 @@ pub trait QuarterTurnRotatable {
 }
 
 // TODO: generalize to any trait?
-macro_rules! impl_quarter_turn_rotatable_for_newtype {
+macro_rules! impl_quarter_turn_rotatable_via_newtype {
     // TODO: is the dummy $T metavariable required for the optional parts with only it?
     ($type:ident$(<$T:ident$(: $traitparam:ident)?>)?) => {
         impl$(<$T$(: $traitparam)?>)? QuarterTurnRotatable for $type$(<$T>)? {
@@ -48,7 +48,7 @@ macro_rules! impl_quarter_turn_rotatable_for_newtype {
         }
     };
 }
-pub(crate) use impl_quarter_turn_rotatable_for_newtype;
+pub(crate) use impl_quarter_turn_rotatable_via_newtype;
 
 // TODO: Can use blanket implementation over IntoIterator and FromIterator instead?
 impl<T> QuarterTurnRotatable for Vec<T>

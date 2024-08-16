@@ -97,7 +97,7 @@ where {
         Self::new(border)
     }
 }
-macro_rules! impl_constructors_for_refinement {
+macro_rules! impl_constructors_via_refinement {
     ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
         // static assert prerequisite trait is implemented
         impl<P: $TraitParam> Constructors<P> for $Type<P> {
@@ -119,7 +119,7 @@ macro_rules! impl_constructors_for_refinement {
         }
     };
 }
-pub(crate) use impl_constructors_for_refinement;
+pub(crate) use impl_constructors_via_refinement;
 
 impl<P: PointReqs> Complement for Shape<P> {
     type Output = Self;
@@ -146,7 +146,7 @@ pub(crate) use impl_quarter_turn_rotatable_for_impl_half_plane_ops;
 
 impl_quarter_turn_rotatable_for_impl_half_plane_ops!(Shape<P: PointReqs>);
 
-// impl_quarter_turn_rotatable_for_newtype!(Shape<P: PointReqs>);
+// impl_quarter_turn_rotatable_via_newtype!(Shape<P: PointReqs>);
 
 // TODO: Switch to associated point type
 type BorderTypeOf<T, P> = <T as half_plane::Operations<P>>::BorderType;
@@ -385,9 +385,9 @@ pub trait Operations<P: PointReqs>:
     }
 }
 
-impl_half_plane_ops_for_newtype!(Shape<P: PointReqs>, base= DirectedLine<P>);
+impl_half_plane_ops_via_newtype!(Shape<P: PointReqs>, base= DirectedLine<P>);
 
-macro_rules! impl_half_plane_ops_for_newtype {
+macro_rules! impl_half_plane_ops_via_newtype {
     ($Type:ident<P: $TraitParam:ident>, base= $BaseType:ident<P>) => {
         impl<P: $TraitParam> half_plane::Operations<P> for $Type<P> {
             type BorderType = $BaseType<P>;
@@ -397,7 +397,7 @@ macro_rules! impl_half_plane_ops_for_newtype {
         }
     };
 }
-pub(crate) use impl_half_plane_ops_for_newtype;
+pub(crate) use impl_half_plane_ops_via_newtype;
 use num::Float;
 
 impl<P: PointReqs> Display for Shape<P> {

@@ -10,18 +10,19 @@ pub type Shape<P: PointReqs> =
 // }
 
 // not an abstraction of two points on g
-// impl_abstraction_for_newtype!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+// impl_abstraction_via_newtype!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 // TODO: maybe instead blanket implement through the wrapper type
 // impl<P: PointReqs> AbstractionOf<TwoPointsOnDifferentFacesOfGridSquare<P>> for Shape<P> { }
 
 // TODO Switch to TryTranslate and avoid panic?
-translate::impl_for_newtype!(Shape<P: PointReqs>);
+translate::impl_via_newtype!(Shape<P: PointReqs>);
 
 line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
 
 
-directed_line::impl_operations_for_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
-directed_line::impl_constructors_for!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+directed_line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
+// TODO: refactor to pass shape module instead of exact struct
+directed_line::impl_constructors_via_base!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 two_different_points::impl_constructors_for_abstraction!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl<P: PointReqs> Into<DirectedLine<P>> for Shape<P> {
