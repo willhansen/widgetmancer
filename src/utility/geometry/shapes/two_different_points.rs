@@ -160,7 +160,7 @@ macro_rules! impl_constructors_via_refinement {
 }
 pub(crate) use impl_constructors_via_refinement;
 
-macro_rules! impl_constructors_for_abstraction {
+macro_rules! impl_constructors_via_abstraction {
     ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
         impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
         where
@@ -172,7 +172,7 @@ macro_rules! impl_constructors_for_abstraction {
         }
     };
 }
-pub(crate) use impl_constructors_for_abstraction;
+pub(crate) use impl_constructors_via_abstraction;
 
 impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {

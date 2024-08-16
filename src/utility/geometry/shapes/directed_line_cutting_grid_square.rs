@@ -23,7 +23,7 @@ line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing())
 directed_line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
 // TODO: refactor to pass shape module instead of exact struct
 directed_line::impl_constructors_via_base!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
-two_different_points::impl_constructors_for_abstraction!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
+two_different_points::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
 
 impl<P: PointReqs> Into<DirectedLine<P>> for Shape<P> {
     fn into(self) -> DirectedLine<P> {
