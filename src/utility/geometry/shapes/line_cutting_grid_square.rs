@@ -38,13 +38,13 @@ pub trait Operations<P: PointReqs> {}
 
 impl<P: PointReqs> Operations<P> for Shape<P> {}
 
-line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=thing());
+line::impl_operations_via_delegate!(Shape<P: PointReqs>, accessor=|x| x.thing());
 line::impl_constructors_via_base!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 directed_line::impl_constructors_via_base!(Shape<P: PointReqs>, base= DirectedLineCuttingGridSquare<P>);
 
 // TODO: this could be generally implemented for anything convertible from twodifferentpoints
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P> for Shape<P> {
+impl<P: PointReqs> two_different_points::Constructors<P> for Shape<P> {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
         TwoDifferentPoints::try_from_two_exact_points(p1, p2).try_into()
     }

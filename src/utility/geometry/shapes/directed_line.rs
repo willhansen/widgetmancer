@@ -65,7 +65,7 @@ macro_rules! impl_operations_via_delegate {
 }
 pub(crate) use impl_operations_via_delegate;
 
-line::impl_constructors_via_base!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+line::impl_constructors_via_base!(Shape<P: PointReqs>, base= two_different_points::Shape<P>);
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>

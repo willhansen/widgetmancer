@@ -24,5 +24,3 @@ pub trait Operations:
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
 impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
-
-trait_alias!(pub trait SignedIntCoordinateOps = int_coordinate::Operations + signed_coordinate::Operations);

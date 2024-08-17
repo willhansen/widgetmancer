@@ -6,9 +6,11 @@ trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::P
 pub struct Shape<P: PointReqs>(directed_line_cutting_centered_unit_square::Shape<P>);
 
 impl_abstraction_via_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
-impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
 
-// Is the arrow direction confusing?
+// TODO: this multi-step chaining should not have to be done manually
+impl_abstraction_skip_level!(Shape<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+impl_abstraction_skip_level!(Shape<P: PointReqs> -->  TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> --> TwoDifferentPoints<P> );
+
 impl_skip_level_try_from!(LineCuttingCenteredUnitSquare<P: PointReqs> --> DirectedLineCuttingCenteredUnitSquare<P> --> DirectedLine<P>);
 
 // TODO: Switch to TryTranslate to avoid panics
@@ -47,4 +49,8 @@ pub trait Constructors<P: PointReqs>: directed_line_cutting_centered_unit_square
 
 }
 
+impl<P: PointReqs> directed_line_cutting_centered_unit_square::Constructors<P> for Shape<P> {}
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
+
+two_different_points::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+two_points_on_different_faces_of_centered_unit_square::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);

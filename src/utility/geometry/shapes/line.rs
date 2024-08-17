@@ -140,7 +140,7 @@ pub trait Operations<P: PointReqs>:
             );
         };
         let p2 = p + *good_dir;
-        TwoDifferentPoints::from_two_points(p, p2)
+        two_different_points::Constructors::from_two_points(p, p2)
     }
     fn with_arbitrary_direction(&self) -> impl Operations<P> {
         self.with_direction(self.parallel_directions()[1])
@@ -271,6 +271,8 @@ pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
     }
 }
 macro_rules! impl_constructors_via_base {
+    // TODO: allow scopes in the base type path
+    // ($type:ident<P: $traitparam:path>, base= $basetype:ident$(::$basetype2:ident)*<P>) => {
     ($type:ident<P: $traitparam:path>, base= $basetype:ident<P>) => {
         impl<P: $traitparam> line::Constructors<P> for $type<P> {
         }
@@ -352,7 +354,7 @@ pub fn first_inside_square_face_hit_by_ray(
         .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
 }
 // TODO: Move to gridsquare file
-pub fn square_face_as_line<P: SignedIntCoordinate>(
+pub fn square_face_as_line<P: signed_int_coordinate::Operations>(
     square: P,
     face_direction: OrthogonalDirection,
 ) -> TwoDifferentPoints<P::Floating> {
