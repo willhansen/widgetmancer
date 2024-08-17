@@ -65,3 +65,9 @@ impl<P: float_coordinate::Operations> two_different_points::Constructors<P> for 
         Self::try_new_from_two_ordered_points_on_line(p1, p2)
     }
 }
+
+impl<P: PointReqs> AbstractsTo<directed_line_cutting_centered_unit_square::Shape<P>> for Shape<P> {
+    fn set_with_abstraction(&self, val: &directed_line_cutting_centered_unit_square::Shape<P>) -> Self {
+        todo!()
+    }
+}

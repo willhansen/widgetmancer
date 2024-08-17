@@ -100,18 +100,19 @@ where {
 macro_rules! impl_constructors_via_refinement {
     ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
         // static assert prerequisite trait is implemented
-        impl<P: $TraitParam> Constructors<P> for $Type<P> {
+        impl<P: $TraitParam> half_plane::Constructors<P> for $Type<P> {
             type BorderType = $BorderType<P>;
             fn from_border_with_inside_on_right(border: Self::BorderType) -> Self
         // where
-                                                    //     // is refinement
-                                                    //     Self: Refinement<$BaseType<P>>,
-                                                    //     // refinement base is constructor
-                                                    //     $BaseType::<P>: Constructors<P>,
-                                                    //     // border type is refinement of the refinement base's border
-                                                    //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
+                                                            //     // is refinement
+                                                            //     Self: Refinement<$BaseType<P>>,
+                                                            //     // refinement base is constructor
+                                                            //     $BaseType::<P>: Constructors<P>,
+                                                            //     // border type is refinement of the refinement base's border
+                                                            //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
             {
-                let border_of_base: <$BaseType<P> as Constructors<P>>::BorderType = border.into();
+                let border_of_base: <$BaseType<P> as half_plane::Constructors<P>>::BorderType =
+                    border.into();
                 let refinement_base: $BaseType<P> =
                     $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
                 refinement_base.try_into().unwrap()
@@ -409,12 +410,11 @@ impl<P: PointReqs> Display for Shape<P> {
     }
 }
 
-impl<P:PointReqs> AbstractsTo<Line<P>> for Shape<P> {
+impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &Line<P>) -> Self {
         todo!()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
