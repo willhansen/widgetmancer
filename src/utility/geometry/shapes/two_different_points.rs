@@ -212,7 +212,7 @@ where
 }
 
 // TODO: separate file and also int rays
-impl<P: float_coordinate::Operations> Ray<P> for Shape<P> {
+impl<P: ray::PointReqs> ray::Operations<P> for Shape<P> {
     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
     where
         P: float_coordinate::Operations,
@@ -262,7 +262,7 @@ macro_rules! impls {
                 self.to_array()
             }
         }
-        impl<P: $PointReqs> ConstructorsForLine<P> for $TheStruct<P> {}
+        impl<P: $PointReqs> line::Constructors<P> for $TheStruct<P> {}
 
         impl<P: $PointReqs> Reversible for $TheStruct<P> {
             fn reversed(&self) -> Self {

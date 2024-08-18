@@ -43,3 +43,6 @@ pub trait Operations<P: PointReqs>: half_plane::Operations<P> {
 }
 
 impl<P: PointReqs> Operations<P> for Shape<P> {}
+
+pub trait Constructors<P: PointReqs> {}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}

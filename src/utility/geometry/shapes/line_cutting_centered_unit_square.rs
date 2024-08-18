@@ -20,7 +20,7 @@ translate::impl_via_newtype!(
 impl_quarter_turn_rotatable_via_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>);
 
-line::impl_operations_via_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=0);
+line::impl_operations_via_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=|x| x.0);
 line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 directed_line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);

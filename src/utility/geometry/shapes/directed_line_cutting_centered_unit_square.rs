@@ -42,6 +42,8 @@ impl<P: PointReqs> RefinementOf<DirectedLine<P>> for Shape<P> {
         true
     }
 }
+pub trait Operations<P: PointReqs> {}
+
 pub trait Constructors<P: PointReqs>: two_points_on_different_faces_of_centered_unit_square::Constructors<P> {
 
 }

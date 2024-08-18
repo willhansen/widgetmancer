@@ -26,6 +26,9 @@ impl<T, P: PointReqs> Operations<P> for T where
     T: directed_line::Operations<P> + line_segment::Operations<P>
 {
 }
+pub trait Constructors<P: PointReqs>{}
+
+impl<P: PointReqs> Constructors<P> for self::Shape<P> {}
 
 impl<P: PointReqs> From<TwoDifferentPoints<P>> for Shape<P> {
     fn from(value: TwoDifferentPoints<P>) -> Self {

@@ -50,3 +50,7 @@ impl<L, P: PointReqs> Operations<P> for L where
     L: float_line::Operations<P> + directed_line::Operations<P>
 {
 }
+
+pub trait Constructors<P: PointReqs> {
+}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}

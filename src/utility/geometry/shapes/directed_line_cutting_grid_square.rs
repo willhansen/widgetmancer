@@ -30,3 +30,6 @@ impl<P: PointReqs> Into<DirectedLine<P>> for Shape<P> {
         DirectedLine::<P>::new_from_directed_line(self)
     }
 }
+
+pub trait Constructors<P: PointReqs> {}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}

@@ -271,9 +271,7 @@ pub trait Constructors<P: PointReqs>: directed_line::Constructors<P> + Sized {
     }
 }
 macro_rules! impl_constructors_via_base {
-    // TODO: allow scopes in the base type path
-    // ($type:ident<P: $traitparam:path>, base= $basetype:ident$(::$basetype2:ident)*<P>) => {
-    ($type:ident<P: $traitparam:path>, base= $basetype:ident<P>) => {
+    ($type:ident<P: $traitparam:path>, base= $basetype:ident$(::$basetype2:ident)*<P>) => {
         impl<P: $traitparam> line::Constructors<P> for $type<P> {
         }
     }

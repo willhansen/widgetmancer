@@ -15,6 +15,7 @@ pub_use!(
     coordinates,
     has_origin_pose,
     orthogonal_facing_int_pose,
+    ortho_angle,
     partial_angle_interval, // TODO: make private and contained within angle_interval?
     poses,
     quadrant,

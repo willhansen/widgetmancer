@@ -25,6 +25,10 @@ impl<P: PointReqs> From<DirectedLineSegment<P>> for Shape<P> {
         Self(value)
     }
 }
+pub trait Constructors<P: PointReqs> {}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}
+
+
 
 #[cfg(test)]
 mod tests {

@@ -167,3 +167,6 @@ pub trait Operations<P: PointReqs>: line::Operations<P> {
 }
 
 impl<L, P: PointReqs> Operations<P> for L where L: line::Operations<P> {}
+
+pub trait Constructors<P: PointReqs> {}
+impl<P: PointReqs> Constructors<P> for Shape<P> {}

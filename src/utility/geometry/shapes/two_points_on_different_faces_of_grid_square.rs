@@ -69,7 +69,7 @@ impl<P: PointReqs> Operations<P>
     for Shape<P>
 {
 }
-impl<P: PointReqs> ConstructorsForTwoDifferentPoints<P>
+impl<P: PointReqs> two_different_points::Constructors<P>
     for Shape<P>
 {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
