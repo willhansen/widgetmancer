@@ -10,7 +10,7 @@ impl<P: PointReqs> Shape<P> {
         *self.thing()
     }
 }
-// TODO: why is this implemented here?
+
 impl<P: PointReqs> two_different_points::Operations<P> for Shape<P> {
     fn point_by_index(&self, point_index: usize) -> P {
         self.points_on_the_square().point_by_index(point_index) + self.square_center()

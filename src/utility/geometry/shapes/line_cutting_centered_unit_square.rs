@@ -52,5 +52,5 @@ pub trait Constructors<P: PointReqs>: directed_line_cutting_centered_unit_square
 impl<P: PointReqs> directed_line_cutting_centered_unit_square::Constructors<P> for Shape<P> {}
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
 
-two_different_points::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= TwoDifferentPoints<P>);
+two_different_points::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= two_points_on_different_faces_of_centered_unit_square::Shape<P>);
 two_points_on_different_faces_of_centered_unit_square::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);

@@ -30,7 +30,7 @@ pub trait Operations:
         NormalizedOrthoAngle::new_from_quarter_turns(self.quarter_turns())
     }
     fn cos<T: num::Signed>(&self) -> T {
-        match self.normalized().0 {
+        match self.normalized().quarter_turns() {
             0 => T::one(),
             1 | 3 => T::zero(),
             2 => -T::one(),
@@ -38,7 +38,7 @@ pub trait Operations:
         }
     }
     fn sin<T: num::Signed>(&self) -> T {
-        match self.normalized().0 {
+        match self.normalized().quarter_turns() {
             0 | 2 => T::zero(),
             1 => T::one(),
             3 => -T::one(),
