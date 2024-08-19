@@ -72,14 +72,16 @@ impl<P: PointReqs> AbstractsTo<directed_line_cutting_centered_unit_square::Shape
     }
 }
 
+impl<P> AbstractionOf<two_different_points::Shape<P>> for Shape<P> {}
 
-macro_rules! impl_constructors_via_abstraction {
+
+macro_rules! impl_constructors_via_base {
     ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident$(::$BaseType2:ident)*<P>) => {
         impl<P: $reqs> two_points_on_different_faces_of_centered_unit_square::Constructors<P> for $SelfType<P>
-        where
-            Self: AbstractionOf<$BaseType$(::$BaseType2)*<P>>,
+        // where
+        //     Self: AbstractionOf<$BaseType$(::$BaseType2)*<P>>,
         {
         }
     };
 }
-pub(crate) use impl_constructors_via_abstraction;
+pub(crate) use impl_constructors_via_base;

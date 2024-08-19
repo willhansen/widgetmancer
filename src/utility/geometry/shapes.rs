@@ -24,8 +24,6 @@ automod::dir!(pub "src/utility/geometry/shapes");
 
 use crate::utility::*;
 
-// TODO: put this in the new_shape macro
-// alias for the type
 
 macro_rules! verify_abstraction_relation {
     (concrete: $concrete_module:ident, abstract: $abstract_module:ident, point type: $point_type:ty) => {

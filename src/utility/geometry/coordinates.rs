@@ -1,4 +1,4 @@
-automod::dir!(pub "src/utility/geometry/coordinates");
+automod::dir!("src/utility/geometry/coordinates");
 
 pub_use!(
     // float_coordinate,
@@ -7,6 +7,8 @@ pub_use!(
     // signed_coordinate,
     // unsigned_coordinate,
 );
+
+pub use self::coordinates::unsigned_coordinate::UnsignedCoordinate;
 
 use map_macro::hash_set;
 use std::{

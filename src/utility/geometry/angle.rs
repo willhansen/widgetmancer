@@ -3,7 +3,6 @@ automod::dir!(pub "src/utility/geometry/angle");
 pub_use!(
     orthogonal_direction,
     normalized_ortho_angle,
-    ortho_angle,
 );
 
 use std::{

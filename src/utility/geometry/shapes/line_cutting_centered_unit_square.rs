@@ -20,7 +20,8 @@ translate::impl_via_newtype!(
 impl_quarter_turn_rotatable_via_newtype!(
     LineCuttingCenteredUnitSquare<P: PointReqs>);
 
-line::impl_operations_via_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=|x| x.0);
+// TODO: is the trait bound on the lambda necessary?
+line::impl_operations_via_delegate!(LineCuttingCenteredUnitSquare<P: PointReqs>, accessor=|x: Shape<_>| x.0);
 line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 directed_line::impl_constructors_via_base!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
@@ -52,5 +53,5 @@ pub trait Constructors<P: PointReqs>: directed_line_cutting_centered_unit_square
 impl<P: PointReqs> directed_line_cutting_centered_unit_square::Constructors<P> for Shape<P> {}
 impl<P: PointReqs> Constructors<P> for Shape<P> {}
 
-two_different_points::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= two_points_on_different_faces_of_centered_unit_square::Shape<P>);
-two_points_on_different_faces_of_centered_unit_square::impl_constructors_via_abstraction!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);
+two_different_points::impl_constructors_via_base!(Shape<P: PointReqs>, base= two_points_on_different_faces_of_centered_unit_square::Shape<P>);
+two_points_on_different_faces_of_centered_unit_square::impl_constructors_via_base!(Shape<P: PointReqs>, base= TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>);

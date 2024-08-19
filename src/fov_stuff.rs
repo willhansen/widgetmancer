@@ -1,3 +1,5 @@
+use crate::utility::*;
+
 pub mod angle_based_visible_segment;
 pub mod fence;
 pub_mod_and_use!(
@@ -21,7 +23,6 @@ use crate::glyph::DoubleGlyphFunctions;
 use crate::graphics::drawable::{Drawable, DrawableEnum, SolidColorDrawable, TextDrawable};
 use crate::graphics::Graphics;
 use crate::portal_geometry::PortalGeometry;
-use crate::utility::*;
 
 use self::rasterized_field_of_view::RasterizedFieldOfViewFunctions;
 

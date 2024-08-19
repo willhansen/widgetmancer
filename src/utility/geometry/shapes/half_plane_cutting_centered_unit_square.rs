@@ -11,12 +11,12 @@ impl<P: PointReqs> Shape<P> {
     }
 }
 
-impl_complement_via_refinement!(Shape<P: PointReqs>, refinement_base= HalfPlane<P>);
+impl_complement_via_base!(Shape<P: PointReqs>, base= HalfPlane<P>);
 impl_quarter_turn_rotatable_via_newtype!(Shape<P: PointReqs>);
 
 half_plane::impl_operations_via_newtype!(Shape<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
-half_plane::impl_constructors_via_refinement!(Shape<P: PointReqs>, border= DirectedLineCuttingCenteredUnitSquare<P>, base=HalfPlane<P>);
+half_plane::impl_constructors_via_base!(Shape<P: PointReqs>, border= DirectedLineCuttingCenteredUnitSquare<P>, base=HalfPlane<P>);
 
 impl<P: PointReqs> TryFrom<HalfPlane<P>> for Shape<P> {
     type Error = String;

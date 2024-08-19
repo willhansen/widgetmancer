@@ -15,17 +15,17 @@ macro_rules! impl_complement_via_newtype {
 }
 pub(crate) use impl_complement_via_newtype;
 
-macro_rules! impl_complement_via_refinement {
-    ($type:ident<P: $PointReqs:ident>, refinement_base= $RefinementBase:ident<P>) => {
+macro_rules! impl_complement_via_base {
+    ($type:ident<P: $PointReqs:ident>, base= $BaseType:ident$(::$BaseType2:ident)*<P>) => {
         // TODO: double check the prerequisite trait is implemented for the macro (at compile time)
         // const {assert_impl!($type<P>, Refinement<$RefinementBase<P>>);}
         impl<P: $PointReqs> Complement for $type<P> {
             type Output = Self;
             fn complement(&self) -> Self::Output {
-                let base: $RefinementBase::<P> = (*self).into();
+                let base: $BaseType$(::$BaseType2)*::<P> = (*self).into();
                 base.complement().try_into().unwrap()
             }
         }
     };
 }
-pub(crate) use impl_complement_via_refinement;
+pub(crate) use impl_complement_via_base;

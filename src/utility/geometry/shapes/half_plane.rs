@@ -97,8 +97,8 @@ where {
         Self::new(border)
     }
 }
-macro_rules! impl_constructors_via_refinement {
-    ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>, base= $BaseType:ident<P>) => {
+macro_rules! impl_constructors_via_base {
+    ($Type:ident<P: $TraitParam:ident>, border= $BorderType:ident<P>,base= $BaseType:ident$(::$BaseType2:ident)*<P>) => {
         // static assert prerequisite trait is implemented
         impl<P: $TraitParam> half_plane::Constructors<P> for $Type<P> {
             type BorderType = $BorderType<P>;
@@ -111,16 +111,16 @@ macro_rules! impl_constructors_via_refinement {
                                                             //     // border type is refinement of the refinement base's border
                                                             //     Self::BorderType: Refinement< <$BaseType<P> as Constructors<P>>::BorderType >,
             {
-                let border_of_base: <$BaseType<P> as half_plane::Constructors<P>>::BorderType =
+                let border_of_base: <$BaseType$(::$BaseType2)*<P> as half_plane::Constructors<P>>::BorderType =
                     border.into();
-                let refinement_base: $BaseType<P> =
-                    $BaseType::<P>::from_border_with_inside_on_right(border_of_base);
+                let refinement_base: $BaseType$(::$BaseType2)*<P> =
+                    $BaseType$(::$BaseType2)*::<P>::from_border_with_inside_on_right(border_of_base);
                 refinement_base.try_into().unwrap()
             }
         }
     };
 }
-pub(crate) use impl_constructors_via_refinement;
+pub(crate) use impl_constructors_via_base;
 
 impl<P: PointReqs> Complement for Shape<P> {
     type Output = Self;

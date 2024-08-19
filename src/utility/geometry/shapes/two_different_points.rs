@@ -146,33 +146,18 @@ where
     }
 }
 
-macro_rules! impl_constructors_via_refinement {
-    ($SelfType:ident<P: $reqs:ident>, unrefined= $BaseType:ident<P>) => {
+macro_rules! impl_constructors_via_base {
+    ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident$(::$BaseType2:ident)*<P>) => {
         impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
-        where
-            Self: RefinementOf<$BaseType<P>>,
         {
             fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                $BaseType::<P>::try_from_two_exact_points(p1, p2)?.try_into()
+                $BaseType$(::$BaseType2)*::<P>::try_from_two_exact_points(p1, p2)?.try_into()
             }
         }
     };
 }
-pub(crate) use impl_constructors_via_refinement;
+pub(crate) use impl_constructors_via_base;
 
-macro_rules! impl_constructors_via_abstraction {
-    ($SelfType:ident<P: $reqs:ident>, base= $BaseType:ident<P>) => {
-        impl<P: $reqs> two_different_points::Constructors<P> for $SelfType<P>
-        where
-            Self: AbstractionOf<$BaseType<P>>,
-        {
-            fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-                $BaseType::<P>::try_from_two_exact_points(p1, p2)?.try_into()
-            }
-        }
-    };
-}
-pub(crate) use impl_constructors_via_abstraction;
 
 impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &DirectedLine<P>) -> Self {
