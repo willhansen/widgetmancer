@@ -14,6 +14,7 @@ use crate::utility::*;
 
 pub use ortho_angle::OrthoAngle;
 pub use normalized_ortho_angle::NormalizedOrthoAngle;
+pub use euclid::Angle;
 
 pub enum AngleVariety {
     Orthogonal,
