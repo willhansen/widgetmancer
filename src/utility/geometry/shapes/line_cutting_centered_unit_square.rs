@@ -5,6 +5,9 @@ trait_alias!(pub trait PointReqs = directed_line_cutting_centered_unit_square::P
 #[derive(PartialEq, Debug, Clone, Copy, Constructor)]
 pub struct Shape<P: PointReqs>(directed_line_cutting_centered_unit_square::Shape<P>);
 
+pub trait Operations<P: PointReqs> {}
+impl<P: PointReqs> Operations<P> for Shape<P> {}
+
 impl_abstraction_via_newtype!(LineCuttingCenteredUnitSquare<P: PointReqs>, base= DirectedLineCuttingCenteredUnitSquare<P>);
 
 // TODO: this multi-step chaining should not have to be done manually

@@ -6,8 +6,8 @@ trait_alias!(pub trait PointReqs = two_points_on_different_faces_of_centered_uni
 pub type Shape<P: PointReqs> =
     ThingRelToSquare<DirectedLineCuttingCenteredUnitSquare<P>, OnGrid<P>>;
 
-// pub trait OperationsForDirectedLineCuttingGridSquare<P: PointReqs> {
-// }
+pub trait Operations<P: PointReqs> {}
+impl<P: PointReqs> Operations<P> for Shape<P> {}
 
 // not an abstraction of two points on g
 // impl_abstraction_via_newtype!(Shape<P: PointReqs>, base=TwoPointsOnDifferentFacesOfGridSquare<P>);
