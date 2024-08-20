@@ -3,6 +3,9 @@ use crate::utility::*;
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct OrthogonalDirection(NormalizedOrthoAngle);
 
+// TODO: This line should not be necessary
+use crate::utility::geometry::angle::ortho_angle::Operations;
+
 impl OrthogonalDirection {
     pub fn from_angle_hint(hint: FAngle) -> Self {
         let hint = standardize_angle_with_zero_min(hint);
