@@ -1,6 +1,10 @@
 use crate::utility::*;
 
-trait_alias!(pub trait CoordinateDataTypeTrait = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
+
+use std::ops::{Add, Div, Mul, Neg, Sub};
+
+// TODO: is this just a scalar?
+trait_alias!(pub trait DataTypeReqs = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
 macro_rules! make_coordinate_datatype_cast_function {
     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -28,7 +32,7 @@ pub trait Operations:
     + From<(Self::DataType, Self::DataType)>
 // + IntoIterator + FromIterator // TODO
 {
-    type DataType: CoordinateDataTypeTrait;
+    type DataType: DataTypeReqs;
     type UnitType;
 
     type Floating: float_coordinate::Operations<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
@@ -131,7 +135,7 @@ pub trait Operations:
 }
 impl<T, U> Operations for Vector2D<T, U>
 where
-    T: CoordinateDataTypeTrait,
+    T: DataTypeReqs,
 {
     type DataType = T;
     type UnitType = U;

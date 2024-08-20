@@ -72,19 +72,18 @@ pub type FloatDataType<P> = DataType<Floating<P>>;
 /// Intended to be a drop-in replacement for the `euclid` equivalent
 pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>
 where
-    DataType: CoordinateDataTypeTrait,
+    DataType: coordinate::DataTypeReqs,
 {
     Point2D::new(x, y)
 }
 /// Intended to be a drop-in replacement for the `euclid` equivalent
 pub const fn vec2<DataType, UnitType>(x: DataType, y: DataType) -> Vector2D<DataType, UnitType>
 where
-    DataType: CoordinateDataTypeTrait,
+    DataType: coordinate::DataTypeReqs,
 {
     Vector2D::new(x, y)
 }
 
-// TODO: is this just a scalar?
 
 macro_rules! make_coordinate_datatype_cast_function {
     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -100,7 +99,7 @@ macro_rules! make_coordinate_datatype_cast_function {
 
 impl<T, U> From<NormalizedOrthoAngle> for Vector2D<T, U>
 where
-    T: CoordinateDataTypeTrait + num::Signed,
+    T: coordinate::DataTypeReqs + num::Signed,
 {
     fn from(value: NormalizedOrthoAngle) -> Self {
         let (x, y) = value.xy();
@@ -109,7 +108,7 @@ where
 }
 impl<T, U> From<OrthogonalDirection> for Vector2D<T, U>
 where
-    T: CoordinateDataTypeTrait + num::Signed,
+    T: coordinate::DataTypeReqs + num::Signed,
 {
     fn from(value: OrthogonalDirection) -> Self {
         value.angle().into()
