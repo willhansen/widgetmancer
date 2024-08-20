@@ -9,7 +9,7 @@ trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
 pub struct Shape<PointType: PointReqs>(DirectedLineSegment<PointType>);
 
 pub trait Operations<P: PointReqs>: line::Operations<P> {
-    fn square_length(&self) -> <P as coordinates::Operations>::DataType {
+    fn square_length(&self) -> <P as coordinate::Operations>::DataType {
         let [p1, p2] = self.two_different_arbitrary_points_on_line();
         (p1 - p2).square_length()
     }

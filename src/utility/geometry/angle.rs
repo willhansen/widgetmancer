@@ -32,10 +32,10 @@ pub trait Direction: QuarterTurnRotatable + Copy + Sized {
     // TODO: diagonals or float angles too?  Template on an `AngleType` enum?
     fn angle(&self) -> NormalizedOrthoAngle;
     fn from_angle(angle: impl ortho_angle::Operations) -> Self;
-    fn from_coordinate<T: coordinates::Operations>(dir: T) -> Self {
+    fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
         Self::try_from_coordinate(dir).unwrap()
     }
-    fn try_from_coordinate<T: coordinates::Operations>(coord: T) -> Result<Self, String> {
+    fn try_from_coordinate<T: coordinate::Operations>(coord: T) -> Result<Self, String> {
         Ok(Self::from_angle(
             <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(coord)?,
         ))
@@ -105,7 +105,7 @@ where
         todo!()
     }
 
-    fn try_from_coordinate<P: coordinates::Operations>(coord: P) -> Result<Self, String> {
+    fn try_from_coordinate<P: coordinate::Operations>(coord: P) -> Result<Self, String> {
         if coord.is_orthogonal() {}
         todo!()
     }

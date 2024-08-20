@@ -12,7 +12,7 @@ pub trait Operations: int_coordinate::Operations {
     fn projected_onto_axis(
         &self,
         axis: FAngle,
-    ) -> ClosedInterval<<Self::Floating as coordinates::Operations>::DataType> {
+    ) -> ClosedInterval<<Self::Floating as coordinate::Operations>::DataType> {
         let all_square_corners_on_axis: [f32; 4] =
             self.square_corners().map(|p| p.position_on_axis(axis));
 

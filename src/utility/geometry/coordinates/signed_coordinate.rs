@@ -1,7 +1,7 @@
 use crate::utility::*;
 
 pub trait Operations:
-    coordinates::Operations<DataType = Self::_DataType>
+    coordinate::Operations<DataType = Self::_DataType>
     + Neg<Output = Self>
     // TODO: put on the SignedCoordinateConstructor trait instead
     + From<NormalizedOrthoAngle>
@@ -45,7 +45,7 @@ pub trait Operations:
 
 impl<T> Operations for T
 where
-    T: coordinates::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
+    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;

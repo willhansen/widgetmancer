@@ -102,16 +102,16 @@ pub trait Operations<P: PointReqs>:
         on_line(p1.to_f32(), p2.to_f32(), point)
     }
     // // fn try_new_from_line(line: impl Line<PointType = P>) -> Result<Self, String>;
-    fn new_horizontal(y: <P as coordinates::Operations>::DataType) -> Self {
+    fn new_horizontal(y: <P as coordinate::Operations>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            P::new(<P as coordinates::Operations>::DataType::zero(), y),
-            P::new(<P as coordinates::Operations>::DataType::one(), y),
+            P::new(<P as coordinate::Operations>::DataType::zero(), y),
+            P::new(<P as coordinate::Operations>::DataType::one(), y),
         )
     }
-    fn new_vertical(x: <P as coordinates::Operations>::DataType) -> Self {
+    fn new_vertical(x: <P as coordinate::Operations>::DataType) -> Self {
         Self::from_two_points_allowing_snap_along_line(
-            P::new(x, <P as coordinates::Operations>::DataType::zero()),
-            P::new(x, <P as coordinates::Operations>::DataType::one()),
+            P::new(x, <P as coordinate::Operations>::DataType::zero()),
+            P::new(x, <P as coordinate::Operations>::DataType::one()),
         )
     }
     fn new_through_origin(second_point: impl Into<P>) -> Self {
@@ -120,7 +120,7 @@ pub trait Operations<P: PointReqs>:
             second_point.into(),
         )
     }
-    fn normal_vector_from_origin(&self) -> <P as coordinates::Operations>::Floating {
+    fn normal_vector_from_origin(&self) -> <P as coordinate::Operations>::Floating {
         -self.normal_vector_to_point(P::zero())
     }
     fn distance_from_origin(&self) -> f32 {
