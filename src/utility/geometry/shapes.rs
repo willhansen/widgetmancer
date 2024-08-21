@@ -1,5 +1,8 @@
 automod::dir!(pub "src/utility/geometry/shapes");
 
+pub_use!(
+    two_different_points,
+);
 // cone,
 // directed_float_line,
 // directed_line,

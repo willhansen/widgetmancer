@@ -6,6 +6,7 @@ pub_use!(
     king_world_step,
     // signed_coordinate,
     // unsigned_coordinate,
+    coordinate,
 );
 
 pub use self::unsigned_coordinate::UnsignedCoordinate;

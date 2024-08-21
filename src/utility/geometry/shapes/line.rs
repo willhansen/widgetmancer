@@ -276,7 +276,7 @@ macro_rules! impl_constructors_via_base {
         }
     }
 }
-pub(crate) use impl_constructors_via_base;
+// pub(crate) use impl_constructors_via_base;
 
 // TODO: generate default data? (in the form of using Line constructors on types that abstract to
 // lines (like TwoDifferentPoints)
