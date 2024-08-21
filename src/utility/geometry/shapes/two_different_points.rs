@@ -142,7 +142,7 @@ where
     T: AbstractionOf<Shape<P>>,
 {
     fn try_from_two_exact_points(p1: P, p2: P) -> Result<Self, String> {
-        Shape::try_from_two_exact_points(p1, p2).into()
+        Shape::try_from_two_exact_points(p1, p2).map(|x| x.into())
     }
 }
 
