@@ -132,7 +132,7 @@ macro_rules! impl_constructors_via_base {
         }
     }
 }
-// pub(crate) use impl_constructors_via_base;
+pub(crate) use impl_constructors_via_base;
 
 impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
     fn set_with_abstraction(&self, val: &Line<P>) -> Self {

@@ -14,6 +14,7 @@ macro_rules! line {
         line()
     };
 }
+// pub(crate) use line;
 
 pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Shape<P> {
     Constructors::<P>::from_two_unordered_points_on_line(p1.into(), p2.into())
@@ -276,7 +277,7 @@ macro_rules! impl_constructors_via_base {
         }
     }
 }
-// pub(crate) use impl_constructors_via_base;
+pub(crate) use impl_constructors_via_base;
 
 // TODO: generate default data? (in the form of using Line constructors on types that abstract to
 // lines (like TwoDifferentPoints)

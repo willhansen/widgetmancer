@@ -120,7 +120,7 @@ macro_rules! impl_constructors_via_base {
         }
     };
 }
-// pub(crate) use impl_constructors_via_base;
+pub(crate) use impl_constructors_via_base;
 
 impl<P: PointReqs> Complement for Shape<P> {
     type Output = Self;
