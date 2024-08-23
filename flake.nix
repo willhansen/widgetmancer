@@ -26,6 +26,7 @@
             cargo-flamegraph
             cargo-profiler
             cargo-nextest
+            cargo-limit
           ];
           shellHook = "zsh";
         };

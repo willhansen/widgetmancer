@@ -1,4 +1,4 @@
-#! /usr/bin/env sh
+#! /usr/bin/env bash
 
 CMD="nvim src/utility/geometry/coordinates.rs"
 

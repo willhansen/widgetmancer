@@ -9,11 +9,11 @@ use crate::utility::*;
 
 trait_alias!(pub trait PointReqs = directed_line::PointReqs);
 
-macro_rules! line {
-    (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
-        line()
-    };
-}
+// macro_rules! line {
+//     (($x1:ident, $y1:ident), ($x2:ident, $y2:ident)) => {
+//         line()
+//     };
+// }
 // pub(crate) use line;
 
 pub fn line<P: PointReqs>(p1: impl Into<P>, p2: impl Into<P>) -> Shape<P> {
