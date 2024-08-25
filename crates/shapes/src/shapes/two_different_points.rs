@@ -1,6 +1,7 @@
-use crate::utility::*;
+use crate::trait_alias_macro::trait_alias;
+use crate::*;
 
-pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
+// pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
 
 trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
 
@@ -96,32 +97,32 @@ pub trait Constructors<P: PointReqs>: Sized {
     ) -> Result<Self, String> {
         Self::try_from_two_points_allowing_snap_along_line(p.p1(), p.p2())
     }
-    fn try_from_point_and_radial(
-        p1: impl Into<P>,
-        angle: FAngle,
-        length: f32,
-    ) -> Result<Self, String>
-    where
-        P: float_coordinate::Operations,
-    {
-        let p1 = p1.into();
-        Self::try_from_two_exact_points(p1, floating_point_step(p1, angle, length))
-    }
-    fn from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
-    where
-        P: float_coordinate::Operations,
-    {
-        Self::try_from_point_and_radial(p1, angle, length).unwrap()
-    }
-    fn from_point_and_unit_step_in_direction(
-        point: impl Into<P>,
-        direction: impl Into<FAngle>,
-    ) -> Self
-    where
-        P: float_coordinate::Operations,
-    {
-        Self::from_point_and_radial(point.into(), direction.into(), 1.0)
-    }
+    // fn try_from_point_and_radial(
+    //     p1: impl Into<P>,
+    //     angle: FAngle,
+    //     length: f32,
+    // ) -> Result<Self, String>
+    // where
+    //     P: float_coordinate::Operations,
+    // {
+    //     let p1 = p1.into();
+    //     Self::try_from_two_exact_points(p1, floating_point_step(p1, angle, length))
+    // }
+    // fn from_point_and_radial(p1: impl Into<P>, angle: FAngle, length: f32) -> Self
+    // where
+    //     P: float_coordinate::Operations,
+    // {
+    //     Self::try_from_point_and_radial(p1, angle, length).unwrap()
+    // }
+    // fn from_point_and_unit_step_in_direction(
+    //     point: impl Into<P>,
+    //     direction: impl Into<FAngle>,
+    // ) -> Self
+    // where
+    //     P: float_coordinate::Operations,
+    // {
+    //     Self::from_point_and_radial(point.into(), direction.into(), 1.0)
+    // }
     fn from_array(arr: [P; 2]) -> Self {
         Self::try_from_two_exact_points(arr[0], arr[1]).unwrap()
     }
@@ -196,24 +197,24 @@ where
     }
 }
 
-// TODO: separate file and also int rays
-impl<P: ray::PointReqs> ray::Operations<P> for Shape<P> {
-    fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
-    where
-        P: float_coordinate::Operations,
-    {
-        Self::new(point, point + P::unit_vector_from_angle(dir))
-    }
+// // TODO: separate file and also int rays
+// impl<P: ray::PointReqs> ray::Operations<P> for Shape<P> {
+//     fn new_from_point_and_dir(point: P, dir: FAngle) -> Self
+//     where
+//         P: float_coordinate::Operations,
+//     {
+//         Self::new(point, point + P::unit_vector_from_angle(dir))
+//     }
 
-    fn point(&self) -> P {
-        self.p1()
-    }
+//     fn point(&self) -> P {
+//         self.p1()
+//     }
 
-    fn angle(&self) -> FAngle {
-        let dir = self.p2() - self.p1();
-        dir.better_angle_from_x_axis()
-    }
-}
+//     fn angle(&self) -> FAngle {
+//         let dir = self.p2() - self.p1();
+//         dir.better_angle_from_x_axis()
+//     }
+// }
 
 macro_rules! impls {
     ($TheStruct:ident<P: $PointReqs:path>) => {

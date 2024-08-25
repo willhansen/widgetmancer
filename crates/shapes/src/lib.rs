@@ -1,4 +1,7 @@
-automod::dir!(pub "src/shapes");
+mod shapes;
+use crate::shapes::*;
+mod trait_alias_macro;
+
 
 macro_rules! verify_abstraction_relation {
     (concrete: $concrete_module:ident, abstract: $abstract_module:ident, point type: $point_type:ty) => {
@@ -85,7 +88,9 @@ macro_rules! validate_shape {
 
 // These function calls are the code representation of the `struct_and_trait_diagram` in the docs
 
-validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line, ray, directed_line_segment,; );
+validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line,; );
+validate_shape!(directed_line, DirectedLine, abstraction_of: two_different_points,; );
+// validate_shape!(two_different_points, TwoDifferentPoints, abstracts_to: directed_line, ray, directed_line_segment,; );
 
 // Traits to help keep all the conversion requirements between newtypes straight
 

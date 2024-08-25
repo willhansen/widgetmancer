@@ -1,4 +1,7 @@
-use crate::utility::*;
+use crate::trait_alias_macro::trait_alias;
+// use crate::shapes::*;
+// use crate::impl_abstraction_via_newtype;
+use crate::*;
 
 trait_alias!(pub trait PointReqs = two_different_points::PointReqs);
 
@@ -13,18 +16,19 @@ impl<P: PointReqs> Shape<P> {
 
 impl_abstraction_via_newtype!(Shape<P: PointReqs>, base=TwoDifferentPoints<P>);
 
-translate::impl_via_newtype!(Shape<P: PointReqs>);
+// translate::impl_via_newtype!(Shape<P: PointReqs>);
 
-pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Constructors<P> {
+// pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Constructors<P> {
+pub trait Operations<P: PointReqs>:  Constructors<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2];
     fn arbitrary_vector_along_line(&self) -> P {
         let [p1, p2] = self.two_points_on_line_in_order();
         p2 - p1
     }
-    fn direction(&self) -> FAngle {
-        self.arbitrary_vector_along_line()
-            .better_angle_from_x_axis()
-    }
+    // fn direction(&self) -> FAngle {
+    //     self.arbitrary_vector_along_line()
+    //         .better_angle_from_x_axis()
+    // }
     fn arbitrary_point_clockwise_of_line(&self) -> P {
         self.arbitrary_point_on_shape() + self.arbitrary_vector_along_line().quarter_rotated_ccw(-1)
     }
@@ -37,17 +41,17 @@ pub trait Operations<P: PointReqs>: line::Operations<P> + Reversible + Construct
     fn arbitrary_point_left_of_line(&self) -> P {
         self.arbitrary_point_anticlockwise_of_line()
     }
-    fn point_is_on_right(&self, p: P) -> bool {
-        let [p1, p2] = self.two_points_on_line_in_order();
-        three_points_are_clockwise(p1, p2, p)
-    }
+    // fn point_is_on_right(&self, p: P) -> bool {
+    //     let [p1, p2] = self.two_points_on_line_in_order();
+    //     three_points_are_clockwise(p1, p2, p)
+    // }
 }
 
-impl<P: PointReqs> line::Operations<P> for Shape<P> {
-    fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-        self.two_points_on_line_in_order()
-    }
-}
+// impl<P: PointReqs> line::Operations<P> for Shape<P> {
+//     fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+//         self.two_points_on_line_in_order()
+//     }
+// }
 impl<P: PointReqs> Operations<P> for Shape<P> {
     fn two_points_on_line_in_order(&self) -> [P; 2] {
         [self.0.p1(), self.0.p2()]
@@ -65,7 +69,7 @@ macro_rules! impl_operations_via_delegate {
 }
 pub(crate) use impl_operations_via_delegate;
 
-line::impl_constructors_via_base!(Shape<P: PointReqs>, base= two_different_points::Shape<P>);
+// line::impl_constructors_via_base!(Shape<P: PointReqs>, base= two_different_points::Shape<P>);
 
 impl<P: PointReqs> Constructors<P> for Shape<P> {
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
@@ -107,10 +111,10 @@ pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors
     {
         Self::try_new_from_directed_line(line).unwrap()
     }
-    fn choose_arbitrary_direction_for_line(line: impl line::Operations<P>) -> Self {
-        let [p1, p2] = line.two_different_arbitrary_points_on_line();
-        Self::from_two_points(p1, p2)
-    }
+    // fn choose_arbitrary_direction_for_line(line: impl line::Operations<P>) -> Self {
+    //     let [p1, p2] = line.two_different_arbitrary_points_on_line();
+    //     Self::from_two_points(p1, p2)
+    // }
     fn try_new_from_directed_line(line: impl Operations<P>) -> Result<Self, String>
     where
         Self: Sized;
@@ -134,19 +138,19 @@ macro_rules! impl_constructors_via_base {
 }
 pub(crate) use impl_constructors_via_base;
 
-impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
-    fn set_with_abstraction(&self, val: &Line<P>) -> Self {
-        // TODO: round trip conversion tests: Convert from base type to abstract type, then set the
-        // base type from the abstract type again.  Should be unchanged in all cases
-        todo!()
-    }
-}
+// impl<P: PointReqs> AbstractsTo<Line<P>> for Shape<P> {
+//     fn set_with_abstraction(&self, val: &Line<P>) -> Self {
+//         // TODO: round trip conversion tests: Convert from base type to abstract type, then set the
+//         // base type from the abstract type again.  Should be unchanged in all cases
+//         todo!()
+//     }
+// }
 
-impl<P: PointReqs> Into<Line<P>> for Shape<P> {
-    fn into(self) -> Line<P> {
-        Line::<P>::from_line(self)
-    }
-}
+// impl<P: PointReqs> Into<Line<P>> for Shape<P> {
+//     fn into(self) -> Line<P> {
+//         Line::<P>::from_line(self)
+//     }
+// }
 
 impl<P: PointReqs, T> Constructors<P> for T
 where
@@ -160,8 +164,8 @@ where
     }
 }
 
-impl<P: PointReqs> QuarterTurnRotatable for Shape<P> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
-    }
-}
+// impl<P: PointReqs> QuarterTurnRotatable for Shape<P> {
+//     fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+//         self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
+//     }
+// }
