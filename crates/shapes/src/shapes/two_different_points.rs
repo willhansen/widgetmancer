@@ -3,7 +3,8 @@ use crate::*;
 
 // pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
 
-trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
+// trait_alias!(pub trait PointReqs = signed_coordinate::Operations);
+trait_alias!(pub trait PointReqs = crate::FloatPointReqs);
 
 // TODO: generalize to N points, and a refinement that the points are different
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

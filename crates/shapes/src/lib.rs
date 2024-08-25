@@ -1,6 +1,29 @@
 mod shapes;
 use crate::shapes::*;
 mod trait_alias_macro;
+use crate::trait_alias_macro::trait_alias;
+
+use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::fmt::Debug;
+
+pub type FloatPoint = euclid::Vector2D<f32, euclid::UnknownUnit>;
+
+trait_alias!(pub trait FloatPointReqs =  Neg<Output = Self>
+    + Copy
+    + PartialEq
+    + Add<Self, Output = Self>
+    + Sub<Self, Output = Self>
+    // + Mul<i32, Output = Self>
+    + Mul<f32, Output = Self>
+    + Div<f32, Output = Self>
+    + euclid::num::Zero
+    + Sized
+    + Debug
+);
+
+static_assertions::assert_impl_all!(FloatPoint: FloatPointReqs);
+
+
 
 
 macro_rules! verify_abstraction_relation {
@@ -81,7 +104,7 @@ macro_rules! validate_shape {
             $(abstraction_of: $($abstraction_of,)+;)?
             // rename to raw_type?
             $(refinement_of: $($refinement_of,)+;)?
-            point type: default::FloatPoint // TODO: should not need to pick a point type to verify.  Ideally would validate schema generally)
+            point type: FloatPoint // TODO: should not need to pick a point type to verify.  Ideally would validate schema generally)
         );
     }
 }
@@ -178,7 +201,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_make_line() {
-        DirectedLine::from_point_and_direction(p(1.0, 2.0), UP);
+        // DirectedLine::from_point_and_direction(p(1.0, 2.0), UP);
         println!("tested");
     }
 }

@@ -85,11 +85,11 @@ impl<P: PointReqs> Constructors<P> for Shape<P> {
 // impl<L> Reversible for L
 // where
 //     L: Operations + Constructors,
-impl<P: PointReqs> Reversible for Shape<P> {
-    fn reversed(&self) -> Self {
-        todo!()
-    }
-}
+// impl<P: PointReqs> Reversible for Shape<P> {
+//     fn reversed(&self) -> Self {
+//         todo!()
+//     }
+// }
 
 pub trait Constructors<P: PointReqs>: Sized + two_different_points::Constructors<P> {
     fn from_two_ordered_points_on_line(p1: P, p2: P) -> Self
