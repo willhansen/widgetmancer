@@ -1,0 +1,6 @@
+[package]
+name = "subtraction_relativity"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
