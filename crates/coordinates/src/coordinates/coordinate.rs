@@ -1,7 +1,9 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
-use misc_utilities::Zero;
+use misc_utilities::euclid_zero_one_traits::{FancyZero, FancyOne};
 
 // TODO: is this just a scalar?
+// Not quite.  Keeping the door open to points and relativity means that subtraction and addition
+// might not be exactly among the same types.
 trait_alias!(pub trait DataTypeReqs = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
 // macro_rules! make_coordinate_datatype_cast_function {

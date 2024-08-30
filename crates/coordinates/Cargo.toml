@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 automod = "1.0.14"
+misc_utilities.workspace = true
 # static_assertions = "1.1.0"
 # line_drawing = "1.0"
 # euclid = "0.22.7"

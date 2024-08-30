@@ -1,4 +1,4 @@
-// Copied from https://docs.rs/euclid/latest/src/euclid/num.rs.html
+// Copied from https://docs.rs/euclid/latest/src/euclid/num.rs.html, with slight modifications
 use num_traits;
 
 // Euclid has its own Zero and One traits instead of of using the num_traits equivalents.
@@ -16,21 +16,21 @@ use num_traits;
 // euclid::num::Zero/One and can/should only manipulate the num_traits equivalents without risk
 // of compatibility issues with euclid.
 
-pub trait Zero {
+pub trait FancyZero {
     fn zero() -> Self;
 }
 
-impl<T: num_traits::Zero> Zero for T {
+impl<T: num_traits::Zero> FancyZero for T {
     fn zero() -> T {
         num_traits::Zero::zero()
     }
 }
 
-pub trait One {
+pub trait FancyOne {
     fn one() -> Self;
 }
 
-impl<T: num_traits::One> One for T {
+impl<T: num_traits::One> FancyOne for T {
     fn one() -> T {
         num_traits::One::one()
     }
