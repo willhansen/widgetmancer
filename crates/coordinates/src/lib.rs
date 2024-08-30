@@ -1,4 +1,6 @@
-automod::dir!(pub "coordinates");
+// automod::dir!(pub "src/coordinates");
+mod coordinates;
+use crate::coordinates::*;
 
 // pub_use!(
 //     // float_coordinate,
@@ -9,27 +11,24 @@ automod::dir!(pub "coordinates");
 //     coordinate,
 // );
 
-pub use self::unsigned_coordinate::UnsignedCoordinate;
-
-use map_macro::hash_set;
+// use map_macro::hash_set;
 use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
-    fmt::Display,
-    marker::PhantomData,
-    ops::{Add, Div, Mul, Neg, Sub},
+    // fmt::Display,
+    // marker::PhantomData,
+    // ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use typenum::{Sum, Unsigned};
+// use typenum::{Sum, Unsigned};
 
-use derive_more;
-use itertools::Itertools;
-use num::{One, Signed, Zero};
-use ordered_float::OrderedFloat;
-use rand::{rngs::StdRng, Rng};
-use static_assertions::{assert_impl_all, assert_not_impl_any};
+// use derive_more;
+// use itertools::Itertools;
+// use num::{One, Signed, Zero};
+// use ordered_float::OrderedFloat;
+// use rand::{rngs::StdRng, Rng};
+// use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-use crate::utility::*;
 
 pub type IPoint = Point2D<i32, euclid::UnknownUnit>;
 pub type FPoint = Point2D<f32, euclid::UnknownUnit>;
@@ -86,16 +85,16 @@ where
 }
 
 
-macro_rules! make_coordinate_datatype_cast_function {
-    ($name:ident, $data_type:ty, $coord_type:ty) => {
-        fn $name(&self) -> $coord_type {
-            <$coord_type>::new(
-                num::NumCast::from(self.x()).unwrap(),
-                num::NumCast::from(self.y()).unwrap(),
-            )
-        }
-    };
-}
+// macro_rules! make_coordinate_datatype_cast_function {
+//     ($name:ident, $data_type:ty, $coord_type:ty) => {
+//         fn $name(&self) -> $coord_type {
+//             <$coord_type>::new(
+//                 num::NumCast::from(self.x()).unwrap(),
+//                 num::NumCast::from(self.y()).unwrap(),
+//             )
+//         }
+//     };
+// }
 
 
 impl<T, U> From<NormalizedOrthoAngle> for Vector2D<T, U>

@@ -1,34 +1,32 @@
-use crate::utility::*;
-
-
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use misc_utilities::Zero;
 
 // TODO: is this just a scalar?
 trait_alias!(pub trait DataTypeReqs = Clone + Debug + PartialEq + num::Num + Copy + PartialOrd + Display + num::Zero + num::One + num::NumCast);
 
-macro_rules! make_coordinate_datatype_cast_function {
-    ($name:ident, $data_type:ty, $coord_type:ty) => {
-        fn $name(&self) -> $coord_type {
-            <$coord_type>::new(
-                num::NumCast::from(self.x()).unwrap(),
-                num::NumCast::from(self.y()).unwrap(),
-            )
-        }
-    };
-}
+// macro_rules! make_coordinate_datatype_cast_function {
+//     ($name:ident, $data_type:ty, $coord_type:ty) => {
+//         fn $name(&self) -> $coord_type {
+//             <$coord_type>::new(
+//                 num::NumCast::from(self.x()).unwrap(),
+//                 num::NumCast::from(self.y()).unwrap(),
+//             )
+//         }
+//     };
+// }
 
-pub trait Operations:
+pub trait Coordinate:
     Copy
     + PartialEq
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
-    // + Mul<OnGridDataType<Self>, Output = Self> // TODO: stricter trait bounds
+    + Mul<OnGridDataType<Self>, Output = Self> // TODO: stricter trait bounds
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + euclid::num::Zero
     + Sized
     + Debug
-    // + Display // TODO
+    + Display // TODO
     + From<(Self::DataType, Self::DataType)>
 // + IntoIterator + FromIterator // TODO
 {
