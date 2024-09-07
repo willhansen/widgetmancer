@@ -1,5 +1,5 @@
 // Copied from https://docs.rs/euclid/latest/src/euclid/num.rs.html, with slight modifications
-use num_traits;
+use num;
 
 // Euclid has its own Zero and One traits instead of of using the num_traits equivalents.
 // Unfortunately, num_traits::Zero requires Add, which opens a bag of sad things:
@@ -20,9 +20,9 @@ pub trait FancyZero {
     fn zero() -> Self;
 }
 
-impl<T: num_traits::Zero> FancyZero for T {
+impl<T: num::Zero> FancyZero for T {
     fn zero() -> T {
-        num_traits::Zero::zero()
+        num::Zero::zero()
     }
 }
 
@@ -30,8 +30,8 @@ pub trait FancyOne {
     fn one() -> Self;
 }
 
-impl<T: num_traits::One> FancyOne for T {
+impl<T: num::One> FancyOne for T {
     fn one() -> T {
-        num_traits::One::one()
+        num::One::one()
     }
 }

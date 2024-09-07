@@ -1,4 +1,4 @@
-use crate::trait_alias_macro::trait_alias;
+use misc_utilities::trait_alias;
 // use crate::shapes::*;
 // use crate::impl_abstraction_via_newtype;
 use crate::*;

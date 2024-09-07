@@ -1,6 +1,6 @@
 // automod::dir!(pub "src/coordinates");
 mod coordinates;
-use crate::coordinates::*;
+use crate::coordinates::coordinate::*;
 
 // pub_use!(
 //     // float_coordinate,
@@ -30,59 +30,26 @@ use std::{
 // use static_assertions::{assert_impl_all, assert_not_impl_any};
 
 
-pub type IPoint = Point2D<i32, euclid::UnknownUnit>;
-pub type FPoint = Point2D<f32, euclid::UnknownUnit>;
-pub type IVector = Vector2D<i32, euclid::UnknownUnit>;
-pub type FVector = Vector2D<f32, euclid::UnknownUnit>;
+pub type ICoord2 = Coord2<i32>;
+pub type FCoord2 = Coord2<f32>;
 
-pub const DOWN_I: IVector = vec2(0, -1);
-pub const UP_I: IVector = vec2(0, 1);
-pub const LEFT_I: IVector = vec2(-1, 0);
-pub const RIGHT_I: IVector = vec2(1, 0);
+pub const DOWN_I: ICoord2 = coord2(0, -1);
+pub const UP_I: ICoord2 = coord2(0, 1);
+pub const LEFT_I: ICoord2 = coord2(-1, 0);
+pub const RIGHT_I: ICoord2 = coord2(1, 0);
 
-pub type FAngle = Angle<f32>;
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket? // TODO: replace these with versions that properly incorporate addition and subtraction relativity #[derive( Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg, )]
 // pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 // pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
 
-// This is kind of hack to ignore relativity until it is re-implemented later
-pub type Point2D<DataType, UnitType> = euclid::Vector2D<DataType, UnitType>;
 
-// #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
-// pub struct Point2D<DataType, UnitType> {
-//     x: DataType,
-//     y: DataType,
-//     _unit: std::marker::PhantomData<UnitType>,
-// }
-// TODO: fix relativity
-pub type Vector2D<T, U> = Point2D<T, U>;
 
-// TODO: there's got to be a better way
-pub type Floating<P> = <P as coordinate::Operations>::Floating;
-pub type OnGrid<P> = <P as coordinate::Operations>::OnGrid;
-pub type DataType<P> = <P as coordinate::Operations>::DataType;
-pub type UnitType<P> = <P as coordinate::Operations>::UnitType;
+// TODO: there's got to be a better way to extract associated types
+// pub type DataTypeOf<P> = <P as coordinate::Operations>::DataType;
 
-pub type OnGridDataType<P> = DataType<OnGrid<P>>;
-pub type FloatDataType<P> = DataType<Floating<P>>;
 
-// TODO: is this the right place for these two functions?
-/// Intended to be a drop-in replacement for the `euclid` equivalent
-pub const fn point2<DataType, UnitType>(x: DataType, y: DataType) -> Point2D<DataType, UnitType>
-where
-    DataType: coordinate::DataTypeReqs,
-{
-    Point2D::new(x, y)
-}
-/// Intended to be a drop-in replacement for the `euclid` equivalent
-pub const fn vec2<DataType, UnitType>(x: DataType, y: DataType) -> Vector2D<DataType, UnitType>
-where
-    DataType: coordinate::DataTypeReqs,
-{
-    Vector2D::new(x, y)
-}
 
 
 // macro_rules! make_coordinate_datatype_cast_function {
@@ -103,7 +70,7 @@ where
 {
     fn from(value: NormalizedOrthoAngle) -> Self {
         let (x, y) = value.xy();
-        vec2(x, y)
+        coord2(x, y)
     }
 }
 impl<T, U> From<OrthogonalDirection> for Vector2D<T, U>
@@ -187,12 +154,6 @@ pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
     point - point.round()
 }
 
-pub fn snap_angle_to_diagonal(angle: Angle<f32>) -> Angle<f32> {
-    (0..4)
-        .map(|i| standardize_angle_with_zero_mid(Angle::degrees(45.0 + 90.0 * i as f32)))
-        .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
-        .unwrap()
-}
 
 // TODO: make a coordinates method
 pub fn get_8_octant_transforms_of<PointType: signed_coordinate::Operations>(v: PointType) -> Vec<PointType> {
@@ -249,9 +210,9 @@ pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdR
 pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
-pub fn random_unit_vector() -> FVector {
+pub fn random_unit_vector() -> FCoord2 {
     let angle = random_angle();
-    FVector::unit_vector_from_angle(angle)
+    FCoord2::unit_vector_from_angle(angle)
 }
 
 pub fn revolve_square(
@@ -312,8 +273,8 @@ pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
             HashSet::from([dir + STEP_LEFT, dir + STEP_RIGHT])
         }
     } else {
-        let no_x = vec2(0, dir.y);
-        let no_y = vec2(dir.x, 0);
+        let no_x = coord2(0, dir.y);
+        let no_y = coord2(dir.x, 0);
         HashSet::from([no_x, no_y])
     }
 }
@@ -407,7 +368,7 @@ pub fn point_is_in_centered_unit_square_with_tolerance<U>(
 }
 
 pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
-    <P::OnGrid as euclid::num::Zero>::zero().square_corners()
+    <P::OnGrid as FancyZero>::zero().square_corners()
 }
 
 #[cfg(test)]
@@ -475,7 +436,7 @@ mod tests {
     fn test_rotate_zero_vector() {
         assert_eq!(
             WorldMove::new(0.0, 0.0).rotate_vect(Angle::radians(PI)),
-            vec2(0.0, 0.0)
+            coord2(0.0, 0.0)
         );
     }
     #[test]

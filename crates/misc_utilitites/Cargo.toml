@@ -4,5 +4,12 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-num-traits.workspace = true
+num.workspace = true
 automod.workspace = true
+getset.workspace = true
+itertools.workspace = true
+ntest.workspace = true
+try-partialord.workspace = true
+derive_more.workspace = true
+ordered-float.workspace = true
+

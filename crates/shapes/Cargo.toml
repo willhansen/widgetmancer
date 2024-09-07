@@ -4,7 +4,13 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-automod = "1.0.14"
-static_assertions = "1.1.0"
-line_drawing = "1.0"
-euclid = "0.22.7"
+# internal
+misc_utilities.workspace = true
+
+# external
+automod.workspace = true
+static_assertions.workspace = true
+line_drawing.workspace = true
+euclid.workspace = true
+
+

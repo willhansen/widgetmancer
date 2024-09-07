@@ -1,4 +1,4 @@
-use crate::trait_alias_macro::trait_alias;
+use misc_utilities::{general_utility::{max_for_partial_ord, min_for_partial_ord}, trait_alias};
 use crate::*;
 
 // pub type TwoDifferentFloatPoints<U> = Shape<Point2D<f32, U>>;
@@ -39,33 +39,33 @@ pub trait Operations<P: PointReqs>: Sized + Copy + PartialEq + Constructors<P> {
     fn points(&self) -> [P; 2] {
         self.to_array()
     }
-    fn cast_unit<Other, OtherPointType>(&self) -> Other
-    where
-        Other: Operations<OtherPointType>,
-        // TODO: find a way around not being able to restrict the base DataType associated type
-        OtherPointType: PointReqs<_DataType = P::DataType>,
-    {
-        Other::from_array(self.to_array().map(|p| p.cast_unit()))
-    }
+    // fn cast_unit<Other, OtherPointType>(&self) -> Other
+    // where
+    //     Other: Operations<OtherPointType>,
+    //     // TODO: find a way around not being able to restrict the base DataType associated type
+    //     OtherPointType: FloatPointReqs,
+    // {
+    //     Other::from_array(self.to_array().map(|p| p.cast_unit()))
+    // }
     fn to_array(&self) -> [P; 2] {
         [0, 1].map(|i| self.point_by_index(i))
     }
-    fn x_min(&self) -> P::DataType {
+    fn x_min(&self) -> f32 {
         min_for_partial_ord(self.p1().x(), self.p2().x())
     }
-    fn x_max(&self) -> P::DataType {
+    fn x_max(&self) -> f32 {
         max_for_partial_ord(self.p1().x(), self.p2().x())
     }
-    fn y_min(&self) -> P::DataType {
+    fn y_min(&self) -> f32 {
         min_for_partial_ord(self.p1().y(), self.p2().y())
     }
-    fn y_max(&self) -> P::DataType {
+    fn y_max(&self) -> f32 {
         max_for_partial_ord(self.p1().y(), self.p2().y())
     }
-    fn width(&self) -> P::DataType {
+    fn width(&self) -> f32 {
         self.x_max() - self.x_min()
     }
-    fn height(&self) -> P::DataType {
+    fn height(&self) -> f32 {
         self.y_max() - self.y_min()
     }
 }
@@ -166,16 +166,16 @@ impl<P: PointReqs> AbstractsTo<DirectedLine<P>> for Shape<P> {
         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
     }
 }
-impl<P: PointReqs> AbstractsTo<Ray<P>> for Shape<P> {
-    fn set_with_abstraction(&self, val: &Ray<P>) -> Self {
-        Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
-    }
-}
-impl<P: PointReqs> AbstractsTo<DirectedLineSegment<P>> for Shape<P> {
-    fn set_with_abstraction(&self, val: &DirectedLineSegment<P>) -> Self {
-        Self::from_two_points(val.start(), val.end())
-    }
-}
+// impl<P: PointReqs> AbstractsTo<Ray<P>> for Shape<P> {
+//     fn set_with_abstraction(&self, val: &Ray<P>) -> Self {
+//         Self::from_point_and_unit_step_in_direction(self.p1(), val.direction())
+//     }
+// }
+// impl<P: PointReqs> AbstractsTo<DirectedLineSegment<P>> for Shape<P> {
+//     fn set_with_abstraction(&self, val: &DirectedLineSegment<P>) -> Self {
+//         Self::from_two_points(val.start(), val.end())
+//     }
+// }
 
 impl<P: PointReqs> Operations<P> for Shape<P> {
     fn point_by_index(&self, pi: usize) -> P {
@@ -188,15 +188,15 @@ impl<P: PointReqs> Operations<P> for Shape<P> {
 }
 
 // TODO: operations for refinements should be failable
-impl<P: PointReqs, T> Operations<P> for T
-where
-    T: RefinementOf<Shape<P>>,
-{
-    fn point_by_index(&self, point_index: usize) -> P {
-        let intermediate: Shape<P> = self.into();
-        intermediate.point_by_index(point_index)
-    }
-}
+// impl<P: PointReqs, T> Operations<P> for T
+// where
+//     T: RefinementOf<Shape<P>>,
+// {
+//     fn point_by_index(&self, point_index: usize) -> P {
+//         let intermediate: Shape<P> = self.into();
+//         intermediate.point_by_index(point_index)
+//     }
+// }
 
 // // TODO: separate file and also int rays
 // impl<P: ray::PointReqs> ray::Operations<P> for Shape<P> {
@@ -244,31 +244,31 @@ macro_rules! impls {
             }
         }
 
-        impl<P: $PointReqs> line::Operations<P> for $TheStruct<P> {
-            fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
-                self.to_array()
-            }
-        }
-        impl<P: $PointReqs> line::Constructors<P> for $TheStruct<P> {}
+        // impl<P: $PointReqs> line::Operations<P> for $TheStruct<P> {
+        //     fn two_different_arbitrary_points_on_line(&self) -> [P; 2] {
+        //         self.to_array()
+        //     }
+        // }
+        // impl<P: $PointReqs> line::Constructors<P> for $TheStruct<P> {}
 
-        impl<P: $PointReqs> Reversible for $TheStruct<P> {
-            fn reversed(&self) -> Self {
-                Self::new_from_points(self.p2(), self.p1())
-            }
-        }
+        // impl<P: $PointReqs> Reversible for $TheStruct<P> {
+        //     fn reversed(&self) -> Self {
+        //         Self::new_from_points(self.p2(), self.p1())
+        //     }
+        // }
 
-        impl<P: $PointReqs> QuarterTurnRotatable for $TheStruct<P> {
-            fn quarter_rotated_ccw(
-                &self,
-                quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
-            ) -> Self {
-                let quarter_turns_ccw = quarter_turns_ccw.into();
-                let new_points = self
-                    .to_array()
-                    .map(|p| p.quarter_rotated_ccw(quarter_turns_ccw));
-                Self::from_array(new_points)
-            }
-        }
+        // impl<P: $PointReqs> QuarterTurnRotatable for $TheStruct<P> {
+        //     fn quarter_rotated_ccw(
+        //         &self,
+        //         quarter_turns_ccw: impl Into<NormalizedOrthoAngle>,
+        //     ) -> Self {
+        //         let quarter_turns_ccw = quarter_turns_ccw.into();
+        //         let new_points = self
+        //             .to_array()
+        //             .map(|p| p.quarter_rotated_ccw(quarter_turns_ccw));
+        //         Self::from_array(new_points)
+        //     }
+        // }
     };
 }
 pub(crate) use impls;
@@ -302,34 +302,34 @@ where
     }
 }
 
-impl<P: float_coordinate::Operations> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>> for Shape<P> {
-    fn from(value: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>) -> Self {
-        Self::from_array(value.points())
-    }
-}
+// impl<P: float_coordinate::Operations> From<TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>> for Shape<P> {
+//     fn from(value: TwoPointsOnDifferentFacesOfCenteredUnitSquare<P>) -> Self {
+//         Self::from_array(value.points())
+//     }
+// }
 
-impl<P: float_coordinate::Operations> TryFrom<Shape<P>> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
-    type Error = String;
+// impl<P: float_coordinate::Operations> TryFrom<Shape<P>> for TwoPointsOnDifferentFacesOfCenteredUnitSquare<P> {
+//     type Error = String;
 
-    fn try_from(value: Shape<P>) -> Result<Self, Self::Error> {
-        Self::try_from_two_exact_points(value.p1, value.p2)
-    }
-}
-impl TwoDifferentWorldPoints {
-    // TODO: move to line segment
-    pub fn touched_squares(&self) -> Vec<WorldSquare> {
-        let start_square = world_point_to_world_square(self.p1);
-        let end_square = world_point_to_world_square(self.p2);
-        // TODO: use better line algorithm.  Account for floating point start and ends
-        line_drawing::WalkGrid::new(start_square.to_tuple(), end_square.to_tuple())
-            .map(|(x, y)| point2(x, y))
-            .collect_vec()
-    }
-}
+//     fn try_from(value: Shape<P>) -> Result<Self, Self::Error> {
+//         Self::try_from_two_exact_points(value.p1, value.p2)
+//     }
+// }
+// impl TwoDifferentWorldPoints {
+//     // TODO: move to line segment
+//     pub fn touched_squares(&self) -> Vec<WorldSquare> {
+//         let start_square = world_point_to_world_square(self.p1);
+//         let end_square = world_point_to_world_square(self.p2);
+//         // TODO: use better line algorithm.  Account for floating point start and ends
+//         line_drawing::WalkGrid::new(start_square.to_tuple(), end_square.to_tuple())
+//             .map(|(x, y)| point2(x, y))
+//             .collect_vec()
+//     }
+// }
 
 // TODO: allow for unsigned
-impl<P: PointReqs> Display for Shape<P> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<P: PointReqs> std::fmt::Display for Shape<P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "p1: {}, p2: {}\n\tx-intercept: {}\n\ty-intercept: {}\n\tslope: {}",

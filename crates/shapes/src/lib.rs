@@ -1,7 +1,6 @@
 mod shapes;
 use crate::shapes::*;
-mod trait_alias_macro;
-use crate::trait_alias_macro::trait_alias;
+use misc_utilities::trait_alias;
 
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::fmt::Debug;
