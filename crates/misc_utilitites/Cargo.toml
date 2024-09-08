@@ -12,4 +12,5 @@ ntest.workspace = true
 try-partialord.workspace = true
 derive_more.workspace = true
 ordered-float.workspace = true
+pretty_assertions.workspace = true
 

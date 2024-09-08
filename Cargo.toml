@@ -39,6 +39,4 @@ try-partialord = "0.1.3"
 map-macro = "0.3.0"
 derive-getters = "0.3.0"
 automod = "1.0.14"
-
-[workspace.dev-dependencies]
 pretty_assertions = "1.3.0"
