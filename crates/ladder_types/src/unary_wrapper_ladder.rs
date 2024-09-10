@@ -1,14 +1,23 @@
-//! ```rust
-//! use ladder_types::unary_wrapper_ladder::*
+//! ```
+//! use ladder_types::unary_wrapper_ladder::*;
 //! assert_eq!(R0::new() + R1::new(), R0::new());
 //! assert_eq!(R1::new() + R2::new(), R1::new());
 //! assert_eq!(R2::new() + R3::new(), R2::new());
 //! ```
-//! ```rust,compile_fail,E0515
-//! use ladder_types::unary_wrapper_ladder::*
+//! ```compile_fail
+//! use ladder_types::unary_wrapper_ladder::*;
 //! R0::new() + R0::new();
+//! ```
+//! ```compile_fail
+//! use ladder_types::unary_wrapper_ladder::*;
 //! R0::new() + R2::new();
+//! ```
+//! ```compile_fail
+//! use ladder_types::unary_wrapper_ladder::*;
 //! R1::new() + R1::new();
+//! ```
+//! ```compile_fail
+//! use ladder_types::unary_wrapper_ladder::*;
 //! R1::new() + R0::new();
 //! ```
 //!

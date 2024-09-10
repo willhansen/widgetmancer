@@ -1,11 +1,11 @@
 //! ```rust
-//! use ladder_types::kiss_ladder::*
+//! use ladder_types::kiss_ladder::*;
 //! assert_eq!(R0::new() + R1::new(), R0::new());
 //! assert_eq!(R1::new() + R2::new(), R1::new());
 //! assert_eq!(R2::new() + R3::new(), R2::new());
 //! ```
 //! ```rust,compile_fail,E0515
-//! use ladder_types::kiss_ladder::*
+//! use ladder_types::kiss_ladder::*;
 //! R0::new() + R0::new();
 //! R0::new() + R2::new();
 //! R1::new() + R1::new();
@@ -15,15 +15,21 @@
 use std::ops::Add;
 
 #[derive(Eq, PartialEq, Debug)]
-pub struct Relative<const Level: u32>();
+pub struct Relative<const LEVEL: u32>();
 
 impl< const L: u32> Relative<L> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self()
     }
 }
 
-// impl<const Level: u32> Relative<Level> {
+impl<const L: u32> Default for Relative<L> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// impl<const LEVEL: u32> Relative<LEVEL> {
 //     fn level() -> u32
 // }
 
