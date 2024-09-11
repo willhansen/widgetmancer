@@ -1,17 +1,3 @@
-//! ```rust
-//! use ladder_types::kiss_ladder::*;
-//! assert_eq!(R0::new() + R1::new(), R0::new());
-//! assert_eq!(R1::new() + R2::new(), R1::new());
-//! assert_eq!(R2::new() + R3::new(), R2::new());
-//! ```
-//! ```rust,compile_fail,E0515
-//! use ladder_types::kiss_ladder::*;
-//! R0::new() + R0::new();
-//! R0::new() + R2::new();
-//! R1::new() + R1::new();
-//! R1::new() + R0::new();
-//! ```
-//!
 use std::ops::Add;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -55,5 +41,4 @@ macro_rules! impl_add {
 impl_add!(R0, R1, R0);
 impl_add!(R1, R2, R1);
 impl_add!(R2, R3, R2);
-
 

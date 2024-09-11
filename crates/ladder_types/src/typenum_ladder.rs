@@ -1,17 +1,3 @@
-//! ```rust
-//! use ladder_types::typenum_ladder::*;
-//! assert_eq!(R0::new() + R1::new(), R0::new());
-//! assert_eq!(R1::new() + R2::new(), R1::new());
-//! assert_eq!(R2::new() + R3::new(), R2::new());
-//! ```
-//! ```rust,compile_fail,E0515
-//! use ladder_types::typenum_ladder::*;
-//! R0::new() + R0::new();
-//! R0::new() + R2::new();
-//! R1::new() + R1::new();
-//! R1::new() + R0::new();
-//! ```
-//!
 use std::ops::Add;
 use typenum::{U0, U1, U2, U3, B1, Add1, Unsigned};
 

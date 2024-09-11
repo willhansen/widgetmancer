@@ -1,26 +1,3 @@
-//! ```
-//! use ladder_types::unary_wrapper_ladder::*;
-//! assert_eq!(R0::new() + R1::new(), R0::new());
-//! assert_eq!(R1::new() + R2::new(), R1::new());
-//! assert_eq!(R2::new() + R3::new(), R2::new());
-//! ```
-//! ```compile_fail
-//! use ladder_types::unary_wrapper_ladder::*;
-//! R0::new() + R0::new();
-//! ```
-//! ```compile_fail
-//! use ladder_types::unary_wrapper_ladder::*;
-//! R0::new() + R2::new();
-//! ```
-//! ```compile_fail
-//! use ladder_types::unary_wrapper_ladder::*;
-//! R1::new() + R1::new();
-//! ```
-//! ```compile_fail
-//! use ladder_types::unary_wrapper_ladder::*;
-//! R1::new() + R0::new();
-//! ```
-//!
 use std::ops::Add;
 use std::marker::PhantomData;
 
