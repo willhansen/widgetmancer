@@ -13,17 +13,13 @@ modules = ["kiss_ladder", "typenum_ladder", "unary_wrapper_ladder"]
 
 sum_template_path = script_dir / "sum_template.txt"
 # Ra + Rb == Rc
-sums = [
-    (0, 0, False),
-    (0, 1, True),
-    (0, 2, False),
-    (1, 0, False),
-    (1, 1, False),
-    (1, 2, True),
-    (2, 0, False),
-    (2, 1, False),
-    (2, 2, False),
-]
+a_b_add_ok_sub_ok = [ ]
+for a in range(5):
+    for b in range(5): 
+        a_b_add_ok_sub_ok.append((a,b, b==a+1, b==a or b==a+1))
+    
+
+
 
 generated_dir = script_dir / "generated"
 
@@ -45,7 +41,7 @@ for module in modules:
     module_path = generated_dir / module
     module_path.mkdir()
 
-    for ra, rb, should_pass in sums:
+    for ra, rb, can_add, can_sub in a_b_add_ok_sub_ok:
         filename = f"test__{module}__R{ra}_plus_R{rb}.rs"
         if should_pass:
             test_path = pass_dir / filename
