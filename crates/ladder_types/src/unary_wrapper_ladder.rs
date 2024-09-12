@@ -24,6 +24,7 @@ pub type R0 = RelativeTo<()>;
 pub type R1 = RelativeTo<R0>;
 pub type R2 = RelativeTo<R1>;
 pub type R3 = RelativeTo<R2>;
+pub type R4 = RelativeTo<R3>;
 // ...
 
 

@@ -1,0 +1,17 @@
+error[E0277]: cannot subtract `typenum::bit::B1` from `typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B0>`
+ --> tests/ui/generated/should_fail/test__typenum_ladder__R3_minus_R2.rs:5:22
+  |
+5 |    let _ = R3::new() - R2::new();
+  |                      ^ no implementation for `typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B0> - typenum::bit::B1`
+  |
+  = help: the trait `Sub<typenum::bit::B1>` is not implemented for `typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B0>`, which is required by `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>: Sub<_>`
+  = help: the following other types implement trait `Sub<Rhs>`:
+            <typenum::uint::UInt<U, B> as Sub<typenum::bit::B0>>
+            <typenum::uint::UInt<U, typenum::bit::B0> as Sub<typenum::bit::B1>>
+            <typenum::uint::UInt<Ul, Bl> as Sub<Ur>>
+            <typenum::uint::UInt<typenum::uint::UInt<U, B>, typenum::bit::B1> as Sub<typenum::bit::B1>>
+            <typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1> as Sub<typenum::bit::B1>>
+  = note: required for `typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>` to implement `typenum::private::PrivateSub<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>`
+  = note: required for `typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>` to implement `Sub<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>`
+  = note: 1 redundant requirement hidden
+  = note: required for `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>` to implement `Sub<ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>>`

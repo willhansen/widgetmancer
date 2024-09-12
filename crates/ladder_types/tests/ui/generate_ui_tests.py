@@ -39,7 +39,6 @@ with open(sum_template_path, "r") as f_in:
 
 for module in modules:
     module_path = generated_dir / module
-    module_path.mkdir()
 
     for ra, rb, can_add, can_sub in a_b_add_ok_sub_ok:
         ops_verbs_symbols = [(can_add, "plus", "+"), (can_sub, "minus", "-")]

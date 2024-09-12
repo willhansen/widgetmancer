@@ -1,0 +1,10 @@
+error[E0277]: cannot subtract `Relative<1>` from `Relative<2>`
+ --> tests/ui/generated/should_fail/test__kiss_ladder__R2_minus_R1.rs:5:22
+  |
+5 |    let _ = R2::new() - R1::new();
+  |                      ^ no implementation for `Relative<2> - Relative<1>`
+  |
+  = help: the trait `Sub<Relative<1>>` is not implemented for `Relative<2>`
+  = help: the following other types implement trait `Sub<Rhs>`:
+            <Relative<2> as Sub<Relative<3>>>
+            <Relative<2> as Sub>

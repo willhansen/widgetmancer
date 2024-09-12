@@ -1,0 +1,8 @@
+error[E0308]: mismatched types
+ --> tests/ui/generated/should_fail/test__kiss_ladder__R2_plus_R2.rs:5:24
+  |
+5 |    let _ = R2::new() + R2::new();
+  |                        ^^^^^^^^^ expected `3`, found `2`
+  |
+  = note: expected struct `Relative<3>`
+             found struct `Relative<2>`

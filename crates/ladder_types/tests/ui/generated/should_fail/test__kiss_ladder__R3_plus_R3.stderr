@@ -1,0 +1,7 @@
+error[E0369]: cannot add `Relative<3>` to `Relative<3>`
+ --> tests/ui/generated/should_fail/test__kiss_ladder__R3_plus_R3.rs:5:22
+  |
+5 |    let _ = R3::new() + R3::new();
+  |            --------- ^ --------- Relative<3>
+  |            |
+  |            Relative<3>

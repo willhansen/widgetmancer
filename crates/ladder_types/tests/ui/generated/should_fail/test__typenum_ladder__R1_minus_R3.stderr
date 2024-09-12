@@ -1,0 +1,7 @@
+error[E0277]: the trait bound `typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>: SubWithLevelDiff<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>` is not satisfied
+ --> tests/ui/generated/should_fail/test__typenum_ladder__R1_minus_R3.rs:5:22
+  |
+5 |    let _ = R1::new() - R3::new();
+  |                      ^ the trait `SubWithLevelDiff<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>>` is not implemented for `typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>`, which is required by `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>>: Sub<_>`
+  |
+  = note: required for `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>>` to implement `Sub<ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>>`

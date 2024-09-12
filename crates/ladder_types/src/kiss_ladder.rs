@@ -23,6 +23,7 @@ pub type R0 = Relative<0>;
 pub type R1 = Relative<1>;
 pub type R2 = Relative<2>;
 pub type R3 = Relative<3>;
+pub type R4 = Relative<4>;
 
 
 
@@ -59,6 +60,7 @@ impl_sub!(R2, R3, R2);
 impl_sub!(R0, R0, R1);
 impl_sub!(R1, R1, R2);
 impl_sub!(R2, R2, R3);
+impl_sub!(R3, R3, R4);
 
 
 #[cfg(test)]

@@ -1,0 +1,11 @@
+error[E0277]: cannot subtract `typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>` from `typenum::uint::UTerm`
+ --> tests/ui/generated/should_fail/test__typenum_ladder__R3_minus_R0.rs:5:22
+  |
+5 |    let _ = R3::new() - R0::new();
+  |                      ^ no implementation for `typenum::uint::UTerm - typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>`
+  |
+  = help: the trait `Sub<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>` is not implemented for `typenum::uint::UTerm`, which is required by `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>: Sub<_>`
+  = help: the following other types implement trait `Sub<Rhs>`:
+            <typenum::uint::UTerm as Sub<typenum::bit::B0>>
+            <typenum::uint::UTerm as Sub>
+  = note: required for `ladder_types::typenum_ladder::LadderRung<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B1>>` to implement `Sub<ladder_types::typenum_ladder::LadderRung<typenum::uint::UTerm>>`

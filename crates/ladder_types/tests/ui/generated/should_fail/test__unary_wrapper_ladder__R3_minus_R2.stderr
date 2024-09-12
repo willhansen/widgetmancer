@@ -1,0 +1,10 @@
+error[E0277]: cannot subtract `RelativeTo<RelativeTo<RelativeTo<()>>>` from `RelativeTo<RelativeTo<RelativeTo<RelativeTo<()>>>>`
+ --> tests/ui/generated/should_fail/test__unary_wrapper_ladder__R3_minus_R2.rs:5:22
+  |
+5 |    let _ = R3::new() - R2::new();
+  |                      ^ no implementation for `RelativeTo<RelativeTo<RelativeTo<RelativeTo<()>>>> - RelativeTo<RelativeTo<RelativeTo<()>>>`
+  |
+  = help: the trait `Sub<RelativeTo<RelativeTo<RelativeTo<()>>>>` is not implemented for `RelativeTo<RelativeTo<RelativeTo<RelativeTo<()>>>>`
+  = help: the following other types implement trait `Sub<Rhs>`:
+            <RelativeTo<R> as Sub<RelativeTo<RelativeTo<R>>>>
+            <RelativeTo<R> as Sub>
