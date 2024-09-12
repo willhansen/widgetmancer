@@ -19,11 +19,6 @@ impl<const L: u32> Default for Relative<L> {
 //     fn level() -> u32
 // }
 
-pub type R0 = Relative<0>;
-pub type R1 = Relative<1>;
-pub type R2 = Relative<2>;
-pub type R3 = Relative<3>;
-pub type R4 = Relative<4>;
 
 
 
@@ -48,20 +43,20 @@ macro_rules! impl_sub {
         impl_binary_op!(Sub, sub, $Ra, $Rb, $Rc);
     }
 }
+macro_rules! impl_R {
+    ($N:literal, $Shorter:ident) => {
+        pub type $Shorter = Relative<$N>;
+        impl_add!(Relative<{$N-1}>, Relative<$N>, Relative<{$N-1}>);
+        impl_sub!(Relative<{$N-1}>, Relative<$N>, Relative<{$N-1}>);
+        impl_sub!(Relative<{$N-1}>, Relative<{$N-1}>, Relative<$N>);
+    }
+}
 
-impl_add!(R0, R1, R0);
-impl_add!(R1, R2, R1);
-impl_add!(R2, R3, R2);
-
-impl_sub!(R0, R1, R0);
-impl_sub!(R1, R2, R1);
-impl_sub!(R2, R3, R2);
-
-impl_sub!(R0, R0, R1);
-impl_sub!(R1, R1, R2);
-impl_sub!(R2, R2, R3);
-impl_sub!(R3, R3, R4);
-
+pub type R0 = Relative<0>;
+impl_R!(1,R1);
+impl_R!(2,R2);
+impl_R!(3,R3);
+impl_R!(4,R4);
 
 #[cfg(test)]
 mod test {

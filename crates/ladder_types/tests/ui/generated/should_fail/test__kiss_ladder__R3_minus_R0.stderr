@@ -1,8 +1,16 @@
-error[E0308]: mismatched types
- --> tests/ui/generated/should_fail/test__kiss_ladder__R3_minus_R0.rs:5:24
+error[E0277]: cannot subtract `Relative<0>` from `Relative<3>`
+ --> tests/ui/generated/should_fail/test__kiss_ladder__R3_minus_R0.rs:5:22
   |
 5 |    let _ = R3::new() - R0::new();
-  |                        ^^^^^^^^^ expected `3`, found `0`
+  |                      ^ no implementation for `Relative<3> - Relative<0>`
   |
-  = note: expected struct `Relative<3>`
-             found struct `Relative<0>`
+  = help: the trait `Sub<Relative<0>>` is not implemented for `Relative<3>`
+  = help: the following other types implement trait `Sub<Rhs>`:
+            <Relative<0> as Sub<Relative<1>>>
+            <Relative<0> as Sub>
+            <Relative<1> as Sub<Relative<2>>>
+            <Relative<1> as Sub>
+            <Relative<2> as Sub<Relative<3>>>
+            <Relative<2> as Sub>
+            <Relative<3> as Sub<Relative<4>>>
+            <Relative<3> as Sub>

@@ -6,5 +6,11 @@ error[E0277]: cannot subtract `Relative<3>` from `Relative<1>`
   |
   = help: the trait `Sub<Relative<3>>` is not implemented for `Relative<1>`
   = help: the following other types implement trait `Sub<Rhs>`:
+            <Relative<0> as Sub<Relative<1>>>
+            <Relative<0> as Sub>
             <Relative<1> as Sub<Relative<2>>>
             <Relative<1> as Sub>
+            <Relative<2> as Sub<Relative<3>>>
+            <Relative<2> as Sub>
+            <Relative<3> as Sub<Relative<4>>>
+            <Relative<3> as Sub>
