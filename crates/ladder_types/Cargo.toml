@@ -6,3 +6,5 @@ edition.workspace = true
 [dependencies]
 typenum = "1.17.0"
 trybuild = "1.0"
+num.workspace = true
+derive_more.workspace = true
