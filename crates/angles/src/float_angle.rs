@@ -2,6 +2,7 @@ use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU},
 };
 use derive_more;
+use misc_utilities::general_utilities::range_array;
 
 pub const HALF_TURN: FAngle = FAngle(PI);
 pub const QUARTER_TURN: FAngle = FAngle(FRAC_PI_2);
@@ -38,16 +39,18 @@ impl FAngle {
         self.rad().tan()
     }
     pub fn standardized_with_zero_mid(&self) -> Self {
-        (self + HALF_TURN).standardized_with_positive() - HALF_TURN
+        (*self + HALF_TURN).standardized_positive() - HALF_TURN
     }
     pub fn standardized_positive(&self) -> Self {
         Self::from_rad(self.rad().rem_euclid(TAU))
     }
     pub fn diagonals() -> [Self;4] {
+        range_array<4>().map(|i| 0.25 + 0.5 * i as f32).map(|turns| FAngle::from_turns(turns))
+        
 
     }
     pub fn orthogonals() -> [Self;4] {
-        core::array::from_fn(|i| deg(90.0 * i as i32))
+        core::array::from_fn(|i| deg(90.0 * i as f32))
 
     }
     pub fn snap_to_diagonal(&self) -> Self {

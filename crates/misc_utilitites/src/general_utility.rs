@@ -170,6 +170,11 @@ pub fn transpose<T: Copy>(a: Vec<Vec<T>>) -> Vec<Vec<T>> {
         .collect()
 }
 
+pub fn range_array<const N:usize>() -> [usize;N] {
+    (0..N).collect_vec().try_into().unwrap()
+
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;
