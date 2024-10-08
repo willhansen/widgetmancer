@@ -8,6 +8,7 @@ angular-units.workspace = true
 automod.workspace = true
 ntest.workspace = true
 derive_more.workspace = true
-# misc_utilities.workspace = true
+misc_utilities.workspace = true
 # num.workspace = true
+ordered_float.workspace = true
 

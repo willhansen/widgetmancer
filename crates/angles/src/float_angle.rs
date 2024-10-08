@@ -2,7 +2,8 @@ use std::{
     f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU},
 };
 use derive_more;
-use misc_utilities::general_utilities::range_array;
+use misc_utilities;
+use ordered_float::OrderedFloat;
 
 pub const HALF_TURN: FAngle = FAngle(PI);
 pub const QUARTER_TURN: FAngle = FAngle(FRAC_PI_2);
@@ -44,19 +45,23 @@ impl FAngle {
     pub fn standardized_positive(&self) -> Self {
         Self::from_rad(self.rad().rem_euclid(TAU))
     }
-    pub fn diagonals() -> [Self;4] {
-        range_array<4>().map(|i| 0.25 + 0.5 * i as f32).map(|turns| FAngle::from_turns(turns))
-        
+    pub fn standardized_with_zero_min(&self) -> Self {
+        self.standardized_positive()
 
+    }
+    pub fn normalized_positive(&self) -> Self {
+        self.standardized_positive()
+
+    }
+    pub fn diagonals() -> [Self;4] {
+        misc_utilities::general_utility::range_array::<4>().map(|i| 1.0/8.0 + 1.0/4.0 * i as f32).map(|turns| FAngle::from_turns(turns))
     }
     pub fn orthogonals() -> [Self;4] {
         core::array::from_fn(|i| deg(90.0 * i as f32))
-
     }
     pub fn snap_to_diagonal(&self) -> Self {
-        (0..4)
-            .map(|i| standardize_angle_with_zero_mid(deg(45.0 + 90.0 * i as f32)))
-            .min_by_key(|&snap_angle| OrderedFloat(abs_angle_distance(snap_angle, angle).radians))
+            Self::diagonals().into_iter()
+            .min_by_key(|snap_angle| OrderedFloat(self.abs_angle_to(snap_angle).rad()))
             .unwrap()
     }
     pub fn dot(&self, other: &Self) -> f32 {
@@ -64,6 +69,12 @@ impl FAngle {
     }
     pub fn angle_to(&self, other: &Self) -> Self {
         todo!()
+    }
+    pub fn abs(&self) -> Self {
+        Self::from_rad(self.rad().abs())
+    }
+    pub fn abs_angle_to(&self, other: &Self) -> Self {
+        self.angle_to(other).abs()
     }
 }
 pub fn deg(x: f32) -> FAngle {
@@ -108,6 +119,13 @@ mod tests {
                 c
             );
         });
+    }
+    #[test]
+    fn test_diagonal() {
+        assert_about_eq!(FAngle::diagonals()[0].normalize_positive().deg(), 45.0);
+        assert_about_eq!(FAngle::diagonals()[1].normalize_positive().deg(), (90.0 + 180.0) / 2.0);
+        assert_about_eq!(FAngle::diagonals()[2].normalize_positive().deg(), (180.0 + 270.0) / 2.0);
+        assert_about_eq!(FAngle::diagonals()[3].normalize_positive().deg(), (270.0 + 360.0) / 2.0);
     }
     mod angle_to {
         use super::*;
