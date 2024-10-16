@@ -10,5 +10,5 @@ ntest.workspace = true
 derive_more.workspace = true
 misc_utilities.workspace = true
 # num.workspace = true
-ordered_float.workspace = true
+ordered-float.workspace = true
 
