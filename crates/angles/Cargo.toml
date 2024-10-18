@@ -7,6 +7,7 @@ edition.workspace = true
 angular-units.workspace = true
 automod.workspace = true
 ntest.workspace = true
+more-asserts.workspace = true
 derive_more.workspace = true
 misc_utilities.workspace = true
 # num.workspace = true
