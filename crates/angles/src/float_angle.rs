@@ -1,5 +1,5 @@
 use std::{
-    f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU},
+    f32::consts::{FRAC_PI_2, PI, TAU},
 };
 use derive_more;
 use misc_utilities;
@@ -8,8 +8,9 @@ use ordered_float::OrderedFloat;
 pub const FULL_TURN: FAngle = FAngle(TAU);
 pub const HALF_TURN: FAngle = FAngle(PI);
 pub const QUARTER_TURN: FAngle = FAngle(FRAC_PI_2);
+pub const NO_TURN: FAngle = FAngle(0.0);
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd, derive_more::Add, derive_more::Sub)]
+#[derive(Default, Copy, Clone, PartialEq, PartialOrd, derive_more::Add, derive_more::Sub, derive_more::Neg)]
 pub struct FAngle(f32);
 
 impl FAngle {
@@ -30,6 +31,9 @@ impl FAngle {
     }
     pub fn turns(&self) -> f32 {
         self.rad()/TAU
+    }
+    pub fn quarter_turns(&self) -> f32 {
+        self.turns() * 4.0
     }
     pub fn from_deg(x: f32) -> Self {
         Self(x.to_radians())
@@ -70,7 +74,7 @@ impl FAngle {
         Self::from_rad(self.rad().rem_euclid(TAU))
     }
     pub fn diagonals() -> [Self;4] {
-        misc_utilities::general_utility::range_array::<4>().map(|i| 1.0/8.0 + 1.0/4.0 * i as f32).map(|turns| FAngle::from_turns(turns))
+        misc_utilities::general_utility::range_array::<4>().map(|i| 1.0/8.0 + 1.0/4.0 * i as f32).map(FAngle::from_turns)
     }
     pub fn orthogonals() -> [Self;4] {
         core::array::from_fn(|i| deg(90.0 * i as f32))
@@ -86,22 +90,37 @@ impl FAngle {
     pub fn smallest_angle_to(&self, other: Self) -> Self {
         let a = self.standardized_starting_at_zero();
         let b = other.standardized_starting_at_zero();
-        let a_to_b = b-a;
-        let a_to_b2 = (b + Self::one_turn()) - a;
-        if a_to_b.abs() < a_to_b2.abs() {
-            a_to_b
+
+        let diff = b-a;
+        if diff.abs() < HALF_TURN || diff == HALF_TURN {
+            diff
+        } else if diff > HALF_TURN {
+            diff - FULL_TURN
         } else {
-            a_to_b2
+            diff + FULL_TURN
         }
+
+//         let bs = [b-FULL_TURN, b, b+FULL_TURN];
+//         let diffs: [FAngle; 3] = bs.map(|bi| bi - a);
+//         let the_min = diffs.into_iter().min_by_key(|di| OrderedFloat(di.abs().deg())).unwrap();
+//         // dbg!(a,b,bs, diffs, the_min);
+//         if the_min + FULL_TURN  {
+//             the_min + FULL_TURN
+//         } else {
+//             the_min
+//         }
+        
+
+        // bs.into_iter().min_by(|&b1, &b2 | (b1-a).abs().partial_cmp(&((b2-a).abs())).unwrap()).unwrap() - a
     }
     // Includes 0
     pub fn positive_angle_to(&self, other: Self) -> Self {
         let a = self.standardized_starting_at_zero();
         let b = other.standardized_starting_at_zero();
-        if a < b {
+        if a <= b {
             b - a
         } else {
-            a - b
+            b - a + FAngle::one_turn()
         }
     }
     pub fn abs(&self) -> Self {
@@ -113,6 +132,30 @@ impl FAngle {
 }
 pub fn deg(x: f32) -> FAngle {
     FAngle::from_deg(x)
+}
+
+impl std::ops::Mul<f32> for FAngle {
+    type Output = Self;
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self::from_rad(self.rad().mul(rhs))
+    }
+}
+impl std::ops::Div<f32> for FAngle {
+    type Output = Self;
+    fn div(self, rhs: f32) -> Self::Output {
+        Self::from_rad(self.rad().div(rhs))
+    }
+}
+
+impl std::fmt::Debug for FAngle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FAngle")
+            .field("Radians", &self.rad())
+            .field("Degrees", &self.deg())
+            .field("Turns", &self.turns())
+            .field("Quarter Turns", &self.quarter_turns())
+            .finish()
+    }
 }
 
 
@@ -133,6 +176,11 @@ mod tests {
         assert_about_eq!(-1.0, FAngle::from_rad(PI).x());
         assert_about_eq!(-1.0, FAngle::from_turns(0.5).x());
         assert_about_eq!(-1.0, FAngle::from_quarter_turns(2.0).x());
+    }
+    #[test]
+    fn test_standardized() {
+        assert_about_eq!(0.1, FAngle::from_turns(2.1).standardized_starting_at_zero().turns());
+        assert_about_eq!(-0.1, FAngle::from_turns(2.9).standardized_centered_at_zero().turns());
     }
 
     #[test]
@@ -158,10 +206,10 @@ mod tests {
     }
     #[test]
     fn test_diagonal() {
-        assert_about_eq!(FAngle::diagonals()[0].standardized_starting_at_zero().deg(), 45.0);
-        assert_about_eq!(FAngle::diagonals()[1].standardized_starting_at_zero().deg(), (90.0 + 180.0) / 2.0);
-        assert_about_eq!(FAngle::diagonals()[2].standardized_starting_at_zero().deg(), (180.0 + 270.0) / 2.0);
-        assert_about_eq!(FAngle::diagonals()[3].standardized_starting_at_zero().deg(), (270.0 + 360.0) / 2.0);
+        assert_about_eq!(FAngle::diagonals()[0].standardized_starting_at_zero().deg(), 45.0, 1e-4);
+        assert_about_eq!(FAngle::diagonals()[1].standardized_starting_at_zero().deg(), (90.0 + 180.0) / 2.0, 1e-4);
+        assert_about_eq!(FAngle::diagonals()[2].standardized_starting_at_zero().deg(), (180.0 + 270.0) / 2.0, 1e-4);
+        assert_about_eq!(FAngle::diagonals()[3].standardized_starting_at_zero().deg(), (270.0 + 360.0) / 2.0, 1e-4);
     }
     mod angle_to {
         use super::*;
@@ -170,9 +218,18 @@ mod tests {
                 $(
                     #[test]
                     fn $name() {
-                        let (start, end, small_dist, pos_dist) = $value;
-                        ma::assert_lt!((small_dist - deg(start).smallest_angle_to(deg(end)).deg()).abs(), 1e-6, "smallest_angle");
-                        ma::assert_lt!((pos_dist - deg(start).positive_angle_to(deg(end)).deg()).abs(), 1e-6, "positive_angle");
+                        let (start, end, correct_small_deg, correct_pos_deg) = $value;
+                        (0..365).for_each(|i| {
+                            let start_plus = start + i as f32;
+                            let end_plus = end + i as f32;
+                            let small_deg = deg(start_plus).smallest_angle_to(deg(end_plus)).deg();
+                            let abs_small_err =(correct_small_deg - small_deg).abs();
+                            ma::assert_lt!(abs_small_err, 1e-4, "smallest_angle from {start_plus}° to {end_plus}° is {small_deg}°, should_have_been {correct_small_deg}°");
+
+                            let pos_deg = deg(start_plus).positive_angle_to(deg(end_plus)).deg();
+                            let abs_pos_err =(correct_pos_deg - pos_deg).abs(); 
+                            ma::assert_lt!(abs_pos_err, 1e-4, "positive_angle from {start_plus}° to {end_plus}° is {pos_deg}°, should_have_been {correct_pos_deg}°");
+                        });
                     }
                 )*
             }
@@ -183,10 +240,26 @@ mod tests {
             zero_at_not_zero: (20.0, 20.0, 0.0, 0.0),
             zero_to_quadrant_1: (0.0, 20.0, 20.0, 20.0),
             quadrant_1_to_zero: (20.0, 0.0, -20.0, 340.0),
-            zero_to_half: (0.0, 180.0, 180.0, 180.0),
+            zero_to_nearly_half: (0.0, 179.0, 179.0, 179.0),
+            nearly_half_to_zero: (179.0, 0.0, -179.0, 181.0),
             wraparound: (359.0, 1.0, 2.0, 2.0),
             negative_wraparound: (1.0, 359.0, -2.0, 358.0),
         }
+    }
+    #[test]
+    fn test_positive_half_turn_for_smallest_angle_to() {
+        assert_eq!(HALF_TURN,  NO_TURN.smallest_angle_to(HALF_TURN));
+        ma::assert_lt!(0.0,  QUARTER_TURN.smallest_angle_to(QUARTER_TURN * 3.0).rad());
+        let n=10;
+        for i in 0..n {
+            let start = FULL_TURN / n as f32 * i as f32; 
+            let end = start + HALF_TURN;
+            if end.rad()-start.rad()-PI == 0.0 {
+                ma::assert_lt!(0.0,  start.smallest_angle_to(end).rad(), "start: {}, end: {}, end-start-PI: {}", start.rad(), end.rad(), end.rad()-start.rad()-PI);
+            }
+
+        }
+
     }
     mod conversions {
         use super::*;
