@@ -1,6 +1,6 @@
 // use crate::utility::*;
 use crate::ortho_angle::OrthoAngle;
-use iter_tools::collect_vec;
+use itertools::Itertools;
 
 pub trait QuarterTurnRotatable: Sized {
     // TODO: pass reference?

@@ -7,7 +7,7 @@ use num;
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign, derive_more::Add, derive_more::Sub)]
 pub struct OrthoAngle(i32);
 
-impl Operations for OrthoAngle
+impl OrthoAngleOperations for OrthoAngle
 where
     Self: Sized,
 {
@@ -23,11 +23,11 @@ impl QuarterTurnRotatable for OrthoAngle {
         &self,
         quarter_turns_ccw: OrthoAngle
     ) -> Self {
-        self + quarter_turns_ccw
+        *self + quarter_turns_ccw
     }
 }
 
-pub trait Operations:
+pub trait OrthoAngleOperations:
     Sized
     // + std::ops::Sub<NormalizedOrthoAngle, Output = Self>
     // + std::ops::Add<NormalizedOrthoAngle, Output = Self>
@@ -35,9 +35,9 @@ pub trait Operations:
     + std::ops::Add
     + QuarterTurnRotatable
     + Copy
-    + Into<NormalizedOrthoAngle>
+    // + Into<NormalizedOrthoAngle>
 {
-    fn from_quarter_turns_ccw(quarter_turns: i32) -> Self;
+    fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self;
     fn quarter_turns_ccw(&self) -> i32;
     fn normalized(&self) -> NormalizedOrthoAngle {
         NormalizedOrthoAngle::from_quarter_turns_ccw(self.quarter_turns_ccw())
@@ -195,6 +195,11 @@ macro_rules! impl_ops_for_OrthoAngles {
 impl From<NormalizedOrthoAngle> for OrthoAngle {
     fn from(value: NormalizedOrthoAngle) -> Self {
         value.quarter_turns_ccw().into()
+    }
+}
+impl From<i32> for OrthoAngle {
+    fn from(value: i32) -> Self {
+        Self::from_quarter_turns_ccw(value)
     }
 }
 
