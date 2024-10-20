@@ -10,6 +10,7 @@ ntest.workspace = true
 more-asserts.workspace = true
 derive_more.workspace = true
 misc_utilities.workspace = true
-# num.workspace = true
+num.workspace = true
 ordered-float.workspace = true
+itertools.workspace = true
 
