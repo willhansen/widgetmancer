@@ -1,4 +1,5 @@
-use crate::utility::*;
+// use crate::utility::*;
+use crate::ortho_angle;
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
@@ -14,8 +15,8 @@ where
     }
 }
 
-impl From<OrthoAngle> for NormalizedOrthoAngle {
-    fn from(value: OrthoAngle) -> Self {
+impl From<ortho_angle::OrthoAngle> for NormalizedOrthoAngle {
+    fn from(value: ortho_angle::OrthoAngle) -> Self {
         value.normalized()
     }
 }

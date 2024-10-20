@@ -1,8 +1,9 @@
-use crate::utility::*;
+// use crate::utility::*;
+use crate::normalized_ortho_angle::NormalizedOrthoAngle;
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct OrthoAngle(i32);
-impl ortho_angle::Operations for OrthoAngle
+impl Operations for OrthoAngle
 where
     Self: Sized,
 {
@@ -16,10 +17,10 @@ where
 
 pub trait Operations:
     Sized
-    + Sub<NormalizedOrthoAngle, Output = Self>
-    + Add<NormalizedOrthoAngle, Output = Self>
-    + Sub
-    + Add
+    + std::ops::Sub<NormalizedOrthoAngle, Output = Self>
+    + std::ops::Add<NormalizedOrthoAngle, Output = Self>
+    + std::ops::Sub
+    + std::ops::Add
     + QuarterTurnRotatable
     + Copy
     + Into<NormalizedOrthoAngle>

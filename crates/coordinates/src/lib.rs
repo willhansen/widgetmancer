@@ -1,6 +1,7 @@
 // automod::dir!(pub "src/coordinates");
 mod coordinates;
 use crate::coordinates::coordinate::*;
+use angles::normalized_ortho_angle::NormalizedOrthoAngle;
 
 // pub_use!(
 //     // float_coordinate,

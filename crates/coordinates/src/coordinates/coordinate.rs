@@ -1,8 +1,9 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use misc_utilities::euclid_zero_one_traits::{FancyZero, FancyOne};
 use misc_utilities::trait_alias;
-use angles::*;
-use num;
+use angles::float_angle::FAngle; use num;
+use ordered_float::OrderedFloat;
+use itertools::Itertools;
 // use std::num;
 
 // TODO: is this just a scalar?
@@ -120,7 +121,7 @@ pub trait Coordinate:
         let onto = onto.into();
         onto * (self.dot(onto) / onto.square_length())
     }
-    fn points_sorted_along_axis(points: impl IntoIterator<Item = Self>, axis: impl angular_units::Angle) -> impl IntoIterator<Item = Self> {
+    fn points_sorted_along_axis(points: impl IntoIterator<Item = Self>, axis: FAngle) -> impl IntoIterator<Item = Self> {
         // TODO: panic if there's a nan.
         points.into_iter().sorted_by_key(|&point|OrderedFloat(point.position_on_axis(axis)))
     }
@@ -132,7 +133,7 @@ pub trait Coordinate:
         self.x() == Self::T::zero() || self.y() == Self::T::zero()
     }
     fn is_diagonal(&self) -> bool {
-        abs(self.x()) == abs(self.y())
+        self.x().abs() == self.y().abs()
     }
     fn is_orthodiagonal(&self) -> bool {
         self.is_orthogonal() || self.is_diagonal()
@@ -141,25 +142,8 @@ pub trait Coordinate:
         self.square_length() == Self::T::one()
     }
 }
-impl<T, U> Operations for Vector2D<T, U>
-where
-    T: DataTypeReqs,
-{
-    type DataType = T;
 
-    fn x(&self) -> T {
-        self.x
-    }
-
-    fn y(&self) -> T {
-        self.y
-    }
-
-    fn new(x: T, y: T) -> Self {
-        coord2(x, y)
-    }
-}
-
+#[derive(Default, Copy, Clone, PartialEq, derive_more::Add, derive_more::Sub, derive_more::Neg)]
 pub struct Coord2<T: DataTypeReqs>([T;2]);
 
 pub const fn coord2<T>(x: T, y: T) -> Coord2<T>
@@ -169,3 +153,21 @@ where
     Coord2([x, y])
 }
 
+impl<DataType> Coordinate for Coord2<DataType>
+where
+    DataType: DataTypeReqs,
+{
+    type T = DataType;
+
+    fn x(&self) -> Self::T {
+        self.x
+    }
+
+    fn y(&self) -> Self::T {
+        self.y
+    }
+
+    fn new(x: Self::T, y: Self::T) -> Self {
+        coord2(x, y)
+    }
+}
