@@ -4,13 +4,14 @@ use misc_utilities::trait_alias;
 use angles::float_angle::FAngle; use num;
 use ordered_float::OrderedFloat;
 use itertools::Itertools;
+use geo::Coord;
 // use std::num;
 
 // TODO: is this just a scalar?
 // Not quite.  Keeping the door open to points and relativity means that subtraction and addition
 // might not be exactly among the same types.
 // Multiplication between things of different units might also complicate it.
-trait_alias!(pub trait DataTypeReqs = Clone + std::fmt::Debug + PartialEq + Copy + PartialOrd + std::fmt::Display + FancyZero + FancyOne);// + num::NumCast);
+trait_alias!(pub trait DataTypeReqs = geo::CoordNum);
 
 
 // macro_rules! make_coordinate_datatype_cast_function {
@@ -24,7 +25,7 @@ trait_alias!(pub trait DataTypeReqs = Clone + std::fmt::Debug + PartialEq + Copy
 //     };
 // }
 
-pub trait Coordinate:
+pub trait CoordinateTrait:
     Copy
     + PartialEq
     + Add<Self, Output = Self>
@@ -35,7 +36,8 @@ pub trait Coordinate:
     + FancyZero
     + Sized
     + std::fmt::Debug
-    + std::fmt::Display
+    // + std::fmt::Display
+    + geo::CoordNum
     // + From<(Self::T, Self::T)>
 // + IntoIterator + FromIterator // TODO
 {
@@ -143,17 +145,17 @@ pub trait Coordinate:
     }
 }
 
-#[derive(Default, Copy, Clone, PartialEq, derive_more::Add, derive_more::Sub, derive_more::Neg)]
-pub struct Coord2<T: DataTypeReqs>([T;2]);
+// #[derive(Default, Copy, Clone, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg)]
+// pub struct Coord2<T: DataTypeReqs>([T;2]);
 
-pub const fn coord2<T>(x: T, y: T) -> Coord2<T>
-where
-    T: DataTypeReqs,
-{
-    Coord2([x, y])
-}
+// pub const fn coord2<T>(x: T, y: T) -> Coord2<T>
+// where
+//     T: DataTypeReqs,
+// {
+//     Coord2([x, y])
+// }
 
-impl<DataType> Coordinate for Coord2<DataType>
+impl<DataType> CoordinateTrait for Coord<DataType>
 where
     DataType: DataTypeReqs,
 {

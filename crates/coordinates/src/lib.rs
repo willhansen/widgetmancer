@@ -2,6 +2,10 @@
 mod coordinates;
 use crate::coordinates::coordinate::*;
 use angles::normalized_ortho_angle::NormalizedOrthoAngle;
+use angles::ortho_angle::{OrthoAngleOperations, OrthoAngle};
+use angles::float_angle::FAngle;
+use geo::Coord;
+use geo::coord;
 
 // pub_use!(
 //     // float_coordinate,
@@ -30,14 +34,17 @@ use std::{
 // use rand::{rngs::StdRng, Rng};
 // use static_assertions::{assert_impl_all, assert_not_impl_any};
 
+fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
+    coord!{x: x, y: y}
+}
 
-pub type ICoord2 = Coord2<i32>;
-pub type FCoord2 = Coord2<f32>;
+pub type ICoord = Coord<i32>;
+pub type FCoord = Coord<f32>;
 
-pub const DOWN_I: ICoord2 = coord2(0, -1);
-pub const UP_I: ICoord2 = coord2(0, 1);
-pub const LEFT_I: ICoord2 = coord2(-1, 0);
-pub const RIGHT_I: ICoord2 = coord2(1, 0);
+pub const DOWN_I: ICoord = coord(0, -1);
+pub const UP_I: ICoord = coord(0, 1);
+pub const LEFT_I: ICoord = coord(-1, 0);
+pub const RIGHT_I: ICoord = coord(1, 0);
 
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket? // TODO: replace these with versions that properly incorporate addition and subtraction relativity #[derive( Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg, )]
@@ -65,23 +72,25 @@ pub const RIGHT_I: ICoord2 = coord2(1, 0);
 // }
 
 
-impl<T, U> From<NormalizedOrthoAngle> for Vector2D<T, U>
-where
-    T: coordinate::DataTypeReqs + num::Signed,
-{
-    fn from(value: NormalizedOrthoAngle) -> Self {
-        let (x, y) = value.xy();
-        coord2(x, y)
-    }
-}
-impl<T, U> From<OrthogonalDirection> for Vector2D<T, U>
-where
-    T: coordinate::DataTypeReqs + num::Signed,
-{
-    fn from(value: OrthogonalDirection) -> Self {
-        value.angle().into()
-    }
-}
+// impl<O, T> From<O> for Coord<T>
+// where
+//     O: OrthoAngleOperations,
+//     T: DataTypeReqs + num::Signed,
+// {
+//     fn from(value: O) -> Self {
+//         let (x, y) = value.xy();
+//         coord(x, y)
+//     }
+// }
+
+// impl<T> From<OrthogonalDirection> for Coord<T>
+// where
+//     T: coordinate::DataTypeReqs + num::Signed,
+// {
+//     fn from(value: OrthogonalDirection) -> Self {
+//         value.angle().into()
+//     }
+// }
 
 
 
@@ -147,17 +156,17 @@ where
 
 
 
-pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    point2(sign_f32(point.x()), sign_f32(point.y()))
-}
+// pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
+//     point2(sign_f32(point.x()), sign_f32(point.y()))
+// }
 
-pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
-    point - point.round()
-}
+// pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
+//     point - point.round()
+// }
 
 
 // TODO: make a coordinates method
-pub fn get_8_octant_transforms_of<PointType: signed_coordinate::Operations>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: CoordNum>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()
@@ -173,21 +182,21 @@ pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
     new_v
 }
 #[deprecated(note = "coordinates::king_length instead")]
-pub fn king_step_distance<U>(step: Vector2D<i32, U>) -> u32 {
+pub fn king_step_distance(step: ICoord) -> u32 {
     step.x().abs().max(step.y().abs()) as u32
 }
 #[deprecated(note = "coordinates::king_length instead")]
-pub fn king_move_distance<U>(step: Vector2D<f32, U>) -> f32 {
+pub fn king_move_distance(step: FCoord) -> f32 {
     step.x().abs().max(step.y().abs())
 }
 
-pub fn round_to_king_step(step: WorldStep) -> WorldStep {
+pub fn round_to_king_step(step: ICoord) -> ICoord {
     if step.square_length() == 0 {
         return step;
     }
     let radians_from_plus_x = step.to_f32().better_angle_from_x_axis();
     let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
-    let rounded_radians_from_plus_x = Angle::radians(eighth_steps_from_plus_x * TAU / 8.0);
+    let rounded_radians_from_plus_x = FAngle::radians(eighth_steps_from_plus_x * TAU / 8.0);
 
     let float_step = Vector2D::<f32, SquareGridInWorldFrame>::from_angle_and_length(
         rounded_radians_from_plus_x,
@@ -211,9 +220,9 @@ pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdR
 pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
     seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
-pub fn random_unit_vector() -> FCoord2 {
+pub fn random_unit_vector() -> FCoord {
     let angle = random_angle();
-    FCoord2::unit_vector_from_angle(angle)
+    FCoord::unit_vector_from_angle(angle)
 }
 
 pub fn revolve_square(
