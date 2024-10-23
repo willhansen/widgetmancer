@@ -1,6 +1,6 @@
-// automod::dir!(pub "src/coordinates");
-mod coordinates;
-use crate::coordinates::coordinate::*;
+automod::dir!(pub "src");
+// mod coordinates;
+use crate::coordinate::*;
 use angles::normalized_ortho_angle::NormalizedOrthoAngle;
 use angles::ortho_angle::{OrthoAngleOperations, OrthoAngle};
 use angles::float_angle::FAngle;
@@ -166,7 +166,7 @@ pub const RIGHT_I: ICoord = coord(1, 0);
 
 
 // TODO: make a coordinates method
-pub fn get_8_octant_transforms_of<PointType: CoordNum>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: CoordinateTrait>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()

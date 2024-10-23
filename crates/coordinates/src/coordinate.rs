@@ -37,7 +37,7 @@ pub trait CoordinateTrait:
     + Sized
     + std::fmt::Debug
     // + std::fmt::Display
-    + geo::CoordNum
+    // + geo::CoordNum
     // + From<(Self::T, Self::T)>
 // + IntoIterator + FromIterator // TODO
 {
