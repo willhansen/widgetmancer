@@ -2,6 +2,8 @@ use map_macro::hash_set;
 use crate::signed_coordinate;
 use misc_utilities::general_utility::any_true;
 use std::collections::HashSet;
+use angles::float_angle::FAngle;
+use angles::ortho_angle::OrthoAngle;
 
 
 // use crate::utility::*;
@@ -26,18 +28,18 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = 
     fn round(&self) -> Self {
         Self::new(self.x().round(), self.y().round())
     }
-    fn from_angle_and_length(angle: Angle<f32>, length: f32) -> Self {
+    fn from_angle_and_length(angle: FAngle, length: f32) -> Self {
         Self::new(length * angle.radians.cos(), length * angle.radians.sin())
     }
 
-    fn rotate_around_point(&self, axis_point: Self, angle: Angle<f32>) -> Self {
+    fn rotate_around_point(&self, axis_point: Self, angle: FAngle) -> Self {
         axis_point + (*self - axis_point).rotate_vect(angle)
     }
 
-    fn unit_vector_from_angle(angle: Angle<f32>) -> Self {
+    fn unit_vector_from_angle(angle: FAngle) -> Self {
         Self::new(angle.radians.cos(), angle.radians.sin())
     }
-    fn rotate_vect(&self, delta_angle: Angle<f32>) -> Self {
+    fn rotate_vect(&self, delta_angle: FAngle) -> Self {
         let start_angle = self.better_angle_from_x_axis();
         let new_angle = start_angle + delta_angle;
         Self::from_angle_and_length(new_angle, self.length())
@@ -51,7 +53,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = 
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
     }
-    fn angle_to(&self, other: Self) -> Angle<f32> {
+    fn angle_to(&self, other: Self) -> FAngle {
         self.better_angle_from_x_axis()
             .angle_to(other.better_angle_from_x_axis())
     }
