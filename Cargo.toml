@@ -9,6 +9,7 @@ edition = "2021"
 # local
 misc_utilities = { path = "./crates/misc_utilitites", version = "0.0.0"}
 angles = { path = "./crates/angles", version = "0.0.0"}
+coordinates = { path = "./crates/coordinates", version = "0.0.0"}
 
 # non-local
 approx = "0.5.1"

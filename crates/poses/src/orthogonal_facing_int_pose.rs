@@ -373,3 +373,89 @@ where
         (value.square, value.direction())
     }
 }
+
+// TODO: Add tolerance?
+// TODO: Was in float_coordinates.  Need to adapt
+// fn on_same_square_face(&self, other: Self) -> bool {
+//     HashSet::<OrthogonalFacingIntPose<Self::OnGrid>>::from_iter(self.touched_square_faces())
+//         .intersection(&HashSet::from_iter(other.touched_square_faces()))
+//         .count()
+//         > 0
+// }
+// // TODO: Add tolerance?
+// fn touched_square_faces(&self) -> HashSet<OrthogonalFacingIntPose<Self::OnGrid>> {
+//     let on_border_by_axis = [0, 1].map(|i| self.on_square_border_on_axis(i));
+//     match on_border_by_axis {
+//         [true, true] => [-1, 1]
+//             .into_iter()
+//             .cartesian_product([-1, 1])
+//             .flat_map(|(x_nudge, y_nudge)| {
+//                 let nudge_vector = Self::OnGrid::new(x_nudge, y_nudge);
+//                 let offset_point = *self + nudge_vector.to_f32() * 0.1;
+//                 let square = offset_point.snap_to_grid();
+//                 [
+//                     (square, NonZeroSign::try_from(-x_nudge).unwrap() * RIGHT).into(),
+//                     (square, NonZeroSign::try_from(-y_nudge).unwrap() * UP).into(),
+//                 ]
+//             })
+//             .collect(),
+//         [false, false] => hash_set![],
+//         [x_border, y_border] => {
+//             let border_axis_index = if x_border { 0 } else { 1 };
+//             let non_border_axis_index = 1 - border_axis_index;
+//             let normal_to_border = Self::nth_basis_vector(border_axis_index);
+//             let one_face = Face::from_square_and_dir(
+//                 (*self + normal_to_border * 0.1).snap_to_grid(),
+//                 -normal_to_border.nearest_orthogonal_direction(),
+//             );
+//             HashSet::from(one_face.both_sides_of_face())
+//         }
+//     }
+// }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_touched_square_faces() {
+        [
+            ((0.0, 0.0), hash_set![]),
+            ((0.5, 0.0), hash_set![(0, 0, RIGHT), (1, 0, LEFT)]),
+            ((-8.5, 0.0), hash_set![(-9, 0, RIGHT), (-8, 0, LEFT)]),
+            ((0.2, 0.5), hash_set![(0, 0, UP), (0, 1, DOWN)]),
+            (
+                (0.5, 0.5),
+                hash_set![
+                    (0, 0, RIGHT),
+                    (1, 0, LEFT),
+                    (0, 1, RIGHT),
+                    (1, 1, LEFT),
+                    (0, 0, UP),
+                    (0, 1, DOWN),
+                    (1, 0, UP),
+                    (1, 1, DOWN),
+                ],
+            ),
+            (
+                (-0.5, 0.5),
+                hash_set![
+                    (-1, 0, RIGHT),
+                    (0, 0, LEFT),
+                    (-1, 1, RIGHT),
+                    (0, 1, LEFT),
+                    (-1, 0, UP),
+                    (-1, 1, DOWN),
+                    (0, 0, UP),
+                    (0, 1, DOWN),
+                ],
+            ),
+        ]
+        .into_iter()
+        .for_each(|((x, y), faces)| {
+            let faces: HashSet<OrthogonalFacingIntPose<WorldSquare>> = map_into(faces).collect();
+            assert_eq!(WorldPoint::new(x, y).touched_square_faces(), faces);
+        })
+    }
+}

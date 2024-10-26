@@ -707,44 +707,4 @@ mod tests {
             );
         })
     }
-    #[test]
-    fn test_touched_square_faces() {
-        [
-            ((0.0, 0.0), hash_set![]),
-            ((0.5, 0.0), hash_set![(0, 0, RIGHT), (1, 0, LEFT)]),
-            ((-8.5, 0.0), hash_set![(-9, 0, RIGHT), (-8, 0, LEFT)]),
-            ((0.2, 0.5), hash_set![(0, 0, UP), (0, 1, DOWN)]),
-            (
-                (0.5, 0.5),
-                hash_set![
-                    (0, 0, RIGHT),
-                    (1, 0, LEFT),
-                    (0, 1, RIGHT),
-                    (1, 1, LEFT),
-                    (0, 0, UP),
-                    (0, 1, DOWN),
-                    (1, 0, UP),
-                    (1, 1, DOWN),
-                ],
-            ),
-            (
-                (-0.5, 0.5),
-                hash_set![
-                    (-1, 0, RIGHT),
-                    (0, 0, LEFT),
-                    (-1, 1, RIGHT),
-                    (0, 1, LEFT),
-                    (-1, 0, UP),
-                    (-1, 1, DOWN),
-                    (0, 0, UP),
-                    (0, 1, DOWN),
-                ],
-            ),
-        ]
-        .into_iter()
-        .for_each(|((x, y), faces)| {
-            let faces: HashSet<OrthogonalFacingIntPose<WorldSquare>> = map_into(faces).collect();
-            assert_eq!(WorldPoint::new(x, y).touched_square_faces(), faces);
-        })
-    }
 }

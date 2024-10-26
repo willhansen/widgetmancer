@@ -1,0 +1,23 @@
+[package]
+name = "poses"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+#internal
+misc_utilities.workspace = true
+angles.workspace = true
+coordinates.workspace = true
+
+#external
+# angular-units.workspace = true
+# automod.workspace = true
+# derive_more.workspace = true
+# num.workspace = true
+# ordered-float.workspace = true
+# itertools.workspace = true
+# geo.workspace = true
+# map-macro.workspace = true
+# static_assertions = "1.1.0"
+# line_drawing = "1.0"
+# euclid = "0.22.7"
