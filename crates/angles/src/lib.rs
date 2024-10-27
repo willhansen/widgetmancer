@@ -1,5 +1,14 @@
-pub mod float_angle;
-pub mod ortho_angle;
-pub mod normalized_ortho_angle;
-pub mod quarter_turn_rotatable;
-// pub use float_angle::*;
+mod float_angle;
+pub use float_angle::FAngle;
+
+mod ortho_angle;
+pub use ortho_angle::OrthoAngle;
+pub use ortho_angle::Operations as OrthoAngleOperations;
+
+mod normalized_ortho_angle;
+pub use normalized_ortho_angle::NormalizedOrthoAngle;
+
+mod quarter_turn_rotatable;
+pub use quarter_turn_rotatable::QuarterTurnRotatable;
+
+

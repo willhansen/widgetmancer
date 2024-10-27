@@ -25,7 +25,7 @@ trait_alias!(pub trait DataTypeReqs = geo::CoordNum);
 //     };
 // }
 
-pub trait CoordinateTrait:
+pub trait Operations:
     Copy
     + PartialEq
     + Add<Self, Output = Self>
@@ -155,7 +155,7 @@ pub trait CoordinateTrait:
 //     Coord2([x, y])
 // }
 
-impl<DataType> CoordinateTrait for Coord<DataType>
+impl<DataType> Operations for Coord<DataType>
 where
     DataType: DataTypeReqs,
 {

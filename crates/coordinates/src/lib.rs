@@ -1,9 +1,9 @@
-automod::dir!(pub "src");
+automod::dir!("src");
 // mod coordinates;
-use crate::coordinate::*;
-use angles::normalized_ortho_angle::NormalizedOrthoAngle;
-use angles::ortho_angle::{OrthoAngleOperations, OrthoAngle};
-use angles::float_angle::FAngle;
+pub use crate::coordinate::Operations as CoordinateOperations;
+
+use angles::*;
+use angles::FAngle;
 use geo::Coord;
 use geo::coord;
 
@@ -34,17 +34,12 @@ use std::{
 // use rand::{rngs::StdRng, Rng};
 // use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
+pub fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
     coord!{x: x, y: y}
 }
 
-pub type ICoord = Coord<i32>;
 pub type FCoord = Coord<f32>;
 
-pub const DOWN_I: ICoord = coord(0, -1);
-pub const UP_I: ICoord = coord(0, 1);
-pub const LEFT_I: ICoord = coord(-1, 0);
-pub const RIGHT_I: ICoord = coord(1, 0);
 
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket? // TODO: replace these with versions that properly incorporate addition and subtraction relativity #[derive( Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg, )]

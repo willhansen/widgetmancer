@@ -1,8 +1,8 @@
-pub use getset::CopyGetters;
-pub use itertools::Itertools;
-pub use ntest::assert_false;
-pub use std::ops::{Add, Sub};
-pub use std::{
+use getset::CopyGetters;
+use itertools::Itertools;
+use ntest::assert_false;
+use std::ops::{Add, Sub};
+use std::{
     collections::{HashMap, HashSet},
     f32::consts::{PI, TAU},
     fmt::{Debug, Display, Formatter},
@@ -12,10 +12,10 @@ pub use std::{
 };
 use try_partialord::TryMinMax;
 
-pub use derive_more::Neg;
+use derive_more::Neg;
 
-pub use num::Signed;
-pub use ordered_float::OrderedFloat;
+use num::Signed;
+use ordered_float::OrderedFloat;
 
 pub type SimpleResult = Result<(), ()>;
 pub type OkOrMessage = Result<(), String>;

@@ -1,4 +1,20 @@
 // use crate::utility::*;
+use crate::signed_coordinate;
+use core::hash::Hash;
+use geo::Coord;
+use crate::*;
+
+pub type ICoord = Coord<i32>;
+pub struct IntCoordinate(ICoord);
+
+impl IntCoordinate {
+    pub const DOWN: Self = Self(coord(0, -1));
+    pub const UP: Self = Self(coord(0, 1));
+    pub const LEFT: Self = Self(coord(-1, 0));
+    pub const RIGHT: Self = Self(coord(1, 0));
+
+}
+
 
 pub trait Operations:
     signed_coordinate::Operations<_DataType = i32, OnGrid = Self> + Hash + Eq

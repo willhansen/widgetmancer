@@ -7,7 +7,7 @@ use num;
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign, derive_more::Add, derive_more::Sub)]
 pub struct OrthoAngle(i32);
 
-impl OrthoAngleOperations for OrthoAngle
+impl Operations for OrthoAngle
 where
     Self: Sized,
 {
@@ -27,7 +27,7 @@ impl QuarterTurnRotatable for OrthoAngle {
     }
 }
 
-pub trait OrthoAngleOperations:
+pub trait Operations:
     Sized
     // + std::ops::Sub<NormalizedOrthoAngle, Output = Self>
     // + std::ops::Add<NormalizedOrthoAngle, Output = Self>

@@ -1,9 +1,12 @@
 use map_macro::hash_set;
-use crate::signed_coordinate;
 use misc_utilities::general_utility::any_true;
 use std::collections::HashSet;
 use angles::float_angle::FAngle;
 use angles::ortho_angle::OrthoAngle;
+use crate::orthogonal_direction::OrthogonalDirection;
+use misc_utilities::general_utility::*;
+use crate::signed_coordinate;
+use signed_coordinate::Operations as SignedCoordinateOperations;
 
 
 // use crate::utility::*;

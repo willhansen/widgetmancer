@@ -5,15 +5,16 @@ use derive_more;
 use misc_utilities;
 use ordered_float::OrderedFloat;
 
-pub const FULL_TURN: FAngle = FAngle(TAU);
-pub const HALF_TURN: FAngle = FAngle(PI);
-pub const QUARTER_TURN: FAngle = FAngle(FRAC_PI_2);
-pub const NO_TURN: FAngle = FAngle(0.0);
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, derive_more::Add, derive_more::Sub, derive_more::Neg)]
 pub struct FAngle(f32);
 
 impl FAngle {
+    pub const FULL_TURN: FAngle = FAngle(TAU);
+    pub const HALF_TURN: FAngle = FAngle(PI);
+    pub const QUARTER_TURN: FAngle = FAngle(FRAC_PI_2);
+    pub const NO_TURN: FAngle = FAngle(0.0);
+
     pub fn one_turn() -> Self {
         Self::from_turns(1.0)
     }
@@ -68,7 +69,7 @@ impl FAngle {
         self.rad().tan()
     }
     pub fn standardized_centered_at_zero(&self) -> Self {
-        (*self + HALF_TURN).standardized_starting_at_zero() - HALF_TURN
+        (*self + FAngle::HALF_TURN).standardized_starting_at_zero() - FAngle::HALF_TURN
     }
     pub fn standardized_starting_at_zero(&self) -> Self {
         Self::from_rad(self.rad().rem_euclid(TAU))
@@ -92,20 +93,20 @@ impl FAngle {
         let b = other.standardized_starting_at_zero();
 
         let diff = b-a;
-        if diff.abs() < HALF_TURN || diff == HALF_TURN {
+        if diff.abs() < FAngle::HALF_TURN || diff == FAngle::HALF_TURN {
             diff
-        } else if diff > HALF_TURN {
-            diff - FULL_TURN
+        } else if diff > FAngle::HALF_TURN {
+            diff - FAngle::FULL_TURN
         } else {
-            diff + FULL_TURN
+            diff + FAngle::FULL_TURN
         }
 
-//         let bs = [b-FULL_TURN, b, b+FULL_TURN];
+//         let bs = [b-FAngle::FULL_TURN, b, b+FAngle::FULL_TURN];
 //         let diffs: [FAngle; 3] = bs.map(|bi| bi - a);
 //         let the_min = diffs.into_iter().min_by_key(|di| OrderedFloat(di.abs().deg())).unwrap();
 //         // dbg!(a,b,bs, diffs, the_min);
-//         if the_min + FULL_TURN  {
-//             the_min + FULL_TURN
+//         if the_min + FAngle::FULL_TURN  {
+//             the_min + FAngle::FULL_TURN
 //         } else {
 //             the_min
 //         }
@@ -248,12 +249,12 @@ mod tests {
     }
     #[test]
     fn test_positive_half_turn_for_smallest_angle_to() {
-        assert_eq!(HALF_TURN,  NO_TURN.smallest_angle_to(HALF_TURN));
-        ma::assert_lt!(0.0,  QUARTER_TURN.smallest_angle_to(QUARTER_TURN * 3.0).rad());
+        assert_eq!(FAngle::HALF_TURN,  FAngle::NO_TURN.smallest_angle_to(FAngle::HALF_TURN));
+        ma::assert_lt!(0.0,  FAngle::QUARTER_TURN.smallest_angle_to(FAngle::QUARTER_TURN * 3.0).rad());
         let n=10;
         for i in 0..n {
-            let start = FULL_TURN / n as f32 * i as f32; 
-            let end = start + HALF_TURN;
+            let start = FAngle::FULL_TURN / n as f32 * i as f32; 
+            let end = start + FAngle::HALF_TURN;
             if end.rad()-start.rad()-PI == 0.0 {
                 ma::assert_lt!(0.0,  start.smallest_angle_to(end).rad(), "start: {}, end: {}, end-start-PI: {}", start.rad(), end.rad(), end.rad()-start.rad()-PI);
             }

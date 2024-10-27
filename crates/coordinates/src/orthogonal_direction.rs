@@ -1,7 +1,7 @@
 // use crate::utility::*;
 
 use angles::normalized_ortho_angle::NormalizedOrthoAngle;
-use angles::ortho_angle::{OrthoAngle, OrthoAngleOperations};
+use angles::ortho_angle::{OrthoAngle, Operations};
 use angles::float_angle::FAngle;
 use angles::quarter_turn_rotatable::QuarterTurnRotatable;
 
@@ -43,7 +43,7 @@ impl std::fmt::Display for OrthogonalDirection {
     }
 }
 
-impl<T: OrthoAngleOperations> From<T> for OrthogonalDirection {
+impl<T: Operations> From<T> for OrthogonalDirection {
     fn from(value: T) -> Self {
         value.dir()
     }
