@@ -1,11 +1,24 @@
-automod::dir!("src");
+// automod::dir!("src");
 // mod coordinates;
-pub use crate::coordinate::Operations as CoordinateOperations;
+mod coordinate;
+pub use coordinate::Operations as CoordinateOperations;
+
+mod int_coordinate;
+pub use int_coordinate::{ICoord, IntCoordinate, Operations as IntCoordinateOperations};
+mod float_coordinate;
+mod signed_coordinate;
+mod signed_int_coordinate;
+mod unsigned_coordinate;
+
+mod orthogonal_direction;
+mod king_direction;
+
+// TODO: move everything below this comment out of this file
 
 use angles::*;
 use angles::FAngle;
 use geo::Coord;
-use geo::coord;
+
 
 // pub_use!(
 //     // float_coordinate,
@@ -34,9 +47,6 @@ use std::{
 // use rand::{rngs::StdRng, Rng};
 // use static_assertions::{assert_impl_all, assert_not_impl_any};
 
-pub fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
-    coord!{x: x, y: y}
-}
 
 pub type FCoord = Coord<f32>;
 
@@ -160,221 +170,25 @@ pub type FCoord = Coord<f32>;
 // }
 
 
-// TODO: make a coordinates method
-pub fn get_8_octant_transforms_of<PointType: CoordinateTrait>(v: PointType) -> Vec<PointType> {
-    let transpose = PointType::new(v.y(), v.x());
-    vec![v, transpose]
-        .into_iter()
-        .map(|x| x.quadrant_rotations_going_ccw())
-        .flatten()
-        .collect()
-}
 
 
-pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
-    let mut new_v = v.clone();
-    new_v.reverse();
-    new_v
-}
-#[deprecated(note = "coordinates::king_length instead")]
-pub fn king_step_distance(step: ICoord) -> u32 {
-    step.x().abs().max(step.y().abs()) as u32
-}
-#[deprecated(note = "coordinates::king_length instead")]
-pub fn king_move_distance(step: FCoord) -> f32 {
-    step.x().abs().max(step.y().abs())
-}
-
-pub fn round_to_king_step(step: ICoord) -> ICoord {
-    if step.square_length() == 0 {
-        return step;
-    }
-    let radians_from_plus_x = step.to_f32().better_angle_from_x_axis();
-    let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
-    let rounded_radians_from_plus_x = FAngle::radians(eighth_steps_from_plus_x * TAU / 8.0);
-
-    let float_step = Vector2D::<f32, SquareGridInWorldFrame>::from_angle_and_length(
-        rounded_radians_from_plus_x,
-        1.5,
-    );
-    // 1.5 length to allow truncating down to 1 i32 in the diagonal case
-    // because 1.5/sqrt(2) > 1.0
-
-    // truncate towards zero intentionally
-    float_step.to_i32()
-}
-
-pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdRng, radius: f32) -> P {
-    let mut v = P::new(10.0, 10.0);
-    while v.square_length() > 1.0 {
-        v = P::new(rng.gen_range(-1.0..=1.0), rng.gen_range(-1.0..=1.0));
-    }
-    v * radius
-}
-
-pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
-    seeded_rand_radial_offset(&mut get_new_rng(), radius)
-}
-pub fn random_unit_vector() -> FCoord {
-    let angle = random_angle();
-    FCoord::unit_vector_from_angle(angle)
-}
-
-pub fn revolve_square(
-    moving_square: WorldSquare,
-    pivot_square: WorldSquare,
-    rotation: NormalizedOrthoAngle,
-) -> WorldSquare {
-    let rel_square = moving_square - pivot_square;
-    pivot_square + rotation.rotate_vector(rel_square)
-}
-#[deprecated(note = "use Vector2D's to_array function instead")]
-pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
-    match i {
-        0 => WorldStep::new(step.x, 0),
-        1 => WorldStep::new(0, step.y),
-        _ => panic!("Too many dimensions: {}", i),
-    }
-}
-
-#[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
-pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalDirection) -> i32 {
-    step.project_onto_vector(axis.to_step()).dot(axis.to_step())
-}
-
-pub fn assert_about_eq_2d<P: float_coordinate::Operations>(p1: P, p2: P) {
-    p1.check_about_eq(p2).unwrap();
-}
-pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
-    assert_ne!(faces[0], faces[1]);
-    assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(1)) {
-        faces
-    } else {
-        [faces[1], faces[0]]
-    }
-}
 
 
-pub fn cross_correlate_squares_with_steps(
-    squares: SquareSet,
-    steps: HashSet<WorldStep>,
-) -> HashMap<WorldSquare, u32> {
-    let mut step_count_map = HashMap::<WorldSquare, u32>::new();
-    squares.iter().for_each(|&square| {
-        steps
-            .iter()
-            .map(|&diagonal_step| square + diagonal_step)
-            .for_each(|step_square| *step_count_map.entry(step_square).or_default() += 1)
-    });
-    step_count_map
-}
-pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
-    assert!(dir.is_king_step());
-    if ORTHOGONAL_STEPS.contains(&dir) {
-        if dir.x != 0 {
-            HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
-        } else {
-            HashSet::from([dir + STEP_LEFT, dir + STEP_RIGHT])
-        }
-    } else {
-        let no_x = coord2(0, dir.y);
-        let no_y = coord2(dir.x, 0);
-        HashSet::from([no_x, no_y])
-    }
-}
-// TODO: move RigidlyTransformable to its own file to prevent super:: imports
-impl RigidlyTransformable for WorldSquare {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        revolve_square(*self, tf.start_pose.square(), tf.rotation()) + tf.translation()
-    }
-}
 
-impl QuarterTurnRotatable for Angle<f32> {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
-        standardize_angle_with_zero_mid(Angle::radians(
-            self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
-        ))
-    }
-}
-pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) -> [P; 2] {
-    assert!(points.len() >= 2);
-    let furthest = points
-        .iter()
-        .combinations(2)
-        .max_by_key(|two_points: &Vec<&P>| OrderedFloat((*two_points[0] - *two_points[1]).length()))
-        .unwrap();
-    let furthest_values: Vec<P> = furthest.into_iter().copied().collect();
-    furthest_values.try_into().unwrap()
-}
 
-pub fn three_points_are_clockwise<P>(a: P, b: P, c: P) -> bool
-where
-    P: signed_coordinate::Operations,
-    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
-{
-    let ab = b - a;
-    let ac = c - a;
-    ab.cross(ac) < P::DataType::zero()
-}
 
-pub fn two_points_are_ccw_with_origin<P: signed_coordinate::Operations>(a: P, b: P) -> bool
-where
-    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
-{
-    a.cross(b) > P::DataType::zero()
-}
 
-pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
-    if two_points_are_ccw_with_origin(v[0], v[1]) {
-        v
-    } else {
-        [v[1], v[0]]
-    }
-}
 
-pub fn opposite_angle(a: FAngle) -> FAngle {
-    a + FAngle::degrees(180.0)
-}
 
-pub fn check_vectors_in_ccw_order(
-    v: impl IntoIterator<Item = impl Into<WorldMove>>,
-) -> OkOrMessage {
-    v.into_iter()
-        .map(|x| x.into())
-        .tuple_windows()
-        .map(|(a, b)| match two_points_are_ccw_with_origin(a, b) {
-            true => Ok(()),
-            false => Err(format!(
-                "These two points not in order: \na: {}\nb: {}",
-                a.to_string(),
-                b.to_string()
-            )),
-        })
-        .collect()
-}
-pub fn on_line<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
-    let ab = b - a;
-    let ac = c - a;
-    ab.cross(ac) == P::DataType::zero()
-}
 
-pub fn on_line_in_this_order<P: float_coordinate::Operations>(a: P, b: P, c: P) -> bool {
-    on_line(a, b, c) && (a - b).length() < (a - c).length()
-}
 
-pub fn point_is_in_centered_unit_square_with_tolerance<U>(
-    point: impl Into<Point2D<f32, U>>,
-    tolerance: f32,
-) -> BoolWithPartial {
-    assert!(tolerance >= 0.0);
-    let vec = point.into();
-    BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
-}
 
-pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
-    <P::OnGrid as FancyZero>::zero().square_corners()
-}
+
+
+
+
+
+
 
 #[cfg(test)]
 mod tests {

@@ -66,3 +66,36 @@ where
         )
     }
 }
+
+// TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
+pub fn get_8_octant_transforms_of<PointType: CoordinateTrait>(v: PointType) -> Vec<PointType> {
+    let transpose = PointType::new(v.y(), v.x());
+    vec![v, transpose]
+        .into_iter()
+        .map(|x| x.quadrant_rotations_going_ccw())
+        .flatten()
+        .collect()
+}
+
+// TODO: why is this not just the negative operator?
+pub fn reversed<T: Copy>(v: Vec<T>) -> Vec<T> {
+    let mut new_v = v.clone();
+    new_v.reverse();
+    new_v
+}
+
+pub fn three_points_are_clockwise<P>(a: P, b: P, c: P) -> bool
+where
+    P: signed_coordinate::Operations,
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+{
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) < P::DataType::zero()
+}
+pub fn two_points_are_ccw_with_origin<P: signed_coordinate::Operations>(a: P, b: P) -> bool
+where
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+{
+    a.cross(b) > P::DataType::zero()
+}

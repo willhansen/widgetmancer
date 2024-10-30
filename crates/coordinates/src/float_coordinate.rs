@@ -78,3 +78,45 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = 
 
 // TODO: convert to auto trait when stable
 impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = f32, Floating = T> {}
+
+#[deprecated(note = "coordinates::king_length instead")]
+pub fn king_move_distance(step: FCoord) -> f32 {
+    step.x().abs().max(step.y().abs())
+}
+
+pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdRng, radius: f32) -> P {
+    let mut v = P::new(10.0, 10.0);
+    while v.square_length() > 1.0 {
+        v = P::new(rng.gen_range(-1.0..=1.0), rng.gen_range(-1.0..=1.0));
+    }
+    v * radius
+}
+
+pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+    seeded_rand_radial_offset(&mut get_new_rng(), radius)
+}
+
+pub fn random_unit_vector() -> FCoord {
+    let angle = random_angle();
+    FCoord::unit_vector_from_angle(angle)
+}
+pub fn assert_about_eq_2d<P: float_coordinate::Operations>(p1: P, p2: P) {
+    p1.check_about_eq(p2).unwrap();
+}
+pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) -> [P; 2] {
+    assert!(points.len() >= 2);
+    let furthest = points
+        .iter()
+        .combinations(2)
+        .max_by_key(|two_points: &Vec<&P>| OrderedFloat((*two_points[0] - *two_points[1]).length()))
+        .unwrap();
+    let furthest_values: Vec<P> = furthest.into_iter().copied().collect();
+    furthest_values.try_into().unwrap()
+}
+pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
+    if two_points_are_ccw_with_origin(v[0], v[1]) {
+        v
+    } else {
+        [v[1], v[0]]
+    }
+}

@@ -159,6 +159,49 @@ impl std::fmt::Debug for FAngle {
     }
 }
 
+impl QuarterTurnRotatable for Angle<f32> {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+        standardize_angle_with_zero_mid(Angle::radians(
+            self.radians + PI / 2.0 * quarter_turns_ccw.into().quarter_turns() as f32,
+        ))
+    }
+}
+
+pub fn opposite_angle(a: FAngle) -> FAngle {
+    a + FAngle::degrees(180.0)
+}
+
+
+pub fn check_vectors_in_ccw_order(
+    v: impl IntoIterator<Item = impl Into<WorldMove>>,
+) -> OkOrMessage {
+    v.into_iter()
+        .map(|x| x.into())
+        .tuple_windows()
+        .map(|(a, b)| match two_points_are_ccw_with_origin(a, b) {
+            true => Ok(()),
+            false => Err(format!(
+                "These two points not in order: \na: {}\nb: {}",
+                a.to_string(),
+                b.to_string()
+            )),
+        })
+        .collect()
+}
+pub fn on_line_in_this_order<P: float_coordinate::Operations>(a: P, b: P, c: P) -> bool {
+    on_line(a, b, c) && (a - b).length() < (a - c).length()
+}
+pub fn point_is_in_centered_unit_square_with_tolerance<U>(
+    point: impl Into<Point2D<f32, U>>,
+    tolerance: f32,
+) -> BoolWithPartial {
+    assert!(tolerance >= 0.0);
+    let vec = point.into();
+    BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
+}
+pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
+    <P::OnGrid as FancyZero>::zero().square_corners()
+}
 
 #[allow(non_snake_case)]
 #[cfg(test)]

@@ -1,19 +1,19 @@
 // use crate::utility::*;
-use crate::IntCoord;
+use crate::int_coordinate::IntCoordinate;
 use crate::orthogonal_direction::OrthogonalDirection;
 use angles::*;
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct KingDirection {
-    step: IntCoord,
+    step: IntCoordinate,
 }
 
 impl KingDirection {
-    pub fn new(dir: IntCoord) -> Self {
+    pub fn new(dir: IntCoordinate) -> Self {
         assert!(dir.is_king_step());
         KingDirection { step: dir }
     }
-    pub fn step(&self) -> IntCoord {
+    pub fn step(&self) -> IntCoordinate {
         self.step
     }
 }
@@ -31,14 +31,9 @@ impl QuarterTurnRotatable for KingDirection {
     }
 }
 
-impl From<IntCoord> for KingDirection {
-    fn from(value: IntCoord) -> Self {
+impl From<IntCoordinate> for KingDirection {
+    fn from(value: IntCoordinate) -> Self {
         KingDirection::new(value)
     }
 }
 
-impl From<KingDirection> for IntCoord {
-    fn from(value: KingDirection) -> Self {
-        value.step
-    }
-}

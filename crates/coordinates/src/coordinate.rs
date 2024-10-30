@@ -1,11 +1,16 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use misc_utilities::euclid_zero_one_traits::{FancyZero, FancyOne};
 use misc_utilities::trait_alias;
-use angles::float_angle::FAngle; use num;
+use angles::FAngle;
 use ordered_float::OrderedFloat;
 use itertools::Itertools;
 use geo::Coord;
+use geo::coord;
 // use std::num;
+
+pub fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
+    coord!{x: x, y: y}
+}
 
 // TODO: is this just a scalar?
 // Not quite.  Keeping the door open to points and relativity means that subtraction and addition
@@ -172,4 +177,9 @@ where
     fn new(x: Self::T, y: Self::T) -> Self {
         coord2(x, y)
     }
+}
+pub fn on_line<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
+    let ab = b - a;
+    let ac = c - a;
+    ab.cross(ac) == P::DataType::zero()
 }

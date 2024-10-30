@@ -391,9 +391,6 @@ impl Default for RigidTransform {
     }
 }
 
-pub trait RigidlyTransformable {
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
-}
 
 pub fn get_by_index<T>(vector: &Vec<T>, index: i32) -> &T {
     let index = if index < 0 {
