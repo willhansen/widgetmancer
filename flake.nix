@@ -27,6 +27,7 @@
             cargo-profiler
             cargo-nextest
             cargo-limit
+            # luarocks
           ];
           shellHook = "zsh";
         };

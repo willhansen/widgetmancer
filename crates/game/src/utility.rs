@@ -13,8 +13,7 @@ use euclid::num::{One, Zero};
 use line_drawing::{Bresenham, Point, Supercover};
 use ntest::about_eq;
 use num::traits::real::Real;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rgb::RGB8;
 
 use crate::glyph::glyph_constants::{
@@ -87,9 +86,6 @@ pub fn random_event(p: f32) -> bool {
     rand::thread_rng().gen_range(0.0..=1.0) < p
 }
 
-pub fn random_angle() -> Angle<f32> {
-    Angle::degrees(rand::thread_rng().gen_range(0.0..360.0))
-}
 
 pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()

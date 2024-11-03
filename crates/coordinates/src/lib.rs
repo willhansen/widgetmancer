@@ -6,6 +6,7 @@ pub use coordinate::Operations as CoordinateOperations;
 mod int_coordinate;
 pub use int_coordinate::{ICoord, IntCoordinate, Operations as IntCoordinateOperations};
 mod float_coordinate;
+pub use float_coordinate::{FCoord, Operations as FloatCoordinateOperations};
 mod signed_coordinate;
 mod signed_int_coordinate;
 mod unsigned_coordinate;
@@ -48,7 +49,6 @@ use std::{
 // use static_assertions::{assert_impl_all, assert_not_impl_any};
 
 
-pub type FCoord = Coord<f32>;
 
 
 
@@ -168,7 +168,6 @@ pub type FCoord = Coord<f32>;
 // pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 //     point - point.round()
 // }
-
 
 
 
@@ -381,47 +380,56 @@ mod tests {
             STEP_RIGHT.to_f32()
         ));
     }
-    #[test]
-    fn test_point_is_in_centered_unit_square__simple_true() {
-        assert!(
+    mod point_in_cus {
+        use super::*;
+        #[test]
+        fn simple_true() {
+            assert!(
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.0, 0.0), 0.0)
                 .is_true()
         )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__simple_false() {
-        assert!(
+        }
+        #[test]
+        fn simple_false() {
+            assert!(
             point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(5.0, 0.0), 0.0)
                 .is_false()
-        )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__outside_square__inside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.0), 0.2)
-                .is_partial()
-        )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__inside_square__inside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), 0.2)
-                .is_partial()
-        )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__outside_square_diagonally__inside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.51), 0.2)
-                .is_partial()
-        )
-    }
-    #[test]
-    fn test_point_is_in_centered_unit_square__inside_square_diagonally__inside_tolerance() {
-        assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
-                .is_partial()
-        )
+            )
+        }
+
+        mod inside_tolerance {
+            use super::*;
+            #[test]
+            fn outside_square() {
+                assert!(
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.0), 0.2)
+                    .is_partial()
+            )
+            }
+            #[test]
+            fn inside_square() {
+                assert!(
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), 0.2)
+                    .is_partial()
+            )
+            }
+            #[test]
+            fn outside_square_diagonally() {
+                assert!(
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.51), 0.2)
+                    .is_partial()
+            )
+            }
+            #[test]
+            fn inside_square_diagonally() {
+                assert!(
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
+                    .is_partial()
+            )
+            }
+        }
+
+
     }
     #[test]
     #[ignore = "Relativity is unimplemented for coordinates for the time being"]

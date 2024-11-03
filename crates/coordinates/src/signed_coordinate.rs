@@ -1,4 +1,6 @@
 // use crate::utility::*;
+use angles::*;
+use crate::coordinate;
 
 pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
@@ -92,10 +94,4 @@ where
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) < P::DataType::zero()
-}
-pub fn two_points_are_ccw_with_origin<P: signed_coordinate::Operations>(a: P, b: P) -> bool
-where
-    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
-{
-    a.cross(b) > P::DataType::zero()
 }

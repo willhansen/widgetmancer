@@ -1,13 +1,13 @@
 use map_macro::hash_set;
 use misc_utilities::general_utility::any_true;
 use std::collections::HashSet;
-use angles::float_angle::FAngle;
-use angles::ortho_angle::OrthoAngle;
-use crate::orthogonal_direction::OrthogonalDirection;
+use angles::*;
+use crate::*;
 use misc_utilities::general_utility::*;
-use crate::signed_coordinate;
 use signed_coordinate::Operations as SignedCoordinateOperations;
+use rand::{rngs::StdRng, Rng};
 
+pub type FCoord = Coord<f32>;
 
 // use crate::utility::*;
 
@@ -84,7 +84,7 @@ pub fn king_move_distance(step: FCoord) -> f32 {
     step.x().abs().max(step.y().abs())
 }
 
-pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdRng, radius: f32) -> P {
+pub fn seeded_rand_radial_offset<P: Operations>(rng: &mut StdRng, radius: f32) -> P {
     let mut v = P::new(10.0, 10.0);
     while v.square_length() > 1.0 {
         v = P::new(rng.gen_range(-1.0..=1.0), rng.gen_range(-1.0..=1.0));
@@ -92,7 +92,7 @@ pub fn seeded_rand_radial_offset<P: float_coordinate::Operations>(rng: &mut StdR
     v * radius
 }
 
-pub fn rand_radial_offset(radius: f32) -> default::Vector2D<f32> {
+pub fn rand_radial_offset(radius: f32) -> FCoord {
     seeded_rand_radial_offset(&mut get_new_rng(), radius)
 }
 

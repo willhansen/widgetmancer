@@ -1,9 +1,9 @@
 // use crate::utility::*;
 
-use angles::normalized_ortho_angle::NormalizedOrthoAngle;
-use angles::ortho_angle::{OrthoAngle, Operations};
-use angles::float_angle::FAngle;
-use angles::quarter_turn_rotatable::QuarterTurnRotatable;
+use angles::NormalizedOrthoAngle;
+use angles::{OrthoAngle, OrthoAngleOperations};
+use angles::FAngle;
+use angles::QuarterTurnRotatable;
 
 
 

@@ -1,16 +1,13 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
-use misc_utilities::euclid_zero_one_traits::{FancyZero, FancyOne};
-use misc_utilities::trait_alias;
 use angles::FAngle;
-use ordered_float::OrderedFloat;
-use itertools::Itertools;
-use geo::Coord;
 use geo::coord;
+use geo::Coord;
+use itertools::Itertools;
+use misc_utilities::euclid_zero_one_traits::{FancyOne, FancyZero};
+use misc_utilities::trait_alias;
+use misc_utilities::bool_with_partial::BoolWithPartial;
+use ordered_float::OrderedFloat;
+use std::ops::{Add, Div, Mul, Neg, Sub};
 // use std::num;
-
-pub fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
-    coord!{x: x, y: y}
-}
 
 // TODO: is this just a scalar?
 // Not quite.  Keeping the door open to points and relativity means that subtraction and addition
@@ -18,6 +15,16 @@ pub fn coord<T: geo::GeoNum> (x: T, y: T) -> geo::Coord<T> {
 // Multiplication between things of different units might also complicate it.
 trait_alias!(pub trait DataTypeReqs = geo::CoordNum);
 
+pub type Coord2<T> = geo::Coord<T>;
+
+
+pub fn coord<T: DataTypeReqs>(x: T, y: T) -> Coord2<T> {
+    coord! {x: x, y: y}
+}
+
+pub fn coord2<T: DataTypeReqs>(x: T, y: T) -> Coord2<T> {
+    coord(x, y)
+}
 
 // macro_rules! make_coordinate_datatype_cast_function {
 //     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -150,15 +157,6 @@ pub trait Operations:
     }
 }
 
-// #[derive(Default, Copy, Clone, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg)]
-// pub struct Coord2<T: DataTypeReqs>([T;2]);
-
-// pub const fn coord2<T>(x: T, y: T) -> Coord2<T>
-// where
-//     T: DataTypeReqs,
-// {
-//     Coord2([x, y])
-// }
 
 impl<DataType> Operations for Coord<DataType>
 where
@@ -178,8 +176,46 @@ where
         coord2(x, y)
     }
 }
-pub fn on_line<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
+pub fn on_line<P: Operations>(a: P, b: P, c: P) -> bool {
     let ab = b - a;
     let ac = c - a;
     ab.cross(ac) == P::DataType::zero()
+}
+
+pub fn two_points_are_ccw_with_origin<P: Operations>(a: P, b: P) -> BoolWithPartial
+where
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+{
+    BoolWithPartial::greater_than( a.cross(b) , P::DataType::zero())
+}
+
+pub fn check_vectors_in_ccw_order<T: DataTypeReqs>(
+    v: impl IntoIterator<Item = Coord2<T>>,
+) -> OkOrMessage {
+    v.into_iter()
+        .tuple_windows()
+        .map(|(a, b)| match two_points_are_ccw_with_origin(a, b) {
+            true => Ok(()),
+            false => Err(format!(
+                "These two points not in order: \na: {}\nb: {}",
+                a.to_string(),
+                b.to_string()
+            )),
+        })
+        .collect()
+}
+pub fn on_line_in_this_order<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
+    on_line(a, b, c) && (a - b).length() < (a - c).length()
+}
+
+pub fn point_is_in_centered_unit_square_with_tolerance<U>(
+    point: impl Into<Point2D<f32, U>>,
+    tolerance: f32,
+) -> BoolWithPartial {
+    assert!(tolerance >= 0.0);
+    let vec = point.into();
+    BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
+}
+pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
+    <P::OnGrid as FancyZero>::zero().square_corners()
 }

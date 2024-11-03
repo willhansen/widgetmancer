@@ -13,4 +13,5 @@ more-asserts.workspace = true
 ntest.workspace = true
 num.workspace = true
 ordered-float.workspace = true
+rand.workspace = true
 
