@@ -2,10 +2,13 @@ use angles::FAngle;
 use geo::coord;
 use geo::Coord;
 use itertools::Itertools;
-use misc_utilities::euclid_zero_one_traits::{FancyOne, FancyZero};
 use misc_utilities::trait_alias;
 use misc_utilities::bool_with_partial::BoolWithPartial;
+use misc_utilities::OkOrMessage;
 use ordered_float::OrderedFloat;
+use std::num;
+use crate::float_coordinate;
+use ::num::traits::Zero;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 // use std::num;
 
@@ -45,7 +48,7 @@ pub trait Operations:
     // + Mul<OnGridDataType<Self>, Output = Self> // TODO: stricter trait bounds
     + Mul<Self::T, Output = Self>
     + Div<Self::T, Output = Self>
-    + FancyZero
+    + Zero
     + Sized
     + std::fmt::Debug
     // + std::fmt::Display
@@ -119,8 +122,8 @@ pub trait Operations:
     // make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
     fn king_length(&self) -> Self::T {
-        let a = num::traits::abs(self.x());
-        let b = num::traits::abs(self.y());
+        let a = ::num::traits::abs(self.x());
+        let b = ::num::traits::abs(self.y());
         a.max(b)
         // max_for_partial_ord(a,b)
     }
@@ -184,7 +187,7 @@ pub fn on_line<P: Operations>(a: P, b: P, c: P) -> bool {
 
 pub fn two_points_are_ccw_with_origin<P: Operations>(a: P, b: P) -> BoolWithPartial
 where
-    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
+    P::T: PartialOrd, // TODO: should be implied by SignedCoordinate
 {
     BoolWithPartial::greater_than( a.cross(b) , P::DataType::zero())
 }
@@ -204,18 +207,18 @@ pub fn check_vectors_in_ccw_order<T: DataTypeReqs>(
         })
         .collect()
 }
-pub fn on_line_in_this_order<P: coordinate::Operations>(a: P, b: P, c: P) -> bool {
+pub fn on_line_in_this_order<P: Operations>(a: P, b: P, c: P) -> bool {
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
-pub fn point_is_in_centered_unit_square_with_tolerance<U>(
-    point: impl Into<Point2D<f32, U>>,
+pub fn point_is_in_centered_unit_square_with_tolerance(
+    point: impl Into<Coord2<f32>>,
     tolerance: f32,
 ) -> BoolWithPartial {
     assert!(tolerance >= 0.0);
     let vec = point.into();
-    BoolWithPartial::from_less_than_with_tolerance(king_move_distance(vec), 0.5, tolerance)
+    BoolWithPartial::from_less_than_with_tolerance(vec.king_length(), 0.5, tolerance)
 }
 pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
-    <P::OnGrid as FancyZero>::zero().square_corners()
+    <P::OnGrid as Zero>::zero().square_corners()
 }

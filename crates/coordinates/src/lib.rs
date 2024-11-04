@@ -1,10 +1,10 @@
 // automod::dir!("src");
 // mod coordinates;
 mod coordinate;
-pub use coordinate::Operations as CoordinateOperations;
+pub use coordinate::{Operations as CoordinateOperations, coord};
 
 mod int_coordinate;
-pub use int_coordinate::{ICoord, IntCoordinate, Operations as IntCoordinateOperations};
+pub use int_coordinate::{ICoord, Operations as IntCoordinateOperations};
 mod float_coordinate;
 pub use float_coordinate::{FCoord, Operations as FloatCoordinateOperations};
 mod signed_coordinate;
@@ -12,42 +12,14 @@ mod signed_int_coordinate;
 mod unsigned_coordinate;
 
 mod orthogonal_direction;
+pub use orthogonal_direction::OrthogonalDirection;
+
 mod king_direction;
+pub use king_direction::KingDirection;
 
 // TODO: move everything below this comment out of this file
 
-use angles::*;
-use angles::FAngle;
 use geo::Coord;
-
-
-// pub_use!(
-//     // float_coordinate,
-//     // int_coordinate,
-//     king_world_step,
-//     // signed_coordinate,
-//     // unsigned_coordinate,
-//     coordinate,
-// );
-
-// use map_macro::hash_set;
-use std::{
-    collections::{HashMap, HashSet},
-    f32::consts::{PI, TAU},
-    // fmt::Display,
-    // marker::PhantomData,
-    // ops::{Add, Div, Mul, Neg, Sub},
-};
-
-// use typenum::{Sum, Unsigned};
-
-// use derive_more;
-// use itertools::Itertools;
-// use num::{One, Signed, Zero};
-// use ordered_float::OrderedFloat;
-// use rand::{rngs::StdRng, Rng};
-// use static_assertions::{assert_impl_all, assert_not_impl_any};
-
 
 
 

@@ -3,20 +3,25 @@ use crate::signed_coordinate;
 use crate::king_direction::KingDirection;
 use core::hash::Hash;
 use geo::Coord;
-use crate::coordinate::*;
+use angles::*;
+// use crate::coordinate::*;
+use crate::*;
+use std::collections::{HashMap, HashSet};
 
 // use crate::*;
 
 pub type ICoord = Coord<i32>;
-pub struct IntCoordinate(ICoord);
 
-impl IntCoordinate {
-    pub const DOWN: Self = Self(coord(0, -1));
-    pub const UP: Self = Self(coord(0, 1));
-    pub const LEFT: Self = Self(coord(-1, 0));
-    pub const RIGHT: Self = Self(coord(1, 0));
+pub type GridSet = HashSet<ICoord>;
 
+pub trait ICoordConsts {
+    const UP: ICoord = coord(0, 1);
+    const DOWN: ICoord = coord(0, -1);
+    const RIGHT: ICoord = coord(1, 0);
+    const LEFT: ICoord = coord(-1, 0);
+    const ORTHOGONAL_STEPS: [ICoord; 4] = [Self::RIGHT, Self::UP, Self::LEFT, Self::DOWN];
 }
+impl ICoordConsts for ICoord {}
 
 
 pub trait Operations:
@@ -44,9 +49,12 @@ pub trait Operations:
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
 impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
 
-impl From<KingDirection> for IntCoordinate {
+// TODO: There's got to be an easier way to dodge the Orphan Rule
+pub trait FromKingDirectionable {}
+impl FromKingDirectionable for ICoord {}
+impl<T> From<KingDirection> for T where T: FromKingDirectionable {
     fn from(value: KingDirection) -> Self {
-        value.step
+        value.step()
     }
 }
 
@@ -60,10 +68,10 @@ pub fn round_to_king_step(step: ICoord) -> ICoord {
         return step;
     }
     let radians_from_plus_x = step.to_f32().better_angle_from_x_axis();
-    let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / TAU).round();
-    let rounded_radians_from_plus_x = FAngle::radians(eighth_steps_from_plus_x * TAU / 8.0);
+    let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / f32::consts::TAU).round();
+    let rounded_radians_from_plus_x = FAngle::radians(eighth_steps_from_plus_x * f32::consts::TAU / 8.0);
 
-    let float_step = Vector2D::<f32, SquareGridInWorldFrame>::from_angle_and_length(
+    let float_step = crate::FCoord::from_angle_and_length(
         rounded_radians_from_plus_x,
         1.5,
     );
@@ -75,31 +83,31 @@ pub fn round_to_king_step(step: ICoord) -> ICoord {
 }
 
 pub fn revolve_square(
-    moving_square: WorldSquare,
-    pivot_square: WorldSquare,
+    moving_square: ICoord,
+    pivot_square: ICoord,
     rotation: NormalizedOrthoAngle,
-) -> WorldSquare {
+) -> ICoord {
     let rel_square = moving_square - pivot_square;
     pivot_square + rotation.rotate_vector(rel_square)
 }
 
 #[deprecated(note = "use Vector2D's to_array function instead")]
-pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
+pub fn ith_projection_of_step(step: ICoord, i: u32) -> ICoord {
     match i {
-        0 => WorldStep::new(step.x, 0),
-        1 => WorldStep::new(0, step.y),
+        0 => ICoord::new(step.x, 0),
+        1 => ICoord::new(0, step.y),
         _ => panic!("Too many dimensions: {}", i),
     }
 }
 #[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
-pub fn distance_of_step_along_axis(step: WorldStep, axis: OrthogonalDirection) -> i32 {
+pub fn distance_of_step_along_axis(step: ICoord, axis: OrthogonalDirection) -> i32 {
     step.project_onto_vector(axis.to_step()).dot(axis.to_step())
 }
 pub fn cross_correlate_squares_with_steps(
-    squares: SquareSet,
-    steps: HashSet<WorldStep>,
-) -> HashMap<WorldSquare, u32> {
-    let mut step_count_map = HashMap::<WorldSquare, u32>::new();
+    squares: GridSet,
+    steps: GridSet,
+) -> HashMap<ICoord, u32> {
+    let mut step_count_map = HashMap::<ICoord, u32>::new();
     squares.iter().for_each(|&square| {
         steps
             .iter()
@@ -108,17 +116,17 @@ pub fn cross_correlate_squares_with_steps(
     });
     step_count_map
 }
-pub fn adjacent_king_steps(dir: WorldStep) -> StepSet {
+pub fn adjacent_king_steps(dir: ICoord) -> GridSet {
     assert!(dir.is_king_step());
-    if ORTHOGONAL_STEPS.contains(&dir) {
+    if ICoord::ORTHOGONAL_STEPS.contains(&dir) {
         if dir.x != 0 {
-            HashSet::from([dir + STEP_UP, dir + STEP_DOWN])
+            HashSet::from([dir + ICoord::UP, dir + ICoord::DOWN])
         } else {
-            HashSet::from([dir + STEP_LEFT, dir + STEP_RIGHT])
+            HashSet::from([dir + ICoord::LEFT, dir + ICoord::RIGHT])
         }
     } else {
-        let no_x = coord2(0, dir.y);
-        let no_y = coord2(dir.x, 0);
+        let no_x = coord(0, dir.y);
+        let no_y = coord(dir.x, 0);
         HashSet::from([no_x, no_y])
     }
 }

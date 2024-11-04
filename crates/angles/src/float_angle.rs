@@ -90,7 +90,7 @@ impl FAngle {
         Self::from_rad(self.rad().rem_euclid(TAU))
     }
     pub fn diagonals() -> [Self; 4] {
-        misc_utilities::general_utility::range_array::<4>()
+        misc_utilities::range_array::<4>()
             .map(|i| 1.0 / 8.0 + 1.0 / 4.0 * i as f32)
             .map(FAngle::from_turns)
     }

@@ -1,10 +1,8 @@
 use map_macro::hash_set;
-use misc_utilities::general_utility::any_true;
 use std::collections::HashSet;
 use angles::*;
 use crate::*;
-use misc_utilities::general_utility::*;
-use signed_coordinate::Operations as SignedCoordinateOperations;
+use misc_utilities::*;
 use rand::{rngs::StdRng, Rng};
 
 pub type FCoord = Coord<f32>;
