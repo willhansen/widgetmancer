@@ -1,6 +1,9 @@
 // use crate::utility::*;
 use angles::*;
 use crate::coordinate;
+use std::ops::Neg;
+use std::fmt::Debug;
+use crate::OrthogonalDirection;
 
 pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
@@ -33,21 +36,36 @@ pub trait Operations:
     fn stepped(&self, dir: OrthogonalDirection) -> Self {
         self.moved(dir, Self::DataType::one())
     }
-    fn moved(&self, dir: OrthogonalDirection, length: Self::DataType) -> Self {
+    fn moved(&self, dir: OrthogonalDirection, length: Self::_DataType) -> Self {
         *self + dir.to_step::<Self>() * length
     }
-    fn position_on_orthogonal_axis(&self, axis: impl Into<OrthogonalDirection>) -> Self::DataType {
+    fn position_on_orthogonal_axis(&self, axis: impl Into<OrthogonalDirection>) -> Self::_DataType {
         let axis_vector: Self = axis.into().to_step();
         self.dot(axis_vector)
     }
     fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
-        <NormalizedOrthoAngle as ortho_angle::Operations>::try_from_coordinate(*self)
+        if !self.is_orthogonal() {
+            return Err(format!("Not orthogonal: {}", self.to_string()));
+        }
+        Ok(Self::new_from_quarter_turns(
+            if self.x() == Self::_DataType::zero() {
+                if self.y() > Self::_DataType::zero() {
+                    1
+                } else {
+                    3
+                }
+            } else if self.x() > Self::_DataType::zero() {
+                0
+            } else {
+                2
+            },
+        ))
     }
 }
 
 impl<T> Operations for T
 where
-    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection>,
+    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection> + From<(<T as Coordinate::Operations>DataType, Self::_DataType)>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
@@ -70,7 +88,7 @@ where
 }
 
 // TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
-pub fn get_8_octant_transforms_of<PointType: CoordinateTrait>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(v: PointType) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()

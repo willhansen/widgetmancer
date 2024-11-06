@@ -3,7 +3,7 @@ use geo::coord;
 use geo::Coord;
 use itertools::Itertools;
 use misc_utilities::trait_alias;
-use misc_utilities::bool_with_partial::BoolWithPartial;
+use misc_utilities::BoolWithPartial;
 use misc_utilities::OkOrMessage;
 use ordered_float::OrderedFloat;
 use std::num;
@@ -46,8 +46,8 @@ pub trait Operations:
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
     // + Mul<OnGridDataType<Self>, Output = Self> // TODO: stricter trait bounds
-    + Mul<Self::T, Output = Self>
-    + Div<Self::T, Output = Self>
+    + Mul<Self::DataType, Output = Self>
+    + Div<Self::DataType, Output = Self>
     + Zero
     + Sized
     + std::fmt::Debug
@@ -56,15 +56,15 @@ pub trait Operations:
     // + From<(Self::T, Self::T)>
 // + IntoIterator + FromIterator // TODO
 {
-    type T: DataTypeReqs;
+    type DataType: DataTypeReqs;
     // type UnitType;
 
     // type Floating: float_coordinate::Operations<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
     // type OnGrid: int_coordinate::Operations<UnitType = Self::UnitType, Floating = Self::Floating, OnGrid = Self::OnGrid>;
 
-    fn x(&self) -> Self::T;
-    fn y(&self) -> Self::T;
-    fn nth_component(&self, i: usize) -> Self::T {
+    fn x(&self) -> Self::DataType;
+    fn y(&self) -> Self::DataType;
+    fn nth_component(&self, i: usize) -> Self::DataType {
         match i {
             0 => self.x(),
             1 => self.y(),
@@ -73,32 +73,32 @@ pub trait Operations:
     }
     fn nth_basis_vector(i: usize) -> Self {
         match i {
-            0 => Self::new(Self::T::one(), Self::T::zero()),
-            1 => Self::new(Self::T::zero(), Self::T::one()),
+            0 => Self::new(Self::DataType::one(), Self::DataType::zero()),
+            1 => Self::new(Self::DataType::zero(), Self::DataType::one()),
             _ => panic!("bad index: {i}"),
         }
     }
-    fn new(x: Self::T, y: Self::T) -> Self;
+    fn new(x: Self::DataType, y: Self::DataType) -> Self;
     // TODO: delete commented code
     // fn zero() -> Self {
     //     Self::new(Self::DataType::zero(), Self::DataType::zero())
     // }
-    fn tuple(&self) -> (Self::T, Self::T) {
+    fn tuple(&self) -> (Self::DataType, Self::DataType) {
         (self.x(), self.y())
     }
     fn is_horizontal(&self) -> bool {
-        self.x() != Self::T::zero() && self.y() == Self::T::zero()
+        self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
     fn to_string(&self) -> String {
         format!("(x: {}, y: {})", self.x(), self.y())
     }
     fn is_vertical(&self) -> bool {
-        self.x() == Self::T::zero() && self.y() != Self::T::zero()
+        self.x() == Self::DataType::zero() && self.y() != Self::DataType::zero()
     }
     fn is_zero(&self) -> bool {
         *self == Self::zero()
     }
-    fn square_length(&self) -> Self::T {
+    fn square_length(&self) -> Self::DataType {
         self.x() * self.x() + self.y() * self.y()
     }
     fn length(&self) -> f32 {
@@ -121,17 +121,17 @@ pub trait Operations:
     // make_coordinate_datatype_cast_function!(to_f32, f32, Self::Floating);
     // make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
-    fn king_length(&self) -> Self::T {
+    fn king_length(&self) -> Self::DataType {
         let a = ::num::traits::abs(self.x());
         let b = ::num::traits::abs(self.y());
         a.max(b)
         // max_for_partial_ord(a,b)
     }
-    fn dot(&self, other: impl Into<Self>) -> Self::T {
+    fn dot(&self, other: impl Into<Self>) -> Self::DataType {
         let other = other.into();
         self.x() * other.x() + self.y() * other.y()
     }
-    fn cross(&self, other: Self) -> Self::T {
+    fn cross(&self, other: Self) -> Self::DataType {
         self.x() * other.y() - self.y() * other.x()
     }
     fn projected_onto(self, onto: impl Into<Self>) -> Self {
@@ -147,7 +147,7 @@ pub trait Operations:
         self.length() * cos_factor
     }
     fn is_orthogonal(&self) -> bool {
-        self.x() == Self::T::zero() || self.y() == Self::T::zero()
+        self.x() == Self::DataType::zero() || self.y() == Self::DataType::zero()
     }
     fn is_diagonal(&self) -> bool {
         self.x().abs() == self.y().abs()
@@ -156,7 +156,7 @@ pub trait Operations:
         self.is_orthogonal() || self.is_diagonal()
     }
     fn is_unit_length(&self) -> bool {
-        self.square_length() == Self::T::one()
+        self.square_length() == Self::DataType::one()
     }
 }
 
@@ -165,17 +165,17 @@ impl<DataType> Operations for Coord<DataType>
 where
     DataType: DataTypeReqs,
 {
-    type T = DataType;
+    type DataType = DataType;
 
-    fn x(&self) -> Self::T {
+    fn x(&self) -> Self::DataType {
         self.x
     }
 
-    fn y(&self) -> Self::T {
+    fn y(&self) -> Self::DataType {
         self.y
     }
 
-    fn new(x: Self::T, y: Self::T) -> Self {
+    fn new(x: Self::DataType, y: Self::DataType) -> Self {
         coord2(x, y)
     }
 }
@@ -187,9 +187,17 @@ pub fn on_line<P: Operations>(a: P, b: P, c: P) -> bool {
 
 pub fn two_points_are_ccw_with_origin<P: Operations>(a: P, b: P) -> BoolWithPartial
 where
-    P::T: PartialOrd, // TODO: should be implied by SignedCoordinate
+    P::DataType: PartialOrd, // TODO: should be implied by SignedCoordinate
 {
     BoolWithPartial::greater_than( a.cross(b) , P::DataType::zero())
+}
+
+pub fn two_sorted_going_ccw<P: Operations>(v: [P; 2]) -> [P; 2] {
+    if two_points_are_ccw_with_origin(v[0], v[1]).is_false() {
+        v
+    } else {
+        [v[1], v[0]]
+    }
 }
 
 pub fn check_vectors_in_ccw_order<T: DataTypeReqs>(

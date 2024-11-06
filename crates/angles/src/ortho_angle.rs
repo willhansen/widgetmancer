@@ -70,26 +70,6 @@ pub trait Operations:
     //     self.to_step()
     // }
     
-    // fn try_from_coordinate<T: coordinate::Operations>(dir: T) -> Result<Self, String> {
-    //     if !dir.is_orthogonal() {
-    //         return Err(format!("Not orthogonal: {}", dir.to_string()));
-    //     }
-    //     Ok(Self::new_from_quarter_turns(
-    //         if dir.x() == T::DataType::zero() {
-    //             if dir.y() > T::DataType::zero() {
-    //                 1
-    //             } else {
-    //                 3
-    //             }
-    //         } else {
-    //             if dir.x() > T::DataType::zero() {
-    //                 0
-    //             } else {
-    //                 2
-    //             }
-    //         },
-    //     ))
-    // }
 
     // fn from_coordinate<T: coordinate::Operations>(dir: T) -> Self {
     //     Self::try_from_coordinate(dir).unwrap()

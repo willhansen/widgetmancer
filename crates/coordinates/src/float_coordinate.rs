@@ -1,4 +1,5 @@
 use map_macro::hash_set;
+use ordered_float::OrderedFloat;
 use std::collections::HashSet;
 use angles::*;
 use crate::*;
@@ -9,7 +10,7 @@ pub type FCoord = Coord<f32>;
 
 // use crate::utility::*;
 
-pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = Self> {
+pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
     // TODO: Add tolerance?
     fn on_centered_unit_square(&self) -> bool {
         // NOTE: 0.5 can be exactly represented by floating point numbers
@@ -45,7 +46,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = 
         let new_angle = start_angle + delta_angle;
         Self::from_angle_and_length(new_angle, self.length())
     }
-    fn snap_to_grid(&self) -> Self::OnGrid {
+    fn snap_to_grid(&self) -> ICoord {
         self.round().to_i32()
     }
     fn nearest_orthogonal_direction(&self) -> OrthogonalDirection {
@@ -75,7 +76,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32, Floating = 
 }
 
 // TODO: convert to auto trait when stable
-impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = f32, Floating = T> {}
+impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = f32> {}
 
 #[deprecated(note = "coordinates::king_length instead")]
 pub fn king_move_distance(step: FCoord) -> f32 {
@@ -110,11 +111,4 @@ pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) ->
         .unwrap();
     let furthest_values: Vec<P> = furthest.into_iter().copied().collect();
     furthest_values.try_into().unwrap()
-}
-pub fn two_sorted_going_ccw(v: [WorldMove; 2]) -> [WorldMove; 2] {
-    if two_points_are_ccw_with_origin(v[0], v[1]) {
-        v
-    } else {
-        [v[1], v[0]]
-    }
 }

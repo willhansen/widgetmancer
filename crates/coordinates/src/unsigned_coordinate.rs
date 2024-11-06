@@ -1,4 +1,4 @@
-// use crate::utility::*;
+use crate::coordinate;
 
 pub trait UnsignedCoordinate: coordinate::Operations {}
 impl<T> UnsignedCoordinate for T

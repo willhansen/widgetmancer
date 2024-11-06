@@ -5,4 +5,3 @@ mod general_utility;
 pub use general_utility::*;
 
 mod trait_alias_macro;
-pub use trait_alias_macro::*;

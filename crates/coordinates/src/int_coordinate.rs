@@ -25,7 +25,7 @@ impl ICoordConsts for ICoord {}
 
 
 pub trait Operations:
-    signed_coordinate::Operations<_DataType = i32, OnGrid = Self> + Hash + Eq
+    signed_coordinate::Operations<_DataType = i32> + Hash + Eq
 {
     fn is_orthogonal_king_step(&self) -> bool {
         self.square_length() == 1
@@ -47,16 +47,16 @@ pub trait Operations:
 
 // TODO: convert to auto trait when stable
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
-impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32, OnGrid = T> + Hash + Eq {}
+impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32> + Hash + Eq {}
 
-// TODO: There's got to be an easier way to dodge the Orphan Rule
-pub trait FromKingDirectionable {}
-impl FromKingDirectionable for ICoord {}
-impl<T> From<KingDirection> for T where T: FromKingDirectionable {
-    fn from(value: KingDirection) -> Self {
-        value.step()
-    }
-}
+// // TODO: There's got to be an easier way to dodge the Orphan Rule
+// pub trait FromKingDirectionable {}
+// impl FromKingDirectionable for ICoord {}
+// impl<T> From<KingDirection> for T where T: FromKingDirectionable {
+//     fn from(value: KingDirection) -> Self {
+//         value.step()
+//     }
+// }
 
 #[deprecated(note = "coordinates::king_length instead")]
 pub fn king_step_distance(step: ICoord) -> u32 {
