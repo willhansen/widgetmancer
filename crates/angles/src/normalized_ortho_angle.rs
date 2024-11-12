@@ -1,17 +1,22 @@
 // use crate::utility::*;
 use crate::quarter_turn_rotatable::QuarterTurnRotatable;
-use crate::ortho_angle::{OrthoAngle, Operations};
+use crate::OrthoAngle;
+use crate::OrthoAngleOperations;
 
 // AKA NormalizedQuarterTurnsCcw
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
 pub struct NormalizedOrthoAngle(i32);
-impl Operations for NormalizedOrthoAngle
+
+impl NormalizedOrthoAngle {
+    pub const fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self {
+        NormalizedOrthoAngle(quarter_turns_ccw.rem_euclid(4))
+    }
+}
+
+impl OrthoAngleOperations for NormalizedOrthoAngle
 where
     Self: Sized,
 {
-    fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self {
-        NormalizedOrthoAngle(quarter_turns_ccw.rem_euclid(4))
-    }
     fn quarter_turns_ccw(&self) -> i32 {
         self.0
     }

@@ -1,6 +1,8 @@
 // use crate::utility::*;
 use angles::*;
 use crate::coordinate;
+use crate::{ICoord, FCoord};
+use crate::signed_coordinate;
 use std::ops::Neg;
 use std::fmt::Debug;
 use crate::OrthogonalDirection;
@@ -65,27 +67,35 @@ pub trait Operations:
 
 impl<T> Operations for T
 where
-    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection> + From<(<T as Coordinate::Operations>DataType, Self::_DataType)>,
+    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection> + From<(<T as coordinate::Operations>::DataType, <T as coordinate::Operations>::DataType)>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
 }
 
-impl<V> QuarterTurnRotatable for V
-where
-    V: Operations,
-{
-    fn quarter_rotated_ccw(&self, angle: impl Into<NormalizedOrthoAngle>) -> Self {
-        // if self.is_absolute() {
-        //     return *self;
-        // }
-        let angle = angle.into();
-        Self::new(
-            self.x() * angle.cos() - self.y() * angle.sin(),
-            self.x() * angle.sin() + self.y() * angle.cos(),
-        )
-    }
-}
+// macro_rules! impl_quarter_turn_rotatable_for_signed_coordinate_operable {
+//     ($TheOperable:ident) => {
+//         impl QuarterTurnRotatable for $TheOperable
+//         where
+//             $TheOperable: Operations,
+//         {
+//             fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
+//                 // if self.is_absolute() {
+//                 //     return *self;
+//                 // }
+//                 Self::new(
+//                     self.x() * quarter_turns_ccw.cos() - self.y() * quarter_turns_ccw.sin(),
+//                     self.x() * quarter_turns_ccw.sin() + self.y() * quarter_turns_ccw.cos(),
+//                 )
+//             }
+//         }
+
+//     }
+
+// }
+
+// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(ICoord);
+// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(FCoord);
 
 // TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
 pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(v: PointType) -> Vec<PointType> {

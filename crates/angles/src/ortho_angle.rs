@@ -7,13 +7,16 @@ use num;
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign, derive_more::Add, derive_more::Sub)]
 pub struct OrthoAngle(i32);
 
+impl OrthoAngle {
+    pub const fn from_quarter_turns_ccw(quarter_turns: i32) -> Self {
+        OrthoAngle(quarter_turns)
+    }
+}
+
 impl Operations for OrthoAngle
 where
     Self: Sized,
 {
-    fn from_quarter_turns_ccw(quarter_turns: i32) -> Self {
-        OrthoAngle(quarter_turns)
-    }
     fn quarter_turns_ccw(&self) -> i32 {
         self.0
     }
@@ -37,7 +40,7 @@ pub trait Operations:
     + Copy
     // + Into<NormalizedOrthoAngle>
 {
-    fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self;
+    // fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self;
     fn quarter_turns_ccw(&self) -> i32;
     fn normalized(&self) -> NormalizedOrthoAngle {
         NormalizedOrthoAngle::from_quarter_turns_ccw(self.quarter_turns_ccw())

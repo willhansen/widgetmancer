@@ -26,7 +26,7 @@ impl From<OrthogonalDirection> for KingDirection {
 
 // TODO: generate with macro
 impl QuarterTurnRotatable for KingDirection {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: impl Into<NormalizedOrthoAngle>) -> Self {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
         self.step().quarter_rotated_ccw(quarter_turns_ccw).into()
     }
 }
