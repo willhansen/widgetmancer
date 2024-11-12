@@ -5,18 +5,18 @@ use itertools::Itertools;
 use misc_utilities::trait_alias;
 use misc_utilities::BoolWithPartial;
 use misc_utilities::OkOrMessage;
+use misc_utilities::AbsThatWorksWithUnsigned;
 use ordered_float::OrderedFloat;
-use std::num;
 use crate::float_coordinate;
-use ::num::traits::Zero;
+use num::Zero;
+use num::One;
+use num::ToPrimitive;
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use crate::FCoord;
 // use std::num;
 
 // TODO: is this just a scalar?
-// Not quite.  Keeping the door open to points and relativity means that subtraction and addition
-// might not be exactly among the same types.
-// Multiplication between things of different units might also complicate it.
-trait_alias!(pub trait DataTypeReqs = geo::CoordNum);
+trait_alias!(pub trait DataTypeReqs = geo::CoordNum + AbsThatWorksWithUnsigned);
 
 pub type Coord2<T> = geo::Coord<T>;
 
@@ -89,7 +89,7 @@ pub trait Operations:
     fn is_horizontal(&self) -> bool {
         self.x() != Self::DataType::zero() && self.y() == Self::DataType::zero()
     }
-    fn to_string(&self) -> String {
+    fn to_string(&self) -> String where <Self as Operations>::DataType: std::fmt::Display {
         format!("(x: {}, y: {})", self.x(), self.y())
     }
     fn is_vertical(&self) -> bool {
@@ -102,7 +102,17 @@ pub trait Operations:
         self.x() * self.x() + self.y() * self.y()
     }
     fn length(&self) -> f32 {
-        self.to_f32().square_length().sqrt()
+        self.square_length().to_f32().unwrap().sqrt()
+    }
+    fn to_f32(&self) -> Option<FCoord> {
+        let x = self.x().to_f32();
+        let y = self.y().to_f32();
+        if x.is_none() || y.is_none() {
+            Some(coord2(x.unwrap(), y.unwrap()))
+        } else {
+            None
+        }
+
     }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinates<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
@@ -113,8 +123,8 @@ pub trait Operations:
     // }
     // euclid uses fast and imprecise trig for this by default for some reason
     fn better_angle_from_x_axis(&self) -> FAngle {
-        let float_self = self.to_f32();
-        angular_units::Rad(float_self.y().atan2(float_self.x())).into()
+        let float_self = self.to_f32().unwrap();
+        FAngle::from_rad(float_self.y().atan2(float_self.x()))
     }
 
     // TODO: generalize
@@ -122,8 +132,8 @@ pub trait Operations:
     // make_coordinate_datatype_cast_function!(to_i32, i32, Self::OnGrid);
 
     fn king_length(&self) -> Self::DataType {
-        let a = ::num::traits::abs(self.x());
-        let b = ::num::traits::abs(self.y());
+        let a = self.x().abs_that_works_with_unsigned();
+        let b = self.y().abs_that_works_with_unsigned();
         a.max(b)
         // max_for_partial_ord(a,b)
     }
