@@ -1,4 +1,5 @@
 use std::cmp::Ord;
+use try_partialord::TryMinMax;
 
 // TODO: better name
 pub trait MinMaxThatWorkWithPartialOrd {
@@ -20,18 +21,10 @@ macro_rules! impl_min_max_that_work_for_partial_ord_for {
     (partial_ord: $Type:ty) => {
         impl MinMaxThatWorkWithPartialOrd for $Type {
             fn min_that_works_with_partial_ord(&self, other: Self) -> Self {
-                if *self <= other {
-                    *self
-                } else {
-                    other
-                }
+                [*self, other].into_iter().try_min().unwrap().unwrap()
             }
             fn max_that_works_with_partial_ord(&self, other: Self) -> Self {
-                if *self >= other {
-                    *self
-                } else {
-                    other
-                }
+                [*self, other].into_iter().try_max().unwrap().unwrap()
             }
         }
     }
@@ -71,5 +64,17 @@ mod tests {
         assert_eq!(5f32.max_that_works_with_partial_ord(7f32), 7f32);
         assert_eq!((-5f32).min_that_works_with_partial_ord(200f32), -5f32);
         assert_eq!((-5f32).max_that_works_with_partial_ord(200f32), 200f32);
+
+        assert_eq!(f32::INFINITY.min_that_works_with_partial_ord(f32::INFINITY), f32::INFINITY);
+        assert_eq!(f32::INFINITY.max_that_works_with_partial_ord(f32::INFINITY), f32::INFINITY);
+
+        assert_eq!(f32::NEG_INFINITY.min_that_works_with_partial_ord(f32::INFINITY), f32::NEG_INFINITY);
+        assert_eq!(f32::NEG_INFINITY.max_that_works_with_partial_ord(f32::INFINITY), f32::INFINITY);
+
+        assert_eq!(f32::NEG_INFINITY.min_that_works_with_partial_ord(f32::NEG_INFINITY), f32::NEG_INFINITY);
+        assert_eq!(f32::NEG_INFINITY.max_that_works_with_partial_ord(f32::NEG_INFINITY), f32::NEG_INFINITY);
+
+        assert_eq!(f32::INFINITY.min_that_works_with_partial_ord(f32::NEG_INFINITY), f32::NEG_INFINITY);
+        assert_eq!(f32::INFINITY.max_that_works_with_partial_ord(f32::NEG_INFINITY), f32::INFINITY);
     }
 }

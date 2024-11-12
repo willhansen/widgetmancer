@@ -2,10 +2,7 @@ use angles::FAngle;
 use geo::coord;
 use geo::Coord;
 use itertools::Itertools;
-use misc_utilities::trait_alias;
-use misc_utilities::BoolWithPartial;
-use misc_utilities::OkOrMessage;
-use misc_utilities::AbsThatWorksWithUnsigned;
+use misc_utilities::*;
 use ordered_float::OrderedFloat;
 use crate::float_coordinate;
 use num::Zero;
@@ -16,7 +13,7 @@ use crate::FCoord;
 // use std::num;
 
 // TODO: is this just a scalar?
-trait_alias!(pub trait DataTypeReqs = geo::CoordNum + AbsThatWorksWithUnsigned);
+trait_alias!(pub trait DataTypeReqs = geo::CoordNum + AbsThatWorksWithUnsigned + MinMaxThatWorkWithPartialOrd);
 
 pub type Coord2<T> = geo::Coord<T>;
 
@@ -134,7 +131,7 @@ pub trait Operations:
     fn king_length(&self) -> Self::DataType {
         let a = self.x().abs_that_works_with_unsigned();
         let b = self.y().abs_that_works_with_unsigned();
-        a.max(b)
+        a.max_that_works_with_partial_ord(b)
         // max_for_partial_ord(a,b)
     }
     fn dot(&self, other: impl Into<Self>) -> Self::DataType {
@@ -153,7 +150,7 @@ pub trait Operations:
         points.into_iter().sorted_by_key(|&point|OrderedFloat(point.position_on_axis(axis)))
     }
     fn position_on_axis(&self, angle: FAngle) -> f32 {
-        let cos_factor = self.better_angle_from_x_axis().angle_to(angle).radians.cos();
+        let cos_factor = self.better_angle_from_x_axis().dot(angle);
         self.length() * cos_factor
     }
     fn is_orthogonal(&self) -> bool {
