@@ -31,7 +31,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
         Self::new(self.x().round(), self.y().round())
     }
     fn from_angle_and_length(angle: FAngle, length: f32) -> Self {
-        Self::new(length * angle.radians.cos(), length * angle.radians.sin())
+        Self::new(length * angle.cos(), length * angle.sin())
     }
 
     fn rotate_around_point(&self, axis_point: Self, angle: FAngle) -> Self {
@@ -39,7 +39,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
     }
 
     fn unit_vector_from_angle(angle: FAngle) -> Self {
-        Self::new(angle.radians.cos(), angle.radians.sin())
+        Self::new(angle.cos(), angle.sin())
     }
     fn rotate_vect(&self, delta_angle: FAngle) -> Self {
         let start_angle = self.better_angle_from_x_axis();
@@ -111,4 +111,7 @@ pub fn furthest_apart_points<P: float_coordinate::Operations>(points: Vec<P>) ->
         .unwrap();
     let furthest_values: Vec<P> = furthest.into_iter().copied().collect();
     furthest_values.try_into().unwrap()
+}
+pub fn corner_points_of_centered_unit_square<P: Operations>() -> [P; 4] {
+    (P::one() * 0.5).quadrant_rotations_going_ccw()
 }

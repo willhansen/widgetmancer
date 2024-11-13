@@ -10,10 +10,11 @@ use num::One;
 use num::ToPrimitive;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use crate::FCoord;
+use crate::ICoord;
 // use std::num;
 
 // TODO: is this just a scalar?
-trait_alias!(pub trait DataTypeReqs = geo::CoordNum + AbsThatWorksWithUnsigned + MinMaxThatWorkWithPartialOrd);
+trait_alias!(pub trait DataTypeReqs = geo::CoordNum + AbsThatWorksWithUnsigned + MinMaxThatWorkWithPartialOrd + std::fmt::Display);
 
 pub type Coord2<T> = geo::Coord<T>;
 
@@ -46,6 +47,7 @@ pub trait Operations:
     + Mul<Self::DataType, Output = Self>
     + Div<Self::DataType, Output = Self>
     + Zero
+    // + One // TODO
     + Sized
     + std::fmt::Debug
     // + std::fmt::Display
@@ -61,6 +63,10 @@ pub trait Operations:
 
     fn x(&self) -> Self::DataType;
     fn y(&self) -> Self::DataType;
+    // TODO: Should be trait
+    fn one() -> Self {
+        Self::new(Self::DataType::one(), Self::DataType::one())
+    }
     fn nth_component(&self, i: usize) -> Self::DataType {
         match i {
             0 => self.x(),
@@ -109,7 +115,15 @@ pub trait Operations:
         } else {
             None
         }
-
+    }
+    fn to_i32(&self) -> Option<ICoord> {
+        let x = self.x().to_i32();
+        let y = self.y().to_i32();
+        if x.is_none() || y.is_none() {
+            Some(coord2(x.unwrap(), y.unwrap()))
+        } else {
+            None
+        }
     }
     // fn cast_data_type<T>(&self) -> Self<DataType=T> where T: num::NumCast{self.cast()}
     // fn cast_relativity_level<C,R>(&self) -> C where C: Coordinates<DataType=Self::DataType, UnitType=Self::UnitType, RelativityLevel = R>{self.cast()}
@@ -157,7 +171,7 @@ pub trait Operations:
         self.x() == Self::DataType::zero() || self.y() == Self::DataType::zero()
     }
     fn is_diagonal(&self) -> bool {
-        self.x().abs() == self.y().abs()
+        self.x().abs_that_works_with_unsigned() == self.y().abs_that_works_with_unsigned()
     }
     fn is_orthodiagonal(&self) -> bool {
         self.is_orthogonal() || self.is_diagonal()
@@ -213,8 +227,8 @@ pub fn check_vectors_in_ccw_order<T: DataTypeReqs>(
     v.into_iter()
         .tuple_windows()
         .map(|(a, b)| match two_points_are_ccw_with_origin(a, b) {
-            true => Ok(()),
-            false => Err(format!(
+            BoolWithPartial::True => Ok(()),
+            _ => Err(format!(
                 "These two points not in order: \na: {}\nb: {}",
                 a.to_string(),
                 b.to_string()
@@ -232,8 +246,5 @@ pub fn point_is_in_centered_unit_square_with_tolerance(
 ) -> BoolWithPartial {
     assert!(tolerance >= 0.0);
     let vec = point.into();
-    BoolWithPartial::from_less_than_with_tolerance(vec.king_length(), 0.5, tolerance)
-}
-pub fn corner_points_of_centered_unit_square<P: float_coordinate::Operations>() -> [P; 4] {
-    <P::OnGrid as Zero>::zero().square_corners()
+    BoolWithPartial::less_than_with_tolerance(vec.king_length(), 0.5, tolerance)
 }

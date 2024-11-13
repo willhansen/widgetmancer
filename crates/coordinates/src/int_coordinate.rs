@@ -1,6 +1,5 @@
 // use crate::utility::*;
 use crate::signed_coordinate;
-use crate::king_direction::KingDirection;
 use core::hash::Hash;
 use geo::Coord;
 use angles::*;
@@ -15,10 +14,10 @@ pub type ICoord = Coord<i32>;
 pub type GridSet = HashSet<ICoord>;
 
 pub trait ICoordConsts {
-    const UP: ICoord = coord(0, 1);
-    const DOWN: ICoord = coord(0, -1);
-    const RIGHT: ICoord = coord(1, 0);
-    const LEFT: ICoord = coord(-1, 0);
+    const UP: ICoord = geo::coord!(x:0, y:1);
+    const DOWN: ICoord = geo::coord!(x:0, y:-1);
+    const RIGHT: ICoord = geo::coord!(x:1, y:0);
+    const LEFT: ICoord = geo::coord!(x:-1, y:0);
     const ORTHOGONAL_STEPS: [ICoord; 4] = [Self::RIGHT, Self::UP, Self::LEFT, Self::DOWN];
 }
 impl ICoordConsts for ICoord {}
@@ -67,19 +66,7 @@ pub fn round_to_king_step(step: ICoord) -> ICoord {
     if step.square_length() == 0 {
         return step;
     }
-    let radians_from_plus_x = step.to_f32().better_angle_from_x_axis();
-    let eighth_steps_from_plus_x = (radians_from_plus_x.radians * 8.0 / f32::consts::TAU).round();
-    let rounded_radians_from_plus_x = FAngle::radians(eighth_steps_from_plus_x * f32::consts::TAU / 8.0);
-
-    let float_step = crate::FCoord::from_angle_and_length(
-        rounded_radians_from_plus_x,
-        1.5,
-    );
-    // 1.5 length to allow truncating down to 1 i32 in the diagonal case
-    // because 1.5/sqrt(2) > 1.0
-
-    // truncate towards zero intentionally
-    float_step.to_i32()
+    KingDirection::snap_angle(step.better_angle_from_x_axis()).step()
 }
 
 pub fn revolve_square(
