@@ -1,11 +1,8 @@
 // use crate::utility::*;
 use angles::*;
 use crate::coordinate;
-use crate::{ICoord, FCoord};
-use crate::signed_coordinate;
 use std::ops::Neg;
-use std::fmt::Debug;
-use crate::OrthogonalDirection;
+use crate::*;
 
 pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
@@ -15,7 +12,7 @@ pub trait Operations:
     + From<OrthogonalDirection>
     + From<(Self::_DataType, Self::_DataType)>
 {
-    type _DataType: num::Signed + Copy + PartialOrd + Debug;
+    type _DataType: num::Signed + Copy + PartialOrd + Debug + Display;
     fn flip_x(&self) -> Self {
         Self::new(-self.x(), self.y())
     }
@@ -39,17 +36,17 @@ pub trait Operations:
         self.moved(dir, Self::DataType::one())
     }
     fn moved(&self, dir: OrthogonalDirection, length: Self::_DataType) -> Self {
-        *self + dir.to_step::<Self>() * length
+        *self + Self::from(dir) * length
     }
-    fn position_on_orthogonal_axis(&self, axis: impl Into<OrthogonalDirection>) -> Self::_DataType {
-        let axis_vector: Self = axis.into().to_step();
+    fn position_on_orthogonal_axis(&self, axis: OrthogonalDirection) -> Self::_DataType {
+        let axis_vector: Self = axis.into();
         self.dot(axis_vector)
     }
     fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
         if !self.is_orthogonal() {
             return Err(format!("Not orthogonal: {}", self.to_string()));
         }
-        Ok(Self::new_from_quarter_turns(
+        Ok(NormalizedOrthoAngle::from_quarter_turns_ccw(
             if self.x() == Self::_DataType::zero() {
                 if self.y() > Self::_DataType::zero() {
                     1

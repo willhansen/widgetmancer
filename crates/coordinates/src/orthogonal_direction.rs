@@ -5,6 +5,7 @@ use angles::NormalizedOrthoAngle;
 use angles::{OrthoAngle, OrthoAngleOperations};
 use angles::FAngle;
 use angles::QuarterTurnRotatable;
+use crate::ICoord;
 
 
 
@@ -14,13 +15,16 @@ pub struct OrthogonalDirection(NormalizedOrthoAngle);
 impl OrthogonalDirection {
     pub fn from_angle_hint(hint: FAngle) -> Self {
         let hint = hint.standardized_starting_at_zero();
-        let quarter_turns_ccw = ((hint.radians + std::f32::consts::FRAC_PI_4) / std::f32::consts::FRAC_PI_2) as i32;
-        Self(NormalizedOrthoAngle::from_quarter_turns(
+        let quarter_turns_ccw = ((hint.radians() + std::f32::consts::FRAC_PI_4) / std::f32::consts::FRAC_PI_2) as i32;
+        Self(NormalizedOrthoAngle::from_quarter_turns_ccw(
             quarter_turns_ccw,
         ))
     }
     pub fn from_degrees_hint(deg: f32) -> Self {
         Self::from_angle_hint(FAngle::from_degrees(deg))
+    }
+    pub fn to_step(&self) -> ICoord {
+        self.0.xy().into()
     }
 }
 
@@ -38,11 +42,11 @@ impl std::ops::Neg for OrthogonalDirection {
     }
 }
 
-impl std::fmt::Display for OrthogonalDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.dir_name())
-    }
-}
+// impl std::fmt::Display for OrthogonalDirection {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", self.dir_name())
+//     }
+// }
 
 // TODO: need this?
 // impl<T: Operations> From<T> for OrthogonalDirection {

@@ -21,6 +21,9 @@ pub use king_direction::KingDirection;
 
 use geo::Coord;
 
+pub use std::fmt::{Debug, Display};
+pub use num::{Zero, One};
+
 
 
 
