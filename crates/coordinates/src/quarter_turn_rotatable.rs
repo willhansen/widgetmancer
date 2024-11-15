@@ -94,6 +94,28 @@ where
     }
 }
 
+impl QuarterTurnRotatable for OrthoAngle {
+    fn quarter_rotated_ccw(
+        &self,
+        quarter_turns_ccw: OrthoAngle
+    ) -> Self {
+        *self + quarter_turns_ccw
+    }
+}
+
+impl QuarterTurnRotatable for NormalizedOrthoAngle {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
+        (quarter_turns_ccw + OrthoAngle::from(*self)).normalized()
+    }
+}
+
+impl QuarterTurnRotatable for FAngle {
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
+        *self + quarter_turns_ccw.into()
+    }
+}
+
+// TODO: delete
 // macro_rules! impl_quarter_turn_rotatable_for_signed_coordinate_operable {
 //     ($TheOperable:ident) => {
 //         impl QuarterTurnRotatable for $TheOperable

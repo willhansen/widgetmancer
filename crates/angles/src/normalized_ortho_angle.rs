@@ -1,5 +1,4 @@
 // use crate::utility::*;
-use crate::quarter_turn_rotatable::QuarterTurnRotatable;
 use crate::OrthoAngle;
 use crate::OrthoAngleOperations;
 
@@ -37,11 +36,6 @@ impl std::ops::Sub for NormalizedOrthoAngle {
     }
 }
 
-impl QuarterTurnRotatable for NormalizedOrthoAngle {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
-        (quarter_turns_ccw + OrthoAngle::from(*self)).normalized()
-    }
-}
 
 // impl From<ortho_angle::OrthoAngle> for NormalizedOrthoAngle {
 //     fn from(value: ortho_angle::OrthoAngle) -> Self {

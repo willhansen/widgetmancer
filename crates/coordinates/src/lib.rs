@@ -17,6 +17,9 @@ pub use orthogonal_direction::OrthogonalDirection;
 mod king_direction;
 pub use king_direction::KingDirection;
 
+mod quarter_turn_rotatable;
+pub use quarter_turn_rotatable::QuarterTurnRotatable;
+
 // TODO: move everything below this comment out of this file
 
 use geo::Coord;

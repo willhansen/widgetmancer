@@ -176,11 +176,6 @@ impl std::fmt::Debug for FAngle {
     }
 }
 
-impl QuarterTurnRotatable for FAngle {
-    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
-        *self + quarter_turns_ccw.into()
-    }
-}
 
 pub fn opposite_angle(a: FAngle) -> FAngle {
     a + FAngle::HALF_TURN

@@ -8,7 +8,3 @@ pub use ortho_angle::Operations as OrthoAngleOperations;
 mod normalized_ortho_angle;
 pub use normalized_ortho_angle::NormalizedOrthoAngle;
 
-mod quarter_turn_rotatable;
-pub use quarter_turn_rotatable::QuarterTurnRotatable;
-
-

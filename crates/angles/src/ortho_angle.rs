@@ -1,6 +1,5 @@
 // use crate::utility::*;
 use crate::normalized_ortho_angle::NormalizedOrthoAngle;
-use crate::quarter_turn_rotatable::QuarterTurnRotatable;
 use num;
 
 // AKA QuarterTurnsCcw
@@ -19,14 +18,6 @@ where
 {
     fn quarter_turns_ccw(&self) -> i32 {
         self.0
-    }
-}
-impl QuarterTurnRotatable for OrthoAngle {
-    fn quarter_rotated_ccw(
-        &self,
-        quarter_turns_ccw: OrthoAngle
-    ) -> Self {
-        *self + quarter_turns_ccw
     }
 }
 
