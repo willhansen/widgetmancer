@@ -11,6 +11,7 @@ pub trait Operations:
     + From<NormalizedOrthoAngle>
     + From<OrthogonalDirection>
     + From<(Self::_DataType, Self::_DataType)>
+    + QuarterTurnRotatable
 {
     type _DataType: num::Signed + Copy + PartialOrd + Debug + Display;
     fn flip_x(&self) -> Self {
@@ -70,29 +71,6 @@ where
     type _DataType = T::DataType;
 }
 
-// macro_rules! impl_quarter_turn_rotatable_for_signed_coordinate_operable {
-//     ($TheOperable:ident) => {
-//         impl QuarterTurnRotatable for $TheOperable
-//         where
-//             $TheOperable: Operations,
-//         {
-//             fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
-//                 // if self.is_absolute() {
-//                 //     return *self;
-//                 // }
-//                 Self::new(
-//                     self.x() * quarter_turns_ccw.cos() - self.y() * quarter_turns_ccw.sin(),
-//                     self.x() * quarter_turns_ccw.sin() + self.y() * quarter_turns_ccw.cos(),
-//                 )
-//             }
-//         }
-
-//     }
-
-// }
-
-// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(ICoord);
-// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(FCoord);
 
 // TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
 pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(v: PointType) -> Vec<PointType> {

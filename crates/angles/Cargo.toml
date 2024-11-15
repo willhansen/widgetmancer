@@ -4,11 +4,14 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
+# internal
+misc_utilities.workspace = true
+
+# external
 angular-units.workspace = true
 automod.workspace = true
 derive_more.workspace = true
 itertools.workspace = true
-misc_utilities.workspace = true
 more-asserts.workspace = true
 ntest.workspace = true
 num.workspace = true

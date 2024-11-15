@@ -1,5 +1,6 @@
 // use crate::utility::*;
 use crate::ortho_angle::OrthoAngle;
+use coordinates::SignedCoordinateOperations;
 use itertools::Itertools;
 
 pub trait QuarterTurnRotatable: Sized {
@@ -77,3 +78,42 @@ where
             .map(|x| x.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
+
+impl QuarterTurnRotatable for T
+where
+    T: SignedCoordinateOperations,
+{
+    fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
+        // if self.is_absolute() {
+        //     return *self;
+        // }
+        Self::new(
+            self.x() * quarter_turns_ccw.cos() - self.y() * quarter_turns_ccw.sin(),
+            self.x() * quarter_turns_ccw.sin() + self.y() * quarter_turns_ccw.cos(),
+        )
+    }
+}
+
+// macro_rules! impl_quarter_turn_rotatable_for_signed_coordinate_operable {
+//     ($TheOperable:ident) => {
+//         impl QuarterTurnRotatable for $TheOperable
+//         where
+//             $TheOperable: signed_coordinate::Operations,
+//         {
+//             fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
+//                 // if self.is_absolute() {
+//                 //     return *self;
+//                 // }
+//                 Self::new(
+//                     self.x() * quarter_turns_ccw.cos() - self.y() * quarter_turns_ccw.sin(),
+//                     self.x() * quarter_turns_ccw.sin() + self.y() * quarter_turns_ccw.cos(),
+//                 )
+//             }
+//         }
+
+//     }
+
+// }
+
+// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(ICoord);
+// impl_quarter_turn_rotatable_for_signed_coordinate_operable!(FCoord);
