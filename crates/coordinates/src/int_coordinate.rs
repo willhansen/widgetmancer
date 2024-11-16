@@ -48,6 +48,8 @@ pub trait Operations:
 // TODO: Same trait bounds are copy pasted from main trait declaration.  Factor them out somehow.
 impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = i32> + Hash + Eq {}
 
+static_assertions::assert_impl_all!(ICoord: Operations);
+
 // // TODO: There's got to be an easier way to dodge the Orphan Rule
 // pub trait FromKingDirectionable {}
 // impl FromKingDirectionable for ICoord {}

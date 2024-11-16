@@ -8,6 +8,7 @@ pub use int_coordinate::{ICoord, Operations as IntCoordinateOperations};
 mod float_coordinate;
 pub use float_coordinate::{FCoord, Operations as FloatCoordinateOperations};
 mod signed_coordinate;
+pub use signed_coordinate::Operations as SignedCoordinateOperations;
 mod signed_int_coordinate;
 mod unsigned_coordinate;
 

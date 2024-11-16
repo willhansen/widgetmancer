@@ -1,11 +1,5 @@
-// use crate::utility::*;
-
-use crate::coordinate;
-use angles::NormalizedOrthoAngle;
-use angles::{OrthoAngle, OrthoAngleOperations};
-use angles::FAngle;
-use angles::QuarterTurnRotatable;
-use crate::ICoord;
+use angles::*;
+use crate::*;
 
 
 
@@ -24,7 +18,10 @@ impl OrthogonalDirection {
         Self::from_angle_hint(FAngle::from_degrees(deg))
     }
     pub fn to_step(&self) -> ICoord {
-        self.0.xy().into()
+        self.xy().into()
+    }
+    pub fn xy<T: num::Signed>(&self) -> [T;2]  {
+        self.0.xy()
     }
 }
 
@@ -55,9 +52,9 @@ impl std::ops::Neg for OrthogonalDirection {
 //     }
 // }
 
-impl From<OrthogonalDirection> for NormalizedOrthoAngle {
-    fn from(value: OrthogonalDirection) -> Self {
-        value.angle()
+impl Into<NormalizedOrthoAngle> for OrthogonalDirection{
+    fn into(self) -> NormalizedOrthoAngle {
+        self.0
     }
 }
 impl QuarterTurnRotatable for OrthogonalDirection {

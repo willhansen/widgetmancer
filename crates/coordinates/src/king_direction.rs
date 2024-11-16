@@ -1,16 +1,11 @@
-// use crate::utility::*;
-use crate::ICoord;
-use crate::FCoord;
-use crate::FloatCoordinateOperations;
-use crate::CoordinateOperations;
-use crate::IntCoordinateOperations;
-use crate::orthogonal_direction::OrthogonalDirection;
+use crate::*;
 use angles::*;
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct KingDirection {
     step: ICoord,
 }
+
 
 impl KingDirection {
     pub fn new(dir: ICoord) -> Self {

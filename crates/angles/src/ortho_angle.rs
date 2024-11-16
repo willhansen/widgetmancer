@@ -27,7 +27,7 @@ pub trait Operations:
     // + std::ops::Add<NormalizedOrthoAngle, Output = Self>
     + std::ops::Sub
     + std::ops::Add
-    + QuarterTurnRotatable
+    // + QuarterTurnRotatable
     + Copy
     // + Into<NormalizedOrthoAngle>
 {

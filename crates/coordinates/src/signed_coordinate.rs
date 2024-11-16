@@ -8,9 +8,9 @@ pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
     + Neg<Output = Self>
     // TODO: put on the SignedCoordinateConstructor trait instead
-    + From<NormalizedOrthoAngle>
-    + From<OrthogonalDirection>
-    + From<(Self::_DataType, Self::_DataType)>
+    // + From<NormalizedOrthoAngle>
+    // + From<OrthogonalDirection>
+    // + From<(Self::_DataType, Self::_DataType)>
     + QuarterTurnRotatable
 {
     type _DataType: num::Signed + Copy + PartialOrd + Debug + Display;
@@ -35,6 +35,9 @@ pub trait Operations:
     // TODO: allow non-orthogonal directions
     fn stepped(&self, dir: OrthogonalDirection) -> Self {
         self.moved(dir, Self::DataType::one())
+    }
+    fn from_orthogonal_direction(dir: OrthogonalDirection) -> Self {
+        dir.xy().into()
     }
     fn moved(&self, dir: OrthogonalDirection, length: Self::_DataType) -> Self {
         *self + Self::from(dir) * length
@@ -65,7 +68,11 @@ pub trait Operations:
 
 impl<T> Operations for T
 where
-    T: coordinate::Operations + Neg<Output = Self> + From<NormalizedOrthoAngle> + From<OrthogonalDirection> + From<(<T as coordinate::Operations>::DataType, <T as coordinate::Operations>::DataType)>,
+    T: coordinate::Operations +
+    Neg<Output = Self>, 
+    // + From<NormalizedOrthoAngle> 
+    // + From<OrthogonalDirection> 
+    // + From<(<T as coordinate::Operations>::DataType, <T as coordinate::Operations>::DataType)>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;

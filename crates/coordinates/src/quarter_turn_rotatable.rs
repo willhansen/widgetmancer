@@ -1,7 +1,7 @@
 // use crate::utility::*;
-use crate::ortho_angle::OrthoAngle;
-use coordinates::SignedCoordinateOperations;
+use crate::SignedCoordinateOperations;
 use itertools::Itertools;
+use angles::*;
 
 pub trait QuarterTurnRotatable: Sized {
     // TODO: pass reference?
@@ -79,7 +79,7 @@ where
     }
 }
 
-impl QuarterTurnRotatable for T
+impl<T> QuarterTurnRotatable for T
 where
     T: SignedCoordinateOperations,
 {

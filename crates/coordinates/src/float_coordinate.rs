@@ -78,6 +78,8 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
 // TODO: convert to auto trait when stable
 impl<T> Operations for T where T: signed_coordinate::Operations<_DataType = f32> {}
 
+static_assertions::assert_impl_all!(FCoord: Operations);
+
 #[deprecated(note = "coordinates::king_length instead")]
 pub fn king_move_distance(step: FCoord) -> f32 {
     step.x().abs().max(step.y().abs())
