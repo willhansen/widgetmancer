@@ -1,6 +1,7 @@
 // use crate::utility::*;
 use crate::OrthoAngle;
 use crate::OrthoAngleOperations;
+use static_assertions;
 
 // AKA NormalizedQuarterTurnsCcw
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, derive_more::AddAssign)]
@@ -10,7 +11,25 @@ impl NormalizedOrthoAngle {
     pub const fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self {
         NormalizedOrthoAngle(quarter_turns_ccw.rem_euclid(4))
     }
+    pub fn cos<T: num::Signed>(&self) -> T {
+        match self.0 {
+            0 => T::one(),
+            1 | 3 => T::zero(),
+            2 => -T::one(),
+            x => panic!("Invalid angle: {}", x),
+        }
+    }
+    pub fn sin<T: num::Signed>(&self) -> T {
+        match self.0 {
+            0 | 2 => T::zero(),
+            1 => T::one(),
+            3 => -T::one(),
+            x => panic!("Invalid angle: {}", x),
+        }
+    }
 }
+
+static_assertions::assert_impl_all!(NormalizedOrthoAngle: OrthoAngleOperations);
 
 impl OrthoAngleOperations for NormalizedOrthoAngle
 where
@@ -18,6 +37,9 @@ where
 {
     fn quarter_turns_ccw(&self) -> i32 {
         self.0
+    }
+    fn normalized(&self) -> NormalizedOrthoAngle {
+        *self
     }
 }
 

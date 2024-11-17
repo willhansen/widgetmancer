@@ -37,13 +37,13 @@ pub trait Operations:
         self.moved(dir, Self::DataType::one())
     }
     fn from_orthogonal_direction(dir: OrthogonalDirection) -> Self {
-        Self::from_array(dir.xy())
+        Self::from_array(dir.xy_array())
     }
     fn moved(&self, dir: OrthogonalDirection, length: Self::_DataType) -> Self {
-        *self + Self::from(dir) * length
+        *self + Self::from_orthogonal_direction(dir) * length
     }
     fn position_on_orthogonal_axis(&self, axis: OrthogonalDirection) -> Self::_DataType {
-        let axis_vector: Self = axis.into();
+        let axis_vector: Self = Self::from_orthogonal_direction(axis);
         self.dot(axis_vector)
     }
     fn orthogonal_angle(&self) -> Result<NormalizedOrthoAngle, String> {
@@ -78,7 +78,7 @@ where
 }
 
 // TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
-pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(
+pub fn get_8_octant_transforms_of<PointType: signed_coordinate::Operations>(
     v: PointType,
 ) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());

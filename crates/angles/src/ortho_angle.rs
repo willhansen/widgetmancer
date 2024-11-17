@@ -12,15 +12,6 @@ impl OrthoAngle {
     }
 }
 
-impl Operations for OrthoAngle
-where
-    Self: Sized,
-{
-    fn quarter_turns_ccw(&self) -> i32 {
-        self.0
-    }
-}
-
 pub trait Operations:
     Sized
     // + std::ops::Sub<NormalizedOrthoAngle, Output = Self>
@@ -33,27 +24,22 @@ pub trait Operations:
 {
     // fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self;
     fn quarter_turns_ccw(&self) -> i32;
-    fn normalized(&self) -> NormalizedOrthoAngle {
-        NormalizedOrthoAngle::from_quarter_turns_ccw(self.quarter_turns_ccw())
-    }
+    fn normalized(&self) -> NormalizedOrthoAngle;
     fn cos<T: num::Signed>(&self) -> T {
-        match self.normalized().quarter_turns_ccw() {
-            0 => T::one(),
-            1 | 3 => T::zero(),
-            2 => -T::one(),
-            x => panic!("Invalid angle: {}", x),
-        }
+        self.normalized().cos()
     }
     fn sin<T: num::Signed>(&self) -> T {
-        match self.normalized().quarter_turns_ccw() {
-            0 | 2 => T::zero(),
-            1 => T::one(),
-            3 => -T::one(),
-            x => panic!("Invalid angle: {}", x),
-        }
+        self.normalized().sin()
     }
+    
     fn xy<T: num::Signed>(&self) -> [T;2]  {
         [self.cos(), self.sin()]
+    }
+    fn x<T: num::Signed>(&self) -> T {
+        self.cos()
+    }
+    fn y<T: num::Signed>(&self) -> T {
+        self.sin()
     }
     // fn dir(&self) -> OrthogonalDirection {
     //     OrthogonalDirection::from_angle(*self)
@@ -101,6 +87,19 @@ pub trait Operations:
     // fn rotate_vector<PointType: signed_coordinate::Operations>(&self, v: PointType) -> PointType {
     //     v.quarter_rotated_ccw(*self)
     // }
+}
+
+
+impl Operations for OrthoAngle
+where
+    Self: Sized,
+{
+    fn quarter_turns_ccw(&self) -> i32 {
+        self.0
+    }
+    fn normalized(&self) -> NormalizedOrthoAngle {
+        NormalizedOrthoAngle::from_quarter_turns_ccw(self.quarter_turns_ccw())
+    }
 }
 
 macro_rules! impl_ops_for_OrthoAngles {

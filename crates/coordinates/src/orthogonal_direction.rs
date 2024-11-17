@@ -7,21 +7,19 @@ use crate::*;
 pub struct OrthogonalDirection(NormalizedOrthoAngle);
 
 impl OrthogonalDirection {
-    pub fn from_angle_hint(hint: FAngle) -> Self {
+    pub fn snap_from_angle(hint: FAngle) -> Self {
         let hint = hint.standardized_starting_at_zero();
+        // TODO: use an angle method for this
         let quarter_turns_ccw = ((hint.radians() + std::f32::consts::FRAC_PI_4) / std::f32::consts::FRAC_PI_2) as i32;
         Self(NormalizedOrthoAngle::from_quarter_turns_ccw(
             quarter_turns_ccw,
         ))
     }
-    pub fn from_degrees_hint(deg: f32) -> Self {
-        Self::from_angle_hint(FAngle::from_degrees(deg))
+    pub fn snap_from_degrees(deg: f32) -> Self {
+        Self::snap_from_angle(FAngle::from_degrees(deg))
     }
     pub fn to_step(&self) -> ICoord {
-        self.xy().into()
-    }
-    pub fn xy<T: num::Signed>(&self) -> [T;2]  {
-        self.0.xy()
+        self.xy_array().into()
     }
 }
 
@@ -32,10 +30,6 @@ impl DirectionOperations for OrthogonalDirection {
 
     fn y<T: num::Signed>(&self) -> T {
         self.0.y()
-    }
-
-    fn reversed(&self) -> Self {
-        todo!()
     }
 }
 
