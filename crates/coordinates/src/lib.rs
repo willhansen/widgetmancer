@@ -12,6 +12,9 @@ pub use signed_coordinate::Operations as SignedCoordinateOperations;
 mod signed_int_coordinate;
 mod unsigned_coordinate;
 
+mod direction;
+pub use direction::Operations as DirectionOperations;
+
 mod orthogonal_direction;
 pub use orthogonal_direction::OrthogonalDirection;
 

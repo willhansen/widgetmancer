@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use map_macro::hash_set;
 use ordered_float::OrderedFloat;
 use std::collections::HashSet;
@@ -47,7 +48,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
         Self::from_angle_and_length(new_angle, self.length())
     }
     fn snap_to_grid(&self) -> ICoord {
-        self.round().to_i32()
+        self.round().to_i32().unwrap()
     }
     fn nearest_orthogonal_direction(&self) -> OrthogonalDirection {
         OrthogonalDirection::from_angle_hint(self.better_angle_from_x_axis())
@@ -98,7 +99,7 @@ pub fn rand_radial_offset(radius: f32) -> FCoord {
 }
 
 pub fn random_unit_vector() -> FCoord {
-    let angle = random_angle();
+    let angle = FAngle::random();
     FCoord::unit_vector_from_angle(angle)
 }
 pub fn assert_about_eq_2d<P: float_coordinate::Operations>(p1: P, p2: P) {

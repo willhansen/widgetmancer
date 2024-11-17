@@ -74,10 +74,10 @@ pub fn round_to_king_step(step: ICoord) -> ICoord {
 pub fn revolve_square(
     moving_square: ICoord,
     pivot_square: ICoord,
-    rotation: NormalizedOrthoAngle,
+    rotation: OrthoAngle,
 ) -> ICoord {
     let rel_square = moving_square - pivot_square;
-    pivot_square + rotation.rotate_vector(rel_square)
+    pivot_square + rel_square.quarter_rotated_ccw(rotation)
 }
 
 #[deprecated(note = "use Vector2D's to_array function instead")]
@@ -90,7 +90,7 @@ pub fn ith_projection_of_step(step: ICoord, i: u32) -> ICoord {
 }
 #[deprecated(note = "use SignedCoordinate::position_on_axis instead")]
 pub fn distance_of_step_along_axis(step: ICoord, axis: OrthogonalDirection) -> i32 {
-    step.project_onto_vector(axis.to_step()).dot(axis.to_step())
+    step.projected_onto(axis.to_step()).dot(axis.to_step())
 }
 pub fn cross_correlate_squares_with_steps(
     squares: GridSet,

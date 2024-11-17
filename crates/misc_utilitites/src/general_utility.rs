@@ -1,4 +1,5 @@
 use getset::CopyGetters;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use itertools::Itertools;
 use ntest::assert_false;
 use std::ops::{Add, Sub};
@@ -173,6 +174,20 @@ pub fn transpose<T: Copy>(a: Vec<Vec<T>>) -> Vec<Vec<T>> {
 pub fn range_array<const N:usize>() -> [usize;N] {
     (0..N).collect_vec().try_into().unwrap()
 
+}
+
+pub fn get_new_rng() -> StdRng {
+    StdRng::from_rng(rand::thread_rng()).unwrap()
+}
+
+// TODO: better name
+pub fn random_event(p: f32) -> bool {
+    assert!(p >= 0.0 && p <= 1.0);
+    rand::thread_rng().gen_range(0.0..=1.0) < p
+}
+
+pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
+    v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
 #[cfg(test)]

@@ -77,20 +77,6 @@ pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
 }
 
-pub fn get_new_rng() -> StdRng {
-    StdRng::from_rng(rand::thread_rng()).unwrap()
-}
-
-pub fn random_event(p: f32) -> bool {
-    assert!(p >= 0.0 && p <= 1.0);
-    rand::thread_rng().gen_range(0.0..=1.0) < p
-}
-
-
-pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
-    v.get(rng.gen_range(0..v.len())).unwrap()
-}
-
 pub fn number_to_color(i: u32) -> RGB8 {
     let in_order = vec![GREY, RED, BLUE, GREEN, YELLOW, CYAN, MAGENTA];
     in_order[i as usize % in_order.len()]

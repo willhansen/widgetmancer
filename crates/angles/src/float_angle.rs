@@ -106,7 +106,7 @@ impl FAngle {
     pub fn dot(&self, other: Self) -> f32 {
         self.x() * other.x() + self.y() * other.y()
     }
-    pub fn smallest_angle_to(&self, other: Self) -> Self {
+    pub fn angle_to(&self, other: Self) -> Self {
         let a = self.standardized_starting_at_zero();
         let b = other.standardized_starting_at_zero();
 
@@ -145,8 +145,12 @@ impl FAngle {
         Self::from_rad(self.rad().abs())
     }
     pub fn abs_smallest_angle_to(&self, other: Self) -> Self {
-        self.smallest_angle_to(other).abs()
+        self.angle_to(other).abs()
     }
+    pub fn random() -> Self {
+        Self::from_degrees(rand::thread_rng().gen_range(0.0..360.0))
+    }
+
 }
 pub fn deg(x: f32) -> FAngle {
     FAngle::from_deg(x)
@@ -185,10 +189,6 @@ impl From<OrthoAngle> for FAngle {
     fn from(value: OrthoAngle) -> Self {
         FAngle::from_quarter_turns(value.quarter_turns_ccw() as f32)
     }
-}
-
-pub fn random_angle() -> FAngle {
-    FAngle::from_degrees(rand::thread_rng().gen_range(0.0..360.0))
 }
 
 #[allow(non_snake_case)]
@@ -307,12 +307,12 @@ mod tests {
     fn test_positive_half_turn_for_smallest_angle_to() {
         assert_eq!(
             FAngle::HALF_TURN,
-            FAngle::NO_TURN.smallest_angle_to(FAngle::HALF_TURN)
+            FAngle::NO_TURN.angle_to(FAngle::HALF_TURN)
         );
         ma::assert_lt!(
             0.0,
             FAngle::QUARTER_TURN
-                .smallest_angle_to(FAngle::QUARTER_TURN * 3.0)
+                .angle_to(FAngle::QUARTER_TURN * 3.0)
                 .rad()
         );
         let n = 10;
@@ -322,7 +322,7 @@ mod tests {
             if end.rad() - start.rad() - PI == 0.0 {
                 ma::assert_lt!(
                     0.0,
-                    start.smallest_angle_to(end).rad(),
+                    start.angle_to(end).rad(),
                     "start: {}, end: {}, end-start-PI: {}",
                     start.rad(),
                     end.rad(),

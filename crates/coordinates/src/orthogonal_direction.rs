@@ -25,6 +25,20 @@ impl OrthogonalDirection {
     }
 }
 
+impl DirectionOperations for OrthogonalDirection {
+    fn x<T: num::Signed>(&self) -> T {
+        self.0.x()
+    }
+
+    fn y<T: num::Signed>(&self) -> T {
+        self.0.y()
+    }
+
+    fn reversed(&self) -> Self {
+        todo!()
+    }
+}
+
 pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(0));
 pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(1));
 pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(2));
@@ -55,6 +69,11 @@ impl std::ops::Neg for OrthogonalDirection {
 impl Into<NormalizedOrthoAngle> for OrthogonalDirection{
     fn into(self) -> NormalizedOrthoAngle {
         self.0
+    }
+}
+impl Into<ICoord> for OrthogonalDirection{
+    fn into(self) -> ICoord {
+        ICoord::new(self.x(), self.y())
     }
 }
 impl QuarterTurnRotatable for OrthogonalDirection {

@@ -1,8 +1,8 @@
 // use crate::utility::*;
-use angles::*;
 use crate::coordinate;
-use std::ops::Neg;
 use crate::*;
+use angles::*;
+use std::ops::Neg;
 
 pub trait Operations:
     coordinate::Operations<DataType = Self::_DataType>
@@ -37,7 +37,7 @@ pub trait Operations:
         self.moved(dir, Self::DataType::one())
     }
     fn from_orthogonal_direction(dir: OrthogonalDirection) -> Self {
-        dir.xy().into()
+        Self::from_array(dir.xy())
     }
     fn moved(&self, dir: OrthogonalDirection, length: Self::_DataType) -> Self {
         *self + Self::from(dir) * length
@@ -68,19 +68,19 @@ pub trait Operations:
 
 impl<T> Operations for T
 where
-    T: coordinate::Operations +
-    Neg<Output = Self>, 
-    // + From<NormalizedOrthoAngle> 
-    // + From<OrthogonalDirection> 
+    T: coordinate::Operations + Neg<Output = Self>,
+    // + From<NormalizedOrthoAngle>
+    // + From<OrthogonalDirection>
     // + From<(<T as coordinate::Operations>::DataType, <T as coordinate::Operations>::DataType)>,
     T::DataType: num::Signed,
 {
     type _DataType = T::DataType;
 }
 
-
 // TODO: Incorporate this into the quarter QuarterTurnRotatable trait?
-pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(v: PointType) -> Vec<PointType> {
+pub fn get_8_octant_transforms_of<PointType: coordinate::Operations>(
+    v: PointType,
+) -> Vec<PointType> {
     let transpose = PointType::new(v.y(), v.x());
     vec![v, transpose]
         .into_iter()

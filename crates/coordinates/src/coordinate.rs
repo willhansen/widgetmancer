@@ -67,6 +67,12 @@ pub trait Operations:
     fn one() -> Self {
         Self::new(Self::DataType::one(), Self::DataType::one())
     }
+    fn from_tuple(tuple: (Self::DataType, Self::DataType)) -> Self {
+        Self::new(tuple.0, tuple.1)
+    }
+    fn from_array(array: [Self::DataType; 2]) -> Self {
+        Self::new(array[0], array[1])
+    }
     fn nth_component(&self, i: usize) -> Self::DataType {
         match i {
             0 => self.x(),
