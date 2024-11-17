@@ -27,7 +27,7 @@ impl KingDirection {
         // because 1.5/sqrt(2) > 1.0
 
         // truncate towards zero intentionally
-        float_step.to_i32()
+        Self::new(float_step.to_i32().unwrap())
 
     }
 }

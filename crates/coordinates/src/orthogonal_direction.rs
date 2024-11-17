@@ -72,13 +72,13 @@ impl Into<ICoord> for OrthogonalDirection{
 }
 impl QuarterTurnRotatable for OrthogonalDirection {
     fn quarter_rotated_ccw(&self, quarter_turns_ccw: OrthoAngle) -> Self {
-        self.0.quarter_rotated_ccw(quarter_turns_ccw).into()
+        Self(self.0.quarter_rotated_ccw(quarter_turns_ccw))
     }
 }
 pub fn sorted_left_to_right(faces: [OrthogonalDirection; 2]) -> [OrthogonalDirection; 2] {
     assert_ne!(faces[0], faces[1]);
     assert_ne!(faces[0], -faces[1]);
-    if faces[0] == faces[1].quarter_rotated_ccw(NormalizedOrthoAngle::new_from_quarter_turns(1)) {
+    if faces[0] == faces[1].ez_quarter_rotated_ccw(1) {
         faces
     } else {
         [faces[1], faces[0]]

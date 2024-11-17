@@ -25,6 +25,7 @@ pub trait Operations:
     // fn from_quarter_turns_ccw(quarter_turns_ccw: i32) -> Self;
     fn quarter_turns_ccw(&self) -> i32;
     fn normalized(&self) -> NormalizedOrthoAngle;
+
     fn cos<T: num::Signed>(&self) -> T {
         self.normalized().cos()
     }
