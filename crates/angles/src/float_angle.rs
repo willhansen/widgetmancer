@@ -268,6 +268,7 @@ mod tests {
             1e-4
         );
     }
+
     mod angle_to {
         use super::*;
         macro_rules! tests_for_angle_to {
@@ -279,7 +280,7 @@ mod tests {
                         (0..365).for_each(|i| {
                             let start_plus = start + i as f32;
                             let end_plus = end + i as f32;
-                            let small_deg = deg(start_plus).smallest_angle_to(deg(end_plus)).deg();
+                            let small_deg = deg(start_plus).angle_to(deg(end_plus)).deg();
                             let abs_small_err =(correct_small_deg - small_deg).abs();
                             ma::assert_lt!(abs_small_err, 1e-4, "smallest_angle from {start_plus}° to {end_plus}° is {small_deg}°, should_have_been {correct_small_deg}°");
 
