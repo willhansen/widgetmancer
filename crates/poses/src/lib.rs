@@ -14,7 +14,7 @@ pub struct TranslationAndRotationTransform {
     translation: WorldStep,
     quarter_rotations_counterclockwise: u32,
 }
-impl<SquareType> RigidlyTransformable for OrthogonalFacingIntPose<SquareType>
+impl<SquareType> RigidlyTransformable for SquareWithOrthogonalDirection<SquareType>
 where
     SquareType: Copy + RigidlyTransformable + WorldIntCoordinateOps,
 {
@@ -37,7 +37,7 @@ pub fn faces_away_from_center_at_rel_square(
 }
 
 pub fn squares_sharing_face<SquareType: WorldIntCoordinateOps>(
-    face: OrthogonalFacingIntPose<SquareType>,
+    face: SquareWithOrthogonalDirection<SquareType>,
 ) -> [SquareType; 2] {
     [face.square(), face.stepped().square()]
 }

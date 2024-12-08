@@ -50,10 +50,10 @@ pub type SquareSet = HashSet<WorldSquare>;
 pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
 
-pub type WorldSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldSquare>;
-pub type Face<T> = OrthogonalFacingIntPose<T>;
+pub type WorldSquareWithOrthogonalDir = SquareWithOrthogonalDirection<WorldSquare>;
+pub type Face<T> = SquareWithOrthogonalDirection<T>;
 pub type FaceOfWorldSquare = WorldSquareWithOrthogonalDir;
-pub type RelativeSquareWithOrthogonalDir = OrthogonalFacingIntPose<WorldStep>;
+pub type RelativeSquareWithOrthogonalDir = SquareWithOrthogonalDirection<WorldStep>;
 pub type RelativeFace = RelativeSquareWithOrthogonalDir;
 
 pub type WorldDirectedLine = DirectedLine<WorldPoint>;

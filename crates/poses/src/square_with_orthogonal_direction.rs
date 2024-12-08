@@ -385,13 +385,13 @@ where
 // TODO: Add tolerance?
 // TODO: Was in float_coordinates.  Need to adapt
 // fn on_same_square_face(&self, other: Self) -> bool {
-//     HashSet::<OrthogonalFacingIntPose<Self::OnGrid>>::from_iter(self.touched_square_faces())
+//     HashSet::<SquareWithOrthogonalDirection<Self::OnGrid>>::from_iter(self.touched_square_faces())
 //         .intersection(&HashSet::from_iter(other.touched_square_faces()))
 //         .count()
 //         > 0
 // }
 // // TODO: Add tolerance?
-// fn touched_square_faces(&self) -> HashSet<OrthogonalFacingIntPose<Self::OnGrid>> {
+// fn touched_square_faces(&self) -> HashSet<SquareWithOrthogonalDirection<Self::OnGrid>> {
 //     let on_border_by_axis = [0, 1].map(|i| self.on_square_border_on_axis(i));
 //     match on_border_by_axis {
 //         [true, true] => [-1, 1]
