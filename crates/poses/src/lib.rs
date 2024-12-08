@@ -6,25 +6,34 @@ mod square_with_king_direction;
 
 use misc_utilities::*;
 use coordinates::*;
+use angles::*;
 
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
-#[get_copy = "pub"]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct TranslationAndRotationTransform {
-    translation: WorldStep,
-    quarter_rotations_counterclockwise: u32,
+    translation: ICoord,
+    quarter_rotations_counterclockwise: OrthoAngle,
 }
-impl<SquareType> RigidlyTransformable for SquareWithOrthogonalDirection<SquareType>
-where
-    SquareType: Copy + RigidlyTransformable + WorldIntCoordinateOps,
-{
-    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
-        Self::from_square_and_step(
-            self.square().apply_rigid_transform(tf),
-            self.dir().quarter_rotated_ccw(tf.rotation()),
-        )
+
+impl TranslationAndRotationTransform {
+    pub fn translation(&self) -> ICoord {
+        self.translation
+    }
+    pub fn quarter_rotations_counterclockwise(&self) -> OrthoAngle {
+        self.quarter_rotations_counterclockwise
     }
 }
+
+pub fn faces_of_square_facing_away_from_origin(square: ICoord) -> HashSet<SquareWithOrthogonalDirection> {
+    ORTHOGONAL_DIRECTIONS
+        .iter()
+        .filter(|&&orthodir| square.dot(orthodir) >= 0)
+        .map(|&orthodir| (square, orthodir).into())
+        .collect()
+
+}
+
+#[deprecated(note = "use faces_of_square_facing_away_from_origin instead")]
 pub fn faces_away_from_center_at_rel_square(
     step: impl Into<WorldStep>,
 ) -> HashSet<RelativeSquareWithOrthogonalDir> {

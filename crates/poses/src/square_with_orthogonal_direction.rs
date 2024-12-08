@@ -421,6 +421,17 @@ where
 //     }
 // }
 
+impl<SquareType> RigidlyTransformable for SquareWithOrthogonalDirection<SquareType>
+where
+    SquareType: Copy + RigidlyTransformable + WorldIntCoordinateOps,
+{
+    fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
+        Self::from_square_and_step(
+            self.square().apply_rigid_transform(tf),
+            self.dir().quarter_rotated_ccw(tf.rotation()),
+        )
+    }
+}
 
 
 #[cfg(test)]
