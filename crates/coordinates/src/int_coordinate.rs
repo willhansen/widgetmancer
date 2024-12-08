@@ -68,7 +68,7 @@ pub fn round_to_king_step(step: ICoord) -> ICoord {
     if step.square_length() == 0 {
         return step;
     }
-    KingDirection::snap_angle(step.better_angle_from_x_axis()).step()
+    KingDirection::snap_angle(step.angle_from_x_axis()).step()
 }
 
 pub fn revolve_square(

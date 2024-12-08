@@ -174,10 +174,11 @@ pub use num::{Zero, One};
 #[cfg(test)]
 mod tests {
 
+    use angles::FAngle;
     use ntest::{assert_about_eq, assert_false, assert_true, timeout};
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::utility::{STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO};
+    // use crate::utility::{STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT, STEP_ZERO};
 
     use super::*;
     #[test]
@@ -235,50 +236,51 @@ mod tests {
     #[test]
     fn test_rotate_zero_vector() {
         assert_eq!(
-            WorldMove::new(0.0, 0.0).rotate_vect(Angle::radians(PI)),
-            coord2(0.0, 0.0)
+            coord(0.0, 0.0).rotate_vect(FAngle::from_radians(std::f32::consts::PI)),
+            coord(0.0, 0.0)
         );
     }
     #[test]
     fn test_angle_from_x_axis() {
         assert_about_eq!(
-            default::Vector2D::new(0.5, 0.5)
-                .better_angle_from_x_axis()
+            coord(0.5, 0.5)
+                .angle_from_x_axis()
                 .to_degrees(),
             45.0
         );
         assert_about_eq!(
-            default::Vector2D::new(0.0, 0.5)
-                .better_angle_from_x_axis()
+            coord(0.0, 0.5)
+                .angle_from_x_axis()
                 .to_degrees(),
             90.0
         );
         assert_about_eq!(
-            default::Vector2D::new(0.0, -0.5)
-                .better_angle_from_x_axis()
+            coord(0.0, -0.5)
+                .angle_from_x_axis()
                 .to_degrees(),
             -90.0
         );
         assert_about_eq!(
-            default::Vector2D::new(1.0, 0.0)
-                .better_angle_from_x_axis()
-                .to_degrees(),
+            coord(1.0, 0.0)
+                .angle_from_x_axis()
+                .degrees(),
             0.0
         );
         assert_about_eq!(
-            default::Vector2D::new(-1.0, 0.0)
-                .better_angle_from_x_axis()
-                .to_degrees(),
+            coord(-1.0, 0.0)
+                .angle_from_x_axis()
+                .degrees(),
             180.0
         );
     }
 
     #[test]
+    // TODO this should fail, then we can delete the test
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
         assert!(
-            (default::Vector2D::new(0.5, 0.5)
+            (coord(0.5, 0.5)
                 .angle_from_x_axis()
-                .to_degrees()
+                .degrees()
                 - 45.0)
                 .abs()
                 > 0.01
@@ -288,8 +290,9 @@ mod tests {
     #[test]
     fn test_standardize_angle() {
         assert_about_eq!(
-            standardize_angle_with_zero_mid(Angle::<f32>::degrees(75.0)).radians,
-            standardize_angle_with_zero_mid(Angle::<f32>::degrees(75.0 - 360.0)).radians
+
+            FAngle::from_degrees(75.0).standardized_centered_at_zero().radians(),
+            FAngle::from_degrees(75.0 - 360.0).standardized_centered_at_zero().radians()
         );
     }
     #[test]

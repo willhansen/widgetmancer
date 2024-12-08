@@ -43,7 +43,7 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
         Self::new(angle.cos(), angle.sin())
     }
     fn rotate_vect(&self, delta_angle: FAngle) -> Self {
-        let start_angle = self.better_angle_from_x_axis();
+        let start_angle = self.angle_from_x_axis();
         let new_angle = start_angle + delta_angle;
         Self::from_angle_and_length(new_angle, self.length())
     }
@@ -51,14 +51,14 @@ pub trait Operations: signed_coordinate::Operations<_DataType = f32> {
         self.round().to_i32().unwrap()
     }
     fn nearest_orthogonal_direction(&self) -> OrthogonalDirection {
-        OrthogonalDirection::snap_from_angle(self.better_angle_from_x_axis())
+        OrthogonalDirection::snap_from_angle(self.angle_from_x_axis())
     }
     fn lerp2d(&self, target: Self, t: f32) -> Self {
         Self::new(lerp(self.x(), target.x(), t), lerp(self.y(), target.y(), t))
     }
     fn angle_to(&self, other: Self) -> FAngle {
-        self.better_angle_from_x_axis()
-            .angle_to(other.better_angle_from_x_axis())
+        self.angle_from_x_axis()
+            .angle_to(other.angle_from_x_axis())
     }
     fn about_eq(&self, other: Self, tolerance: Self::DataType) -> bool {
         (*self - other).length() < tolerance

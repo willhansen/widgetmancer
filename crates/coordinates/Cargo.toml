@@ -19,5 +19,7 @@ geo.workspace = true
 map-macro.workspace = true
 rand.workspace = true
 static_assertions.workspace = true
+ntest.workspace = true
+pretty_assertions.workspace = true
 # line_drawing = "1.0"
 # euclid = "0.22.7"

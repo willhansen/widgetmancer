@@ -139,7 +139,7 @@ pub trait Operations:
     //     Other::new(self.x(), self.y())
     // }
     // euclid uses fast and imprecise trig for this by default for some reason
-    fn better_angle_from_x_axis(&self) -> FAngle {
+    fn angle_from_x_axis(&self) -> FAngle {
         let float_self = self.to_f32().unwrap();
         FAngle::from_rad(float_self.y().atan2(float_self.x()))
     }
@@ -170,7 +170,7 @@ pub trait Operations:
         points.into_iter().sorted_by_key(|&point|OrderedFloat(point.position_on_axis(axis)))
     }
     fn position_on_axis(&self, angle: FAngle) -> f32 {
-        let cos_factor = self.better_angle_from_x_axis().dot(angle);
+        let cos_factor = self.angle_from_x_axis().dot(angle);
         self.length() * cos_factor
     }
     fn is_orthogonal(&self) -> bool {
