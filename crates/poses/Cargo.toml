@@ -11,7 +11,7 @@ coordinates.workspace = true
 
 #external
 # angular-units.workspace = true
-# automod.workspace = true
+automod.workspace = true
 # derive_more.workspace = true
 # num.workspace = true
 # ordered-float.workspace = true

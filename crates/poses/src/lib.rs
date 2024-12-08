@@ -1,52 +1,12 @@
-automod::dir!(pub "src");
-use crate::glyph::{glyph_constants::FACE_ARROWS, Glyph};
+// automod::dir!(pub "src");
 
-use crate::utility::*;
+mod square_with_orthogonal_direction;
+mod square_with_king_direction;
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
-#[get_copy = "pub"]
-pub struct SquareWithKingDir {
-    square: WorldSquare,
-    direction: KingWorldStep,
-}
 
-impl SquareWithKingDir {
-    pub fn new(square: WorldSquare, direction: KingWorldStep) -> Self {
-        SquareWithKingDir { square, direction }
-    }
-    pub fn from_square_and_step(square: WorldSquare, direction: WorldStep) -> SquareWithKingDir {
-        Self::new(square, direction.into())
-    }
-    pub fn tuple(&self) -> (WorldSquare, KingWorldStep) {
-        (self.square, self.direction)
-    }
-    pub fn stepped(&self) -> SquareWithKingDir {
-        SquareWithKingDir::from_square_and_step(
-            self.square + self.direction.step(),
-            self.direction.into(),
-        )
-    }
-}
+use misc_utilities::*;
+use coordinates::*;
 
-impl From<WorldSquareWithOrthogonalDir> for SquareWithKingDir {
-    fn from(value: WorldSquareWithOrthogonalDir) -> Self {
-        SquareWithKingDir {
-            square: value.square(),
-            direction: value.direction().into(),
-        }
-    }
-}
-
-impl From<(WorldSquare, KingWorldStep)> for SquareWithKingDir {
-    fn from(value: (WorldSquare, KingWorldStep)) -> Self {
-        Self::new(value.0, value.1)
-    }
-}
-impl From<SquareWithKingDir> for (WorldSquare, KingWorldStep) {
-    fn from(value: SquareWithKingDir) -> (WorldSquare, KingWorldStep) {
-        (value.square, value.direction)
-    }
-}
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy, CopyGetters)]
 #[get_copy = "pub"]
@@ -252,7 +212,7 @@ mod tests {
         // |..>  .
         // |  .  .
         // +-------
-        let abs_square = WorldSquare::new(6, 3);
+        let abs_square = ICoord::new(6, 3);
         let observer_pose = WorldSquareWithOrthogonalDir::from_square_and_step((3, 2), STEP_RIGHT);
         let correct_rel_square = WorldStep::new(-1, 3);
         assert_eq!(
@@ -273,7 +233,7 @@ mod tests {
         ];
         pose_square.into_iter().for_each(|(p, s)| {
             let pose: WorldSquareWithOrthogonalDir = p.into();
-            let square: WorldSquare = s.into();
+            let square: ICoord = s.into();
             assert_eq!(
                 pose.other_square_relative_to_absolute(
                     pose.other_square_absolute_to_relative(square)

@@ -3,22 +3,30 @@ use std::{
     ops::{Add, Sub},
 };
 
-use crate::utility::*;
+use misc_utilities::*;
+use angles::*;
+use coordinates::*;
 
-#[derive(Clone, Copy, Hash, Eq, PartialEq, getset::CopyGetters)]
-#[get_copy = "pub"]
-pub struct OrthogonalFacingIntPose<SquareType>
+#[derive(Clone, Copy, Hash, Eq, PartialEq)]
+pub struct SquareWithOrthogonalDirection<SquareType>
 where
-    SquareType: int_coordinate::Operations,
+    SquareType: IntCoordinateOperations,
 {
     square: SquareType,
     dir: OrthogonalDirection,
 }
 
-impl<SquareType> OrthogonalFacingIntPose<SquareType>
+impl<SquareType> SquareWithOrthogonalDirection<SquareType>
 where
-    SquareType: int_coordinate::Operations,
+    SquareType: IntCoordinateOperations,
 {
+    pub fn square(&self) -> SquareType {
+        self.square
+    }
+    pub fn dir(&self) -> OrthogonalDirection {
+        self.dir
+    }
+
     pub fn angle(&self) -> NormalizedOrthoAngle {
         self.dir.into()
     }
@@ -221,7 +229,7 @@ where
         [*self, self.stepped().turned_back()]
     }
 }
-impl<T: int_coordinate::Operations> Debug for OrthogonalFacingIntPose<T>
+impl<T: int_coordinate::Operations> Debug for SquareWithOrthogonalDirection<T>
 where
     Self: Display,
 {
@@ -229,7 +237,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: int_coordinate::Operations> Display for OrthogonalFacingIntPose<T> {
+impl<T: int_coordinate::Operations> Display for SquareWithOrthogonalDirection<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -314,22 +322,22 @@ impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
     }
 }
 
-impl<T: int_coordinate::Operations> Add<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
+impl<T: int_coordinate::Operations> Add<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
     type Output = Self;
 
-    fn add(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
-        OrthogonalFacingIntPose::from_square_and_dir(
+    fn add(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
+        SquareWithOrthogonalDirection::from_square_and_dir(
             self.square + rhs.square,
             self.angle() + rhs.angle(),
         )
     }
 }
 
-impl<T: int_coordinate::Operations> Sub<OrthogonalFacingIntPose<T>> for OrthogonalFacingIntPose<T> {
+impl<T: int_coordinate::Operations> Sub<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
     type Output = Self;
 
-    fn sub(self, rhs: OrthogonalFacingIntPose<T>) -> Self::Output {
-        OrthogonalFacingIntPose::from_square_and_dir(
+    fn sub(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
+        SquareWithOrthogonalDirection::from_square_and_dir(
             self.square - rhs.square,
             self.angle() - rhs.angle(),
         )
@@ -340,7 +348,7 @@ impl<T: int_coordinate::Operations> Sub<OrthogonalFacingIntPose<T>> for Orthogon
 // TODO: implement for base Pose trait
 // TODO: make base Pose trait
 impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
-    for OrthogonalFacingIntPose<SquareType>
+    for SquareWithOrthogonalDirection<SquareType>
 where
     SquareType: int_coordinate::Operations,
     IntoSquareType: Into<SquareType>,
@@ -354,7 +362,7 @@ where
     }
 }
 
-impl<T, SquareType, IntoDir> From<(T, T, IntoDir)> for OrthogonalFacingIntPose<SquareType>
+impl<T, SquareType, IntoDir> From<(T, T, IntoDir)> for SquareWithOrthogonalDirection<SquareType>
 where
     (T, T): Into<SquareType>,
     SquareType: WorldIntCoordinateOps,
@@ -365,11 +373,11 @@ where
     }
 }
 
-impl<SquareType> From<OrthogonalFacingIntPose<SquareType>> for (SquareType, OrthogonalDirection)
+impl<SquareType> From<SquareWithOrthogonalDirection<SquareType>> for (SquareType, OrthogonalDirection)
 where
     SquareType: WorldIntCoordinateOps,
 {
-    fn from(value: OrthogonalFacingIntPose<SquareType>) -> (SquareType, OrthogonalDirection) {
+    fn from(value: SquareWithOrthogonalDirection<SquareType>) -> (SquareType, OrthogonalDirection) {
         (value.square, value.direction())
     }
 }
@@ -454,7 +462,7 @@ mod tests {
         ]
         .into_iter()
         .for_each(|((x, y), faces)| {
-            let faces: HashSet<OrthogonalFacingIntPose<WorldSquare>> = map_into(faces).collect();
+            let faces: HashSet<SquareWithOrthogonalDirection<WorldSquare>> = map_into(faces).collect();
             assert_eq!(WorldPoint::new(x, y).touched_square_faces(), faces);
         })
     }
