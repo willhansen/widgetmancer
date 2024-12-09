@@ -10,14 +10,16 @@ angles.workspace = true
 coordinates.workspace = true
 
 #external
-# angular-units.workspace = true
 automod.workspace = true
+static_assertions.workspace = true
+ntest.workspace = true
+pretty_assertions.workspace = true
+map-macro.workspace = true
+# angular-units.workspace = true
 # derive_more.workspace = true
 # num.workspace = true
 # ordered-float.workspace = true
 # itertools.workspace = true
 # geo.workspace = true
-# map-macro.workspace = true
-# static_assertions = "1.1.0"
 # line_drawing = "1.0"
 # euclid = "0.22.7"

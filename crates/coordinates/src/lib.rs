@@ -16,7 +16,7 @@ mod direction;
 pub use direction::Operations as DirectionOperations;
 
 mod orthogonal_direction;
-pub use orthogonal_direction::OrthogonalDirection;
+pub use orthogonal_direction::{OrthogonalDirection, OrthogonalDirectionConstants};
 
 mod king_direction;
 pub use king_direction::KingDirection;
@@ -184,23 +184,23 @@ mod tests {
     #[test]
     fn test_round_to_kingstep() {
         assert_eq!(
-            WorldStep::new(0, 0),
-            round_to_king_step(WorldStep::new(0, 0)),
+            ICoord::new(0, 0),
+            round_to_king_step(ICoord::new(0, 0)),
             "zero to zero"
         );
         assert_eq!(
-            WorldStep::new(1, 0),
-            round_to_king_step(WorldStep::new(5, 0)),
+            ICoord::new(1, 0),
+            round_to_king_step(ICoord::new(5, 0)),
             "reduce length"
         );
         assert_eq!(
-            WorldStep::new(0, -1),
-            round_to_king_step(WorldStep::new(5, -300)),
+            ICoord::new(0, -1),
+            round_to_king_step(ICoord::new(5, -300)),
             "snap to orthogonal"
         );
         assert_eq!(
-            WorldStep::new(-1, 1),
-            round_to_king_step(WorldStep::new(-30, 25)),
+            ICoord::new(-1, 1),
+            round_to_king_step(ICoord::new(-30, 25)),
             "snap to diagonal"
         );
     }
@@ -421,8 +421,8 @@ mod tests {
     fn test_relative_and_absolute() {
         let point = WorldPoint::new(4.0, 5.0);
         let moov = WorldMove::new(4.0, 5.0);
-        let square = WorldSquare::new(4, 5);
-        let step = WorldStep::new(4, 5);
+        let square = ICoord::new(4, 5);
+        let step = ICoord::new(4, 5);
 
         // TODO: uncomment when relativity is re-implemented
         // assert_true!(point.is_absolute());
@@ -447,9 +447,9 @@ mod tests {
     }
     #[test]
     fn test_king_length() {
-        assert_eq!(WorldStep::new(2, 3).king_length(), 3);
+        assert_eq!(ICoord::new(2, 3).king_length(), 3);
         assert_eq!(WorldMove::new(2.0, -3.0).king_length(), 3.0);
-        assert_eq!(WorldSquare::new(-2, 200).king_length(), 200);
+        assert_eq!(ICoord::new(-2, 200).king_length(), 200);
         assert_eq!(WorldPoint::new(1.5, 3.3).king_length(), 3.3);
     }
     #[test]

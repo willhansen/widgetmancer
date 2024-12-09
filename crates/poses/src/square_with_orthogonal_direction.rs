@@ -3,9 +3,11 @@ use std::{
     ops::{Add, Sub},
 };
 
+use map_macro::hash_set;
 use misc_utilities::*;
 use angles::*;
 use coordinates::*;
+// use static_assertions;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
 pub struct SquareWithOrthogonalDirection<SquareType>
@@ -175,7 +177,7 @@ where
 
     pub fn face_crosses_positive_x_axis(&self) -> bool {
         if self.square == SquareType::zero() {
-            return self.direction() == RIGHT;
+            return self.direction() == OrthogonalDirection::RIGHT;
         }
 
         self.square.x() > SquareType::DataType::zero()

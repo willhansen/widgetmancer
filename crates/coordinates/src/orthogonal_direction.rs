@@ -33,10 +33,15 @@ impl DirectionOperations for OrthogonalDirection {
     }
 }
 
-pub const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(0));
-pub const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(1));
-pub const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(2));
-pub const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(3));
+pub trait OrthogonalDirectionConstants {
+    const RIGHT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(0));
+    const UP: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(1));
+    const LEFT: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(2));
+    const DOWN: OrthogonalDirection = OrthogonalDirection(NormalizedOrthoAngle::from_quarter_turns_ccw(3));
+}
+
+impl OrthogonalDirectionConstants for OrthogonalDirection {}
+
 
 // Behavior of negative is the main difference between orthogonaldirection and normalizedorthoangle
 impl std::ops::Neg for OrthogonalDirection {
