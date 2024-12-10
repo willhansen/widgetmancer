@@ -921,10 +921,10 @@ mod tests {
         let start_segment = fence.edges[4];
         let end_segment = fence.edges[15];
         let start_angle = start_segment
-            .middle_point_of_face()
+            .midpoint()
             .better_angle_from_x_axis();
         let end_angle = end_segment
-            .middle_point_of_face()
+            .midpoint()
             .better_angle_from_x_axis();
 
         let arc = AngleInterval::from_angles(start_angle, end_angle);

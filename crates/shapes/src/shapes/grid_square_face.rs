@@ -4,7 +4,7 @@ use coordinate::*;
 pub struct GridSquareFace(SquareWithOrthogonalDirection<ICoord>);
 
 impl GridSquareFace {
-    pub fn middle_point_of_face(&self) -> FCoord {
+    pub fn midpoint(&self) -> FCoord {
         self.square.to_f32() + self.direction().to_step::<WorldMove>() * 0.5
     }
 
