@@ -6,6 +6,8 @@ edition.workspace = true
 [dependencies]
 # internal
 misc_utilities.workspace = true
+poses.workspace = true
+coordinates.workspace = true
 
 # external
 automod.workspace = true

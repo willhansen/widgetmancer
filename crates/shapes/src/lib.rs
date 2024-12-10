@@ -5,6 +5,8 @@ use misc_utilities::trait_alias;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::fmt::Debug;
 
+mod grid_square_face;
+
 pub type FloatPoint = euclid::Vector2D<f32, euclid::UnknownUnit>;
 
 trait_alias!(pub trait FloatPointReqs =  Neg<Output = Self>

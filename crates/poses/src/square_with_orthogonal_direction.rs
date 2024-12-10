@@ -144,94 +144,8 @@ where
     pub fn reversed(&self) -> Self {
         self.with_direction(-self.direction())
     }
-    pub fn face_is_on_same_line<OtherType: Into<Self>>(&self, other: OtherType) -> bool {
-        let other_face: Self = other.into();
-        let directions_are_parallel = self.dir.is_parallel(other_face.dir);
-        if !directions_are_parallel {
-            return false;
-        }
-
-        let pos_on_dir_axis = self.square().position_on_orthogonal_axis(self.dir());
-        let stepped_pos_on_dir_axis = self
-            .stepped()
-            .square()
-            .position_on_orthogonal_axis(self.dir());
-        let other_pos_on_dir_axis = other_face.square().position_on_orthogonal_axis(self.dir());
-
-        let same_direction = self.dir() == other_face.dir();
-        if same_direction {
-            other_pos_on_dir_axis == pos_on_dir_axis
-        } else {
-            other_pos_on_dir_axis == stepped_pos_on_dir_axis
-        }
-    }
-    pub fn faces_overlap<OtherType: Into<Self> + std::marker::Copy>(
-        &self,
-        other_face: OtherType,
-    ) -> bool {
-        *self == other_face.into() || *self == other_face.into().stepped().turned_back()
-    }
-    pub fn face_line_segment(&self) -> impl line_segment::Operations<SquareType::Floating> {
-        line::square_face_as_line(self.square, self.dir)
-    }
-
-    pub fn face_crosses_positive_x_axis(&self) -> bool {
-        if self.square == SquareType::zero() {
-            return self.direction() == OrthogonalDirection::RIGHT;
-        }
-
-        self.square.x() > SquareType::DataType::zero()
-            && self.square.y() == 0
-            && self.direction().is_horizontal()
-    }
-
-    pub fn center_point_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
-        self.square().to_f32()
-            + self
-                .dir()
-                .to_step::<<SquareType as coordinate::Operations>::Floating>()
-                * 0.5
-    }
-    pub fn end_points_of_face(&self) -> [<SquareType as coordinate::Operations>::Floating; 2] {
-        [self.left(), self.right()].map(|dir| {
-            self.center_point_of_face()
-                + dir.to_step::<<SquareType as coordinate::Operations>::Floating>() * 0.5
-        })
-    }
-    pub fn end_points_of_face_in_ccw_order(&self) -> [<SquareType as coordinate::Operations>::Floating; 2] {
-        let mut ps = self.end_points_of_face();
-        if !two_points_are_ccw_with_origin(ps[0], ps[1]) {
-            ps.reverse();
-        }
-        ps
-    }
-    pub fn cw_end_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
-        self.end_points_of_face_in_ccw_order()[0]
-    }
-    pub fn ccw_end_of_face(&self) -> <SquareType as coordinate::Operations>::Floating {
-        self.end_points_of_face_in_ccw_order()[1]
-    }
-    pub fn face_end_point_approx_touches_point(
-        &self,
-        point: <SquareType as coordinate::Operations>::Floating,
-    ) -> bool {
-        let tolerance = 1e-6;
-        self.end_points_of_face()
-            .into_iter()
-            .any(|end_point| end_point.about_eq(point, tolerance))
-    }
-    pub fn face_flipped_to_face_origin(&self) -> Self {
-        if self.square().dot(self.direction()) < 0 {
-            self.stepped().turned_back()
-        } else {
-            *self
-        }
-    }
-    pub fn both_sides_of_face(&self) -> [Self; 2] {
-        [*self, self.stepped().turned_back()]
-    }
 }
-impl<T: int_coordinate::Operations> Debug for SquareWithOrthogonalDirection<T>
+impl<T: IntCoordinateOperations> Debug for SquareWithOrthogonalDirection<T>
 where
     Self: Display,
 {
@@ -239,7 +153,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: int_coordinate::Operations> Display for SquareWithOrthogonalDirection<T> {
+impl<T: IntCoordinateOperations> Display for SquareWithOrthogonalDirection<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -265,15 +179,12 @@ impl<T: int_coordinate::Operations> Display for SquareWithOrthogonalDirection<T>
 //     }
 // }
 
-static_assertions::assert_not_impl_any!(WorldSquareWithOrthogonalDir: QuarterTurnRotatable);
+static_assertions::assert_not_impl_any!(SquareWithOrthogonalDirection: QuarterTurnRotatable);
 static_assertions::assert_not_impl_any!(RelativeSquareWithOrthogonalDir: QuarterTurnRotatable);
 static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable);
 
 // TODO: Generalize these functions for any unit
-impl WorldSquareWithOrthogonalDir {
-    pub fn middle_point_of_face(&self) -> WorldPoint {
-        self.square.to_f32() + self.direction().to_step::<WorldMove>() * 0.5
-    }
+impl SquareWithOrthogonalDirection {
 
     // TODO: replace with just subtraction, returning whatever a relative pose is (probably a translation and rotation)
     pub fn other_pose_absolute_to_relative(&self, other: impl Into<Self>) -> Self {
@@ -313,7 +224,7 @@ impl WorldSquareWithOrthogonalDir {
     }
 }
 
-impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
+impl TryFrom<SquareWithKingDir> for SquareWithOrthogonalDirection {
     type Error = &'static str;
 
     fn try_from(value: SquareWithKingDir) -> Result<Self, Self::Error> {
@@ -324,7 +235,7 @@ impl TryFrom<SquareWithKingDir> for WorldSquareWithOrthogonalDir {
     }
 }
 
-impl<T: int_coordinate::Operations> Add<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
+impl<T: IntCoordinateOperations> Add<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
     type Output = Self;
 
     fn add(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
@@ -335,7 +246,7 @@ impl<T: int_coordinate::Operations> Add<SquareWithOrthogonalDirection<T>> for Sq
     }
 }
 
-impl<T: int_coordinate::Operations> Sub<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
+impl<T: IntCoordinateOperations> Sub<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
     type Output = Self;
 
     fn sub(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
@@ -352,7 +263,7 @@ impl<T: int_coordinate::Operations> Sub<SquareWithOrthogonalDirection<T>> for Sq
 impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
     for SquareWithOrthogonalDirection<SquareType>
 where
-    SquareType: int_coordinate::Operations,
+    SquareType: IntCoordinateOperations,
     IntoSquareType: Into<SquareType>,
     IntoStepType: Into<SquareType>,
 {
