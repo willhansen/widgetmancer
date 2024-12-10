@@ -1,6 +1,0 @@
-
-use ladder_types::$MODULE::*;
-
-fn main() {
-   let _ = $RA::new() $SYMBOL $RB::new();
-}
