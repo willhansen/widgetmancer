@@ -1,7 +1,7 @@
 // automod::dir!("src");
 // mod coordinates;
 mod coordinate;
-pub use coordinate::{Operations as CoordinateOperations, coord};
+pub use coordinate::{coord, Operations as CoordinateOperations};
 
 mod int_coordinate;
 pub use int_coordinate::{ICoord, Operations as IntCoordinateOperations};
@@ -16,7 +16,7 @@ mod direction;
 pub use direction::Operations as DirectionOperations;
 
 mod orthogonal_direction;
-pub use orthogonal_direction::{OrthogonalDirection, OrthogonalDirectionConstants};
+pub use orthogonal_direction::OrthogonalDirection;
 
 mod king_direction;
 pub use king_direction::KingDirection;
@@ -28,24 +28,16 @@ pub use quarter_turn_rotatable::QuarterTurnRotatable;
 
 use geo::Coord;
 
+pub use num::{One, Zero};
 pub use std::fmt::{Debug, Display};
-pub use num::{Zero, One};
-
-
-
 
 // TODO: why does using newtypes on these cause rust-analyzer memory to skyrocket? // TODO: replace these with versions that properly incorporate addition and subtraction relativity #[derive( Clone, Copy, Hash, Eq, PartialEq, Debug, derive_more::Add, derive_more::Sub, derive_more::Neg, )]
 // pub struct Point2D<DataType, UnitType>(euclid::Point2D<DataType, UnitType>);
 // #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 // pub struct Vector2D<DataType, UnitType>(euclid::Vector2D<DataType, UnitType>);
 
-
-
 // TODO: there's got to be a better way to extract associated types
 // pub type DataTypeOf<P> = <P as coordinate::Operations>::DataType;
-
-
-
 
 // macro_rules! make_coordinate_datatype_cast_function {
 //     ($name:ident, $data_type:ty, $coord_type:ty) => {
@@ -57,7 +49,6 @@ pub use num::{Zero, One};
 //         }
 //     };
 // }
-
 
 // impl<O, T> From<O> for Coord<T>
 // where
@@ -78,8 +69,6 @@ pub use num::{Zero, One};
 //         value.angle().into()
 //     }
 // }
-
-
 
 // TODO: uncomment when newtyping Vector2D and Point2D
 // macro_rules! impl_from_tuple {
@@ -141,8 +130,6 @@ pub use num::{Zero, One};
 // {
 // }
 
-
-
 // pub fn sign2d<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 //     point2(sign_f32(point.x()), sign_f32(point.y()))
 // }
@@ -150,26 +137,6 @@ pub use num::{Zero, One};
 // pub fn fraction_part<U>(point: Point2D<f32, U>) -> Point2D<f32, U> {
 //     point - point.round()
 // }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -242,57 +209,28 @@ mod tests {
     }
     #[test]
     fn test_angle_from_x_axis() {
-        assert_about_eq!(
-            coord(0.5, 0.5)
-                .angle_from_x_axis()
-                .to_degrees(),
-            45.0
-        );
-        assert_about_eq!(
-            coord(0.0, 0.5)
-                .angle_from_x_axis()
-                .to_degrees(),
-            90.0
-        );
-        assert_about_eq!(
-            coord(0.0, -0.5)
-                .angle_from_x_axis()
-                .to_degrees(),
-            -90.0
-        );
-        assert_about_eq!(
-            coord(1.0, 0.0)
-                .angle_from_x_axis()
-                .degrees(),
-            0.0
-        );
-        assert_about_eq!(
-            coord(-1.0, 0.0)
-                .angle_from_x_axis()
-                .degrees(),
-            180.0
-        );
+        assert_about_eq!(coord(0.5, 0.5).angle_from_x_axis().to_degrees(), 45.0);
+        assert_about_eq!(coord(0.0, 0.5).angle_from_x_axis().to_degrees(), 90.0);
+        assert_about_eq!(coord(0.0, -0.5).angle_from_x_axis().to_degrees(), -90.0);
+        assert_about_eq!(coord(1.0, 0.0).angle_from_x_axis().degrees(), 0.0);
+        assert_about_eq!(coord(-1.0, 0.0).angle_from_x_axis().degrees(), 180.0);
     }
 
     #[test]
     // TODO this should fail, then we can delete the test
     fn test_built_in_angle_from_x_axis_can_not_be_trusted() {
-        assert!(
-            (coord(0.5, 0.5)
-                .angle_from_x_axis()
-                .degrees()
-                - 45.0)
-                .abs()
-                > 0.01
-        );
+        assert!((coord(0.5, 0.5).angle_from_x_axis().degrees() - 45.0).abs() > 0.01);
     }
 
     #[test]
     fn test_standardize_angle() {
         assert_about_eq!(
-
-            FAngle::from_degrees(75.0).standardized_centered_at_zero().radians(),
-            FAngle::from_degrees(75.0 - 360.0).standardized_centered_at_zero().radians()
+            FAngle::from_degrees(75.0)
+                .standardized_centered_at_zero()
+                .radians(),
+            FAngle::from_degrees(75.0 - 360.0)
+                .standardized_centered_at_zero()
+                .radians()
         );
     }
     #[test]
@@ -370,15 +308,15 @@ mod tests {
         #[test]
         fn simple_true() {
             assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.0, 0.0), 0.0)
-                .is_true()
-        )
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.0, 0.0), 0.0)
+                    .is_true()
+            )
         }
         #[test]
         fn simple_false() {
             assert!(
-            point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(5.0, 0.0), 0.0)
-                .is_false()
+                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(5.0, 0.0), 0.0)
+                    .is_false()
             )
         }
 
@@ -386,35 +324,37 @@ mod tests {
             use super::*;
             #[test]
             fn outside_square() {
-                assert!(
-                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.0), 0.2)
-                    .is_partial()
-            )
+                assert!(point_is_in_centered_unit_square_with_tolerance(
+                    WorldPoint::new(0.51, 0.0),
+                    0.2
+                )
+                .is_partial())
             }
             #[test]
             fn inside_square() {
-                assert!(
-                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.0), 0.2)
-                    .is_partial()
-            )
+                assert!(point_is_in_centered_unit_square_with_tolerance(
+                    WorldPoint::new(0.49, 0.0),
+                    0.2
+                )
+                .is_partial())
             }
             #[test]
             fn outside_square_diagonally() {
-                assert!(
-                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.51, 0.51), 0.2)
-                    .is_partial()
-            )
+                assert!(point_is_in_centered_unit_square_with_tolerance(
+                    WorldPoint::new(0.51, 0.51),
+                    0.2
+                )
+                .is_partial())
             }
             #[test]
             fn inside_square_diagonally() {
-                assert!(
-                point_is_in_centered_unit_square_with_tolerance(WorldPoint::new(0.49, 0.49), 0.2)
-                    .is_partial()
-            )
+                assert!(point_is_in_centered_unit_square_with_tolerance(
+                    WorldPoint::new(0.49, 0.49),
+                    0.2
+                )
+                .is_partial())
             }
         }
-
-
     }
     #[test]
     #[ignore = "Relativity is unimplemented for coordinates for the time being"]

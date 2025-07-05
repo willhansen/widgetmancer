@@ -190,6 +190,10 @@ pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
+pub fn map_into<A: Into<B>, B>(a: impl IntoIterator<Item = A>) -> impl Iterator<Item = B> {
+    a.into_iter().map(|x| x.into())
+}
+
 #[cfg(test)]
 mod tests {
     use std::array::from_fn;

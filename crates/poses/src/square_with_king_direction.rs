@@ -1,6 +1,7 @@
 
 use misc_utilities::*;
 use coordinates::*;
+use crate::*;
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Copy)]
 pub struct SquareWithKingDir {
@@ -33,8 +34,8 @@ impl SquareWithKingDir {
     }
 }
 
-impl From<WorldSquareWithOrthogonalDir> for SquareWithKingDir {
-    fn from(value: WorldSquareWithOrthogonalDir) -> Self {
+impl From<SquareWithOrthogonalDirection> for SquareWithKingDir {
+    fn from(value: SquareWithOrthogonalDirection) -> Self {
         SquareWithKingDir {
             square: value.square(),
             direction: value.direction().into(),

@@ -3,26 +3,23 @@ use std::{
     ops::{Add, Sub},
 };
 
-use map_macro::hash_set;
-use misc_utilities::*;
+use crate::*;
 use angles::*;
 use coordinates::*;
+use map_macro::hash_set;
+use misc_utilities::*;
 // use static_assertions;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
-pub struct SquareWithOrthogonalDirection<SquareType>
-where
-    SquareType: IntCoordinateOperations,
+pub struct SquareWithOrthogonalDirection
 {
-    square: SquareType,
+    square: ICoord,
     dir: OrthogonalDirection,
 }
 
-impl<SquareType> SquareWithOrthogonalDirection<SquareType>
-where
-    SquareType: IntCoordinateOperations,
+impl SquareWithOrthogonalDirection
 {
-    pub fn square(&self) -> SquareType {
+    pub fn square(&self) -> ICoord {
         self.square
     }
     pub fn dir(&self) -> OrthogonalDirection {
@@ -33,17 +30,16 @@ where
         self.dir.into()
     }
     pub fn from_square_and_step(
-        square: impl Into<SquareType>,
-        step: impl Into<SquareType>,
+        square: ICoord,
+        step: ICoord,
     ) -> Self {
-        let step = step.into();
         Self::from_square_and_dir(
             square,
             OrthogonalDirection::try_from_coordinate(step).unwrap(),
         )
     }
     pub fn from_square_and_dir(
-        square: impl Into<SquareType>,
+        square: ICoord,
         direction: impl Into<OrthogonalDirection>,
     ) -> Self {
         Self {
@@ -52,8 +48,8 @@ where
         }
     }
     pub fn from_x_y_dir(
-        x: SquareType::DataType,
-        y: SquareType::DataType,
+        x: i32,
+        y: i32,
         dir: OrthogonalDirection,
     ) -> Self {
         Self::from_square_and_dir((x, y), dir)
@@ -66,7 +62,7 @@ where
     }
     pub fn stepped_n(&self, n: i32) -> Self {
         Self::from_square_and_dir(
-            self.square + self.direction().to_step::<SquareType>() * n,
+            self.square + self.direction().to_step() * n,
             self.direction(),
         )
     }
@@ -81,7 +77,7 @@ where
     }
     pub fn strafed_right_n(&self, n: i32) -> Self {
         Self::from_square_and_step(
-            self.square + self.right().to_step::<SquareType>() * n,
+            self.square + self.right().to_step() * n,
             self.direction(),
         )
     }
@@ -132,10 +128,10 @@ where
     pub fn turned_back(&self) -> Self {
         Self::from_square_and_dir(self.square, -self.direction())
     }
-    pub fn with_offset(&self, offset: SquareType) -> Self {
+    pub fn with_offset(&self, offset: ICoord) -> Self {
         Self::from_square_and_step(self.square + offset, self.dir())
     }
-    pub fn at_square(&self, position: impl Into<SquareType>) -> Self {
+    pub fn at_square(&self, position: ICoord) -> Self {
         Self::from_square_and_step(position, self.dir())
     }
     pub fn with_direction(&self, dir: impl Into<OrthogonalDirection>) -> Self {
@@ -145,7 +141,7 @@ where
         self.with_direction(-self.direction())
     }
 }
-impl<T: IntCoordinateOperations> Debug for SquareWithOrthogonalDirection<T>
+impl Debug for SquareWithOrthogonalDirection
 where
     Self: Display,
 {
@@ -153,7 +149,7 @@ where
         std::fmt::Display::fmt(&(&self), &mut f)
     }
 }
-impl<T: IntCoordinateOperations> Display for SquareWithOrthogonalDirection<T> {
+impl Display for SquareWithOrthogonalDirection {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: tidy
         write!(
@@ -180,19 +176,19 @@ impl<T: IntCoordinateOperations> Display for SquareWithOrthogonalDirection<T> {
 // }
 
 static_assertions::assert_not_impl_any!(SquareWithOrthogonalDirection: QuarterTurnRotatable);
-static_assertions::assert_not_impl_any!(RelativeSquareWithOrthogonalDir: QuarterTurnRotatable);
 static_assertions::assert_not_impl_any!(SquareWithKingDir: QuarterTurnRotatable);
 
 // TODO: Generalize these functions for any unit
 impl SquareWithOrthogonalDirection {
-
     // TODO: replace with just subtraction, returning whatever a relative pose is (probably a translation and rotation)
     pub fn other_pose_absolute_to_relative(&self, other: impl Into<Self>) -> Self {
         let other = other.into();
 
-        let naive_translation: WorldStep = other.square - self.square;
-        let rotation =
-            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.to_step(), STEP_UP);
+        let naive_translation: ICoord = other.square - self.square;
+        let rotation = NormalizedOrthoAngle::from_start_and_end_directions(
+            self.dir.to_step(),
+            OrthogonalDirection::UP,
+        );
         Self::from_square_and_step(
             naive_translation.quarter_rotated_ccw(rotation),
             other.dir.quarter_rotated_ccw(rotation),
@@ -204,23 +200,28 @@ impl SquareWithOrthogonalDirection {
     ) -> Self {
         let other: Self = other.into();
 
-        let relative_translation: WorldStep = other.square;
-        let rotation =
-            NormalizedOrthoAngle::from_start_and_end_directions(self.dir.to_step(), STEP_UP);
+        let relative_translation: ICoord = other.square;
+        let rotation = NormalizedOrthoAngle::from_start_and_end_directions(
+            self.dir.to_step(),
+            OrthogonalDirection::UP,
+        );
         Self::from_square_and_step(
             self.square + relative_translation.quarter_rotated_ccw(-rotation),
             other.dir.quarter_rotated_ccw(-rotation),
         )
     }
     // TODO: Rename
-    pub fn other_square_absolute_to_relative(&self, other: impl Into<WorldSquare>) -> WorldStep {
-        self.other_pose_absolute_to_relative((other.into(), STEP_UP))
+    pub fn other_square_absolute_to_relative(&self, other: ICoord) -> ICoord {
+        self.other_pose_absolute_to_relative((other.into(), OrthogonalDirection::UP))
             .square()
     }
     // TODO: Rename
-    pub fn other_square_relative_to_absolute(&self, other: impl Into<WorldStep>) -> WorldSquare {
-        self.convert_other_pose_from_using_this_origin_to_absolute_origin((other.into(), STEP_UP))
-            .square()
+    pub fn other_square_relative_to_absolute(&self, other: ICoord) -> ICoord {
+        self.convert_other_pose_from_using_this_origin_to_absolute_origin((
+            other.into(),
+            OrthogonalDirection::UP,
+        ))
+        .square()
     }
 }
 
@@ -235,10 +236,13 @@ impl TryFrom<SquareWithKingDir> for SquareWithOrthogonalDirection {
     }
 }
 
-impl<T: IntCoordinateOperations> Add<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
+// TODO: don't add two absolute poses
+impl Add<SquareWithOrthogonalDirection>
+    for SquareWithOrthogonalDirection
+{
     type Output = Self;
 
-    fn add(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
+    fn add(self, rhs: SquareWithOrthogonalDirection) -> Self::Output {
         SquareWithOrthogonalDirection::from_square_and_dir(
             self.square + rhs.square,
             self.angle() + rhs.angle(),
@@ -246,10 +250,12 @@ impl<T: IntCoordinateOperations> Add<SquareWithOrthogonalDirection<T>> for Squar
     }
 }
 
-impl<T: IntCoordinateOperations> Sub<SquareWithOrthogonalDirection<T>> for SquareWithOrthogonalDirection<T> {
+impl Sub<SquareWithOrthogonalDirection>
+    for SquareWithOrthogonalDirection
+{
     type Output = Self;
 
-    fn sub(self, rhs: SquareWithOrthogonalDirection<T>) -> Self::Output {
+    fn sub(self, rhs: SquareWithOrthogonalDirection) -> Self::Output {
         SquareWithOrthogonalDirection::from_square_and_dir(
             self.square - rhs.square,
             self.angle() - rhs.angle(),
@@ -260,12 +266,11 @@ impl<T: IntCoordinateOperations> Sub<SquareWithOrthogonalDirection<T>> for Squar
 // Generic pair to single type thing
 // TODO: implement for base Pose trait
 // TODO: make base Pose trait
-impl<IntoSquareType, IntoStepType, SquareType> From<(IntoSquareType, IntoStepType)>
-    for SquareWithOrthogonalDirection<SquareType>
+impl<IntoSquareType, IntoStepType> From<(IntoSquareType, IntoStepType)>
+    for SquareWithOrthogonalDirection
 where
-    SquareType: IntCoordinateOperations,
-    IntoSquareType: Into<SquareType>,
-    IntoStepType: Into<SquareType>,
+    IntoSquareType: Into<ICoord>,
+    IntoStepType: Into<ICoord>,
 {
     // type Error = &'static str;
 
@@ -275,10 +280,9 @@ where
     }
 }
 
-impl<T, SquareType, IntoDir> From<(T, T, IntoDir)> for SquareWithOrthogonalDirection<SquareType>
+impl<T,  IntoDir> From<(T, T, IntoDir)> for SquareWithOrthogonalDirection
 where
-    (T, T): Into<SquareType>,
-    SquareType: WorldIntCoordinateOps,
+    (T, T): Into<ICoord>,
     IntoDir: Into<OrthogonalDirection>,
 {
     fn from(value: (T, T, IntoDir)) -> Self {
@@ -286,11 +290,10 @@ where
     }
 }
 
-impl<SquareType> From<SquareWithOrthogonalDirection<SquareType>> for (SquareType, OrthogonalDirection)
-where
-    SquareType: WorldIntCoordinateOps,
+impl From<SquareWithOrthogonalDirection>
+    for (ICoord, OrthogonalDirection)
 {
-    fn from(value: SquareWithOrthogonalDirection<SquareType>) -> (SquareType, OrthogonalDirection) {
+    fn from(value: SquareWithOrthogonalDirection) -> (ICoord, OrthogonalDirection) {
         (value.square, value.direction())
     }
 }
@@ -334,9 +337,7 @@ where
 //     }
 // }
 
-impl<SquareType> RigidlyTransformable for SquareWithOrthogonalDirection<SquareType>
-where
-    SquareType: Copy + RigidlyTransformable + WorldIntCoordinateOps,
+impl RigidlyTransformable for SquareWithOrthogonalDirection
 {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self {
         Self::from_square_and_step(
@@ -346,48 +347,51 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn test_touched_square_faces() {
+        use OrthogonalDirection as dir;
         [
             ((0.0, 0.0), hash_set![]),
-            ((0.5, 0.0), hash_set![(0, 0, RIGHT), (1, 0, LEFT)]),
-            ((-8.5, 0.0), hash_set![(-9, 0, RIGHT), (-8, 0, LEFT)]),
-            ((0.2, 0.5), hash_set![(0, 0, UP), (0, 1, DOWN)]),
+            ((0.5, 0.0), hash_set![(0, 0, dir::RIGHT), (1, 0, dir::LEFT)]),
+            (
+                (-8.5, 0.0),
+                hash_set![(-9, 0, dir::RIGHT), (-8, 0, dir::dir::LEFT)],
+            ),
+            ((0.2, 0.5), hash_set![(0, 0, dir::UP), (0, 1, dir::DOWN)]),
             (
                 (0.5, 0.5),
                 hash_set![
-                    (0, 0, RIGHT),
-                    (1, 0, LEFT),
-                    (0, 1, RIGHT),
-                    (1, 1, LEFT),
-                    (0, 0, UP),
-                    (0, 1, DOWN),
-                    (1, 0, UP),
-                    (1, 1, DOWN),
+                    (0, 0, dir::RIGHT),
+                    (1, 0, dir::LEFT),
+                    (0, 1, dir::RIGHT),
+                    (1, 1, dir::LEFT),
+                    (0, 0, dir::UP),
+                    (0, 1, dir::DOWN),
+                    (1, 0, dir::UP),
+                    (1, 1, dir::DOWN),
                 ],
             ),
             (
                 (-0.5, 0.5),
                 hash_set![
-                    (-1, 0, RIGHT),
-                    (0, 0, LEFT),
-                    (-1, 1, RIGHT),
-                    (0, 1, LEFT),
-                    (-1, 0, UP),
-                    (-1, 1, DOWN),
-                    (0, 0, UP),
-                    (0, 1, DOWN),
+                    (-1, 0, dir::RIGHT),
+                    (0, 0, dir::LEFT),
+                    (-1, 1, dir::RIGHT),
+                    (0, 1, dir::LEFT),
+                    (-1, 0, dir::UP),
+                    (-1, 1, dir::DOWN),
+                    (0, 0, dir::UP),
+                    (0, 1, dir::DOWN),
                 ],
             ),
         ]
         .into_iter()
         .for_each(|((x, y), faces)| {
-            let faces: HashSet<SquareWithOrthogonalDirection<WorldSquare>> = map_into(faces).collect();
-            assert_eq!(WorldPoint::new(x, y).touched_square_faces(), faces);
+            let faces: HashSet<SquareWithOrthogonalDirection> = map_into(faces).collect();
+            assert_eq!(FCoord::new(x, y).touched_square_faces(), faces);
         })
     }
 }

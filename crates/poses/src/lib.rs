@@ -1,7 +1,16 @@
 // automod::dir!(pub "src");
 
 mod square_with_orthogonal_direction;
+pub use square_with_orthogonal_direction::SquareWithOrthogonalDirection;
+
 mod square_with_king_direction;
+pub use square_with_king_direction::SquareWithKingDir;
+
+mod rigidly_transformable;
+pub use rigidly_transformable::RigidlyTransformable;
+
+mod rigid_transform;
+pub use rigid_transform::RigidTransform;
 
 
 use misc_utilities::*;
@@ -24,6 +33,7 @@ impl TranslationAndRotationTransform {
     }
 }
 
+// TODO: put in GridSquare struct impl
 pub fn faces_of_square_facing_away_from_origin(square: ICoord) -> HashSet<SquareWithOrthogonalDirection> {
     ORTHOGONAL_DIRECTIONS
         .iter()

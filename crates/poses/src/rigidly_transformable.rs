@@ -1,4 +1,6 @@
 
+// Is a rigid transform different from the translation and rotation transform?
+
 pub trait RigidlyTransformable {
     fn apply_rigid_transform(&self, tf: RigidTransform) -> Self;
 }
