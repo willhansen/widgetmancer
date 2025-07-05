@@ -1,3 +1,5 @@
+use euclid::point2;
+use itertools::Itertools;
 use rgb::RGB8;
 use rust_roguelike::glyph::DoubleGlyphFunctions;
 use rust_roguelike::graphics::Graphics;
@@ -12,8 +14,6 @@ use termion::{
     input::{MouseTerminal, TermRead},
     raw::IntoRawMode,
 };
-use euclid::point2;
-use itertools::Itertools;
 
 struct GameState {
     width: u16,
@@ -23,6 +23,14 @@ struct GameState {
     last_frame: Option<Frame>,
 }
 impl GameState {
+    pub fn new(width: u16, height: u16) -> Self {
+        GameState {
+            width,
+            height,
+            mouse_pos: None,
+            last_frame: None,
+        }
+    }
     pub fn process_event(&mut self, event: Event) {
         match event {
             Event::Key(key) => match key {
@@ -52,15 +60,19 @@ impl GameState {
     }
     pub fn render(&self) -> Frame {
         Frame {
-            grid: (0..self.width).map(|col| {
-                (0..self.height).map(|row| {
-                    let x = col;
-                    let y = self.height - row - 1;
-                    DoubleGlyph::solid_color(board_color(point2(x as i32,y as i32)).unwrap())
-
-                }).collect_vec()
-
-        }).collect_vec()
+            grid: (0..self.width)
+                .map(|col| {
+                    (0..self.height)
+                        .map(|row| {
+                            let x = col;
+                            let y = self.height - row - 1;
+                            DoubleGlyph::solid_color(
+                                board_color(point2(x as i32, y as i32)).unwrap(),
+                            )
+                        })
+                        .collect_vec()
+                })
+                .collect_vec(),
         }
     }
 }
@@ -74,6 +86,12 @@ struct Frame {
 }
 
 impl Frame {
+    pub fn width(&self) -> usize {
+        self.grid[0].len()
+    }
+    pub fn height(&self) -> usize {
+        self.grid.len()
+    }
     pub fn diff(&self, maybe_old_frame: &Option<Frame>) -> String {
         let mut output = String::new();
 
@@ -95,10 +113,10 @@ impl Frame {
                     .is_some_and(|[prev_row, prev_col]| row == prev_row && prev_col == col - 1);
 
                 let should_do_linewrap = prev_written_row_col.is_some_and(|[prev_row, prev_col]| {
-                    prev_row == row - 1 && col == 0 && prev_col == cols - 1
+                    prev_row + 1 == row && col == 0 && prev_col + 1 == cols
                 });
                 let directly_below = prev_written_row_col
-                    .is_some_and(|[prev_row, prev_col]| prev_row == row - 1 && col == prev_col);
+                    .is_some_and(|[prev_row, prev_col]| prev_row + 1 == row && col == prev_col);
 
                 if just_next_horizontally {
                     // Do nothing
@@ -148,6 +166,7 @@ fn main() {
         }
         let frame = game_state.render();
         draw_frame(&mut writable, &frame, &game_state.last_frame);
+        game_state.last_frame = Some(frame);
         thread::sleep(Duration::from_millis(21));
     }
 }
@@ -155,4 +174,18 @@ fn main() {
 fn board_color(square: WorldSquare) -> Option<RGB8> {
     let is_white = ((square.x / 3) % 2 == 0) == ((square.y / 3) % 2 == 0);
     Some(if is_white { grey(191) } else { grey(127) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    #[test]
+    fn test_simple_output() {
+        let state = GameState::new(10, 10);
+        let frame = state.render();
+        assert_eq!(frame.width(), 10);
+        assert_eq!(frame.height(), 10);
+    }
 }
