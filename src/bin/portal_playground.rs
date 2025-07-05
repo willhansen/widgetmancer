@@ -12,6 +12,8 @@ use termion::{
     input::{MouseTerminal, TermRead},
     raw::IntoRawMode,
 };
+use euclid::point2;
+use itertools::Itertools;
 
 struct GameState {
     width: u16,
@@ -21,9 +23,50 @@ struct GameState {
     last_frame: Option<Frame>,
 }
 impl GameState {
-    pub fn render(&self) -> Frame {
-        todo!();
+    pub fn process_event(&mut self, event: Event) {
+        match event {
+            Event::Key(key) => match key {
+                Key::Char('q') => std::process::exit(0),
+                // Key::Backspace => todo!(),
+                // Key::Left => todo!(),
+                // Key::Right => todo!(),
+                // Key::Up => todo!(),
+                // Key::Down => todo!(),
+                // Key::Home => todo!(),
+                // Key::End => todo!(),
+                // Key::PageUp => todo!(),
+                // Key::PageDown => todo!(),
+                // Key::BackTab => todo!(),
+                // Key::Delete => todo!(),
+                // Key::Insert => todo!(),
+                // Key::F(_) => todo!(),
+                // Key::Alt(_) => todo!(),
+                // Key::Ctrl(_) => todo!(),
+                // Key::Null => todo!(),
+                // Key::Esc => todo!(),
+                _ => {}
+            },
+            Event::Mouse(mouse_event) => todo!(),
+            Event::Unsupported(items) => todo!(),
+        }
     }
+    pub fn render(&self) -> Frame {
+        Frame {
+            grid: (0..self.width).map(|col| {
+                (0..self.height).map(|row| {
+                    let x = col;
+                    let y = self.height - row - 1;
+                    DoubleGlyph::solid_color(board_color(point2(x as i32,y as i32)).unwrap())
+
+                }).collect_vec()
+
+        }).collect_vec()
+        }
+    }
+}
+
+fn grey(x: u8) -> RGB8 {
+    RGB8::new(x, x, x)
 }
 
 struct Frame {
@@ -79,14 +122,13 @@ impl Frame {
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     write!(writable, "{}", new_frame.diff(maybe_old_frame));
-
 }
 
 fn main() {
     let (width, height) = termion::terminal_size().unwrap();
 
     let mut game_state = GameState {
-        width,
+        width: width / 2,
         height,
         mouse_pos: None,
         last_frame: None,
@@ -102,31 +144,7 @@ fn main() {
 
     loop {
         while let Ok(event) = event_receiver.try_recv() {
-            match event {
-                Event::Key(key) => match key {
-                    Key::Char('q') => std::process::exit(0),
-                    // Key::Backspace => todo!(),
-                    // Key::Left => todo!(),
-                    // Key::Right => todo!(),
-                    // Key::Up => todo!(),
-                    // Key::Down => todo!(),
-                    // Key::Home => todo!(),
-                    // Key::End => todo!(),
-                    // Key::PageUp => todo!(),
-                    // Key::PageDown => todo!(),
-                    // Key::BackTab => todo!(),
-                    // Key::Delete => todo!(),
-                    // Key::Insert => todo!(),
-                    // Key::F(_) => todo!(),
-                    // Key::Alt(_) => todo!(),
-                    // Key::Ctrl(_) => todo!(),
-                    // Key::Null => todo!(),
-                    // Key::Esc => todo!(),
-                    _ => {},
-                },
-                Event::Mouse(mouse_event) => todo!(),
-                Event::Unsupported(items) => todo!(),
-            }
+            game_state.process_event(event);
         }
         let frame = game_state.render();
         draw_frame(&mut writable, &frame, &game_state.last_frame);
@@ -135,5 +153,6 @@ fn main() {
 }
 
 fn board_color(square: WorldSquare) -> Option<RGB8> {
-    todo!();
+    let is_white = ((square.x / 3) % 2 == 0) == ((square.y / 3) % 2 == 0);
+    Some(if is_white { grey(191) } else { grey(127) })
 }
