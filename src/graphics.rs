@@ -95,7 +95,7 @@ pub struct Graphics {
 }
 
 impl Graphics {
-    pub(crate) fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
+    pub fn new(terminal_width: u16, terminal_height: u16, start_time: Instant) -> Graphics {
         let mut g = Graphics {
             screen: Screen::new(terminal_width, terminal_height),
             draw_buffer: HashMap::default(),

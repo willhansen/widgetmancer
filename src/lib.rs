@@ -36,7 +36,7 @@ pub mod animations;
 mod fov_stuff;
 pub mod game;
 pub mod glyph;
-mod graphics;
+pub mod graphics;
 mod inputmap;
 pub mod piece;
 pub mod portal_geometry;
@@ -51,7 +51,7 @@ fn set_up_panic_hook() {
     }));
 }
 
-fn set_up_input_thread() -> Receiver<Event> {
+pub fn set_up_input_thread() -> Receiver<Event> {
     let (tx, rx) = channel();
     thread::spawn(move || {
         for c in stdin().events() {
