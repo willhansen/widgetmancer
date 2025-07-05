@@ -31,7 +31,7 @@ struct Frame {
 }
 
 impl Frame {
-    pub fn diff(&self, old_frame: Frame) -> String {
+    pub fn diff(&self, maybe_old_frame: &Option<Frame>) -> String {
         let mut output = String::new();
 
         let rows = self.grid.len();
@@ -40,12 +40,14 @@ impl Frame {
         for row in 0..rows {
             for col in 0..cols {
                 let new_glyphs = self.grid[row][col].to_string();
-                let old_glyphs = old_frame.grid[row][col].to_string();
-                let this_square_is_same = new_glyphs == old_glyphs;
-                if this_square_is_same {
-                    continue;
-                }
 
+                if let Some(old_frame) = maybe_old_frame {
+                    let old_glyphs = old_frame.grid[row][col].to_string();
+                    let this_square_is_same = new_glyphs == old_glyphs;
+                    if this_square_is_same {
+                        continue;
+                    }
+                }
                 let just_next_horizontally = prev_written_row_col
                     .is_some_and(|[prev_row, prev_col]| row == prev_row && prev_col == col - 1);
 
@@ -61,6 +63,9 @@ impl Frame {
                     output += "\n\r";
                 } else if directly_below {
                     output += "\n";
+                } else {
+                    output +=
+                        &termion::cursor::Goto((col + 1) as u16, (row + 1) as u16).to_string();
                 }
 
                 output += &new_glyphs.to_string();
@@ -68,8 +73,13 @@ impl Frame {
                 prev_written_row_col = Some([row, col]);
             }
         }
-            output
+        output
     }
+}
+
+fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
+    write!(writable, "{}", new_frame.diff(maybe_old_frame));
+
 }
 
 fn main() {
@@ -95,13 +105,31 @@ fn main() {
             match event {
                 Event::Key(key) => match key {
                     Key::Char('q') => std::process::exit(0),
+                    // Key::Backspace => todo!(),
+                    // Key::Left => todo!(),
+                    // Key::Right => todo!(),
+                    // Key::Up => todo!(),
+                    // Key::Down => todo!(),
+                    // Key::Home => todo!(),
+                    // Key::End => todo!(),
+                    // Key::PageUp => todo!(),
+                    // Key::PageDown => todo!(),
+                    // Key::BackTab => todo!(),
+                    // Key::Delete => todo!(),
+                    // Key::Insert => todo!(),
+                    // Key::F(_) => todo!(),
+                    // Key::Alt(_) => todo!(),
+                    // Key::Ctrl(_) => todo!(),
+                    // Key::Null => todo!(),
+                    // Key::Esc => todo!(),
+                    _ => {},
                 },
                 Event::Mouse(mouse_event) => todo!(),
                 Event::Unsupported(items) => todo!(),
             }
         }
         let frame = game_state.render();
-        draw_frame(frame, &mut writable);
+        draw_frame(&mut writable, &frame, &game_state.last_frame);
         thread::sleep(Duration::from_millis(21));
     }
 }
