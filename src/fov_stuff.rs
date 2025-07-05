@@ -883,7 +883,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                 let combined_view_arc_of_portals: AngleInterval = if portal_view_arcs.len() == 1 {
                     *portal_view_arcs.values().next().unwrap()
                 } else if portal_view_arcs.len() == 2 {
-                    let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
+                    // let arcs = portal_view_arcs.values().next_chunk::<2>().unwrap();
+                    let mut vals = portal_view_arcs.values();
+                    let arcs = [vals.next().unwrap(), vals.next().unwrap()];
                     arcs[0].union(*arcs[1])
                 } else {
                     panic!(
@@ -1304,7 +1306,7 @@ mod tests {
     #[test]
     fn test_fov_square_sequence__detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new(Octant::new(1), 0);
-        let correct_sequence = [
+        let correct_sequence = vec![
             vec2(0, 0),
             vec2(0, 1),
             vec2(1, 1),
@@ -1313,7 +1315,7 @@ mod tests {
             vec2(2, 2),
             vec2(0, 3),
         ];
-        assert_eq!(sequence.next_chunk::<7>().unwrap(), correct_sequence);
+        assert_eq!(sequence.take(7).collect_vec(), correct_sequence);
     }
 
     #[test]

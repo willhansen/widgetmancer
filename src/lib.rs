@@ -1,18 +1,5 @@
 //#![allow(non_snake_case)]
-#![feature(is_sorted)]
-#![feature(extract_if)]
 #![allow(warnings)]
-#![feature(trait_upcasting)]
-#![feature(duration_constants)]
-#![feature(int_abs_diff)]
-#![feature(inline_const_pat)]
-#![feature(is_some_and)]
-#![feature(let_chains)]
-#![feature(drain_keep_rest)]
-#![feature(inherent_associated_types)]
-#![feature(iter_next_chunk)]
-#![feature(trait_alias)]
-#![feature(div_duration)]
 #![allow(non_snake_case)]
 
 extern crate approx;

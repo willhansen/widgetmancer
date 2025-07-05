@@ -219,12 +219,19 @@ impl PortalGeometry {
                 self.get_portal_by_entrance(second_y_entrance);
 
             // miss the first portals (the directly orthogonal ones, unless there are two of them at once
-            if let Some(first_x_portal) = maybe_first_x_portal && let Some(first_y_portal) = maybe_first_y_portal {
+            if maybe_first_x_portal.is_some() && maybe_first_y_portal.is_some() {
+                let first_x_portal = maybe_first_x_portal.unwrap();
+                let first_y_portal = maybe_first_y_portal.unwrap();
                 if first_x_portal.is_coherent_with(&first_y_portal) {
                     // TODO: account for other second portals on the other side of the first ones.
-                    let dest_square = first_x_portal.exit.square() + first_y_portal.exit.direction().step();
-                    let dest_dir = first_x_portal.exit.direction().step() + first_y_portal.exit.direction().step();
-                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
+                    let dest_square =
+                        first_x_portal.exit.square() + first_y_portal.exit.direction().step();
+                    let dest_dir = first_x_portal.exit.direction().step()
+                        + first_y_portal.exit.direction().step();
+                    Ok(SquareWithKingDir::from_square_and_step(
+                        dest_square,
+                        dest_dir,
+                    ))
                 } else {
                     // Can't walk through a portal corner that goes to two different places
                     Err(())
@@ -232,39 +239,63 @@ impl PortalGeometry {
             } else {
                 // ignore single adjacent portals, just go around them.
                 // consider the second portals instead
-                if let Some(second_x_portal) = maybe_second_x_portal && let Some(second_y_portal) = maybe_second_y_portal {
+                if maybe_second_x_portal.is_some() && maybe_second_y_portal.is_some() {
+                    let second_x_portal = maybe_second_x_portal.unwrap();
+                    let second_y_portal = maybe_second_y_portal.unwrap();
                     if second_x_portal.is_coherent_with(&second_y_portal) {
                         let dest_square = second_x_portal.exit.square();
-                        let dest_dir = second_x_portal.exit.direction().step() + second_y_portal.exit.direction().step();
-                        Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
+                        let dest_dir = second_x_portal.exit.direction().step()
+                            + second_y_portal.exit.direction().step();
+                        Ok(SquareWithKingDir::from_square_and_step(
+                            dest_square,
+                            dest_dir,
+                        ))
                     } else {
                         // Can't step through mismatched corner
                         Err(())
                     }
-                } else if let Some(second_x_portal) = maybe_second_x_portal && maybe_second_y_portal.is_none() {
+                } else if maybe_second_x_portal.is_some() && maybe_second_y_portal.is_none() {
+                    let second_x_portal = maybe_second_x_portal.unwrap();
                     // if the second portal is only on the x side, the player steps in the y direction to go through it, but then they need to go left or right on the other side to get to the real destination.
                     // step through, but turn left or right?
-                    let y_dir_to_x_dir_is_left = rotated_n_quarter_turns_counter_clockwise(y_step, 1) == x_step;
+                    let y_dir_to_x_dir_is_left =
+                        rotated_n_quarter_turns_counter_clockwise(y_step, 1) == x_step;
 
                     let turn_after_portal = if y_dir_to_x_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_x_portal.exit.direction().step(), turn_after_portal);
+                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(
+                        second_x_portal.exit.direction().step(),
+                        turn_after_portal,
+                    );
 
                     let dest_square = second_x_portal.exit.square();
-                    let dest_dir = second_x_portal.exit.direction().step() + sideways_dir_after_portal;
+                    let dest_dir =
+                        second_x_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
-                } else if let Some(second_y_portal) = maybe_second_y_portal && maybe_second_x_portal.is_none() {
-                    let x_dir_to_y_dir_is_left = rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
+                    Ok(SquareWithKingDir::from_square_and_step(
+                        dest_square,
+                        dest_dir,
+                    ))
+                } else if maybe_second_y_portal.is_some() && maybe_second_x_portal.is_none() {
+                    let second_y_portal = maybe_second_y_portal.unwrap();
+                    let x_dir_to_y_dir_is_left =
+                        rotated_n_quarter_turns_counter_clockwise(x_step, 1) == y_step;
 
                     let turn_after_portal = if x_dir_to_y_dir_is_left { 1 } else { -1 };
 
-                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(second_y_portal.exit.direction().step(), turn_after_portal);
+                    let sideways_dir_after_portal = rotated_n_quarter_turns_counter_clockwise(
+                        second_y_portal.exit.direction().step(),
+                        turn_after_portal,
+                    );
 
                     let dest_square = second_y_portal.exit.square();
-                    let dest_dir = second_y_portal.exit.direction().step() + sideways_dir_after_portal;
+                    let dest_dir =
+                        second_y_portal.exit.direction().step() + sideways_dir_after_portal;
 
-                    Ok(SquareWithKingDir::from_square_and_step(dest_square, dest_dir))
+                    Ok(SquareWithKingDir::from_square_and_step(
+                        dest_square,
+                        dest_dir,
+                    ))
                 } else {
                     // it's neither
                     Ok(start.stepped())

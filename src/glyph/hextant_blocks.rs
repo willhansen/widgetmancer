@@ -49,6 +49,12 @@ pub fn hextant_block_by_offset(hextant_grid_steps: IVector) -> char {
         _ => SPACE,
     }
 }
+
+const HEX_SPACE: u8 = const { hextant_character_to_binary(SPACE) };
+const HEX_LEFT: u8 = const { hextant_character_to_binary(LEFT_HALF_BLOCK) };
+const HEX_RIGHT: u8 = const { hextant_character_to_binary(RIGHT_HALF_BLOCK) };
+const HEX_FULL: u8 = const { hextant_character_to_binary(FULL_BLOCK) };
+
 pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     let as_binary = hextant_array_to_binary(hextant_array);
     let before_half_left = '🬓';
@@ -57,10 +63,10 @@ pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     let after_half_right = '🬨';
 
     match as_binary {
-        const { hextant_character_to_binary(SPACE) } => SPACE,
-        const { hextant_character_to_binary(LEFT_HALF_BLOCK) } => LEFT_HALF_BLOCK,
-        const { hextant_character_to_binary(RIGHT_HALF_BLOCK) } => RIGHT_HALF_BLOCK,
-        const { hextant_character_to_binary(FULL_BLOCK) } => FULL_BLOCK,
+        HEX_SPACE => SPACE,
+        HEX_LEFT => LEFT_HALF_BLOCK,
+        HEX_RIGHT => RIGHT_HALF_BLOCK,
+        HEX_FULL => FULL_BLOCK,
         _ => {
             let unadjusted_value = FIRST_HEXTANT as u32 + as_binary as u32;
             let offset = if unadjusted_value

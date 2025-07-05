@@ -399,7 +399,9 @@ impl Glyph {
         let top = *self;
 
         if top.has_fg() {
-            if top.bg_transparent && let Some(combined_character) = combine_characters(top.character, bottom.character) {
+            let maybe_combined = combine_characters(top.character, bottom.character);
+            if top.bg_transparent && maybe_combined.is_some() {
+                let combined_character = maybe_combined.unwrap();
                 Glyph::new(combined_character, top.fg_color, bottom.bg_color)
             } else {
                 let bg = if !top.bg_transparent {

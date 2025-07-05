@@ -427,12 +427,16 @@ impl Game {
     ) -> Vec<FloatingEntityEnum> {
         let hunter_drones_from_square = self
             .floating_hunter_drones
-            .extract_if(|drone| world_point_to_world_square(drone.position) == square)
+            .extract_if(.., |drone| {
+                world_point_to_world_square(drone.position) == square
+            })
             .map(|drone| FloatingEntityEnum::FloatingHunterDrone(drone))
             .collect_vec();
         let death_cubes_from_square = self
             .death_cubes
-            .extract_if(|cube: &mut DeathCube| world_point_to_world_square(cube.position) == square)
+            .extract_if(.., |cube: &mut DeathCube| {
+                world_point_to_world_square(cube.position) == square
+            })
             .map(|cube| FloatingEntityEnum::DeathCube(cube))
             .collect_vec();
 
@@ -783,7 +787,10 @@ impl Game {
             kill_squares.insert(point2(x, y));
         }
         kill_squares.into_iter().for_each(|square| {
-            if let Some(piece) = self.get_piece_at(square) && piece.faction != self.death_cube_faction {
+            if self
+                .get_piece_at(square)
+                .is_some_and(|piece| piece.faction != self.death_cube_faction)
+            {
                 self.capture_piece_at(square);
             } else if self.is_player_at(square) {
                 self.capture_piece_at(square);
@@ -1122,7 +1129,9 @@ impl Game {
 
         for square in found_incubation_squares {
             let faction = self.get_piece_at(square + STEP_UP).unwrap().faction;
-            if let Some(existing_incubation) = self.incubating_pawns.get_mut(&square) && existing_incubation.faction == faction {
+            let maybe_existing_incubation = self.incubating_pawns.get_mut(&square);
+            if maybe_existing_incubation.as_ref().is_some_and(|incubation| incubation.faction == faction) {
+                let existing_incubation = maybe_existing_incubation.unwrap();
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
                     self.place_piece(Piece::new(OmniDirectionalPawn, faction), square);
