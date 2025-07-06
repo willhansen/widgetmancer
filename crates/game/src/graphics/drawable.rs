@@ -11,23 +11,9 @@ use itertools::Itertools;
 use rgb::RGB8;
 
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
-use crate::glyph::angled_blocks::half_plane_to_angled_block_character;
-use crate::glyph::braille::{
-    get_braille_arrays_for_braille_line, BrailleArray, DoubleBrailleArray,
-};
-use crate::glyph::floating_square::{
-    characters_for_full_square_with_2d_offset, characters_for_full_square_with_looping_1d_offset,
-};
-use crate::glyph::glyph_constants::{BLACK, GREEN, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE};
-use crate::glyph::{DoubleChar, DoubleGlyph, DoubleGlyphFunctions, Glyph};
-use crate::utility::coordinate_frame_conversions::{
-    local_square_half_plane_to_local_character_half_plane, world_point_to_world_square, WorldMove,
-    WorldPoint, WorldSquare, WorldStep,
-};
-use crate::utility::{
-    rotate_vect, rotated_n_quarter_turns_counter_clockwise, tint_color, KingWorldStep,
-    OrthogonalWorldStep, QuarterTurnsAnticlockwise,
-};
+use terminal_rendering::*;
+use utility::*;
+use glyph_constants::named_colors::*;
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug {
@@ -473,7 +459,7 @@ impl OffsetSquareDrawable {
                     offset: floating_square_offset_from_square_center,
                     colors: [color, BLACK],
                 };
-                let glyphs_round_to_empty_square = drawable.to_glyphs().chars() == [SPACE; 2];
+                let glyphs_round_to_empty_square = drawable.to_glyphs().chars() == [glyph_constants::SPACE; 2];
                 if !glyphs_round_to_empty_square {
                     output.insert(square, drawable);
                 }
@@ -525,12 +511,12 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph::braille::EMPTY_BRAILLE;
+    use terminal_rendering::glyph::braille::EMPTY_BRAILLE;
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
-    use crate::utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use terminal_rendering::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
+    use utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
 

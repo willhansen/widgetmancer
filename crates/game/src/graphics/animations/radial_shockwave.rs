@@ -4,18 +4,9 @@ use std::time::{Duration, Instant};
 use euclid::{vec2, Length};
 use rgb::RGB8;
 
-use crate::animations::static_board::StaticBoard;
-use crate::animations::Animation;
-use crate::glyph::floating_square;
-use crate::glyph::Glyph;
-use crate::graphics::{FloorColorEnum, Graphics};
-use crate::utility::coordinate_frame_conversions::{
-    world_square_glyph_map_to_world_character_glyph_map, BoardSize, WorldCharacterSquareGlyphMap,
-    WorldMove, WorldSquare, WorldSquareGlyphMap, WorldStep,
-};
-use crate::utility::{
-    is_diagonal_king_step, is_orthogonal_king_step, round_to_king_step, RIGHT_I, STEP_RIGHT,
-};
+use crate::graphics::*;
+use terminal_rendering::*;
+use utility::*;
 
 #[derive(Clone)]
 pub struct RadialShockwave {
@@ -124,8 +115,7 @@ mod tests {
     use euclid::point2;
     use ntest::assert_about_eq;
 
-    use crate::animations::recoiling_board::RecoilingBoardAnimation;
-    use crate::glyph::glyph_constants::RED;
+    use terminal_rendering::glyph::glyph_constants::RED;
 
     use super::*;
 

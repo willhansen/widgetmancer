@@ -388,7 +388,7 @@ impl PortalGeometry {
 
 #[cfg(test)]
 mod tests {
-    use crate::utility::{
+    use utility::{
         assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT,
     };
     use ntest::assert_about_eq;

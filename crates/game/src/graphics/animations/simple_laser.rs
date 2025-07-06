@@ -1,7 +1,6 @@
-use crate::animations::Animation;
-use crate::glyph::glyph_constants::RED;
-use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{WorldCharacterSquareGlyphMap, WorldPoint};
+use crate::graphics::*;
+use terminal_rendering::*;
+use utility::*;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

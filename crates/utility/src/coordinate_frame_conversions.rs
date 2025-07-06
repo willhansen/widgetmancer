@@ -47,7 +47,7 @@ pub fn local_square_point_to_world_point(
     local_square_point: LocalSquarePoint,
     square: WorldSquare,
 ) -> WorldPoint {
-    (local_square_point.cast_unit() + square.to_f32().to_vector())
+    local_square_point.cast_unit() + square.to_f32().to_vector()
 }
 
 

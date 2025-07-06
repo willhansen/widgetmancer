@@ -21,27 +21,11 @@ use termion::terminal_size;
 
 use glyph::glyph_constants::*;
 
-use crate::animations::blink_animation::BlinkAnimation;
-use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
-use crate::animations::circle_attack_animation::CircleAttackAnimation;
-use crate::animations::floaty_laser::FloatyLaserAnimation;
-use crate::animations::piece_death_animation::PieceDeathAnimation;
-use crate::animations::radial_shockwave::RadialShockwave;
-use crate::animations::recoiling_board::RecoilingBoardAnimation;
-use crate::animations::selector_animation::SelectorAnimation;
-use crate::animations::simple_laser::SimpleLaserAnimation;
-use crate::animations::smite_from_above::SmiteAnimation;
-use crate::animations::spear_attack_animation::SpearAttackAnimation;
-use crate::animations::static_board::StaticBoard;
-use crate::animations::*;
 use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
 use crate::game::{
     DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD,
     HUNTER_DRONE_SIGHT_RANGE,
 };
-use crate::glyph::braille::count_braille_dots;
-use crate::glyph::floating_square::character_map_for_full_square_at_point;
-use crate::glyph::{DoubleGlyph, Glyph};
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
     OffsetSquareDrawable, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
@@ -49,20 +33,35 @@ use crate::graphics::drawable::{
 use crate::graphics::screen::{
     CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
 };
-use crate::num::ToPrimitive;
+pub use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, 
-    reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
-    OrthogonalWorldStep, WorldLine, STEP_RIGHT,
-};
 use crate::{
-    get_by_point, glyph, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
+    get_by_point, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
     IPoint, PieceType, RIGHT_I,
 };
+use terminal_rendering::*;
+use utility::*;
 
 pub(crate) mod drawable;
+
+pub mod animations;
+pub use animations::*;
+
+pub mod game_colors {
+    use super::*;
+
+    pub const EXPLOSION_COLOR: RGB8 = BLACK; //RGB8::new(200, 200, 255);
+    pub const SELECTOR_COLOR: RGB8 = RGB8::new(255, 64, 0);
+    pub const ENEMY_PIECE_COLOR: RGB8 = WHITE;
+    pub const DANGER_SQUARE_COLOR: RGB8 = GREY_RED;
+    pub const PATH_COLOR: RGB8 = MAGENTA;
+    pub const RED_PAWN_COLOR: RGB8 = RED;
+    pub const BLINK_EFFECT_COLOR: RGB8 = COBALT_BLUE;
+    pub const SPEAR_COLOR: RGB8 = MAROON;
+    pub const HUNTER_DRONE_COLOR: RGB8 = BRICK_RED;
+    pub const SIGHT_LINE_SEEKING_COLOR: RGB8 = GREEN;
+}
+use game_colors::*;
 
 pub type FloorColorFunction = fn(WorldSquare) -> RGB8;
 
@@ -271,7 +270,8 @@ impl Graphics {
             if let Some(unrotated) = maybe_unrotated {
                 let rotated: DrawableEnum =
                     unrotated.rotated(-self.screen.rotation().quarter_turns());
-                self.screen.draw_glyphs_straight_to_screen_square(&rotated.to_glyphs(), screen_square);
+                self.screen
+                    .draw_glyphs_straight_to_screen_square(rotated.to_glyphs(), screen_square);
             }
         }
     }
@@ -299,7 +299,10 @@ impl Graphics {
                         .screen_buffer_character_square_to_screen_buffer_square(
                             screen_buffer_character_square,
                         );
-                    self.screen.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_buffer_square);
+                    self.screen.draw_glyphs_straight_to_screen_square(
+                        drawable.to_glyphs(),
+                        screen_buffer_square,
+                    );
                 }
             }
         }
@@ -417,16 +420,13 @@ impl Graphics {
                 .copied()
                 .collect();
 
-        self.draw_same_glyphs_at_squares(Glyph::danger_square_glyphs(), &move_and_capture_squares);
+        self.draw_same_glyphs_at_squares(danger_square_glyphs(), &move_and_capture_squares);
         self.draw_same_glyphs_at_squares(
-            Glyph::tricky_danger_square_glyphs(),
+            tricky_danger_square_glyphs(),
             &conditional_move_and_capture_squares,
         );
-        self.draw_same_glyphs_at_squares(Glyph::move_only_square_glyphs(), &move_only_squares);
-        self.draw_same_glyphs_at_squares(
-            Glyph::capture_only_square_glyphs(),
-            &capture_only_squares,
-        );
+        self.draw_same_glyphs_at_squares(move_only_square_glyphs(), &move_only_squares);
+        self.draw_same_glyphs_at_squares(capture_only_square_glyphs(), &capture_only_squares);
     }
 
     pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
@@ -555,7 +555,7 @@ impl Graphics {
         paths.iter().flatten().for_each(|&square| {
             path_squares.insert(square);
         });
-        self.draw_same_glyphs_at_squares(Glyph::path_glyphs(), &path_squares);
+        self.draw_same_glyphs_at_squares(path_glyphs(), &path_squares);
     }
 
     pub fn start_recoil_animation(&mut self, board_size: BoardSize, shot_direction: WorldStep) {
@@ -647,11 +647,23 @@ impl Graphics {
     }
 }
 
-
 pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
 
-
-
+pub fn danger_square_glyphs() -> DoubleGlyph {
+    MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+}
+pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
+    CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+}
+pub fn move_only_square_glyphs() -> DoubleGlyph {
+    MOVE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+}
+pub fn capture_only_square_glyphs() -> DoubleGlyph {
+    CAPTURE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
+}
+pub fn path_glyphs() -> DoubleGlyph {
+    KING_PATH_GLYPHS.map(|c| Glyph::fg_only(c, PATH_COLOR))
+}
 
 #[cfg(test)]
 mod tests {
@@ -659,8 +671,8 @@ mod tests {
 
     use crate::fov_stuff::portal_aware_field_of_view_from_square;
     use crate::piece::PieceType::TurningPawn;
-    use crate::utility::*;
     use crate::{LEFT_I, RIGHT_I};
+    use utility::*;
 
     use super::*;
 

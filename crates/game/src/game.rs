@@ -21,26 +21,20 @@ use rgb::RGB8;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::{
     portal_aware_field_of_view_from_square, FieldOfViewResult, SquareVisibility,
 };
-use terminal_rendering::glyph::glyph_constants::{
-    BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
-};
 use crate::graphics::drawable::{DrawableEnum, TextDrawable};
-use terminal_rendering::screen::ScreenBufferStep;
-use crate::graphics::Graphics;
+use crate::graphics::*;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
 use crate::portal_geometry::PortalGeometry;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::*;
-use crate::{
-    lerp, point_to_string, rand_radial_offset, rotate_vect, round_to_king_step, Glyph, IPoint,
-    IVector, LEFT_I,
-};
+use crate::*;
+use terminal_rendering::*;
+use utility::*;
+use glyph_constants::named_colors::*;
+use crate::graphics::game_colors::*;
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
@@ -1130,7 +1124,10 @@ impl Game {
         for square in found_incubation_squares {
             let faction = self.get_piece_at(square + STEP_UP).unwrap().faction;
             let maybe_existing_incubation = self.incubating_pawns.get_mut(&square);
-            if maybe_existing_incubation.as_ref().is_some_and(|incubation| incubation.faction == faction) {
+            if maybe_existing_incubation
+                .as_ref()
+                .is_some_and(|incubation| incubation.faction == faction)
+            {
                 let existing_incubation = maybe_existing_incubation.unwrap();
                 existing_incubation.age_in_turns += 1;
                 if existing_incubation.age_in_turns >= TURNS_TO_SPAWN_PAWN {
@@ -2449,26 +2446,17 @@ mod tests {
     use ::num::integer::Roots;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
+    use terminal_rendering::glyph_constants::named_chars;
 
     use crate::game;
-    use crate::glyph::braille::{char_is_braille, EMPTY_BRAILLE};
-    use crate::glyph::glyph_constants::{
-        BLINK_EFFECT_COLOR, BLOCK_FG, BLUE, DANGER_SQUARE_COLOR, FULL_BLOCK, GREY,
-        HUNTER_DRONE_COLOR, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, RED, RED_PAWN_COLOR,
-        RIGHT_HALF_BLOCK, SIGHT_LINE_SEEKING_COLOR,
-    };
-    use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions};
     use crate::graphics::drawable::{Drawable, DrawableEnum};
-    use crate::graphics::screen::{
-        Screen, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_RIGHT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP,
-        SCREEN_STEP_UP_RIGHT, SCREEN_STEP_ZERO,
-    };
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
-    use crate::utility::{
-        STEP_DOWN, STEP_DOWN_RIGHT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT, STEP_UP_RIGHT,
-    };
     use crate::utils_for_tests::*;
+    use terminal_rendering::glyph::glyph_constants::{
+        BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, RED,
+        RIGHT_HALF_BLOCK,
+    };
 
     use super::*;
 
@@ -4636,7 +4624,7 @@ mod tests {
             .get_screen_glyphs_at_visual_offset_from_center(SCREEN_STEP_DOWN * 3);
         assert_eq!(upper_glyphs.to_clean_string(), "▄▄");
         assert_eq!(middle_glyphs.to_clean_string(), "▀▀");
-        assert_eq!(lower_glyphs.chars(), [SPACE, '⡇']); // Might need to flip horizontally at some point
+        assert_eq!(lower_glyphs.chars(), [named_chars::SPACE, '⡇']); // Might need to flip horizontally at some point
     }
     #[test]
     fn test_conveyor_belt__place_and_draw() {
@@ -4666,7 +4654,7 @@ mod tests {
 
         let glyphs2_5 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
 
-        assert_eq!(glyphs2_5.chars(), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(glyphs2_5.chars(), [LEFT_HALF_BLOCK, named_chars::SPACE]);
 
         let glyphs3 = advance_and_get_glyphs(&mut game, CONVEYOR_BELT_VISUAL_PERIOD.div_f32(2.0));
 

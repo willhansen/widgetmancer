@@ -1,12 +1,7 @@
-use crate::animations::Animation;
-use crate::glyph::braille::world_points_for_braille_line;
-use crate::glyph::glyph_constants::RED;
-use crate::glyph::Glyph;
-use crate::utility::coordinate_frame_conversions::{
-    WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
-};
+use crate::graphics::*;
+use terminal_rendering::*;
+use utility::*;
 use euclid::Angle;
-use num::ToPrimitive;
 use rand::{Rng, SeedableRng};
 use std::f32::consts::{E, PI, TAU};
 use std::time::{Duration, Instant};

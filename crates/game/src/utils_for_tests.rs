@@ -4,8 +4,8 @@ use euclid::point2;
 
 use crate::game::Game;
 use crate::piece::Piece;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{LEFT_I, RIGHT_I, STEP_LEFT, STEP_UP, UP_I};
+use utility::coordinate_frame_conversions::*;
+use utility::{LEFT_I, RIGHT_I, STEP_LEFT, STEP_UP, UP_I};
 
 pub fn set_up_nxm_game(rows: u32, cols: u32) -> Game {
     Game::new(cols as u16 * 2, rows as u16, Instant::now())

@@ -7,8 +7,8 @@ use terminal_rendering::screen::{
     ScreenBufferStep, SCREEN_STEP_DOWN, SCREEN_STEP_DOWN_LEFT, SCREEN_STEP_DOWN_RIGHT,
     SCREEN_STEP_LEFT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_LEFT, SCREEN_STEP_UP_RIGHT,
 };
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{FVector, IVector};
+use utility::coordinate_frame_conversions::*;
+use utility::{FVector, IVector};
 use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {

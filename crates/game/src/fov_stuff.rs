@@ -11,13 +11,12 @@ use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
 
-use crate::glyph::angled_blocks::{
-    angle_block_char_complement, half_plane_to_angled_block_character,
-};
-use crate::glyph::glyph_constants::{
+use terminal_rendering::*;
+use utility::*;
+use terminal_rendering::glyph::glyph_constants::{
     BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
 };
-use crate::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::graphics;
 use crate::graphics::drawable::DrawableEnum::SolidColor;
 use crate::graphics::drawable::{
@@ -25,9 +24,9 @@ use crate::graphics::drawable::{
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::*;
+use utility::angle_interval::AngleInterval;
+use utility::coordinate_frame_conversions::*;
+use utility::*;
 
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
@@ -1078,13 +1077,13 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
-    use crate::glyph::angled_blocks::{
+    use terminal_rendering::glyph::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
         angled_block_char_to_snap_points_map, angled_block_flip_y, SnapGridPoint,
     };
-    use crate::glyph::glyph_constants::{FULL_BLOCK, GREEN};
-    use crate::glyph::DoubleGlyphFunctions;
-    use crate::utility::{
+    use terminal_rendering::glyph::glyph_constants::{FULL_BLOCK, GREEN};
+    use terminal_rendering::glyph::DoubleGlyphFunctions;
+    use utility::{
         better_angle_from_x_axis, QuarterTurnsAnticlockwise, SquareWithKingDir,
         SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
     };

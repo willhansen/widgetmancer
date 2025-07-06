@@ -17,16 +17,17 @@ use glyph_constants::*;
 use hextant_blocks::*;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
-use crate::screen::{is_world_character_square_left_square_of_world_square, world_character_square_to_world_square, CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap};
+use crate::screen::{
+    is_world_character_square_left_square_of_world_square, world_character_square_to_world_square,
+    CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap,
+};
 use utility::coordinate_frame_conversions::*;
 use utility::sign;
 use utility::*;
 
-pub mod angled_blocks;
-pub mod braille;
-pub mod floating_square;
+pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
+
 pub mod glyph_constants;
-pub mod hextant_blocks;
 
 // x, y
 pub type DoubleChar = [char; 2];
@@ -243,7 +244,6 @@ impl Glyph {
         glyphs
     }
 
-
     pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
             color == solid_color
@@ -361,9 +361,6 @@ impl Glyph {
         SOLID_CHESS_PIECES.contains(&c)
     }
 
-    pub fn danger_square_glyphs() -> DoubleGlyph {
-        MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
-    }
     pub fn transparent_glyph() -> Glyph {
         Glyph::fg_only(' ', BLACK)
     }
@@ -372,19 +369,6 @@ impl Glyph {
     }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
         [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
-    }
-
-    pub fn tricky_danger_square_glyphs() -> DoubleGlyph {
-        CONDITIONAL_MOVE_AND_CAPTURE_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
-    }
-    pub fn move_only_square_glyphs() -> DoubleGlyph {
-        MOVE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
-    }
-    pub fn capture_only_square_glyphs() -> DoubleGlyph {
-        CAPTURE_ONLY_SQUARE_CHARS.map(|c| Glyph::fg_only(c, DANGER_SQUARE_COLOR))
-    }
-    pub fn path_glyphs() -> DoubleGlyph {
-        KING_PATH_GLYPHS.map(|c| Glyph::fg_only(c, PATH_COLOR))
     }
 
     // ╳

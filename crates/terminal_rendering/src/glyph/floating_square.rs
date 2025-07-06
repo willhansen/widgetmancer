@@ -97,7 +97,7 @@ pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<ch
             let y = j as i32 - 1;
             let square = point2(x, y);
             if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                let character = square_with_half_step_offset((grid_offset - square.to_f32()));
+                let character = square_with_half_step_offset(grid_offset - square.to_f32());
                 if character != ' ' {
                     output[i][j] = Some(character);
                 }

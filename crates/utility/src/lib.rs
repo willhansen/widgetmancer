@@ -26,7 +26,10 @@ use rgb::RGB8;
 use crate::coordinate_frame_conversions::*;
 
 pub mod angle_interval;
+pub use angle_interval::*;
+
 pub mod coordinate_frame_conversions;
+pub use coordinate_frame_conversions::*;
 
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
@@ -62,6 +65,25 @@ pub const KING_STEPS: [WorldStep; 8] = [
     STEP_DOWN_RIGHT,
     STEP_DOWN_LEFT,
 ];
+
+#[macro_export]
+macro_rules! pub_mod_and_use {
+    ($($module:ident), +) => {
+        $(
+            pub mod $module;
+            pub use self::$module::*;
+        )+
+    };
+}
+
+#[macro_export]
+macro_rules! pub_use {
+    ($($module:ident,)+) => {
+        $(
+            pub use self::$module::*;
+        )+
+    };
+}
 
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
 #[get_copy = "pub"]
@@ -898,7 +920,7 @@ pub fn rotate_point_around_point<U>(
     moving_point: Point2D<f32, U>,
     angle: Angle<f32>,
 ) -> Point2D<f32, U> {
-    axis_point + rotate_vect((moving_point - axis_point), angle)
+    axis_point + rotate_vect(moving_point - axis_point, angle)
 }
 
 pub fn cross_correlate_squares_with_steps(

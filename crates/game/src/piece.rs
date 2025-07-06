@@ -9,17 +9,14 @@ use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
-use crate::glyph::DoubleGlyph;
-use crate::glyph_constants::*;
+use terminal_rendering::glyph::DoubleGlyph;
+use terminal_rendering::glyph_constants::*;
 use crate::piece::PieceType::*;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    adjacent_king_steps, get_new_rng, random_choice, KingWorldStep, DIAGONAL_STEPS, KING_STEPS,
-    ORTHOGONAL_STEPS, STEP_RIGHT,
-};
+use utility::*;
 use crate::{
     get_4_rotations_of, get_8_octants_of, rotated_n_quarter_turns_counter_clockwise, Glyph,
 };
+use crate::graphics::game_colors::*;
 
 pub const MAX_PIECE_RANGE: u32 = 5;
 

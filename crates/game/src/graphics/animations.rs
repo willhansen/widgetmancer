@@ -8,40 +8,29 @@ use dyn_clone::DynClone;
 use euclid::{point2, vec2, Angle, Length};
 use num::{clamp, ToPrimitive};
 use rand::{Rng, SeedableRng};
-use static_board::StaticBoard;
 use termion::color::Black;
 use termion::style::Blink;
 
-use crate::animations::blink_animation::BlinkAnimation;
-use crate::animations::burst_explosion_animation::BurstExplosionAnimation;
-use crate::animations::circle_attack_animation::CircleAttackAnimation;
-use crate::animations::floaty_laser::FloatyLaserAnimation;
-use crate::animations::piece_death_animation::PieceDeathAnimation;
-use crate::animations::radial_shockwave::RadialShockwave;
-use crate::animations::recoiling_board::RecoilingBoardAnimation;
-use crate::animations::selector_animation::SelectorAnimation;
-use crate::animations::simple_laser::SimpleLaserAnimation;
-use crate::animations::smite_from_above::SmiteAnimation;
-use crate::animations::spear_attack_animation::SpearAttackAnimation;
-use terminal_rendering::glyph::braille::world_points_for_braille_line;
-use terminal_rendering::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
-use terminal_rendering::glyph_constants::*;
-use utility::coordinate_frame_conversions::*;
-use utility::*;
 use crate::{is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics, RIGHT_I, UP_I};
+use terminal_rendering::glyph_constants::*;
+use utility::*;
+use terminal_rendering::*;
 
-pub mod blink_animation;
-pub mod burst_explosion_animation;
-pub mod circle_attack_animation;
-pub mod floaty_laser;
-pub mod piece_death_animation;
-pub mod radial_shockwave;
-pub mod recoiling_board;
-pub mod selector_animation;
-pub mod simple_laser;
-pub mod smite_from_above;
-pub mod spear_attack_animation;
-pub mod static_board;
+// use utility::pub_mod_and_use
+pub_mod_and_use!(
+    blink_animation,
+    burst_explosion_animation,
+    circle_attack_animation,
+    floaty_laser,
+    piece_death_animation,
+    radial_shockwave,
+    recoiling_board,
+    selector_animation,
+    simple_laser,
+    smite_from_above,
+    spear_attack_animation,
+    static_board
+);
 
 pub type AnimationList = Vec<AnimationEnum>;
 
@@ -108,9 +97,7 @@ pub const DOTS_IN_SELECTOR: u32 = 3;
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::animations::floaty_laser::FloatyLaserAnimation;
-    use crate::animations::recoiling_board::RecoilingBoardAnimation;
-    use crate::animations::simple_laser::SimpleLaserAnimation;
+
     use crate::graphics::FloorColorEnum;
     use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
 

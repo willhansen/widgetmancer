@@ -1,7 +1,9 @@
 use euclid::point2;
 use itertools::Itertools;
 use rgb::RGB8;
-use game::{glyph::{DoubleGlyph, DoubleGlyphFunctions}, graphics::Graphics, set_up_input_thread, utility::coordinate_frame_conversions::WorldSquare};
+use game::{graphics::Graphics, set_up_input_thread};
+use utility::*;
+use terminal_rendering::*;
 use std::io::{stdin, stdout, Write};
 use std::thread;
 use std::time::{Duration, Instant};
