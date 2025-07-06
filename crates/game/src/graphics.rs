@@ -63,7 +63,6 @@ use crate::{
 };
 
 pub(crate) mod drawable;
-pub mod screen;
 
 pub type FloorColorFunction = fn(WorldSquare) -> RGB8;
 

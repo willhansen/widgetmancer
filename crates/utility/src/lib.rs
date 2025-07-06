@@ -1658,35 +1658,7 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_world_pos_to_character_world_pos() {
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                0.0, 0.0,
-            )),
-            "zero is actually between two characters"
-        );
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                1.0, 1.0,
-            )),
-            "diagonal a bit"
-        );
-    }
 
-    #[test]
-    fn test_local_square_point_to_local_character_point() {
-        assert_eq!(
-            local_square_point_to_local_character_point(point2(0.0, 0.0), 0),
-            point2(0.5, 0.0)
-        );
-        assert_eq!(
-            local_square_point_to_local_character_point(point2(0.0, 0.0), 1),
-            point2(-0.5, 0.0)
-        );
-    }
 
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {

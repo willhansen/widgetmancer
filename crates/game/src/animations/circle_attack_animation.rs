@@ -1,6 +1,6 @@
 use crate::animations::Animation;
-use crate::glyph::glyph_constants::CYAN;
-use crate::glyph::Glyph;
+use terminal_rendering::glyph::glyph_constants::CYAN;
+use terminal_rendering::glyph::Glyph;
 use crate::utility::coordinate_frame_conversions::{
     WorldCharacterSquareGlyphMap, WorldMove, WorldPoint,
 };

@@ -8,10 +8,9 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use utility::angle_interval::AngleInterval;
-use utility::coordinate_frame_conversions::{
+use utility::{angle_interval::AngleInterval, coordinate_frame_conversions::{
     StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
-};
+}};
 use utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
     ith_projection_of_step, naive_ray_endpoint, revolve_square,

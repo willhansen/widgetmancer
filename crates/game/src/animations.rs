@@ -23,11 +23,11 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::animations::simple_laser::SimpleLaserAnimation;
 use crate::animations::smite_from_above::SmiteAnimation;
 use crate::animations::spear_attack_animation::SpearAttackAnimation;
-use crate::glyph::braille::world_points_for_braille_line;
-use crate::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
-use crate::glyph_constants::*;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::*;
+use terminal_rendering::glyph::braille::world_points_for_braille_line;
+use terminal_rendering::glyph::hextant_blocks::{points_to_hextant_chars, snap_to_hextant_grid};
+use terminal_rendering::glyph_constants::*;
+use utility::coordinate_frame_conversions::*;
+use utility::*;
 use crate::{is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics, RIGHT_I, UP_I};
 
 pub mod blink_animation;

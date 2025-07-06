@@ -25,7 +25,7 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 
 use terminal_rendering::glyph::*;
-use utility::utility::*;
+use utility::*;
 
 use crate::game::Game;
 use crate::graphics::Graphics;

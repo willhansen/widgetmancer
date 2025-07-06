@@ -1,5 +1,5 @@
 [package]
-name = "terminal-rendering"
+name = "terminal_rendering"
 version = "0.0.0"
 edition.workspace = true
 
