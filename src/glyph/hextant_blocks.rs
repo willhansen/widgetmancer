@@ -1,10 +1,11 @@
 use super::glyph_constants::*;
-use crate::utility::coordinate_frame_conversions::{
-    world_point_to_local_character_point, world_point_to_world_character_point,
-    LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,
+use utility::coordinate_frame_conversions::{
+    
     WorldPoint,
 };
-use crate::utility::IVector;
+use crate::screen::{world_point_to_local_character_point, world_point_to_world_character_point,
+    LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,};
+use utility::IVector;
 use euclid::{point2, Point2D};
 use ordered_float::OrderedFloat;
 use std::collections::{HashMap, HashSet};
