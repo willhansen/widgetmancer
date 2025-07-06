@@ -25,7 +25,7 @@ use rgb::RGB8;
 
 use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
 use crate::piece::PieceType::King;
-use crate::utility::coordinate_frame_conversions::*;
+use crate::coordinate_frame_conversions::*;
 use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
