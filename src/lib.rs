@@ -23,10 +23,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
-use crate::glyph::glyph_constants::{BLUE, CYAN, GREEN, GREY, MAGENTA, RED, YELLOW};
-use crate::piece::PieceType::King;
 use crate::coordinate_frame_conversions::*;
-use crate::{DoubleGlyph, Glyph};
 
 pub mod angle_interval;
 pub mod coordinate_frame_conversions;
@@ -837,10 +834,6 @@ pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
-pub fn number_to_color(i: u32) -> RGB8 {
-    let in_order = vec![GREY, RED, BLUE, GREEN, YELLOW, CYAN, MAGENTA];
-    in_order[i as usize % in_order.len()]
-}
 
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
     if vector.length() == 0.0 {
@@ -866,54 +859,7 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
 
-#[deprecated(note = "worldcharactersquareglyphmap is bad")]
-pub fn pair_up_character_square_map<T: Clone>(
-    character_glyph_map: HashMap<WorldCharacterSquare, T>,
-    default_filler: T,
-) -> HashMap<WorldSquare, [T; 2]> {
-    let mut output_map = HashMap::<WorldSquare, [T; 2]>::new();
-    character_glyph_map
-        .into_iter()
-        .for_each(|(character_square, value)| {
-            let world_square = world_character_square_to_world_square(character_square);
-            let is_left_value =
-                is_world_character_square_left_square_of_world_square(character_square);
-            let position_index = if is_left_value { 0 } else { 1 };
 
-            if output_map.contains_key(&world_square) {
-                let mut existing_double_value = output_map.get_mut(&world_square).unwrap();
-                existing_double_value[position_index] = value;
-            } else {
-                let mut new_double_value = [default_filler.clone(), default_filler.clone()];
-                new_double_value[position_index] = value;
-                output_map.insert(world_square, new_double_value);
-            }
-        });
-    output_map
-}
-
-pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
-    let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
-    let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
-    let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
-    let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
-    let mut string = String::new();
-    for bottom_to_top_y in bottom_row..=top_row {
-        let y = top_row + bottom_row - bottom_to_top_y;
-        for x in left_column..=right_column {
-            let square = WorldCharacterSquare::new(x, y);
-            let new_part = if let Some(glyph) = glyph_map.get(&square) {
-                glyph.to_string()
-            } else {
-                " ".to_string()
-            };
-
-            string += &new_part;
-        }
-        string += "\n";
-    }
-    string
-}
 
 fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
     assert!(points.len() >= 2);
@@ -947,14 +893,6 @@ pub fn on_line_in_this_order<U>(
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
 
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn is_world_character_square_left_square_of_world_square(
-    character_square: WorldCharacterSquare,
-) -> bool {
-    world_square_to_left_world_character_square(world_character_square_to_world_square(
-        character_square,
-    )) == character_square
-}
 
 pub fn rotate_point_around_point<U>(
     axis_point: Point2D<f32, U>,
@@ -1638,6 +1576,42 @@ pub fn naive_ray_endpoint<U>(
     start + unit_vector_from_angle(angle).cast_unit() * length
 }
 
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, CopyGetters)]
+#[get_copy = "pub"]
+pub struct NStep {
+    stepp: WorldStep,
+    n: Option<u32>,
+}
+
+impl NStep {
+    pub fn one(stepp: WorldStep) -> Self {
+        NStep { stepp, n: Some(1) }
+    }
+    pub fn dir(step: WorldStep) -> Self {
+        NStep {
+            stepp: step,
+            n: None,
+        }
+    }
+
+    pub fn quadrant_symmetries(&self) -> Vec<Self> {
+        get_4_rotations_of(self.stepp)
+            .into_iter()
+            .map(|step| NStep::new(step, self.n))
+            .collect()
+    }
+    pub fn octant_symmetries(&self) -> Vec<Self> {
+        get_8_octants_of(self.stepp)
+            .into_iter()
+            .map(|step| NStep::new(step, self.n))
+            .collect()
+    }
+}
+
+
+
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
@@ -1670,48 +1644,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pair_up_glyph_map__positions() {
-        let character_squares: Vec<WorldCharacterSquare> = vec![
-            point2(0, 0),
-            point2(1, 0),
-            point2(1, 1),
-            point2(2, 0),
-            point2(2, 1),
-        ];
-
-        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
-        for square in character_squares {
-            character_glyph_map.insert(square, Glyph::default_transparent());
-        }
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
-        let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
-        assert_eq!(square_glyph_map.len(), correct_squares.len());
-        for square in correct_squares {
-            assert!(square_glyph_map.contains_key(&square));
-        }
-    }
-
-    #[test]
-    fn test_pair_up_glyph_map__glyphs() {
-        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
-        let test_glyph = Glyph {
-            character: ' ',
-            fg_color: RGB8::new(0, 0, 0),
-            bg_color: RGB8::new(100, 100, 150),
-            bg_transparent: false,
-        };
-        character_glyph_map.insert(point2(0, 0), test_glyph);
-        character_glyph_map.insert(point2(1, 0), test_glyph);
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
-        assert_eq!(square_glyph_map.len(), 1);
-        assert_eq!(
-            *square_glyph_map.get(&point2(0, 0)).unwrap(),
-            [test_glyph; 2]
-        );
-    }
 
     #[test]
     fn test_clockwise() {
