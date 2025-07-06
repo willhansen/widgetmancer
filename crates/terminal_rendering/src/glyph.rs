@@ -17,10 +17,9 @@ use glyph_constants::*;
 use hextant_blocks::*;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
-use crate::piece::Upgrade;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::sign;
-use crate::utility::*;
+use utility::coordinate_frame_conversions::*;
+use utility::sign;
+use utility::*;
 
 pub mod angled_blocks;
 pub mod braille;
@@ -243,9 +242,6 @@ impl Glyph {
         glyphs
     }
 
-    pub fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
-        [Glyph::fg_only('*', CYAN), Glyph::transparent_glyph()]
-    }
 
     pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
@@ -588,6 +584,53 @@ fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
     } else {
         None
     }
+}
+pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
+    let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
+    let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
+    let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
+    let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
+    let mut string = String::new();
+    for bottom_to_top_y in bottom_row..=top_row {
+        let y = top_row + bottom_row - bottom_to_top_y;
+        for x in left_column..=right_column {
+            let square = WorldCharacterSquare::new(x, y);
+            let new_part = if let Some(glyph) = glyph_map.get(&square) {
+                glyph.to_string()
+            } else {
+                " ".to_string()
+            };
+
+            string += &new_part;
+        }
+        string += "\n";
+    }
+    string
+}
+#[deprecated(note = "worldcharactersquareglyphmap is bad")]
+pub fn pair_up_character_square_map<T: Clone>(
+    character_glyph_map: HashMap<WorldCharacterSquare, T>,
+    default_filler: T,
+) -> HashMap<WorldSquare, [T; 2]> {
+    let mut output_map = HashMap::<WorldSquare, [T; 2]>::new();
+    character_glyph_map
+        .into_iter()
+        .for_each(|(character_square, value)| {
+            let world_square = world_character_square_to_world_square(character_square);
+            let is_left_value =
+                is_world_character_square_left_square_of_world_square(character_square);
+            let position_index = if is_left_value { 0 } else { 1 };
+
+            if output_map.contains_key(&world_square) {
+                let mut existing_double_value = output_map.get_mut(&world_square).unwrap();
+                existing_double_value[position_index] = value;
+            } else {
+                let mut new_double_value = [default_filler.clone(), default_filler.clone()];
+                new_double_value[position_index] = value;
+                output_map.insert(world_square, new_double_value);
+            }
+        });
+    output_map
 }
 
 #[cfg(test)]
@@ -951,5 +994,47 @@ mod tests {
     fn test_character_width_detection() {
         assert!(Glyph::char_is_fullwidth('🢂'));
         assert_false!(Glyph::char_is_fullwidth('>'));
+    }
+    #[test]
+    fn test_pair_up_glyph_map__positions() {
+        let character_squares: Vec<WorldCharacterSquare> = vec![
+            point2(0, 0),
+            point2(1, 0),
+            point2(1, 1),
+            point2(2, 0),
+            point2(2, 1),
+        ];
+
+        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
+        for square in character_squares {
+            character_glyph_map.insert(square, Glyph::default_transparent());
+        }
+        let square_glyph_map =
+            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
+        let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
+        assert_eq!(square_glyph_map.len(), correct_squares.len());
+        for square in correct_squares {
+            assert!(square_glyph_map.contains_key(&square));
+        }
+    }
+
+    #[test]
+    fn test_pair_up_glyph_map__glyphs() {
+        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
+        let test_glyph = Glyph {
+            character: ' ',
+            fg_color: RGB8::new(0, 0, 0),
+            bg_color: RGB8::new(100, 100, 150),
+            bg_transparent: false,
+        };
+        character_glyph_map.insert(point2(0, 0), test_glyph);
+        character_glyph_map.insert(point2(1, 0), test_glyph);
+        let square_glyph_map =
+            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
+        assert_eq!(square_glyph_map.len(), 1);
+        assert_eq!(
+            *square_glyph_map.get(&point2(0, 0)).unwrap(),
+            [test_glyph; 2]
+        );
     }
 }

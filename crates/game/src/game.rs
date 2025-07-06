@@ -25,11 +25,11 @@ use crate::animations::selector_animation::SelectorAnimation;
 use crate::fov_stuff::{
     portal_aware_field_of_view_from_square, FieldOfViewResult, SquareVisibility,
 };
-use crate::glyph::glyph_constants::{
+use terminal_rendering::glyph::glyph_constants::{
     BLACK, DARK_CYAN, ENEMY_PIECE_COLOR, RED_PAWN_COLOR, SPACE, WHITE,
 };
 use crate::graphics::drawable::{DrawableEnum, TextDrawable};
-use crate::graphics::screen::ScreenBufferStep;
+use terminal_rendering::screen::ScreenBufferStep;
 use crate::graphics::Graphics;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;

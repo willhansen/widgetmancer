@@ -77,37 +77,6 @@ impl FactionFactory {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, CopyGetters)]
-#[get_copy = "pub"]
-pub struct NStep {
-    stepp: WorldStep,
-    n: Option<u32>,
-}
-
-impl NStep {
-    pub fn one(stepp: WorldStep) -> Self {
-        NStep { stepp, n: Some(1) }
-    }
-    pub fn dir(step: WorldStep) -> Self {
-        NStep {
-            stepp: step,
-            n: None,
-        }
-    }
-
-    pub fn quadrant_symmetries(&self) -> Vec<Self> {
-        get_4_rotations_of(self.stepp)
-            .into_iter()
-            .map(|step| NStep::new(step, self.n))
-            .collect()
-    }
-    pub fn octant_symmetries(&self) -> Vec<Self> {
-        get_8_octants_of(self.stepp)
-            .into_iter()
-            .map(|step| NStep::new(step, self.n))
-            .collect()
-    }
-}
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Hash)]
 pub struct Piece {

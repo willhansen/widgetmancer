@@ -24,8 +24,8 @@ use termion::input::{MouseTerminal, TermRead};
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 
-use glyph::*;
-use utility::*;
+use terminal_rendering::glyph::*;
+use utility::utility::*;
 
 use crate::game::Game;
 use crate::graphics::Graphics;
@@ -35,13 +35,12 @@ use crate::piece::{Piece, PieceType};
 pub mod animations;
 mod fov_stuff;
 pub mod game;
-pub mod glyph;
 pub mod graphics;
 mod inputmap;
 pub mod piece;
 pub mod portal_geometry;
-pub mod utility;
 pub mod utils_for_tests;
+
 
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {

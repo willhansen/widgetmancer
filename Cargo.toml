@@ -8,9 +8,10 @@ name = "rust_roguelike"
 version = "0.1.0"
 edition = "2021"
 
-# [workspace.dependencies]
+[workspace.dependencies]
 # local                                                                              
-utilities = { path = "./crates/utility", version = "0.0.0" }
+utility = { path = "./crates/utility", version = "0.0.0" }
+terminal_rendering = { path = "./crates/terminal_rendering", version = "0.0.0" }
 # angles = { path = "./crates/angles", version = "0.0.0" }
 # coordinates = { path = "./crates/coordinates", version = "0.0.0" }
 

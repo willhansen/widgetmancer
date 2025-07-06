@@ -10,11 +10,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
-use crate::utility::angle_interval::AngleInterval;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::{
-    is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
-};
+use utility::{coordinate_frame_conversions::*, is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct AngleBlockSnapGridInLocalFrame;

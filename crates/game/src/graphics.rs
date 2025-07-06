@@ -53,7 +53,7 @@ use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::utility::coordinate_frame_conversions::*;
 use crate::utility::{
-    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, number_to_color,
+    flip_y, hue_to_rgb, is_world_character_square_left_square_of_world_square, 
     reversed, square_is_odd, squares_on_board, unit_vector_from_angle, KingWorldStep,
     OrthogonalWorldStep, WorldLine, STEP_RIGHT,
 };
@@ -272,7 +272,7 @@ impl Graphics {
             if let Some(unrotated) = maybe_unrotated {
                 let rotated: DrawableEnum =
                     unrotated.rotated(-self.screen.rotation().quarter_turns());
-                self.screen.draw_drawable(&rotated, screen_square);
+                self.screen.draw_glyphs_straight_to_screen_square(&rotated.to_glyphs(), screen_square);
             }
         }
     }
@@ -300,7 +300,7 @@ impl Graphics {
                         .screen_buffer_character_square_to_screen_buffer_square(
                             screen_buffer_character_square,
                         );
-                    self.screen.draw_drawable(drawable, screen_buffer_square);
+                    self.screen.draw_glyphs_straight_to_screen_square(drawable.to_glyphs(), screen_buffer_square);
                 }
             }
         }
@@ -376,7 +376,10 @@ impl Graphics {
     }
 
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
-        self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_upgrade(upgrade));
+        self.draw_glyphs_for_square_to_draw_buffer(square, Self::glyphs_for_upgrade(upgrade));
+    }
+    fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
+        [Glyph::fg_only('*', CYAN), Glyph::transparent_glyph()]
     }
     pub fn draw_arrow(&mut self, square: WorldSquare, dir: KingWorldStep) {
         self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_flying_arrow(dir))
@@ -588,6 +591,10 @@ impl Graphics {
             .into_iter()
             .for_each(|animation| self.draw_animation(&animation, time))
     }
+    pub fn number_to_color(i: u32) -> RGB8 {
+        let in_order = vec![GREY, RED, BLUE, GREEN, YELLOW, CYAN, MAGENTA];
+        in_order[i as usize % in_order.len()]
+    }
 
     pub fn draw_non_board_animations(&mut self, time: Instant) {
         let mut glyphs_to_draw = vec![];
@@ -610,8 +617,8 @@ impl Graphics {
             }
         }
         self.active_animations
-            .extract_if(..,|x| x.finished_at_time(time));
-        self.selectors.extract_if(..,|x| x.finished_at_time(time));
+            .extract_if(.., |x| x.finished_at_time(time));
+        self.selectors.extract_if(.., |x| x.finished_at_time(time));
     }
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {

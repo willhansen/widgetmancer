@@ -1,11 +1,12 @@
 use crate::glyph::glyph_constants::*;
 use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offset};
 use crate::glyph::DoubleChar;
-use crate::utility::coordinate_frame_conversions::{
-    world_character_point_to_world_character_square, CharacterGridInLocalCharacterFrame,
-    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, WorldMove,
+use crate::screen::{
+    world_character_point_to_world_character_square, 
+    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, 
 };
-use crate::utility::*;
+use utility::coordinate_frame_conversions::{CharacterGridInLocalCharacterFrame,WorldMove,};
+use utility::*;
 use euclid::{point2, vec2, Point2D};
 use itertools::Itertools;
 use num::clamp;
