@@ -6,12 +6,6 @@ use crate::*;
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInWorldFrame;
 
-#[deprecated(note = "Obselete since screen rotation")]
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInWorldFrame;
-
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInLocalCharacterFrame;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SquareGridInLocalSquareFrame;
@@ -35,8 +29,6 @@ pub type StepSet = HashSet<WorldStep>;
 pub type NStepSet = HashSet<NStep>;
 
 
-pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
-pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 
 pub type LocalSquare = Point2D<i32, SquareGridInLocalSquareFrame>;
 pub type LocalSquarePoint = Point2D<f32, SquareGridInLocalSquareFrame>;

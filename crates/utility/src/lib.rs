@@ -644,7 +644,6 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
 }
 
 pub type WorldLine = Line<f32, SquareGridInWorldFrame>;
-pub type LocalCharacterLine = Line<f32, CharacterGridInLocalCharacterFrame>;
 
 pub fn sign(x: f32) -> f32 {
     if x < 0.0 {

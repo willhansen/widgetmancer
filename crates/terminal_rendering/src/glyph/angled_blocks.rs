@@ -10,6 +10,7 @@ use crate::glyph::glyph_constants::{
     UPPER_LEFT_HALF_BLOCK_TRIANGLE, UPPER_ONE_THIRD_BLOCK, UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
     UPPER_TWO_THIRD_BLOCK,
 };
+use crate::screen::{CharacterGridInLocalCharacterFrame, LocalCharacterPoint};
 use utility::{coordinate_frame_conversions::*, is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -336,7 +337,7 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
-    use crate::utility::Line;
+    use utility::Line;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;

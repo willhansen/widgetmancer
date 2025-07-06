@@ -648,6 +648,12 @@ impl Graphics {
     }
 }
 
+
+pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
+
+
+
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};

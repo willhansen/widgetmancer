@@ -3,6 +3,8 @@ use std::io::Write;
 
 use euclid::{point2, vec2, Point2D, Vector2D};
 use rgb::RGB8;
+use utility::coordinate_frame_conversions::{local_square_point_to_world_point, world_point_to_world_square, LocalSquarePoint, SquareGridInLocalSquareFrame, SquareGridInWorldFrame};
+use utility::HalfPlane;
 
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
@@ -454,7 +456,6 @@ pub type WorldCharacterMove = Vector2D<f32, CharacterGridInWorldFrame>;
 pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
 #[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
-pub type WorldSquareDrawableMap = HashMap<WorldSquare, DrawableEnum>;
 
 #[deprecated(note = "World does not know about characters")]
 pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
@@ -557,12 +558,36 @@ pub fn local_square_half_plane_to_local_character_half_plane(
     })
 }
 
+
+
+#[deprecated(note = "Obselete since screen rotation")]
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub struct CharacterGridInWorldFrame;
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub struct CharacterGridInLocalCharacterFrame;
+
+pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
+pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
+
+
+
+#[deprecated(note = "Invalidated by screen rotation")]
+pub fn is_world_character_square_left_square_of_world_square(
+    character_square: WorldCharacterSquare,
+) -> bool {
+    world_square_to_left_world_character_square(world_character_square_to_world_square(
+        character_square,
+    )) == character_square
+}
+
+
 #[cfg(test)]
 mod tests {
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use crate::utility::{STEP_DOWN, STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
+    use utility::{STEP_DOWN, STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
 
     use super::*;
 

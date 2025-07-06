@@ -1,7 +1,8 @@
 use crate::glyph::glyph_constants::SPACE;
 use crate::glyph::DoubleChar;
-use crate::utility::coordinate_frame_conversions::*;
-use crate::utility::*;
+use crate::{pair_up_character_square_map, screen::*};
+use utility::coordinate_frame_conversions::*;
+use utility::*;
 use euclid::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
 use std::ops::BitXor;
@@ -28,8 +29,13 @@ pub const ALL_NON_EMPTY_BRAILLE_IN_ONE_STRING: &str = "⠁⠂⠃⠄⠅⠆⠇⠈�
 pub type BrailleArray = BoolArray2D<2, 4>;
 pub type DoubleBrailleArray = SquareBoolArray2D<4>;
 
-impl BrailleArray {
-    pub fn from_char(mut c: char) -> Self {
+pub trait BrailleArrayExt {
+    fn from_char(c: char) -> Self;
+    fn char(&self) -> char;
+
+}
+impl BrailleArrayExt for BrailleArray {
+    fn from_char(mut c: char) -> Self {
         if c == SPACE {
             c = EMPTY_BRAILLE;
         }
@@ -47,7 +53,7 @@ impl BrailleArray {
         }
         braille_array
     }
-    pub fn char(&self) -> char {
+    fn char(&self) -> char {
         let mut dot_val: u32 = 0;
         for x in 0..2 {
             for y in 0..4 {
@@ -65,15 +71,22 @@ impl BrailleArray {
     }
 }
 
-impl DoubleBrailleArray {
-    pub fn from_chars(chars: DoubleChar) -> Self {
+pub trait DoubleBrailleArrayExt {
+
+    fn from_chars(chars: DoubleChar) -> Self;
+    fn chars(&self) -> DoubleChar;
+    fn from_two_braille_arrays(arrays: [BrailleArray; 2]) -> Self;
+    fn to_two_braille_arrays(&self) -> [BrailleArray; 2];
+}
+impl DoubleBrailleArrayExt for DoubleBrailleArray {
+    fn from_chars(chars: DoubleChar) -> Self {
         Self::from_two_braille_arrays(chars.map(|c| BrailleArray::from_char(c)))
     }
-    pub fn chars(&self) -> DoubleChar {
+    fn chars(&self) -> DoubleChar {
         self.to_two_braille_arrays()
             .map(|braille_array| braille_array.char())
     }
-    pub fn from_two_braille_arrays(arrays: [BrailleArray; 2]) -> Self {
+    fn from_two_braille_arrays(arrays: [BrailleArray; 2]) -> Self {
         let mut double_braille_array = Self::empty();
         for row in 0..Self::height() {
             for col in 0..Self::width() {
@@ -84,7 +97,7 @@ impl DoubleBrailleArray {
         }
         double_braille_array
     }
-    pub fn to_two_braille_arrays(&self) -> [BrailleArray; 2] {
+    fn to_two_braille_arrays(&self) -> [BrailleArray; 2] {
         let mut arrays = [BrailleArray::empty(), BrailleArray::empty()];
         for row in 0..Self::height() {
             for col in 0..Self::width() {
