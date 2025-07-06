@@ -4,9 +4,9 @@ version = "0.0.0"
 edition.workspace = true
 
 [dependencies]
-# num = "0.4"
+num = "0.4"
 # rgb = "0.8.34"
-# euclid = "0.22.7"
+euclid = "0.22.7"
 # ordered-float = "3.3.0"
 # line_drawing = "1.0"
 # termion = "2.0.1"
