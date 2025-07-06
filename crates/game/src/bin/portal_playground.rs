@@ -1,10 +1,7 @@
 use euclid::point2;
 use itertools::Itertools;
 use rgb::RGB8;
-use rust_roguelike::glyph::DoubleGlyphFunctions;
-use rust_roguelike::graphics::Graphics;
-use rust_roguelike::set_up_input_thread;
-use rust_roguelike::{glyph::DoubleGlyph, utility::coordinate_frame_conversions::WorldSquare};
+use game::{glyph::{DoubleGlyph, DoubleGlyphFunctions}, graphics::Graphics, set_up_input_thread, utility::coordinate_frame_conversions::WorldSquare};
 use std::io::{stdin, stdout, Write};
 use std::thread;
 use std::time::{Duration, Instant};
