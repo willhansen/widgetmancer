@@ -1,18 +1,19 @@
 use euclid::point2;
+use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
-use game::{graphics::Graphics, set_up_input_thread};
-use utility::*;
-use terminal_rendering::*;
+use terminal_rendering::glyph_constants::named_colors;
 use std::io::{stdin, stdout, Write};
 use std::thread;
 use std::time::{Duration, Instant};
+use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
     event::{Event, Key},
     input::{MouseTerminal, TermRead},
     raw::IntoRawMode,
 };
+use utility::*;
 
 struct GameState {
     width: u16,
@@ -53,7 +54,13 @@ impl GameState {
                 // Key::Esc => todo!(),
                 _ => {}
             },
-            Event::Mouse(mouse_event) => todo!(),
+            Event::Mouse(mouse_event) => match mouse_event {
+                termion::event::MouseEvent::Press(mouse_button, _, _) => todo!(),
+                termion::event::MouseEvent::Release(_, _) => todo!(),
+                termion::event::MouseEvent::Hold(x, y) => {
+                    self.mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                }
+            },
             Event::Unsupported(items) => todo!(),
         }
     }
@@ -65,9 +72,12 @@ impl GameState {
                         .map(|row| {
                             let x = col;
                             let y = self.height - row - 1;
-                            DoubleGlyph::solid_color(
-                                board_color(point2(x as i32, y as i32)).unwrap(),
-                            )
+                            let pos = point2(x as i32, y as i32);
+                            DoubleGlyph::solid_color(if self.mouse_pos == Some(pos) {
+                                named_colors::RED
+                            } else {
+                                board_color(pos).unwrap()
+                            })
                         })
                         .collect_vec()
                 })
