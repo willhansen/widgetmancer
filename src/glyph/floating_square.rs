@@ -3,9 +3,9 @@ use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offse
 use crate::glyph::DoubleChar;
 use crate::screen::{
     world_character_point_to_world_character_square, 
-    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, 
+    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, CharacterGridInLocalCharacterFrame,
 };
-use utility::coordinate_frame_conversions::{CharacterGridInLocalCharacterFrame,WorldMove,};
+use utility::coordinate_frame_conversions::{WorldMove,};
 use utility::*;
 use euclid::{point2, vec2, Point2D};
 use itertools::Itertools;

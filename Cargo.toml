@@ -14,3 +14,6 @@ ntest = "0.9.0"
 itertools = "0.10.5"
 
 utility.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1.3.0"
