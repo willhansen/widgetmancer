@@ -71,11 +71,11 @@ impl Screen {
     pub fn new_by_square_dimensions(width: u16, height: u16) -> Self {
         Self::new(width * 2, height)
     }
-    pub(crate) fn terminal_width(&self) -> i32 {
+    pub fn terminal_width(&self) -> i32 {
         self.terminal_width as i32
     }
 
-    pub(crate) fn terminal_height(&self) -> i32 {
+    pub fn terminal_height(&self) -> i32 {
         self.terminal_height as i32
     }
 
