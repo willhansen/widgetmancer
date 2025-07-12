@@ -2,10 +2,12 @@ use euclid::point2;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
-use terminal_rendering::glyph_constants::named_colors;
+use std::fmt::Display;
 use std::io::{stdin, stdout, Write};
+use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
+use terminal_rendering::glyph_constants::named_colors;
 use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
@@ -31,6 +33,9 @@ impl GameState {
             last_frame: None,
         }
     }
+    pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
+        events.into_iter().for_each(|e| self.process_event(e))
+    }
     pub fn process_event(&mut self, event: Event) {
         match event {
             Event::Key(key) => match key {
@@ -55,8 +60,10 @@ impl GameState {
                 _ => {}
             },
             Event::Mouse(mouse_event) => match mouse_event {
-                termion::event::MouseEvent::Press(mouse_button, _, _) => todo!(),
-                termion::event::MouseEvent::Release(_, _) => todo!(),
+                termion::event::MouseEvent::Press(mouse_button, x, y) => {
+                    self.mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                }
+                termion::event::MouseEvent::Release(x, y) => self.mouse_pos = None,
                 termion::event::MouseEvent::Hold(x, y) => {
                     self.mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
                 }
@@ -90,11 +97,21 @@ fn grey(x: u8) -> RGB8 {
     RGB8::new(x, x, x)
 }
 
+#[derive(PartialEq)]
 struct Frame {
     grid: Vec<Vec<DoubleGlyph>>,
 }
 
 impl Frame {
+    pub fn save_to_file(&self, path: PathBuf) {
+        todo!();
+    }
+    pub fn load_from_file(path: PathBuf) -> Option<Frame> {
+        todo!();
+    }
+    pub fn load_from_string(string: String) -> Frame {
+        todo!();
+    }
     pub fn width(&self) -> usize {
         self.grid[0].len()
     }
@@ -147,6 +164,12 @@ impl Frame {
     }
 }
 
+impl Display for Frame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     write!(writable, "{}", new_frame.diff(maybe_old_frame));
 }
@@ -196,5 +219,57 @@ mod tests {
         let frame = state.render();
         assert_eq!(frame.width(), 10);
         assert_eq!(frame.height(), 10);
+    }
+
+    fn press_left(x: u16, y: u16) -> termion::event::Event {
+        termion::event::Event::Mouse(termion::event::MouseEvent::Press(
+            termion::event::MouseButton::Left,
+            x,
+            y,
+        ))
+    }
+    fn drag_mouse(x: u16, y: u16) -> termion::event::Event {
+        termion::event::Event::Mouse(termion::event::MouseEvent::Hold(x, y))
+    }
+    fn release_mouse(x: u16, y: u16) -> termion::event::Event {
+        termion::event::Event::Mouse(termion::event::MouseEvent::Release(x, y))
+    }
+
+    macro_rules! compare_frame_for_test {
+        ($frame:ident) => {
+            let test_name: String = todo!();
+            let correct_frame_path: PathBuf = todo!();
+
+            let maybe_correct_frame: Option<Frame> = Frame::load_from_file(correct_frame_path);
+
+            let Some(correct_frame) = maybe_correct_frame else {
+                let blessed = todo!();
+                if blessed {
+                    $frame.save_to_file(correct_frame_path);
+                    return;
+                }
+                panic!("No correct frame found.  Bless tests to lock-in current frame as correct.\n\n{}", $frame);
+            };
+
+            if $frame == correct_frame {
+                return;
+            }
+
+            panic!("Frames do not match.\n\nCorrect:\n{correct_frame}\n\nIncorrect:\n{}\n\nDiff:\n{}", $frame, Frame::load_from_string(correct_frame.diff(&Some($frame))));
+
+        }
+    }
+
+    #[test]
+    fn test_place_portal() {
+        let mut game = GameState::new(10, 10);
+        game.process_events([
+            press_left(3, 3),
+            drag_mouse(3, 2),
+            drag_mouse(7, 2),
+            release_mouse(7, 4),
+        ]);
+        let frame = game.render();
+        compare_frame_for_test!(frame);
     }
 }
