@@ -43,6 +43,7 @@ pub const SCREEN_STEP_DOWN_RIGHT: ScreenBufferStep = vec2(1, 1);
 pub struct Screen {
     screen_origin: WorldSquare,
     rotation: QuarterTurnsAnticlockwise,
+    // TODO: replace with Frame
     pub screen_buffer: Vec<Vec<Glyph>>,
     // (x,y), left to right, top to bottom
     pub current_screen_state: Vec<Vec<Glyph>>,
