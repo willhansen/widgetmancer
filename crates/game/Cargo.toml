@@ -31,6 +31,7 @@ ambassador = "0.3.5"
 
 utility.workspace = true
 terminal_rendering.workspace = true
+stdext = "0.3.3"
 
 
 [dev-dependencies]

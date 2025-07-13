@@ -3,7 +3,10 @@ use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
 use std::fmt::Display;
+use std::fs::File;
+use std::io::Read;
 use std::io::{stdin, stdout, Write};
+use std::option_env;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -97,81 +100,17 @@ fn grey(x: u8) -> RGB8 {
     RGB8::new(x, x, x)
 }
 
-#[derive(PartialEq)]
-struct Frame {
-    grid: Vec<Vec<DoubleGlyph>>,
-}
 
-impl Frame {
-    pub fn save_to_file(&self, path: PathBuf) {
-        todo!();
-    }
-    pub fn load_from_file(path: PathBuf) -> Option<Frame> {
-        todo!();
-    }
-    pub fn load_from_string(string: String) -> Frame {
-        todo!();
-    }
-    pub fn width(&self) -> usize {
-        self.grid[0].len()
-    }
-    pub fn height(&self) -> usize {
-        self.grid.len()
-    }
-    pub fn diff(&self, maybe_old_frame: &Option<Frame>) -> String {
-        let mut output = String::new();
-
-        let rows = self.grid.len();
-        let cols = self.grid[0].len();
-        let mut prev_written_row_col: Option<[usize; 2]> = None;
-        for row in 0..rows {
-            for col in 0..cols {
-                let new_glyphs = self.grid[row][col].to_string();
-
-                if let Some(old_frame) = maybe_old_frame {
-                    let old_glyphs = old_frame.grid[row][col].to_string();
-                    let this_square_is_same = new_glyphs == old_glyphs;
-                    if this_square_is_same {
-                        continue;
-                    }
-                }
-                let just_next_horizontally = prev_written_row_col
-                    .is_some_and(|[prev_row, prev_col]| row == prev_row && prev_col == col - 1);
-
-                let should_do_linewrap = prev_written_row_col.is_some_and(|[prev_row, prev_col]| {
-                    prev_row + 1 == row && col == 0 && prev_col + 1 == cols
-                });
-                let directly_below = prev_written_row_col
-                    .is_some_and(|[prev_row, prev_col]| prev_row + 1 == row && col == prev_col);
-
-                if just_next_horizontally {
-                    // Do nothing
-                } else if should_do_linewrap {
-                    output += "\n\r";
-                } else if directly_below {
-                    output += "\n";
-                } else {
-                    output +=
-                        &termion::cursor::Goto((col + 1) as u16, (row + 1) as u16).to_string();
-                }
-
-                output += &new_glyphs.to_string();
-
-                prev_written_row_col = Some([row, col]);
-            }
-        }
-        output
-    }
-}
-
-impl Display for Frame {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
+fn add_border(string: String) -> String {
+    let lines = string.lines().collect_vec();
+    let len = lines.get(0).unwrap_or( &"").chars().count();
+    "#".repeat(len + 2)
+        + &lines.into_iter().map(|l| format!("#{l}#")).join("\n")
+        + &"#".repeat(len + 2)
 }
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
-    write!(writable, "{}", new_frame.diff(maybe_old_frame));
+    writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
 }
 
 fn main() {
@@ -212,6 +151,7 @@ fn board_color(square: WorldSquare) -> Option<RGB8> {
 mod tests {
     use super::*;
     use pretty_assertions::{assert_eq, assert_ne};
+    use stdext::function_name;
 
     #[test]
     fn test_simple_output() {
@@ -237,27 +177,36 @@ mod tests {
 
     macro_rules! compare_frame_for_test {
         ($frame:ident) => {
-            let test_name: String = todo!();
-            let correct_frame_path: PathBuf = todo!();
+            let test_name: String = function_name!().replace(":", "_");
+            compare_frame_for_test($frame, test_name)
+        };
+    }
 
-            let maybe_correct_frame: Option<Frame> = Frame::load_from_file(correct_frame_path);
+    fn compare_frame_for_test(frame: Frame, file_prefix: String) {
+        let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
+        assert!(file_directory.is_dir());
+        let correct_frame_path: PathBuf = file_directory.join(file_prefix + "_good_frame.txt");
 
-            let Some(correct_frame) = maybe_correct_frame else {
-                let blessed = todo!();
-                if blessed {
-                    $frame.save_to_file(correct_frame_path);
-                    return;
-                }
-                panic!("No correct frame found.  Bless tests to lock-in current frame as correct.\n\n{}", $frame);
-            };
+        let maybe_correct_frame_string: Option<String> =
+            std::fs::read_to_string(correct_frame_path.clone()).ok();
 
-            if $frame == correct_frame {
-                return;
+        if let Some(correct_frame_string) = maybe_correct_frame_string {
+            let frame_string = frame.string_for_regular_display();
+            assert_eq!(frame_string, correct_frame_string,
+                "Frames do not match.\n\nCorrect:\n{}\n\nIncorrect:\n{}\n\nCorrect:\n{}\n\nIncorrect:\n{}",
+                correct_frame_string,
+                frame_string,
+                correct_frame_string.escape_debug(),
+                frame_string.escape_debug()
+            );
+        } else {
+            let blessed = option_env!("BLESS_TESTS").is_some();
+            if blessed {
+                frame.save_to_file(correct_frame_path);
+            } else {
+                panic!("No correct frame found.  Bless tests to lock-in current frame as correct.\n\n{}\n\n{}", frame, frame.string_for_regular_display().escape_debug());
             }
-
-            panic!("Frames do not match.\n\nCorrect:\n{correct_frame}\n\nIncorrect:\n{}\n\nDiff:\n{}", $frame, Frame::load_from_string(correct_frame.diff(&Some($frame))));
-
-        }
+        };
     }
 
     #[test]
@@ -271,5 +220,6 @@ mod tests {
         ]);
         let frame = game.render();
         compare_frame_for_test!(frame);
+        panic!();
     }
 }
