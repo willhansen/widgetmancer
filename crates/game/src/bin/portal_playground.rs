@@ -100,15 +100,6 @@ fn grey(x: u8) -> RGB8 {
     RGB8::new(x, x, x)
 }
 
-
-fn add_border(string: String) -> String {
-    let lines = string.lines().collect_vec();
-    let len = lines.get(0).unwrap_or( &"").chars().count();
-    "#".repeat(len + 2)
-        + &lines.into_iter().map(|l| format!("#{l}#")).join("\n")
-        + &"#".repeat(len + 2)
-}
-
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
 }
@@ -175,7 +166,7 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(x, y))
     }
 
-    macro_rules! compare_frame_for_test {
+    macro_rules! compare_frame_to_file {
         ($frame:ident) => {
             let test_name: String = function_name!().replace(":", "_");
             compare_frame_for_test($frame, test_name)
@@ -204,14 +195,14 @@ mod tests {
             if blessed {
                 frame.save_to_file(correct_frame_path);
             } else {
-                panic!("No correct frame found.  Bless tests to lock-in current frame as correct.\n\n{}\n\n{}", frame, frame.string_for_regular_display().escape_debug());
+                panic!("No correct frame found.  Set the BLESS_TESTS env var to lock-in current frame as correct.\n\n{}", frame);
             }
         };
     }
 
     #[test]
     fn test_place_portal() {
-        let mut game = GameState::new(10, 10);
+        let mut game = GameState::new(12, 12);
         game.process_events([
             press_left(3, 3),
             drag_mouse(3, 2),
@@ -219,7 +210,7 @@ mod tests {
             release_mouse(7, 4),
         ]);
         let frame = game.render();
-        compare_frame_for_test!(frame);
+        compare_frame_to_file!(frame);
         panic!();
     }
 }
