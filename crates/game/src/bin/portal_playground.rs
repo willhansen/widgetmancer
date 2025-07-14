@@ -2,6 +2,7 @@ use euclid::point2;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Read;
@@ -20,11 +21,17 @@ use termion::{
 };
 use utility::*;
 
+type IPoint = [i32; 2];
+type Quadrant = i32;
+type Portal = (IPoint, Quadrant);
+
 struct GameState {
     width: u16,
     height: u16,
 
-    mouse_pos: Option<WorldSquare>,
+    portals: HashMap<Portal, Portal>,
+
+    last_mouse_pos: Option<WorldSquare>,
     last_frame: Option<Frame>,
 }
 impl GameState {
@@ -32,7 +39,8 @@ impl GameState {
         GameState {
             width,
             height,
-            mouse_pos: None,
+            portals: Default::default(),
+            last_mouse_pos: None,
             last_frame: None,
         }
     }
@@ -64,11 +72,11 @@ impl GameState {
             },
             Event::Mouse(mouse_event) => match mouse_event {
                 termion::event::MouseEvent::Press(mouse_button, x, y) => {
-                    self.mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                    self.last_mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
                 }
-                termion::event::MouseEvent::Release(x, y) => self.mouse_pos = None,
+                termion::event::MouseEvent::Release(x, y) => self.last_mouse_pos = None,
                 termion::event::MouseEvent::Hold(x, y) => {
-                    self.mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                    self.last_mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
                 }
             },
             Event::Unsupported(items) => todo!(),
@@ -83,7 +91,7 @@ impl GameState {
                             let x = col;
                             let y = self.height - row - 1;
                             let pos = point2(x as i32, y as i32);
-                            DoubleGlyph::solid_color(if self.mouse_pos == Some(pos) {
+                            DoubleGlyph::solid_color(if self.last_mouse_pos == Some(pos) {
                                 named_colors::RED
                             } else {
                                 board_color(pos).unwrap()
@@ -110,7 +118,8 @@ fn main() {
     let mut game_state = GameState {
         width: width / 2,
         height,
-        mouse_pos: None,
+        portals: Default::default(),
+        last_mouse_pos: None,
         last_frame: None,
     };
     let mut graphics = Graphics::new(width, height, Instant::now());
@@ -167,9 +176,12 @@ mod tests {
     }
 
     macro_rules! compare_frame_to_file {
-        ($frame:ident) => {
+        ($frame:ident, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
-            compare_frame_for_test($frame, test_name)
+            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name))
+        };
+        ($frame:ident) => {
+            compare_frame_to_file!($frame, "")
         };
     }
 
