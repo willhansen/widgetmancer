@@ -31,7 +31,7 @@ struct GameState {
 
     portals: HashMap<Portal, Portal>,
 
-    last_mouse_pos: Option<WorldSquare>,
+    last_mouse_screen_pos: Option<WorldSquare>,
     last_frame: Option<Frame>,
 }
 impl GameState {
@@ -40,7 +40,7 @@ impl GameState {
             width,
             height,
             portals: Default::default(),
-            last_mouse_pos: None,
+            last_mouse_screen_pos: None,
             last_frame: None,
         }
     }
@@ -72,11 +72,11 @@ impl GameState {
             },
             Event::Mouse(mouse_event) => match mouse_event {
                 termion::event::MouseEvent::Press(mouse_button, x, y) => {
-                    self.last_mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                    self.last_mouse_screen_pos = Some(point2(x as i32 - 1, y as i32 - 1))
                 }
-                termion::event::MouseEvent::Release(x, y) => self.last_mouse_pos = None,
+                termion::event::MouseEvent::Release(x, y) => self.last_mouse_screen_pos = None,
                 termion::event::MouseEvent::Hold(x, y) => {
-                    self.last_mouse_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                    self.last_mouse_screen_pos = Some(point2(x as i32 - 1, y as i32 - 1))
                 }
             },
             Event::Unsupported(items) => todo!(),
@@ -84,17 +84,19 @@ impl GameState {
     }
     pub fn render(&self) -> Frame {
         Frame {
-            grid: (0..self.width as i32)
-                .map(|world_x| {
-                    (0..self.height as i32)
-                        .map(|world_y| {
+            grid: (0..self.height as i32)
+                .map(|world_row| {
+                    let world_y = self.height as i32 - world_row - 1;
+                    (0..self.width as i32)
+                        .map(|world_x| {
                             // let x = col;
                             // let y = self.height - row - 1;
                             let world_pos = point2(world_x as i32, world_y as i32);
-                            let mouse_is_here = self.last_mouse_pos.is_some_and(|mouse_pos| {
-                                let [screen_x, screen_y] = mouse_pos.to_array();
-                                screen_x / 2 == world_x && screen_y == world_y
-                            });
+                            let mouse_is_here =
+                                self.last_mouse_screen_pos.is_some_and(|mouse_pos| {
+                                    let [screen_x, screen_y] = mouse_pos.to_array();
+                                    screen_x / 2 == world_x && screen_y == world_y
+                                });
 
                             DoubleGlyph::solid_color(if mouse_is_here {
                                 named_colors::RED
@@ -124,7 +126,7 @@ fn main() {
         width: width as usize / 2,
         height: height as usize,
         portals: Default::default(),
-        last_mouse_pos: None,
+        last_mouse_screen_pos: None,
         last_frame: None,
     };
     let mut graphics = Graphics::new(width, height, Instant::now());
@@ -217,6 +219,22 @@ mod tests {
         };
     }
 
+    #[test]
+    fn test_click_a() {
+        let mut game = GameState::new(12, 12);
+        game.process_event(press_left(0, 0));
+        let frame = game.render();
+        compare_frame_to_file!(frame);
+    }
+    #[ignore]
+    #[test]
+    fn test_click_b() {
+        let mut game = GameState::new(12, 12);
+        game.process_event(press_left(2, 3));
+        let frame = game.render();
+        compare_frame_to_file!(frame);
+    }
+    #[ignore]
     #[test]
     fn test_place_portal() {
         let mut game = GameState::new(12, 12);

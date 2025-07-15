@@ -13,9 +13,9 @@ pub struct Frame {
 
 impl Frame {
     pub fn save_to_file(&self, path: PathBuf) {
-        File::open(path)
+        File::create(path)
             .unwrap()
-            .write_all(&self.bytes_for_raw_display_over(&None));
+            .write_all(&self.string_for_regular_display().as_bytes());
     }
     pub fn width(&self) -> usize {
         self.grid[0].len()
