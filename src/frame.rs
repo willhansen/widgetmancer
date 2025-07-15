@@ -15,7 +15,7 @@ impl Frame {
     pub fn save_to_file(&self, path: PathBuf) {
         File::open(path)
             .unwrap()
-            .write(&self.bytes_for_raw_display_over(&None));
+            .write_all(&self.bytes_for_raw_display_over(&None));
     }
     pub fn width(&self) -> usize {
         self.grid[0].len()
@@ -49,13 +49,11 @@ impl Frame {
     pub fn bytes_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> Vec<u8> {
         let mut output = String::new();
 
-        let rows = self.grid.len();
-        let cols = self.grid[0].len();
         let mut prev_written_row_col: Option<[usize; 2]> = None;
-        for x in 0..self.width() {
-            for y in 0..self.height() {
-                let col = x;
-                let row = self.height() - y - 1;
+        for frame_x in 0..self.width() {
+            for frame_y in 0..self.height() {
+                let col = frame_x;
+                let row = self.height() - frame_y - 1;
                 let new_glyphs = self.grid[row][col].to_string();
 
                 if let Some(old_frame) = maybe_old_frame {
@@ -69,7 +67,7 @@ impl Frame {
                     .is_some_and(|[prev_row, prev_col]| row == prev_row && prev_col == col - 1);
 
                 let should_do_linewrap = prev_written_row_col.is_some_and(|[prev_row, prev_col]| {
-                    prev_row + 1 == row && col == 0 && prev_col + 1 == cols
+                    prev_row + 1 == row && col == 0 && prev_col + 1 == self.width()
                 });
                 let directly_below = prev_written_row_col
                     .is_some_and(|[prev_row, prev_col]| prev_row + 1 == row && col == prev_col);
@@ -82,7 +80,7 @@ impl Frame {
                     output += "\n";
                 } else {
                     output +=
-                        &termion::cursor::Goto((col + 1) as u16, (row + 1) as u16).to_string();
+                        &termion::cursor::Goto((row + 1) as u16, (col + 1) as u16).to_string();
                 }
 
                 output += &new_glyphs.to_string();
