@@ -52,8 +52,10 @@ impl Frame {
         let rows = self.grid.len();
         let cols = self.grid[0].len();
         let mut prev_written_row_col: Option<[usize; 2]> = None;
-        for row in 0..rows {
-            for col in 0..cols {
+        for x in 0..self.width() {
+            for y in 0..self.height() {
+                let col = x;
+                let row = self.height() - y - 1;
                 let new_glyphs = self.grid[row][col].to_string();
 
                 if let Some(old_frame) = maybe_old_frame {

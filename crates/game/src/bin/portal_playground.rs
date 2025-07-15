@@ -85,11 +85,11 @@ impl GameState {
     pub fn render(&self) -> Frame {
         Frame {
             grid: (0..self.width)
-                .map(|col| {
+                .map(|x| {
                     (0..self.height)
-                        .map(|row| {
-                            let x = col;
-                            let y = self.height - row - 1;
+                        .map(|y| {
+                            // let x = col;
+                            // let y = self.height - row - 1;
                             let pos = point2(x as i32, y as i32);
                             DoubleGlyph::solid_color(if self.last_mouse_pos == Some(pos) {
                                 named_colors::RED
