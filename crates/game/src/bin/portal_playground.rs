@@ -26,8 +26,8 @@ type Quadrant = i32;
 type Portal = (IPoint, Quadrant);
 
 struct GameState {
-    width: u16,
-    height: u16,
+    width: usize,
+    height: usize,
 
     portals: HashMap<Portal, Portal>,
 
@@ -35,7 +35,7 @@ struct GameState {
     last_frame: Option<Frame>,
 }
 impl GameState {
-    pub fn new(width: u16, height: u16) -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         GameState {
             width,
             height,
@@ -84,17 +84,22 @@ impl GameState {
     }
     pub fn render(&self) -> Frame {
         Frame {
-            grid: (0..self.width)
-                .map(|x| {
-                    (0..self.height)
-                        .map(|y| {
+            grid: (0..self.width as i32)
+                .map(|world_x| {
+                    (0..self.height as i32)
+                        .map(|world_y| {
                             // let x = col;
                             // let y = self.height - row - 1;
-                            let pos = point2(x as i32, y as i32);
-                            DoubleGlyph::solid_color(if self.last_mouse_pos == Some(pos) {
+                            let world_pos = point2(world_x as i32, world_y as i32);
+                            let mouse_is_here = self.last_mouse_pos.is_some_and(|mouse_pos| {
+                                let [screen_x, screen_y] = mouse_pos.to_array();
+                                screen_x / 2 == world_x && screen_y == world_y
+                            });
+
+                            DoubleGlyph::solid_color(if mouse_is_here {
                                 named_colors::RED
                             } else {
-                                board_color(pos).unwrap()
+                                board_color(world_pos).unwrap()
                             })
                         })
                         .collect_vec()
@@ -116,8 +121,8 @@ fn main() {
     let (width, height) = termion::terminal_size().unwrap();
 
     let mut game_state = GameState {
-        width: width / 2,
-        height,
+        width: width as usize / 2,
+        height: height as usize,
         portals: Default::default(),
         last_mouse_pos: None,
         last_frame: None,
