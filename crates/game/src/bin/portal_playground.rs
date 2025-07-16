@@ -168,11 +168,11 @@ mod tests {
         assert_eq!(frame.height(), 10);
     }
 
-    fn press_left(x: u16, y: u16) -> termion::event::Event {
+    fn press_left(screen_x: u16, screen_y: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Press(
             termion::event::MouseButton::Left,
-            x,
-            y,
+            screen_x,
+            screen_y,
         ))
     }
     fn drag_mouse(x: u16, y: u16) -> termion::event::Event {
@@ -182,41 +182,49 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(x, y))
     }
 
+    macro_rules! compare_string_to_file {
+        ($string:ident, $prefix:expr) => {
+            let test_name: String = function_name!().replace(":", "_");
+            compare_string_for_test($string, format!("{}_{}", $prefix, test_name))
+        };
+        ($frame:ident) => {
+            compare_string_to_file!($string, "")
+        };
+    }
     macro_rules! compare_frame_to_file {
         ($frame:ident, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name))
+            let string = $frame.string_for_regular_display();
+            compare_string_to_file!(string, $prefix)
         };
         ($frame:ident) => {
             compare_frame_to_file!($frame, "")
         };
     }
 
-    fn compare_frame_for_test(frame: Frame, file_prefix: String) {
+    fn compare_string_for_test(candidate_string: String, file_prefix: String) {
         let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
         assert!(file_directory.is_dir());
         let correct_frame_path: PathBuf = file_directory.join(file_prefix + "_good_frame.txt");
 
-        let maybe_correct_frame_string: Option<String> =
+        let maybe_correct_string: Option<String> =
             std::fs::read_to_string(correct_frame_path.clone()).ok();
 
-        if let Some(correct_frame_string) = maybe_correct_frame_string {
-            let frame_string = frame.string_for_regular_display();
-            assert_eq!(frame_string, correct_frame_string,
-                "Frames do not match.\n\nCorrect:\n{}\n\nIncorrect:\n{}\n\nCorrect:\n{}\n\nIncorrect:\n{}",
-                correct_frame_string,
-                frame_string,
-                correct_frame_string.escape_debug(),
-                frame_string.escape_debug()
-            );
-        } else {
-            let blessed = option_env!("BLESS_TESTS").is_some();
-            if blessed {
-                frame.save_to_file(correct_frame_path);
-            } else {
-                panic!("No correct frame found.  Set the BLESS_TESTS env var to lock-in current frame as correct.\n\n{}", frame);
-            }
-        };
+        let blessed = option_env!("BLESS_TESTS").is_some();
+        if blessed || maybe_correct_string.is_none() {
+            std::fs::write(correct_frame_path, candidate_string).unwrap();
+            return;
+        }
+
+        let correct_string = maybe_correct_string.unwrap();
+        assert_eq!(candidate_string, correct_string,
+            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n❌\nCorrect:\n{}\n\nGiven:\n{}",
+            correct_string,
+            candidate_string,
+            correct_string.escape_debug(),
+            candidate_string.escape_debug()
+        );
+
+        println!("{}\n✅", candidate_string);
     }
 
     #[test]
@@ -226,12 +234,31 @@ mod tests {
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
-    #[ignore]
     #[test]
     fn test_click_b() {
         let mut game = GameState::new(12, 12);
-        game.process_event(press_left(2, 3));
+        game.process_event(press_left(3, 3));
         let frame = game.render();
+        dbg!(&frame);
+        println!("{}", frame.string_for_regular_display());
+        let red_map: String = (0..frame.height())
+            .map(|row| {
+                let y = frame.row_to_y(row);
+                (0..frame.width() * 2)
+                    .map(|col| {
+                        let x = col;
+                        if frame.get([x, y]).bg_color == named_colors::RED {
+                            "1"
+                        } else {
+                            "0"
+                        }
+                    })
+                    .join("")
+            })
+            .join("\n");
+        compare_string_to_file!(red_map, "red_map");
+        assert_eq!(frame.get([2, 2]).bg_color, named_colors::RED);
+        assert_eq!(frame.get([3, 2]).bg_color, named_colors::RED);
         compare_frame_to_file!(frame);
     }
     #[ignore]
