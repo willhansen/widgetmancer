@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Frame {
     pub grid: Vec<Vec<DoubleGlyph>>,
 }
@@ -24,6 +24,25 @@ impl Frame {
         self.grid.len()
     }
 
+    pub fn row_to_y(&self, row: usize) -> usize {
+         self.height() - row - 1
+
+    }
+    pub fn y_to_row(&self, y: usize) -> usize {
+        // Symmetric transform
+        self.row_to_y(y)
+
+    }
+
+    pub fn get(&self, frame_point: [usize; 2]) -> Glyph {
+        let [x, y] = frame_point;
+        assert!(x >= 0 && y >= 0 && x < self.width() * 2 && y < self.height());
+        let col = x / 2;
+        let row = self.y_to_row(y);
+        let double_glyph_index = x as usize % 2;
+        self.grid[row][col][double_glyph_index]
+    }
+
     pub fn framed(&self) -> String {
         //╭╮╯╰─│
         format!(
@@ -32,7 +51,7 @@ impl Frame {
 {contents}
 ╰{horiz}╯\
 ",
-            horiz = "─".repeat(self.width()*2),
+            horiz = "─".repeat(self.width() * 2),
             contents = self
                 .string_for_regular_display()
                 .lines()
@@ -95,5 +114,10 @@ impl Frame {
 impl Display for Frame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.framed())
+    }
+}
+impl std::fmt::Debug for Frame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&("\n".to_string() + &self.framed()))
     }
 }
