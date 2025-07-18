@@ -275,4 +275,23 @@ mod tests {
         compare_frame_to_file!(frame);
         panic!();
     }
+    #[test]
+    fn test_raw_vs_non_raw_rendering() {
+        let mut game = GameState::new(4, 4);
+        game.process_event(press_left(3, 2));
+        let frame = game.render();
+        let non_raw = frame.string_for_regular_display(); 
+        let raw = frame.bytes_for_raw_display_over(&None);
+
+        let unraw = String::from_utf8(raw).unwrap();
+        let prefix = &termion::cursor::Goto(4,1).to_string();
+
+        let unraw = unraw.strip_prefix(prefix).unwrap();
+        let unraw = unraw.replace("\r", "");
+        dbg!(&unraw[..20], &prefix);
+
+        assert_eq!(non_raw.escape_debug().to_string(), unraw.escape_debug().to_string());
+        assert_eq!(non_raw, unraw);
+
+    }
 }
