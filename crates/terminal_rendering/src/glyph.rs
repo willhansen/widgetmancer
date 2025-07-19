@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
+use itertools::Itertools;
 use ::num::clamp;
 use euclid::*;
 use euclid::{point2, vec2};
@@ -100,8 +101,11 @@ impl Glyph {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string_colored(&self, colored: bool) -> String {
         let mut output = self.character.to_string();
+        if !colored {
+            return output;
+        }
         output = format!(
             "{}{}{}",
             color::Fg(color::Rgb(
@@ -123,6 +127,13 @@ impl Glyph {
             color::Bg(color::Reset),
         );
         return output;
+    }
+    pub fn to_string(&self) -> String {
+        self.to_string_colored(true)
+    }
+
+    fn to_string_after(&self, prev: Self) -> String {
+        todo!()
     }
 
     pub fn from_char(character: char) -> Glyph {
@@ -266,6 +277,10 @@ impl Glyph {
             bg_color: color,
             bg_transparent: false,
         }
+    }
+    pub fn solid_color(color: RGB8) -> Glyph {
+        Self::solid_bg(color)
+
     }
 
     pub fn get_solid_color(&self) -> Option<RGB8> {
@@ -453,10 +468,13 @@ impl Debug for Glyph {
     }
 }
 
+
 pub trait DoubleGlyphFunctions {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
     fn to_string(&self) -> String;
+    fn to_string_colored(&self, colored:bool) -> String;
+    fn to_string_after(&self, prev: Self) -> String;
     fn to_clean_string(&self) -> String;
     fn chars(&self) -> DoubleChar;
     fn get_solid_color(&self) -> Option<RGB8>;
@@ -465,6 +483,13 @@ pub trait DoubleGlyphFunctions {
     fn fg_colors(&self) -> [RGB8; 2];
     fn solid_color(color: RGB8) -> DoubleGlyph;
     fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph;
+    fn from_chars(value: DoubleChar) -> DoubleGlyph {
+        value.map(Glyph::from_char)
+    }
+    fn from_str(value: &str) -> DoubleGlyph {
+        assert!(value.len() == 2);
+        value.chars().map(Glyph::from_char).collect_vec().try_into().unwrap()
+    }
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -515,7 +540,13 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         return output;
     }
     fn to_string(&self) -> String {
-        self[0].to_string() + &self[1].to_string()
+        self.to_string_colored(true)
+    }
+    fn to_string_colored(&self, colored:bool) -> String {
+        self[0].to_string_colored(colored) + &self[1].to_string_colored(colored)
+    }
+    fn to_string_after(&self, prev: Self) -> String {
+        self[0].to_string_after(prev[1]) + &self[1].to_string_after(self[0])
     }
 
     fn to_clean_string(&self) -> String {
@@ -558,6 +589,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         self.map(|g| g.tinted(color, strength))
     }
 }
+
 
 fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
     if Glyph::char_is_empty(top_char) {

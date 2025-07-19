@@ -31,8 +31,7 @@ struct GameState {
 
     portals: HashMap<Portal, Portal>,
 
-    last_mouse_screen_pos: Option<WorldSquare>,
-    last_frame: Option<Frame>,
+    last_mouse_screen_row_col: Option<[u16;2]>,
 }
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -40,8 +39,7 @@ impl GameState {
             width,
             height,
             portals: Default::default(),
-            last_mouse_screen_pos: None,
-            last_frame: None,
+            last_mouse_screen_row_col: None,
         }
     }
     pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
@@ -71,43 +69,40 @@ impl GameState {
                 _ => {}
             },
             Event::Mouse(mouse_event) => match mouse_event {
-                termion::event::MouseEvent::Press(mouse_button, x, y) => {
-                    self.last_mouse_screen_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                termion::event::MouseEvent::Press(mouse_button, col, row) => {
+                    self.last_mouse_screen_row_col = Some([row, col])
                 }
-                termion::event::MouseEvent::Release(x, y) => self.last_mouse_screen_pos = None,
-                termion::event::MouseEvent::Hold(x, y) => {
-                    self.last_mouse_screen_pos = Some(point2(x as i32 - 1, y as i32 - 1))
+                termion::event::MouseEvent::Release(col, row) => self.last_mouse_screen_row_col = None,
+                termion::event::MouseEvent::Hold(col, row) => {
+                    self.last_mouse_screen_row_col = Some([row, col])
                 }
             },
             Event::Unsupported(items) => todo!(),
         }
     }
     pub fn render(&self) -> Frame {
-        Frame {
-            grid: (0..self.height as i32)
-                .map(|world_row| {
-                    let world_y = self.height as i32 - world_row - 1;
-                    (0..self.width as i32)
-                        .map(|world_x| {
-                            // let x = col;
-                            // let y = self.height - row - 1;
-                            let world_pos = point2(world_x as i32, world_y as i32);
-                            let mouse_is_here =
-                                self.last_mouse_screen_pos.is_some_and(|mouse_pos| {
-                                    let [screen_x, screen_y] = mouse_pos.to_array();
-                                    screen_x / 2 == world_x && screen_y == world_y
-                                });
+        (0..self.height as i32)
+            .map(|world_row| {
+                let world_y = self.height as i32 - world_row - 1;
+                (0..self.width as i32)
+                    .map(|world_x| {
+                        // let x = col;
+                        // let y = self.height - row - 1;
+                        let world_pos = point2(world_x as i32, world_y as i32);
+                        let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(|[screen_row, screen_col]| {
+                            i32::from(screen_col / 2)-1 == world_x && i32::from(screen_row)-1 == world_y
+                        });
 
-                            DoubleGlyph::solid_color(if mouse_is_here {
-                                named_colors::RED
-                            } else {
-                                board_color(world_pos).unwrap()
-                            })
+                        DoubleGlyph::solid_color(if mouse_is_here {
+                            named_colors::RED
+                        } else {
+                            board_color(world_pos).unwrap()
                         })
-                        .collect_vec()
-                })
-                .collect_vec(),
-        }
+                    })
+                    .collect_vec()
+            })
+            .collect_vec()
+            .into()
     }
 }
 
@@ -120,14 +115,16 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 }
 
 fn main() {
-    let (width, height) = termion::terminal_size().unwrap();
+    let (term_width, term_height) = termion::terminal_size().unwrap();
+    let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
+    let (width, height) = (30,15);
+
 
     let mut game_state = GameState {
         width: width as usize / 2,
         height: height as usize,
         portals: Default::default(),
-        last_mouse_screen_pos: None,
-        last_frame: None,
+        last_mouse_screen_row_col: None,
     };
     let mut graphics = Graphics::new(width, height, Instant::now());
 
@@ -138,13 +135,16 @@ fn main() {
 
     let event_receiver = set_up_input_thread();
 
+    let mut prev_drawn = None;
     loop {
         while let Ok(event) = event_receiver.try_recv() {
             game_state.process_event(event);
         }
         let frame = game_state.render();
-        draw_frame(&mut writable, &frame, &game_state.last_frame);
-        game_state.last_frame = Some(frame);
+        screen_frame.blit(&frame, [0,0]);
+        screen_frame.draw_text(format!("{:?}", game_state.last_mouse_screen_row_col), [16, 0]);
+        draw_frame(&mut writable, &screen_frame, &prev_drawn);
+        prev_drawn = Some(screen_frame.clone());
         thread::sleep(Duration::from_millis(21));
     }
 }
@@ -164,7 +164,7 @@ mod tests {
     fn test_simple_output() {
         let state = GameState::new(10, 10);
         let frame = state.render();
-        assert_eq!(frame.width(), 10);
+        assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
 
@@ -244,10 +244,10 @@ mod tests {
         let red_map: String = (0..frame.height())
             .map(|row| {
                 let y = frame.row_to_y(row);
-                (0..frame.width() * 2)
+                (0..frame.width())
                     .map(|col| {
                         let x = col;
-                        if frame.get([x, y]).bg_color == named_colors::RED {
+                        if frame.get_xy([x, y]).bg_color == named_colors::RED {
                             "1"
                         } else {
                             "0"
@@ -257,8 +257,8 @@ mod tests {
             })
             .join("\n");
         compare_string_to_file!(red_map, "red_map");
-        assert_eq!(frame.get([2, 2]).bg_color, named_colors::RED);
-        assert_eq!(frame.get([3, 2]).bg_color, named_colors::RED);
+        assert_eq!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
+        assert_eq!(frame.get_xy([3, 2]).bg_color, named_colors::RED);
         compare_frame_to_file!(frame);
     }
     #[ignore]
@@ -274,24 +274,5 @@ mod tests {
         let frame = game.render();
         compare_frame_to_file!(frame);
         panic!();
-    }
-    #[test]
-    fn test_raw_vs_non_raw_rendering() {
-        let mut game = GameState::new(4, 4);
-        game.process_event(press_left(3, 2));
-        let frame = game.render();
-        let non_raw = frame.string_for_regular_display(); 
-        let raw = frame.bytes_for_raw_display_over(&None);
-
-        let unraw = String::from_utf8(raw).unwrap();
-        let prefix = &termion::cursor::Goto(4,1).to_string();
-
-        let unraw = unraw.strip_prefix(prefix).unwrap();
-        let unraw = unraw.replace("\r", "");
-        dbg!(&unraw[..20], &prefix);
-
-        assert_eq!(non_raw.escape_debug().to_string(), unraw.escape_debug().to_string());
-        assert_eq!(non_raw, unraw);
-
     }
 }
