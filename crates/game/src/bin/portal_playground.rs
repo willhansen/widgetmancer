@@ -90,7 +90,8 @@ impl GameState {
                         // let y = self.height - row - 1;
                         let world_pos = point2(world_x as i32, world_y as i32);
                         let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(|[screen_row, screen_col]| {
-                            (i32::from(screen_col)-1) / 2 == world_x && i32::from(screen_row)-1 == world_y
+                            let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
+                            (i32::from(screen_col)) / 2 == world_x && screen_y == world_y
                         });
 
                         DoubleGlyph::solid_color(if mouse_is_here {
@@ -157,7 +158,8 @@ fn board_color(square: WorldSquare) -> Option<RGB8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::{assert_str_eq};
+    use std::{assert_eq, assert_ne};
     use stdext::function_name;
 
     #[test]
@@ -224,7 +226,7 @@ mod tests {
             candidate_string.escape_debug()
         );
 
-        println!("{}\n✅", candidate_string);
+        eprintln!("{}\n✅", candidate_string);
     }
 
     #[test]
@@ -232,15 +234,17 @@ mod tests {
         let mut game = GameState::new(12, 12);
         game.process_event(press_left(0, 0));
         let frame = game.render();
+        let no_color = frame.uncolored_regular_string();
+        dbg!(&frame);
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_click_b() {
         let mut game = GameState::new(12, 12);
-        game.process_event(press_left(3, 3));
+        game.process_event(press_left(3, 9));
         let frame = game.render();
         dbg!(&frame);
-        println!("{}", frame.string_for_regular_display());
+        eprintln!("{}", frame.string_for_regular_display());
         let red_map: String = (0..frame.height())
             .map(|row| {
                 let y = frame.row_to_y(row);
