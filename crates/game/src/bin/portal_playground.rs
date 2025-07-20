@@ -90,7 +90,7 @@ impl GameState {
                         // let y = self.height - row - 1;
                         let world_pos = point2(world_x as i32, world_y as i32);
                         let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(|[screen_row, screen_col]| {
-                            i32::from(screen_col / 2)-1 == world_x && i32::from(screen_row)-1 == world_y
+                            (i32::from(screen_col)-1) / 2 == world_x && i32::from(screen_row)-1 == world_y
                         });
 
                         DoubleGlyph::solid_color(if mouse_is_here {
