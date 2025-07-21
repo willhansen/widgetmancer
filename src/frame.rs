@@ -105,7 +105,9 @@ impl Frame {
     fn regular_string(&self, colored: bool) -> String {
         self.grid
             .iter()
-            .map(|row| row.iter().map(|s| s.to_string_colored(colored)).join(""))
+            .map(|row| {
+                Self::string_for_row(row)
+            })
             .join("\n")
     }
     pub fn uncolored_regular_string(&self) -> String {
@@ -117,16 +119,28 @@ impl Frame {
     fn naive_raw_display_stirng(&self) -> String {
         String::from_utf8(self.bytes_for_raw_display_over(&None)).unwrap()
     }
+    fn string_for_row(row: &Vec<Glyph>) -> String {
+        let mut prev = None;
+        let mut out = String::new();
+        for &g in row.iter() {
+            out += &g.to_string_after(prev);
+            prev = Some(g);
+        }
+        out += &Glyph::color_reset_string();
+        dbg!(&out);
+        out
+    }
     fn raw_string(&self, maybe_old_frame: &Option<Frame>, colored: bool) -> String {
         let mut output = String::new();
 
         let mut prev_written_row_col: Option<[usize; 2]> = None;
+        let mut prev_written_glyph: Option<Glyph> = None;
         for row in 0..self.height() {
             for col in 0..self.width() {
-                let new_glyph = self.grid[row][col].to_string_colored(colored);
+                let new_glyph = self.grid[row][col];
 
                 if let Some(old_frame) = maybe_old_frame {
-                    let old_glyph = old_frame.grid[row][col].to_string();
+                    let old_glyph = old_frame.grid[row][col];
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -152,8 +166,18 @@ impl Frame {
                         &termion::cursor::Goto((col + 1) as u16, (row + 1) as u16).to_string();
                 }
 
-                output += &new_glyph.to_string();
+                output += &if colored {
+                    if should_do_linewrap {
 
+                         new_glyph.to_string_after(None)
+                    } else {
+
+                         new_glyph.to_string_after(prev_written_glyph)
+                    }
+                } else {
+                    new_glyph.character.to_string()
+                };
+                prev_written_glyph = Some(new_glyph);
                 prev_written_row_col = Some([row, col]);
             }
         }
