@@ -262,6 +262,15 @@ mod tests {
         compare_frame_to_file!(frame);
     }
     #[test]
+    fn test_click_a_small() {
+        let mut game = GameState::new(2, 2);
+        game.process_event(press_left(0, 0));
+        let frame = game.render();
+        // let no_color = frame.uncolored_regular_string();
+        // dbg!(&frame);
+        compare_frame_to_file!(frame);
+    }
+    #[test]
     fn test_click_b() {
         let mut game = GameState::new(12, 12);
         game.process_event(press_left(3, 9));
