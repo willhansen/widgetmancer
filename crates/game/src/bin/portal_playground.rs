@@ -26,6 +26,7 @@ type Quadrant = i32;
 type Portal = (IPoint, Quadrant);
 
 struct GameState {
+    running: bool,
     width: usize,
     height: usize,
 
@@ -36,6 +37,7 @@ struct GameState {
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
         GameState {
+            running: true,
             width,
             height,
             portals: Default::default(),
@@ -48,7 +50,7 @@ impl GameState {
     pub fn process_event(&mut self, event: Event) {
         match event {
             Event::Key(key) => match key {
-                Key::Char('q') => std::process::exit(0),
+                Key::Char('q') => self.running = false,
                 // Key::Backspace => todo!(),
                 // Key::Left => todo!(),
                 // Key::Right => todo!(),
@@ -138,6 +140,7 @@ fn main() {
     let (width, height) = (30, 15);
 
     let mut game_state = GameState {
+        running: true,
         width: width as usize / 2,
         height: height as usize,
         portals: Default::default(),
@@ -153,7 +156,7 @@ fn main() {
     let event_receiver = set_up_input_thread();
 
     let mut prev_drawn = None;
-    loop {
+    while game_state.running {
         while let Ok(event) = event_receiver.try_recv() {
             game_state.process_event(event);
         }
@@ -203,20 +206,12 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(col + 1, row + 1))
     }
 
-    macro_rules! compare_string_to_file {
-        ($string:ident, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            compare_string_for_test($string, format!("{}_{}", $prefix, test_name))
-        };
-        ($frame:ident) => {
-            compare_string_to_file!($string, "")
-        };
-    }
     macro_rules! compare_frame_to_file {
         ($frame:ident, $prefix:expr) => {
             let string = $frame.string_for_regular_display();
             eprintln!("{:?}", $frame);
-            compare_string_to_file!(string, $prefix)
+            let test_name: String = function_name!().replace(":", "_");
+            compare_string_for_test(string, format!("{}_{}", $prefix, test_name))
         };
         ($frame:ident) => {
             compare_frame_to_file!($frame, "")
@@ -245,8 +240,8 @@ mod tests {
             "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n❌\nCorrect:\n{}\n\nGiven:\n{}",
             correct_string,
             candidate_string,
-            correct_string.escape_debug(),
-            candidate_string.escape_debug()
+            frame::display_string_to_readable_string(correct_string.clone()),
+            frame::display_string_to_readable_string(candidate_string.clone())
         );
 
         eprintln!("{}\n✅", candidate_string);
@@ -266,8 +261,6 @@ mod tests {
         let mut game = GameState::new(2, 2);
         game.process_event(press_left(0, 0));
         let frame = game.render();
-        // let no_color = frame.uncolored_regular_string();
-        // dbg!(&frame);
         compare_frame_to_file!(frame);
     }
     #[test]
@@ -277,22 +270,6 @@ mod tests {
         let frame = game.render();
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
-        let red_map: String = (0..frame.height())
-            .map(|row| {
-                let y = frame.row_to_y(row);
-                (0..frame.width())
-                    .map(|col| {
-                        let x = col;
-                        if frame.get_xy([x, y]).bg_color == named_colors::RED {
-                            "1"
-                        } else {
-                            "0"
-                        }
-                    })
-                    .join("")
-            })
-            .join("\n");
-        compare_string_to_file!(red_map, "red_map");
         assert_ne!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
         assert_eq!(frame.get_xy([3, 2]).bg_color, named_colors::RED);
         compare_frame_to_file!(frame);

@@ -1,6 +1,7 @@
 use crate::glyph_constants::named_colors;
 use crate::*;
 
+use fancy_regex::Regex;
 use itertools::Itertools;
 use std::fmt::Display;
 use std::fs::File;
@@ -100,15 +101,10 @@ impl Frame {
         )
     }
     pub fn string_for_regular_display(&self) -> String {
-        self.regular_string(true)
+        self.non_raw_render_string(true)
     }
-    fn regular_string(&self, colored: bool) -> String {
-        self.grid
-            .iter()
-            .map(|row| {
-                Self::string_for_row(row)
-            })
-            .join("\n")
+    fn non_raw_render_string(&self, colored: bool) -> String {
+        raw_display_string_to_regular_display_string(self.simple_raw_display_string())
     }
     pub fn uncolored_regular_string(&self) -> String {
         self.grid
@@ -116,22 +112,12 @@ impl Frame {
             .map(|row| row.iter().map(|s| s.character).join(""))
             .join("\n")
     }
-    fn naive_raw_display_stirng(&self) -> String {
+    fn simple_raw_display_string(&self) -> String {
         String::from_utf8(self.bytes_for_raw_display_over(&None)).unwrap()
-    }
-    fn string_for_row(row: &Vec<Glyph>) -> String {
-        let mut prev = None;
-        let mut out = String::new();
-        for &g in row.iter() {
-            out += &g.to_string_after(prev);
-            prev = Some(g);
-        }
-        out += &Glyph::color_reset_string();
-        dbg!(&out);
-        out
     }
     fn raw_string(&self, maybe_old_frame: &Option<Frame>, colored: bool) -> String {
         let mut output = String::new();
+        let is_simple_draw_case = maybe_old_frame.is_none() && colored;
 
         let mut prev_written_row_col: Option<[usize; 2]> = None;
         let mut prev_written_glyph: Option<Glyph> = None;
@@ -158,6 +144,9 @@ impl Frame {
                 if just_next_horizontally {
                     // Do nothing
                 } else if should_do_linewrap {
+                    if is_simple_draw_case {
+                        output += &Glyph::color_reset_string();
+                    }
                     output += "\n\r";
                 } else if directly_below {
                     output += "\n";
@@ -168,11 +157,9 @@ impl Frame {
 
                 output += &if colored {
                     if should_do_linewrap {
-
-                         new_glyph.to_string_after(None)
+                        new_glyph.to_string_after(None)
                     } else {
-
-                         new_glyph.to_string_after(prev_written_glyph)
+                        new_glyph.to_string_after(prev_written_glyph)
                     }
                 } else {
                     new_glyph.character.to_string()
@@ -181,12 +168,35 @@ impl Frame {
                 prev_written_row_col = Some([row, col]);
             }
         }
+        if is_simple_draw_case {
+            output += &Glyph::color_reset_string();
+        }
         output
     }
 
     pub fn bytes_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> Vec<u8> {
         self.raw_string(maybe_old_frame, true).into_bytes()
     }
+    // Debug string with readable strings instead of escape codes
+    pub fn readable_string(&self) -> String {
+        display_string_to_readable_string(self.simple_raw_display_string())
+    }
+}
+
+pub fn display_string_to_readable_string(display_string: String) -> String {
+    let a_b = [
+        [r"\\u\{1b\}\[38;2(;([0-9]+))\1\1m", "BG<$2>"],
+        [r"\\u\{1b\}\[48;2(;([0-9]+))\1\1m", "FG<$2>"],
+        [r"\\u\{1b\}\[48;2;255;0;0m", "FG<r  >"],
+        [r"\\u\{1b\}\[38;2;255;0;255m", "BG<r b>"],
+        [r"\\n", "\n"],
+    ];
+
+    let mut hay = display_string.escape_debug().to_string();
+    for [a, b] in a_b.into_iter() {
+        hay = Regex::new(a).unwrap().replace_all(&hay, b).to_string();
+    }
+    hay.to_string()
 }
 
 fn string_for_goto_top_left() -> String {
@@ -194,14 +204,14 @@ fn string_for_goto_top_left() -> String {
 }
 
 // These do not account for efficient rendering by ignoring screen characters that are already
-// correct (thus "naive")
-fn naive_raw_display_string_to_regular_display_string(naive_raw_display_string: String) -> String {
+// correct
+fn raw_display_string_to_regular_display_string(naive_raw_display_string: String) -> String {
     naive_raw_display_string
         .strip_prefix(&string_for_goto_top_left())
         .unwrap()
         .replace("\r", "")
 }
-fn regular_display_string_to_naive_raw_display_string(regular_display_string: String) -> String {
+fn regular_display_string_to_raw_display_string(regular_display_string: String) -> String {
     string_for_goto_top_left() + &regular_display_string.replace("\n", "\n\r")
 }
 
@@ -212,7 +222,12 @@ impl Display for Frame {
 }
 impl std::fmt::Debug for Frame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&("\n".to_string() + &self.framed()))
+        f.write_str(&format!(
+            "\n{}\n\nRaw Render String:\n\n{}\n\nNon-Raw Render String:\n\n{}",
+            self.framed(),
+            display_string_to_readable_string(self.simple_raw_display_string()),
+            display_string_to_readable_string(self.non_raw_render_string(true))
+        ))
     }
 }
 
@@ -259,8 +274,8 @@ mod tests {
     }
     #[test]
     fn test_naive_raw_to_regular_conversions() {
-        let ab = regular_display_string_to_naive_raw_display_string;
-        let ba = naive_raw_display_string_to_regular_display_string;
+        let ab = regular_display_string_to_raw_display_string;
+        let ba = raw_display_string_to_regular_display_string;
         let e = |s: String| s.escape_debug().to_string();
         macro_rules! t {
             ($a:expr, $b:expr) => {
@@ -270,7 +285,7 @@ mod tests {
         [small_letter_frame(), small_color_frame()]
             .iter()
             .for_each(|frame| {
-                let regular = frame.regular_string(false);
+                let regular = frame.non_raw_render_string(false);
                 let raw = frame.raw_string(&None, false);
 
                 let a = regular;
