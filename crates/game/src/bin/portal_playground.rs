@@ -31,7 +31,7 @@ struct GameState {
 
     portals: HashMap<Portal, Portal>,
 
-    last_mouse_screen_row_col: Option<[u16;2]>,
+    last_mouse_screen_row_col: Option<[u16; 2]>,
 }
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -70,17 +70,22 @@ impl GameState {
             },
             Event::Mouse(mouse_event) => match mouse_event {
                 termion::event::MouseEvent::Press(mouse_button, col, row) => {
-                    self.last_mouse_screen_row_col = Some([row, col])
+                    self.last_mouse_screen_row_col = Some([row - 1, col - 1])
                 }
-                termion::event::MouseEvent::Release(col, row) => self.last_mouse_screen_row_col = None,
+                termion::event::MouseEvent::Release(col, row) => {
+                    self.last_mouse_screen_row_col = None
+                }
                 termion::event::MouseEvent::Hold(col, row) => {
-                    self.last_mouse_screen_row_col = Some([row, col])
+                    self.last_mouse_screen_row_col = Some([row - 1, col - 1])
                 }
             },
             Event::Unsupported(items) => todo!(),
         }
     }
     pub fn render(&self) -> Frame {
+        let mouse_is_on_left_half_of_square = self
+            .last_mouse_screen_row_col
+            .is_some_and(|[row, col]| col % 2 == 0);
         (0..self.height as i32)
             .map(|world_row| {
                 let world_y = self.height as i32 - world_row - 1;
@@ -89,16 +94,28 @@ impl GameState {
                         // let x = col;
                         // let y = self.height - row - 1;
                         let world_pos = point2(world_x as i32, world_y as i32);
-                        let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(|[screen_row, screen_col]| {
-                            let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
-                            (i32::from(screen_col)) / 2 == world_x && screen_y == world_y
-                        });
-
-                        DoubleGlyph::solid_color(if mouse_is_here {
-                            named_colors::RED
+                        let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(
+                            |[screen_row, screen_col]| {
+                                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
+                                (i32::from(screen_col)) / 2 == world_x && screen_y == world_y
+                            },
+                        );
+                        let board_color = board_color(world_pos).unwrap();
+                        if mouse_is_here {
+                            if mouse_is_on_left_half_of_square {
+                                [
+                                    Glyph::solid_color(named_colors::RED),
+                                    Glyph::solid_color(board_color),
+                                ]
+                            } else {
+                                [
+                                    Glyph::solid_color(board_color),
+                                    Glyph::solid_color(named_colors::RED),
+                                ]
+                            }
                         } else {
-                            board_color(world_pos).unwrap()
-                        })
+                            DoubleGlyph::solid_color(board_color)
+                        }
                     })
                     .collect_vec()
             })
@@ -118,8 +135,7 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 fn main() {
     let (term_width, term_height) = termion::terminal_size().unwrap();
     let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
-    let (width, height) = (30,15);
-
+    let (width, height) = (30, 15);
 
     let mut game_state = GameState {
         width: width as usize / 2,
@@ -142,8 +158,11 @@ fn main() {
             game_state.process_event(event);
         }
         let frame = game_state.render();
-        screen_frame.blit(&frame, [0,0]);
-        screen_frame.draw_text(format!("{:?}", game_state.last_mouse_screen_row_col), [16, 0]);
+        screen_frame.blit(&frame, [0, 0]);
+        screen_frame.draw_text(
+            format!("{:?}", game_state.last_mouse_screen_row_col),
+            [16, 0],
+        );
         draw_frame(&mut writable, &screen_frame, &prev_drawn);
         prev_drawn = Some(screen_frame.clone());
         thread::sleep(Duration::from_millis(21));
@@ -158,7 +177,7 @@ fn board_color(square: WorldSquare) -> Option<RGB8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::{assert_str_eq};
+    use pretty_assertions::assert_str_eq;
     use std::{assert_eq, assert_ne};
     use stdext::function_name;
 
@@ -170,18 +189,18 @@ mod tests {
         assert_eq!(frame.height(), 10);
     }
 
-    fn press_left(screen_x: u16, screen_y: u16) -> termion::event::Event {
+    fn press_left(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Press(
             termion::event::MouseButton::Left,
-            screen_x,
-            screen_y,
+            col + 1,
+            row + 1,
         ))
     }
-    fn drag_mouse(x: u16, y: u16) -> termion::event::Event {
-        termion::event::Event::Mouse(termion::event::MouseEvent::Hold(x, y))
+    fn drag_mouse(col: u16, row: u16) -> termion::event::Event {
+        termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col + 1, row + 1))
     }
-    fn release_mouse(x: u16, y: u16) -> termion::event::Event {
-        termion::event::Event::Mouse(termion::event::MouseEvent::Release(x, y))
+    fn release_mouse(col: u16, row: u16) -> termion::event::Event {
+        termion::event::Event::Mouse(termion::event::MouseEvent::Release(col + 1, row + 1))
     }
 
     macro_rules! compare_string_to_file {
@@ -196,6 +215,7 @@ mod tests {
     macro_rules! compare_frame_to_file {
         ($frame:ident, $prefix:expr) => {
             let string = $frame.string_for_regular_display();
+            eprintln!("{:?}", $frame);
             compare_string_to_file!(string, $prefix)
         };
         ($frame:ident) => {
@@ -211,13 +231,16 @@ mod tests {
         let maybe_correct_string: Option<String> =
             std::fs::read_to_string(correct_frame_path.clone()).ok();
 
+        // eprintln!("{}", &candidate_string);
+
         let blessed = option_env!("BLESS_TESTS").is_some();
-        if blessed || maybe_correct_string.is_none() {
+        if blessed {
             std::fs::write(correct_frame_path, candidate_string).unwrap();
             return;
         }
 
-        let correct_string = maybe_correct_string.unwrap();
+        let correct_string = maybe_correct_string
+            .expect("No existing test output found.  Set BLESS_TESTS to canonize current output.");
         assert_eq!(candidate_string, correct_string,
             "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n❌\nCorrect:\n{}\n\nGiven:\n{}",
             correct_string,
@@ -234,7 +257,7 @@ mod tests {
         let mut game = GameState::new(12, 12);
         game.process_event(press_left(0, 0));
         let frame = game.render();
-        let no_color = frame.uncolored_regular_string();
+        // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         compare_frame_to_file!(frame);
     }
@@ -264,6 +287,20 @@ mod tests {
         assert_eq!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
         assert_eq!(frame.get_xy([3, 2]).bg_color, named_colors::RED);
         compare_frame_to_file!(frame);
+    }
+    #[test]
+    fn test_drag_mouse() {
+        let mut game = GameState::new(12, 12);
+        game.process_events([press_left(3, 3)]);
+        let frame_1 = game.render();
+        game.process_events([drag_mouse(4, 3)]);
+        let frame_2 = game.render();
+        game.process_events([drag_mouse(5, 3)]);
+        let frame_3 = game.render();
+        dbg!(&frame_1, &frame_2, &frame_3);
+        compare_frame_to_file!(frame_1, "1");
+        compare_frame_to_file!(frame_2, "2");
+        compare_frame_to_file!(frame_3, "3");
     }
     #[ignore]
     #[test]
