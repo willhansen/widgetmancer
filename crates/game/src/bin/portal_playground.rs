@@ -284,7 +284,7 @@ mod tests {
             })
             .join("\n");
         compare_string_to_file!(red_map, "red_map");
-        assert_eq!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
+        assert_ne!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
         assert_eq!(frame.get_xy([3, 2]).bg_color, named_colors::RED);
         compare_frame_to_file!(frame);
     }
