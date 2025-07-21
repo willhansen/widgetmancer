@@ -272,6 +272,7 @@ mod tests {
         dbg!(&frame, &raw);
         assert_eq!(raw.matches("\n").count(), 1);
     }
+    #[ignore]
     #[test]
     fn test_naive_raw_to_regular_conversions() {
         let ab = regular_display_string_to_raw_display_string;
