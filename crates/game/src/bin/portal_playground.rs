@@ -2,7 +2,7 @@ use euclid::point2;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Read;
@@ -132,6 +132,7 @@ fn grey(x: u8) -> RGB8 {
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
+    writable.flush();
 }
 
 fn main() {
@@ -156,16 +157,22 @@ fn main() {
     let event_receiver = set_up_input_thread();
 
     let mut prev_drawn = None;
+    let mut event_log = VecDeque::new();
     while game_state.running {
         while let Ok(event) = event_receiver.try_recv() {
+            event_log.push_front(event.clone());
+            event_log.truncate(5);
             game_state.process_event(event);
         }
         let frame = game_state.render();
         screen_frame.blit(&frame, [0, 0]);
         screen_frame.draw_text(
             format!("{:?}", game_state.last_mouse_screen_row_col),
-            [16, 0],
+            [(height + 1).into(), 0],
         );
+        for (i, event) in event_log.iter().enumerate() {
+            screen_frame.draw_text(format!("{:-<30?}", event), [height as usize + 3 + i, 0]);
+        }
         draw_frame(&mut writable, &screen_frame, &prev_drawn);
         prev_drawn = Some(screen_frame.clone());
         thread::sleep(Duration::from_millis(21));
