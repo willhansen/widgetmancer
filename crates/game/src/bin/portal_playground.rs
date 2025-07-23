@@ -22,17 +22,75 @@ use termion::{
 use utility::*;
 
 type IPoint = [i32; 2];
-type Quadrant = i32;
-type Portal = (IPoint, Quadrant);
+type OrthoDir = i32;
+type SquareEdge = (IPoint, OrthoDir);
+type PortalSide = SquareEdge;
+
+enum PortalRenderingOption {
+    LineOnFloor,
+    Absolute,
+    LineOfSight,
+}
+
+const DIR_RIGHT: i32 = 0;
+const DIR_UP: i32 = 1;
+const DIR_LEFT: i32 = 2;
+const DIR_DOWN: i32 = 3;
+
+const STEP_RIGHT: IPoint = [1,0];
+const STEP_UP: IPoint = [0,1];
+const STEP_LEFT: IPoint = [-1,0];
+const STEP_DOWN: IPoint = [0,-1];
+
+fn step_in_direction(dir: OrthoDir) -> IPoint {
+    match dir {
+        0 => [1,0],
+        1 => [0,1],
+        2 => [-1,0],
+        3 => [0,-1],
+        _ => panic!("invalid direction: {dir}")
+    }
+}
+fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
+    if square[0].abs() == square[1].abs() {
+        return None
+    }
+
+    Some(if square[0].abs() > square[1].abs() {
+        if square[0] > 0 {
+            0
+        } else {2}
+
+    } else {
+        if square[1] > 0 {
+            1
+        } else {3}
+    })
+
+}
+
+fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
+    let step = step_in_direction(edge.1);
+    let reverse_dir = (edge.1 + 2) %4;
+    ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
+}
+
+// struct PortalUnderConstruction {
+//     start_square: IPoint,
+//     entrance_direction: Option<OrthoDir>,
+//     extension_direction: Option<OrthoDir>,
+//     extension_length: Option<u32>
+// }
 
 struct GameState {
     running: bool,
     width: usize,
     height: usize,
 
-    portals: HashMap<Portal, Portal>,
+    portals: HashMap<PortalSide, PortalSide>,
 
     last_mouse_screen_row_col: Option<[u16; 2]>,
+    pub portal_rendering: PortalRenderingOption,
 }
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -42,10 +100,18 @@ impl GameState {
             height,
             portals: Default::default(),
             last_mouse_screen_row_col: None,
+            portal_rendering: PortalRenderingOption::LineOnFloor,
         }
     }
     pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
         events.into_iter().for_each(|e| self.process_event(e))
+    }
+
+    pub fn place_portal(&mut self, entrance: PortalSide, reverse_entrance: PortalSide ) {
+        self.portals.insert(entrance, reverse_entrance);
+        self.portals.insert(reverse_entrance, entrance);
+        self.portals.insert(other_side_of_edge(entrance), other_side_of_edge(reverse_entrance));
+        self.portals.insert(other_side_of_edge(reverse_entrance), other_side_of_edge(entrance));
     }
     pub fn process_event(&mut self, event: Event) {
         match event {
@@ -140,14 +206,7 @@ fn main() {
     let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
     let (width, height) = (30, 15);
 
-    let mut game_state = GameState {
-        running: true,
-        width: width as usize / 2,
-        height: height as usize,
-        portals: Default::default(),
-        last_mouse_screen_row_col: None,
-    };
-    let mut graphics = Graphics::new(width, height, Instant::now());
+    let mut game_state = GameState::new(width/2, height);
 
     let mut writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
@@ -295,16 +354,10 @@ mod tests {
         compare_frame_to_file!(frame_2, "2");
         compare_frame_to_file!(frame_3, "3");
     }
-    #[ignore]
     #[test]
-    fn test_place_portal() {
+    fn test_render_portal_edges() {
         let mut game = GameState::new(12, 12);
-        game.process_events([
-            press_left(3, 3),
-            drag_mouse(3, 2),
-            drag_mouse(7, 2),
-            release_mouse(7, 4),
-        ]);
+        game.place_portal(([6,9],DIR_UP), ([10,7], DIR_RIGHT));
         let frame = game.render();
         compare_frame_to_file!(frame);
         panic!();
