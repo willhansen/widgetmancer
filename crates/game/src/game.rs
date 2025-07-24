@@ -3258,55 +3258,6 @@ mod tests {
         );
     }
 
-    #[ignore = "Turns out not a great feature"]
-    #[test]
-    fn test_screen_jumps_to_player_if_far_from_screen_center() {
-        let mut game = set_up_nxn_game(20);
-        let start_square = point2(5, 5);
-        let recenter_radius = 10;
-        let square2 = point2(start_square.x + recenter_radius - 1, 5);
-        let square3 = point2(start_square.x + recenter_radius + 1, 5);
-        game.place_player(start_square);
-        game.borrow_graphics_mut()
-            .screen
-            .set_screen_center_by_world_square(start_square);
-        game.draw_headless_now();
-        assert_eq!(
-            game.graphics.screen.screen_center_as_world_square(),
-            game.player_square()
-        );
-
-        assert_false!(game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_world_square(game.player_square())
-            .looks_solid());
-
-        game.move_player_to(square2);
-        game.draw_headless_now();
-        assert_ne!(
-            game.graphics.screen.screen_center_as_world_square(),
-            game.player_square()
-        );
-        assert!(game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_world_square(game.player_square())
-            .looks_solid());
-
-        game.move_player_to(square3);
-        game.draw_headless_now();
-        assert_eq!(
-            game.graphics.screen.screen_center_as_world_square(),
-            game.player_square()
-        );
-        assert_false!(game
-            .graphics
-            .screen
-            .get_screen_glyphs_at_world_square(game.player_square())
-            .looks_solid());
-    }
-
     #[test]
     fn test_observed_crash_from_one_pillar_shadow() {
         let mut game = set_up_nxn_game(20);

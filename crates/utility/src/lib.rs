@@ -1630,6 +1630,15 @@ impl NStep {
     }
 }
 
+pub trait ToDebug {
+    fn to_debug(&self) -> String;
+}
+
+impl<T> ToDebug for T where T: Debug {
+    fn to_debug(&self) -> String {
+        format!("{:?}", self)
+    }
+}
 
 
 

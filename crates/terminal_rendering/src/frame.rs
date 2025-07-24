@@ -17,9 +17,9 @@ impl Frame {
     pub fn blank(width: usize, height: usize) -> Self {
         Frame {
             grid: (0..height)
-                .map(|row| {
+                .map(|_row| {
                     (0..width)
-                        .map(|col| Glyph::solid_color(named_colors::BLACK))
+                        .map(|_col| Glyph::solid_color(named_colors::BLACK))
                         .collect()
                 })
                 .collect(),
@@ -29,6 +29,18 @@ impl Frame {
         File::create(path)
             .unwrap()
             .write_all(&self.string_for_regular_display().as_bytes());
+    }
+    pub fn from_plain_string(s: &str) -> Self {
+        let lines = s.lines().collect_vec();
+        let height = lines.len();
+        let width = lines.iter().map(|l| l.len()).max().unwrap();
+        let mut frame = Frame::blank(width, height);
+        lines.into_iter().enumerate().for_each(|(row, line)| {
+            line.chars()
+                .enumerate()
+                .for_each(|(col, char)| frame.grid[row][col] = Glyph::from_char(char))
+        });
+        frame
     }
     pub fn width(&self) -> usize {
         self.grid[0].len()
@@ -48,7 +60,7 @@ impl Frame {
     pub fn get_xy(&self, frame_point: [usize; 2]) -> Glyph {
         let [x, y] = frame_point;
         assert!(
-            x >= 0 && y >= 0 && x < self.width() && y < self.height(),
+            x < self.width() && y < self.height(),
             "x: {x}, y: {y}, width: {width}, height: {height}",
             width = self.width(),
             height = self.height()
@@ -103,7 +115,7 @@ impl Frame {
     pub fn string_for_regular_display(&self) -> String {
         self.non_raw_render_string(true)
     }
-    fn non_raw_render_string(&self, colored: bool) -> String {
+    fn non_raw_render_string(&self, _colored: bool) -> String {
         raw_display_string_to_regular_display_string(self.simple_raw_display_string())
     }
     pub fn uncolored_regular_string(&self) -> String {
@@ -138,8 +150,8 @@ impl Frame {
                 let should_do_linewrap = prev_written_row_col.is_some_and(|[prev_row, prev_col]| {
                     prev_row + 1 == row && col == 0 && prev_col + 1 == self.width()
                 });
-                let directly_below = prev_written_row_col
-                    .is_some_and(|[prev_row, prev_col]| prev_row + 1 == row && col == prev_col);
+                let down_right = prev_written_row_col
+                    .is_some_and(|[prev_row, prev_col]| prev_row + 1 == row && prev_col + 1 == col);
 
                 if just_next_horizontally {
                     // Do nothing
@@ -148,7 +160,7 @@ impl Frame {
                         output += &Glyph::color_reset_string();
                     }
                     output += "\n\r";
-                } else if directly_below {
+                } else if down_right {
                     output += "\n";
                 } else {
                     output +=
@@ -176,6 +188,9 @@ impl Frame {
 
     pub fn bytes_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> Vec<u8> {
         self.raw_string(maybe_old_frame, true).into_bytes()
+    }
+    pub fn string_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> String {
+        self.raw_string(maybe_old_frame, true)
     }
     // Debug string with readable strings instead of escape codes
     pub fn readable_string(&self) -> String {
@@ -246,7 +261,7 @@ mod tests {
     use crate::glyph_constants::named_colors;
 
     use super::*;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     fn small_color_frame() -> Frame {
         use named_colors::*;
@@ -297,5 +312,49 @@ mod tests {
                 t!(ba(ab(a.clone())), a.clone());
                 t!(ab(ba(b.clone())), b.clone());
             })
+    }
+    #[test]
+    fn test_render_string_directly_below() {
+        let frame_a = Frame::from_plain_string(
+            "aaa111
+aaa111
+",
+        );
+        let frame_b = Frame::from_plain_string(
+            "aaa211
+aaa211
+",
+        );
+        let frame_c = Frame::from_plain_string(
+            "aaa211
+aaa121
+",
+        );
+        assert_eq!(6, frame_a.width());
+        assert_eq!(2, frame_a.height());
+
+        let directly_below = frame_b.raw_string(&Some(frame_a.clone()), false);
+        let correct = 
+            termion::cursor::Goto(4, 1).to_string()
+                + "2"
+                + &termion::cursor::Goto(4, 2).to_string()
+                + "2";
+
+        assert_eq!(
+            correct,
+            directly_below,
+            "\n\nA:\n\n{:?}\n\nB:\n\n{:?}\n\nDiff:\n\n{:?}\n\nCorrect:\n\n{correct:?}",
+            frame_a.clone(),
+            frame_b,
+            directly_below
+        );
+
+        let below_and_next = frame_c.raw_string(&Some(frame_a.clone()), false);
+        let correct = termion::cursor::Goto(4, 1).to_string() + "2\n2";
+        assert_eq!(
+            correct,
+            below_and_next,
+            "\n\nA:\n\n{frame_a:?}\n\nC:\n\n{frame_c:?}\n\nDiff:\n\n{below_and_next:?}\n\nCorrect:\n\n{correct:?}"
+        );
     }
 }
