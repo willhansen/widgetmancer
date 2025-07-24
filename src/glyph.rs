@@ -658,6 +658,31 @@ pub fn pair_up_character_square_map<T: Clone>(
     output_map
 }
 
+// Order is anticlockwise [right, up, left, down]
+pub fn chars_for_square_walls(walls: [bool;4]) -> DoubleChar {
+    let left= match walls {
+        [_, true, true, true] => '𜷂',
+        [_, true, true, false] => '🭽',//𜵊
+        [_, true, false, true] => '𜶮',
+        [_, true, false, false] => '▔',
+        [_, false, true, true] => '🭼',//𜷀
+        [_, false, true, false] => '▏',
+        [_, false, false, true] => '▁',
+        [_, false, false, false] => ' ',
+    };
+    let right= match walls {
+        [true, true, _, true] => '𜷖',
+        [true, true, _, false] => '🭾',//'𜶘'
+        [true, false, _, true] => '🭿',//𜷕
+        [true, false, _, false] => '▕',
+        [false, true, _, true] => '𜶮',
+        [false, true, _, false] => '▔',
+        [false, false, _, true] => '▁',
+        [false, false, _, false] => ' ',
+    };
+    [left,right]
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::assert_false;
