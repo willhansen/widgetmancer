@@ -355,7 +355,6 @@ mod tests {
         compare_frame_to_file!(frame_2, "2");
         compare_frame_to_file!(frame_3, "3");
     }
-    #[ignore = "TODO"]
     #[test]
     fn test_render_portal_edges() {
         let mut game = GameState::new(12, 12);
