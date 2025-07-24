@@ -152,9 +152,6 @@ impl GameState {
         }
     }
     pub fn render(&self) -> Frame {
-        let mouse_is_on_left_half_of_square = self
-            .last_mouse_screen_row_col
-            .is_some_and(|[row, col]| col % 2 == 0);
         (0..self.height as i32)
             .map(|world_row| {
                 let world_y = self.height as i32 - world_row - 1;
@@ -170,21 +167,22 @@ impl GameState {
                             },
                         );
                         let board_color = board_color(world_pos).unwrap();
+                        let portal_entrances_ccw: [bool;4] = [0,1,2,3].map(|dir|self.portals.contains_key(&([world_x, world_y], dir)));
+                        let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
+                        let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
+                        glyphs.iter_mut().for_each(|glyph| {
+                            glyph.fg_color = named_colors::RED;
+                            glyph.bg_color = board_color;
+                        });
                         if mouse_is_here {
-                            if mouse_is_on_left_half_of_square {
-                                [
-                                    Glyph::solid_color(named_colors::RED),
-                                    Glyph::solid_color(board_color),
-                                ]
-                            } else {
-                                [
-                                    Glyph::solid_color(board_color),
-                                    Glyph::solid_color(named_colors::RED),
-                                ]
-                            }
-                        } else {
-                            DoubleGlyph::solid_color(board_color)
-                        }
+                            let mouse_is_on_left_half_of_square = self
+                                .last_mouse_screen_row_col
+                                .is_some_and(|[row, col]| col % 2 == 0);
+                            let mouse_index_in_square = if mouse_is_on_left_half_of_square{0}else{1};
+                            glyphs[mouse_index_in_square].swap_fg_bg();
+                            glyphs[mouse_index_in_square].bg_color = named_colors::RED;
+                        } 
+                        glyphs
                     })
                     .collect_vec()
             })
@@ -227,7 +225,7 @@ fn main() {
         let frame = game_state.render();
         screen_frame.blit(&frame, [0, 0]);
         screen_frame.draw_text(
-            format!("{:?}", game_state.last_mouse_screen_row_col.to_debug()),
+            format!("{:<30}", game_state.last_mouse_screen_row_col.to_debug()),
             [(height + 1).into(), 0],
         );
         for (i, event) in event_log.iter().enumerate() {

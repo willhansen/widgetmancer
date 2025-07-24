@@ -463,6 +463,12 @@ impl Glyph {
     ) -> Glyph {
         Glyph::new(character_world_pos_to_braille_char(world_pos), color, BLACK)
     }
+
+    pub fn swap_fg_bg(&mut self) {
+        let tmp = self.fg_color;
+        self.fg_color = self.bg_color;
+        self.fg_color = tmp;
+    }
 }
 
 impl Debug for Glyph {
