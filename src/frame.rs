@@ -202,8 +202,23 @@ pub fn display_string_to_readable_string(display_string: String) -> String {
     let a_b = [
         [r"\\u\{1b\}\[38;2(;([0-9]+))\1\1m", "BG<$2>"],
         [r"\\u\{1b\}\[48;2(;([0-9]+))\1\1m", "FG<$2>"],
+
         [r"\\u\{1b\}\[48;2;255;0;0m", "FG<r  >"],
+        [r"\\u\{1b\}\[48;2;0;255;0m", "FG< g >"],
+        [r"\\u\{1b\}\[48;2;255;255;0m", "FG<rg >"],
+        [r"\\u\{1b\}\[48;2;0;0;255m", "FG<  b>"],
+        [r"\\u\{1b\}\[48;2;255;0;255m", "FG<r b>"],
+        [r"\\u\{1b\}\[48;2;0;255;255m", "FG< gb>"],
+        [r"\\u\{1b\}\[48;2;255;255;255m", "FG<rgb>"],
+
+        [r"\\u\{1b\}\[38;2;255;0;0m", "BG<r  >"],
+        [r"\\u\{1b\}\[38;2;0;255;0m", "BG< g >"],
+        [r"\\u\{1b\}\[38;2;255;255;0m", "BG<rg >"],
+        [r"\\u\{1b\}\[38;2;0;0;255m", "BG<  b>"],
         [r"\\u\{1b\}\[38;2;255;0;255m", "BG<r b>"],
+        [r"\\u\{1b\}\[38;2;0;255;255m", "BG< gb>"],
+        [r"\\u\{1b\}\[38;2;255;255;255m", "BG<rgb>"],
+
         [r"\\n", "\n"],
     ];
 
@@ -238,10 +253,10 @@ impl Display for Frame {
 impl std::fmt::Debug for Frame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
-            "\n{}\n\nRaw Render String:\n\n{}\n\nNon-Raw Render String:\n\n{}",
+            "\n{}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
             self.framed(),
-            display_string_to_readable_string(self.simple_raw_display_string()),
-            display_string_to_readable_string(self.non_raw_render_string(true))
+            display_string_to_readable_string(self.non_raw_render_string(true)),
+            self.simple_raw_display_string().to_debug(),
         ))
     }
 }
