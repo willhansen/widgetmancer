@@ -168,12 +168,18 @@ impl GameState {
                         );
                         let board_color = board_color(world_pos).unwrap();
                         let portal_entrances_ccw: [bool;4] = [0,1,2,3].map(|dir|self.portals.contains_key(&([world_x, world_y], dir)));
-                        let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
-                        let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
-                        glyphs.iter_mut().for_each(|glyph| {
-                            glyph.fg_color = named_colors::RED;
-                            glyph.bg_color = board_color;
-                        });
+                        let mut glyphs = if portal_entrances_ccw.iter().any(|&x|x) {
+                            let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
+                            let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
+                            glyphs.iter_mut().for_each(|glyph| {
+                                glyph.fg_color = named_colors::RED;
+                                glyph.bg_color = board_color;
+                            });
+                            glyphs
+                        }
+                        else {
+                            DoubleGlyph::solid_color(board_color)
+                        };
                         if mouse_is_here {
                             let mouse_is_on_left_half_of_square = self
                                 .last_mouse_screen_row_col
