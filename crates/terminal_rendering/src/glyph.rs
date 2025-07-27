@@ -1,21 +1,13 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
-use ::num::clamp;
 use euclid::*;
-use euclid::{point2, vec2};
 use itertools::Itertools;
-use line_drawing::Point;
-use ordered_float::OrderedFloat;
 use rgb::*;
 use termion::color;
-use termion::color::Black;
 
-use braille::*;
 use glyph_constants::*;
-use hextant_blocks::*;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::{
@@ -23,7 +15,6 @@ use crate::screen::{
     CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap,
 };
 use utility::coordinate_frame_conversions::*;
-use utility::sign;
 use utility::*;
 
 pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
@@ -653,7 +644,7 @@ pub fn pair_up_character_square_map<T: Clone>(
             let position_index = if is_left_value { 0 } else { 1 };
 
             if output_map.contains_key(&world_square) {
-                let mut existing_double_value = output_map.get_mut(&world_square).unwrap();
+                let existing_double_value = output_map.get_mut(&world_square).unwrap();
                 existing_double_value[position_index] = value;
             } else {
                 let mut new_double_value = [default_filler.clone(), default_filler.clone()];

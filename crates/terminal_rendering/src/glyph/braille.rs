@@ -6,7 +6,6 @@ use utility::*;
 use euclid::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
 use std::ops::BitXor;
-use std::string::ToString;
 
 pub struct BrailleGridInWorldFrame;
 pub type WorldBrailleSquare = Point2D<i32, BrailleGridInWorldFrame>;
@@ -316,7 +315,7 @@ pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareT
 mod tests {
     use super::*;
     use crate::glyph::glyph_constants::SPACE;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_array_to_braille_char() {

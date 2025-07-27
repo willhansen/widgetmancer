@@ -7,7 +7,6 @@ use crate::screen::{world_point_to_local_character_point, world_point_to_world_c
     LocalCharacterPoint, WorldCharacterPoint, WorldCharacterSquare, WorldCharacterSquareToCharMap,};
 use utility::IVector;
 use euclid::{point2, Point2D};
-use ordered_float::OrderedFloat;
 use std::collections::{HashMap, HashSet};
 
 pub const FIRST_HEXTANT: char = '🬀';
@@ -231,7 +230,7 @@ pub fn points_to_hextant_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareT
 mod tests {
     use super::*;
     use ntest::assert_about_eq;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_hextant_array_to_char() {

@@ -1,19 +1,16 @@
-use std::collections::HashSet;
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Sub};
 
-use euclid::{default, vec2, Angle};
+use euclid::{vec2, Angle};
 use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
-use num::traits::FloatConst;
 use ordered_float::OrderedFloat;
 
 use crate::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise, ORTHOGONAL_STEPS,
+    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
     STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
@@ -522,6 +519,7 @@ mod tests {
     use ntest::{assert_about_eq, assert_false};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
+    use crate::ORTHOGONAL_STEPS;
 
     use crate::{STEP_DOWN, STEP_RIGHT, STEP_UP};
 

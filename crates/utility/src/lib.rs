@@ -8,14 +8,12 @@ use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, AddAssign, Neg, Sub};
 
-use approx::AbsDiffEq;
-use derive_more::{AddAssign, Constructor, Display, Neg};
+use derive_more::{AddAssign, Constructor, Neg};
 use euclid::approxeq::ApproxEq;
 use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
-use line_drawing::{Bresenham, Point, Supercover};
-use ntest::about_eq;
+use line_drawing::Supercover;
 use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
@@ -23,7 +21,6 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
-use crate::coordinate_frame_conversions::*;
 
 pub mod angle_interval;
 pub use angle_interval::*;

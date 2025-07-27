@@ -354,7 +354,7 @@ mod tests {
         let frame_2 = game.render();
         game.process_events([drag_mouse(5, 3)]);
         let frame_3 = game.render();
-        dbg!(&frame_1, &frame_2, &frame_3);
+        // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
         compare_frame_to_file!(frame_2, "2");
         compare_frame_to_file!(frame_3, "3");
