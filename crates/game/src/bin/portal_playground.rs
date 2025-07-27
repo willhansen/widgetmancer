@@ -362,9 +362,20 @@ mod tests {
     #[test]
     fn test_render_portal_edges() {
         let mut game = GameState::new(12, 12);
-        game.place_portal(([6,9],DIR_UP), ([10,7], DIR_RIGHT));
+        game.place_portal(([1,1],DIR_UP), ([1,3], DIR_UP));
+        game.place_portal(([3,1],DIR_UP), ([3,3], DIR_UP));
+        game.place_portal(([3,1],DIR_DOWN), ([3,3], DIR_DOWN));
+        game.place_portal(([5,1],DIR_UP), ([5,3], DIR_UP));
+        game.place_portal(([5,1],DIR_DOWN), ([5,3], DIR_DOWN));
+        game.place_portal(([5,1],DIR_RIGHT), ([5,3], DIR_RIGHT));
+        game.place_portal(([7,1],DIR_UP), ([7,3], DIR_UP));
+        game.place_portal(([7,1],DIR_DOWN), ([7,3], DIR_DOWN));
+        game.place_portal(([7,1],DIR_RIGHT), ([7,3], DIR_RIGHT));
+        game.place_portal(([7,1],DIR_LEFT), ([7,3], DIR_LEFT));
+        game.place_portal(([9,1],DIR_DOWN), ([9,3], DIR_DOWN));
+        game.place_portal(([9,1],DIR_RIGHT), ([9,3], DIR_RIGHT));
+        game.place_portal(([9,1],DIR_LEFT), ([9,3], DIR_LEFT));
         let frame = game.render();
         compare_frame_to_file!(frame);
-        panic!();
     }
 }

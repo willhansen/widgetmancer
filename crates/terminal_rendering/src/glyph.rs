@@ -60,7 +60,11 @@ pub struct Glyph {
     pub bg_transparent: bool,
 }
 
+
 impl Glyph {
+
+    pub const default_fg_color: RGB8 = named_colors::WHITE;
+    pub const default_bg_color: RGB8 = named_colors::BLACK;
     pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
         Glyph {
             character,
@@ -70,17 +74,14 @@ impl Glyph {
         }
     }
     pub fn default_transparent() -> Glyph {
-        Glyph::fg_only(' ', WHITE)
-    }
-    pub fn default_background() -> Glyph {
-        Glyph::new(FULL_BLOCK, BLACK, BLACK)
+        Glyph::fg_only(' ', Glyph::default_fg_color)
     }
 
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
         Glyph {
             character,
             fg_color,
-            bg_color: BLACK,
+            bg_color: Glyph::default_bg_color,
             bg_transparent: true,
         }
     }
@@ -142,7 +143,7 @@ impl Glyph {
     }
 
     pub fn from_char(character: char) -> Glyph {
-        Glyph::new(character, WHITE, BLACK)
+        Glyph::new(character, Glyph::default_fg_color, Glyph::default_bg_color)
     }
 
     pub fn with_char(&self, new_char: char) -> Glyph {
@@ -381,10 +382,10 @@ impl Glyph {
     }
 
     pub fn transparent_glyph() -> Glyph {
-        Glyph::fg_only(' ', BLACK)
+        Glyph::fg_only(' ', Glyph::default_bg_color)
     }
     pub fn transparent_square_glyphs() -> DoubleGlyph {
-        [Glyph::fg_only(' ', BLACK); 2]
+        [Glyph::fg_only(' ', Glyph::default_bg_color); 2]
     }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
         [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
@@ -452,7 +453,7 @@ impl Glyph {
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,
     ) -> Glyph {
-        Glyph::new(character_world_pos_to_braille_char(world_pos), color, BLACK)
+        Glyph::new(character_world_pos_to_braille_char(world_pos), color, Glyph::default_bg_color)
     }
 
     pub fn swap_fg_bg(&mut self) {
