@@ -132,6 +132,28 @@ impl Frame {
         f
     }
 
+    // TODO: actually use.  Probably need to parse render strings to frames from tests
+    pub fn diff_from(&self, other: &Self) -> Self {
+        assert_eq!(self.width(), other.width());
+        assert_eq!(self.height(), other.height());
+        let mut out = self.clone();
+
+        for row in 0..self.height() {
+            for col in 0..self.width() {
+                if out.grid[row][col].bg_color == other.grid[row][col].bg_color {
+                    out.grid[row][col].bg_color = Glyph::default_bg_color;
+                } 
+                if out.grid[row][col].fg_color == other.grid[row][col].fg_color {
+                    out.grid[row][col].fg_color = Glyph::default_fg_color;
+                } 
+                if out.grid[row][col].character == other.grid[row][col].character {
+                    out.grid[row][col].character = ' ';
+                } 
+            }
+        }
+        out
+    }
+
     pub fn framed(&self) -> String {
         //╭╮╯╰─│
         format!(
@@ -325,10 +347,13 @@ impl std::fmt::Debug for Frame {
             5,
         );
 
+        // f.write_str(&format!(
+        //     "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
+        //     display_string_to_readable_string(self.non_raw_render_string(true)),
+        //     self.simple_raw_display_string().to_debug(),
+        // ))
         f.write_str(&format!(
-            "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
-            display_string_to_readable_string(self.non_raw_render_string(true)),
-            self.simple_raw_display_string().to_debug(),
+            "\n{s}\n"
         ))
     }
 }
