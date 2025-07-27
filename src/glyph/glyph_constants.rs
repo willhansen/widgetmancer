@@ -33,7 +33,7 @@ pub const BLOCK_BG: RGB8 = BLACK;
 pub const BLOCK_FG: RGB8 = BLACK;
 
 pub mod named_chars {
-    use super::*;
+    
 
     pub const LEFT_HALF_BLOCK: char = '▌';
     pub const RIGHT_HALF_BLOCK: char = '▐';

@@ -1,15 +1,13 @@
 use crate::glyph::glyph_constants::*;
-use crate::glyph::hextant_blocks::{hextant_array_to_char, hextant_block_by_offset};
+use crate::glyph::hextant_blocks::hextant_block_by_offset;
 use crate::glyph::DoubleChar;
 use crate::screen::{
-    world_character_point_to_world_character_square, 
-    WorldCharacterMove, WorldCharacterPoint, WorldCharacterSquare, CharacterGridInLocalCharacterFrame,
+    world_character_point_to_world_character_square, WorldCharacterPoint, WorldCharacterSquare,
 };
 use utility::coordinate_frame_conversions::{WorldMove,};
 use utility::*;
-use euclid::{point2, vec2, Point2D};
+use euclid::{point2, vec2};
 use itertools::Itertools;
-use num::clamp;
 use ordered_float::OrderedFloat;
 use rgb::*;
 use std::collections::HashMap;
@@ -317,7 +315,7 @@ pub fn characters_for_full_square_with_looping_1d_offset(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::glyph::DoubleChar;
+    
     use euclid::vec2;
 
     #[test]

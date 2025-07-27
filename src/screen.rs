@@ -10,9 +10,8 @@ use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use utility::{coordinate_frame_conversions::{
     
-     SquareSet, 
      WorldPoint, WorldSquare, WorldStep,
-}, flip_y, get_by_point, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP};
+}, flip_y, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInScreenBufferFrame;
@@ -588,7 +587,7 @@ mod tests {
     use ntest::assert_false;
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use utility::{STEP_DOWN, STEP_DOWN_LEFT, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_LEFT};
+    use utility::{STEP_LEFT, STEP_RIGHT, STEP_UP};
 
     use super::*;
 
@@ -702,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_world_square_is_on_screen() {
-        let mut g = Screen::new(41, 20);
+        let g = Screen::new(41, 20);
         let xmax = 20;
         let ymax = 19;
 

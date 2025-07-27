@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
-use euclid::{point2, vec2, Angle, Point2D};
+use euclid::{point2, Angle, Point2D};
 use ordered_float::OrderedFloat;
 
 use crate::glyph::glyph_constants::{
@@ -11,7 +11,7 @@ use crate::glyph::glyph_constants::{
     UPPER_TWO_THIRD_BLOCK,
 };
 use crate::screen::{CharacterGridInLocalCharacterFrame, LocalCharacterPoint};
-use utility::{coordinate_frame_conversions::*, is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line};
+use utility::{is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct AngleBlockSnapGridInLocalFrame;
@@ -338,7 +338,7 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
     use utility::Line;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     use super::*;
 

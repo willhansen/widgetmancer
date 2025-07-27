@@ -95,6 +95,42 @@ impl Frame {
             self.grid[row][col] = Glyph::from_char(char);
         }
     }
+    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut Glyph> {
+        self.grid.iter_mut().flat_map(|row| row.iter_mut())
+    }
+
+    pub fn bg_only(&self) -> Self {
+        let mut f = self.clone();
+        f.glyphs().for_each(|glyph| {
+            glyph.character = ' ';
+            glyph.fg_color = named_colors::BLACK;
+        });
+        f
+    }
+    pub fn fg_only(&self) -> Self {
+        let mut f = self.clone();
+        f.glyphs().for_each(|glyph| {
+            glyph.bg_color = named_colors::BLACK;
+        });
+        f
+    }
+    pub fn fg_colors(&self) -> Self {
+        let mut f = self.clone();
+        f.glyphs().for_each(|glyph| {
+            glyph.character = ' ';
+            glyph.bg_color = glyph.fg_color;
+            glyph.fg_color = named_colors::BLACK;
+        });
+        f
+    }
+    pub fn characters_only(&self) -> Self {
+        let mut f = self.clone();
+        f.glyphs().for_each(|glyph| {
+            glyph.fg_color = named_colors::WHITE;
+            glyph.bg_color = named_colors::BLACK;
+        });
+        f
+    }
 
     pub fn framed(&self) -> String {
         //╭╮╯╰─│
@@ -198,11 +234,34 @@ impl Frame {
     }
 }
 
+fn horiz_concat_strings(strings: &[String], spaces: usize) -> String {
+    let mut out = String::new();
+    let num_cols = strings.len();
+    let mut columns = strings
+        .into_iter()
+        .map(|s| s.lines().collect_vec())
+        .collect_vec();
+    for row in 0.. {
+        for col in 0..num_cols {
+            let column = &columns[col];
+            if row >= column.len() {
+                return out;
+            }
+            out += column[row];
+
+            if col < num_cols - 1 {
+                out += &" ".repeat(spaces);
+            }
+        }
+        out += "\n";
+    }
+    unreachable!("string needs to finish");
+}
+
 pub fn display_string_to_readable_string(display_string: String) -> String {
     let a_b = [
         [r"\\u\{1b\}\[38;2(;([0-9]+))\1\1m", "BG<$2>"],
         [r"\\u\{1b\}\[48;2(;([0-9]+))\1\1m", "FG<$2>"],
-
         [r"\\u\{1b\}\[48;2;255;0;0m", "FG<r  >"],
         [r"\\u\{1b\}\[48;2;0;255;0m", "FG< g >"],
         [r"\\u\{1b\}\[48;2;255;255;0m", "FG<rg >"],
@@ -210,7 +269,6 @@ pub fn display_string_to_readable_string(display_string: String) -> String {
         [r"\\u\{1b\}\[48;2;255;0;255m", "FG<r b>"],
         [r"\\u\{1b\}\[48;2;0;255;255m", "FG< gb>"],
         [r"\\u\{1b\}\[48;2;255;255;255m", "FG<rgb>"],
-
         [r"\\u\{1b\}\[38;2;255;0;0m", "BG<r  >"],
         [r"\\u\{1b\}\[38;2;0;255;0m", "BG< g >"],
         [r"\\u\{1b\}\[38;2;255;255;0m", "BG<rg >"],
@@ -218,7 +276,6 @@ pub fn display_string_to_readable_string(display_string: String) -> String {
         [r"\\u\{1b\}\[38;2;255;0;255m", "BG<r b>"],
         [r"\\u\{1b\}\[38;2;0;255;255m", "BG< gb>"],
         [r"\\u\{1b\}\[38;2;255;255;255m", "BG<rgb>"],
-
         [r"\\n", "\n"],
     ];
 
@@ -252,9 +309,24 @@ impl Display for Frame {
 }
 impl std::fmt::Debug for Frame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = horiz_concat_strings(
+            &[
+                ("Full", self),
+                ("BG Colors", &self.bg_only()),
+                ("FG Colors", &self.fg_colors()),
+                ("Characters", &self.characters_only()),
+            ]
+            .map(|(title, frame)| {
+
+                let full_title: String =
+                    title.to_string() + &" ".repeat((frame.width() + 2).saturating_sub(title.len()));
+                format!("{full_title}\n{}", frame.framed())
+            }),
+            5,
+        );
+
         f.write_str(&format!(
-            "\n{}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
-            self.framed(),
+            "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
             display_string_to_readable_string(self.non_raw_render_string(true)),
             self.simple_raw_display_string().to_debug(),
         ))
@@ -349,11 +421,10 @@ aaa121
         assert_eq!(2, frame_a.height());
 
         let directly_below = frame_b.raw_string(&Some(frame_a.clone()), false);
-        let correct = 
-            termion::cursor::Goto(4, 1).to_string()
-                + "2"
-                + &termion::cursor::Goto(4, 2).to_string()
-                + "2";
+        let correct = termion::cursor::Goto(4, 1).to_string()
+            + "2"
+            + &termion::cursor::Goto(4, 2).to_string()
+            + "2";
 
         assert_eq!(
             correct,
