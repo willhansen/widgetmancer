@@ -626,7 +626,7 @@ impl FieldOfViewResult {
             .insert(relative_square, SquareVisibility::new_fully_visible());
     }
 
-    fn sorted_by_draw_order(
+    pub fn sorted_by_draw_order(
         visibilities: Vec<PositionedSquareVisibilityInFov>,
     ) -> Vec<PositionedSquareVisibilityInFov> {
         // TODO: The sorting here may be insufficient to prevent ambiguity (and thus flashing)

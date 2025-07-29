@@ -1,4 +1,5 @@
 use euclid::point2;
+use game::fov_stuff::FieldOfViewResult;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
@@ -37,42 +38,44 @@ const DIR_UP: i32 = 1;
 const DIR_LEFT: i32 = 2;
 const DIR_DOWN: i32 = 3;
 
-const STEP_RIGHT: IPoint = [1,0];
-const STEP_UP: IPoint = [0,1];
-const STEP_LEFT: IPoint = [-1,0];
-const STEP_DOWN: IPoint = [0,-1];
+const STEP_RIGHT: IPoint = [1, 0];
+const STEP_UP: IPoint = [0, 1];
+const STEP_LEFT: IPoint = [-1, 0];
+const STEP_DOWN: IPoint = [0, -1];
 
 fn step_in_direction(dir: OrthoDir) -> IPoint {
     match dir {
-        0 => [1,0],
-        1 => [0,1],
-        2 => [-1,0],
-        3 => [0,-1],
-        _ => panic!("invalid direction: {dir}")
+        0 => [1, 0],
+        1 => [0, 1],
+        2 => [-1, 0],
+        3 => [0, -1],
+        _ => panic!("invalid direction: {dir}"),
     }
 }
 #[allow(dead_code)]
 fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
     if square[0].abs() == square[1].abs() {
-        return None
+        return None;
     }
 
     Some(if square[0].abs() > square[1].abs() {
         if square[0] > 0 {
             0
-        } else {2}
-
+        } else {
+            2
+        }
     } else {
         if square[1] > 0 {
             1
-        } else {3}
+        } else {
+            3
+        }
     })
-
 }
 
 fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
     let step = step_in_direction(edge.1);
-    let reverse_dir = (edge.1 + 2) %4;
+    let reverse_dir = (edge.1 + 2) % 4;
     ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
 }
 
@@ -108,11 +111,17 @@ impl GameState {
         events.into_iter().for_each(|e| self.process_event(e))
     }
 
-    pub fn place_portal(&mut self, entrance: PortalSide, reverse_entrance: PortalSide ) {
+    pub fn place_portal(&mut self, entrance: PortalSide, reverse_entrance: PortalSide) {
         self.portals.insert(entrance, reverse_entrance);
         self.portals.insert(reverse_entrance, entrance);
-        self.portals.insert(other_side_of_edge(entrance), other_side_of_edge(reverse_entrance));
-        self.portals.insert(other_side_of_edge(reverse_entrance), other_side_of_edge(entrance));
+        self.portals.insert(
+            other_side_of_edge(entrance),
+            other_side_of_edge(reverse_entrance),
+        );
+        self.portals.insert(
+            other_side_of_edge(reverse_entrance),
+            other_side_of_edge(entrance),
+        );
     }
     pub fn process_event(&mut self, event: Event) {
         match event {
@@ -152,42 +161,74 @@ impl GameState {
         }
     }
     pub fn render(&self) -> Frame {
+        let fov_center_world_pos = [5, 5];
+        let portal_geometry =
+            game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
+                self.portals.clone(),
+            );
+        let fov = game::fov_stuff::portal_aware_field_of_view_from_square(
+            fov_center_world_pos.into(),
+            10,
+            &Default::default(),
+            &portal_geometry,
+        );
+        // panic!();
+
+        let mouse_camera_pos: Option<[i32; 2]> =
+            self.last_mouse_screen_row_col
+                .map(|[screen_row, screen_col]| {
+                    let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
+                    [i32::from(screen_col) / 2, screen_y]
+                });
+
         (0..self.height as i32)
-            .map(|world_row| {
-                let world_y = self.height as i32 - world_row - 1;
+            .map(|camera_row| {
+                let camera_y = self.height as i32 - camera_row - 1;
                 (0..self.width as i32)
-                    .map(|world_x| {
+                    .map(|camera_x| {
                         // let x = col;
                         // let y = self.height - row - 1;
-                        let world_pos = point2(world_x as i32, world_y as i32);
-                        let mouse_is_here = self.last_mouse_screen_row_col.is_some_and(
-                            |[screen_row, screen_col]| {
-                                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
-                                (i32::from(screen_col)) / 2 == world_x && screen_y == world_y
-                            },
-                        );
-                        let board_color = board_color(world_pos).unwrap();
-                        let portal_entrances_ccw: [bool;4] = [0,1,2,3].map(|dir|self.portals.contains_key(&([world_x, world_y], dir)));
-                        let mut glyphs = if portal_entrances_ccw.iter().any(|&x|x) {
-                            let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
+                        let camera_pos: WorldSquare = [camera_x as i32, camera_y as i32].into();
+                        let camera_pos_relative_to_fov_center =
+                            camera_pos - WorldSquare::from(fov_center_world_pos);
+                        let visible_portions_at_relative_square =
+                            FieldOfViewResult::sorted_by_draw_order(
+                                fov.visibilities_of_relative_square(
+                                    camera_pos_relative_to_fov_center,
+                                ),
+                            );
+                        let mut glyphs_to_draw_here: DoubleGlyph = DoubleGlyph::solid_color(named_colors::BLACK);
+
+                        let board_color = board_color(visible_portions_at_relative_square[0].absolute_square()).unwrap();
+                        let portal_entrances_ccw: [bool; 4] = [0, 1, 2, 3]
+                            .map(|dir| self.portals.contains_key(&([camera_x, camera_y], dir)));
+                        let mut glyphs = if portal_entrances_ccw.iter().any(|&x| x) {
+                            let portal_entrance_characters =
+                                chars_for_square_walls(portal_entrances_ccw);
                             let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
                             glyphs.iter_mut().for_each(|glyph| {
                                 glyph.fg_color = named_colors::RED;
                                 glyph.bg_color = board_color;
                             });
                             glyphs
-                        }
-                        else {
+                        } else {
                             DoubleGlyph::solid_color(board_color)
                         };
+                        let mouse_is_here = 
+                            mouse_camera_pos
+                            .is_some_and(|mouse_camera_pos| WorldSquare::from(mouse_camera_pos) == camera_pos);
                         if mouse_is_here {
                             let mouse_is_on_left_half_of_square = self
                                 .last_mouse_screen_row_col
                                 .is_some_and(|[row, col]| col % 2 == 0);
-                            let mouse_index_in_square = if mouse_is_on_left_half_of_square{0}else{1};
+                            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
+                                0
+                            } else {
+                                1
+                            };
                             glyphs[mouse_index_in_square].swap_fg_bg();
                             glyphs[mouse_index_in_square].bg_color = named_colors::RED;
-                        } 
+                        }
                         glyphs
                     })
                     .collect_vec()
@@ -211,7 +252,7 @@ fn main() {
     let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
     let (width, height) = (30, 15);
 
-    let mut game_state = GameState::new(width/2, height);
+    let mut game_state = GameState::new(width / 2, height);
 
     let mut writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
@@ -235,7 +276,10 @@ fn main() {
             [(height + 1).into(), 0],
         );
         for (i, event) in event_log.iter().enumerate() {
-            screen_frame.draw_text(format!("{:<30}", format!("{:?}",event)), [height as usize + 3 + i, 0]);
+            screen_frame.draw_text(
+                format!("{:<30}", format!("{:?}", event)),
+                [height as usize + 3 + i, 0],
+            );
         }
         draw_frame(&mut writable, &screen_frame, &prev_drawn);
         prev_drawn = Some(screen_frame.clone());
@@ -362,19 +406,19 @@ mod tests {
     #[test]
     fn test_render_portal_edges() {
         let mut game = GameState::new(12, 12);
-        game.place_portal(([1,1],DIR_UP), ([1,3], DIR_UP));
-        game.place_portal(([3,1],DIR_UP), ([3,3], DIR_UP));
-        game.place_portal(([3,1],DIR_DOWN), ([3,3], DIR_DOWN));
-        game.place_portal(([5,1],DIR_UP), ([5,3], DIR_UP));
-        game.place_portal(([5,1],DIR_DOWN), ([5,3], DIR_DOWN));
-        game.place_portal(([5,1],DIR_RIGHT), ([5,3], DIR_RIGHT));
-        game.place_portal(([7,1],DIR_UP), ([7,3], DIR_UP));
-        game.place_portal(([7,1],DIR_DOWN), ([7,3], DIR_DOWN));
-        game.place_portal(([7,1],DIR_RIGHT), ([7,3], DIR_RIGHT));
-        game.place_portal(([7,1],DIR_LEFT), ([7,3], DIR_LEFT));
-        game.place_portal(([9,1],DIR_DOWN), ([9,3], DIR_DOWN));
-        game.place_portal(([9,1],DIR_RIGHT), ([9,3], DIR_RIGHT));
-        game.place_portal(([9,1],DIR_LEFT), ([9,3], DIR_LEFT));
+        game.place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
+        game.place_portal(([3, 1], DIR_UP), ([3, 3], DIR_UP));
+        game.place_portal(([3, 1], DIR_DOWN), ([3, 3], DIR_DOWN));
+        game.place_portal(([5, 1], DIR_UP), ([5, 3], DIR_UP));
+        game.place_portal(([5, 1], DIR_DOWN), ([5, 3], DIR_DOWN));
+        game.place_portal(([5, 1], DIR_RIGHT), ([5, 3], DIR_RIGHT));
+        game.place_portal(([7, 1], DIR_UP), ([7, 3], DIR_UP));
+        game.place_portal(([7, 1], DIR_DOWN), ([7, 3], DIR_DOWN));
+        game.place_portal(([7, 1], DIR_RIGHT), ([7, 3], DIR_RIGHT));
+        game.place_portal(([7, 1], DIR_LEFT), ([7, 3], DIR_LEFT));
+        game.place_portal(([9, 1], DIR_DOWN), ([9, 3], DIR_DOWN));
+        game.place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
+        game.place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.portal_rendering = PortalRenderingOption::LineOnFloor;
         let frame = game.render();
         compare_frame_to_file!(frame);
@@ -382,7 +426,7 @@ mod tests {
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
-        game.place_portal(([6,7],DIR_UP), ([6,10], DIR_UP));
+        game.place_portal(([6, 7], DIR_UP), ([6, 10], DIR_UP));
         let frame = game.render();
         compare_frame_to_file!(frame);
     }

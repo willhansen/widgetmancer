@@ -32,7 +32,7 @@ use crate::graphics::Graphics;
 use crate::inputmap::InputMap;
 use crate::piece::{Piece, PieceType};
 
-mod fov_stuff;
+pub mod fov_stuff;
 pub mod game;
 pub mod graphics;
 mod inputmap;

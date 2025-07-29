@@ -8,9 +8,10 @@ use getset::CopyGetters;
 use itertools::Itertools;
 use ntest::assert_false;
 
-use utility::{angle_interval::AngleInterval, coordinate_frame_conversions::{
-    StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep,
-}};
+use utility::{
+    angle_interval::AngleInterval,
+    coordinate_frame_conversions::{StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep},
+};
 use utility::{
     better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
     ith_projection_of_step, naive_ray_endpoint, revolve_square,
@@ -140,6 +141,22 @@ pub struct PortalGeometry {
 }
 
 impl PortalGeometry {
+    pub fn from_entrances_and_reverse_entrances(
+        entrances_and_reverse_entrances: HashMap<([i32; 2], i32), ([i32; 2], i32)>,
+    ) -> Self {
+        PortalGeometry {
+            portal_exits_by_entrance: entrances_and_reverse_entrances
+                .into_iter()
+                .map(|(entrance, reverse_entrance)| {
+                    (
+                        SquareWithOrthogonalDir::from_square_and_turns(entrance.0.into(), QuarterTurnsAnticlockwise::new(entrance.1)),
+                        SquareWithOrthogonalDir::from_square_and_turns(reverse_entrance.0.into(), QuarterTurnsAnticlockwise::new(reverse_entrance.1))
+                            .reversed(),
+                    )
+                })
+                .collect(),
+        }
+    }
     pub fn create_portal(
         &mut self,
         entrance_step: SquareWithOrthogonalDir,
@@ -388,10 +405,8 @@ impl PortalGeometry {
 
 #[cfg(test)]
 mod tests {
-    use utility::{
-        assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT,
-    };
     use ntest::assert_about_eq;
+    use utility::{assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT};
 
     use super::*;
 
