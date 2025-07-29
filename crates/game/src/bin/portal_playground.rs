@@ -375,6 +375,14 @@ mod tests {
         game.place_portal(([9,1],DIR_DOWN), ([9,3], DIR_DOWN));
         game.place_portal(([9,1],DIR_RIGHT), ([9,3], DIR_RIGHT));
         game.place_portal(([9,1],DIR_LEFT), ([9,3], DIR_LEFT));
+        game.portal_rendering = PortalRenderingOption::LineOnFloor;
+        let frame = game.render();
+        compare_frame_to_file!(frame);
+    }
+    #[test]
+    fn test_render_one_line_of_sight_portal() {
+        let mut game = GameState::new(12, 12);
+        game.place_portal(([6,7],DIR_UP), ([6,10], DIR_UP));
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
