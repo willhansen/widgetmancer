@@ -1,5 +1,5 @@
 use euclid::point2;
-use game::fov_stuff::FieldOfViewResult;
+use game::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
@@ -90,11 +90,13 @@ struct GameState {
     running: bool,
     width: usize,
     height: usize,
+    fov_center_world_pos: IPoint,
 
     portals: HashMap<PortalSide, PortalSide>,
 
     last_mouse_screen_row_col: Option<[u16; 2]>,
     pub portal_rendering: PortalRenderingOption,
+    board_color_function: fn(&GameState, IPoint) -> Option<RGB8>,
 }
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -102,11 +104,22 @@ impl GameState {
             running: true,
             width,
             height,
+            fov_center_world_pos: [5, 5],
             portals: Default::default(),
             last_mouse_screen_row_col: None,
             portal_rendering: PortalRenderingOption::LineOnFloor,
+            board_color_function: Self::default_board_color,
         }
     }
+    fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
+        let is_white = ((square[0] / 3) % 2 == 0) == ((square[1] / 3) % 2 == 0);
+        Some(if is_white { grey(191) } else { grey(127) })
+    }
+
+    pub fn on_board(&self, square: IPoint) -> bool {
+        square[0] >= 0 && square[0] < self.width as i32 && square[1] >= 0 && square[1] < self.height as i32
+    }
+
     pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
         events.into_iter().for_each(|e| self.process_event(e))
     }
@@ -161,13 +174,12 @@ impl GameState {
         }
     }
     pub fn render(&self) -> Frame {
-        let fov_center_world_pos = [5, 5];
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(),
             );
         let fov = game::fov_stuff::portal_aware_field_of_view_from_square(
-            fov_center_world_pos.into(),
+            self.fov_center_world_pos.into(),
             10,
             &Default::default(),
             &portal_geometry,
@@ -190,16 +202,34 @@ impl GameState {
                         // let y = self.height - row - 1;
                         let camera_pos: WorldSquare = [camera_x as i32, camera_y as i32].into();
                         let camera_pos_relative_to_fov_center =
-                            camera_pos - WorldSquare::from(fov_center_world_pos);
-                        let visible_portions_at_relative_square =
-                            FieldOfViewResult::sorted_by_draw_order(
-                                fov.visibilities_of_relative_square(
+                            camera_pos - WorldSquare::from(self.fov_center_world_pos);
+                        let visible_portions_at_relative_square = match self.portal_rendering {
+                            PortalRenderingOption::LineOfSight => {
+                                FieldOfViewResult::sorted_by_draw_order(
+                                    fov.visibilities_of_relative_square(
+                                        camera_pos_relative_to_fov_center,
+                                    ),
+                                )
+                            }
+                            PortalRenderingOption::LineOnFloor => {
+                                vec![PositionedSquareVisibilityInFov::new_in_top_view(
+                                    SquareVisibility::new_fully_visible(),
+                                    camera_pos,
                                     camera_pos_relative_to_fov_center,
-                                ),
-                            );
-                        let mut glyphs_to_draw_here: DoubleGlyph = DoubleGlyph::solid_color(named_colors::BLACK);
+                                )]
+                            }
+                            PortalRenderingOption::Absolute => todo!(),
+                        };
+                        let mut glyphs_to_draw_here: DoubleGlyph =
+                            DoubleGlyph::solid_color(named_colors::BLACK);
 
-                        let board_color = board_color(visible_portions_at_relative_square[0].absolute_square()).unwrap();
+                        let board_color = (self.board_color_function)(
+                            &self,
+                            visible_portions_at_relative_square[0]
+                                .absolute_square()
+                                .into(),
+                        )
+                        .unwrap();
                         let portal_entrances_ccw: [bool; 4] = [0, 1, 2, 3]
                             .map(|dir| self.portals.contains_key(&([camera_x, camera_y], dir)));
                         let mut glyphs = if portal_entrances_ccw.iter().any(|&x| x) {
@@ -214,9 +244,9 @@ impl GameState {
                         } else {
                             DoubleGlyph::solid_color(board_color)
                         };
-                        let mouse_is_here = 
-                            mouse_camera_pos
-                            .is_some_and(|mouse_camera_pos| WorldSquare::from(mouse_camera_pos) == camera_pos);
+                        let mouse_is_here = mouse_camera_pos.is_some_and(|mouse_camera_pos| {
+                            WorldSquare::from(mouse_camera_pos) == camera_pos
+                        });
                         if mouse_is_here {
                             let mouse_is_on_left_half_of_square = self
                                 .last_mouse_screen_row_col
@@ -287,16 +317,11 @@ fn main() {
     }
 }
 
-fn board_color(square: WorldSquare) -> Option<RGB8> {
-    let is_white = ((square.x / 3) % 2 == 0) == ((square.y / 3) % 2 == 0);
-    Some(if is_white { grey(191) } else { grey(127) })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_str_eq;
-    use std::{assert_eq, assert_ne};
+    use std::{assert_eq, assert_ne, f32::consts::TAU};
     use stdext::function_name;
 
     #[test]
@@ -426,7 +451,26 @@ mod tests {
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
-        game.place_portal(([6, 7], DIR_UP), ([6, 10], DIR_UP));
+        game.portal_rendering = PortalRenderingOption::LineOfSight;
+        game.board_color_function = |game_state, square| {
+            let [cx, cy] = game_state.fov_center_world_pos;
+            let dx = square[0] - cx;
+            let dy = square[1] - cy;
+            let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+            let wave_length = 7.0;
+            let mid = 120.0;
+            let ampl = 50.0;
+
+            let val = mid + ampl * (d / wave_length * TAU).cos();
+
+            if game_state.on_board(square) {
+                Some(grey(val.round() as u8))
+            } else {
+                None
+            }
+        };
+
+        game.place_portal(([5, 7], DIR_UP), ([5, 10], DIR_UP));
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
