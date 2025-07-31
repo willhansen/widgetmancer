@@ -162,6 +162,12 @@ impl Sub for QuarterTurnsAnticlockwise {
     }
 }
 
+impl Into<i32> for QuarterTurnsAnticlockwise {
+    fn into(self) -> i32 {
+        self.quarter_turns()
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
 
