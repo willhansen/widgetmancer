@@ -97,6 +97,7 @@ struct GameState {
     last_mouse_screen_row_col: Option<[u16; 2]>,
     pub portal_rendering: PortalRenderingOption,
     board_color_function: fn(&GameState, IPoint) -> Option<RGB8>,
+    portal_tint_function: fn(RGB8, u32) -> RGB8,
 }
 impl GameState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -109,15 +110,59 @@ impl GameState {
             last_mouse_screen_row_col: None,
             portal_rendering: PortalRenderingOption::LineOnFloor,
             board_color_function: Self::default_board_color,
+            portal_tint_function: Self::default_portal_tint,
         }
     }
     fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
         let is_white = ((square[0] / 3) % 2 == 0) == ((square[1] / 3) % 2 == 0);
         Some(if is_white { grey(191) } else { grey(127) })
     }
+    fn radial_sin_board_colors(&self, square: IPoint) -> Option<RGB8> {
+        let [cx, cy] = self.fov_center_world_pos;
+        let dx = square[0] - cx;
+        let dy = square[1] - cy;
+        let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+        let wave_length = 7.0;
+        let mid = 120.0;
+        let ampl = 50.0;
+
+        let val = mid + ampl * (d / wave_length * std::f32::consts::TAU).cos();
+
+        if self.on_board(square) {
+            Some(grey(val.round() as u8))
+        } else {
+            None
+        }
+    }
+    fn default_portal_tint(color: RGB8, depth: u32) -> RGB8 {
+        let tint = named_colors::RED;
+        let strength = (0.1 * depth as f32).min(1.0);
+        tint_color(color, tint, strength)
+    }
+    fn rainbow_tint(color: RGB8, depth: u32) -> RGB8 {
+        if depth == 0 {
+            return color;
+        }
+        use named_colors::*;
+        let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
+        let tint = rainbow[depth.saturating_sub(1) as usize % rainbow.len()];
+        let strength = (0.1 * depth as f32).min(1.0);
+        tint_color(color, tint, strength)
+    }
+    fn rainbow_solid(color: RGB8, depth: u32) -> RGB8 {
+        if depth == 0 {
+            return color;
+        }
+        use named_colors::*;
+        let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
+        rainbow[depth.saturating_sub(1) as usize % rainbow.len()]
+    }
 
     pub fn on_board(&self, square: IPoint) -> bool {
-        square[0] >= 0 && square[0] < self.width as i32 && square[1] >= 0 && square[1] < self.height as i32
+        square[0] >= 0
+            && square[0] < self.width as i32
+            && square[1] >= 0
+            && square[1] < self.height as i32
     }
 
     pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
@@ -173,6 +218,57 @@ impl GameState {
             Event::Unsupported(items) => todo!(),
         }
     }
+    fn naive_glyphs_for_rotated_world_square(&self, square: IPoint, rotation: i32) -> DoubleGlyph {
+        assert!(rotation >= 0 && rotation < 4);
+        let board_color =
+            (self.board_color_function)(&self, square)
+                .unwrap();
+        let mut portal_entrances_ccw: [bool; 4] =
+            [0, 1, 2, 3].map(|dir| self.portals.contains_key(&(square, dir)));
+        portal_entrances_ccw.rotate_left(rotation as usize);
+        let mut glyphs = if portal_entrances_ccw.iter().any(|&x| x) {
+            let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
+            let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
+            glyphs.iter_mut().for_each(|glyph| {
+                glyph.fg_color = named_colors::RED;
+                glyph.bg_color = board_color;
+            });
+            glyphs
+        } else {
+            DoubleGlyph::solid_color(board_color)
+        };
+        let mouse_is_here = self
+            .mouse_square_xy_in_camera_frame()
+            .is_some_and(|mouse_camera_pos| mouse_camera_pos == square);
+        if mouse_is_here {
+            let mouse_is_on_left_half_of_square = self
+                .last_mouse_screen_row_col
+                .is_some_and(|[row, col]| col % 2 == 0);
+            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
+                0
+            } else {
+                1
+            };
+            glyphs[mouse_index_in_square].swap_fg_bg();
+            glyphs[mouse_index_in_square].bg_color = named_colors::RED;
+        }
+        glyphs
+
+    }
+    // Simple top-down, no rotation, no portals (except for entrance/exit)
+    fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyph {
+        self.naive_glyphs_for_rotated_world_square(square, 0)
+    }
+    fn mouse_square_xy_in_camera_frame(&self) -> Option<IPoint> {
+        self.last_mouse_screen_row_col
+            .map(|[screen_row, screen_col]| {
+                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
+                [i32::from(screen_col) / 2, screen_y]
+            })
+    }
+    fn mouse_square_xy_in_world_frame(&self) -> Option<IPoint> {
+        todo!()
+    }
     pub fn render(&self) -> Frame {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
@@ -203,7 +299,9 @@ impl GameState {
                         let camera_pos: WorldSquare = [camera_x as i32, camera_y as i32].into();
                         let camera_pos_relative_to_fov_center =
                             camera_pos - WorldSquare::from(self.fov_center_world_pos);
-                        let visible_portions_at_relative_square = match self.portal_rendering {
+                        let visible_portions_at_relative_square: Vec<
+                            PositionedSquareVisibilityInFov,
+                        > = match self.portal_rendering {
                             PortalRenderingOption::LineOfSight => {
                                 FieldOfViewResult::sorted_by_draw_order(
                                     fov.visibilities_of_relative_square(
@@ -220,46 +318,30 @@ impl GameState {
                             }
                             PortalRenderingOption::Absolute => todo!(),
                         };
-                        let mut glyphs_to_draw_here: DoubleGlyph =
-                            DoubleGlyph::solid_color(named_colors::BLACK);
 
-                        let board_color = (self.board_color_function)(
-                            &self,
-                            visible_portions_at_relative_square[0]
-                                .absolute_square()
-                                .into(),
-                        )
-                        .unwrap();
-                        let portal_entrances_ccw: [bool; 4] = [0, 1, 2, 3]
-                            .map(|dir| self.portals.contains_key(&([camera_x, camera_y], dir)));
-                        let mut glyphs = if portal_entrances_ccw.iter().any(|&x| x) {
-                            let portal_entrance_characters =
-                                chars_for_square_walls(portal_entrances_ccw);
-                            let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
-                            glyphs.iter_mut().for_each(|glyph| {
-                                glyph.fg_color = named_colors::RED;
-                                glyph.bg_color = board_color;
+                        let glyph_layers_to_combine = visible_portions_at_relative_square
+                            .clone()
+                            .into_iter()
+                            .map(|square_viz| {
+                                if square_viz.unrotated_square_visibility().is_fully_visible() {
+                                    todo!();
+                                } else {
+                                    todo!();
+                                }
                             });
-                            glyphs
-                        } else {
-                            DoubleGlyph::solid_color(board_color)
-                        };
-                        let mouse_is_here = mouse_camera_pos.is_some_and(|mouse_camera_pos| {
-                            WorldSquare::from(mouse_camera_pos) == camera_pos
+
+                        let chosen_single_target = visible_portions_at_relative_square[0];
+                        let mut naive_glyphs = self.naive_glyphs_for_rotated_world_square(chosen_single_target.absolute_square().into(), chosen_single_target.portal_rotation().into());
+
+
+                        naive_glyphs.colors_mut().for_each(|color| {
+                            *color = (self.portal_tint_function)(
+                                *color,
+                                chosen_single_target.portal_depth(),
+                            )
                         });
-                        if mouse_is_here {
-                            let mouse_is_on_left_half_of_square = self
-                                .last_mouse_screen_row_col
-                                .is_some_and(|[row, col]| col % 2 == 0);
-                            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
-                                0
-                            } else {
-                                1
-                            };
-                            glyphs[mouse_index_in_square].swap_fg_bg();
-                            glyphs[mouse_index_in_square].bg_color = named_colors::RED;
-                        }
-                        glyphs
+
+                        naive_glyphs
                     })
                     .collect_vec()
             })
@@ -452,25 +534,11 @@ mod tests {
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
         game.portal_rendering = PortalRenderingOption::LineOfSight;
-        game.board_color_function = |game_state, square| {
-            let [cx, cy] = game_state.fov_center_world_pos;
-            let dx = square[0] - cx;
-            let dy = square[1] - cy;
-            let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
-            let wave_length = 7.0;
-            let mid = 120.0;
-            let ampl = 50.0;
-
-            let val = mid + ampl * (d / wave_length * TAU).cos();
-
-            if game_state.on_board(square) {
-                Some(grey(val.round() as u8))
-            } else {
-                None
-            }
-        };
-
-        game.place_portal(([5, 7], DIR_UP), ([5, 10], DIR_UP));
+        game.board_color_function = GameState::radial_sin_board_colors;
+        game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
+        game.portal_tint_function = GameState::rainbow_solid;
+        dbg!(game.render());
+        game.portal_tint_function = GameState::rainbow_tint;
         let frame = game.render();
         compare_frame_to_file!(frame);
     }

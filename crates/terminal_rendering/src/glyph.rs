@@ -60,9 +60,7 @@ pub struct Glyph {
     pub bg_transparent: bool,
 }
 
-
 impl Glyph {
-
     pub const default_fg_color: RGB8 = named_colors::WHITE;
     pub const default_bg_color: RGB8 = named_colors::BLACK;
     pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
@@ -92,7 +90,6 @@ impl Glyph {
             ..*self
         }
     }
-
 
     pub fn fg_color_string(&self) -> String {
         color::Fg(color::Rgb(
@@ -453,13 +450,22 @@ impl Glyph {
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,
     ) -> Glyph {
-        Glyph::new(character_world_pos_to_braille_char(world_pos), color, Glyph::default_bg_color)
+        Glyph::new(
+            character_world_pos_to_braille_char(world_pos),
+            color,
+            Glyph::default_bg_color,
+        )
     }
 
     pub fn swap_fg_bg(&mut self) {
         let tmp = self.fg_color;
         self.fg_color = self.bg_color;
         self.fg_color = tmp;
+    }
+
+    pub fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8> {
+        use std::iter::once;
+        once(&mut self.fg_color).chain(once(&mut self.bg_color))
     }
 }
 
@@ -503,6 +509,7 @@ pub trait DoubleGlyphFunctions {
             .try_into()
             .unwrap()
     }
+    fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8>;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -595,6 +602,10 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph {
         self.map(|g| g.tinted(color, strength))
     }
+
+    fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8> {
+        self.iter_mut().flat_map(|g| g.colors_mut())
+    }
 }
 
 fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
@@ -657,28 +668,28 @@ pub fn pair_up_character_square_map<T: Clone>(
 }
 
 // Order is anticlockwise [right, up, left, down]
-pub fn chars_for_square_walls(walls: [bool;4]) -> DoubleChar {
-    let left= match walls {
+pub fn chars_for_square_walls(walls: [bool; 4]) -> DoubleChar {
+    let left = match walls {
         [_, true, true, true] => '𜷂',
-        [_, true, true, false] => '🭽',//𜵊
+        [_, true, true, false] => '🭽', //𜵊
         [_, true, false, true] => '𜶮',
         [_, true, false, false] => '▔',
-        [_, false, true, true] => '🭼',//𜷀
+        [_, false, true, true] => '🭼', //𜷀
         [_, false, true, false] => '▏',
         [_, false, false, true] => '▁',
         [_, false, false, false] => ' ',
     };
-    let right= match walls {
+    let right = match walls {
         [true, true, _, true] => '𜷖',
-        [true, true, _, false] => '🭾',//'𜶘'
-        [true, false, _, true] => '🭿',//𜷕
+        [true, true, _, false] => '🭾', //'𜶘'
+        [true, false, _, true] => '🭿', //𜷕
         [true, false, _, false] => '▕',
         [false, true, _, true] => '𜶮',
         [false, true, _, false] => '▔',
         [false, false, _, true] => '▁',
         [false, false, _, false] => ' ',
     };
-    [left,right]
+    [left, right]
 }
 
 #[cfg(test)]
