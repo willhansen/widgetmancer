@@ -286,6 +286,11 @@ impl GameState {
                     [i32::from(screen_col) / 2, screen_y]
                 });
 
+        let fov_center = match mouse_camera_pos {
+            Some(x) => x,
+            None => self.fov_center_world_pos,
+        };
+
         (0..self.height as i32)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row - 1;
@@ -295,7 +300,7 @@ impl GameState {
                         // let y = self.height - row - 1;
                         let camera_pos: WorldSquare = [camera_x as i32, camera_y as i32].into();
                         let camera_pos_relative_to_fov_center =
-                            camera_pos - WorldSquare::from(self.fov_center_world_pos);
+                            camera_pos - WorldSquare::from(fov_center);
                         let visible_portions_at_relative_square: Vec<
                             PositionedSquareVisibilityInFov,
                         > = match self.portal_rendering {
@@ -316,40 +321,61 @@ impl GameState {
                             PortalRenderingOption::Absolute => todo!(),
                         };
 
-                        let glyph_layers_to_combine = visible_portions_at_relative_square
-                            .clone()
-                            .into_iter()
-                            .map(|square_viz| {
-                                let mut glyphs = self.naive_glyphs_for_rotated_world_square(
-                                    square_viz.absolute_square().into(),
-                                    square_viz.portal_rotation().into(),
-                                );
-                                if !square_viz.unrotated_square_visibility().is_fully_visible() {
-                                    let bias_direction = square_viz
-                                        .unrotated_square_visibility()
-                                        .visible_portion()
-                                        .unwrap()
-                                        .direction_away_from_plane();
-                                    glyphs = glyphs.into_iter().zip(square_viz.unrotated_square_visibility().split_into_character_visibilities().into_iter()).map(|(glyph, visible_portion_of_glyph)|{
-                                        todo!();
-                                    }).collect_vec().try_into().unwrap();
-                                }
-                            });
+                        let glyph_layers_to_combine: Vec<DoubleGlyph> =
+                            visible_portions_at_relative_square
+                                .clone()
+                                .into_iter()
+                                .map(|square_viz| {
+                                    let mut glyphs = self.naive_glyphs_for_rotated_world_square(
+                                        square_viz.absolute_square().into(),
+                                        square_viz.portal_rotation().into(),
+                                    );
+                                    // apply tint
 
-                        let chosen_single_target = visible_portions_at_relative_square[0];
-                        let mut naive_glyphs = self.naive_glyphs_for_rotated_world_square(
-                            chosen_single_target.absolute_square().into(),
-                            chosen_single_target.portal_rotation().into(),
-                        );
+                                    glyphs.colors_mut().for_each(|color| {
+                                        *color = (self.portal_tint_function)(
+                                            *color,
+                                            square_viz.portal_depth(),
+                                        )
+                                    });
 
-                        naive_glyphs.colors_mut().for_each(|color| {
-                            *color = (self.portal_tint_function)(
-                                *color,
-                                chosen_single_target.portal_depth(),
-                            )
-                        });
-
-                        naive_glyphs
+                                    if !square_viz.unrotated_square_visibility().is_fully_visible()
+                                    {
+                                        let bias_direction = square_viz
+                                            .unrotated_square_visibility()
+                                            .visible_portion()
+                                            .unwrap()
+                                            .direction_away_from_plane();
+                                        glyphs = glyphs
+                                            .into_iter()
+                                            .zip(
+                                                square_viz
+                                                    .unrotated_square_visibility()
+                                                    .split_into_character_visibilities()
+                                                    .into_iter(),
+                                            )
+                                            .map(|(glyph, visible_portion_of_glyph)| {
+                                                match visible_portion_of_glyph {
+                                                    None => glyph,
+                                                    Some(visible_portion) => Glyph::new(
+                                                        half_plane_to_angled_block_character(
+                                                            visible_portion,
+                                                            bias_direction,
+                                                        ),
+                                                        glyph.fg_color,
+                                                        glyph.bg_color,
+                                                    ),
+                                                }
+                                            })
+                                            .collect_vec()
+                                            .try_into()
+                                            .unwrap()
+                                    }
+                                    glyphs
+                                })
+                                .collect_vec();
+                        // TODO: combine properly
+                        glyph_layers_to_combine[0]
                     })
                     .collect_vec()
             })
@@ -373,6 +399,8 @@ fn main() {
     let (width, height) = (30, 15);
 
     let mut game_state = GameState::new(width / 2, height);
+    game_state.portal_rendering = PortalRenderingOption::LineOfSight;
+    game_state.place_portal(([10, 5], DIR_UP), ([25, 25], DIR_RIGHT));
 
     let mut writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
