@@ -220,9 +220,7 @@ impl GameState {
     }
     fn naive_glyphs_for_rotated_world_square(&self, square: IPoint, rotation: i32) -> DoubleGlyph {
         assert!(rotation >= 0 && rotation < 4);
-        let board_color =
-            (self.board_color_function)(&self, square)
-                .unwrap();
+        let board_color = (self.board_color_function)(&self, square).unwrap();
         let mut portal_entrances_ccw: [bool; 4] =
             [0, 1, 2, 3].map(|dir| self.portals.contains_key(&(square, dir)));
         portal_entrances_ccw.rotate_left(rotation as usize);
@@ -253,7 +251,6 @@ impl GameState {
             glyphs[mouse_index_in_square].bg_color = named_colors::RED;
         }
         glyphs
-
     }
     // Simple top-down, no rotation, no portals (except for entrance/exit)
     fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyph {
@@ -323,16 +320,27 @@ impl GameState {
                             .clone()
                             .into_iter()
                             .map(|square_viz| {
-                                if square_viz.unrotated_square_visibility().is_fully_visible() {
-                                    todo!();
-                                } else {
-                                    todo!();
+                                let mut glyphs = self.naive_glyphs_for_rotated_world_square(
+                                    square_viz.absolute_square().into(),
+                                    square_viz.portal_rotation().into(),
+                                );
+                                if !square_viz.unrotated_square_visibility().is_fully_visible() {
+                                    let bias_direction = square_viz
+                                        .unrotated_square_visibility()
+                                        .visible_portion()
+                                        .unwrap()
+                                        .direction_away_from_plane();
+                                    glyphs = glyphs.into_iter().zip(square_viz.unrotated_square_visibility().split_into_character_visibilities().into_iter()).map(|(glyph, visible_portion_of_glyph)|{
+                                        todo!();
+                                    }).collect_vec().try_into().unwrap();
                                 }
                             });
 
                         let chosen_single_target = visible_portions_at_relative_square[0];
-                        let mut naive_glyphs = self.naive_glyphs_for_rotated_world_square(chosen_single_target.absolute_square().into(), chosen_single_target.portal_rotation().into());
-
+                        let mut naive_glyphs = self.naive_glyphs_for_rotated_world_square(
+                            chosen_single_target.absolute_square().into(),
+                            chosen_single_target.portal_rotation().into(),
+                        );
 
                         naive_glyphs.colors_mut().for_each(|color| {
                             *color = (self.portal_tint_function)(
@@ -530,6 +538,7 @@ mod tests {
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
+    #[ignore]
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);

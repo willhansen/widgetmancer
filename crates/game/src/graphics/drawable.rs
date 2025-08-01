@@ -11,9 +11,9 @@ use itertools::Itertools;
 use rgb::RGB8;
 
 use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
+use glyph_constants::named_colors::*;
 use terminal_rendering::*;
 use utility::*;
-use glyph_constants::named_colors::*;
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug {
@@ -126,12 +126,7 @@ impl Drawable for PartialVisibilityDrawable {
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        let character_visible_portions = [0, 1].map(|i| {
-            local_square_half_plane_to_local_character_half_plane(
-                self.visibility.visible_portion().unwrap(),
-                i,
-            )
-        });
+        let character_visible_portions = self.visibility.split_into_character_visibilities();
 
         let bias_direction = self
             .visibility
@@ -142,8 +137,13 @@ impl Drawable for PartialVisibilityDrawable {
         let glyphs = character_visible_portions
             .iter()
             .map(|vis_portion| {
-                let angle_char = half_plane_to_angled_block_character(*vis_portion, bias_direction);
-                Glyph::new(angle_char, self.fg_color, self.bg_color)
+                if let Some(vis_portion) = vis_portion {
+                    let angle_char =
+                        half_plane_to_angled_block_character(*vis_portion, bias_direction);
+                    Glyph::new(angle_char, self.fg_color, self.bg_color)
+                } else {
+                    Glyph::solid_fg(self.fg_color)
+                }
             })
             .collect::<Vec<Glyph>>()
             .try_into()
@@ -459,7 +459,8 @@ impl OffsetSquareDrawable {
                     offset: floating_square_offset_from_square_center,
                     colors: [color, BLACK],
                 };
-                let glyphs_round_to_empty_square = drawable.to_glyphs().chars() == [glyph_constants::SPACE; 2];
+                let glyphs_round_to_empty_square =
+                    drawable.to_glyphs().chars() == [glyph_constants::SPACE; 2];
                 if !glyphs_round_to_empty_square {
                     output.insert(square, drawable);
                 }
@@ -511,9 +512,9 @@ impl Drawable for OffsetSquareDrawable {
 
 #[cfg(test)]
 mod tests {
-    use terminal_rendering::glyph::braille::EMPTY_BRAILLE;
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
+    use terminal_rendering::glyph::braille::EMPTY_BRAILLE;
 
     use terminal_rendering::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
     use utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};

@@ -11,12 +11,6 @@ use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
 
-use terminal_rendering::*;
-use utility::*;
-use terminal_rendering::glyph::glyph_constants::{
-    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
-};
-use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use crate::graphics;
 use crate::graphics::drawable::DrawableEnum::SolidColor;
 use crate::graphics::drawable::{
@@ -24,8 +18,14 @@ use crate::graphics::drawable::{
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
+use terminal_rendering::glyph::glyph_constants::{
+    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
+};
+use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use terminal_rendering::*;
 use utility::angle_interval::AngleInterval;
 use utility::coordinate_frame_conversions::*;
+use utility::*;
 use utility::*;
 
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
@@ -168,6 +168,24 @@ impl SquareVisibility {
             .chars()
             .zip(other.as_string().chars())
             .all(|(c1, c2)| angle_block_char_complement(c1) == c2)
+    }
+    pub fn split_into_character_visibilities(&self) -> [Option<CharacterShadow>; 2] {
+        [0, 1].map(|i| {
+            if let Some(square_visible_portion) = self.visible_portion {
+                let character_visible_portion =
+                    local_square_half_plane_to_local_character_half_plane(
+                        square_visible_portion,
+                        i,
+                    );
+                if character_visible_portion.fully_covers_unit_square() {
+                    None
+                } else {
+                    Some(character_visible_portion)
+                }
+            } else {
+                None
+            }
+        })
     }
 }
 
