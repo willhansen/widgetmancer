@@ -596,7 +596,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     }
 
     fn solid_color(color: RGB8) -> DoubleGlyph {
-        [Glyph::new(SPACE, color, color); 2]
+        [Glyph::new(SPACE, Glyph::default_fg_color, color); 2]
     }
 
     fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph {
