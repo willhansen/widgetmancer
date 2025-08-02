@@ -1,8 +1,8 @@
 use crate::glyph_constants::named_colors;
 use crate::*;
 
-use fancy_regex::Regex;
 use itertools::Itertools;
+use rgb::RGB8;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Write;
@@ -14,16 +14,22 @@ pub struct Frame {
 }
 
 impl Frame {
+    pub fn from_glyph_grid(grid: Vec<Vec<Glyph>>) -> Self {
+        assert!(grid.len() > 0);
+        assert!(grid[0].len() > 0);
+        assert!(grid.iter().map(|row| row.len()).all_equal());
+        Frame { grid }
+    }
     pub fn blank(width: usize, height: usize) -> Self {
-        Frame {
-            grid: (0..height)
+        Frame::from_glyph_grid(
+            (0..height)
                 .map(|_row| {
                     (0..width)
                         .map(|_col| Glyph::solid_color(named_colors::BLACK))
                         .collect()
                 })
                 .collect(),
-        }
+        )
     }
     pub fn save_to_file(&self, path: PathBuf) {
         File::create(path)
@@ -142,13 +148,13 @@ impl Frame {
             for col in 0..self.width() {
                 if out.grid[row][col].bg_color == other.grid[row][col].bg_color {
                     out.grid[row][col].bg_color = Glyph::default_bg_color;
-                } 
+                }
                 if out.grid[row][col].fg_color == other.grid[row][col].fg_color {
                     out.grid[row][col].fg_color = Glyph::default_fg_color;
-                } 
+                }
                 if out.grid[row][col].character == other.grid[row][col].character {
                     out.grid[row][col].character = ' ';
-                } 
+                }
             }
         }
         out
@@ -172,6 +178,68 @@ impl Frame {
     }
     pub fn string_for_regular_display(&self) -> String {
         self.non_raw_render_string(true)
+    }
+    pub fn parse_regular_display_string(input_string: String) -> Self {
+        let three_bytes_regex = regex::Regex::new(r";2;([0-9]+);([0-9]+);([0-9]+)").unwrap();
+        let escape_regex = regex::Regex::new("\u{1b}\\[(.*?)m").unwrap();
+        const fg_set: &str = "38";
+        const bg_set: &str = "48";
+        const fg_reset: &str = "39";
+        const bg_reset: &str = "49";
+        let parse_3_byte_color_string = |param_string: &str| {
+            let rgb_array: [u8; 3] = three_bytes_regex
+                .captures(param_string)
+                .unwrap()
+                .iter()
+                .skip(1)
+                .map(|cap| cap.unwrap().as_str().parse::<u8>().unwrap())
+                .collect_vec()
+                .try_into()
+                .unwrap();
+            RGB8::from(rgb_array)
+        };
+        // regular display strings reset colors every line, so we can split easily
+        let grid = input_string
+            .lines()
+            .map(|line| {
+                let mut glyphs_out = Vec::new();
+
+                let mut fg: Option<RGB8> = None;
+                let mut bg: Option<RGB8> = None;
+
+                let mut found_color_command_iter = escape_regex.captures_iter(line).peekable();
+                while let Some(found_color_command) = found_color_command_iter.next() {
+                    // let color_command = &line[found_color_command.range()];
+                    let color_command = &found_color_command[1];
+
+                    let end = if let Some(next_capture) = found_color_command_iter.peek() {
+                        next_capture.get(0).unwrap().start()
+                    } else {
+                        line.len()
+                    };
+
+                    let text_until_next = &line[found_color_command.get(0).unwrap().end()..end];
+                    let utf8_until_next = String::from_utf8(text_until_next.into()).unwrap();
+
+                    // modify current colors based on command
+                    let cmd_code = &color_command[..2];
+                    let rest_of_cmd = &color_command[2..];
+                    match cmd_code {
+                        fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                        bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                        fg_reset => fg = None,
+                        bg_reset => bg = None,
+                        x => panic!("Invalid escape code: {x:?}"),
+                    }
+
+                    utf8_until_next
+                        .chars()
+                        .for_each(|c| glyphs_out.push(Glyph::new(c, fg.unwrap(), bg.unwrap())));
+                }
+                glyphs_out
+            })
+            .collect_vec();
+        Frame::from_glyph_grid(grid)
     }
     fn non_raw_render_string(&self, _colored: bool) -> String {
         raw_display_string_to_regular_display_string(self.simple_raw_display_string())
@@ -305,7 +373,10 @@ pub fn display_string_to_readable_string(display_string: String) -> String {
 
     let mut hay = display_string.escape_debug().to_string();
     for [a, b] in a_b.into_iter() {
-        hay = Regex::new(a).unwrap().replace_all(&hay, b).to_string();
+        hay = fancy_regex::Regex::new(a)
+            .unwrap()
+            .replace_all(&hay, b)
+            .to_string();
     }
     hay.to_string()
 }
@@ -341,9 +412,8 @@ impl std::fmt::Debug for Frame {
                 ("Characters", &self.characters_only()),
             ]
             .map(|(title, frame)| {
-
-                let full_title: String =
-                    title.to_string() + &" ".repeat((frame.width() + 2).saturating_sub(title.len()));
+                let full_title: String = title.to_string()
+                    + &" ".repeat((frame.width() + 2).saturating_sub(title.len()));
                 format!("{full_title}\n{}", frame.framed())
             }),
             5,
@@ -354,20 +424,18 @@ impl std::fmt::Debug for Frame {
         //     display_string_to_readable_string(self.non_raw_render_string(true)),
         //     self.simple_raw_display_string().to_debug(),
         // ))
-        f.write_str(&format!(
-            "\n{s}\n"
-        ))
+        f.write_str(&format!("\n{s}\n"))
     }
 }
 
 impl From<Vec<Vec<DoubleGlyph>>> for Frame {
     fn from(value: Vec<Vec<DoubleGlyph>>) -> Self {
-        Frame {
-            grid: value
+        Frame::from_glyph_grid(
+            value
                 .into_iter()
                 .map(|row| row.into_iter().flat_map(|dg| dg.into_iter()).collect_vec())
                 .collect_vec(),
-        }
+        )
     }
 }
 #[cfg(test)]
@@ -469,5 +537,39 @@ aaa121
             below_and_next,
             "\n\nA:\n\n{frame_a:?}\n\nC:\n\n{frame_c:?}\n\nDiff:\n\n{below_and_next:?}\n\nCorrect:\n\n{correct:?}"
         );
+    }
+    #[test]
+    fn test_frame_to_regular_display_string_back_to_frame() {
+        let mut frame = Frame::from_plain_string(
+            "abc
+def
+ghi",
+        );
+        dbg!(&frame);
+        let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
+        dbg!(&b);
+        assert_eq!(frame, b);
+
+        frame.grid[0][2].bg_color = named_colors::WHITE;
+        frame.grid[0][2].fg_color = named_colors::RED;
+
+        frame.grid[1][0].bg_color = named_colors::BLUE;
+        frame.grid[2][2].fg_color = named_colors::GREEN;
+
+        let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
+        assert_eq!(frame, b);
+    }
+    #[test]
+    fn test_regex_lazy() {
+        let hay = "\u{1b}[48;2;0;0;0m\u{1b}[38;2;255;255;255mabc\u{1b}[49m\u{1b}[39m";
+        let regex = regex::Regex::new("\u{1b}\\[(.*?)m").unwrap();
+        dbg!(&regex);
+        let captures = regex.captures(&hay);
+        dbg!(&captures);
+        let contents = regex
+            .captures_iter(&hay)
+            .map(|nth| nth[1].to_string())
+            .collect_vec();
+        assert_eq!(contents, vec!["48;2;0;0;0", "38;2;255;255;255", "49", "39"]);
     }
 }

@@ -375,7 +375,11 @@ impl GameState {
                                 })
                                 .collect_vec();
                         // TODO: combine properly
-                        glyph_layers_to_combine[0]
+                        glyph_layers_to_combine.into_iter().rev().fold(
+                            DoubleGlyph::solid_color(named_colors::BLACK),
+                            |below, above| above.drawn_over(below),
+                        )
+                        // glyph_layers_to_combine[0]
                     })
                     .collect_vec()
             })
@@ -466,17 +470,17 @@ mod tests {
 
     macro_rules! compare_frame_to_file {
         ($frame:ident, $prefix:expr) => {
-            let string = $frame.string_for_regular_display();
-            eprintln!("{:?}", $frame);
             let test_name: String = function_name!().replace(":", "_");
-            compare_string_for_test(string, format!("{}_{}", $prefix, test_name))
+            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name))
         };
         ($frame:ident) => {
             compare_frame_to_file!($frame, "")
         };
     }
 
-    fn compare_string_for_test(candidate_string: String, file_prefix: String) {
+    fn compare_frame_for_test(candidate_frame: Frame, file_prefix: String) {
+        let candidate_string = candidate_frame.string_for_regular_display();
+
         let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
         assert!(file_directory.is_dir());
         let correct_frame_path: PathBuf = file_directory.join(file_prefix + "_good_frame.txt");
@@ -492,17 +496,17 @@ mod tests {
             return;
         }
 
-        let correct_string = maybe_correct_string
-            .expect("No existing test output found.  Set BLESS_TESTS to canonize current output.");
-        assert_eq!(candidate_string, correct_string,
-            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n❌\nCorrect:\n{}\n\nGiven:\n{}",
-            correct_string,
-            candidate_string,
-            frame::display_string_to_readable_string(correct_string.clone()),
-            frame::display_string_to_readable_string(candidate_string.clone())
+        let correct_frame =
+            Frame::parse_regular_display_string(maybe_correct_string.expect(
+                "No existing test output found.  Set BLESS_TESTS to canonize current output.",
+            ));
+        assert_eq!(candidate_frame, correct_frame,
+            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{correct_frame:?}\n\nGiven:\n{candidate_frame:?}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}❌\n",
+            diff1 = correct_frame.diff_from(&candidate_frame),
+            diff2 = candidate_frame.diff_from(&correct_frame)
         );
 
-        eprintln!("{}\n✅", candidate_string);
+        eprintln!("{candidate_frame:?}\n✅");
     }
 
     #[test]
@@ -573,8 +577,8 @@ mod tests {
         game.portal_rendering = PortalRenderingOption::LineOfSight;
         game.board_color_function = GameState::radial_sin_board_colors;
         game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
-        game.portal_tint_function = GameState::rainbow_solid;
-        dbg!(game.render());
+        // game.portal_tint_function = GameState::rainbow_solid;
+        // dbg!(game.render());
         game.portal_tint_function = GameState::rainbow_tint;
         let frame = game.render();
         compare_frame_to_file!(frame);
