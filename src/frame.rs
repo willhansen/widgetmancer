@@ -322,6 +322,12 @@ impl Frame {
     pub fn readable_string(&self) -> String {
         display_string_to_readable_string(self.simple_raw_display_string())
     }
+    pub fn set_by_double_wide_grid(&mut self, row:usize, wide_col: usize, val: DoubleGlyph) {
+        let left_narrow_col = wide_col * 2;
+        self.grid[row][left_narrow_col] = val[0];
+        self.grid[row][left_narrow_col+1] = val[1];
+
+    }
 }
 
 fn horiz_concat_strings(strings: &[String], spaces: usize) -> String {
