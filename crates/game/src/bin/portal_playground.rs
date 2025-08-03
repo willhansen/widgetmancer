@@ -22,9 +22,6 @@ use termion::{
 };
 use utility::*;
 
-type IPoint = [i32; 2];
-type OrthoDir = i32;
-type SquareEdge = (IPoint, OrthoDir);
 type PortalSide = SquareEdge;
 
 enum PortalRenderingOption {
@@ -33,50 +30,143 @@ enum PortalRenderingOption {
     LineOfSight,
 }
 
-const DIR_RIGHT: i32 = 0;
-const DIR_UP: i32 = 1;
-const DIR_LEFT: i32 = 2;
-const DIR_DOWN: i32 = 3;
+// TODO
+// enum OrthoDir {
+//     Right,
+//     Up,
+//     Left,
+//     Down,
+// }
 
-const STEP_RIGHT: IPoint = [1, 0];
-const STEP_UP: IPoint = [0, 1];
-const STEP_LEFT: IPoint = [-1, 0];
-const STEP_DOWN: IPoint = [0, -1];
+mod geometry2 {
 
-fn step_in_direction(dir: OrthoDir) -> IPoint {
-    match dir {
-        0 => [1, 0],
-        1 => [0, 1],
-        2 => [-1, 0],
-        3 => [0, -1],
-        _ => panic!("invalid direction: {dir}"),
+    pub type IPoint = [i32; 2];
+    pub type OrthoDir = i32;
+    pub type SquareEdge = (IPoint, OrthoDir);
+
+    pub const DIR_RIGHT: i32 = 0;
+    pub const DIR_UP: i32 = 1;
+    pub const DIR_LEFT: i32 = 2;
+    pub const DIR_DOWN: i32 = 3;
+
+    pub const STEP_RIGHT: IPoint = [1, 0];
+    pub const STEP_UP: IPoint = [0, 1];
+    pub const STEP_LEFT: IPoint = [-1, 0];
+    pub const STEP_DOWN: IPoint = [0, -1];
+
+    pub trait IPointExt: Sized {
+        fn x(&self) -> i32;
+        fn y(&self) -> i32;
+        fn new(x: i32, y: i32) -> Self;
+        fn add(&self, rhs: Self) -> Self {
+            Self::new(self.x() + rhs.x(), self.y() + rhs.y())
+        }
+        fn neg(&self) -> Self {
+            Self::new(-self.x(), -self.y())
+        }
+        fn sub(&self, rhs: Self) -> Self {
+            self.add(rhs.neg())
+        }
+    }
+
+    impl IPointExt for IPoint {
+        fn x(&self) -> i32 {
+            self[0]
+        }
+        fn y(&self) -> i32 {
+            self[1]
+        }
+        fn new(x: i32, y: i32) -> Self {
+            [x, y]
+        }
+    }
+
+    pub fn step_in_direction(dir: OrthoDir) -> IPoint {
+        match dir {
+            0 => [1, 0],
+            1 => [0, 1],
+            2 => [-1, 0],
+            3 => [0, -1],
+            _ => panic!("invalid direction: {dir}"),
+        }
+    }
+    #[allow(dead_code)]
+    pub fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
+        if square[0].abs() == square[1].abs() {
+            return None;
+        }
+
+        Some(if square[0].abs() > square[1].abs() {
+            if square[0] > 0 {
+                0
+            } else {
+                2
+            }
+        } else {
+            if square[1] > 0 {
+                1
+            } else {
+                3
+            }
+        })
+    }
+
+    pub fn rotate_quarter_turns(v: [i32; 2], turns: i32) -> [i32; 2] {
+        match turns.rem_euclid(4) {
+            0 => v,
+            1 => [-v[1], v[0]],
+            2 => [-v[0], v[1]],
+            3 => [v[1], -v[0]],
+            _ => unreachable!()
+        }
+    }
+
+    pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
+        let step = step_in_direction(edge.1);
+        let reverse_dir = (edge.1 + 2).rem_euclid(4);
+        ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
     }
 }
-#[allow(dead_code)]
-fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
-    if square[0].abs() == square[1].abs() {
-        return None;
-    }
+use geometry2::IPoint;
+use geometry2::*;
 
-    Some(if square[0].abs() > square[1].abs() {
-        if square[0] > 0 {
-            0
-        } else {
-            2
-        }
-    } else {
-        if square[1] > 0 {
-            1
-        } else {
-            3
-        }
-    })
+struct Camera {
+    lower_left_local_square_in_world: [i32; 2],
+    upper_right_local_square_in_world: [i32; 2],
 }
+impl Camera {
+    pub fn size(&self) -> [u32; 2] {
+        [
+            (self.upper_right_local_square_in_world[0] - self.lower_left_local_square_in_world[0])
+                as u32,
+            (self.upper_right_local_square_in_world[1] - self.lower_left_local_square_in_world[1])
+                as u32,
+        ]
+    }
+    pub fn width(&self) -> u32 {
+        self.size()[0]
+    }
+    pub fn height(&self) -> u32 {
+        self.size()[1]
+    }
+    pub fn local_to_world_square(&self, local_v: IPoint) -> IPoint {
+        rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
+            .add(self.lower_left_local_square_in_world)
+    }
+    pub fn local_to_world_ortho_dir(&self, dir: OrthoDir) -> OrthoDir {
+        (dir + self.quarter_turns_ccw_from_world()).rem_euclid(4)
+    }
+    pub fn quarter_turns_ccw_from_world(&self) -> OrthoDir {
+        let [x1, y1] = self.lower_left_local_square_in_world;
+        let [x2, y2] = self.upper_right_local_square_in_world;
 
-fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
-    let step = step_in_direction(edge.1);
-    let reverse_dir = (edge.1 + 2) % 4;
-    ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
+        match (x1 < x2, y1 < y2) {
+            (true, true) => 0,
+            (true, false) => 3,
+            (false, true) => 1,
+            (false, false) => 2,
+        }
+    }
 }
 
 // struct PortalUnderConstruction {
@@ -114,7 +204,7 @@ impl GameState {
         }
     }
     fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
-        let is_white = ((square[0] / 3) % 2 == 0) == ((square[1] / 3) % 2 == 0);
+        let is_white = ((square[0] / 3).rem_euclid(2) == 0) == ((square[1] / 3).rem_euclid(2) == 0);
         Some(if is_white { grey(191) } else { grey(127) })
     }
     fn radial_sin_board_colors(&self, square: IPoint) -> Option<RGB8> {
@@ -145,7 +235,7 @@ impl GameState {
         }
         use named_colors::*;
         let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
-        let tint = rainbow[depth.saturating_sub(1) as usize % rainbow.len()];
+        let tint = rainbow[(depth.saturating_sub(1) as usize).rem_euclid(rainbow.len())];
         let strength = (0.1 * depth as f32).min(1.0);
         tint_color(color, tint, strength)
     }
@@ -155,7 +245,7 @@ impl GameState {
         }
         use named_colors::*;
         let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
-        rainbow[depth.saturating_sub(1) as usize % rainbow.len()]
+        rainbow[(depth.saturating_sub(1) as usize).rem_euclid(rainbow.len())]
     }
 
     pub fn on_board(&self, square: IPoint) -> bool {
@@ -241,7 +331,7 @@ impl GameState {
         if mouse_is_here {
             let mouse_is_on_left_half_of_square = self
                 .last_mouse_screen_row_col
-                .is_some_and(|[row, col]| col % 2 == 0);
+                .is_some_and(|[row, col]| col.rem_euclid(2) == 0);
             let mouse_index_in_square = if mouse_is_on_left_half_of_square {
                 0
             } else {
@@ -266,7 +356,16 @@ impl GameState {
     fn mouse_square_xy_in_world_frame(&self) -> Option<IPoint> {
         todo!()
     }
-    pub fn render(&self) -> Frame {
+
+    // first part of output tuple: frame to render
+    // Second part of output tuple: list of frames that combine to the output frame.  Each frame in
+    // the list is a different coherent view through portals
+    //   - Same portal depth
+    //   - Same Portal tint (currently identical to portal depth) (may also count non-portal light
+    //   sources in future)
+    //   - Same transform from local to absolute frame, even if the portals are separated
+    //   physically
+    fn render_with_debug_deconstruction(&self, is_debug: bool) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(),
@@ -291,7 +390,11 @@ impl GameState {
             None => self.fov_center_world_pos,
         };
 
-        (0..self.height as i32)
+        // Key is (depth, absolute_fov_origin) with absolute_fov_origin being (world position, rotation)
+        let mut debug_portal_visualizer_frames: HashMap<(u32, ([i32; 2], i32)), Frame> =
+            Default::default();
+
+        let frame = (0..self.height as i32)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row - 1;
                 (0..self.width as i32)
@@ -384,7 +487,11 @@ impl GameState {
                     .collect_vec()
             })
             .collect_vec()
-            .into()
+            .into();
+        (frame, vec![])
+    }
+    pub fn render(&self) -> Frame {
+        self.render_with_debug_deconstruction(false).0
     }
 }
 
@@ -496,10 +603,11 @@ mod tests {
             return;
         }
 
-        let correct_frame =
-            Frame::parse_regular_display_string(maybe_correct_string.expect(
-                "No existing test output found.  Set BLESS_TESTS to canonize current output.",
-            ));
+        let correct_frame = Frame::parse_regular_display_string(
+            maybe_correct_string.expect(
+                &format!("No existing test output found.  Set BLESS_TESTS to canonize current output frame:\n\n{candidate_frame:?}"),
+            ),
+        );
         assert_eq!(candidate_frame, correct_frame,
             "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{correct_frame:?}\n\nGiven:\n{candidate_frame:?}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}❌\n",
             diff1 = correct_frame.diff_from(&candidate_frame),
@@ -570,7 +678,6 @@ mod tests {
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
-    #[ignore]
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
