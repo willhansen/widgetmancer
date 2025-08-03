@@ -117,7 +117,7 @@ mod geometry2 {
             1 => [-v[1], v[0]],
             2 => [-v[0], v[1]],
             3 => [v[1], -v[0]],
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -390,18 +390,19 @@ impl GameState {
             None => self.fov_center_world_pos,
         };
 
-        // Key is (depth, absolute_fov_origin) with absolute_fov_origin being (world position, rotation)
-        let mut debug_portal_visualizer_frames: HashMap<(u32, ([i32; 2], i32)), Frame> =
+        // Key is (depth, absolute_position, rotation from portal)
+        let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let frame = (0..self.height as i32)
+        let frame = (0..self.height)
             .map(|camera_row| {
-                let camera_y = self.height as i32 - camera_row - 1;
+                let camera_y = self.height as i32 - camera_row as i32 - 1;
                 (0..self.width as i32)
                     .map(|camera_x| {
+                        let camera_col = camera_x as usize;
                         // let x = col;
                         // let y = self.height - row - 1;
-                        let camera_pos: WorldSquare = [camera_x as i32, camera_y as i32].into();
+                        let camera_pos: WorldSquare = [camera_x, camera_y].into();
                         let camera_pos_relative_to_fov_center =
                             camera_pos - WorldSquare::from(fov_center);
                         let visible_portions_at_relative_square: Vec<
@@ -431,7 +432,7 @@ impl GameState {
                                 .map(|square_viz| {
                                     let mut glyphs = self.naive_glyphs_for_rotated_world_square(
                                         square_viz.absolute_square().into(),
-                                        square_viz.portal_rotation().into(),
+                                        square_viz.portal_rotation_relative_to_absolute().into(),
                                     );
                                     // apply tint
 
@@ -474,6 +475,28 @@ impl GameState {
                                             .try_into()
                                             .unwrap()
                                     }
+                                    if is_debug {
+                                        let debug_frames_key: (u32, IPoint, i32) = (
+                                            square_viz.portal_depth(),
+                                            square_viz.absolute_fov_center_square().into(),
+                                            square_viz
+                                                .portal_rotation_relative_to_absolute()
+                                                .quarter_turns()
+                                                .rem_euclid(4),
+                                        );
+                                        if !debug_portal_visualizer_frames
+                                            .contains_key(&debug_frames_key)
+                                        {
+                                            debug_portal_visualizer_frames.insert(
+                                                debug_frames_key,
+                                                Frame::blank(self.width*2, self.height),
+                                            );
+                                        }
+                                        let mut debug_frame = debug_portal_visualizer_frames
+                                            .get_mut(&debug_frames_key)
+                                            .unwrap();
+                                        debug_frame.set_by_double_wide_grid(camera_row,camera_col, glyphs);
+                                    }
                                     glyphs
                                 })
                                 .collect_vec();
@@ -488,7 +511,7 @@ impl GameState {
             })
             .collect_vec()
             .into();
-        (frame, vec![])
+        (frame, debug_portal_visualizer_frames.into_values().collect_vec())
     }
     pub fn render(&self) -> Frame {
         self.render_with_debug_deconstruction(false).0
@@ -687,7 +710,8 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render());
         game.portal_tint_function = GameState::rainbow_tint;
-        let frame = game.render();
+        let (frame, layers) = game.render_with_debug_deconstruction(true);
+        layers.into_iter().for_each(|frame|{dbg!(frame);});
         compare_frame_to_file!(frame);
     }
 }

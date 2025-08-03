@@ -203,22 +203,33 @@ impl Debug for SquareVisibility {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedSquareVisibilityInFov {
-    unrotated_square_visibility: SquareVisibility,
+    square_visibility_in_absolute_frame: SquareVisibility,
     relative_square: WorldStep,
     absolute_square: WorldSquare,
     //step_in_fov_sequence: u32,
     portal_depth: u32,
-    portal_rotation: QuarterTurnsAnticlockwise,
+    portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise,
 }
 
 impl PositionedSquareVisibilityInFov {
+    pub fn absolute_fov_center_square(&self) -> [i32; 2] {
+        let relative_fov_center_to_relative_square = self.relative_square();
+        let absolute_fov_center_to_absolute_square = rotated_n_quarter_turns_counter_clockwise(
+            relative_fov_center_to_relative_square,
+            self.portal_rotation_from_relative_to_absolute
+                .quarter_turns(),
+        );
+        (self.absolute_square() - absolute_fov_center_to_absolute_square).into()
+    }
     pub fn one_portal_deeper(
         &self,
         forward_rotation_through_portal: QuarterTurnsAnticlockwise,
     ) -> Self {
         PositionedSquareVisibilityInFov {
             portal_depth: self.portal_depth + 1,
-            portal_rotation: self.portal_rotation + forward_rotation_through_portal,
+            portal_rotation_from_relative_to_absolute: self
+                .portal_rotation_from_relative_to_absolute
+                + forward_rotation_through_portal,
             relative_square: rotated_n_quarter_turns_counter_clockwise(
                 self.relative_square,
                 -forward_rotation_through_portal.quarter_turns(),
@@ -227,13 +238,13 @@ impl PositionedSquareVisibilityInFov {
         }
     }
     pub fn unrotated_square_visibility(&self) -> SquareVisibility {
-        self.unrotated_square_visibility
+        self.square_visibility_in_absolute_frame
     }
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
     }
-    pub fn portal_rotation(&self) -> QuarterTurnsAnticlockwise {
-        self.portal_rotation
+    pub fn portal_rotation_relative_to_absolute(&self) -> QuarterTurnsAnticlockwise {
+        self.portal_rotation_from_relative_to_absolute
     }
     pub fn absolute_square(&self) -> WorldSquare {
         self.absolute_square
@@ -247,16 +258,19 @@ impl PositionedSquareVisibilityInFov {
         relative_square: WorldStep,
     ) -> Self {
         PositionedSquareVisibilityInFov {
-            unrotated_square_visibility: square_visibility,
+            square_visibility_in_absolute_frame: square_visibility,
             relative_square,
             absolute_square,
             portal_depth: 0,
-            portal_rotation: Default::default(),
+            portal_rotation_from_relative_to_absolute: Default::default(),
         }
     }
-    pub fn rotated_square_visibility(&self) -> SquareVisibility {
-        self.unrotated_square_visibility
-            .rotated(-self.portal_rotation.quarter_turns())
+    pub fn square_visibility_in_relative_frame(&self) -> SquareVisibility {
+        self.square_visibility_in_absolute_frame.rotated(
+            -self
+                .portal_rotation_from_relative_to_absolute
+                .quarter_turns(),
+        )
     }
 }
 
@@ -681,7 +695,11 @@ impl FieldOfViewResult {
                     drawable_map
                         .get(&positioned_visibility.absolute_square())
                         .unwrap()
-                        .rotated(-positioned_visibility.portal_rotation.quarter_turns())
+                        .rotated(
+                            -positioned_visibility
+                                .portal_rotation_from_relative_to_absolute
+                                .quarter_turns(),
+                        )
                 } else {
                     // SolidColorDrawable::new(GREY).to_enum()
                     // SolidColorDrawable::new(number_to_hue_rotation(
@@ -707,7 +725,7 @@ impl FieldOfViewResult {
                         PartialVisibilityDrawable::from_partially_visible_drawable(
                             &drawable,
                             if render_portals_with_line_of_sight {
-                                positioned_visibility.rotated_square_visibility()
+                                positioned_visibility.square_visibility_in_relative_frame()
                             } else {
                                 positioned_visibility.unrotated_square_visibility()
                             },
@@ -2154,10 +2172,10 @@ mod tests {
         let the_positioned_visibility = visibilities_of_one_right[0];
         assert_eq!(the_positioned_visibility.portal_depth, 0);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation_from_relative_to_absolute,
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.unrotated_square_visibility;
+        let the_square_visibility = the_positioned_visibility.square_visibility_in_absolute_frame;
         assert_about_eq!(
             the_square_visibility
                 .visible_portion
@@ -2220,10 +2238,10 @@ mod tests {
         let the_positioned_visibility = visibilities_of_test_square[0];
         assert_eq!(the_positioned_visibility.portal_depth, 1);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation_from_relative_to_absolute,
             QuarterTurnsAnticlockwise::new(0)
         );
-        let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
+        let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
         assert!(the_square_visibility.is_fully_visible());
     }
 
@@ -2275,10 +2293,10 @@ mod tests {
         let the_positioned_visibility = visibilities_of_test_square[0];
         assert_eq!(the_positioned_visibility.portal_depth, 1);
         assert_eq!(
-            the_positioned_visibility.portal_rotation,
+            the_positioned_visibility.portal_rotation_from_relative_to_absolute,
             QuarterTurnsAnticlockwise::new(1)
         );
-        let the_square_visibility = the_positioned_visibility.rotated_square_visibility();
+        let the_square_visibility = the_positioned_visibility.square_visibility_in_relative_frame();
         assert_false!(the_square_visibility.is_fully_visible());
         let the_drawable = PartialVisibilityDrawable::from_partially_visible_drawable(
             &SolidColorDrawable::new(RED),
@@ -2287,5 +2305,28 @@ mod tests {
         let the_glyphs = the_drawable.to_glyphs();
         let the_clean_string = the_glyphs.to_clean_string();
         assert_eq!(the_clean_string, "🬎🬎");
+    }
+    #[test]
+    fn test_virtual_fov_center() {
+        let center = point2(5, 5);
+        let mut portal_geometry = PortalGeometry::default();
+        portal_geometry.create_portal(
+            ([5, 7].into(), STEP_UP).into(),
+            ([20, 20].into(), STEP_LEFT).into(),
+        );
+        let fov_result = portal_aware_field_of_view_from_square(
+            center,
+            10,
+            &Default::default(),
+            &portal_geometry,
+        );
+        let positioned_visibility: PositionedSquareVisibilityInFov = *fov_result
+            .visibilities_of_relative_square([0, 4].into())
+            .first()
+            .unwrap();
+        assert_eq!(
+            positioned_visibility.absolute_fov_center_square(),
+            [23, 20]
+        );
     }
 }
