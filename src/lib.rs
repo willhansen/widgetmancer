@@ -166,6 +166,11 @@ impl Into<i32> for QuarterTurnsAnticlockwise {
         self.quarter_turns()
     }
 }
+impl From<i32> for QuarterTurnsAnticlockwise {
+    fn from(value: i32) -> Self {
+        Self::new(value)
+    }
+}
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Octant(i32);
