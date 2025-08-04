@@ -772,7 +772,7 @@ mod tests {
 
         compare_frame_to_file!(frame);
     }
-    // #[ignore]
+    #[ignore]
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
