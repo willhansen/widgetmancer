@@ -430,76 +430,40 @@ impl GameState {
                                 .clone()
                                 .into_iter()
                                 .map(|square_viz| {
-                                    let mut glyphs = self.naive_glyphs_for_rotated_world_square(
-                                        square_viz.absolute_square().into(),
-                                        square_viz.portal_rotation_relative_to_absolute().into(),
-                                    );
-                                    // apply tint
-
-                                    glyphs.colors_mut().for_each(|color| {
-                                        *color = (self.portal_tint_function)(
-                                            *color,
-                                            square_viz.portal_depth(),
-                                        )
-                                    });
-
-                                    if !square_viz.unrotated_square_visibility().is_fully_visible()
-                                    {
-                                        let bias_direction = square_viz
-                                            .unrotated_square_visibility()
-                                            .visible_portion()
-                                            .unwrap()
-                                            .direction_away_from_plane();
-                                        glyphs = glyphs
-                                            .into_iter()
-                                            .zip(
-                                                square_viz
-                                                    .unrotated_square_visibility()
-                                                    .split_into_character_visibilities()
-                                                    .into_iter(),
-                                            )
-                                            .map(|(glyph, visible_portion_of_glyph)| {
-                                                match visible_portion_of_glyph {
-                                                    None => glyph,
-                                                    Some(visible_portion) => Glyph::new(
-                                                        half_plane_to_angled_block_character(
-                                                            visible_portion,
-                                                            bias_direction,
-                                                        ),
-                                                        glyph.fg_color,
-                                                        glyph.bg_color,
-                                                    ),
-                                                }
-                                            })
-                                            .collect_vec()
-                                            .try_into()
-                                            .unwrap()
-                                    }
-                                    if is_debug {
-                                        let debug_frames_key: (u32, IPoint, i32) = (
-                                            square_viz.portal_depth(),
-                                            square_viz.absolute_fov_center_square().into(),
-                                            square_viz
-                                                .portal_rotation_relative_to_absolute()
-                                                .quarter_turns()
-                                                .rem_euclid(4),
-                                        );
-                                        if !debug_portal_visualizer_frames
-                                            .contains_key(&debug_frames_key)
-                                        {
-                                            debug_portal_visualizer_frames.insert(
-                                                debug_frames_key,
-                                                Frame::blank(self.width*2, self.height),
-                                            );
-                                        }
-                                        let mut debug_frame = debug_portal_visualizer_frames
-                                            .get_mut(&debug_frames_key)
-                                            .unwrap();
-                                        debug_frame.set_by_double_wide_grid(camera_row,camera_col, glyphs);
-                                    }
-                                    glyphs
+                                    self.render_a_visible_part_of_a_square(&square_viz)
                                 })
                                 .collect_vec();
+                        if is_debug {
+                            visible_portions_at_relative_square
+                                .iter()
+                                .zip(glyph_layers_to_combine.iter())
+                                .for_each(|(square_viz, double_glyph)| {
+                                    let debug_frames_key: (u32, IPoint, i32) = (
+                                        square_viz.portal_depth(),
+                                        square_viz.absolute_fov_center_square().into(),
+                                        square_viz
+                                            .portal_rotation_from_relative_to_absolute()
+                                            .quarter_turns()
+                                            .rem_euclid(4),
+                                    );
+                                    if !debug_portal_visualizer_frames
+                                        .contains_key(&debug_frames_key)
+                                    {
+                                        debug_portal_visualizer_frames.insert(
+                                            debug_frames_key,
+                                            Frame::blank(self.width * 2, self.height),
+                                        );
+                                    }
+                                    let mut debug_frame = debug_portal_visualizer_frames
+                                        .get_mut(&debug_frames_key)
+                                        .unwrap();
+                                    debug_frame.set_by_double_wide_grid(
+                                        camera_row,
+                                        camera_col,
+                                        *double_glyph,
+                                    );
+                                });
+                        }
                         // TODO: combine properly
                         glyph_layers_to_combine.into_iter().rev().fold(
                             DoubleGlyph::solid_color(named_colors::BLACK),
@@ -511,10 +475,59 @@ impl GameState {
             })
             .collect_vec()
             .into();
-        (frame, debug_portal_visualizer_frames.into_values().collect_vec())
+        (
+            frame,
+            debug_portal_visualizer_frames.into_values().collect_vec(),
+        )
     }
     pub fn render(&self) -> Frame {
         self.render_with_debug_deconstruction(false).0
+    }
+    fn render_a_visible_part_of_a_square(
+        &self,
+        square_viz: &PositionedSquareVisibilityInFov,
+    ) -> DoubleGlyph {
+        let mut glyphs = self.naive_glyphs_for_rotated_world_square(
+            square_viz.absolute_square().into(),
+            square_viz
+                .portal_rotation_from_relative_to_absolute()
+                .into(),
+        );
+        // apply tint
+
+        glyphs.colors_mut().for_each(|color| {
+            *color = (self.portal_tint_function)(*color, square_viz.portal_depth())
+        });
+
+        if !square_viz.unrotated_square_visibility().is_fully_visible() {
+            let bias_direction = square_viz
+                .unrotated_square_visibility()
+                .visible_portion()
+                .unwrap()
+                .direction_away_from_plane();
+            glyphs = glyphs
+                .into_iter()
+                .zip(
+                    square_viz
+                        .unrotated_square_visibility()
+                        .split_into_character_visibilities()
+                        .into_iter(),
+                )
+                .map(
+                    |(glyph, visible_portion_of_glyph)| match visible_portion_of_glyph {
+                        None => glyph,
+                        Some(visible_portion) => Glyph::new(
+                            half_plane_to_angled_block_character(visible_portion, bias_direction),
+                            glyph.fg_color,
+                            glyph.bg_color,
+                        ),
+                    },
+                )
+                .collect_vec()
+                .try_into()
+                .unwrap()
+        }
+        glyphs
     }
 }
 
@@ -572,6 +585,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game::fov_stuff::LocalSquareHalfPlane;
     use pretty_assertions::assert_str_eq;
     use std::{assert_eq, assert_ne, f32::consts::TAU};
     use stdext::function_name;
@@ -702,6 +716,24 @@ mod tests {
         compare_frame_to_file!(frame);
     }
     #[test]
+    fn test_render_part_of_square() {
+        let game = GameState::new(12, 12);
+        let visible_portion = PositionedSquareVisibilityInFov {
+            square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
+                LocalSquareHalfPlane::from_clockwise_sweeping_line([[3.0, 1.0], [0.0, 0.0]].into()),
+            ).unwrap(),
+            relative_square: [2, 2].into(),
+            absolute_square: [2, 2].into(),
+            portal_depth: 0,
+            portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise::new(0),
+        };
+        let glyphs = game.render_a_visible_part_of_a_square(&visible_portion);
+        println!("{}",glyphs.to_string());
+        println!("{}",glyphs.to_clean_string());
+        panic!();
+    }
+    #[ignore]
+    #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
         game.portal_rendering = PortalRenderingOption::LineOfSight;
@@ -711,7 +743,9 @@ mod tests {
         // dbg!(game.render());
         game.portal_tint_function = GameState::rainbow_tint;
         let (frame, layers) = game.render_with_debug_deconstruction(true);
-        layers.into_iter().for_each(|frame|{dbg!(frame);});
+        layers.into_iter().for_each(|frame| {
+            dbg!(frame);
+        });
         compare_frame_to_file!(frame);
     }
 }

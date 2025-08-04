@@ -203,12 +203,12 @@ impl Debug for SquareVisibility {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedSquareVisibilityInFov {
-    square_visibility_in_absolute_frame: SquareVisibility,
-    relative_square: WorldStep,
-    absolute_square: WorldSquare,
+    pub square_visibility_in_absolute_frame: SquareVisibility,
+    pub relative_square: WorldStep,
+    pub absolute_square: WorldSquare,
     //step_in_fov_sequence: u32,
-    portal_depth: u32,
-    portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise,
+    pub portal_depth: u32,
+    pub portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise,
 }
 
 impl PositionedSquareVisibilityInFov {
@@ -243,7 +243,7 @@ impl PositionedSquareVisibilityInFov {
     pub fn portal_depth(&self) -> u32 {
         self.portal_depth
     }
-    pub fn portal_rotation_relative_to_absolute(&self) -> QuarterTurnsAnticlockwise {
+    pub fn portal_rotation_from_relative_to_absolute(&self) -> QuarterTurnsAnticlockwise {
         self.portal_rotation_from_relative_to_absolute
     }
     pub fn absolute_square(&self) -> WorldSquare {
@@ -2328,5 +2328,6 @@ mod tests {
             positioned_visibility.absolute_fov_center_square(),
             [23, 20]
         );
+        assert_eq!(positioned_visibility.portal_rotation_from_relative_to_absolute().quarter_turns(), 1);
     }
 }
