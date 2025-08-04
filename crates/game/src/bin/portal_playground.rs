@@ -497,9 +497,9 @@ impl GameState {
             *color = (self.portal_tint_function)(*color, square_viz.portal_depth())
         });
 
-        if !square_viz.unrotated_square_visibility().is_fully_visible() {
+        if !square_viz.square_visibility_in_absolute_frame().is_fully_visible() {
             let bias_direction = square_viz
-                .unrotated_square_visibility()
+                .square_visibility_in_relative_frame()
                 .visible_portion()
                 .unwrap()
                 .direction_away_from_plane();
@@ -507,7 +507,7 @@ impl GameState {
                 .into_iter()
                 .zip(
                     square_viz
-                        .unrotated_square_visibility()
+                        .square_visibility_in_relative_frame()
                         .split_into_character_visibilities()
                         .into_iter(),
                 )
@@ -751,7 +751,7 @@ mod tests {
         let mut game = GameState::new(12, 12);
         game.board_color_function = |_state, _square| Some(named_colors::GREEN);
 
-        let mut frame = Frame::blank(15, 10);
+        let mut frame = Frame::blank(20, 3);
 
         for i in 0..4 {
             let visible_portion = PositionedSquareVisibilityInFov {
@@ -770,8 +770,7 @@ mod tests {
             frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
         }
 
-        panic!();
-        // println!("{}",glyphs.to_clean_string());
+        compare_frame_to_file!(frame);
     }
     #[ignore]
     #[test]

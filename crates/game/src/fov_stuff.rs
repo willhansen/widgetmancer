@@ -237,7 +237,7 @@ impl PositionedSquareVisibilityInFov {
             ..*self
         }
     }
-    pub fn unrotated_square_visibility(&self) -> SquareVisibility {
+    pub fn square_visibility_in_absolute_frame(&self) -> SquareVisibility {
         self.square_visibility_in_absolute_frame
     }
     pub fn portal_depth(&self) -> u32 {
@@ -521,7 +521,7 @@ impl FieldOfViewResult {
             && visibility
                 .get(0)
                 .unwrap()
-                .unrotated_square_visibility()
+                .square_visibility_in_absolute_frame()
                 .is_fully_visible();
     }
 
@@ -718,7 +718,7 @@ impl FieldOfViewResult {
                     .to_enum()
                 };
                 if !positioned_visibility
-                    .unrotated_square_visibility()
+                    .square_visibility_in_absolute_frame()
                     .is_fully_visible()
                 {
                     drawable = DrawableEnum::PartialVisibility(
@@ -727,7 +727,7 @@ impl FieldOfViewResult {
                             if render_portals_with_line_of_sight {
                                 positioned_visibility.square_visibility_in_relative_frame()
                             } else {
-                                positioned_visibility.unrotated_square_visibility()
+                                positioned_visibility.square_visibility_in_absolute_frame()
                             },
                         ),
                     )
@@ -1310,7 +1310,7 @@ mod tests {
             .clone();
         assert_eq!(
             PartialVisibilityDrawable::from_square_visibility(
-                visibility_of_test_square.unrotated_square_visibility()
+                visibility_of_test_square.square_visibility_in_absolute_frame()
             )
             .to_glyphs()
             .to_clean_string()
@@ -1581,12 +1581,12 @@ mod tests {
         assert!(square_visibility
             .get(0)
             .unwrap()
-            .unrotated_square_visibility()
+            .square_visibility_in_absolute_frame()
             .is_fully_visible());
         assert!(square_visibility
             .get(0)
             .unwrap()
-            .unrotated_square_visibility()
+            .square_visibility_in_absolute_frame()
             .visible_portion
             .is_none());
     }
@@ -1969,7 +1969,7 @@ mod tests {
                 .len(),
             1
         );
-        assert!(visibility.unrotated_square_visibility().is_fully_visible());
+        assert!(visibility.square_visibility_in_absolute_frame().is_fully_visible());
     }
 
     #[test]
