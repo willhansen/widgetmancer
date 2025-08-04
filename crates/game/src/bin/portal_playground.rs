@@ -429,9 +429,7 @@ impl GameState {
                             visible_portions_at_relative_square
                                 .clone()
                                 .into_iter()
-                                .map(|square_viz| {
-                                    self.render_a_visible_part_of_a_square(&square_viz)
-                                })
+                                .map(|square_viz| self.render_one_view_of_a_square(&square_viz))
                                 .collect_vec();
                         if is_debug {
                             visible_portions_at_relative_square
@@ -483,7 +481,7 @@ impl GameState {
     pub fn render(&self) -> Frame {
         self.render_with_debug_deconstruction(false).0
     }
-    fn render_a_visible_part_of_a_square(
+    fn render_one_view_of_a_square(
         &self,
         square_viz: &PositionedSquareVisibilityInFov,
     ) -> DoubleGlyph {
@@ -516,11 +514,19 @@ impl GameState {
                 .map(
                     |(glyph, visible_portion_of_glyph)| match visible_portion_of_glyph {
                         None => glyph,
-                        Some(visible_portion) => Glyph::new(
-                            half_plane_to_angled_block_character(visible_portion, bias_direction),
-                            glyph.fg_color,
-                            glyph.bg_color,
-                        ),
+                        Some(visible_portion) => {
+                            let character = half_plane_to_angled_block_character(
+                                visible_portion,
+                                bias_direction,
+                            );
+                            let bg = Glyph::default_bg_color;
+                            let fg = if glyph.character == ' ' {
+                                glyph.bg_color
+                            } else {
+                                glyph.fg_color
+                            };
+                            Glyph::new(character, fg, bg)
+                        }
                     },
                 )
                 .collect_vec()
@@ -717,20 +723,55 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square() {
-        let game = GameState::new(12, 12);
+        let mut game = GameState::new(12, 12);
+        game.board_color_function = |_state, _square| Some(named_colors::GREEN);
+
         let visible_portion = PositionedSquareVisibilityInFov {
             square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
-                LocalSquareHalfPlane::from_clockwise_sweeping_line([[3.0, 1.0], [0.0, 0.0]].into()),
-            ).unwrap(),
+                LocalSquareHalfPlane::from_clockwise_sweeping_line([[3.0, 2.0], [0.0, 0.0]].into()),
+            )
+            .unwrap(),
             relative_square: [2, 2].into(),
             absolute_square: [2, 2].into(),
             portal_depth: 0,
             portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise::new(0),
         };
-        let glyphs = game.render_a_visible_part_of_a_square(&visible_portion);
-        println!("{}",glyphs.to_string());
-        println!("{}",glyphs.to_clean_string());
+        let glyphs = game.render_one_view_of_a_square(&visible_portion);
+        println!("{}", glyphs.to_string());
+        assert_eq!(glyphs[0].character, '🭞');
+        assert_eq!(glyphs[0].fg_color, named_colors::GREEN);
+        assert_eq!(glyphs[0].bg_color, Glyph::default_bg_color);
+        assert_eq!(glyphs[1].character, '🭜');
+        assert_eq!(glyphs[1].fg_color, named_colors::GREEN);
+        assert_eq!(glyphs[1].bg_color, Glyph::default_bg_color);
+        // println!("{}",glyphs.to_clean_string());
+    }
+    #[test]
+    fn test_render_part_of_square_with_rotation() {
+        let mut game = GameState::new(12, 12);
+        game.board_color_function = |_state, _square| Some(named_colors::GREEN);
+
+        let mut frame = Frame::blank(15, 10);
+
+        for i in 0..4 {
+            let visible_portion = PositionedSquareVisibilityInFov {
+                square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
+                    LocalSquareHalfPlane::from_clockwise_sweeping_line(
+                        [[3.0, 2.0], [0.0, 0.0]].into(),
+                    ),
+                )
+                .unwrap(),
+                relative_square: [2, 2].into(),
+                absolute_square: [2, 2].into(),
+                portal_depth: 0,
+                portal_rotation_from_relative_to_absolute: i.into(),
+            };
+            let glyphs = game.render_one_view_of_a_square(&visible_portion);
+            frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
+        }
+
         panic!();
+        // println!("{}",glyphs.to_clean_string());
     }
     #[ignore]
     #[test]
