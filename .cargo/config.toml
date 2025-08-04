@@ -1,0 +1,5 @@
+[build]
+rustflags = ["-Cinstrument-coverage"]
+
+[env]
+LLVM_PROFILE_FILE = "coverage/%p-%m.profraw"
