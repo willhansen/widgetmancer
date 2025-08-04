@@ -21,7 +21,6 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rgb::RGB8;
 
-
 pub mod angle_interval;
 pub use angle_interval::*;
 
@@ -487,6 +486,18 @@ impl<U: Copy> Line<f32, U> {
     }
 }
 
+impl<T, U> From<[[T; 2]; 2]> for Line<T, U>
+where
+    T: Clone + Debug + PartialEq + Signed + Copy,
+{
+    fn from(value: [[T; 2]; 2]) -> Self {
+        Self {
+            p1: value[0].into(),
+            p2: value[1].into(),
+        }
+    }
+}
+
 impl WorldLine {
     pub fn touched_squares(&self) -> Vec<WorldSquare> {
         let start_square = world_point_to_world_square(self.p1);
@@ -664,6 +675,11 @@ impl<U: Copy + Debug> HalfPlane<f32, U> {
             dist
         } else {
             -dist
+        }
+    }
+    pub fn from_clockwise_sweeping_line(line: [[f32; 2]; 2]) -> Self {
+        Self {
+            dividing_line: line.into(),
         }
     }
 }
@@ -858,7 +874,6 @@ pub fn random_choice<'a, T>(rng: &'a mut StdRng, v: &'a Vec<T>) -> &'a T {
     v.get(rng.gen_range(0..v.len())).unwrap()
 }
 
-
 pub fn rotate_vect<U>(vector: Vector2D<f32, U>, delta_angle: Angle<f32>) -> Vector2D<f32, U> {
     if vector.length() == 0.0 {
         return vector;
@@ -882,8 +897,6 @@ pub fn derivative(f: fn(f32) -> f32, x: f32, dx: f32) -> f32 {
     }
     (f(x + dx / 2.0) - f(x - dx / 2.0)) / dx
 }
-
-
 
 fn furthest_apart_points<U>(points: Vec<Point2D<f32, U>>) -> [Point2D<f32, U>; 2] {
     assert!(points.len() >= 2);
@@ -916,7 +929,6 @@ pub fn on_line_in_this_order<U>(
 ) -> bool {
     on_line(a, b, c) && (a - b).length() < (a - c).length()
 }
-
 
 pub fn rotate_point_around_point<U>(
     axis_point: Point2D<f32, U>,
@@ -1600,7 +1612,6 @@ pub fn naive_ray_endpoint<U>(
     start + unit_vector_from_angle(angle).cast_unit() * length
 }
 
-
 #[derive(Eq, PartialEq, Debug, Copy, Clone, Hash, Constructor, CopyGetters)]
 #[get_copy = "pub"]
 pub struct NStep {
@@ -1637,13 +1648,14 @@ pub trait ToDebug {
     fn to_debug(&self) -> String;
 }
 
-impl<T> ToDebug for T where T: Debug {
+impl<T> ToDebug for T
+where
+    T: Debug,
+{
     fn to_debug(&self) -> String {
         format!("{:?}", self)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -1677,7 +1689,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_clockwise() {
         assert!(is_clockwise::<WorldPoint>(
@@ -1691,8 +1702,6 @@ mod tests {
             point2(-0.1, -10.0)
         ));
     }
-
-
 
     #[test]
     fn test_line_intersections_with_square_are_in_same_order_as_input_line() {
