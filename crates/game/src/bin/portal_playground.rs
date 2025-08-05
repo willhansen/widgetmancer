@@ -12,7 +12,7 @@ use std::option_env;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
-use terminal_rendering::glyph_constants::{named_colors, BLACK};
+use terminal_rendering::glyph_constants::{named_colors, BLACK, RED};
 use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
@@ -308,23 +308,26 @@ impl GameState {
             Event::Unsupported(items) => todo!(),
         }
     }
-    fn naive_glyphs_for_rotated_world_square(&self, square: IPoint, rotation: i32) -> DoubleGlyph {
+    fn naive_glyphs_for_rotated_world_square(
+        &self,
+        square: IPoint,
+        rotation: i32,
+    ) -> DoubleGlyphWithTransparency {
         assert!(rotation >= 0 && rotation < 4);
         let board_color = (self.board_color_function)(&self, square).unwrap();
         let mut portal_entrances_ccw: [bool; 4] =
             [0, 1, 2, 3].map(|dir| self.portals.contains_key(&(square, dir)));
         portal_entrances_ccw.rotate_left(rotation as usize);
-        let mut glyphs = if portal_entrances_ccw.iter().any(|&x| x) {
+        let mut glyphs = DoubleGlyphWithTransparency::solid_color(board_color);
+        if portal_entrances_ccw.iter().any(|&x| x) {
             let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
-            let mut glyphs = DoubleGlyph::from_chars(portal_entrance_characters);
-            glyphs.iter_mut().for_each(|glyph| {
-                glyph.fg_color = named_colors::RED;
-                glyph.bg_color = board_color;
+            let new_glyphs = portal_entrance_characters.map(|c| {
+                GlyphWithTransparency::from_char(c)
+                    .with_primary_rgb(RED)
+                    .with_primary_only()
             });
-            glyphs
-        } else {
-            DoubleGlyph::solid_color(board_color)
-        };
+            glyphs = [0,1].map(|i| new_glyphs[i].over(glyphs[i]));
+        }
         let mouse_is_here = self
             .mouse_square_xy_in_camera_frame()
             .is_some_and(|mouse_camera_pos| mouse_camera_pos == square);
@@ -337,13 +340,12 @@ impl GameState {
             } else {
                 1
             };
-            glyphs[mouse_index_in_square].swap_fg_bg();
-            glyphs[mouse_index_in_square].bg_color = named_colors::RED;
+            glyphs[mouse_index_in_square] = GlyphWithTransparency::solid_color(RED);
         }
         glyphs
     }
     // Simple top-down, no rotation, no portals (except for entrance/exit)
-    fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyph {
+    fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyphWithTransparency {
         self.naive_glyphs_for_rotated_world_square(square, 0)
     }
     fn mouse_square_xy_in_camera_frame(&self) -> Option<IPoint> {
@@ -498,11 +500,11 @@ impl GameState {
         );
         // apply tint
 
-        glyphs.colors_mut().for_each(|color| {
-            *color = (self.portal_tint_function)(*color, square_viz.portal_depth())
+        glyphs.iter_mut().for_each(|glyph| {
+            *glyph.primary_color.rgb_mut() = (self.portal_tint_function)(glyph.primary_color.rgb(), square_viz.portal_depth());
+            *glyph.secondary_color.rgb_mut() = (self.portal_tint_function)(glyph.secondary_color.rgb(), square_viz.portal_depth())
         });
 
-        let mut glyphs = glyphs.map(|g| GlyphWithTransparency::from_glyph(g));
 
         if !square_viz
             .square_visibility_in_absolute_frame()
@@ -744,10 +746,10 @@ mod tests {
         println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
         assert_eq!(glyphs[0].fg_color(), named_colors::GREEN.into());
-        assert_eq!(glyphs[0].bg_color(), Glyph::default_bg_color.into());
+        assert_eq!(glyphs[0].bg_color(), Glyph::default_bg_color.with_alpha(0));
         assert_eq!(glyphs[1].character, '🭜');
         assert_eq!(glyphs[1].fg_color(), named_colors::GREEN.into());
-        assert_eq!(glyphs[1].bg_color(), Glyph::default_bg_color.into());
+        assert_eq!(glyphs[1].bg_color(), Glyph::default_bg_color.with_alpha(0));
         // println!("{}",glyphs.to_clean_string());
     }
     #[test]
