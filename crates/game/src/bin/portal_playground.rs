@@ -425,7 +425,7 @@ impl GameState {
                             PortalRenderingOption::Absolute => todo!(),
                         };
 
-                        let glyph_layers_to_combine: Vec<[GlyphWithTransparency;2]> =
+                        let glyph_layers_to_combine: Vec<[GlyphWithTransparency; 2]> =
                             visible_portions_at_relative_square
                                 .clone()
                                 .into_iter()
@@ -458,15 +458,20 @@ impl GameState {
                                     debug_frame.set_by_double_wide_grid(
                                         camera_row,
                                         camera_col,
-                                        *double_glyph.map(|g|g.over_solid_bg(BLACK)),
+                                        double_glyph.map(|g| g.over_solid_bg(BLACK)),
                                     );
                                 });
                         }
                         // TODO: combine properly
-                        glyph_layers_to_combine.into_iter().rev().fold(
-                            DoubleGlyph::solid_color(named_colors::BLACK),
-                            |below, above| above.drawn_over(below),
-                        )
+                        glyph_layers_to_combine
+                            .into_iter()
+                            .rev()
+                            .fold(
+                                DoubleGlyph::solid_color(named_colors::BLACK)
+                                    .map(|g| GlyphWithTransparency::from_glyph(g)),
+                                |below, above| [0, 1].map(|i| above[i].over(below[i])),
+                            )
+                            .map(|g| g.over_solid_bg(BLACK))
                         // glyph_layers_to_combine[0]
                     })
                     .collect_vec()
@@ -484,7 +489,7 @@ impl GameState {
     fn render_one_view_of_a_square(
         &self,
         square_viz: &PositionedSquareVisibilityInFov,
-    ) -> [GlyphWithTransparency;2] {
+    ) -> [GlyphWithTransparency; 2] {
         let mut glyphs = self.naive_glyphs_for_rotated_world_square(
             square_viz.absolute_square().into(),
             square_viz
@@ -497,7 +502,12 @@ impl GameState {
             *color = (self.portal_tint_function)(*color, square_viz.portal_depth())
         });
 
-        if !square_viz.square_visibility_in_absolute_frame().is_fully_visible() {
+        let mut glyphs = glyphs.map(|g| GlyphWithTransparency::from_glyph(g));
+
+        if !square_viz
+            .square_visibility_in_absolute_frame()
+            .is_fully_visible()
+        {
             let bias_direction = square_viz
                 .square_visibility_in_relative_frame()
                 .visible_portion()
@@ -515,17 +525,11 @@ impl GameState {
                     |(glyph, visible_portion_of_glyph)| match visible_portion_of_glyph {
                         None => glyph,
                         Some(visible_portion) => {
-                            let character = half_plane_to_angled_block_character(
+                            let window = half_plane_to_angled_block_character(
                                 visible_portion,
                                 bias_direction,
                             );
-                            let bg = Glyph::default_bg_color;
-                            let fg = if glyph.character == ' ' {
-                                glyph.bg_color
-                            } else {
-                                glyph.fg_color
-                            };
-                            GlyphWithTransparency::from(Glyph::new(character, fg, bg)).with_primary_only()
+                            glyph.seen_through_window(window)
                         }
                     },
                 )
@@ -737,13 +741,13 @@ mod tests {
             portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise::new(0),
         };
         let glyphs = game.render_one_view_of_a_square(&visible_portion);
-        println!("{}", glyphs.to_string());
+        println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
-        assert_eq!(glyphs[0].fg_color, named_colors::GREEN);
-        assert_eq!(glyphs[0].bg_color, Glyph::default_bg_color);
+        assert_eq!(glyphs[0].fg_color(), named_colors::GREEN.into());
+        assert_eq!(glyphs[0].bg_color(), Glyph::default_bg_color.into());
         assert_eq!(glyphs[1].character, '🭜');
-        assert_eq!(glyphs[1].fg_color, named_colors::GREEN);
-        assert_eq!(glyphs[1].bg_color, Glyph::default_bg_color);
+        assert_eq!(glyphs[1].fg_color(), named_colors::GREEN.into());
+        assert_eq!(glyphs[1].bg_color(), Glyph::default_bg_color.into());
         // println!("{}",glyphs.to_clean_string());
     }
     #[test]
@@ -767,7 +771,11 @@ mod tests {
                 portal_rotation_from_relative_to_absolute: i.into(),
             };
             let glyphs = game.render_one_view_of_a_square(&visible_portion);
-            frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
+            frame.set_by_double_wide_grid(
+                1,
+                2 * i as usize + 1,
+                glyphs.map(|g| g.over_solid_bg(BLACK)),
+            );
         }
 
         compare_frame_to_file!(frame);
