@@ -2,11 +2,12 @@ use std::iter::once;
 
 use rgb::{RGB8, RGBA8};
 
+use crate::glyph_constants::named_colors::*;
 use crate::Glyph;
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq)]
 pub struct GlyphWithTransparency {
-    character: char,
+    pub character: char,
     primary_color: RGBA8,
     secondary_color: RGBA8,
     // For when you and unicode disagree on the foreground and background parts of a character
@@ -65,11 +66,26 @@ impl GlyphWithTransparency {
         out.secondary_color = color_combine(self.secondary_color, other.primary_color);
         out
     }
-    pub fn over_solid_color(&self, c: RGB8) -> Glyph {
+    pub fn over_solid_bg(&self, c: RGB8) -> Glyph {
         let mut bg = Self::from_char(' ').with_primary_rgb(c);
         bg.fg_is_primary = false;
         let result = self.over(bg);
-        Glyph::new(self.character, result.fg_color().rgb(), result.bg_color().rgb())
+        Glyph::new(
+            self.character,
+            result.fg_color().rgb(),
+            result.bg_color().rgb(),
+        )
+    }
+    pub fn seen_through_window(&self, window: char) -> Self {
+        Self {
+            character: window,
+            primary_color: self.primary_color,
+            secondary_color: Glyph::default_bg_color.with_alpha(0),
+            fg_is_primary: true,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        self.over_solid_bg(BLACK).to_string()
     }
 }
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing
