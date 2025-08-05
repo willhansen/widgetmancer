@@ -12,6 +12,7 @@ pub mod named_colors {
     pub const ORANGE: RGB8 = RGB8::new(255, 165, 0); // #FFA500
     pub const GREEN: RGB8 = RGB8::new(0, 255, 0);
     pub const BLUE: RGB8 = RGB8::new(0, 0, 255);
+    pub const PURPLE: RGB8 = RGB8::new(160, 32, 240);
     pub const COBALT_BLUE: RGB8 = RGB8::new(0, 71, 171);
     pub const LIGHTISH_BLUE: RGB8 = RGB8::new(0, 130, 170);
     pub const CYAN: RGB8 = RGB8::new(0, 255, 255);

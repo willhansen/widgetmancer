@@ -14,21 +14,15 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn from_glyph_grid(grid: Vec<Vec<Glyph>>) -> Self {
-        assert!(grid.len() > 0);
-        assert!(grid[0].len() > 0);
-        assert!(grid.iter().map(|row| row.len()).all_equal());
-        Frame { grid }
-    }
     pub fn blank(width: usize, height: usize) -> Self {
-        Frame::from_glyph_grid(
+        Frame::from(
             (0..height)
                 .map(|_row| {
                     (0..width)
                         .map(|_col| Glyph::solid_color(named_colors::BLACK))
-                        .collect()
+                        .collect_vec()
                 })
-                .collect(),
+                .collect_vec(),
         )
     }
     pub fn save_to_file(&self, path: PathBuf) {
@@ -239,7 +233,7 @@ impl Frame {
                 glyphs_out
             })
             .collect_vec();
-        Frame::from_glyph_grid(grid)
+        grid.into()
     }
     fn non_raw_render_string(&self, _colored: bool) -> String {
         raw_display_string_to_regular_display_string(self.simple_raw_display_string())
@@ -322,11 +316,10 @@ impl Frame {
     pub fn readable_string(&self) -> String {
         display_string_to_readable_string(self.simple_raw_display_string())
     }
-    pub fn set_by_double_wide_grid(&mut self, row:usize, wide_col: usize, val: DoubleGlyph) {
+    pub fn set_by_double_wide_grid(&mut self, row: usize, wide_col: usize, val: DoubleGlyph) {
         let left_narrow_col = wide_col * 2;
         self.grid[row][left_narrow_col] = val[0];
-        self.grid[row][left_narrow_col+1] = val[1];
-
+        self.grid[row][left_narrow_col + 1] = val[1];
     }
 }
 
@@ -436,12 +429,19 @@ impl std::fmt::Debug for Frame {
 
 impl From<Vec<Vec<DoubleGlyph>>> for Frame {
     fn from(value: Vec<Vec<DoubleGlyph>>) -> Self {
-        Frame::from_glyph_grid(
-            value
-                .into_iter()
-                .map(|row| row.into_iter().flat_map(|dg| dg.into_iter()).collect_vec())
-                .collect_vec(),
-        )
+        value
+            .into_iter()
+            .map(|row| row.into_iter().flat_map(|dg| dg.into_iter()).collect_vec())
+            .collect_vec()
+            .into()
+    }
+}
+impl From<Vec<Vec<Glyph>>> for Frame {
+    fn from(value: Vec<Vec<Glyph>>) -> Self {
+        assert!(value.len() > 0);
+        assert!(value[0].len() > 0);
+        assert!(value.iter().map(|row| row.len()).all_equal());
+        Frame { grid: value }
     }
 }
 #[cfg(test)]
