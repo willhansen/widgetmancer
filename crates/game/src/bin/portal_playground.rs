@@ -12,7 +12,7 @@ use std::option_env;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
-use terminal_rendering::glyph_constants::named_colors;
+use terminal_rendering::glyph_constants::{named_colors, BLACK};
 use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
@@ -425,7 +425,7 @@ impl GameState {
                             PortalRenderingOption::Absolute => todo!(),
                         };
 
-                        let glyph_layers_to_combine: Vec<DoubleGlyph> =
+                        let glyph_layers_to_combine: Vec<[GlyphWithTransparency;2]> =
                             visible_portions_at_relative_square
                                 .clone()
                                 .into_iter()
@@ -458,7 +458,7 @@ impl GameState {
                                     debug_frame.set_by_double_wide_grid(
                                         camera_row,
                                         camera_col,
-                                        *double_glyph,
+                                        *double_glyph.map(|g|g.over_solid_bg(BLACK)),
                                     );
                                 });
                         }
@@ -484,7 +484,7 @@ impl GameState {
     fn render_one_view_of_a_square(
         &self,
         square_viz: &PositionedSquareVisibilityInFov,
-    ) -> DoubleGlyph {
+    ) -> [GlyphWithTransparency;2] {
         let mut glyphs = self.naive_glyphs_for_rotated_world_square(
             square_viz.absolute_square().into(),
             square_viz
@@ -525,7 +525,7 @@ impl GameState {
                             } else {
                                 glyph.fg_color
                             };
-                            Glyph::new(character, fg, bg)
+                            GlyphWithTransparency::from(Glyph::new(character, fg, bg)).with_primary_only()
                         }
                     },
                 )

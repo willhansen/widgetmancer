@@ -41,14 +41,35 @@ impl GlyphWithTransparency {
         *x.secondary_color.rgb_mut() = color;
         x
     }
+    pub fn fg_color(&self) -> RGBA8 {
+        if self.fg_is_primary {
+            self.primary_color
+        } else {
+            self.secondary_color
+        }
+    }
+    pub fn bg_color(&self) -> RGBA8 {
+        if self.fg_is_primary {
+            self.secondary_color
+        } else {
+            self.primary_color
+        }
+    }
     pub fn with_rgbs(&self, primary_rgb: RGB8, secondary_rgb: RGB8) -> Self {
-        self.with_primary_rgb(primary_rgb).with_secondary_rgb(secondary_rgb)
+        self.with_primary_rgb(primary_rgb)
+            .with_secondary_rgb(secondary_rgb)
     }
     pub fn over(&self, other: Self) -> Self {
         let mut out = self.clone();
         out.primary_color = color_combine(self.primary_color, other.primary_color);
         out.secondary_color = color_combine(self.secondary_color, other.primary_color);
         out
+    }
+    pub fn over_solid_color(&self, c: RGB8) -> Glyph {
+        let mut bg = Self::from_char(' ').with_primary_rgb(c);
+        bg.fg_is_primary = false;
+        let result = self.over(bg);
+        Glyph::new(self.character, result.fg_color().rgb(), result.bg_color().rgb())
     }
 }
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing
@@ -58,13 +79,14 @@ pub fn color_combine(above: RGBA8, below: RGBA8) -> RGBA8 {
     let a_a = a.a as f32 / 255.0;
     let b_a = b.a as f32 / 255.0;
     let c_a = a_a + (1.0 - a_a) * b_a;
-    RGBA8::from_iter(a.rgb()
-        .iter()
-        .zip(b.rgb().iter())
-        .map(|(a, b)| (a as f32 * a_a + b as f32 * (1.0 - a_a) * b_a) / c_a)
-        .chain(once(c_a * 255.0))
-        .map(|f| f as u8))
-        
+    RGBA8::from_iter(
+        a.rgb()
+            .iter()
+            .zip(b.rgb().iter())
+            .map(|(a, b)| (a as f32 * a_a + b as f32 * (1.0 - a_a) * b_a) / c_a)
+            .chain(once(c_a * 255.0))
+            .map(|f| f as u8),
+    )
 }
 #[cfg(test)]
 mod tests {
@@ -80,8 +102,6 @@ mod tests {
         let a = RGBA8::from(RED).with_alpha(0);
         let b = BLUE.into();
         assert_eq!(color_combine(a, b), b);
-
-
     }
 
     #[test]
@@ -91,7 +111,9 @@ mod tests {
     }
     #[test]
     fn test_letter_over_letter() {
-        let a = GlyphWithTransparency::from_char('a').with_primary_only().with_primary_rgb(BLUE);
+        let a = GlyphWithTransparency::from_char('a')
+            .with_primary_only()
+            .with_primary_rgb(BLUE);
         let b = GlyphWithTransparency::from_char('b').with_primary_rgb(GREEN);
         let c = GlyphWithTransparency::from_char('a').with_rgbs(BLUE, GREEN);
         dbg!(&a, &b, &c);
@@ -99,7 +121,9 @@ mod tests {
     }
     #[test]
     fn test_partially_occluded_letter() {
-        let mut a = GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_primary_only().with_rgbs(GREEN, PURPLE);
+        let mut a = GlyphWithTransparency::from_char(LOWER_HALF_BLOCK)
+            .with_primary_only()
+            .with_rgbs(GREEN, PURPLE);
         let mut b = GlyphWithTransparency::from_char('b').with_rgbs(RED, BLUE);
 
         let c = GlyphWithTransparency {
@@ -119,6 +143,9 @@ mod tests {
         b.secondary_color.a = 0;
         *b.primary_color.rgb_mut() = BLUE;
         let mut c = GlyphWithTransparency::from_char('c').with_rgbs(PURPLE, GREEN);
-        assert_eq!(a.over(b.over(c)), GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_rgbs(RED, BLUE));
+        assert_eq!(
+            a.over(b.over(c)),
+            GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_rgbs(RED, BLUE)
+        );
     }
 }
