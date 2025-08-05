@@ -3,16 +3,16 @@ use std::iter::once;
 use rgb::{RGB8, RGBA8};
 
 use crate::glyph_constants::named_colors::*;
-use crate::Glyph;
+use crate::{DoubleGlyph, Glyph};
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq)]
 pub struct GlyphWithTransparency {
     pub character: char,
-    primary_color: RGBA8,
-    secondary_color: RGBA8,
+    pub primary_color: RGBA8,
+    pub secondary_color: RGBA8,
     // For when you and unicode disagree on the foreground and background parts of a character
     // Primarily used when converting to a non-transparent Glyph
-    fg_is_primary: bool,
+    pub fg_is_primary: bool,
 }
 
 impl GlyphWithTransparency {
@@ -86,6 +86,37 @@ impl GlyphWithTransparency {
     }
     pub fn to_string(&self) -> String {
         self.over_solid_bg(BLACK).to_string()
+    }
+    pub fn with_bg_as_primary(&self) -> Self {
+        let mut x = self.clone();
+        x.fg_is_primary = false;
+        x
+    }
+    pub fn solid_color(color: RGB8) -> Self {
+        Self::from_char(' ')
+            .with_primary_rgb(color)
+            .with_bg_as_primary()
+    }
+}
+pub type DoubleGlyphWithTransparency = [GlyphWithTransparency; 2];
+pub trait DoubleGlyphWithTransparencyExt {
+    fn solid_color(color: RGB8) -> Self;
+    fn with_primary_only(&self) -> Self;
+    fn with_primary_rgb(&self, color: RGB8) -> Self;
+    fn with_secondary_rgb(&self, color: RGB8) -> Self;
+}
+impl DoubleGlyphWithTransparencyExt for DoubleGlyphWithTransparency {
+    fn solid_color(color: RGB8) -> Self {
+        [GlyphWithTransparency::solid_color(color); 2]
+    }
+    fn with_primary_only(&self) -> Self {
+        self.map(|g|g.with_primary_only())
+    }
+    fn with_primary_rgb(&self, color: RGB8) -> Self {
+        self.map(|g|g.with_primary_rgb(color))
+    }
+    fn with_secondary_rgb(&self, color: RGB8) -> Self {
+        self.map(|g|g.with_secondary_rgb(color))
     }
 }
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing
