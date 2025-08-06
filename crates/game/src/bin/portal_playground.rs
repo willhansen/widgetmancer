@@ -308,6 +308,16 @@ impl GameState {
             Event::Unsupported(items) => todo!(),
         }
     }
+    // xy order from bottom left of screen
+    fn mouse_screen_square(&self) -> Option<IPoint> {
+        self.last_mouse_screen_row_col
+            .map(|[screen_row, screen_col]| {
+                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
+                [i32::from(screen_col) / 2, screen_y]
+            })
+
+    }
+
     fn naive_glyphs_for_rotated_world_square(
         &self,
         square: IPoint,
@@ -372,25 +382,19 @@ impl GameState {
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(),
             );
+        // panic!();
+
+        let mouse_screen_square: Option<[i32; 2]> = self.mouse_screen_square();
+        let fov_center = match mouse_screen_square {
+            Some(x) => x,
+            None => self.fov_center_world_pos,
+        };
         let fov = game::fov_stuff::portal_aware_field_of_view_from_square(
-            self.fov_center_world_pos.into(),
+            fov_center.into(),
             10,
             &Default::default(),
             &portal_geometry,
         );
-        // panic!();
-
-        let mouse_camera_pos: Option<[i32; 2]> =
-            self.last_mouse_screen_row_col
-                .map(|[screen_row, screen_col]| {
-                    let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
-                    [i32::from(screen_col) / 2, screen_y]
-                });
-
-        let fov_center = match mouse_camera_pos {
-            Some(x) => x,
-            None => self.fov_center_world_pos,
-        };
 
         // Key is (depth, absolute_position, rotation from portal)
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
