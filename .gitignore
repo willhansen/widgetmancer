@@ -13,3 +13,5 @@ Cargo.lock
 .project
 
 **/coverage/
+
+**/*.profraw
