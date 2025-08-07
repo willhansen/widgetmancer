@@ -1,6 +1,7 @@
 use std::iter::once;
 
 use rgb::{RGB8, RGBA8};
+use utility::array_zip;
 
 use crate::glyph_constants::named_colors::*;
 use crate::{DoubleGlyph, Glyph};
@@ -104,6 +105,7 @@ pub trait DoubleGlyphWithTransparencyExt {
     fn with_primary_only(&self) -> Self;
     fn with_primary_rgb(&self, color: RGB8) -> Self;
     fn with_secondary_rgb(&self, color: RGB8) -> Self;
+    fn over(&self, other: Self) -> Self;
 }
 impl DoubleGlyphWithTransparencyExt for DoubleGlyphWithTransparency {
     fn solid_color(color: RGB8) -> Self {
@@ -117,6 +119,9 @@ impl DoubleGlyphWithTransparencyExt for DoubleGlyphWithTransparency {
     }
     fn with_secondary_rgb(&self, color: RGB8) -> Self {
         self.map(|g|g.with_secondary_rgb(color))
+    }
+    fn over(&self, other: Self) -> Self {
+        array_zip(*self, other).map(|(a,b)|a.over(b))
     }
 }
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing
