@@ -1662,6 +1662,18 @@ where
     }
 }
 
+pub fn array_zip<T1, T2, const N: usize>(a: [T1; N], b: [T2; N]) -> [(T1, T2); N]
+where
+    T1: Debug,
+    T2: Debug,
+{
+    a.into_iter()
+        .zip(b.into_iter())
+        .collect_vec()
+        .try_into()
+        .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};

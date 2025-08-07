@@ -1,3 +1,4 @@
+use color_hex::color_from_hex;
 use euclid::point2;
 use game::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
 use game::{graphics::Graphics, set_up_input_thread};
@@ -12,6 +13,7 @@ use std::option_env;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
+use terminal_rendering::glyph_constants::named_colors::DARK_GREEN;
 use terminal_rendering::glyph_constants::{named_colors, BLACK, RED};
 use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
@@ -48,6 +50,7 @@ mod geometry2 {
     pub const DIR_UP: i32 = 1;
     pub const DIR_LEFT: i32 = 2;
     pub const DIR_DOWN: i32 = 3;
+    pub const ALL_ORTHODIRS: [OrthoDir; 4] = [0, 1, 2, 3];
 
     pub const STEP_RIGHT: IPoint = [1, 0];
     pub const STEP_UP: IPoint = [0, 1];
@@ -66,6 +69,15 @@ mod geometry2 {
         }
         fn sub(&self, rhs: Self) -> Self {
             self.add(rhs.neg())
+        }
+        fn dot(&self, rhs: IPoint) -> i32 {
+            self.x() * rhs.x() + self.y() * rhs.y()
+        }
+        fn has_component_in_direction(&self, dir: OrthoDir) -> bool {
+            self.dot(step_in_direction(dir)) > 0
+        }
+        fn has_component_against_direction(&self, dir: OrthoDir) -> bool {
+            self.dot(step_in_direction(dir)) < 0
         }
     }
 
@@ -180,7 +192,8 @@ struct GameState {
     running: bool,
     width: usize,
     height: usize,
-    fov_center_world_pos: IPoint,
+    player_square: IPoint,
+    player_is_alive: bool,
 
     portals: HashMap<PortalSide, PortalSide>,
 
@@ -195,7 +208,8 @@ impl GameState {
             running: true,
             width,
             height,
-            fov_center_world_pos: [5, 5],
+            player_square: [5, 5],
+            player_is_alive: false,
             portals: Default::default(),
             last_mouse_screen_row_col: None,
             portal_rendering: PortalRenderingOption::LineOnFloor,
@@ -208,7 +222,7 @@ impl GameState {
         Some(if is_white { grey(191) } else { grey(127) })
     }
     fn radial_sin_board_colors(&self, square: IPoint) -> Option<RGB8> {
-        let [cx, cy] = self.fov_center_world_pos;
+        let [cx, cy] = self.player_square;
         let dx = square[0] - cx;
         let dy = square[1] - cy;
         let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
@@ -275,6 +289,11 @@ impl GameState {
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.running = false,
+                Key::Char('t') => self.portal_rendering = match self.portal_rendering {
+                    PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
+                    PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
+                    PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
+                },
                 // Key::Backspace => todo!(),
                 // Key::Left => todo!(),
                 // Key::Right => todo!(),
@@ -315,7 +334,6 @@ impl GameState {
                 let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
                 [i32::from(screen_col) / 2, screen_y]
             })
-
     }
 
     fn naive_glyphs_for_rotated_world_square(
@@ -324,35 +342,7 @@ impl GameState {
         rotation: i32,
     ) -> DoubleGlyphWithTransparency {
         assert!(rotation >= 0 && rotation < 4);
-        let board_color = (self.board_color_function)(&self, square).unwrap();
-        let mut portal_entrances_ccw: [bool; 4] =
-            [0, 1, 2, 3].map(|dir| self.portals.contains_key(&(square, dir)));
-        portal_entrances_ccw.rotate_left(rotation as usize);
-        let mut glyphs = DoubleGlyphWithTransparency::solid_color(board_color);
-        if portal_entrances_ccw.iter().any(|&x| x) {
-            let portal_entrance_characters = chars_for_square_walls(portal_entrances_ccw);
-            let new_glyphs = portal_entrance_characters.map(|c| {
-                GlyphWithTransparency::from_char(c)
-                    .with_primary_rgb(RED)
-                    .with_primary_only()
-            });
-            glyphs = [0,1].map(|i| new_glyphs[i].over(glyphs[i]));
-        }
-        let mouse_is_here = self
-            .mouse_square_xy_in_camera_frame()
-            .is_some_and(|mouse_camera_pos| mouse_camera_pos == square);
-        if mouse_is_here {
-            let mouse_is_on_left_half_of_square = self
-                .last_mouse_screen_row_col
-                .is_some_and(|[row, col]| col.rem_euclid(2) == 0);
-            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
-                0
-            } else {
-                1
-            };
-            glyphs[mouse_index_in_square] = GlyphWithTransparency::solid_color(RED);
-        }
-        glyphs
+        todo!();
     }
     // Simple top-down, no rotation, no portals (except for entrance/exit)
     fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyphWithTransparency {
@@ -387,7 +377,7 @@ impl GameState {
         let mouse_screen_square: Option<[i32; 2]> = self.mouse_screen_square();
         let fov_center = match mouse_screen_square {
             Some(x) => x,
-            None => self.fov_center_world_pos,
+            None => self.player_square,
         };
         let fov = game::fov_stuff::portal_aware_field_of_view_from_square(
             fov_center.into(),
@@ -496,20 +486,78 @@ impl GameState {
         &self,
         square_viz: &PositionedSquareVisibilityInFov,
     ) -> [GlyphWithTransparency; 2] {
-        let mut glyphs = self.naive_glyphs_for_rotated_world_square(
-            square_viz.absolute_square().into(),
-            square_viz
-                .portal_rotation_from_relative_to_absolute()
-                .into(),
-        );
-        // apply tint
+        let board_color =
+            (self.board_color_function)(&self, square_viz.absolute_square().into()).unwrap();
+        let mut glyphs = DoubleGlyphWithTransparency::solid_color(board_color);
 
+        // draw visible portal entrances
+        {
+            let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
+                !square_viz
+                    .relative_square
+                    .to_array()
+                    .has_component_against_direction(dir)
+            });
+            let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
+                self.portals
+                    .contains_key(&(square_viz.absolute_square().into(), dir))
+            });
+            let mut relative_internal_faces_with_portal_entrance =
+                absolute_internal_faces_with_portal_entrance.clone();
+            relative_internal_faces_with_portal_entrance.rotate_left(
+                square_viz
+                    .portal_rotation_from_absolute_to_relative()
+                    .quarter_turns() as usize,
+            );
+            let internal_faces_with_visible_portal_entrances = array_zip(
+                visible_relative_internal_faces,
+                relative_internal_faces_with_portal_entrance,
+            )
+            .map(|(a, b)| a && b);
+            let any_entrances_visible_here =
+                internal_faces_with_visible_portal_entrances.iter().any(|x|*x);
+            if any_entrances_visible_here {
+                let visible_portal_entrance_characters =
+                    chars_for_square_walls(internal_faces_with_visible_portal_entrances);
+                let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
+                    GlyphWithTransparency::from_char(c)
+                        .with_primary_rgb(RED)
+                        .with_primary_only()
+                });
+                glyphs = visible_portal_entrance_glyphs.over(glyphs);
+            }
+        }
+
+        if square_viz.absolute_square().to_array() == self.player_square && self.player_is_alive {
+            glyphs = DoubleGlyphWithTransparency::solid_color(color_from_hex!("#1688f0").into());
+        }
+
+        let mouse_is_here =
+            self.mouse_square_xy_in_camera_frame()
+                .is_some_and(|mouse_camera_pos| {
+                    mouse_camera_pos == square_viz.absolute_square().to_array()
+                });
+        if mouse_is_here {
+            let mouse_is_on_left_half_of_square = self
+                .last_mouse_screen_row_col
+                .is_some_and(|[row, col]| col.rem_euclid(2) == 0);
+            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
+                0
+            } else {
+                1
+            };
+            glyphs[mouse_index_in_square] = GlyphWithTransparency::solid_color(RED);
+        }
+
+        // apply tint
         glyphs.iter_mut().for_each(|glyph| {
-            *glyph.primary_color.rgb_mut() = (self.portal_tint_function)(glyph.primary_color.rgb(), square_viz.portal_depth());
-            *glyph.secondary_color.rgb_mut() = (self.portal_tint_function)(glyph.secondary_color.rgb(), square_viz.portal_depth())
+            *glyph.primary_color.rgb_mut() =
+                (self.portal_tint_function)(glyph.primary_color.rgb(), square_viz.portal_depth());
+            *glyph.secondary_color.rgb_mut() =
+                (self.portal_tint_function)(glyph.secondary_color.rgb(), square_viz.portal_depth())
         });
 
-
+        // apply obscurement
         if !square_viz
             .square_visibility_in_absolute_frame()
             .is_fully_visible()
@@ -562,6 +610,7 @@ fn main() {
     let (width, height) = (30, 15);
 
     let mut game_state = GameState::new(width / 2, height);
+    game_state.player_is_alive = true;
     game_state.portal_rendering = PortalRenderingOption::LineOfSight;
     game_state.place_portal(([10, 5], DIR_UP), ([25, 25], DIR_RIGHT));
 

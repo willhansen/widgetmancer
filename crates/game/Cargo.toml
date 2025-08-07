@@ -33,6 +33,7 @@ utility.workspace = true
 terminal_rendering.workspace = true
 stdext = "0.3.3"
 regex = "1.11.1"
+color-hex = "0.2.0"
 
 
 [dev-dependencies]

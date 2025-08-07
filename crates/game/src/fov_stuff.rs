@@ -246,6 +246,9 @@ impl PositionedSquareVisibilityInFov {
     pub fn portal_rotation_from_relative_to_absolute(&self) -> QuarterTurnsAnticlockwise {
         self.portal_rotation_from_relative_to_absolute
     }
+    pub fn portal_rotation_from_absolute_to_relative(&self) -> QuarterTurnsAnticlockwise {
+        -self.portal_rotation_from_relative_to_absolute
+    }
     pub fn absolute_square(&self) -> WorldSquare {
         self.absolute_square
     }
