@@ -45,6 +45,7 @@ enum PortalRenderingOption {
 mod geometry2 {
 
     pub type IPoint = [i32; 2];
+    pub type FPoint = [f32; 2];
     pub type OrthoDir = i32;
     pub type SquareEdge = (IPoint, OrthoDir);
 
@@ -65,6 +66,9 @@ mod geometry2 {
         fn new(x: i32, y: i32) -> Self;
         fn add(&self, rhs: Self) -> Self {
             Self::new(self.x() + rhs.x(), self.y() + rhs.y())
+        }
+        fn mul(&self, rhs: i32 ) -> Self {
+            Self::new(self.x() * rhs, self.y() * rhs)
         }
         fn neg(&self) -> Self {
             Self::new(-self.x(), -self.y())
@@ -93,6 +97,40 @@ mod geometry2 {
         fn new(x: i32, y: i32) -> Self {
             [x, y]
         }
+    }
+
+    pub trait FPointExt: Sized {
+        fn x(&self) -> f32;
+        fn y(&self) -> f32;
+        fn new(x: f32, y: f32) -> Self;
+        fn add(&self, rhs: Self) -> Self {
+            Self::new(self.x() + rhs.x(), self.y() + rhs.y())
+        }
+        fn mul(&self, rhs: f32 ) -> Self {
+            Self::new(self.x() * rhs, self.y() * rhs)
+        }
+        fn neg(&self) -> Self {
+            Self::new(-self.x(), -self.y())
+        }
+        fn sub(&self, rhs: Self) -> Self {
+            self.add(rhs.neg())
+        }
+        fn dot(&self, rhs: FPoint) -> f32 {
+            self.x() * rhs.x() + self.y() * rhs.y()
+        }
+
+    }
+    impl FPointExt for FPoint{
+        fn x(&self) -> f32 {
+            self[0]
+        }
+        fn y(&self) -> f32 {
+            self[1]
+        }
+        fn new(x: f32, y: f32) -> Self {
+            [x, y]
+        }
+
     }
 
     pub trait OrthoPoseExt {
@@ -383,10 +421,9 @@ impl GameState {
     fn render_with_debug_deconstruction(&self, is_debug: bool) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
-                self.portals.clone()
-                    // .iter()
-                    // .map(|(&entrance, &reverse_exit)| (entrance, reverse_exit.rotate(2)))
-                    // .collect(),
+                self.portals.clone(), // .iter()
+                                      // .map(|(&entrance, &reverse_exit)| (entrance, reverse_exit.rotate(2)))
+                                      // .collect(),
             );
         // panic!();
 
@@ -499,49 +536,37 @@ impl GameState {
         &self,
         mapped_square: MappedSquare,
     ) -> Option<DoubleGlyphWithTransparency> {
-        // let asdf = mapped_square.relative_square.to_array() == [0, 3];
-        let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
-            !mapped_square
-                .relative_square
-                .to_array()
-                .has_component_against_direction(dir)
-        });
-        // if asdf {
-        //     dbg!(&visible_relative_internal_faces);
-        // }
         let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
             self.portals
                 .contains_key(&(mapped_square.absolute_square.into(), dir))
         });
-        // if asdf {
-        //     dbg!(
-        //         &absolute_internal_faces_with_portal_entrance,
-        //         &mapped_square.absolute_square
-        //     );
-        // }
-        let mut relative_internal_faces_with_portal_entrance =
-            absolute_internal_faces_with_portal_entrance.clone();
-        relative_internal_faces_with_portal_entrance.rotate_left(
-            mapped_square
-                .quarter_turns_ccw_from_absolute_to_relative()
-                .quarter_turns() as usize,
-        );
-        let internal_faces_with_visible_portal_entrances = array_zip(
-            visible_relative_internal_faces,
-            relative_internal_faces_with_portal_entrance,
-        )
-        .map(|(a, b)| a && b);
+        let internal_faces_with_visible_portal_entrances = match self.portal_rendering {
+            PortalRenderingOption::LineOfSight => {
+                let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
+                    !mapped_square
+                        .relative_square
+                        .to_array()
+                        .has_component_against_direction(dir)
+                });
+                let mut relative_internal_faces_with_portal_entrance =
+                    absolute_internal_faces_with_portal_entrance.clone();
+                relative_internal_faces_with_portal_entrance.rotate_left(
+                    mapped_square
+                        .quarter_turns_ccw_from_absolute_to_relative()
+                        .quarter_turns() as usize,
+                );
+                array_zip(
+                    visible_relative_internal_faces,
+                    relative_internal_faces_with_portal_entrance,
+                )
+                .map(|(a, b)| a && b)
+            }
+            _ => absolute_internal_faces_with_portal_entrance,
+        };
         let any_entrances_visible_here = internal_faces_with_visible_portal_entrances
             .iter()
             .any(|x| *x);
         if any_entrances_visible_here {
-            // if asdf {
-            //     dbg!(
-            //         &mapped_square,
-            //         &absolute_internal_faces_with_portal_entrance,
-            //         &relative_internal_faces_with_portal_entrance
-            //     );
-            // }
             let visible_portal_entrance_characters =
                 chars_for_square_walls(internal_faces_with_visible_portal_entrances);
             let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
@@ -702,6 +727,7 @@ mod tests {
     use super::*;
     use game::fov_stuff::LocalSquareHalfPlane;
     use pretty_assertions::assert_str_eq;
+    use termion::event::MouseEvent;
     use std::{assert_eq, assert_ne, f32::consts::TAU};
     use stdext::function_name;
 
@@ -760,7 +786,7 @@ mod tests {
                 &format!("No existing test output found.  Set BLESS_TESTS to canonize current output frame:\n\n{candidate_frame:?}"),
             ),
         );
-        assert_eq!(candidate_frame, correct_frame,
+        assert!(candidate_frame == correct_frame,
             "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{correct_frame:?}\n\nGiven:\n{candidate_frame:?}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}❌\n",
             diff1 = correct_frame.diff_from(&candidate_frame),
             diff2 = candidate_frame.diff_from(&correct_frame)
@@ -810,7 +836,6 @@ mod tests {
         compare_frame_to_file!(frame_2, "2");
         compare_frame_to_file!(frame_3, "3");
     }
-    #[ignore]
     #[test]
     fn test_render_portal_edges() {
         let mut game = GameState::new(12, 12);
@@ -886,7 +911,6 @@ mod tests {
 
         compare_frame_to_file!(frame);
     }
-    // #[ignore]
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = GameState::new(12, 12);
@@ -902,12 +926,18 @@ mod tests {
         });
         compare_frame_to_file!(frame);
     }
-    #[ignore]
     #[test]
     fn test_portal_with_rotation() {
         let mut game = GameState::new(12, 12);
         game.portal_rendering = PortalRenderingOption::LineOfSight;
-        game.board_color_function = GameState::radial_sin_board_colors;
+        game.board_color_function = |game_state, square| {
+            let n = 10;
+            let frac = square.y().rem_euclid(n) as f32 / n as f32;
+            let val = 100 + (100.0 * frac) as u8;
+            Some(grey(val))
+        };
+
+        GameState::radial_sin_board_colors;
         game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render());
@@ -917,5 +947,18 @@ mod tests {
             dbg!(frame);
         });
         compare_frame_to_file!(frame);
+    }
+
+    fn sim_mouse_path(path_fn: fn(f32) -> IPoint) -> Vec<(f32, IPoint)> {
+        todo!();
+    }
+    fn mouse_path_to_events(path: Vec<(f32, IPoint)>) -> Vec<(f32, MouseEvent)> {
+        todo!();
+    }
+
+    #[test]
+    fn test_smoothed_mouse_motion() {
+        let path_func = |t|  [0.0, 0.0].add([1.0, 0.0].mul(t));
+
     }
 }
