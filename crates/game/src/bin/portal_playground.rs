@@ -1,6 +1,8 @@
 use color_hex::color_from_hex;
 use euclid::point2;
-use game::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
+use game::fov_stuff::{
+    FieldOfViewResult, MappedSquare, PositionedSquareVisibilityInFov, SquareVisibility,
+};
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
@@ -90,6 +92,15 @@ mod geometry2 {
         }
         fn new(x: i32, y: i32) -> Self {
             [x, y]
+        }
+    }
+
+    pub trait OrthoPoseExt {
+        fn rotate(&self, quarter_turns_ccw: i32) -> Self;
+    }
+    impl OrthoPoseExt for ([i32; 2], i32) {
+        fn rotate(&self, quarter_turns_ccw: i32) -> Self {
+            (self.0, (self.1 + quarter_turns_ccw).rem_euclid(4))
         }
     }
 
@@ -289,11 +300,13 @@ impl GameState {
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.running = false,
-                Key::Char('t') => self.portal_rendering = match self.portal_rendering {
-                    PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
-                    PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
-                    PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
-                },
+                Key::Char('t') => {
+                    self.portal_rendering = match self.portal_rendering {
+                        PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
+                        PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
+                        PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
+                    }
+                }
                 // Key::Backspace => todo!(),
                 // Key::Left => todo!(),
                 // Key::Right => todo!(),
@@ -370,7 +383,10 @@ impl GameState {
     fn render_with_debug_deconstruction(&self, is_debug: bool) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
-                self.portals.clone(),
+                self.portals
+                    .iter()
+                    .map(|(&entrance, &reverse_exit)| (entrance, reverse_exit.rotate(2)))
+                    .collect(),
             );
         // panic!();
 
@@ -479,6 +495,65 @@ impl GameState {
             debug_portal_visualizer_frames.into_values().collect_vec(),
         )
     }
+    fn portal_entrance_glyphs(
+        &self,
+        mapped_square: MappedSquare,
+    ) -> Option<DoubleGlyphWithTransparency> {
+        // let asdf = mapped_square.relative_square.to_array() == [0, 3];
+        let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
+            !mapped_square
+                .relative_square
+                .to_array()
+                .has_component_against_direction(dir)
+        });
+        // if asdf {
+        //     dbg!(&visible_relative_internal_faces);
+        // }
+        let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
+            self.portals
+                .contains_key(&(mapped_square.absolute_square.into(), dir))
+        });
+        // if asdf {
+        //     dbg!(
+        //         &absolute_internal_faces_with_portal_entrance,
+        //         &mapped_square.absolute_square
+        //     );
+        // }
+        let mut relative_internal_faces_with_portal_entrance =
+            absolute_internal_faces_with_portal_entrance.clone();
+        relative_internal_faces_with_portal_entrance.rotate_left(
+            mapped_square
+                .quarter_turns_ccw_from_absolute_to_relative()
+                .quarter_turns() as usize,
+        );
+        let internal_faces_with_visible_portal_entrances = array_zip(
+            visible_relative_internal_faces,
+            relative_internal_faces_with_portal_entrance,
+        )
+        .map(|(a, b)| a && b);
+        let any_entrances_visible_here = internal_faces_with_visible_portal_entrances
+            .iter()
+            .any(|x| *x);
+        if any_entrances_visible_here {
+            // if asdf {
+            //     dbg!(
+            //         &mapped_square,
+            //         &absolute_internal_faces_with_portal_entrance,
+            //         &relative_internal_faces_with_portal_entrance
+            //     );
+            // }
+            let visible_portal_entrance_characters =
+                chars_for_square_walls(internal_faces_with_visible_portal_entrances);
+            let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
+                GlyphWithTransparency::from_char(c)
+                    .with_primary_rgb(RED)
+                    .with_primary_only()
+            });
+            return Some(visible_portal_entrance_glyphs);
+        }
+        None
+    }
+
     pub fn render(&self) -> Frame {
         self.render_with_debug_deconstruction(false).0
     }
@@ -491,41 +566,11 @@ impl GameState {
         let mut glyphs = DoubleGlyphWithTransparency::solid_color(board_color);
 
         // draw visible portal entrances
+
+        if let Some(visible_portal_entrance_glyphs) =
+            self.portal_entrance_glyphs(square_viz.mapped_square())
         {
-            let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
-                !square_viz
-                    .relative_square
-                    .to_array()
-                    .has_component_against_direction(dir)
-            });
-            let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
-                self.portals
-                    .contains_key(&(square_viz.absolute_square().into(), dir))
-            });
-            let mut relative_internal_faces_with_portal_entrance =
-                absolute_internal_faces_with_portal_entrance.clone();
-            relative_internal_faces_with_portal_entrance.rotate_left(
-                square_viz
-                    .portal_rotation_from_absolute_to_relative()
-                    .quarter_turns() as usize,
-            );
-            let internal_faces_with_visible_portal_entrances = array_zip(
-                visible_relative_internal_faces,
-                relative_internal_faces_with_portal_entrance,
-            )
-            .map(|(a, b)| a && b);
-            let any_entrances_visible_here =
-                internal_faces_with_visible_portal_entrances.iter().any(|x|*x);
-            if any_entrances_visible_here {
-                let visible_portal_entrance_characters =
-                    chars_for_square_walls(internal_faces_with_visible_portal_entrances);
-                let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
-                    GlyphWithTransparency::from_char(c)
-                        .with_primary_rgb(RED)
-                        .with_primary_only()
-                });
-                glyphs = visible_portal_entrance_glyphs.over(glyphs);
-            }
+            glyphs = visible_portal_entrance_glyphs.over(glyphs);
         }
 
         if square_viz.absolute_square().to_array() == self.player_square && self.player_is_alive {
@@ -607,12 +652,12 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 fn main() {
     let (term_width, term_height) = termion::terminal_size().unwrap();
     let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
-    let (width, height) = (30, 15);
+    let (width, height) = (50, 25);
 
     let mut game_state = GameState::new(width / 2, height);
     game_state.player_is_alive = true;
     game_state.portal_rendering = PortalRenderingOption::LineOfSight;
-    game_state.place_portal(([10, 5], DIR_UP), ([25, 25], DIR_RIGHT));
+    game_state.place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
 
     let mut writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
@@ -842,6 +887,22 @@ mod tests {
         game.portal_rendering = PortalRenderingOption::LineOfSight;
         game.board_color_function = GameState::radial_sin_board_colors;
         game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
+        // game.portal_tint_function = GameState::rainbow_solid;
+        // dbg!(game.render());
+        game.portal_tint_function = GameState::rainbow_tint;
+        let (frame, layers) = game.render_with_debug_deconstruction(true);
+        layers.into_iter().for_each(|frame| {
+            dbg!(frame);
+        });
+        compare_frame_to_file!(frame);
+    }
+    // #[ignore]
+    #[test]
+    fn test_portal_with_rotation() {
+        let mut game = GameState::new(12, 12);
+        game.portal_rendering = PortalRenderingOption::LineOfSight;
+        game.board_color_function = GameState::radial_sin_board_colors;
+        game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render());
         game.portal_tint_function = GameState::rainbow_tint;

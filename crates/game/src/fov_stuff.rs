@@ -200,6 +200,26 @@ impl Debug for SquareVisibility {
         )
     }
 }
+#[derive(Debug, Clone, Copy)]
+pub struct MappedSquare {
+    pub relative_square: WorldStep,
+    pub absolute_square: WorldSquare,
+    pub quarter_turns_ccw_from_relative_to_absolute: QuarterTurnsAnticlockwise,
+}
+impl MappedSquare {
+    pub fn absolute_fov_center_square(&self) -> [i32; 2] {
+        let relative_fov_center_to_relative_square = self.relative_square;
+        let absolute_fov_center_to_absolute_square = rotated_n_quarter_turns_counter_clockwise(
+            relative_fov_center_to_relative_square,
+            self.quarter_turns_ccw_from_relative_to_absolute
+                .quarter_turns(),
+        );
+        (self.absolute_square - absolute_fov_center_to_absolute_square).into()
+    }
+    pub fn quarter_turns_ccw_from_absolute_to_relative(&self) -> QuarterTurnsAnticlockwise {
+        -self.quarter_turns_ccw_from_relative_to_absolute
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PositionedSquareVisibilityInFov {
@@ -212,14 +232,16 @@ pub struct PositionedSquareVisibilityInFov {
 }
 
 impl PositionedSquareVisibilityInFov {
+    pub fn mapped_square(&self) -> MappedSquare {
+        MappedSquare {
+            relative_square: self.relative_square,
+            absolute_square: self.absolute_square,
+            quarter_turns_ccw_from_relative_to_absolute: self
+                .portal_rotation_from_relative_to_absolute,
+        }
+    }
     pub fn absolute_fov_center_square(&self) -> [i32; 2] {
-        let relative_fov_center_to_relative_square = self.relative_square();
-        let absolute_fov_center_to_absolute_square = rotated_n_quarter_turns_counter_clockwise(
-            relative_fov_center_to_relative_square,
-            self.portal_rotation_from_relative_to_absolute
-                .quarter_turns(),
-        );
-        (self.absolute_square() - absolute_fov_center_to_absolute_square).into()
+        self.mapped_square().absolute_fov_center_square()
     }
     pub fn one_portal_deeper(
         &self,
@@ -1972,7 +1994,9 @@ mod tests {
                 .len(),
             1
         );
-        assert!(visibility.square_visibility_in_absolute_frame().is_fully_visible());
+        assert!(visibility
+            .square_visibility_in_absolute_frame()
+            .is_fully_visible());
     }
 
     #[test]
@@ -2327,10 +2351,12 @@ mod tests {
             .visibilities_of_relative_square([0, 4].into())
             .first()
             .unwrap();
+        assert_eq!(positioned_visibility.absolute_fov_center_square(), [23, 20]);
         assert_eq!(
-            positioned_visibility.absolute_fov_center_square(),
-            [23, 20]
+            positioned_visibility
+                .portal_rotation_from_relative_to_absolute()
+                .quarter_turns(),
+            1
         );
-        assert_eq!(positioned_visibility.portal_rotation_from_relative_to_absolute().quarter_turns(), 1);
     }
 }
