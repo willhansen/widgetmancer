@@ -92,7 +92,9 @@ impl Frame {
             if col >= self.width() {
                 break;
             }
-            self.grid[row][col] = Glyph::from_char(char);
+            if row < self.height() && col < self.width() {
+                self.grid[row][col] = Glyph::from_char(char);
+            }
         }
     }
     pub fn glyphs(&mut self) -> impl Iterator<Item = &mut Glyph> {
