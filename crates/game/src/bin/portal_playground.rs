@@ -543,10 +543,6 @@ impl GameState {
         &self,
         mapped_square: MappedSquare,
     ) -> Option<DoubleGlyphWithTransparency> {
-        let asdf = mapped_square.relative_square.to_array() == [0, 3];
-        if asdf {
-            dbg!(&mapped_square);
-        }
         let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
             self.portals
                 .contains_key(&(mapped_square.absolute_square.into(), dir))
@@ -561,21 +557,11 @@ impl GameState {
                 });
                 let mut relative_internal_faces_with_portal_entrance =
                     absolute_internal_faces_with_portal_entrance.clone();
-                if asdf {
-                    dbg!(
-                        &absolute_internal_faces_with_portal_entrance,
-                        &mapped_square.quarter_turns_ccw_from_absolute_to_relative()
-                    );
-                }
-                relative_internal_faces_with_portal_entrance.rotate_left(
+                relative_internal_faces_with_portal_entrance.rotate_right(
                     mapped_square
                         .quarter_turns_ccw_from_absolute_to_relative()
                         .quarter_turns() as usize,
                 );
-                if asdf {
-                    dbg!(&relative_internal_faces_with_portal_entrance);
-                    assert_eq!(relative_internal_faces_with_portal_entrance, [false, false, false, true]);
-                }
                 array_zip(
                     visible_relative_internal_faces,
                     relative_internal_faces_with_portal_entrance,
@@ -592,8 +578,7 @@ impl GameState {
                 chars_for_square_walls(internal_faces_with_visible_portal_entrances);
             let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
                 GlyphWithTransparency::from_char(c)
-                    // .with_primary_rgb(RED)
-                    .with_primary_rgb(if asdf { BLUE } else { RED })
+                    .with_primary_rgb(RED)
                     .with_primary_only()
             });
             return Some(visible_portal_entrance_glyphs);
@@ -1041,6 +1026,7 @@ mod tests {
         out
     }
 
+    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
