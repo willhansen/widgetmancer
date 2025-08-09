@@ -323,29 +323,6 @@ impl Frame {
     }
 }
 
-fn horiz_concat_strings(strings: &[String], spaces: usize) -> String {
-    let mut out = String::new();
-    let num_cols = strings.len();
-    let mut columns = strings
-        .into_iter()
-        .map(|s| s.lines().collect_vec())
-        .collect_vec();
-    for row in 0.. {
-        for col in 0..num_cols {
-            let column = &columns[col];
-            if row >= column.len() {
-                return out;
-            }
-            out += column[row];
-
-            if col < num_cols - 1 {
-                out += &" ".repeat(spaces);
-            }
-        }
-        out += "\n";
-    }
-    unreachable!("string needs to finish");
-}
 
 pub fn display_string_to_readable_string(display_string: String) -> String {
     let a_b = [
