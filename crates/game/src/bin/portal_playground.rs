@@ -15,8 +15,7 @@ use std::option_env;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
-use terminal_rendering::glyph_constants::named_colors::DARK_GREEN;
-use terminal_rendering::glyph_constants::{named_colors, BLACK, RED};
+use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
@@ -67,7 +66,7 @@ mod geometry2 {
         fn add(&self, rhs: Self) -> Self {
             Self::new(self.x() + rhs.x(), self.y() + rhs.y())
         }
-        fn mul(&self, rhs: i32 ) -> Self {
+        fn mul(&self, rhs: i32) -> Self {
             Self::new(self.x() * rhs, self.y() * rhs)
         }
         fn neg(&self) -> Self {
@@ -84,6 +83,9 @@ mod geometry2 {
         }
         fn has_component_against_direction(&self, dir: OrthoDir) -> bool {
             self.dot(step_in_direction(dir)) < 0
+        }
+        fn to_float(&self) -> FPoint {
+            FPoint::new(self.x() as f32, self.y() as f32)
         }
     }
 
@@ -106,7 +108,7 @@ mod geometry2 {
         fn add(&self, rhs: Self) -> Self {
             Self::new(self.x() + rhs.x(), self.y() + rhs.y())
         }
-        fn mul(&self, rhs: f32 ) -> Self {
+        fn mul(&self, rhs: f32) -> Self {
             Self::new(self.x() * rhs, self.y() * rhs)
         }
         fn neg(&self) -> Self {
@@ -118,9 +120,16 @@ mod geometry2 {
         fn dot(&self, rhs: FPoint) -> f32 {
             self.x() * rhs.x() + self.y() * rhs.y()
         }
-
+        fn rounded(&self) -> IPoint {
+            [self.x().round() as i32, self.y().round() as i32]
+        }
+        fn dist(&self, other: Self) -> f32 {
+            let dx = other.x() - self.x();
+            let dy = other.y() - self.y();
+            dx.powi(2) + dy.powi(2)
+        }
     }
-    impl FPointExt for FPoint{
+    impl FPointExt for FPoint {
         fn x(&self) -> f32 {
             self[0]
         }
@@ -130,7 +139,6 @@ mod geometry2 {
         fn new(x: f32, y: f32) -> Self {
             [x, y]
         }
-
     }
 
     pub trait OrthoPoseExt {
@@ -188,6 +196,7 @@ mod geometry2 {
         ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
     }
 }
+use geometry2::FPoint;
 use geometry2::IPoint;
 use geometry2::*;
 
@@ -288,7 +297,7 @@ impl GameState {
         }
     }
     fn default_portal_tint(color: RGB8, depth: u32) -> RGB8 {
-        let tint = named_colors::RED;
+        let tint = RED;
         let strength = (0.1 * depth as f32).min(1.0);
         tint_color(color, tint, strength)
     }
@@ -296,7 +305,6 @@ impl GameState {
         if depth == 0 {
             return color;
         }
-        use named_colors::*;
         let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
         let tint = rainbow[(depth.saturating_sub(1) as usize).rem_euclid(rainbow.len())];
         let strength = (0.1 * depth as f32).min(1.0);
@@ -306,7 +314,6 @@ impl GameState {
         if depth == 0 {
             return color;
         }
-        use named_colors::*;
         let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
         rainbow[(depth.saturating_sub(1) as usize).rem_euclid(rainbow.len())]
     }
@@ -516,7 +523,7 @@ impl GameState {
                             .into_iter()
                             .rev()
                             .fold(
-                                DoubleGlyph::solid_color(named_colors::BLACK)
+                                DoubleGlyph::solid_color(BLACK)
                                     .map(|g| GlyphWithTransparency::from_glyph(g)),
                                 |below, above| [0, 1].map(|i| above[i].over(below[i])),
                             )
@@ -536,6 +543,10 @@ impl GameState {
         &self,
         mapped_square: MappedSquare,
     ) -> Option<DoubleGlyphWithTransparency> {
+        let asdf = mapped_square.relative_square.to_array() == [0, 3];
+        if asdf {
+            dbg!(&mapped_square);
+        }
         let absolute_internal_faces_with_portal_entrance = ALL_ORTHODIRS.map(|dir| {
             self.portals
                 .contains_key(&(mapped_square.absolute_square.into(), dir))
@@ -550,11 +561,21 @@ impl GameState {
                 });
                 let mut relative_internal_faces_with_portal_entrance =
                     absolute_internal_faces_with_portal_entrance.clone();
+                if asdf {
+                    dbg!(
+                        &absolute_internal_faces_with_portal_entrance,
+                        &mapped_square.quarter_turns_ccw_from_absolute_to_relative()
+                    );
+                }
                 relative_internal_faces_with_portal_entrance.rotate_left(
                     mapped_square
                         .quarter_turns_ccw_from_absolute_to_relative()
                         .quarter_turns() as usize,
                 );
+                if asdf {
+                    dbg!(&relative_internal_faces_with_portal_entrance);
+                    assert_eq!(relative_internal_faces_with_portal_entrance, [false, false, false, true]);
+                }
                 array_zip(
                     visible_relative_internal_faces,
                     relative_internal_faces_with_portal_entrance,
@@ -571,7 +592,8 @@ impl GameState {
                 chars_for_square_walls(internal_faces_with_visible_portal_entrances);
             let visible_portal_entrance_glyphs = visible_portal_entrance_characters.map(|c| {
                 GlyphWithTransparency::from_char(c)
-                    .with_primary_rgb(RED)
+                    // .with_primary_rgb(RED)
+                    .with_primary_rgb(if asdf { BLUE } else { RED })
                     .with_primary_only()
             });
             return Some(visible_portal_entrance_glyphs);
@@ -722,14 +744,37 @@ fn main() {
     }
 }
 
+fn smoothed_mouse_position(recent_square_entries: &[(f32, IPoint)], now: f32) -> FPoint {
+    assert!(recent_square_entries.len() > 0);
+    if recent_square_entries.len() == 1 {
+        return recent_square_entries[0].1.to_float();
+    }
+
+    // simple interpolation for now
+    let l = recent_square_entries.len();
+    let last = recent_square_entries[l - 1];
+    let prev = recent_square_entries[l - 2];
+    let dt = last.0 - prev.0;
+    let step = last.1.sub(prev.1);
+    let next = last.1.add(step);
+
+    if now > last.0 + dt {
+        return next.to_float();
+    }
+
+    last.1
+        .to_float()
+        .add(step.to_float().mul((now - last.0) / dt))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use game::fov_stuff::LocalSquareHalfPlane;
     use pretty_assertions::assert_str_eq;
-    use termion::event::MouseEvent;
     use std::{assert_eq, assert_ne, f32::consts::TAU};
     use stdext::function_name;
+    use termion::event::MouseEvent;
 
     #[test]
     fn test_simple_output() {
@@ -818,8 +863,8 @@ mod tests {
         let frame = game.render();
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
-        assert_ne!(frame.get_xy([2, 2]).bg_color, named_colors::RED);
-        assert_eq!(frame.get_xy([3, 2]).bg_color, named_colors::RED);
+        assert_ne!(frame.get_xy([2, 2]).bg_color, RED);
+        assert_eq!(frame.get_xy([3, 2]).bg_color, RED);
         compare_frame_to_file!(frame);
     }
     #[test]
@@ -859,7 +904,7 @@ mod tests {
     #[test]
     fn test_render_part_of_square() {
         let mut game = GameState::new(12, 12);
-        game.board_color_function = |_state, _square| Some(named_colors::GREEN);
+        game.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
             square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
@@ -874,17 +919,17 @@ mod tests {
         let glyphs = game.render_one_view_of_a_square(&visible_portion);
         println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
-        assert_eq!(glyphs[0].fg_color(), named_colors::GREEN.into());
+        assert_eq!(glyphs[0].fg_color(), GREEN.into());
         assert_eq!(glyphs[0].bg_color(), Glyph::default_bg_color.with_alpha(0));
         assert_eq!(glyphs[1].character, '🭜');
-        assert_eq!(glyphs[1].fg_color(), named_colors::GREEN.into());
+        assert_eq!(glyphs[1].fg_color(), GREEN.into());
         assert_eq!(glyphs[1].bg_color(), Glyph::default_bg_color.with_alpha(0));
         // println!("{}",glyphs.to_clean_string());
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
         let mut game = GameState::new(12, 12);
-        game.board_color_function = |_state, _square| Some(named_colors::GREEN);
+        game.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
 
@@ -946,19 +991,72 @@ mod tests {
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
+
         compare_frame_to_file!(frame);
     }
 
-    fn sim_mouse_path(path_fn: fn(f32) -> IPoint) -> Vec<(f32, IPoint)> {
-        todo!();
+    fn sim_mouse_path(
+        path_fn: impl Fn(f32) -> FPoint,
+        sample_rate: f32,
+        end_t: f32,
+    ) -> Vec<(f32, FPoint)> {
+        let n = (end_t / sample_rate).floor() as u32;
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / sample_rate;
+                (t, path_fn(t))
+            })
+            .collect_vec()
     }
-    fn mouse_path_to_events(path: Vec<(f32, IPoint)>) -> Vec<(f32, MouseEvent)> {
-        todo!();
+    fn path_to_square_entry_events(path: &[(f32, FPoint)]) -> Vec<(f32, IPoint)> {
+        path.iter()
+            .tuple_windows()
+            .filter_map(|(a, b)| {
+                if a.1.rounded() != b.1.rounded() {
+                    Some((b.0, b.1.rounded()))
+                } else {
+                    None
+                }
+            })
+            .collect_vec()
+    }
+
+    fn smoothed_mouse_path(
+        square_entry_events: Vec<(f32, IPoint)>,
+        sample_rate: f32,
+    ) -> Vec<(f32, FPoint)> {
+        assert!(square_entry_events.len() > 0);
+        let t0 = square_entry_events[0].0;
+        let t_end = square_entry_events.last().unwrap().0;
+        let mut t = t0;
+        let mut i = 0;
+        let mut out = vec![];
+        while t < t_end {
+            while t >= square_entry_events[i].0 {
+                i += 1;
+            }
+            out.push((t, smoothed_mouse_position(&square_entry_events[0..i], t)));
+            t += 1.0 / sample_rate;
+        }
+        out
     }
 
     #[test]
     fn test_smoothed_mouse_motion() {
-        let path_func = |t|  [0.0, 0.0].add([1.0, 0.0].mul(t));
+        let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
+        let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
+        let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
 
+        let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0);
+
+        assert_eq!(sim_path.len(), smoothed_path.len());
+
+        let errors: Vec<f32> = sim_path
+            .iter()
+            .zip(smoothed_path.iter())
+            .map(|((t1, p1), (t2, p2))| p1.dist(*p2))
+            .collect_vec();
+        println!("{}", bargraph(errors, 5));
+        panic!();
     }
 }
