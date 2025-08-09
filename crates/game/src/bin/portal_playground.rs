@@ -13,7 +13,7 @@ use std::io::Read;
 use std::io::{stdin, stdout, Write};
 use std::option_env;
 use std::path::PathBuf;
-use std::thread;
+use std::thread::{self, sleep_ms};
 use std::time::{Duration, Instant};
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::*;
@@ -40,6 +40,26 @@ enum PortalRenderingOption {
 //     Left,
 //     Down,
 // }
+//
+fn set_up_panic_hook() {
+    std::panic::set_hook(Box::new(move |panic_info| {
+        stdout().flush().expect("flush stdout");
+
+
+        write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
+        let string_out = format!("{:#?}\n\n", panic_info)
+            .replace("\n", "\n\r");
+        write!(stdout(), "{string_out}").expect("display panic info");
+
+if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+        println!("panic occurred: {s:?}");
+    } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+        println!("panic occurred: {s:?}");
+    } else {
+        println!("panic occurred");
+    }
+    }));
+}
 
 mod geometry2 {
 
@@ -701,6 +721,8 @@ fn main() {
             .into_alternate_screen()
             .unwrap();
 
+    set_up_panic_hook();
+
     let event_receiver = set_up_input_thread();
 
     let mut prev_drawn = None;
@@ -1026,7 +1048,6 @@ mod tests {
         out
     }
 
-    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
