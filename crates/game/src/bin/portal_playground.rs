@@ -1048,7 +1048,7 @@ mod tests {
         out
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
