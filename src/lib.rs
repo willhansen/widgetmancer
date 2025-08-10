@@ -52,7 +52,6 @@ pub trait MultilineStringExt: ToString {
             .join("\n")
     }
     fn pad_side(&self, dir: i32, n: usize) -> String {
-        dbg!(self.trim_control_characters());
         assert!(
             self.is_rectangular(),
             "frame: \n{}\n\n{:?}",
@@ -163,8 +162,7 @@ pub fn bargraph(data: Vec<f32>, height: u32) -> String {
     };
 
     let columns = data.iter().map(|x| col_func(*x) + "\n-").collect_vec();
-    dbg!(&columns);
-    let graph = horiz_concat_strings(&columns, 0);
+    let graph = horiz_concat_strings_with_vbias(&columns, 0, ConcatVBias::Bottom);
 
     format!("{graph}\n\nMax: {max}")
 }
