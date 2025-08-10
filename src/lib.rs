@@ -254,26 +254,28 @@ mod tests {
             .map(|t| [t as f32 * 0.2, t as f32 * 0.1])
             .collect_vec();
         let out_string = draw_points_in_character_grid(&p);
-        let correct_string = 
-"   ⢀⠄
+        let correct_string = "   ⢀⠄
  ⢀⠔⠁ 
 ⠐⠁   ";
         println!("{}", out_string);
         println!("out:\n{:?}\n\ncorrect:\n{:?}", out_string, correct_string);
         assert_eq!(&out_string, correct_string);
     }
-    #[ignore]
     #[test]
     fn test_print_braille_points() {
         let p = (0..100)
             .map(|t| [t as f32 / 3.0, (t as f32 * TAU / 100.0).sin() * 3.0])
             .collect_vec();
         let out_string = draw_points_in_character_grid(&p);
-        println!("{}", out_string);
-        panic!();
-        let correct_string = " ⢀⠄
- ⢀⠔⠁ 
-⠐⠁   ";
+
+        let correct_string = "     ⢀⣠⠤⠴⠤⠤⣀                      
+   ⢠⠔⠉      ⠙⠢⡀                   
+ ⢀⠜⠁          ⠈⢢⡀                 
+⠐⠁              ⠘⢤               ⡠
+                  ⠙⢄           ⣠⠊ 
+                    ⠑⢤⡀     ⢀⡠⠚   
+                      ⠈⠑⠒⠲⠒⠚⠉     ";
+        println!("out:\n{}\n\ncorrect:\n{}", out_string, correct_string);
         assert_eq!(&out_string, correct_string);
     }
 }
