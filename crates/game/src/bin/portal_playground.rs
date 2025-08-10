@@ -45,177 +45,20 @@ fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
         stdout().flush().expect("flush stdout");
 
-
         write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
-        let string_out = format!("{:#?}\n\n", panic_info)
-            .replace("\n", "\n\r");
+        let string_out = format!("{:#?}\n\n", panic_info).replace("\n", "\n\r");
         write!(stdout(), "{string_out}").expect("display panic info");
 
-if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
-        println!("panic occurred: {s:?}");
-    } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
-        println!("panic occurred: {s:?}");
-    } else {
-        println!("panic occurred");
-    }
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            println!("panic occurred: {s:?}");
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            println!("panic occurred: {s:?}");
+        } else {
+            println!("panic occurred");
+        }
     }));
 }
 
-mod geometry2 {
-
-    pub type IPoint = [i32; 2];
-    pub type FPoint = [f32; 2];
-    pub type OrthoDir = i32;
-    pub type SquareEdge = (IPoint, OrthoDir);
-
-    pub const DIR_RIGHT: i32 = 0;
-    pub const DIR_UP: i32 = 1;
-    pub const DIR_LEFT: i32 = 2;
-    pub const DIR_DOWN: i32 = 3;
-    pub const ALL_ORTHODIRS: [OrthoDir; 4] = [0, 1, 2, 3];
-
-    pub const STEP_RIGHT: IPoint = [1, 0];
-    pub const STEP_UP: IPoint = [0, 1];
-    pub const STEP_LEFT: IPoint = [-1, 0];
-    pub const STEP_DOWN: IPoint = [0, -1];
-
-    pub trait IPointExt: Sized {
-        fn x(&self) -> i32;
-        fn y(&self) -> i32;
-        fn new(x: i32, y: i32) -> Self;
-        fn add(&self, rhs: Self) -> Self {
-            Self::new(self.x() + rhs.x(), self.y() + rhs.y())
-        }
-        fn mul(&self, rhs: i32) -> Self {
-            Self::new(self.x() * rhs, self.y() * rhs)
-        }
-        fn neg(&self) -> Self {
-            Self::new(-self.x(), -self.y())
-        }
-        fn sub(&self, rhs: Self) -> Self {
-            self.add(rhs.neg())
-        }
-        fn dot(&self, rhs: IPoint) -> i32 {
-            self.x() * rhs.x() + self.y() * rhs.y()
-        }
-        fn has_component_in_direction(&self, dir: OrthoDir) -> bool {
-            self.dot(step_in_direction(dir)) > 0
-        }
-        fn has_component_against_direction(&self, dir: OrthoDir) -> bool {
-            self.dot(step_in_direction(dir)) < 0
-        }
-        fn to_float(&self) -> FPoint {
-            FPoint::new(self.x() as f32, self.y() as f32)
-        }
-    }
-
-    impl IPointExt for IPoint {
-        fn x(&self) -> i32 {
-            self[0]
-        }
-        fn y(&self) -> i32 {
-            self[1]
-        }
-        fn new(x: i32, y: i32) -> Self {
-            [x, y]
-        }
-    }
-
-    pub trait FPointExt: Sized {
-        fn x(&self) -> f32;
-        fn y(&self) -> f32;
-        fn new(x: f32, y: f32) -> Self;
-        fn add(&self, rhs: Self) -> Self {
-            Self::new(self.x() + rhs.x(), self.y() + rhs.y())
-        }
-        fn mul(&self, rhs: f32) -> Self {
-            Self::new(self.x() * rhs, self.y() * rhs)
-        }
-        fn neg(&self) -> Self {
-            Self::new(-self.x(), -self.y())
-        }
-        fn sub(&self, rhs: Self) -> Self {
-            self.add(rhs.neg())
-        }
-        fn dot(&self, rhs: FPoint) -> f32 {
-            self.x() * rhs.x() + self.y() * rhs.y()
-        }
-        fn rounded(&self) -> IPoint {
-            [self.x().round() as i32, self.y().round() as i32]
-        }
-        fn dist(&self, other: Self) -> f32 {
-            let dx = other.x() - self.x();
-            let dy = other.y() - self.y();
-            dx.powi(2) + dy.powi(2)
-        }
-    }
-    impl FPointExt for FPoint {
-        fn x(&self) -> f32 {
-            self[0]
-        }
-        fn y(&self) -> f32 {
-            self[1]
-        }
-        fn new(x: f32, y: f32) -> Self {
-            [x, y]
-        }
-    }
-
-    pub trait OrthoPoseExt {
-        fn rotate(&self, quarter_turns_ccw: i32) -> Self;
-    }
-    impl OrthoPoseExt for ([i32; 2], i32) {
-        fn rotate(&self, quarter_turns_ccw: i32) -> Self {
-            (self.0, (self.1 + quarter_turns_ccw).rem_euclid(4))
-        }
-    }
-
-    pub fn step_in_direction(dir: OrthoDir) -> IPoint {
-        match dir {
-            0 => [1, 0],
-            1 => [0, 1],
-            2 => [-1, 0],
-            3 => [0, -1],
-            _ => panic!("invalid direction: {dir}"),
-        }
-    }
-    #[allow(dead_code)]
-    pub fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
-        if square[0].abs() == square[1].abs() {
-            return None;
-        }
-
-        Some(if square[0].abs() > square[1].abs() {
-            if square[0] > 0 {
-                0
-            } else {
-                2
-            }
-        } else {
-            if square[1] > 0 {
-                1
-            } else {
-                3
-            }
-        })
-    }
-
-    pub fn rotate_quarter_turns(v: [i32; 2], turns: i32) -> [i32; 2] {
-        match turns.rem_euclid(4) {
-            0 => v,
-            1 => [-v[1], v[0]],
-            2 => [-v[0], v[1]],
-            3 => [v[1], -v[0]],
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
-        let step = step_in_direction(edge.1);
-        let reverse_dir = (edge.1 + 2).rem_euclid(4);
-        ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
-    }
-}
 use geometry2::FPoint;
 use geometry2::IPoint;
 use geometry2::*;
@@ -1016,16 +859,16 @@ mod tests {
             .collect_vec()
     }
     fn path_to_square_entry_events(path: &[(f32, FPoint)]) -> Vec<(f32, IPoint)> {
-        let moves = path.iter()
-            .tuple_windows()
-            .filter_map(|(a, b)| {
-                if a.1.rounded() != b.1.rounded() {
-                    Some((b.0, b.1.rounded()))
-                } else {
-                    None
-                }
-            });
-        once((path[0].0, path[0].1.rounded())).chain(moves).collect_vec()
+        let moves = path.iter().tuple_windows().filter_map(|(a, b)| {
+            if a.1.rounded() != b.1.rounded() {
+                Some((b.0, b.1.rounded()))
+            } else {
+                None
+            }
+        });
+        once((path[0].0, path[0].1.rounded()))
+            .chain(moves)
+            .collect_vec()
     }
 
     fn smoothed_mouse_path(
@@ -1039,7 +882,7 @@ mod tests {
         let mut i = 0;
         let mut out = vec![];
         while t < end_t {
-            while t >= square_entry_events[i].0 && i < square_entry_events.len()-1 {
+            while t >= square_entry_events[i].0 && i < square_entry_events.len() - 1 {
                 i += 1;
             }
             out.push((t, smoothed_mouse_position(&square_entry_events[0..i], t)));
@@ -1048,24 +891,36 @@ mod tests {
         out
     }
 
-    // #[ignore]
+    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
-        let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
-        let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
-        let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
-        assert_eq!(square_entry_events[0].0, sim_path[0].0);
+        let path_funcs = [
+            |t: f32| [t * 5.0, 0.0],
+            |t: f32| [t * 15.0, 0.0],
+            |t: f32| [t * 10.0, t.sin()],
+        ];
+        for path_func in path_funcs {
+            let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
+            println!(
+                "Path:\n{}",
+                draw_points_in_character_grid(
+                    &sim_path.iter().cloned().map(|(t, p)| p).collect_vec()
+                )
+            );
+            let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
+            assert_eq!(square_entry_events[0].0, sim_path[0].0);
 
-        let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0, 3.0);
+            let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0, 3.0);
 
-        assert_eq!(sim_path.len(), smoothed_path.len());
+            assert_eq!(sim_path.len(), smoothed_path.len());
 
-        let errors: Vec<f32> = sim_path
-            .iter()
-            .zip(smoothed_path.iter())
-            .map(|((t1, p1), (t2, p2))| p1.dist(*p2))
-            .collect_vec();
-        println!("{}", bargraph(errors, 5));
+            let errors: Vec<f32> = sim_path
+                .iter()
+                .zip(smoothed_path.iter())
+                .map(|((t1, p1), (t2, p2))| p1.dist(*p2))
+                .collect_vec();
+            println!("Error:\n{}", bargraph(errors, 5));
+        }
         panic!();
     }
 }

@@ -1,4 +1,12 @@
 pub mod glyph;
+use std::collections::HashMap;
+use std::ops::Add;
+use std::ops::Mul;
+use std::ops::Sub;
+
+use geometry2::FPoint;
+use geometry2::FPointExt;
+use geometry2::IPoint;
 pub use glyph::*;
 
 pub mod glyph_with_transparency;
@@ -12,6 +20,7 @@ pub use screen::*;
 pub mod frame;
 pub use frame::*;
 
+use utility::geometry2::IPointExt;
 pub use utility::*;
 
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
@@ -137,6 +146,37 @@ pub fn horiz_concat_equal_height_strings(strings: &[String], spaces: usize) -> S
         .join("\n")
 }
 
+pub fn char_point_to_local_braille_square(char_point: FPoint) -> IPoint {
+    [
+        (char_point[0].mul(2.0).add(0.5).round() as i32).rem_euclid(2),
+        (char_point[1].mul(4.0).add(1.5).round() as i32).rem_euclid(4),
+    ]
+}
+
+pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
+    let char_map: HashMap<IPoint, char> = points
+        .iter()
+        .map(|&p| (p.rounded(), char_point_to_local_braille_square(p)))
+        // .inspect(|p| {
+        // println!("{}, {}", p.0.to_string(), p.1.to_string());
+        // })
+        .sorted()
+        .group_by(|(char_pos, local_braille_pos)| *char_pos)
+        .into_iter()
+        .map(|(char_pos, pos_pair)| {
+            let local_squares = pos_pair
+                .into_iter()
+                .map(|(char_pos, local_pos)| local_pos)
+                .collect_vec();
+            (
+                char_pos,
+                local_braille_squares_to_braille_char2(local_squares),
+            )
+        })
+        .collect();
+    char_map_to_string(char_map)
+}
+
 pub fn bargraph(data: Vec<f32>, height: u32) -> String {
     const blocks: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     const full_block: char = '█';
@@ -169,6 +209,8 @@ pub fn bargraph(data: Vec<f32>, height: u32) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::f32::consts::TAU;
+
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
@@ -205,5 +247,33 @@ mod tests {
         assert_eq!("a".pad_side(1, 2), " \n \na".to_string());
         assert_eq!("a".pad_side(2, 2), "  a".to_string());
         assert_eq!("a".pad_side(2, 2).pad_side(0, 2), "  a  ".to_string());
+    }
+    #[test]
+    fn test_print_braille_points_simple() {
+        let p = (0..20)
+            .map(|t| [t as f32 * 0.2, t as f32 * 0.1])
+            .collect_vec();
+        let out_string = draw_points_in_character_grid(&p);
+        let correct_string = 
+"   ⢀⠄
+ ⢀⠔⠁ 
+⠐⠁   ";
+        println!("{}", out_string);
+        println!("out:\n{:?}\n\ncorrect:\n{:?}", out_string, correct_string);
+        assert_eq!(&out_string, correct_string);
+    }
+    #[ignore]
+    #[test]
+    fn test_print_braille_points() {
+        let p = (0..100)
+            .map(|t| [t as f32 / 3.0, (t as f32 * TAU / 100.0).sin() * 3.0])
+            .collect_vec();
+        let out_string = draw_points_in_character_grid(&p);
+        println!("{}", out_string);
+        panic!();
+        let correct_string = " ⢀⠄
+ ⢀⠔⠁ 
+⠐⠁   ";
+        assert_eq!(&out_string, correct_string);
     }
 }

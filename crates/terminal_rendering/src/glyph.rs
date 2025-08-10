@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 
 use euclid::*;
@@ -8,6 +8,7 @@ use rgb::*;
 use termion::color;
 
 use glyph_constants::*;
+use utility::geometry2::IPointExt;
 
 use crate::glyph::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::{
@@ -120,7 +121,7 @@ impl Glyph {
         color::Bg(color::Reset).to_string() + &color::Fg(color::Reset).to_string()
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn custom_to_string(&self) -> String {
         self.color_string() + &self.character.to_string() + &Glyph::color_reset_string()
     }
     pub fn to_string_after(&self, prev: Option<Self>) -> String {
@@ -485,6 +486,12 @@ impl Debug for Glyph {
     }
 }
 
+impl Display for Glyph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.custom_to_string())
+    }
+}
+
 pub trait DoubleGlyphFunctions {
     fn solid_color_if_backgroundified(&self) -> [RGB8; 2];
     fn drawn_over(&self, background_glyphs: DoubleGlyph) -> DoubleGlyph;
@@ -619,27 +626,59 @@ fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
         None
     }
 }
-pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
-    let top_row = glyph_map.keys().map(|square| square.y).max().unwrap();
-    let bottom_row = glyph_map.keys().map(|square| square.y).min().unwrap();
-    let left_column = glyph_map.keys().map(|square| square.x).min().unwrap();
-    let right_column = glyph_map.keys().map(|square| square.x).max().unwrap();
-    let mut string = String::new();
-    for bottom_to_top_y in bottom_row..=top_row {
-        let y = top_row + bottom_row - bottom_to_top_y;
-        for x in left_column..=right_column {
-            let square = WorldCharacterSquare::new(x, y);
-            let new_part = if let Some(glyph) = glyph_map.get(&square) {
-                glyph.to_string()
-            } else {
-                " ".to_string()
-            };
 
-            string += &new_part;
-        }
-        string += "\n";
-    }
-    string
+pub fn map_of_stringables_to_string<S>(stringable_map: &HashMap<[i32; 2], S>) -> String
+where
+    S: ToString,
+{
+    let top_row = stringable_map
+        .keys()
+        .map(|square| square.y())
+        .max()
+        .unwrap();
+    let bottom_row = stringable_map
+        .keys()
+        .map(|square| square.y())
+        .min()
+        .unwrap();
+    let left_column = stringable_map
+        .keys()
+        .map(|square| square.x())
+        .min()
+        .unwrap();
+    let right_column = stringable_map
+        .keys()
+        .map(|square| square.x())
+        .max()
+        .unwrap();
+    (bottom_row..=top_row)
+        .map(|bottom_to_top_y| {
+            let y = top_row + bottom_row - bottom_to_top_y;
+            (left_column..=right_column)
+                .map(|x| {
+                    let square = [x, y];
+                    let new_part = if let Some(glyph) = stringable_map.get(&square) {
+                        glyph.to_string()
+                    } else {
+                        " ".to_string()
+                    };
+
+                    new_part
+                })
+                .join("")
+        })
+        .join("\n")
+}
+pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
+    map_of_stringables_to_string(
+        &glyph_map
+            .into_iter()
+            .map(|(&a, &b)| (a.to_array(), b))
+            .collect(),
+    )
+}
+pub fn char_map_to_string(char_map: HashMap<geometry2::IPoint, char>) -> String {
+    map_of_stringables_to_string(&char_map)
 }
 #[deprecated(note = "worldcharactersquareglyphmap is bad")]
 pub fn pair_up_character_square_map<T: Clone>(

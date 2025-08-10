@@ -2,6 +2,7 @@ use crate::glyph::glyph_constants::SPACE;
 use crate::glyph::DoubleChar;
 use crate::{pair_up_character_square_map, screen::*};
 use utility::coordinate_frame_conversions::*;
+use utility::geometry2::IPointExt;
 use utility::*;
 use euclid::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
@@ -228,8 +229,19 @@ pub fn local_braille_squares_to_braille_array(squares: Vec<WorldBrailleSquare>) 
     output_array
 }
 
+
 pub fn local_braille_squares_to_braille_char(squares: Vec<WorldBrailleSquare>) -> char {
     local_braille_squares_to_braille_array(squares).char()
+}
+
+pub fn local_braille_squares_to_braille_char2(squares: Vec<geometry2::IPoint>) -> char {
+    let mut output_array: BrailleArray = BrailleArray::empty();
+    for square in squares {
+        assert!(square.x() >= 0 || square.x() < 2);
+        assert!(square.y() >= 0 || square.y() < 4);
+        output_array.set_xy(square.x() as usize, square.y() as usize, true);
+    }
+    output_array.char()
 }
 
 pub fn get_chars_for_braille_line(

@@ -27,6 +27,8 @@ pub use angle_interval::*;
 pub mod coordinate_frame_conversions;
 pub use coordinate_frame_conversions::*;
 
+pub mod geometry2;
+
 pub type IPoint = default::Point2D<i32>;
 pub type FPoint = default::Point2D<f32>;
 pub type IVector = default::Vector2D<i32>;
