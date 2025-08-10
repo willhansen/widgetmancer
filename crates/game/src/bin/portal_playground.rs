@@ -891,7 +891,7 @@ mod tests {
         out
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_funcs = [
@@ -914,12 +914,20 @@ mod tests {
 
             assert_eq!(sim_path.len(), smoothed_path.len());
 
-            let errors: Vec<f32> = sim_path
-                .iter()
-                .zip(smoothed_path.iter())
-                .map(|((t1, p1), (t2, p2))| p1.dist(*p2))
-                .collect_vec();
-            println!("Error:\n{}", bargraph(errors, 5));
+            let label_and_funcs: &[(&str,fn(FPoint, FPoint) -> f32 )] = &[
+                ("Dist error:", |p1, p2| p1.dist(p2)),
+                ("x error:", |p1, p2| p1.x().sub(p2.x()).abs()),
+                ("y error:", |p1, p2| p1.y().sub(p2.y()).abs()),
+            ];
+
+            label_and_funcs.into_iter().for_each(|(label, func)| {
+                let errors: Vec<f32> = sim_path
+                    .iter()
+                    .zip(smoothed_path.iter())
+                    .map(|(&(t1, p1), &(t2, p2))| func(p1, p2))
+                    .collect_vec();
+                println!("{label}:\n{}", bargraph(errors, 5));
+            })
         }
         panic!();
     }

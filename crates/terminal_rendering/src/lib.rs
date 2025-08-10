@@ -46,7 +46,7 @@ pub trait MultilineStringExt: ToString {
             .unwrap()
     }
     fn trim_control_characters(&self) -> String {
-        let control_char_regex = regex::Regex::new("\u{1b}\\[(.*?)m").unwrap();
+        let control_char_regex = regex_static::static_regex!(r"\u{1b}\[(.*?)m");
         let x = control_char_regex.split(&self.to_string()).join("");
         x
     }
