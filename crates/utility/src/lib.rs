@@ -1673,53 +1673,6 @@ where
         .try_into()
         .unwrap()
 }
-pub fn horiz_concat_strings(strings: &[String], spaces: usize) -> String {
-    let mut out = String::new();
-    let num_cols = strings.len();
-    let mut columns = strings
-        .into_iter()
-        .map(|s| s.lines().collect_vec())
-        .collect_vec();
-    for row in 0.. {
-        for col in 0..num_cols {
-            let column = &columns[col];
-            if row >= column.len() {
-                return out;
-            }
-            out += column[row];
-
-            if col < num_cols - 1 {
-                out += &" ".repeat(spaces);
-            }
-        }
-        out += "\n";
-    }
-    unreachable!("string needs to finish");
-}
-
-pub fn bargraph(data: Vec<f32>, height: u32) -> String {
-    const blocks: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    const full_block: char = '█';
-    let max = data.iter().map(|&x| OrderedFloat(x)).max().unwrap().into_inner();
-    assert!(data.iter().all(|&x| x >= 0.0));
-
-    let col_func = |val: f32| -> String {
-        let height_in_blocks = val / height as f32;
-        let full_blocks = height_in_blocks.floor() as usize;
-        let remainder_in_eighths = (height_in_blocks - full_blocks as f32) / 8.0;
-        let full_eighths = remainder_in_eighths.round() as u32;
-        (if full_eighths > 0 {
-            blocks[(full_eighths - 1) as usize].to_string()
-        } else {
-            "".to_string()
-        }) + &format!("\n{full_block}").repeat(full_blocks)
-    };
-
-    let columns = data.iter().map(|x| col_func(*x) + "\n-").collect_vec();
-    let graph = horiz_concat_strings(&columns, 0);
-
-    format!("{graph}\n\nMax: {max}")
-}
 
 #[cfg(test)]
 mod tests {

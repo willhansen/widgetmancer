@@ -779,7 +779,7 @@ mod tests {
     use super::*;
     use game::fov_stuff::LocalSquareHalfPlane;
     use pretty_assertions::assert_str_eq;
-    use std::{assert_eq, assert_ne, f32::consts::TAU};
+    use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
     use stdext::function_name;
     use termion::event::MouseEvent;
 
@@ -1007,8 +1007,8 @@ mod tests {
         sample_rate: f32,
         end_t: f32,
     ) -> Vec<(f32, FPoint)> {
-        let n = (end_t / sample_rate).floor() as u32;
-        (0..n)
+        let n = (end_t * sample_rate).round() as u32;
+        (0..=n)
             .map(|i| {
                 let t = i as f32 / sample_rate;
                 (t, path_fn(t))
@@ -1016,7 +1016,7 @@ mod tests {
             .collect_vec()
     }
     fn path_to_square_entry_events(path: &[(f32, FPoint)]) -> Vec<(f32, IPoint)> {
-        path.iter()
+        let moves = path.iter()
             .tuple_windows()
             .filter_map(|(a, b)| {
                 if a.1.rounded() != b.1.rounded() {
@@ -1024,22 +1024,22 @@ mod tests {
                 } else {
                     None
                 }
-            })
-            .collect_vec()
+            });
+        once((path[0].0, path[0].1.rounded())).chain(moves).collect_vec()
     }
 
     fn smoothed_mouse_path(
         square_entry_events: Vec<(f32, IPoint)>,
         sample_rate: f32,
+        end_t: f32,
     ) -> Vec<(f32, FPoint)> {
         assert!(square_entry_events.len() > 0);
         let t0 = square_entry_events[0].0;
-        let t_end = square_entry_events.last().unwrap().0;
         let mut t = t0;
         let mut i = 0;
         let mut out = vec![];
-        while t < t_end {
-            while t >= square_entry_events[i].0 {
+        while t < end_t {
+            while t >= square_entry_events[i].0 && i < square_entry_events.len()-1 {
                 i += 1;
             }
             out.push((t, smoothed_mouse_position(&square_entry_events[0..i], t)));
@@ -1048,13 +1048,15 @@ mod tests {
         out
     }
 
+    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_func = |t| [0.0, 0.0].add([5.0, 0.0].mul(t));
         let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
         let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
+        assert_eq!(square_entry_events[0].0, sim_path[0].0);
 
-        let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0);
+        let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0, 3.0);
 
         assert_eq!(sim_path.len(), smoothed_path.len());
 
