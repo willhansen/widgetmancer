@@ -66,6 +66,7 @@ use geometry2::*;
 struct Camera {
     lower_left_local_square_in_world: [i32; 2],
     upper_right_local_square_in_world: [i32; 2],
+    upper_left_row_col_char_on_screen: [u16; 2],
 }
 impl Camera {
     pub fn size(&self) -> [u32; 2] {
@@ -100,6 +101,19 @@ impl Camera {
             (false, false) => 2,
         }
     }
+    pub fn local_screen_row_col_point_to_local_world_point(
+        &self,
+        screen_row_col_point: FPoint,
+    ) -> FPoint {
+        [
+            screen_row_col_point[1] / 2.0,
+            self.height() as f32 - screen_row_col_point[0],
+        ]
+    }
+    // TODO: account for non-default positioning and rotation
+    pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
+        self.local_screen_row_col_point_to_local_world_point(screen_row_col_point)
+    }
 }
 
 // struct PortalUnderConstruction {
@@ -118,6 +132,7 @@ struct GameState {
 
     portals: HashMap<PortalSide, PortalSide>,
 
+    event_log: VecDeque<(std::time::Instant, Event)>,
     last_mouse_screen_row_col: Option<[u16; 2]>,
     pub portal_rendering: PortalRenderingOption,
     board_color_function: fn(&GameState, IPoint) -> Option<RGB8>,
@@ -133,6 +148,7 @@ impl GameState {
             player_is_alive: false,
             portals: Default::default(),
             last_mouse_screen_row_col: None,
+            event_log: Default::default(),
             portal_rendering: PortalRenderingOption::LineOnFloor,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
@@ -188,8 +204,9 @@ impl GameState {
             && square[1] < self.height as i32
     }
 
-    pub fn process_events(&mut self, events: impl IntoIterator<Item = Event>) {
-        events.into_iter().for_each(|e| self.process_event(e))
+    pub fn process_events_now(&mut self, events: impl IntoIterator<Item = Event>) {
+        let now = std::time::Instant::now();
+        events.into_iter().for_each(|e| self.process_event(now, e))
     }
 
     pub fn place_portal(&mut self, entrance: PortalSide, reverse_entrance: PortalSide) {
@@ -204,7 +221,12 @@ impl GameState {
             other_side_of_edge(entrance),
         );
     }
-    pub fn process_event(&mut self, event: Event) {
+    pub fn process_event_now(&mut self, event: Event) {
+        self.process_event(std::time::Instant::now(), event)
+    }
+    pub fn process_event(&mut self, time: std::time::Instant, event: Event) {
+        self.event_log.push_front((time, event.clone()));
+        self.event_log.truncate(20);
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.running = false,
@@ -313,7 +335,7 @@ impl GameState {
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let frame = (0..self.height)
+        let mut frame: Frame = (0..self.height)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row as i32 - 1;
                 (0..self.width as i32)
@@ -397,6 +419,20 @@ impl GameState {
             })
             .collect_vec()
             .into();
+
+        // draw mouse position on top
+        if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col() {
+            let smoothed_mouse_pos_xy = [
+                smoothed_mouse_pos_row_col[1] - 1.0,
+                self.height as f32 - (smoothed_mouse_pos_row_col[0] - 1.0),
+            ];
+            let the_char: char = draw_points_in_character_grid(&[smoothed_mouse_pos_xy])
+                .chars()
+                .next()
+                .unwrap();
+            let [row, col] = smoothed_mouse_pos_row_col.rounded();
+            frame.grid[row as usize][col as usize].character = the_char;
+        }
         (
             frame,
             debug_portal_visualizer_frames.into_values().collect_vec(),
@@ -538,6 +574,41 @@ impl GameState {
         }
         glyphs
     }
+    fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
+        let recent_events = self.recent_mouse_screen_char_entry_events_row_col();
+        if recent_events.is_empty() {
+            return None;
+        }
+        if recent_events.len() == 1 {
+            let e = recent_events.first().unwrap();
+            return Some([e.1 as f32, e.2 as f32]);
+        }
+        let now = std::time::Instant::now();
+        let t0 = recent_events.first().unwrap().0;
+        let formatted: Vec<(f32, IPoint)> = recent_events
+            .into_iter()
+            .map(|(instant, row, col)| (instant.duration_since(t0).as_secs_f32(), [row as i32, col as i32]))
+            .collect_vec();
+
+        Some(smoothed_mouse_position(&formatted, now.duration_since(t0).as_secs_f32()))
+    }
+    fn recent_mouse_screen_char_entry_events_row_col(&self) -> Vec<(Instant, u16, u16)> {
+        self.event_log
+            .iter()
+            .filter_map(|(t, e)| {
+                let (row, col) = match e {
+                    Event::Mouse(termion::event::MouseEvent::Press(
+                        termion::event::MouseButton::Left,
+                        col,
+                        row,
+                    )) => (row, col),
+                    Event::Mouse(termion::event::MouseEvent::Hold(col, row)) => (row, col),
+                    _ => return None,
+                };
+                Some((*t, *row, *col))
+            })
+            .collect_vec()
+    }
 }
 
 fn grey(x: u8) -> RGB8 {
@@ -569,12 +640,10 @@ fn main() {
     let event_receiver = set_up_input_thread();
 
     let mut prev_drawn = None;
-    let mut event_log = VecDeque::new();
     while game_state.running {
+        let now = std::time::Instant::now();
         while let Ok(event) = event_receiver.try_recv() {
-            event_log.push_front(event.clone());
-            event_log.truncate(5);
-            game_state.process_event(event);
+            game_state.process_event(now, event);
         }
         let frame = game_state.render();
         screen_frame.blit(&frame, [0, 0]);
@@ -582,7 +651,7 @@ fn main() {
             format!("{:<30}", game_state.last_mouse_screen_row_col.to_debug()),
             [(height + 1).into(), 0],
         );
-        for (i, event) in event_log.iter().enumerate() {
+        for (i, event) in game_state.event_log.iter().enumerate() {
             screen_frame.draw_text(
                 format!("{:<30}", format!("{:?}", event)),
                 [height as usize + 3 + i, 0],
@@ -693,7 +762,7 @@ mod tests {
     #[test]
     fn test_click_a() {
         let mut game = GameState::new(12, 12);
-        game.process_event(press_left(0, 0));
+        game.process_event_now(press_left(0, 0));
         let frame = game.render();
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
@@ -702,14 +771,14 @@ mod tests {
     #[test]
     fn test_click_a_small() {
         let mut game = GameState::new(2, 2);
-        game.process_event(press_left(0, 0));
+        game.process_event_now(press_left(0, 0));
         let frame = game.render();
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_click_b() {
         let mut game = GameState::new(12, 12);
-        game.process_event(press_left(3, 9));
+        game.process_event_now(press_left(3, 9));
         let frame = game.render();
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
@@ -720,11 +789,11 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = GameState::new(12, 12);
-        game.process_events([press_left(3, 3)]);
+        game.process_events_now([press_left(3, 3)]);
         let frame_1 = game.render();
-        game.process_events([drag_mouse(4, 3)]);
+        game.process_events_now([drag_mouse(4, 3)]);
         let frame_2 = game.render();
-        game.process_events([drag_mouse(5, 3)]);
+        game.process_events_now([drag_mouse(5, 3)]);
         let frame_3 = game.render();
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
