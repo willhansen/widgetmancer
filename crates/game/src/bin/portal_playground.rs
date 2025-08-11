@@ -897,7 +897,7 @@ mod tests {
         let path_funcs = [
             |t: f32| [t * 5.0, 0.0],
             |t: f32| [t * 15.0, 0.0],
-            |t: f32| [t * 10.0, t.sin()],
+            |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0],
         ];
         for path_func in path_funcs {
             let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
@@ -912,9 +912,14 @@ mod tests {
 
             let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0, 3.0);
 
+            let naive_snap_to_square_path = sim_path
+                .iter()
+                .map(|&(t, p)| (t, p.rounded()))
+                .collect_vec();
+
             assert_eq!(sim_path.len(), smoothed_path.len());
 
-            let label_and_funcs: &[(&str,fn(FPoint, FPoint) -> f32 )] = &[
+            let label_and_funcs: &[(&str, fn(FPoint, FPoint) -> f32)] = &[
                 ("Dist error:", |p1, p2| p1.dist(p2)),
                 ("x error:", |p1, p2| p1.x().sub(p2.x()).abs()),
                 ("y error:", |p1, p2| p1.y().sub(p2.y()).abs()),
@@ -927,7 +932,18 @@ mod tests {
                     .map(|(&(t1, p1), &(t2, p2))| func(p1, p2))
                     .collect_vec();
                 println!("{label}:\n{}", bargraph(errors, 5));
-            })
+            });
+            println!(
+                "naive path dist error:\n{}",
+                bargraph(
+                    sim_path
+                        .iter()
+                        .zip(naive_snap_to_square_path.iter())
+                        .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2.to_float()))
+                        .collect_vec(),
+                    5
+                )
+            );
         }
         panic!();
     }
