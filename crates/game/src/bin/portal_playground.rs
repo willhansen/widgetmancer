@@ -13,6 +13,7 @@ use std::io::Read;
 use std::io::{stdin, stdout, Write};
 use std::option_env;
 use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::{self, sleep_ms};
 use std::time::{Duration, Instant};
 use terminal_rendering::glyph_constants::named_colors::*;
@@ -62,6 +63,94 @@ fn set_up_panic_hook() {
 use geometry2::FPoint;
 use geometry2::IPoint;
 use geometry2::*;
+
+struct Game {
+    pub world_state: WorldState,
+    pub ui_handler: UiHandler,
+}
+impl Game {
+    pub fn new(width: usize, height: usize) -> Self {
+        Game {
+            world_state: WorldState::new(width, height),
+            ui_handler: UiHandler::new(),
+        }
+    }
+    pub fn new_headless_one_to_one_square(s: usize) -> Self {
+        Self::new_headless(s as u16, s as u16 * 2, s, s)
+    }
+    pub fn new_headless(
+        screen_height: u16,
+        screen_width: u16,
+        width: usize,
+        height: usize,
+    ) -> Self {
+        Game {
+            world_state: WorldState::new(width, height),
+            ui_handler: UiHandler::new_headless(screen_height, screen_width),
+        }
+    }
+    pub fn give_and_process_fake_event_now(&mut self, event: Event) {
+        self.ui_handler.give_fake_event_now(event);
+        assert!(self.try_process_next_event());
+    }
+    pub fn process_event(&self, time: f32, event: Event) {
+        match event {
+            Event::Key(key) => match key {
+                Key::Char('q') => self.world_state.running = false,
+                Key::Char('t') => {
+                    self.world_state.portal_rendering = match self.world_state.portal_rendering {
+                        PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
+                        PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
+                        PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
+                    }
+                }
+                // Key::Backspace => todo!(),
+                // Key::Left => todo!(),
+                // Key::Right => todo!(),
+                // Key::Up => todo!(),
+                // Key::Down => todo!(),
+                // Key::Home => todo!(),
+                // Key::End => todo!(),
+                // Key::PageUp => todo!(),
+                // Key::PageDown => todo!(),
+                // Key::BackTab => todo!(),
+                // Key::Delete => todo!(),
+                // Key::Insert => todo!(),
+                // Key::F(_) => todo!(),
+                // Key::Alt(_) => todo!(),
+                // Key::Ctrl(_) => todo!(),
+                // Key::Null => todo!(),
+                // Key::Esc => todo!(),
+                _ => {}
+            },
+            Event::Mouse(mouse_event) => match mouse_event {
+                termion::event::MouseEvent::Press(mouse_button, col, row) => {
+                    self.ui_handler.last_mouse_screen_row_col = Some([row - 1, col - 1])
+                }
+                termion::event::MouseEvent::Release(col, row) => {
+                    self.ui_handler.last_mouse_screen_row_col = None
+                }
+                termion::event::MouseEvent::Hold(col, row) => {
+                    self.ui_handler.last_mouse_screen_row_col = Some([row - 1, col - 1])
+                }
+            },
+            Event::Unsupported(items) => todo!(),
+        };
+    }
+    pub fn process_next_event(&mut self) {
+        let (time, event) = self.ui_handler.next_event();
+        self.process_event(time, event)
+    }
+    pub fn try_process_next_event(&mut self) -> bool {
+        // true if processed, false if no next found
+        let Some((time, event)) = self.ui_handler.try_get_next_event() else {
+            return false;
+        };
+        self.process_event(time, event);
+
+        true
+    }
+}
 
 struct Camera {
     lower_left_local_square_in_world: [i32; 2],
@@ -123,7 +212,103 @@ impl Camera {
 //     extension_length: Option<u32>
 // }
 
-struct GameState {
+struct UiHandler {
+    pub start_time: Instant,
+    pub event_log: VecDeque<(f32, Event)>,
+    pub last_mouse_screen_row_col: Option<[u16; 2]>,
+    pub output_writable: Option<Box<dyn Write>>,
+    pub event_receiver: Receiver<(Instant, Event)>,
+    pub fake_event_sender: Option<Sender<(Instant, Event)>>,
+    pub prev_drawn: Option<Frame>,
+    pub screen_buffer: Frame,
+}
+impl UiHandler {
+    pub fn new() -> UiHandler {
+        let (term_width, term_height) = termion::terminal_size().unwrap();
+        let output_writable = Box::new(
+            termion::cursor::HideCursor::from(MouseTerminal::from(
+                stdout().into_raw_mode().unwrap(),
+            ))
+            .into_alternate_screen()
+            .unwrap(),
+        );
+        let event_receiver = set_up_input_thread();
+        Self::new_maybe_headless(
+            term_height,
+            term_width,
+            Some(output_writable),
+            event_receiver,
+        )
+    }
+    pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
+        let (sender, receiver) = channel();
+        let mut handler = Self::new_maybe_headless(screen_height, screen_width, None, receiver);
+        handler.fake_event_sender = Some(sender);
+        handler
+    }
+    pub fn new_maybe_headless(
+        screen_height: u16,
+        screen_width: u16,
+        output_writable: Option<Box<dyn Write>>,
+        event_receiver: Receiver<(Instant, Event)>,
+    ) -> UiHandler {
+        UiHandler {
+            start_time: Instant::now(),
+            event_log: Default::default(),
+            last_mouse_screen_row_col: None,
+            output_writable,
+            event_receiver,
+            fake_event_sender: None,
+            prev_drawn: None,
+            screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
+        }
+    }
+    pub fn draw_screen(&mut self) {
+        draw_frame(
+            &mut self.output_writable.unwrap(),
+            &self.screen_buffer,
+            &self.prev_drawn,
+        );
+        self.prev_drawn = Some(self.screen_buffer.clone());
+    }
+
+    pub fn try_get_next_event(&mut self) -> Option<(f32, Event)> {
+        self.event_receiver.try_recv().ok().map(|(instant, event)| {
+            let t = instant.duration_since(self.start_time).as_secs_f32();
+            self.log_event((t, event));
+            (t, event)
+        })
+    }
+    pub fn next_event(&mut self) -> (f32, Event) {
+        self.event_receiver
+            .recv()
+            .ok()
+            .map(|(instant, event)| {
+                let t = instant.duration_since(self.start_time).as_secs_f32();
+                self.log_event((t, event));
+                (t, event)
+            })
+            .unwrap()
+    }
+    fn log_event(&mut self, e: (f32, Event)) {
+        self.event_log.push_front(e);
+        self.event_log.truncate(20);
+    }
+    pub fn give_fake_event(&mut self, event: (f32, Event)) {
+        self.fake_event_sender
+            .unwrap()
+            .send((self.start_time + Duration::from_secs_f32(event.0), event.1))
+            .unwrap()
+    }
+    pub fn give_fake_event_now(&mut self, event: Event) {
+        self.fake_event_sender
+            .unwrap()
+            .send((Instant::now(), event))
+            .unwrap()
+    }
+}
+
+struct WorldState {
     running: bool,
     width: usize,
     height: usize,
@@ -132,23 +317,19 @@ struct GameState {
 
     portals: HashMap<PortalSide, PortalSide>,
 
-    event_log: VecDeque<(std::time::Instant, Event)>,
-    last_mouse_screen_row_col: Option<[u16; 2]>,
     pub portal_rendering: PortalRenderingOption,
-    board_color_function: fn(&GameState, IPoint) -> Option<RGB8>,
+    board_color_function: fn(&WorldState, IPoint) -> Option<RGB8>,
     portal_tint_function: fn(RGB8, u32) -> RGB8,
 }
-impl GameState {
+impl WorldState {
     pub fn new(width: usize, height: usize) -> Self {
-        GameState {
+        WorldState {
             running: true,
             width,
             height,
             player_square: [5, 5],
             player_is_alive: false,
             portals: Default::default(),
-            last_mouse_screen_row_col: None,
-            event_log: Default::default(),
             portal_rendering: PortalRenderingOption::LineOnFloor,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
@@ -204,11 +385,6 @@ impl GameState {
             && square[1] < self.height as i32
     }
 
-    pub fn process_events_now(&mut self, events: impl IntoIterator<Item = Event>) {
-        let now = std::time::Instant::now();
-        events.into_iter().for_each(|e| self.process_event(now, e))
-    }
-
     pub fn place_portal(&mut self, entrance: PortalSide, reverse_entrance: PortalSide) {
         self.portals.insert(entrance, reverse_entrance);
         self.portals.insert(reverse_entrance, entrance);
@@ -223,52 +399,6 @@ impl GameState {
     }
     pub fn process_event_now(&mut self, event: Event) {
         self.process_event(std::time::Instant::now(), event)
-    }
-    pub fn process_event(&mut self, time: std::time::Instant, event: Event) {
-        self.event_log.push_front((time, event.clone()));
-        self.event_log.truncate(20);
-        match event {
-            Event::Key(key) => match key {
-                Key::Char('q') => self.running = false,
-                Key::Char('t') => {
-                    self.portal_rendering = match self.portal_rendering {
-                        PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
-                        PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
-                        PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
-                    }
-                }
-                // Key::Backspace => todo!(),
-                // Key::Left => todo!(),
-                // Key::Right => todo!(),
-                // Key::Up => todo!(),
-                // Key::Down => todo!(),
-                // Key::Home => todo!(),
-                // Key::End => todo!(),
-                // Key::PageUp => todo!(),
-                // Key::PageDown => todo!(),
-                // Key::BackTab => todo!(),
-                // Key::Delete => todo!(),
-                // Key::Insert => todo!(),
-                // Key::F(_) => todo!(),
-                // Key::Alt(_) => todo!(),
-                // Key::Ctrl(_) => todo!(),
-                // Key::Null => todo!(),
-                // Key::Esc => todo!(),
-                _ => {}
-            },
-            Event::Mouse(mouse_event) => match mouse_event {
-                termion::event::MouseEvent::Press(mouse_button, col, row) => {
-                    self.last_mouse_screen_row_col = Some([row - 1, col - 1])
-                }
-                termion::event::MouseEvent::Release(col, row) => {
-                    self.last_mouse_screen_row_col = None
-                }
-                termion::event::MouseEvent::Hold(col, row) => {
-                    self.last_mouse_screen_row_col = Some([row - 1, col - 1])
-                }
-            },
-            Event::Unsupported(items) => todo!(),
-        }
     }
     // xy order from bottom left of screen
     fn mouse_screen_square(&self) -> Option<IPoint> {
@@ -587,10 +717,18 @@ impl GameState {
         let t0 = recent_events.first().unwrap().0;
         let formatted: Vec<(f32, IPoint)> = recent_events
             .into_iter()
-            .map(|(instant, row, col)| (instant.duration_since(t0).as_secs_f32(), [row as i32, col as i32]))
+            .map(|(instant, row, col)| {
+                (
+                    instant.duration_since(t0).as_secs_f32(),
+                    [row as i32, col as i32],
+                )
+            })
             .collect_vec();
 
-        Some(smoothed_mouse_position(&formatted, now.duration_since(t0).as_secs_f32()))
+        Some(smoothed_mouse_position(
+            &formatted,
+            now.duration_since(t0).as_secs_f32(),
+        ))
     }
     fn recent_mouse_screen_char_entry_events_row_col(&self) -> Vec<(Instant, u16, u16)> {
         self.event_log
@@ -621,44 +759,33 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 }
 
 fn main() {
-    let (term_width, term_height) = termion::terminal_size().unwrap();
-    let mut screen_frame = Frame::blank(term_width as usize, term_height as usize);
-    let (width, height) = (50, 25);
+    let mut game = Game::new(25, 25);
+    game.world_state.player_is_alive = true;
+    game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
+    game.world_state
+        .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
 
-    let mut game_state = GameState::new(width / 2, height);
-    game_state.player_is_alive = true;
-    game_state.portal_rendering = PortalRenderingOption::LineOfSight;
-    game_state.place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
-
-    let mut writable =
-        termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
-            .into_alternate_screen()
-            .unwrap();
+    let mut ui_state = UiHandler::new();
 
     set_up_panic_hook();
 
-    let event_receiver = set_up_input_thread();
-
-    let mut prev_drawn = None;
-    while game_state.running {
+    while game.world_state.running {
         let now = std::time::Instant::now();
-        while let Ok(event) = event_receiver.try_recv() {
-            game_state.process_event(now, event);
-        }
-        let frame = game_state.render();
-        screen_frame.blit(&frame, [0, 0]);
-        screen_frame.draw_text(
-            format!("{:<30}", game_state.last_mouse_screen_row_col.to_debug()),
-            [(height + 1).into(), 0],
+        while game.try_process_next_event() {}
+
+        let frame = game.world_state.render();
+        ui_state.screen_buffer.blit(&frame, [0, 0]);
+        ui_state.screen_buffer.draw_text(
+            format!("{:<30}", ui_state.last_mouse_screen_row_col.to_debug()),
+            [(game.ui_handler.height + 1).into(), 0],
         );
-        for (i, event) in game_state.event_log.iter().enumerate() {
-            screen_frame.draw_text(
+        for (i, event) in ui_state.event_log.iter().enumerate() {
+            ui_state.screen_buffer.draw_text(
                 format!("{:<30}", format!("{:?}", event)),
-                [height as usize + 3 + i, 0],
+                [game.ui_handler.height as usize + 3 + i, 0],
             );
         }
-        draw_frame(&mut writable, &screen_frame, &prev_drawn);
-        prev_drawn = Some(screen_frame.clone());
+        ui_state.draw_screen();
         thread::sleep(Duration::from_millis(21));
     }
 }
@@ -697,7 +824,7 @@ mod tests {
 
     #[test]
     fn test_simple_output() {
-        let state = GameState::new(10, 10);
+        let state = WorldState::new(10, 10);
         let frame = state.render();
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
@@ -761,25 +888,26 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut game = GameState::new(12, 12);
-        game.process_event_now(press_left(0, 0));
-        let frame = game.render();
+        let mut game = Game::new_headless_one_to_one_square(12);
+
+        game.give_and_process_fake_event_now(press_left(0, 0));
+        let frame = game.world_state.render();
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_click_a_small() {
-        let mut game = GameState::new(2, 2);
-        game.process_event_now(press_left(0, 0));
-        let frame = game.render();
+        let mut game = Game::new_headless_one_to_one_square(2);
+        game.give_and_process_fake_event_now(press_left(0, 0));
+        let frame = game.world_state.render();
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_click_b() {
-        let mut game = GameState::new(12, 12);
-        game.process_event_now(press_left(3, 9));
-        let frame = game.render();
+        let mut game = Game::new_headless_one_to_one_square(12);
+        game.give_and_process_fake_event_now(press_left(3, 9));
+        let frame = game.world_state.render();
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED);
@@ -788,13 +916,13 @@ mod tests {
     }
     #[test]
     fn test_drag_mouse() {
-        let mut game = GameState::new(12, 12);
-        game.process_events_now([press_left(3, 3)]);
-        let frame_1 = game.render();
-        game.process_events_now([drag_mouse(4, 3)]);
-        let frame_2 = game.render();
-        game.process_events_now([drag_mouse(5, 3)]);
-        let frame_3 = game.render();
+        let mut game = Game::new_headless(12, 24, 12, 12);
+        game.give_and_process_fake_event_now([press_left(3, 3)]);
+        let frame_1 = game.world_state.render();
+        game.give_and_process_fake_event_now([drag_mouse(4, 3)]);
+        let frame_2 = game.world_state.render();
+        game.give_and_process_fake_event_now([drag_mouse(5, 3)]);
+        let frame_3 = game.world_state.render();
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
         compare_frame_to_file!(frame_2, "2");
@@ -802,28 +930,28 @@ mod tests {
     }
     #[test]
     fn test_render_portal_edges() {
-        let mut game = GameState::new(12, 12);
-        game.place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
-        game.place_portal(([3, 1], DIR_UP), ([3, 3], DIR_UP));
-        game.place_portal(([3, 1], DIR_DOWN), ([3, 3], DIR_DOWN));
-        game.place_portal(([5, 1], DIR_UP), ([5, 3], DIR_UP));
-        game.place_portal(([5, 1], DIR_DOWN), ([5, 3], DIR_DOWN));
-        game.place_portal(([5, 1], DIR_RIGHT), ([5, 3], DIR_RIGHT));
-        game.place_portal(([7, 1], DIR_UP), ([7, 3], DIR_UP));
-        game.place_portal(([7, 1], DIR_DOWN), ([7, 3], DIR_DOWN));
-        game.place_portal(([7, 1], DIR_RIGHT), ([7, 3], DIR_RIGHT));
-        game.place_portal(([7, 1], DIR_LEFT), ([7, 3], DIR_LEFT));
-        game.place_portal(([9, 1], DIR_DOWN), ([9, 3], DIR_DOWN));
-        game.place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
-        game.place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
-        game.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.render();
+        let mut game = Game::new_headless_one_to_one_square(12);
+        world.place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
+        world.place_portal(([3, 1], DIR_UP), ([3, 3], DIR_UP));
+        world.place_portal(([3, 1], DIR_DOWN), ([3, 3], DIR_DOWN));
+        world.place_portal(([5, 1], DIR_UP), ([5, 3], DIR_UP));
+        world.place_portal(([5, 1], DIR_DOWN), ([5, 3], DIR_DOWN));
+        world.place_portal(([5, 1], DIR_RIGHT), ([5, 3], DIR_RIGHT));
+        world.place_portal(([7, 1], DIR_UP), ([7, 3], DIR_UP));
+        world.place_portal(([7, 1], DIR_DOWN), ([7, 3], DIR_DOWN));
+        world.place_portal(([7, 1], DIR_RIGHT), ([7, 3], DIR_RIGHT));
+        world.place_portal(([7, 1], DIR_LEFT), ([7, 3], DIR_LEFT));
+        world.place_portal(([9, 1], DIR_DOWN), ([9, 3], DIR_DOWN));
+        world.place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
+        world.place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
+        world.portal_rendering = PortalRenderingOption::LineOnFloor;
+        let frame = game.world_state.render();
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_render_part_of_square() {
-        let mut game = GameState::new(12, 12);
-        game.board_color_function = |_state, _square| Some(GREEN);
+        let mut game = Game::new_headless_one_to_one_square(12);
+        world.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
             square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
@@ -835,7 +963,7 @@ mod tests {
             portal_depth: 0,
             portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise::new(0),
         };
-        let glyphs = game.render_one_view_of_a_square(&visible_portion);
+        let glyphs = game.world_state.render_one_view_of_a_square(&visible_portion);
         println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
         assert_eq!(glyphs[0].fg_color(), GREEN.into());
@@ -847,8 +975,8 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
-        let mut game = GameState::new(12, 12);
-        game.board_color_function = |_state, _square| Some(GREEN);
+        let mut game = Game::new_headless_one_to_one_square(12);
+        world.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
 
@@ -865,7 +993,7 @@ mod tests {
                 portal_depth: 0,
                 portal_rotation_from_relative_to_absolute: i.into(),
             };
-            let glyphs = game.render_one_view_of_a_square(&visible_portion);
+            let glyphs = game.world_state.render_one_view_of_a_square(&visible_portion);
             frame.set_by_double_wide_grid(
                 1,
                 2 * i as usize + 1,
@@ -877,14 +1005,14 @@ mod tests {
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
-        let mut game = GameState::new(12, 12);
-        game.portal_rendering = PortalRenderingOption::LineOfSight;
-        game.board_color_function = GameState::radial_sin_board_colors;
-        game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
+        let mut game = Game::new_headless_one_to_one_square(12);
+        world.portal_rendering = PortalRenderingOption::LineOfSight;
+        world.board_color_function = WorldState::radial_sin_board_colors;
+        world.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render());
-        game.portal_tint_function = GameState::rainbow_tint;
-        let (frame, layers) = game.render_with_debug_deconstruction(true);
+        world.portal_tint_function = WorldState::rainbow_tint;
+        let (frame, layers) = game.world_state.render_with_debug_deconstruction(true);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -892,21 +1020,21 @@ mod tests {
     }
     #[test]
     fn test_portal_with_rotation() {
-        let mut game = GameState::new(12, 12);
-        game.portal_rendering = PortalRenderingOption::LineOfSight;
-        game.board_color_function = |game_state, square| {
+        let mut game = Game::new_headless_one_to_one_square(12);
+        world.portal_rendering = PortalRenderingOption::LineOfSight;
+        world.board_color_function = |world_state, square| {
             let n = 10;
             let frac = square.y().rem_euclid(n) as f32 / n as f32;
             let val = 100 + (100.0 * frac) as u8;
             Some(grey(val))
         };
 
-        GameState::radial_sin_board_colors;
-        game.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
+        WorldState::radial_sin_board_colors;
+        world.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render());
-        game.portal_tint_function = GameState::rainbow_tint;
-        let (frame, layers) = game.render_with_debug_deconstruction(true);
+        world.portal_tint_function = WorldState::rainbow_tint;
+        let (frame, layers) = game.world_state.render_with_debug_deconstruction(true);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });

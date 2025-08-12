@@ -49,12 +49,12 @@ fn set_up_panic_hook() {
     }));
 }
 
-pub fn set_up_input_thread() -> Receiver<Event> {
+pub fn set_up_input_thread() -> Receiver<(Instant, Event)> {
     let (tx, rx) = channel();
     thread::spawn(move || {
         for c in stdin().events() {
             let evt = c.unwrap();
-            tx.send(evt).unwrap();
+            tx.send((Instant::now(), evt)).unwrap();
         }
     });
     return rx;
@@ -112,7 +112,7 @@ pub fn do_everything() {
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
 
-        while let Ok(event) = event_receiver.try_recv() {
+        while let Ok((event_time, event)) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
 
             game.tick_game_logic();
