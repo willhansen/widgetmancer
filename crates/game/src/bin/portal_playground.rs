@@ -346,7 +346,6 @@ impl UiHandler {
             }
         } else {
             if let Some([row, col]) = self.last_mouse_screen_row_col {
-                dbg!(row, col);
                 self.screen_buffer.grid[row as usize][col as usize] = Glyph::solid_color(RED).into();
             }
         }
