@@ -10,20 +10,20 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Clone)]
 pub struct Frame {
-    pub grid: Vec<Vec<Glyph>>,
+    pub grid: Vec<Vec<GlyphWithTransparency>>,
 }
 
 impl Frame {
     pub fn blank(width: usize, height: usize) -> Self {
-        Frame::from(
-            (0..height)
+        Self {
+            grid: (0..height)
                 .map(|_row| {
                     (0..width)
-                        .map(|_col| Glyph::solid_color(named_colors::BLACK))
-                        .collect_vec()
+                        .map(|_col| Glyph::solid_color(named_colors::BLACK).into())
+                        .collect::<Vec<GlyphWithTransparency>>()
                 })
                 .collect_vec(),
-        )
+        }
     }
     pub fn save_to_file(&self, path: PathBuf) {
         File::create(path)
@@ -38,7 +38,7 @@ impl Frame {
         lines.into_iter().enumerate().for_each(|(row, line)| {
             line.chars()
                 .enumerate()
-                .for_each(|(col, char)| frame.grid[row][col] = Glyph::from_char(char))
+                .for_each(|(col, char)| frame.grid[row][col] = Glyph::from_char(char).into())
         });
         frame
     }
@@ -57,7 +57,7 @@ impl Frame {
         self.row_to_y(y)
     }
 
-    pub fn get_xy(&self, frame_point: [usize; 2]) -> Glyph {
+    pub fn get_xy(&self, frame_point: [usize; 2]) -> GlyphWithTransparency {
         let [x, y] = frame_point;
         assert!(
             x < self.width() && y < self.height(),
@@ -93,11 +93,11 @@ impl Frame {
                 break;
             }
             if row < self.height() && col < self.width() {
-                self.grid[row][col] = Glyph::from_char(char);
+                self.grid[row][col] = Glyph::from_char(char).into();
             }
         }
     }
-    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut Glyph> {
+    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut GlyphWithTransparency> {
         self.grid.iter_mut().flat_map(|row| row.iter_mut())
     }
 
@@ -105,14 +105,14 @@ impl Frame {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
-            glyph.fg_color = named_colors::BLACK;
+            *glyph.fg_color_mut() = named_colors::BLACK.into();
         });
         f
     }
     pub fn fg_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            glyph.bg_color = named_colors::BLACK;
+            *glyph.bg_color_mut() = named_colors::BLACK.into();
         });
         f
     }
@@ -120,16 +120,16 @@ impl Frame {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
-            glyph.bg_color = glyph.fg_color;
-            glyph.fg_color = named_colors::BLACK;
+            *glyph.bg_color_mut() = glyph.fg_color();
+            *glyph.fg_color_mut() = named_colors::BLACK.into();
         });
         f
     }
     pub fn characters_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            glyph.fg_color = named_colors::WHITE;
-            glyph.bg_color = named_colors::BLACK;
+            *glyph.fg_color_mut() = named_colors::WHITE.into();
+            *glyph.bg_color_mut() = named_colors::BLACK.into();
         });
         f
     }
@@ -142,11 +142,11 @@ impl Frame {
 
         for row in 0..self.height() {
             for col in 0..self.width() {
-                if out.grid[row][col].bg_color == other.grid[row][col].bg_color {
-                    out.grid[row][col].bg_color = Glyph::default_bg_color;
+                if out.grid[row][col].bg_color() == other.grid[row][col].bg_color() {
+                    *out.grid[row][col].bg_color_mut() = Glyph::default_bg_color.into();
                 }
-                if out.grid[row][col].fg_color == other.grid[row][col].fg_color {
-                    out.grid[row][col].fg_color = Glyph::default_fg_color;
+                if out.grid[row][col].fg_color() == other.grid[row][col].fg_color() {
+                    *out.grid[row][col].fg_color_mut() = Glyph::default_fg_color.into();
                 }
                 if out.grid[row][col].character == other.grid[row][col].character {
                     out.grid[row][col].character = ' ';
@@ -257,10 +257,10 @@ impl Frame {
         let mut prev_written_glyph: Option<Glyph> = None;
         for row in 0..self.height() {
             for col in 0..self.width() {
-                let new_glyph = self.grid[row][col];
+                let new_glyph: Glyph = self.grid[row][col].into();
 
                 if let Some(old_frame) = maybe_old_frame {
-                    let old_glyph = old_frame.grid[row][col];
+                    let old_glyph: Glyph = old_frame.grid[row][col].into();
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -318,13 +318,17 @@ impl Frame {
     pub fn readable_string(&self) -> String {
         display_string_to_readable_string(self.simple_raw_display_string())
     }
-    pub fn set_by_double_wide_grid(&mut self, row: usize, wide_col: usize, val: DoubleGlyph) {
+    pub fn set_by_double_wide_grid(
+        &mut self,
+        row: usize,
+        wide_col: usize,
+        val: DoubleGlyphWithTransparency,
+    ) {
         let left_narrow_col = wide_col * 2;
         self.grid[row][left_narrow_col] = val[0];
         self.grid[row][left_narrow_col + 1] = val[1];
     }
 }
-
 
 pub fn display_string_to_readable_string(display_string: String) -> String {
     let a_b = [
@@ -415,12 +419,25 @@ impl From<Vec<Vec<DoubleGlyph>>> for Frame {
             .into()
     }
 }
-impl From<Vec<Vec<Glyph>>> for Frame {
-    fn from(value: Vec<Vec<Glyph>>) -> Self {
+impl From<Vec<Vec<GlyphWithTransparency>>> for Frame {
+    fn from(value: Vec<Vec<GlyphWithTransparency>>) -> Self {
         assert!(value.len() > 0);
         assert!(value[0].len() > 0);
         assert!(value.iter().map(|row| row.len()).all_equal());
         Frame { grid: value }
+    }
+}
+impl From<Vec<Vec<Glyph>>> for Frame {
+    fn from(value: Vec<Vec<Glyph>>) -> Self {
+        value
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&g| GlyphWithTransparency::from_glyph(g))
+                    .collect_vec()
+            })
+            .collect_vec()
+            .into()
     }
 }
 #[cfg(test)]
@@ -432,20 +449,18 @@ mod tests {
 
     fn small_color_frame() -> Frame {
         use named_colors::*;
-        Frame {
-            grid: vec![
-                vec![Glyph::solid_color(RED), Glyph::solid_color(GREEN)],
-                vec![Glyph::solid_color(BLUE), Glyph::solid_color(YELLOW)],
-            ],
-        }
+        vec![
+            vec![Glyph::solid_color(RED), Glyph::solid_color(GREEN)],
+            vec![Glyph::solid_color(BLUE), Glyph::solid_color(YELLOW)],
+        ]
+        .into()
     }
     fn small_letter_frame() -> Frame {
-        Frame {
-            grid: vec![
-                vec![Glyph::from_char('a'), Glyph::from_char('b')],
-                vec![Glyph::from_char('c'), Glyph::from_char('d')],
-            ],
-        }
+        vec![
+            vec![Glyph::from_char('a'), Glyph::from_char('b')],
+            vec![Glyph::from_char('c'), Glyph::from_char('d')],
+        ]
+        .into()
     }
     #[test]
     fn test_correct_newlines_in_raw_render() {
@@ -535,11 +550,11 @@ ghi",
         dbg!(&b);
         assert_eq!(frame, b);
 
-        frame.grid[0][2].bg_color = named_colors::WHITE;
-        frame.grid[0][2].fg_color = named_colors::RED;
+        *frame.grid[0][2].bg_color_mut() = named_colors::WHITE.into();
+        *frame.grid[0][2].fg_color_mut() = named_colors::RED.into();
 
-        frame.grid[1][0].bg_color = named_colors::BLUE;
-        frame.grid[2][2].fg_color = named_colors::GREEN;
+        *frame.grid[1][0].bg_color_mut() = named_colors::BLUE.into();
+        *frame.grid[2][2].fg_color_mut() = named_colors::GREEN.into();
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
         assert_eq!(frame, b);
