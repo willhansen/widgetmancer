@@ -346,7 +346,7 @@ impl UiHandler {
             }
         } else {
             if let Some([row, col]) = self.last_mouse_screen_row_col {
-                self.screen_buffer.grid[row as usize][col as usize] = Glyph::solid_color(RED).into();
+                self.screen_buffer.grid[row as usize][col as usize] = GlyphWithTransparency::solid_color(RED);
             }
         }
     }
@@ -850,16 +850,19 @@ mod tests {
     }
 
     macro_rules! compare_frame_to_file {
-        ($frame:ident, $prefix:expr) => {
+        ($frame:ident, $prefix:expr, $verbose:expr) => {
             let test_name: String = function_name!().replace(":", "_");
-            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name))
+            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name), $verbose)
+        };
+        ($frame:ident, $prefix:expr) => {
+            compare_frame_to_file!($frame, $prefix, false)
         };
         ($frame:ident) => {
             compare_frame_to_file!($frame, "")
         };
     }
 
-    fn compare_frame_for_test(candidate_frame: Frame, file_prefix: String) {
+    fn compare_frame_for_test(candidate_frame: Frame, file_prefix: String, verbose: bool) {
         let candidate_string = candidate_frame.string_for_regular_display();
 
         let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
@@ -882,11 +885,34 @@ mod tests {
                 &format!("No existing test output found.  Set BLESS_TESTS to canonize current output frame:\n\n{candidate_frame:?}"),
             ),
         );
-        assert!(candidate_frame == correct_frame,
-            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{correct_frame:?}\n\nGiven:\n{candidate_frame:?}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}❌\n",
+
+        let good = candidate_frame == correct_frame;
+
+        if !good {
+
+            let f = if verbose {
+                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", format!("{:?}", &frame).indent(), frame.string_for_regular_display().escape_debug().to_string().replace("\\n", "\n").indent(), frame.readable_string().indent())
+            } else {
+                |frame: &Frame| format!("Frame:\n{:?}\n", &frame)
+            };
+
+
+
+            let mut err_string = 
+            format!(
+            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}\n",
+            f(&correct_frame).indent(),
+            f(&candidate_frame).indent(),
             diff1 = correct_frame.diff_from(&candidate_frame),
             diff2 = candidate_frame.diff_from(&correct_frame)
         );
+
+
+            err_string += "❌";
+        assert!(good, "{}", err_string);
+
+        }
+
 
         eprintln!("{candidate_frame:?}\n✅");
     }
@@ -906,7 +932,7 @@ mod tests {
         let mut game = Game::new_headless_one_to_one_square(2);
         game.give_and_process_fake_event_now(press_left(0, 0));
         let frame = game.render_with_mouse(None);
-        compare_frame_to_file!(frame);
+        compare_frame_to_file!(frame, "", true);
     }
     #[test]
     fn test_click_b() {

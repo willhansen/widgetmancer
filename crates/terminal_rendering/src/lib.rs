@@ -96,6 +96,13 @@ pub trait MultilineStringExt: ToString {
             ConcatVBias::Bottom => self.pad_side(1, dheight),
         }
     }
+    fn linewise_prefix(&self, prefix: impl Into<String>) -> String {
+        let prefix = prefix.into();
+        self.lines_including_trailing_newline().map(|s| prefix.clone() + s).join("\n")
+    }
+    fn indent(&self) -> String {
+        self.linewise_prefix("\t")
+    }
 }
 
 impl MultilineStringExt for String {
