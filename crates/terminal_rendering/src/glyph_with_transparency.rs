@@ -57,6 +57,20 @@ impl GlyphWithTransparency {
             self.primary_color
         }
     }
+    pub fn fg_color_mut(&mut self) -> &mut RGBA8 {
+        if self.fg_is_primary {
+            &mut self.primary_color
+        } else {
+            &mut self.secondary_color
+        }
+    }
+    pub fn bg_color_mut(&mut self) -> &mut RGBA8 {
+        if self.fg_is_primary {
+            &mut self.secondary_color
+        } else {
+            &mut self.primary_color
+        }
+    }
     pub fn with_rgbs(&self, primary_rgb: RGB8, secondary_rgb: RGB8) -> Self {
         self.with_primary_rgb(primary_rgb)
             .with_secondary_rgb(secondary_rgb)
@@ -99,6 +113,18 @@ impl GlyphWithTransparency {
             .with_bg_as_primary()
     }
 }
+
+impl Into<Glyph> for GlyphWithTransparency {
+    fn into(self) -> Glyph {
+        self.over_solid_bg(BLACK)
+    }
+}
+impl From<Glyph> for GlyphWithTransparency {
+    fn from(value: Glyph) -> Self {
+        Self::from_glyph(value)
+    }
+}
+
 pub type DoubleGlyphWithTransparency = [GlyphWithTransparency; 2];
 pub trait DoubleGlyphWithTransparencyExt {
     fn solid_color(color: RGB8) -> Self;
@@ -112,16 +138,16 @@ impl DoubleGlyphWithTransparencyExt for DoubleGlyphWithTransparency {
         [GlyphWithTransparency::solid_color(color); 2]
     }
     fn with_primary_only(&self) -> Self {
-        self.map(|g|g.with_primary_only())
+        self.map(|g| g.with_primary_only())
     }
     fn with_primary_rgb(&self, color: RGB8) -> Self {
-        self.map(|g|g.with_primary_rgb(color))
+        self.map(|g| g.with_primary_rgb(color))
     }
     fn with_secondary_rgb(&self, color: RGB8) -> Self {
-        self.map(|g|g.with_secondary_rgb(color))
+        self.map(|g| g.with_secondary_rgb(color))
     }
     fn over(&self, other: Self) -> Self {
-        array_zip(*self, other).map(|(a,b)|a.over(b))
+        array_zip(*self, other).map(|(a, b)| a.over(b))
     }
 }
 // ref: https://en.wikipedia.org/wiki/Alpha_compositing

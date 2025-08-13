@@ -347,7 +347,7 @@ impl UiHandler {
         } else {
             if let Some([row, col]) = self.last_mouse_screen_row_col {
                 dbg!(row, col);
-                self.screen_buffer.grid[row as usize][col as usize] = Glyph::solid_color(RED);
+                self.screen_buffer.grid[row as usize][col as usize] = Glyph::solid_color(RED).into();
             }
         }
     }
@@ -604,7 +604,7 @@ impl WorldState {
                                     debug_frame.set_by_double_wide_grid(
                                         camera_row,
                                         camera_col,
-                                        double_glyph.map(|g| g.over_solid_bg(BLACK)),
+                                        double_glyph.map(|g| g),
                                     );
                                 });
                         }
@@ -916,8 +916,8 @@ mod tests {
         let frame = game.world_state.render(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
-        assert_ne!(frame.get_xy([2, 2]).bg_color, RED);
-        assert_eq!(frame.get_xy([3, 2]).bg_color, RED);
+        assert_ne!(frame.get_xy([2, 2]).bg_color(), RED.into());
+        assert_eq!(frame.get_xy([3, 2]).bg_color(), RED.into());
         compare_frame_to_file!(frame);
     }
     #[test]
@@ -1020,7 +1020,7 @@ mod tests {
             frame.set_by_double_wide_grid(
                 1,
                 2 * i as usize + 1,
-                glyphs.map(|g| g.over_solid_bg(BLACK)),
+                glyphs,
             );
         }
 
