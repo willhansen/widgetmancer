@@ -93,7 +93,7 @@ impl Game {
         self.ui_handler.give_fake_event_now(event);
         assert!(self.try_process_next_event());
     }
-    pub fn process_event(&self, time: f32, event: Event) {
+    pub fn process_event(&mut self, time: f32, event: Event) {
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.world_state.running = false,
@@ -149,6 +149,12 @@ impl Game {
         self.process_event(time, event);
 
         true
+    }
+    pub fn render_with_mouse(&mut self, fov_center: Option<IPoint>) -> Frame {
+        let frame = self.world_state.render(fov_center);
+        self.ui_handler.screen_buffer.blit(&frame, [0, 0]);
+        self.ui_handler.draw_mouse();
+        self.ui_handler.screen_buffer.clone()
     }
 }
 
@@ -221,8 +227,51 @@ struct UiHandler {
     pub fake_event_sender: Option<Sender<(Instant, Event)>>,
     pub prev_drawn: Option<Frame>,
     pub screen_buffer: Frame,
+    pub enable_mouse_smoothing: bool,
 }
 impl UiHandler {
+    fn smoothed_mouse_position_screen_row_col(&self, t: f32) -> Option<FPoint> {
+        let recent_events = self.recent_mouse_screen_char_entry_events_row_col();
+        if recent_events.is_empty() {
+            return None;
+        }
+        if recent_events.len() == 1 {
+            let e = recent_events.first().unwrap();
+            return Some([e.1 as f32, e.2 as f32]);
+        }
+        let now = std::time::Instant::now();
+        let t0 = recent_events.first().unwrap().0;
+        let formatted: Vec<(f32, IPoint)> = recent_events
+            .into_iter()
+            .map(|(t, row, col)| (t - t0, [row as i32, col as i32]))
+            .collect_vec();
+
+        Some(smoothed_mouse_position(&formatted, t - t0))
+    }
+
+    fn recent_mouse_screen_char_entry_events_row_col(&self) -> Vec<(f32, u16, u16)> {
+        self.event_log
+            .iter()
+            .filter_map(|(t, e)| {
+                let (row, col) = match e {
+                    Event::Mouse(termion::event::MouseEvent::Press(
+                        termion::event::MouseButton::Left,
+                        col,
+                        row,
+                    )) => (row, col),
+                    Event::Mouse(termion::event::MouseEvent::Hold(col, row)) => (row, col),
+                    _ => return None,
+                };
+                Some((*t, *row, *col))
+            })
+            .collect_vec()
+    }
+    pub fn height(&self) -> u16 {
+        self.screen_buffer.height() as u16
+    }
+    pub fn width(&self) -> u16 {
+        self.screen_buffer.width() as u16
+    }
     pub fn new() -> UiHandler {
         let (term_width, term_height) = termion::terminal_size().unwrap();
         let output_writable = Box::new(
@@ -239,6 +288,20 @@ impl UiHandler {
             Some(output_writable),
             event_receiver,
         )
+    }
+    // xy order from bottom left of screen
+    fn mouse_screen_square_xy(&self) -> Option<IPoint> {
+        self.mouse_screen_xy().map(|p| [p[0] / 2, p[1]])
+    }
+    fn mouse_screen_xy(&self) -> Option<IPoint> {
+        self.last_mouse_screen_row_col
+            .map(|[screen_row, screen_col]| {
+                let screen_y: i32 = self.height() as i32 - i32::from(screen_row) - 1;
+                [i32::from(screen_col), screen_y]
+            })
+    }
+    fn mouse_square_xy_in_camera_frame(&self) -> Option<IPoint> {
+        todo!();
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
         let (sender, receiver) = channel();
@@ -261,11 +324,36 @@ impl UiHandler {
             fake_event_sender: None,
             prev_drawn: None,
             screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
+            enable_mouse_smoothing: false,
+        }
+    }
+    pub fn draw_mouse(&mut self) {
+        // draw mouse position on top
+        if self.enable_mouse_smoothing {
+            if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col(
+                (Instant::now() - self.start_time).as_secs_f32(),
+            ) {
+                let smoothed_mouse_pos_xy = [
+                    smoothed_mouse_pos_row_col[1] - 1.0,
+                    self.height() as f32 - (smoothed_mouse_pos_row_col[0] - 1.0),
+                ];
+                let the_char: char = draw_points_in_character_grid(&[smoothed_mouse_pos_xy])
+                    .chars()
+                    .next()
+                    .unwrap();
+                let [row, col] = smoothed_mouse_pos_row_col.rounded();
+                self.screen_buffer.grid[row as usize][col as usize].character = the_char;
+            }
+        } else {
+            if let Some([row, col]) = self.last_mouse_screen_row_col {
+                dbg!(row, col);
+                self.screen_buffer.grid[row as usize][col as usize] = Glyph::solid_color(RED);
+            }
         }
     }
     pub fn draw_screen(&mut self) {
         draw_frame(
-            &mut self.output_writable.unwrap(),
+            &mut self.output_writable.as_mut().unwrap(),
             &self.screen_buffer,
             &self.prev_drawn,
         );
@@ -275,7 +363,7 @@ impl UiHandler {
     pub fn try_get_next_event(&mut self) -> Option<(f32, Event)> {
         self.event_receiver.try_recv().ok().map(|(instant, event)| {
             let t = instant.duration_since(self.start_time).as_secs_f32();
-            self.log_event((t, event));
+            self.log_event((t, event.clone()));
             (t, event)
         })
     }
@@ -285,7 +373,7 @@ impl UiHandler {
             .ok()
             .map(|(instant, event)| {
                 let t = instant.duration_since(self.start_time).as_secs_f32();
-                self.log_event((t, event));
+                self.log_event((t, event.clone()));
                 (t, event)
             })
             .unwrap()
@@ -296,12 +384,14 @@ impl UiHandler {
     }
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
         self.fake_event_sender
+            .as_mut()
             .unwrap()
             .send((self.start_time + Duration::from_secs_f32(event.0), event.1))
             .unwrap()
     }
     pub fn give_fake_event_now(&mut self, event: Event) {
         self.fake_event_sender
+            .as_mut()
             .unwrap()
             .send((Instant::now(), event))
             .unwrap()
@@ -397,17 +487,6 @@ impl WorldState {
             other_side_of_edge(entrance),
         );
     }
-    pub fn process_event_now(&mut self, event: Event) {
-        self.process_event(std::time::Instant::now(), event)
-    }
-    // xy order from bottom left of screen
-    fn mouse_screen_square(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col
-            .map(|[screen_row, screen_col]| {
-                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
-                [i32::from(screen_col) / 2, screen_y]
-            })
-    }
 
     fn naive_glyphs_for_rotated_world_square(
         &self,
@@ -421,13 +500,6 @@ impl WorldState {
     fn naive_glyphs_for_world_square(&self, square: IPoint) -> DoubleGlyphWithTransparency {
         self.naive_glyphs_for_rotated_world_square(square, 0)
     }
-    fn mouse_square_xy_in_camera_frame(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col
-            .map(|[screen_row, screen_col]| {
-                let screen_y: i32 = self.height as i32 - i32::from(screen_row) - 1;
-                [i32::from(screen_col) / 2, screen_y]
-            })
-    }
     fn mouse_square_xy_in_world_frame(&self) -> Option<IPoint> {
         todo!()
     }
@@ -440,7 +512,11 @@ impl WorldState {
     //   sources in future)
     //   - Same transform from local to absolute frame, even if the portals are separated
     //   physically
-    fn render_with_debug_deconstruction(&self, is_debug: bool) -> (Frame, Vec<Frame>) {
+    fn render_with_debug_deconstruction(
+        &self,
+        is_debug: bool,
+        fov_center: Option<IPoint>,
+    ) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(), // .iter()
@@ -449,8 +525,7 @@ impl WorldState {
             );
         // panic!();
 
-        let mouse_screen_square: Option<[i32; 2]> = self.mouse_screen_square();
-        let fov_center = match mouse_screen_square {
+        let fov_center = match fov_center {
             Some(x) => x,
             None => self.player_square,
         };
@@ -550,19 +625,6 @@ impl WorldState {
             .collect_vec()
             .into();
 
-        // draw mouse position on top
-        if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col() {
-            let smoothed_mouse_pos_xy = [
-                smoothed_mouse_pos_row_col[1] - 1.0,
-                self.height as f32 - (smoothed_mouse_pos_row_col[0] - 1.0),
-            ];
-            let the_char: char = draw_points_in_character_grid(&[smoothed_mouse_pos_xy])
-                .chars()
-                .next()
-                .unwrap();
-            let [row, col] = smoothed_mouse_pos_row_col.rounded();
-            frame.grid[row as usize][col as usize].character = the_char;
-        }
         (
             frame,
             debug_portal_visualizer_frames.into_values().collect_vec(),
@@ -615,8 +677,8 @@ impl WorldState {
         None
     }
 
-    pub fn render(&self) -> Frame {
-        self.render_with_debug_deconstruction(false).0
+    pub fn render(&self, fov_center: Option<IPoint>) -> Frame {
+        self.render_with_debug_deconstruction(false, fov_center).0
     }
     fn render_one_view_of_a_square(
         &self,
@@ -641,23 +703,6 @@ impl WorldState {
 
         if square_viz.absolute_square().to_array() == self.player_square && self.player_is_alive {
             glyphs = DoubleGlyphWithTransparency::solid_color(color_from_hex!("#1688f0").into());
-        }
-
-        let mouse_is_here =
-            self.mouse_square_xy_in_camera_frame()
-                .is_some_and(|mouse_camera_pos| {
-                    mouse_camera_pos == square_viz.absolute_square().to_array()
-                });
-        if mouse_is_here {
-            let mouse_is_on_left_half_of_square = self
-                .last_mouse_screen_row_col
-                .is_some_and(|[row, col]| col.rem_euclid(2) == 0);
-            let mouse_index_in_square = if mouse_is_on_left_half_of_square {
-                0
-            } else {
-                1
-            };
-            glyphs[mouse_index_in_square] = GlyphWithTransparency::solid_color(RED);
         }
 
         // apply tint
@@ -704,49 +749,6 @@ impl WorldState {
         }
         glyphs
     }
-    fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
-        let recent_events = self.recent_mouse_screen_char_entry_events_row_col();
-        if recent_events.is_empty() {
-            return None;
-        }
-        if recent_events.len() == 1 {
-            let e = recent_events.first().unwrap();
-            return Some([e.1 as f32, e.2 as f32]);
-        }
-        let now = std::time::Instant::now();
-        let t0 = recent_events.first().unwrap().0;
-        let formatted: Vec<(f32, IPoint)> = recent_events
-            .into_iter()
-            .map(|(instant, row, col)| {
-                (
-                    instant.duration_since(t0).as_secs_f32(),
-                    [row as i32, col as i32],
-                )
-            })
-            .collect_vec();
-
-        Some(smoothed_mouse_position(
-            &formatted,
-            now.duration_since(t0).as_secs_f32(),
-        ))
-    }
-    fn recent_mouse_screen_char_entry_events_row_col(&self) -> Vec<(Instant, u16, u16)> {
-        self.event_log
-            .iter()
-            .filter_map(|(t, e)| {
-                let (row, col) = match e {
-                    Event::Mouse(termion::event::MouseEvent::Press(
-                        termion::event::MouseButton::Left,
-                        col,
-                        row,
-                    )) => (row, col),
-                    Event::Mouse(termion::event::MouseEvent::Hold(col, row)) => (row, col),
-                    _ => return None,
-                };
-                Some((*t, *row, *col))
-            })
-            .collect_vec()
-    }
 }
 
 fn grey(x: u8) -> RGB8 {
@@ -765,27 +767,31 @@ fn main() {
     game.world_state
         .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
 
-    let mut ui_state = UiHandler::new();
-
     set_up_panic_hook();
 
     while game.world_state.running {
         let now = std::time::Instant::now();
         while game.try_process_next_event() {}
 
-        let frame = game.world_state.render();
-        ui_state.screen_buffer.blit(&frame, [0, 0]);
-        ui_state.screen_buffer.draw_text(
-            format!("{:<30}", ui_state.last_mouse_screen_row_col.to_debug()),
-            [(game.ui_handler.height + 1).into(), 0],
+        let frame = game
+            .world_state
+            .render(game.ui_handler.mouse_screen_square_xy());
+        game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
+        game.ui_handler.screen_buffer.draw_text(
+            format!(
+                "{:<30}",
+                game.ui_handler.last_mouse_screen_row_col.to_debug()
+            ),
+            [(game.ui_handler.height() + 1).into(), 0],
         );
-        for (i, event) in ui_state.event_log.iter().enumerate() {
-            ui_state.screen_buffer.draw_text(
+        for (i, event) in game.ui_handler.event_log.iter().enumerate() {
+            game.ui_handler.screen_buffer.draw_text(
                 format!("{:<30}", format!("{:?}", event)),
-                [game.ui_handler.height as usize + 3 + i, 0],
+                [game.ui_handler.height() as usize + 3 + i, 0],
             );
         }
-        ui_state.draw_screen();
+        game.ui_handler.draw_mouse();
+        game.ui_handler.draw_screen();
         thread::sleep(Duration::from_millis(21));
     }
 }
@@ -825,7 +831,7 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render();
+        let frame = state.render(None);
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
@@ -891,7 +897,7 @@ mod tests {
         let mut game = Game::new_headless_one_to_one_square(12);
 
         game.give_and_process_fake_event_now(press_left(0, 0));
-        let frame = game.world_state.render();
+        let frame = game.world_state.render(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         compare_frame_to_file!(frame);
@@ -900,14 +906,14 @@ mod tests {
     fn test_click_a_small() {
         let mut game = Game::new_headless_one_to_one_square(2);
         game.give_and_process_fake_event_now(press_left(0, 0));
-        let frame = game.world_state.render();
+        let frame = game.render_with_mouse(None);
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_click_b() {
         let mut game = Game::new_headless_one_to_one_square(12);
         game.give_and_process_fake_event_now(press_left(3, 9));
-        let frame = game.world_state.render();
+        let frame = game.world_state.render(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED);
@@ -917,12 +923,12 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = Game::new_headless(12, 24, 12, 12);
-        game.give_and_process_fake_event_now([press_left(3, 3)]);
-        let frame_1 = game.world_state.render();
-        game.give_and_process_fake_event_now([drag_mouse(4, 3)]);
-        let frame_2 = game.world_state.render();
-        game.give_and_process_fake_event_now([drag_mouse(5, 3)]);
-        let frame_3 = game.world_state.render();
+        game.give_and_process_fake_event_now(press_left(3, 3));
+        let frame_1 = game.world_state.render(None);
+        game.give_and_process_fake_event_now(drag_mouse(4, 3));
+        let frame_2 = game.world_state.render(None);
+        game.give_and_process_fake_event_now(drag_mouse(5, 3));
+        let frame_3 = game.world_state.render(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
         compare_frame_to_file!(frame_2, "2");
@@ -931,27 +937,40 @@ mod tests {
     #[test]
     fn test_render_portal_edges() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        world.place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
-        world.place_portal(([3, 1], DIR_UP), ([3, 3], DIR_UP));
-        world.place_portal(([3, 1], DIR_DOWN), ([3, 3], DIR_DOWN));
-        world.place_portal(([5, 1], DIR_UP), ([5, 3], DIR_UP));
-        world.place_portal(([5, 1], DIR_DOWN), ([5, 3], DIR_DOWN));
-        world.place_portal(([5, 1], DIR_RIGHT), ([5, 3], DIR_RIGHT));
-        world.place_portal(([7, 1], DIR_UP), ([7, 3], DIR_UP));
-        world.place_portal(([7, 1], DIR_DOWN), ([7, 3], DIR_DOWN));
-        world.place_portal(([7, 1], DIR_RIGHT), ([7, 3], DIR_RIGHT));
-        world.place_portal(([7, 1], DIR_LEFT), ([7, 3], DIR_LEFT));
-        world.place_portal(([9, 1], DIR_DOWN), ([9, 3], DIR_DOWN));
-        world.place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
-        world.place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
-        world.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.world_state.render();
+        game.world_state
+            .place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
+        game.world_state
+            .place_portal(([3, 1], DIR_UP), ([3, 3], DIR_UP));
+        game.world_state
+            .place_portal(([3, 1], DIR_DOWN), ([3, 3], DIR_DOWN));
+        game.world_state
+            .place_portal(([5, 1], DIR_UP), ([5, 3], DIR_UP));
+        game.world_state
+            .place_portal(([5, 1], DIR_DOWN), ([5, 3], DIR_DOWN));
+        game.world_state
+            .place_portal(([5, 1], DIR_RIGHT), ([5, 3], DIR_RIGHT));
+        game.world_state
+            .place_portal(([7, 1], DIR_UP), ([7, 3], DIR_UP));
+        game.world_state
+            .place_portal(([7, 1], DIR_DOWN), ([7, 3], DIR_DOWN));
+        game.world_state
+            .place_portal(([7, 1], DIR_RIGHT), ([7, 3], DIR_RIGHT));
+        game.world_state
+            .place_portal(([7, 1], DIR_LEFT), ([7, 3], DIR_LEFT));
+        game.world_state
+            .place_portal(([9, 1], DIR_DOWN), ([9, 3], DIR_DOWN));
+        game.world_state
+            .place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
+        game.world_state
+            .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
+        game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
+        let frame = game.world_state.render(None);
         compare_frame_to_file!(frame);
     }
     #[test]
     fn test_render_part_of_square() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        world.board_color_function = |_state, _square| Some(GREEN);
+        game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
             square_visibility_in_absolute_frame: SquareVisibility::from_visible_half_plane(
@@ -963,7 +982,9 @@ mod tests {
             portal_depth: 0,
             portal_rotation_from_relative_to_absolute: QuarterTurnsAnticlockwise::new(0),
         };
-        let glyphs = game.world_state.render_one_view_of_a_square(&visible_portion);
+        let glyphs = game
+            .world_state
+            .render_one_view_of_a_square(&visible_portion);
         println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
         assert_eq!(glyphs[0].fg_color(), GREEN.into());
@@ -976,7 +997,7 @@ mod tests {
     #[test]
     fn test_render_part_of_square_with_rotation() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        world.board_color_function = |_state, _square| Some(GREEN);
+        game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
 
@@ -993,7 +1014,9 @@ mod tests {
                 portal_depth: 0,
                 portal_rotation_from_relative_to_absolute: i.into(),
             };
-            let glyphs = game.world_state.render_one_view_of_a_square(&visible_portion);
+            let glyphs = game
+                .world_state
+                .render_one_view_of_a_square(&visible_portion);
             frame.set_by_double_wide_grid(
                 1,
                 2 * i as usize + 1,
@@ -1006,13 +1029,16 @@ mod tests {
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        world.portal_rendering = PortalRenderingOption::LineOfSight;
-        world.board_color_function = WorldState::radial_sin_board_colors;
-        world.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
+        game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
+        game.world_state.board_color_function = WorldState::radial_sin_board_colors;
+        game.world_state
+            .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
-        // dbg!(game.render());
-        world.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.world_state.render_with_debug_deconstruction(true);
+        // dbg!(game.render(None));
+        game.world_state.portal_tint_function = WorldState::rainbow_tint;
+        let (frame, layers) = game
+            .world_state
+            .render_with_debug_deconstruction(true, None);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1021,8 +1047,8 @@ mod tests {
     #[test]
     fn test_portal_with_rotation() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        world.portal_rendering = PortalRenderingOption::LineOfSight;
-        world.board_color_function = |world_state, square| {
+        game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
+        game.world_state.board_color_function = |world_state, square| {
             let n = 10;
             let frac = square.y().rem_euclid(n) as f32 / n as f32;
             let val = 100 + (100.0 * frac) as u8;
@@ -1030,11 +1056,14 @@ mod tests {
         };
 
         WorldState::radial_sin_board_colors;
-        world.place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
+        game.world_state
+            .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
-        // dbg!(game.render());
-        world.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.world_state.render_with_debug_deconstruction(true);
+        // dbg!(game.render(None));
+        game.world_state.portal_tint_function = WorldState::rainbow_tint;
+        let (frame, layers) = game
+            .world_state
+            .render_with_debug_deconstruction(true, None);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
