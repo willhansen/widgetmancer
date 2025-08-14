@@ -125,13 +125,13 @@ impl Game {
             },
             Event::Mouse(mouse_event) => match mouse_event {
                 termion::event::MouseEvent::Press(mouse_button, col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = Some([row - 1, col - 1])
+                    self.ui_handler.last_mouse_screen_row_col = Some([row, col])
                 }
                 termion::event::MouseEvent::Release(col, row) => {
                     self.ui_handler.last_mouse_screen_row_col = None
                 }
                 termion::event::MouseEvent::Hold(col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = Some([row - 1, col - 1])
+                    self.ui_handler.last_mouse_screen_row_col = Some([row, col])
                 }
             },
             Event::Unsupported(items) => todo!(),
@@ -164,16 +164,21 @@ struct Camera {
     // Note that screen is 1-indexed
     upper_left_row_col_char_on_screen: [u16; 2],
 }
+
+// All screen character coordinates are 1-indexed.  This includes the camera-local ones.
 impl Camera {
     pub fn new() -> Self {
+        Self::new_square(25)
+    }
+    pub fn new_square(s: usize) -> Self {
         Camera {
             lower_left_local_square_in_world: [0,0],
-            upper_right_local_square_in_world: [25,25],
+            upper_right_local_square_in_world: [s as i32,s as i32],
             // Note that screen is 1-indexed
             upper_left_row_col_char_on_screen: [1,1]
         }
     }
-    pub fn size(&self) -> [u32; 2] {
+    pub fn size_in_world(&self) -> [u32; 2] {
         [
             (self.upper_right_local_square_in_world[0] - self.lower_left_local_square_in_world[0])
                 as u32,
@@ -181,11 +186,11 @@ impl Camera {
                 as u32,
         ]
     }
-    pub fn width(&self) -> u32 {
-        self.size()[0]
+    pub fn width_in_world(&self) -> u32 {
+        self.size_in_world()[0]
     }
-    pub fn height(&self) -> u32 {
-        self.size()[1]
+    pub fn height_in_world(&self) -> u32 {
+        self.size_in_world()[1]
     }
     pub fn local_to_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
@@ -210,17 +215,72 @@ impl Camera {
         screen_row_col_point: FPoint,
     ) -> FPoint {
         [
-            screen_row_col_point[1] / 2.0,
-            self.height() as f32 - screen_row_col_point[0],
+            (screen_row_col_point[1] - 1.0) / 2.0,
+            self.height_in_world() as f32 - (screen_row_col_point[0] - 1.0),
         ]
     }
     // TODO: account for non-default positioning and rotation
     pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         self.local_screen_row_col_point_to_local_world_point(screen_row_col_point)
     }
-    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16;2]) -> IPoint {
-        self.local_screen_row_col_point_to_local_world_point(screen_row_col_char.map(|x| x as f32)).rounded()
+
+    pub fn screen_row_col_char_to_camera_local_row_col_char(&self, screen_row_col_char: [u16;2]) -> [u16;2] {
+        screen_row_col_char
     }
+    pub fn camera_local_row_col_char_to_camera_local_world_square(&self, camera_local_row_col_char: [u16;2]) -> IPoint {
+        dbg!(camera_local_row_col_char);
+        [
+            (camera_local_row_col_char[1] as i32 - 1)/ 2,
+            self.height_in_world() as i32 - (camera_local_row_col_char[0] as i32 - 1) - 1,
+        ]
+    }
+    pub fn camera_local_world_square_to_world_square(&self, camera_local_world_square:IPoint) -> IPoint {
+        camera_local_world_square
+
+    }
+    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16;2]) -> IPoint {
+        let p = self.screen_row_col_char_to_camera_local_row_col_char(screen_row_col_char);
+        let p = self.camera_local_row_col_char_to_camera_local_world_square(p);
+         self.camera_local_world_square_to_world_square(p)
+    }
+}
+
+#[cfg(test)]
+mod camera_tests {
+    use super::*;
+    #[test]
+    fn test_screen_to_world_inegers() {
+        let s: i32 = 32;
+        let camera = Camera::new_square(s as usize);
+
+        assert_eq!(camera.screen_row_col_char_to_world_square([1,1]), [0, s-1]);
+
+        assert_eq!(camera.screen_row_col_char_to_camera_local_row_col_char([1,1]), [1,1]);
+
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,1]), [0,s-1]);
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,2]), [0,s-1]);
+
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([2,1]), [0,s-2]);
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([2,2]), [0,s-2]);
+
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,3]), [1,s-1]);
+        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,4]), [1,s-1]);
+
+        assert_eq!(camera.camera_local_world_square_to_world_square([0,s-1]), [0,s-1]);
+        assert_eq!(camera.camera_local_world_square_to_world_square([0,0]), [0,0]);
+
+    }
+    fn test_screen_to_world_floating_point() {
+        let camera = Camera::new();
+
+        assert_eq!(camera.screen_row_col_point_to_world_point([1.0,1.0]), [0.0, camera.height_in_world() as f32]);
+    }
+    #[test]
+    fn test_size() {
+        let camera = Camera::new();
+        assert_eq!(camera.size_in_world(), [25,25]);
+    }
+
 }
 
 // struct PortalUnderConstruction {
@@ -233,6 +293,7 @@ impl Camera {
 struct UiHandler {
     pub start_time: Instant,
     pub event_log: VecDeque<(f32, Event)>,
+    // 1-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
     pub output_writable: Option<Box<dyn Write>>,
     pub event_receiver: Receiver<(Instant, Event)>,
@@ -360,6 +421,7 @@ impl UiHandler {
             }
         } else {
             if let Some([row, col]) = self.last_mouse_screen_row_col {
+                assert!(row > 0 && col > 0, "row: {row}, col: {col}");
                 self.screen_buffer.grid[row as usize][col as usize] = GlyphWithTransparency::solid_color(RED);
             }
         }
@@ -852,15 +914,15 @@ mod tests {
     fn press_left(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Press(
             termion::event::MouseButton::Left,
-            col + 1,
-            row + 1,
+            col,
+            row,
         ))
     }
     fn drag_mouse(col: u16, row: u16) -> termion::event::Event {
-        termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col + 1, row + 1))
+        termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col, row))
     }
     fn release_mouse(col: u16, row: u16) -> termion::event::Event {
-        termion::event::Event::Mouse(termion::event::MouseEvent::Release(col + 1, row + 1))
+        termion::event::Event::Mouse(termion::event::MouseEvent::Release(col, row))
     }
 
     macro_rules! compare_frame_to_file {
@@ -935,7 +997,7 @@ mod tests {
     fn test_click_a() {
         let mut game = Game::new_headless_one_to_one_square(12);
 
-        game.give_and_process_fake_event_now(press_left(0, 0));
+        game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
@@ -944,14 +1006,14 @@ mod tests {
     #[test]
     fn test_click_a_small() {
         let mut game = Game::new_headless_one_to_one_square(2);
-        game.give_and_process_fake_event_now(press_left(0, 0));
+        game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
         compare_frame_to_file!(frame, "", true);
     }
     #[test]
     fn test_click_b() {
         let mut game = Game::new_headless_one_to_one_square(12);
-        game.give_and_process_fake_event_now(press_left(3, 9));
+        game.give_and_process_fake_event_now(press_left(4, 10));
         let frame = game.render_with_mouse(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
@@ -962,11 +1024,11 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = Game::new_headless(12, 24, 12, 12);
-        game.give_and_process_fake_event_now(press_left(3, 3));
+        game.give_and_process_fake_event_now(press_left(4, 3));
         let frame_1 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse(4, 3));
-        let frame_2 = game.render_with_mouse(None);
         game.give_and_process_fake_event_now(drag_mouse(5, 3));
+        let frame_2 = game.render_with_mouse(None);
+        game.give_and_process_fake_event_now(drag_mouse(6, 3));
         let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
