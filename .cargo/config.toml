@@ -1,5 +1,10 @@
 [build]
-rustflags = ["-Cinstrument-coverage"]
+rustflags = [
+  '-Cinstrument-coverage',
+  '-Cforce-frame-pointers=yes',
+  '-Zinstrument-mcount',
+  '-Cpasses=ee-instrument<post-inline>'
+]
 
 [env]
 LLVM_PROFILE_FILE = "coverage/%p-%m.profraw"

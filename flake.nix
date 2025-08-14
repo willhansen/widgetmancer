@@ -18,7 +18,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # rustup
-            (rust-bin.stable.latest.default.override { 
+            # (rust-bin.stable.latest.default.override { 
+            (rust-bin.nightly.latest.default.override { 
               extensions = [ 
                 "llvm-tools-preview" # for code coverage
               ];
