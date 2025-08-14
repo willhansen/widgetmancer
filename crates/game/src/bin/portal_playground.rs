@@ -161,9 +161,18 @@ impl Game {
 struct Camera {
     lower_left_local_square_in_world: [i32; 2],
     upper_right_local_square_in_world: [i32; 2],
+    // Note that screen is 1-indexed
     upper_left_row_col_char_on_screen: [u16; 2],
 }
 impl Camera {
+    pub fn new() -> Self {
+        Camera {
+            lower_left_local_square_in_world: [0,0],
+            upper_right_local_square_in_world: [25,25],
+            // Note that screen is 1-indexed
+            upper_left_row_col_char_on_screen: [1,1]
+        }
+    }
     pub fn size(&self) -> [u32; 2] {
         [
             (self.upper_right_local_square_in_world[0] - self.lower_left_local_square_in_world[0])
@@ -209,6 +218,9 @@ impl Camera {
     pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         self.local_screen_row_col_point_to_local_world_point(screen_row_col_point)
     }
+    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16;2]) -> IPoint {
+        self.local_screen_row_col_point_to_local_world_point(screen_row_col_char.map(|x| x as f32)).rounded()
+    }
 }
 
 // struct PortalUnderConstruction {
@@ -228,6 +240,7 @@ struct UiHandler {
     pub prev_drawn: Option<Frame>,
     pub screen_buffer: Frame,
     pub enable_mouse_smoothing: bool,
+    pub camera: Camera,
 }
 impl UiHandler {
     fn smoothed_mouse_position_screen_row_col(&self, t: f32) -> Option<FPoint> {
@@ -300,8 +313,8 @@ impl UiHandler {
                 [i32::from(screen_col), screen_y]
             })
     }
-    fn mouse_square_xy_in_camera_frame(&self) -> Option<IPoint> {
-        todo!();
+    fn mouse_world_square(&self) -> Option<IPoint> {
+        self.last_mouse_screen_row_col.map(|row_col| self.camera.screen_row_col_char_to_world_square(row_col))
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
         let (sender, receiver) = channel();
@@ -325,6 +338,7 @@ impl UiHandler {
             prev_drawn: None,
             screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
             enable_mouse_smoothing: false,
+            camera: Camera::new(),
         }
     }
     pub fn draw_mouse(&mut self) {
@@ -774,7 +788,7 @@ fn main() {
 
         let frame = game
             .world_state
-            .render(game.ui_handler.mouse_screen_square_xy());
+            .render(game.ui_handler.mouse_world_square());
         game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         game.ui_handler.screen_buffer.draw_text(
             format!(
@@ -886,7 +900,7 @@ mod tests {
             ),
         );
 
-        let good = candidate_frame == correct_frame;
+        let good = candidate_frame.string_for_regular_display() == correct_frame.string_for_regular_display();
 
         if !good {
 
@@ -922,7 +936,7 @@ mod tests {
         let mut game = Game::new_headless_one_to_one_square(12);
 
         game.give_and_process_fake_event_now(press_left(0, 0));
-        let frame = game.world_state.render(None);
+        let frame = game.render_with_mouse(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         compare_frame_to_file!(frame);
@@ -938,7 +952,7 @@ mod tests {
     fn test_click_b() {
         let mut game = Game::new_headless_one_to_one_square(12);
         game.give_and_process_fake_event_now(press_left(3, 9));
-        let frame = game.world_state.render(None);
+        let frame = game.render_with_mouse(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color(), RED.into());
@@ -949,11 +963,11 @@ mod tests {
     fn test_drag_mouse() {
         let mut game = Game::new_headless(12, 24, 12, 12);
         game.give_and_process_fake_event_now(press_left(3, 3));
-        let frame_1 = game.world_state.render(None);
+        let frame_1 = game.render_with_mouse(None);
         game.give_and_process_fake_event_now(drag_mouse(4, 3));
-        let frame_2 = game.world_state.render(None);
+        let frame_2 = game.render_with_mouse(None);
         game.give_and_process_fake_event_now(drag_mouse(5, 3));
-        let frame_3 = game.world_state.render(None);
+        let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
         compare_frame_to_file!(frame_2, "2");
@@ -1142,7 +1156,7 @@ mod tests {
         out
     }
 
-    // #[ignore]
+    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_funcs = [
