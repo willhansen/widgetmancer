@@ -38,6 +38,7 @@
             cargo-limit
             cargo-llvm-cov
             # luarocks
+            uftrace
           ];
           shellHook = "zsh";
         };
