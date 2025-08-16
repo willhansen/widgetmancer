@@ -422,7 +422,7 @@ impl UiHandler {
         } else {
             if let Some([row, col]) = self.last_mouse_screen_row_col {
                 assert!(row > 0 && col > 0, "row: {row}, col: {col}");
-                self.screen_buffer.grid[row as usize][col as usize] = GlyphWithTransparency::solid_color(RED);
+                self.screen_buffer.grid[row as usize - 1][col as usize - 1] = GlyphWithTransparency::solid_color(RED);
             }
         }
     }
@@ -927,6 +927,9 @@ mod tests {
 
     macro_rules! compare_frame_to_file {
         ($frame:ident, $prefix:expr, $verbose:expr) => {
+            if !$prefix.is_empty() {
+                println!("Prefix: {}", $prefix);
+            }
             let test_name: String = function_name!().replace(":", "_");
             compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name), $verbose)
         };
@@ -1024,11 +1027,11 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = Game::new_headless(12, 24, 12, 12);
-        game.give_and_process_fake_event_now(press_left(4, 3));
+        game.give_and_process_fake_event_now(press_left(4, 4));
         let frame_1 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse(5, 3));
+        game.give_and_process_fake_event_now(drag_mouse(5, 4));
         let frame_2 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse(6, 3));
+        game.give_and_process_fake_event_now(drag_mouse(6, 4));
         let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
