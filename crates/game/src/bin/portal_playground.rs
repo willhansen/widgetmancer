@@ -150,11 +150,22 @@ impl Game {
 
         true
     }
+    pub fn process_events_in_queue(&mut self) -> usize {
+        let mut n = 0;
+        while self.try_process_next_event() { n += 1;}
+        n
+    }
     pub fn render_with_mouse(&mut self, fov_center: Option<IPoint>) -> Frame {
+        self.render_with_mouse_now(fov_center)
+    }
+    pub fn render_with_mouse_at_time(&mut self, fov_center: Option<IPoint>, time_from_start_s: f32) -> Frame {
         let frame = self.world_state.render(fov_center);
         self.ui_handler.screen_buffer.blit(&frame, [0, 0]);
-        self.ui_handler.draw_mouse();
+        self.ui_handler.draw_mouse_at_time(time_from_start_s);
         self.ui_handler.screen_buffer.clone()
+    }
+    pub fn render_with_mouse_now(&mut self, fov_center: Option<IPoint>) -> Frame {
+        self.render_with_mouse_at_time(fov_center, Instant::now().duration_since(self.ui_handler.start_time).as_secs_f32() )
     }
 }
 
@@ -339,11 +350,11 @@ impl UiHandler {
             })
             .collect_vec()
     }
-    pub fn height(&self) -> u16 {
-        self.screen_buffer.height() as u16
+    pub fn height(&self) -> usize {
+        self.screen_buffer.height()
     }
-    pub fn width(&self) -> u16 {
-        self.screen_buffer.width() as u16
+    pub fn width(&self) -> usize {
+        self.screen_buffer.width()
     }
     pub fn new() -> UiHandler {
         let (term_width, term_height) = termion::terminal_size().unwrap();
@@ -363,15 +374,17 @@ impl UiHandler {
         )
     }
     // xy order from bottom left of screen
-    fn mouse_screen_square_xy(&self) -> Option<IPoint> {
-        self.mouse_screen_xy().map(|p| [p[0] / 2, p[1]])
+    fn mouse_screen_xy_square(&self) -> Option<IPoint> {
+        self.mouse_screen_xy_char().map(|p| [p[0] / 2, p[1]])
     }
-    fn mouse_screen_xy(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col
-            .map(|[screen_row, screen_col]| {
-                let screen_y: i32 = self.height() as i32 - i32::from(screen_row) - 1;
-                [i32::from(screen_col), screen_y]
-            })
+    fn mouse_screen_xy_char(&self) -> Option<IPoint> {
+        self.last_mouse_screen_row_col.map(|x|self.screen_row_col_char_to_screen_xy_char(x))
+    }
+    fn screen_row_col_char_to_screen_xy_char(&self, row_col_char: ScreenRowColCharPos) -> IPoint {
+        let [screen_row, screen_col] = row_col_char;
+        let screen_y: i32 = self.height() as i32 - i32::from(screen_row) - 1;
+        [i32::from(screen_col), screen_y]
+
     }
     fn mouse_world_square(&self) -> Option<IPoint> {
         self.last_mouse_screen_row_col.map(|row_col| self.camera.screen_row_col_char_to_world_square(row_col))
@@ -402,10 +415,21 @@ impl UiHandler {
         }
     }
     pub fn draw_mouse(&mut self) {
+            let t = 
+                (Instant::now() - self.start_time).as_secs_f32();
+        self.draw_mouse_at_time(t)
+    }
+    pub fn draw_mouse_at_time(&mut self, time_from_start_s: f32) {
         // draw mouse position on top
         if self.enable_mouse_smoothing {
+            self.draw_smoothed_mouse(time_from_start_s);
+        } else {
+            self.draw_mouse_square();
+        }
+    }
+    pub fn draw_smoothed_mouse(&mut self, time_from_start_s: f32) {
             if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col(
-                (Instant::now() - self.start_time).as_secs_f32(),
+                time_from_start_s,
             ) {
                 let smoothed_mouse_pos_xy = [
                     smoothed_mouse_pos_row_col[1] - 1.0,
@@ -418,12 +442,14 @@ impl UiHandler {
                 let [row, col] = smoothed_mouse_pos_row_col.rounded();
                 self.screen_buffer.grid[row as usize][col as usize].character = the_char;
             }
-        } else {
+
+    }
+    pub fn draw_mouse_square(&mut self) {
+
             if let Some([row, col]) = self.last_mouse_screen_row_col {
                 assert!(row > 0 && col > 0, "row: {row}, col: {col}");
                 self.screen_buffer.grid[row as usize - 1][col as usize - 1] = GlyphWithTransparency::solid_color(RED);
             }
-        }
     }
     pub fn draw_screen(&mut self) {
         draw_frame(
@@ -840,12 +866,13 @@ fn main() {
     game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
     game.world_state
         .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
+    game.ui_handler.enable_mouse_smoothing = true;
 
     set_up_panic_hook();
 
     while game.world_state.running {
         let now = std::time::Instant::now();
-        while game.try_process_next_event() {}
+        game.process_events_in_queue();
 
         let frame = game
             .world_state
@@ -917,7 +944,7 @@ mod tests {
             row,
         ))
     }
-    fn drag_mouse(col: u16, row: u16) -> termion::event::Event {
+    fn drag_mouse_to(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col, row))
     }
     fn release_mouse(col: u16, row: u16) -> termion::event::Event {
@@ -1028,9 +1055,9 @@ mod tests {
         let mut game = Game::new_headless(12, 24, 12, 12);
         game.give_and_process_fake_event_now(press_left(4, 4));
         let frame_1 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse(5, 4));
+        game.give_and_process_fake_event_now(drag_mouse_to(5, 4));
         let frame_2 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse(6, 4));
+        game.give_and_process_fake_event_now(drag_mouse_to(6, 4));
         let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         compare_frame_to_file!(frame_1, "1");
@@ -1219,9 +1246,31 @@ mod tests {
         }
         out
     }
+    #[test]
+    fn test_render_smoothed_mouse_stationary() {
+        let mut game = Game::new_headless_one_to_one_square(2);
+        game.ui_handler.enable_mouse_smoothing = true;
+        game.give_and_process_fake_event_now(press_left(1, 1));
+        let frame = game.render_with_mouse(None);
+        assert!(char_is_braille(frame.grid[0][0].character), "{frame:?}");
+        compare_frame_to_file!(frame, "", true);
+    }
+    #[test]
+    fn test_render_smoothed_mouse_linear_move() {
+        let mut game = Game::new_headless_one_to_one_square(3);
+        game.ui_handler.enable_mouse_smoothing = true;
+        game.ui_handler.give_fake_event((0.0, press_left(1,1)));
+        game.ui_handler.give_fake_event((0.2, drag_mouse_to(2,1)));
+        let n = game.process_events_in_queue();
+        assert_eq!(n, 2);
+
+        let frame = game.render_with_mouse_at_time(None, 0.4);
+        assert!(char_is_braille(frame.grid[0][2].character), "{frame:?}");
+        compare_frame_to_file!(frame, "", true);
+    }
 
     #[test]
-    fn test_smoothed_mouse_motion() {
+    fn test_smoothed_mouse_motion_accuracy() {
         let path_funcs = [
             |t: f32| [t * 5.0, 0.0],
             |t: f32| [t * 15.0, 0.0],
@@ -1233,7 +1282,7 @@ mod tests {
                 "Path:\n{}",
                 draw_points_in_character_grid(
                     &sim_path.iter().cloned().map(|(t, p)| p).collect_vec()
-                )
+                ).framed()
             );
             let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
             assert_eq!(square_entry_events[0].0, sim_path[0].0);
