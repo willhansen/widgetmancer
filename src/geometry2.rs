@@ -3,6 +3,8 @@ pub type IPoint = [i32; 2];
 pub type FPoint = [f32; 2];
 pub type OrthoDir = i32;
 pub type SquareEdge = (IPoint, OrthoDir);
+// 1-indexed
+pub type ScreenRowColCharPos = [u16;2];
 
 pub const DIR_RIGHT: i32 = 0;
 pub const DIR_UP: i32 = 1;
