@@ -37,7 +37,7 @@ pub trait MultilineStringExt: ToString {
             .all_equal()
     }
     fn visible_len(&self) -> usize {
-        self.trim_control_characters().chars().count()
+        self.without_control_sequences().chars().count()
     }
     fn width(&self) -> usize {
         self.lines_including_trailing_newline()
@@ -45,7 +45,7 @@ pub trait MultilineStringExt: ToString {
             .max()
             .unwrap()
     }
-    fn trim_control_characters(&self) -> String {
+    fn without_control_sequences(&self) -> String {
         let control_char_regex = regex_static::static_regex!(r"\u{1b}\[(.*?)m");
         let x = control_char_regex.split(&self.to_string()).join("");
         x
@@ -65,7 +65,7 @@ pub trait MultilineStringExt: ToString {
             self.is_rectangular(),
             "frame: \n{}\n\n{:?}",
             self.to_string().replace(" ", "."),
-            self.trim_control_characters()
+            self.without_control_sequences()
                 .lines_including_trailing_newline()
                 .map(|l| l.visible_len())
                 .collect_vec()
@@ -102,6 +102,21 @@ pub trait MultilineStringExt: ToString {
     }
     fn indent(&self) -> String {
         self.linewise_prefix("\t")
+    }
+    fn framed(&self) -> String {
+        //╭╮╯╰─│
+        format!("\
+
+╭{horiz}╮
+{contents}
+╰{horiz}╯\
+",
+            horiz = "─".repeat(self.width()),
+            contents = self
+                .lines_including_trailing_newline()
+                .map(|row| format!("│{row}│"))
+                .join("\n")
+        )
     }
 }
 

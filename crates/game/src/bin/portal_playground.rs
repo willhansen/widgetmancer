@@ -228,7 +228,6 @@ impl Camera {
         screen_row_col_char
     }
     pub fn camera_local_row_col_char_to_camera_local_world_square(&self, camera_local_row_col_char: [u16;2]) -> IPoint {
-        dbg!(camera_local_row_col_char);
         [
             (camera_local_row_col_char[1] as i32 - 1)/ 2,
             self.height_in_world() as i32 - (camera_local_row_col_char[0] as i32 - 1) - 1,
@@ -1211,7 +1210,7 @@ mod tests {
         let mut t = t0;
         let mut i = 0;
         let mut out = vec![];
-        while t < end_t {
+        while t < end_t + 0.0001 {
             while t >= square_entry_events[i].0 && i < square_entry_events.len() - 1 {
                 i += 1;
             }
@@ -1221,7 +1220,6 @@ mod tests {
         out
     }
 
-    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion() {
         let path_funcs = [
@@ -1230,7 +1228,7 @@ mod tests {
             |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0],
         ];
         for path_func in path_funcs {
-            let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 60.0, 3.0);
+            let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 6.0, 3.0);
             println!(
                 "Path:\n{}",
                 draw_points_in_character_grid(
@@ -1240,14 +1238,14 @@ mod tests {
             let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
             assert_eq!(square_entry_events[0].0, sim_path[0].0);
 
-            let smoothed_path = smoothed_mouse_path(square_entry_events, 60.0, 3.0);
+            let smoothed_path = smoothed_mouse_path(square_entry_events, 6.0, 3.0);
 
             let naive_snap_to_square_path = sim_path
                 .iter()
                 .map(|&(t, p)| (t, p.rounded()))
                 .collect_vec();
 
-            assert_eq!(sim_path.len(), smoothed_path.len());
+            assert_eq!(sim_path.len(), smoothed_path.len(), "sim_path:\n{:?}\n\nsmoothed_path:\n{:?}", &sim_path.iter().map(|(t,p)|t).collect_vec(), &smoothed_path.iter().map(|(t,p)|t).collect_vec());
 
             let label_and_funcs: &[(&str, fn(FPoint, FPoint) -> f32)] = &[
                 ("Dist error:", |p1, p2| p1.dist(p2)),
