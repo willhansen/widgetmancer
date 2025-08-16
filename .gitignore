@@ -17,3 +17,4 @@ Cargo.lock
 **/*.profraw
 perf.*
 *.svg
+uftrace.data
