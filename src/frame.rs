@@ -157,20 +157,7 @@ impl Frame {
     }
 
     pub fn framed(&self) -> String {
-        //╭╮╯╰─│
-        format!(
-            "\
-╭{horiz}╮
-{contents}
-╰{horiz}╯\
-",
-            horiz = "─".repeat(self.width()),
-            contents = self
-                .string_for_regular_display()
-                .lines()
-                .map(|row| format!("│{row}│"))
-                .join("\n")
-        )
+        self.string_for_regular_display().framed()
     }
     pub fn string_for_regular_display(&self) -> String {
         self.non_raw_render_string(true)
