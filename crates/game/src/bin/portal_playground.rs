@@ -449,8 +449,13 @@ impl UiHandler {
                     .chars()
                     .next()
                     .unwrap();
-                let [row, col] = smoothed_mouse_pos_row_col.rounded();
-                self.screen_buffer.grid[row as usize - 1][col as usize - 1].character = the_char;
+                let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
+                assert!(row_1i > 0, "{row_1i}");
+                assert!(row_1i <= self.height() as i32, "{row_1i}");
+                assert!(col_1i > 0, "{col_1i}");
+                assert!(col_1i <= self.width() as i32, "{col_1i}");
+                let[row, col] = [row_1i as usize-1, col_1i as usize-1];
+                self.screen_buffer.grid[row][col].character = the_char;
             }
 
     }
@@ -489,8 +494,12 @@ impl UiHandler {
             .unwrap()
     }
     fn log_event(&mut self, e: (f32, Event)) {
-        self.event_log.push_front(e);
-        self.event_log.truncate(20);
+        self.event_log.push_back(e);
+        while self.event_log.len() > 20 {
+
+            self.event_log.pop_front();
+        }
+
     }
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
         self.fake_event_sender
@@ -1290,7 +1299,7 @@ mod tests {
         assert!(char_is_braille(frame.grid[0][0].character), "{frame:?}");
         compare_frame_to_file!(frame, "", true);
     }
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_render_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_one_to_one_square(3);
@@ -1360,5 +1369,10 @@ mod tests {
             );
         }
         panic!();
+    }
+    #[test]
+    fn test_smooth_mouse() {
+        let xy = smoothed_mouse_position(&[(0.1, [1,1]), (0.2,[2,1])], 0.3);
+        assert!(xy.dist([3.0,1.0]) < 0.1, "{xy:?}");
     }
 }
