@@ -943,6 +943,7 @@ fn smoothed_mouse_position(recent_square_entries: &[(f32, IPoint)], now: f32) ->
 mod tests {
     use super::*;
     use game::fov_stuff::LocalSquareHalfPlane;
+    use ordered_float::OrderedFloat;
     use pretty_assertions::assert_str_eq;
     use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
     use stdext::function_name;
@@ -1314,13 +1315,15 @@ mod tests {
         compare_frame_to_file!(frame, "", true);
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion_accuracy() {
         let path_funcs = [
             |t: f32| [t * 5.0, 0.0],
             |t: f32| [t * 15.0, 0.0],
+            |t: f32| [t * 15.0, t * 10.0],
             |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0],
+            |t: f32| [ 3.0 * (t).cos(), 3.0 * (t).sin()],
         ];
         for path_func in path_funcs {
             let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 6.0, 3.0);
@@ -1342,29 +1345,28 @@ mod tests {
 
             assert_eq!(sim_path.len(), smoothed_path.len(), "sim_path:\n{:?}\n\nsmoothed_path:\n{:?}", &sim_path.iter().map(|(t,p)|t).collect_vec(), &smoothed_path.iter().map(|(t,p)|t).collect_vec());
 
-            let label_and_funcs: &[(&str, fn(FPoint, FPoint) -> f32)] = &[
-                ("Dist error:", |p1, p2| p1.dist(p2)),
-                ("x error:", |p1, p2| p1.x().sub(p2.x()).abs()),
-                ("y error:", |p1, p2| p1.y().sub(p2.y()).abs()),
-            ];
 
-            label_and_funcs.into_iter().for_each(|(label, func)| {
-                let errors: Vec<f32> = sim_path
-                    .iter()
-                    .zip(smoothed_path.iter())
-                    .map(|(&(t1, p1), &(t2, p2))| func(p1, p2))
-                    .collect_vec();
-                println!("{label}:\n{}", bargraph(errors, 5));
-            });
-            println!(
-                "naive path dist error:\n{}",
-                bargraph(
+            let errors: Vec<f32> = sim_path
+                .iter()
+                .zip(smoothed_path.iter())
+                .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2))
+                .collect_vec();
+
+            let naive_errors = 
                     sim_path
                         .iter()
                         .zip(naive_snap_to_square_path.iter())
                         .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2.to_float()))
-                        .collect_vec(),
-                    5
+                        .collect_vec();
+
+            let max_err = *errors.iter().chain(naive_errors.iter()).max_by_key(|&&x| OrderedFloat(x)).unwrap();
+
+            println!("Dist error:\n{}", bargraph(errors, 5, Some(max_err)));
+
+            println!(
+                "naive path dist error:\n{}",
+                bargraph(naive_errors,
+                    5, Some(max_err)
                 )
             );
         }

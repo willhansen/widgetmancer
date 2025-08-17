@@ -1,5 +1,7 @@
 pub mod glyph;
 use std::collections::HashMap;
+use std::iter::once;
+use std::iter::repeat_n;
 use std::ops::Add;
 use std::ops::Mul;
 use std::ops::Sub;
@@ -98,14 +100,17 @@ pub trait MultilineStringExt: ToString {
     }
     fn linewise_prefix(&self, prefix: impl Into<String>) -> String {
         let prefix = prefix.into();
-        self.lines_including_trailing_newline().map(|s| prefix.clone() + s).join("\n")
+        self.lines_including_trailing_newline()
+            .map(|s| prefix.clone() + s)
+            .join("\n")
     }
     fn indent(&self) -> String {
         self.linewise_prefix("\t")
     }
     fn framed(&self) -> String {
         //╭╮╯╰─│
-        format!("\
+        format!(
+            "\
 
 ╭{horiz}╮
 {contents}
@@ -152,6 +157,7 @@ pub fn horiz_concat_strings_with_vbias(
 }
 pub fn horiz_concat_equal_height_strings(strings: &[String], spaces: usize) -> String {
     assert!(strings.iter().map(|col| col.height()).all_equal());
+    assert!(strings.iter().map(|col| col.chars().count()).all_equal());
     let mut out = String::new();
     let num_cols = strings.len();
     let height = strings[0].height();
@@ -199,34 +205,72 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
     char_map_to_string(char_map)
 }
 
-pub fn bargraph(data: Vec<f32>, height: u32) -> String {
+pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {
     const blocks: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     const full_block: char = '█';
-    let max = data
-        .iter()
-        .map(|&x| OrderedFloat(x))
-        .max()
-        .unwrap()
-        .into_inner();
+
+    let max = if let Some(m) = max {
+        m
+    } else {
+        data.iter()
+            .map(|&x| OrderedFloat(x))
+            .max()
+            .unwrap()
+            .into_inner()
+    };
     assert!(data.iter().all(|&x| x >= 0.0));
 
     let col_func = |val: f32| -> String {
         let normalized_val = val / max;
         let height_in_blocks = normalized_val * height as f32;
-        let full_blocks = height_in_blocks.floor() as usize;
-        let remainder_in_eighths = (height_in_blocks - full_blocks as f32) * 8.0;
-        let full_eighths = remainder_in_eighths.round() as u32;
-        (if full_eighths > 0 {
-            blocks[(full_eighths - 1) as usize].to_string()
+        let height_in_eighths: u32 = (normalized_val * height as f32 * 8.0).round() as u32;
+
+        let full_blocks = height_in_eighths / 8;
+        let remainder_eighths = height_in_eighths % 8;
+
+        if full_blocks == height as u32 && remainder_eighths == 0 {
+            format!("{full_block}") + &format!("\n{full_block}").repeat(height - 1)
+        } else if full_blocks < height as u32 {
+            (if remainder_eighths > 0 {
+                repeat_n(" ".to_string(), height - full_blocks as usize - 1).chain(
+                     once(blocks[(remainder_eighths - 1) as usize].to_string())).collect_vec()
+            } else {
+                repeat_n(" ".to_string(),height - full_blocks as usize ).collect_vec()
+            }).into_iter().chain(repeat_n(full_block.to_string(), full_blocks as usize)).join("\n")
         } else {
-            "".to_string()
-        }) + &format!("\n{full_block}").repeat(full_blocks)
+            // 🭯
+            "🢁".to_string() + &format!("\n{full_block}").repeat(height - 1)
+        }
     };
 
-    let columns = data.iter().map(|x| col_func(*x) + "\n-").collect_vec();
-    let graph = horiz_concat_strings_with_vbias(&columns, 0, ConcatVBias::Bottom);
+    let columns = data.iter().map(|x| col_func(*x)).collect_vec();
+    let graph = horiz_concat_strings_with_vbias(&columns, 0, ConcatVBias::Bottom).framed();
 
-    format!("{graph}\n\nMax: {max}")
+    let graph = graph
+        .lines()
+        .enumerate()
+        .map(|(i, l)| {
+            if i == 0 {
+                l.chars()
+                    .into_iter()
+                    .take(data.len() + 1)
+                    .collect::<String>()
+                    + "┬─"
+                    + &format!("{max}")
+            } else if i == height + 1 {
+                l.chars()
+                    .into_iter()
+                    .take(data.len() + 1)
+                    .collect::<String>()
+                    + "┴─"
+                    + "0.0"
+            } else {
+                l.to_string()
+            }
+        })
+        .join("\n");
+
+    format!("{graph}")
 }
 
 #[cfg(test)]
