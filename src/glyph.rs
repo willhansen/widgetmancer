@@ -53,6 +53,10 @@ pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 //	🩐 	🩑 	🩒 	🩓
 //	🩠 	🩡 	🩢 	🩣 	🩤 	🩥 	🩦 	🩧 	🩨 	🩩 	🩪 	🩫 	🩬 	🩭
 
+pub fn grey(x: u8) -> RGB8 {
+    RGB8::new(x, x, x)
+}
+
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Glyph {
     pub character: char,
