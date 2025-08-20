@@ -17,6 +17,7 @@ pub use glyph_with_transparency::*;
 pub mod screen;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use rgb::RGBA8;
 pub use screen::*;
 
 pub mod frame;
@@ -24,6 +25,8 @@ pub use frame::*;
 
 use utility::geometry2::IPointExt;
 pub use utility::*;
+
+use crate::glyph::glyph_constants::named_colors::*;
 
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ConcatVBias {
@@ -157,7 +160,7 @@ pub fn horiz_concat_strings_with_vbias(
 }
 pub fn horiz_concat_equal_height_strings(strings: &[String], spaces: usize) -> String {
     assert!(strings.iter().map(|col| col.height()).all_equal());
-    assert!(strings.iter().map(|col| col.chars().count()).all_equal());
+    assert!(strings.iter().map(|col| col.is_rectangular()).all(|x|x));
     let mut out = String::new();
     let num_cols = strings.len();
     let height = strings[0].height();
@@ -202,7 +205,15 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
             )
         })
         .collect();
-    char_map_to_string(char_map)
+    let display_string = char_map_to_string(char_map);
+    let mut frame = Frame::from_plain_string(&display_string);
+    for g in frame.glyphs() {
+        if char_is_braille(g.character) {
+            g.primary_color = WHITE.into();
+            g.secondary_color = grey(20).into();
+        }
+    }
+    frame.string_for_regular_display()
 }
 
 pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {

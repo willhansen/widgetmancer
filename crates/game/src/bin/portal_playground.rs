@@ -870,9 +870,6 @@ impl WorldState {
     }
 }
 
-fn grey(x: u8) -> RGB8 {
-    RGB8::new(x, x, x)
-}
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
@@ -1248,9 +1245,10 @@ mod tests {
     }
 
     fn smoothed_mouse_path(
-        square_entry_events: Vec<(f32, IPoint)>,
+        square_entry_events: &[(f32, IPoint)],
         sample_rate: f32,
         end_t: f32,
+        smoothing_function: fn(&[(f32, IPoint)], f32) ->  FPoint
     ) -> Vec<(f32, FPoint)> {
         assert!(square_entry_events.len() > 0);
         let t0 = square_entry_events[0].0;
@@ -1261,7 +1259,7 @@ mod tests {
             while t >= square_entry_events[i].0 && i < square_entry_events.len() - 1 {
                 i += 1;
             }
-            out.push((t, smoothed_mouse_position(&square_entry_events[0..i], t)));
+            out.push((t, smoothing_function(&square_entry_events[0..i], t)));
             t += 1.0 / sample_rate;
         }
         out
@@ -1327,48 +1325,70 @@ mod tests {
         ];
         for path_func in path_funcs {
             let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 6.0, 3.0);
-            println!(
-                "Path:\n{}",
+            let get_drawn_path = |path: &Vec<(f32, FPoint)>| {
+
                 draw_points_in_character_grid(
-                    &sim_path.iter().cloned().map(|(t, p)| p).collect_vec()
+                    &path.iter().cloned().map(|(t, p)| p).collect_vec()
                 ).framed()
-            );
+            };
+
             let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
             assert_eq!(square_entry_events[0].0, sim_path[0].0);
 
-            let smoothed_path = smoothed_mouse_path(square_entry_events, 6.0, 3.0);
+            let naive_smoothing_function = |entry_events: &[(f32, IPoint)], t| {
+                 entry_events.last().unwrap().1.to_float()
+            };
 
-            let naive_snap_to_square_path = sim_path
-                .iter()
-                .map(|&(t, p)| (t, p.rounded()))
-                .collect_vec();
+            let naive_smoothed_path = smoothed_mouse_path(&square_entry_events, 6.0, 3.0, naive_smoothing_function);
+            let smoothed_path = smoothed_mouse_path(&square_entry_events, 6.0, 3.0, smoothed_mouse_position);
+
+            println!("{}", horiz_concat_strings(
+                &[
+                    format!(
+                        "Path:\n{}",
+                        get_drawn_path(&sim_path)
+                    ), 
+                    format!(
+                        "Naive path:\n{}",
+                        get_drawn_path(&naive_smoothed_path)
+                    ), 
+                    format!(
+                        "Predicted next points:\n{}", 
+                        get_drawn_path(&smoothed_path)
+                    )
+                ], 
+                3
+            ));
+
 
             assert_eq!(sim_path.len(), smoothed_path.len(), "sim_path:\n{:?}\n\nsmoothed_path:\n{:?}", &sim_path.iter().map(|(t,p)|t).collect_vec(), &smoothed_path.iter().map(|(t,p)|t).collect_vec());
 
-
-            let errors: Vec<f32> = sim_path
+            let get_dists_and_avg_dist = |candidate_path: Vec<(f32,FPoint)>| {
+             let dists = sim_path
                 .iter()
-                .zip(smoothed_path.iter())
+                .zip(candidate_path.iter())
                 .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2))
                 .collect_vec();
 
-            let naive_errors = 
-                    sim_path
-                        .iter()
-                        .zip(naive_snap_to_square_path.iter())
-                        .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2.to_float()))
-                        .collect_vec();
+                let avg =&dists.iter().sum::<f32>() / dists.len() as f32; 
+                (dists, avg)
+            };
 
-            let max_err = *errors.iter().chain(naive_errors.iter()).max_by_key(|&&x| OrderedFloat(x)).unwrap();
+            let (dists, avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(smoothed_path);
+            let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
 
-            println!("Dist error:\n{}", bargraph(errors, 5, Some(max_err)));
 
-            println!(
-                "naive path dist error:\n{}",
-                bargraph(naive_errors,
-                    5, Some(max_err)
+            let max_dist = *dists.iter().chain(naive_dists.iter()).max_by_key(|&&x| OrderedFloat(x)).unwrap();
+
+            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists, 5, Some(max_dist))).indent();
+
+            let b = format!(
+                "Naive path dist error:\n{}\n\n\tAvg: {naive_avg_dist}\n\n",
+                bargraph(naive_dists,
+                    5, Some(max_dist)
                 )
-            );
+            ).indent();
+            println!("{a}\n{b}");
         }
         panic!();
     }
