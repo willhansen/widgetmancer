@@ -83,6 +83,13 @@ macro_rules! pub_use {
     };
 }
 
+#[macro_export]
+macro_rules! boxx {
+    ($x:expr) => {
+        Box::new($x)
+    };
+}
+
 #[derive(Hash, Default, Debug, Copy, Clone, Eq, PartialEq, CopyGetters, AddAssign)]
 #[get_copy = "pub"]
 pub struct QuarterTurnsAnticlockwise {

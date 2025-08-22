@@ -968,37 +968,53 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(col, row))
     }
 
-    macro_rules! compare_frame_to_file {
+    macro_rules! assert_value_not_less_than_past {
+        ($val:expr, $prefix:expr) => {
+            let test_name: String = function_name!().replace(":", "_");
+        };
+    }
+    macro_rules! assert_array_not_less_than_past {
+        ($val:expr, $prefix:expr) => {
+            let test_name: String = function_name!().replace(":", "_");
+        };
+    }
+
+    macro_rules! assert_frame_same_as_past {
         ($frame:ident, $prefix:expr, $verbose:expr) => {
             if !$prefix.is_empty() {
                 println!("Prefix: {}", $prefix);
             }
             let test_name: String = function_name!().replace(":", "_");
-            compare_frame_for_test($frame, format!("{}_{}", $prefix, test_name), $verbose)
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_frame".to_string());
+            compare_frame_for_test($frame, file_path, $verbose)
         };
         ($frame:ident, $prefix:expr) => {
-            compare_frame_to_file!($frame, $prefix, false)
+            assert_frame_same_as_past!($frame, $prefix, false)
         };
         ($frame:ident) => {
-            compare_frame_to_file!($frame, "")
+            assert_frame_same_as_past!($frame, "")
         };
     }
 
-    fn compare_frame_for_test(candidate_frame: Frame, file_prefix: String, verbose: bool) {
-        let candidate_string = candidate_frame.string_for_regular_display();
-
+    fn get_blessed_test_file_path(test_name: String, prefix: String, postfix: String) -> PathBuf {
         let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
         assert!(file_directory.is_dir());
-        let correct_frame_path: PathBuf = file_directory.join(file_prefix + "_good_frame.txt");
+        dbg!(file_directory.join(prefix + "_" + &test_name + &postfix).with_extension("txt"))
+    
+    }
+
+    fn compare_frame_for_test(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
+        let candidate_string = candidate_frame.string_for_regular_display();
+
 
         let maybe_correct_string: Option<String> =
-            std::fs::read_to_string(correct_frame_path.clone()).ok();
+            std::fs::read_to_string(blessed_file_path.clone()).ok();
 
         // eprintln!("{}", &candidate_string);
 
         let blessed = option_env!("BLESS_TESTS").is_some();
         if blessed {
-            std::fs::write(correct_frame_path, candidate_string).unwrap();
+            std::fs::write(blessed_file_path, candidate_string).unwrap();
             return;
         }
 
@@ -1047,14 +1063,14 @@ mod tests {
         let frame = game.render_with_mouse(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
     #[test]
     fn test_click_a_small() {
         let mut game = Game::new_headless_one_to_one_square(2);
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
-        compare_frame_to_file!(frame, "", true);
+        assert_frame_same_as_past!(frame, "", true);
     }
     #[test]
     fn test_click_b() {
@@ -1065,7 +1081,7 @@ mod tests {
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color(), RED.into());
         assert_eq!(frame.get_xy([3, 2]).bg_color(), RED.into());
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
     #[test]
     fn test_drag_mouse() {
@@ -1077,9 +1093,9 @@ mod tests {
         game.give_and_process_fake_event_now(drag_mouse_to(6, 4));
         let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
-        compare_frame_to_file!(frame_1, "1");
-        compare_frame_to_file!(frame_2, "2");
-        compare_frame_to_file!(frame_3, "3");
+        assert_frame_same_as_past!(frame_1, "1");
+        assert_frame_same_as_past!(frame_2, "2");
+        assert_frame_same_as_past!(frame_3, "3");
     }
     #[test]
     fn test_render_portal_edges() {
@@ -1112,7 +1128,7 @@ mod tests {
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
         let frame = game.world_state.render(None);
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
     #[test]
     fn test_render_part_of_square() {
@@ -1171,7 +1187,7 @@ mod tests {
             );
         }
 
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
@@ -1189,7 +1205,7 @@ mod tests {
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
     #[test]
     fn test_portal_with_rotation() {
@@ -1215,7 +1231,7 @@ mod tests {
             dbg!(frame);
         });
 
-        compare_frame_to_file!(frame);
+        assert_frame_same_as_past!(frame);
     }
 
     fn sim_mouse_path(
@@ -1296,7 +1312,7 @@ mod tests {
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
         assert!(char_is_braille(frame.grid[0][0].character), "{frame:?}");
-        compare_frame_to_file!(frame, "", true);
+        assert_frame_same_as_past!(frame, "", true);
     }
     // #[ignore]
     #[test]
@@ -1310,20 +1326,20 @@ mod tests {
 
         let frame = game.render_with_mouse_at_time(None, 0.4);
         assert!(char_is_braille(frame.grid[0][2].character), "{frame:?}");
-        compare_frame_to_file!(frame, "", true);
+        assert_frame_same_as_past!(frame, "", true);
     }
 
     // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion_accuracy() {
-        let path_funcs = [
-            |t: f32| [t * 5.0, 0.0],
-            |t: f32| [t * 15.0, 0.0],
-            |t: f32| [t * 15.0, t * 10.0],
-            |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0],
-            |t: f32| [ 3.0 * (t).cos(), 3.0 * (t).sin()],
+        let path_funcs: &[(&str, fn(f32) -> FPoint)] = &[
+            ("horiz", |t: f32| [t * 5.0, 0.0]),
+            ("horiz_fast", |t: f32| [t * 15.0, 0.0]),
+            ("diag", |t: f32| [t * 15.0, t * 10.0]),
+            ("sin", |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0]),
+            ("arc", |t: f32| [ 3.0 * (t).cos(), 3.0 * (t).sin()]),
         ];
-        for path_func in path_funcs {
+        for (name, path_func) in path_funcs {
             let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 6.0, 3.0);
             let get_drawn_path = |path: &Vec<(f32, FPoint)>| {
 
