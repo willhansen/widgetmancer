@@ -945,6 +945,7 @@ mod tests {
     use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
     use stdext::function_name;
     use termion::event::MouseEvent;
+    use std::str::FromStr;
 
     #[test]
     fn test_simple_output() {
@@ -971,11 +972,15 @@ mod tests {
     macro_rules! assert_value_not_less_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_value".to_string());
+            assert_value_not_less_than_past($val, file_path)
         };
     }
     macro_rules! assert_array_not_less_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_array".to_string());
+            assert_array_not_less_than_past($val, file_path)
         };
     }
 
@@ -999,29 +1004,47 @@ mod tests {
     fn get_blessed_test_file_path(test_name: String, prefix: String, postfix: String) -> PathBuf {
         let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
         assert!(file_directory.is_dir());
-        dbg!(file_directory.join(prefix + "_" + &test_name + &postfix).with_extension("txt"))
-    
+        // TODO: use proper directories per test?
+        file_directory.join(prefix + "_" + &test_name + &postfix).with_extension("txt")
+    }
+
+    fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
+        let blessed = option_env!("BLESS_TESTS").is_some();
+        if blessed {
+            std::fs::write(path, candidate).unwrap();
+            return None;
+        }
+
+        let correct_string = std::fs::read_to_string(path.clone()).expect(
+        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate:?}"),
+        );
+        Some(correct_string)
+
+    }
+
+
+    fn assert_value_not_less_than_past(candidate_value: f32, file_path: PathBuf) {
+        let candidate_string = candidate_value.to_string();
+        let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
+            return;
+        };
+        let correct_val = f32::from_str(&correct_string).unwrap();
+        assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val}");
+    }
+    fn assert_array_not_less_than_past(value: &[f32], file_path: PathBuf) {
+        todo!();
     }
 
     fn compare_frame_for_test(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
         let candidate_string = candidate_frame.string_for_regular_display();
 
 
-        let maybe_correct_string: Option<String> =
-            std::fs::read_to_string(blessed_file_path.clone()).ok();
-
-        // eprintln!("{}", &candidate_string);
-
-        let blessed = option_env!("BLESS_TESTS").is_some();
-        if blessed {
-            std::fs::write(blessed_file_path, candidate_string).unwrap();
+        let Some(correct_string) = get_or_set_blessed_string(candidate_string, blessed_file_path) else {
             return;
-        }
+        };
 
         let correct_frame = Frame::parse_regular_display_string(
-            maybe_correct_string.expect(
-                &format!("No existing test output found.  Set BLESS_TESTS to canonize current output frame:\n\n{candidate_frame:?}"),
-            ),
+        correct_string
         );
 
         let good = candidate_frame.string_for_regular_display() == correct_frame.string_for_regular_display();
