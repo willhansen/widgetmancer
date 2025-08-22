@@ -1031,8 +1031,16 @@ mod tests {
         let correct_val = f32::from_str(&correct_string).unwrap();
         assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val}");
     }
-    fn assert_array_not_less_than_past(value: &[f32], file_path: PathBuf) {
-        todo!();
+    fn assert_array_not_less_than_past(candidate_value: &[f32], file_path: PathBuf) {
+        let candidate_string = candidate_value.iter().map(|x|x.to_string()).join("\n");
+        let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
+            return;
+        };
+        correct_string.lines().enumerate().zip(candidate_value).for_each(|((i, line), &candidate_value)| {
+
+            let correct_val = f32::from_str(line).unwrap();
+            assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val} at index {i}");
+        })
     }
 
     fn compare_frame_for_test(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
@@ -1428,6 +1436,8 @@ mod tests {
                 )
             ).indent();
             println!("{a}\n{b}");
+            assert_value_not_less_than_past!(max_dist, name.to_string() + "max_dist");
+            assert_value_not_less_than_past!(avg_dist, name.to_string() + "avg_dist");
         }
         panic!();
     }
