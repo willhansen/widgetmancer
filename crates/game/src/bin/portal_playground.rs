@@ -972,15 +972,29 @@ mod tests {
     macro_rules! assert_value_not_less_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_value".to_string());
-            assert_value_not_less_than_past($val, file_path)
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_value".to_string());
+            assert_each_of_array_not_fn_than_past(&[$val], file_path, PartialOrd::le, |new, past| format!("Error: {new}<{past}"))
+        };
+    }
+    macro_rules! assert_value_not_more_than_past {
+        ($val:expr, $prefix:expr) => {
+            let test_name: String = function_name!().replace(":", "_");
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_value".to_string());
+            assert_each_of_array_not_fn_than_past(&[$val], file_path, PartialOrd::MoreThan)
         };
     }
     macro_rules! assert_array_not_less_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_array".to_string());
-            assert_array_not_less_than_past($val, file_path)
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_array".to_string());
+            assert_each_of_array_not_fn_than_past($val, file_path, PartialOrd::LessThan)
+        };
+    }
+    macro_rules! assert_array_not_more_than_past {
+        ($val:expr, $prefix:expr) => {
+            let test_name: String = function_name!().replace(":", "_");
+            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_array".to_string());
+            assert_each_of_array_not_fn_than_past($val, file_path, PartialOrd::MoreThan)
         };
     }
 
@@ -1009,7 +1023,9 @@ mod tests {
     }
 
     fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
-        let blessed = option_env!("BLESS_TESTS").is_some();
+        const BLESS_NEWBORNS: bool = true;
+
+        let blessed = option_env!("BLESS_TESTS").is_some() || (BLESS_NEWBORNS && !path.is_file());
         if blessed {
             std::fs::write(path, candidate).unwrap();
             return None;
@@ -1031,7 +1047,7 @@ mod tests {
         let correct_val = f32::from_str(&correct_string).unwrap();
         assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val}");
     }
-    fn assert_array_not_less_than_past(candidate_value: &[f32], file_path: PathBuf) {
+    fn assert_each_of_array_not_fn_than_past(candidate_value: &[f32], file_path: PathBuf, func: fn(f32, f32) -> bool, format_func: fn(f32, f32) -> String) {
         let candidate_string = candidate_value.iter().map(|x|x.to_string()).join("\n");
         let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
             return;
@@ -1039,7 +1055,7 @@ mod tests {
         correct_string.lines().enumerate().zip(candidate_value).for_each(|((i, line), &candidate_value)| {
 
             let correct_val = f32::from_str(line).unwrap();
-            assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val} at index {i}");
+            assert!(!func(candidate_value, correct_val), "{} at index {i}", format_func(candidate_value, correct_val));
         })
     }
 
@@ -1425,14 +1441,17 @@ mod tests {
             let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
 
 
-            let max_dist = *dists.iter().chain(naive_dists.iter()).max_by_key(|&&x| OrderedFloat(x)).unwrap();
+            let max_dist = *dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
+            let max_naive_dist=*naive_dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
+            let max_any_dist = max_dist.max(max_naive_dist); 
 
-            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists, 5, Some(max_dist))).indent();
+
+            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists, 5, Some(max_any_dist))).indent();
 
             let b = format!(
                 "Naive path dist error:\n{}\n\n\tAvg: {naive_avg_dist}\n\n",
                 bargraph(naive_dists,
-                    5, Some(max_dist)
+                    5, Some(max_any_dist)
                 )
             ).indent();
             println!("{a}\n{b}");
