@@ -443,12 +443,9 @@ impl UiHandler {
             if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col(
                 time_from_start_s,
             ) {
-            let smoothed_mouse_pos_xy = self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
+                let smoothed_mouse_pos_xy = self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
-                let the_char: char = draw_points_in_character_grid(&[smoothed_mouse_pos_xy])
-                    .chars()
-                    .next()
-                    .unwrap();
+                let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
                 let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
                 assert!(row_1i > 0, "{row_1i}");
                 assert!(row_1i <= self.height() as i32, "{row_1i}");
@@ -973,28 +970,28 @@ mod tests {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
             let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_value".to_string());
-            assert_each_of_array_not_fn_than_past(&[$val], file_path, PartialOrd::le, |new, past| format!("Error: {new}<{past}"))
+            assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
         };
     }
     macro_rules! assert_value_not_more_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
             let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_value".to_string());
-            assert_each_of_array_not_fn_than_past(&[$val], file_path, PartialOrd::MoreThan)
+            assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
         };
     }
     macro_rules! assert_array_not_less_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
             let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_array".to_string());
-            assert_each_of_array_not_fn_than_past($val, file_path, PartialOrd::LessThan)
+            assert_each_of_array_not_fn_than_past($val, file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
         };
     }
     macro_rules! assert_array_not_more_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
             let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_array".to_string());
-            assert_each_of_array_not_fn_than_past($val, file_path, PartialOrd::MoreThan)
+            assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
         };
     }
 
@@ -1039,24 +1036,19 @@ mod tests {
     }
 
 
-    fn assert_value_not_less_than_past(candidate_value: f32, file_path: PathBuf) {
-        let candidate_string = candidate_value.to_string();
-        let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
-            return;
-        };
-        let correct_val = f32::from_str(&correct_string).unwrap();
-        assert!(candidate_value >= correct_val, "failed {candidate_value}>={correct_val}");
-    }
-    fn assert_each_of_array_not_fn_than_past(candidate_value: &[f32], file_path: PathBuf, func: fn(f32, f32) -> bool, format_func: fn(f32, f32) -> String) {
+    fn assert_each_of_array_not_fn_than_past(candidate_value: &[f32], file_path: PathBuf, fail_func: fn(&f32, &f32) -> bool, format_func: fn(f32, f32) -> String) {
         let candidate_string = candidate_value.iter().map(|x|x.to_string()).join("\n");
         let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
             return;
         };
+        let array_len = candidate_value.len();
         correct_string.lines().enumerate().zip(candidate_value).for_each(|((i, line), &candidate_value)| {
 
             let correct_val = f32::from_str(line).unwrap();
-            assert!(!func(candidate_value, correct_val), "{} at index {i}", format_func(candidate_value, correct_val));
-        })
+            assert!(!fail_func(&candidate_value, &correct_val), "{}{}", format_func(candidate_value, correct_val), if array_len > 1 {format!(" at index {i}")} else {"".to_string()});
+        });
+        // TODO: replace file if passed and different
+
     }
 
     fn compare_frame_for_test(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
@@ -1076,7 +1068,9 @@ mod tests {
         if !good {
 
             let f = if verbose {
-                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", format!("{:?}", &frame).indent(), frame.string_for_regular_display().escape_debug().to_string().replace("\\n", "\n").indent(), frame.readable_string().indent())
+                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", 
+                    format!("{:?}", &frame).indent(), 
+                    frame.escaped_regular_display_string().indent(), frame.readable_string().indent())
             } else {
                 |frame: &Frame| format!("Frame:\n{:?}\n", &frame)
             };
@@ -1358,7 +1352,8 @@ mod tests {
         game.ui_handler.enable_mouse_smoothing = true;
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
-        assert!(char_is_braille(frame.grid[0][0].character), "{frame:?}");
+        println!("{}", &frame.escaped_regular_display_string());
+        assert!(char_is_braille(frame.grid[0][0].character), "Char is not braille:\n\n{frame:?}");
         assert_frame_same_as_past!(frame, "", true);
     }
     // #[ignore]

@@ -2,7 +2,7 @@ use crate::glyph::glyph_constants::SPACE;
 use crate::glyph::DoubleChar;
 use crate::{pair_up_character_square_map, screen::*};
 use utility::coordinate_frame_conversions::*;
-use utility::geometry2::IPointExt;
+use utility::geometry2::{FPointExt, IPointExt};
 use utility::*;
 use euclid::{point2, Point2D};
 use std::collections::{HashMap, HashSet};
@@ -145,10 +145,15 @@ pub fn combine_braille_characters(c1: char, c2: char) -> char {
     char::from_u32(c1 as u32 | c2 as u32).unwrap()
 }
 
+pub fn character_grid_point_xy_to_braille_point_xy(character_grid_point_xy: geometry2::FPoint) -> geometry2::FPoint {
+    [character_grid_point_xy.x() * 2.0 + 0.5, character_grid_point_xy.y() * 4.0 + 1.5]
+
+}
+
 pub fn world_character_point_to_braille_point(
     pos: Point2D<f32, CharacterGridInWorldFrame>,
 ) -> Point2D<f32, BrailleGridInWorldFrame> {
-    point2(pos.x * 2.0 + 0.5, pos.y * 4.0 + 1.5)
+    character_grid_point_xy_to_braille_point_xy(pos.to_array()).into()
 }
 
 pub fn braille_pos_to_character_world_pos(
@@ -205,18 +210,20 @@ pub fn world_points_for_braille_line(
     .collect()
 }
 
+pub fn character_grid_point_xy_to_braille_char(pos: geometry2::FPoint) -> char {
+    add_braille_dot(
+        EMPTY_BRAILLE,
+        braille_square_to_dot_in_character(
+            character_grid_point_xy_to_braille_point_xy(pos)
+                .rounded().into()
+            ),
+    )
+}
+
 pub fn character_world_pos_to_braille_char(
     world_pos: Point2D<f32, CharacterGridInWorldFrame>,
 ) -> char {
-    let character = EMPTY_BRAILLE;
-    add_braille_dot(
-        character,
-        braille_square_to_dot_in_character(
-            world_character_point_to_braille_point(world_pos)
-                .round()
-                .to_i32(),
-        ),
-    )
+    character_grid_point_xy_to_braille_char(world_pos.to_array())
 }
 
 pub fn local_braille_squares_to_braille_array(squares: Vec<WorldBrailleSquare>) -> BrailleArray {
