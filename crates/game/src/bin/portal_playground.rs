@@ -1002,7 +1002,7 @@ mod tests {
             }
             let test_name: String = function_name!().replace(":", "_");
             let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_frame".to_string());
-            compare_frame_for_test($frame, file_path, $verbose)
+            assert_frame_same_as_past($frame, file_path, $verbose)
         };
         ($frame:ident, $prefix:expr) => {
             assert_frame_same_as_past!($frame, $prefix, false)
@@ -1020,7 +1020,7 @@ mod tests {
     }
 
     fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
-        const BLESS_NEWBORNS: bool = true;
+        const BLESS_NEWBORNS: bool = false;
 
         let blessed = option_env!("BLESS_TESTS").is_some() || (BLESS_NEWBORNS && !path.is_file());
         if blessed {
@@ -1051,7 +1051,7 @@ mod tests {
 
     }
 
-    fn compare_frame_for_test(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
+    fn assert_frame_same_as_past(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
         let candidate_string = candidate_frame.string_for_regular_display();
 
 
@@ -1403,15 +1403,15 @@ mod tests {
             println!("{}", horiz_concat_strings(
                 &[
                     format!(
-                        "Path:\n{}",
+                        "Truth:\n{}",
                         get_drawn_path(&sim_path)
                     ), 
                     format!(
-                        "Naive path:\n{}",
+                        "Naive:\n{}",
                         get_drawn_path(&naive_smoothed_path)
                     ), 
                     format!(
-                        "Predicted next points:\n{}", 
+                        "\"Smoothed\":\n{}", 
                         get_drawn_path(&smoothed_path)
                     )
                 ], 
