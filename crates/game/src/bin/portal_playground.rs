@@ -966,32 +966,44 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(col, row))
     }
 
+    macro_rules! data_dir_for_test {
+        () => {
+            {
+                let main_dir: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
+
+                let test_name: String = function_name!().replace(":", "_");
+
+                let test_dir = main_dir.join(test_name);
+
+                std::fs::create_dir_all(&test_dir).ok();
+
+                test_dir
+            }
+        };
+    }
+
     macro_rules! assert_value_not_less_than_past {
-        ($val:expr, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_value".to_string());
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
         };
     }
     macro_rules! assert_value_not_more_than_past {
-        ($val:expr, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_value".to_string());
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
         };
     }
     macro_rules! assert_array_not_less_than_past {
-        ($val:expr, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_min_array".to_string());
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             assert_each_of_array_not_fn_than_past($val, file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
         };
     }
 
     macro_rules! get_past_array {
         ($key:expr) => { {
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $key.to_string(), "".to_string());
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             // file_path.read
             // assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
             get_blessed_string(file_path).unwrap().lines().map(|line|
@@ -1001,35 +1013,23 @@ mod tests {
     }
 
     macro_rules! assert_array_not_more_than_past {
-        ($val:expr, $prefix:expr) => {
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_max_array".to_string());
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
         };
     }
 
     macro_rules! assert_frame_same_as_past {
-        ($frame:ident, $prefix:expr, $verbose:expr) => {
-            if !$prefix.is_empty() {
-                println!("Prefix: {}", $prefix);
+        ($frame:ident, $key:expr, $verbose:expr) => {
+            if !$key.is_empty() {
+                println!("Key: {}", $key);
             }
-            let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $prefix.to_string(), "_good_frame".to_string());
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
             assert_frame_same_as_past($frame, file_path, $verbose)
         };
-        ($frame:ident, $prefix:expr) => {
-            assert_frame_same_as_past!($frame, $prefix, false)
+        ($frame:ident, $key:expr) => {
+            assert_frame_same_as_past!($frame, $key, false)
         };
-        ($frame:ident) => {
-            assert_frame_same_as_past!($frame, "")
-        };
-    }
-
-    fn get_blessed_test_file_path(test_name: String, prefix: String, postfix: String) -> PathBuf {
-        let file_directory: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
-        assert!(file_directory.is_dir());
-        // TODO: use proper directories per test?
-        file_directory.join(prefix + "_" + &test_name + &postfix).with_extension("txt")
     }
 
     fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
@@ -1127,14 +1127,14 @@ mod tests {
         let frame = game.render_with_mouse(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_click_a_small() {
         let mut game = Game::new_headless_one_to_one_square(2);
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
-        assert_frame_same_as_past!(frame, "", true);
+        assert_frame_same_as_past!(frame, "a", true);
     }
     #[test]
     fn test_click_b() {
@@ -1145,7 +1145,7 @@ mod tests {
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color(), RED.into());
         assert_eq!(frame.get_xy([3, 2]).bg_color(), RED.into());
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_drag_mouse() {
@@ -1192,7 +1192,7 @@ mod tests {
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
         let frame = game.world_state.render(None);
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_render_part_of_square() {
@@ -1251,7 +1251,7 @@ mod tests {
             );
         }
 
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
@@ -1269,7 +1269,7 @@ mod tests {
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_portal_with_rotation() {
@@ -1295,7 +1295,7 @@ mod tests {
             dbg!(frame);
         });
 
-        assert_frame_same_as_past!(frame);
+        assert_frame_same_as_past!(frame, "a");
     }
 
     fn sim_mouse_path(
@@ -1377,7 +1377,7 @@ mod tests {
         let frame = game.render_with_mouse(None);
         println!("{}", &frame.escaped_regular_display_string());
         assert!(char_is_braille(frame.grid[0][0].character), "Char is not braille:\n\n{frame:?}");
-        assert_frame_same_as_past!(frame, "", true);
+        assert_frame_same_as_past!(frame, "a", true);
     }
     // #[ignore]
     #[test]
@@ -1391,7 +1391,7 @@ mod tests {
 
         let frame = game.render_with_mouse_at_time(None, 0.4);
         assert!(char_is_braille(frame.grid[0][2].character), "{frame:?}");
-        assert_frame_same_as_past!(frame, "", true);
+        assert_frame_same_as_past!(frame, "a", true);
     }
 
     #[test]
@@ -1465,7 +1465,7 @@ mod tests {
             let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
 
 
-            let blessed_dists: Vec<f32> = get_past_array!(name.to_string() + "dists");
+            let blessed_dists: Vec<f32> = get_past_array!(name.to_string() + "_dists");
 
             // TODO: less verbose elementwise operators
             let vs_naive = dists.iter().zip(naive_dists.iter()).map(|(a, b)| a - b).collect_vec();
@@ -1489,9 +1489,9 @@ mod tests {
                 )
             ).indent();
             println!("{a}\n{b}");
-            assert_value_not_more_than_past!(max_dist, name.to_string() + "max_dist");
-            assert_value_not_more_than_past!(avg_dist, name.to_string() + "avg_dist");
-            assert_array_not_more_than_past!(&dists, name.to_string() + "dists");
+            assert_value_not_more_than_past!(max_dist, name.to_string() + "_max_dist");
+            assert_value_not_more_than_past!(avg_dist, name.to_string() + "_avg_dist");
+            assert_array_not_more_than_past!(&dists, name.to_string() + "_dists");
         }
         panic!();
     }
