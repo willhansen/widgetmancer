@@ -162,6 +162,11 @@ impl Frame {
     pub fn string_for_regular_display(&self) -> String {
         self.non_raw_render_string(true)
     }
+
+    pub fn escaped_regular_display_string(&self) -> String {
+        self.string_for_regular_display().escape_debug().to_string().replace("\\n", "\n")
+    }
+
     pub fn parse_regular_display_string(input_string: String) -> Self {
         let three_bytes_regex = regex::Regex::new(r";2;([0-9]+);([0-9]+);([0-9]+)").unwrap();
         let escape_regex = regex::Regex::new("\u{1b}\\[(.*?)m").unwrap();
