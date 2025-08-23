@@ -987,6 +987,18 @@ mod tests {
             assert_each_of_array_not_fn_than_past($val, file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
         };
     }
+
+    macro_rules! get_past_array {
+        ($key:expr) => { {
+            let test_name: String = function_name!().replace(":", "_");
+            let file_path = get_blessed_test_file_path(test_name, $key.to_string(), "_max_array".to_string());
+            // file_path.read
+            // assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
+            todo!();
+            vec![]
+        } };
+    }
+
     macro_rules! assert_array_not_more_than_past {
         ($val:expr, $prefix:expr) => {
             let test_name: String = function_name!().replace(":", "_");
@@ -1371,6 +1383,12 @@ mod tests {
         assert_frame_same_as_past!(frame, "", true);
     }
 
+    #[test]
+    fn test_smooth_mouse() {
+        let xy = smoothed_mouse_position(&[(0.1, [1,1]), (0.2,[2,1])], 0.3);
+        assert!(xy.dist([3.0,1.0]) < 0.1, "{xy:?}");
+    }
+
     // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion_accuracy() {
@@ -1407,7 +1425,7 @@ mod tests {
                         get_drawn_path(&sim_path)
                     ), 
                     format!(
-                        "Naive:\n{}",
+                        "Naive (rounded to last character):\n{}",
                         get_drawn_path(&naive_smoothed_path)
                     ), 
                     format!(
@@ -1436,6 +1454,16 @@ mod tests {
             let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
 
 
+            let blessed_dists: Vec<f32> = get_past_array!(name.to_string() + "dists");
+
+            // TODO: less verbose elementwise operators
+            let vs_naive = dists.iter().zip(naive_dists.iter()).map(|(a, b)| a - b).collect_vec();
+            let vs_blessed = dists.iter().zip(blessed_dists.iter()).map(|(a, b)| a - b).collect_vec();
+
+            println!("\nVs Naive:\n{}", signed_bargraph(vs_naive, 5, None, None));
+            println!("\nVs Blessed:\n{}", signed_bargraph(vs_blessed, 5, None, None));
+
+
             let max_dist = *dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
             let max_naive_dist=*naive_dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
             let max_any_dist = max_dist.max(max_naive_dist); 
@@ -1450,14 +1478,10 @@ mod tests {
                 )
             ).indent();
             println!("{a}\n{b}");
-            assert_value_not_less_than_past!(max_dist, name.to_string() + "max_dist");
-            assert_value_not_less_than_past!(avg_dist, name.to_string() + "avg_dist");
+            assert_value_not_more_than_past!(max_dist, name.to_string() + "max_dist");
+            assert_value_not_more_than_past!(avg_dist, name.to_string() + "avg_dist");
+            assert_array_not_more_than_past!(&dists, name.to_string() + "dists");
         }
         panic!();
-    }
-    #[test]
-    fn test_smooth_mouse() {
-        let xy = smoothed_mouse_position(&[(0.1, [1,1]), (0.2,[2,1])], 0.3);
-        assert!(xy.dist([3.0,1.0]) < 0.1, "{xy:?}");
     }
 }
