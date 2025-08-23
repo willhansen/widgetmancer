@@ -3,7 +3,7 @@ use std::iter::once;
 use rgb::{RGB8, RGBA8};
 use utility::array_zip;
 
-use crate::glyph_constants::named_colors::*;
+use crate::glyph_constants::{named_colors::*, SPACE};
 use crate::{DoubleGlyph, Glyph};
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq)]
@@ -17,6 +17,15 @@ pub struct GlyphWithTransparency {
 }
 
 impl GlyphWithTransparency {
+    pub fn transparent() -> Self {
+        GlyphWithTransparency {
+            character: SPACE,
+            primary_color: RGBA8::from(Glyph::default_fg_color).with_alpha(0),
+            secondary_color: RGBA8::from(Glyph::default_bg_color).with_alpha(0),
+            fg_is_primary: false,
+        }
+    }
+
     pub fn from_glyph(glyph: Glyph) -> Self {
         Self {
             character: glyph.character,
@@ -29,8 +38,11 @@ impl GlyphWithTransparency {
         Self::from_glyph(Glyph::from_char(c))
     }
     pub fn with_primary_only(&self) -> Self {
+        self.with_transparent_secondary()
+    }
+    pub fn with_transparent_secondary(&self) -> Self {
         let mut x = self.clone();
-        x.secondary_color.a = 0;
+        x.secondary_color = x.secondary_color.with_alpha(0);
         x
     }
     pub fn with_primary_rgb(&self, color: RGB8) -> Self {
