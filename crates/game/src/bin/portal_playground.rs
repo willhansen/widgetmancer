@@ -991,11 +991,12 @@ mod tests {
     macro_rules! get_past_array {
         ($key:expr) => { {
             let test_name: String = function_name!().replace(":", "_");
-            let file_path = get_blessed_test_file_path(test_name, $key.to_string(), "_max_array".to_string());
+            let file_path = get_blessed_test_file_path(test_name, $key.to_string(), "".to_string());
             // file_path.read
             // assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
-            todo!();
-            vec![]
+            get_blessed_string(file_path).unwrap().lines().map(|line|
+                 f32::from_str(line).unwrap()
+            ).collect_vec()
         } };
     }
 
@@ -1045,6 +1046,16 @@ mod tests {
         );
         Some(correct_string)
 
+    }
+    fn get_blessed_string(path: PathBuf) -> Option<String> {
+        macro_rules! the_var { () => { "ALLOW_SKIP_BLESSED_FILE"}}
+        if option_env!(the_var!()).is_some() {
+            return None;
+        }
+
+        Some( std::fs::read_to_string(path.clone()).expect(
+        &format!("No existing blessed file found at {}.  Set {} to skip.", path.display(), the_var!()),
+        ))
     }
 
 
@@ -1469,7 +1480,7 @@ mod tests {
             let max_any_dist = max_dist.max(max_naive_dist); 
 
 
-            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists, 5, Some(max_any_dist))).indent();
+            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists.clone(), 5, Some(max_any_dist))).indent();
 
             let b = format!(
                 "Naive path dist error:\n{}\n\n\tAvg: {naive_avg_dist}\n\n",

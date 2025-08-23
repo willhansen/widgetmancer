@@ -27,6 +27,7 @@ use utility::geometry2::IPointExt;
 pub use utility::*;
 
 use crate::glyph::glyph_constants::named_colors::*;
+use crate::glyph_constants::FULL_BLOCK;
 
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ConcatVBias {
@@ -216,36 +217,68 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
     frame.string_for_regular_display()
 }
 
-pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> String {
+pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTransparency> {
     assert!(max_abs > 0.0);
 
-    const blocks: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    const full_block: char = '█';
+    let val_in_blocks = (val / max_abs) * height as f32;
 
-    let normalized_val = val / max_abs;
-    let height_in_blocks = normalized_val * height as f32;
-    let height_in_eighths: u32 = (normalized_val * height as f32 * 8.0).round() as u32;
-
-    let full_blocks = height_in_eighths / 8;
-    let remainder_eighths = height_in_eighths % 8;
-
-    if full_blocks == height as u32 && remainder_eighths == 0 {
-        format!("{full_block}") + &format!("\n{full_block}").repeat(height - 1)
-    } else if full_blocks < height as u32 {
-        (if remainder_eighths > 0 {
-            repeat_n(" ".to_string(), height - full_blocks as usize - 1)
-                .chain(once(blocks[(remainder_eighths - 1) as usize].to_string()))
-                .collect_vec()
-        } else {
-            repeat_n(" ".to_string(), height - full_blocks as usize).collect_vec()
-        })
-        .into_iter()
-        .chain(repeat_n(full_block.to_string(), full_blocks as usize))
-        .join("\n")
+    let (num_full_blocks, maybe_last_glyph) = if val_in_blocks.abs() > max_abs {
+        (
+            height - 1,
+            Some(
+                GlyphWithTransparency::from_char('+')
+                    .with_bg_as_primary()
+                    .with_primary_rgb(WHITE)
+                    .with_transparent_secondary(),
+            ),
+        )
     } else {
-        // 🭯
-        "🢁".to_string() + &format!("\n{full_block}").repeat(height - 1)
+        let num_full_blocks = val_in_blocks.trunc();
+        let remainder_blocks = val_in_blocks - num_full_blocks;
+        let num_full_blocks = num_full_blocks as usize;
+
+        if remainder_blocks == 0.0 {
+            (num_full_blocks, None)
+        } else {
+            // remainder -> offset
+            // 0.0 -> 1.0 or -1.0
+            // 0.99 -> -0.01
+            // -0.99 -> 0.01
+            // 0.5 -> -0.5
+            // -0.5 -> 0.5
+            // x -> -sign * (1.0-x.abs())
+            let floating_square_offset = -sign(remainder_blocks) * (1.0 - remainder_blocks.abs());
+            let remainder_character = floating_square::character_for_half_square_with_1d_offset(
+                true,
+                floating_square_offset,
+            );
+            match remainder_character {
+                FULL_BLOCK => (num_full_blocks + 1, None),
+                SPACE => (num_full_blocks, None),
+                _ => (
+                    num_full_blocks,
+                    Some(
+                        GlyphWithTransparency::from_char(remainder_character)
+                            .with_transparent_secondary(),
+                    ),
+                ),
+            }
+        }
+    };
+
+    let full_block_glyph = GlyphWithTransparency::from_char(FULL_BLOCK);
+    let num_blanks = num_full_blocks + if maybe_last_glyph.is_some() { 1 } else { 0 };
+
+    let mut out: Vec<GlyphWithTransparency> =
+        repeat_n(GlyphWithTransparency::transparent(), num_blanks)
+            .chain(once(maybe_last_glyph).filter_map(|x| x))
+            .chain(repeat_n(full_block_glyph, num_full_blocks))
+            .collect_vec();
+
+    if val < 0.0 {
+        out.reverse();
     }
+    out
 }
 
 pub fn signed_bargraph(
@@ -258,7 +291,6 @@ pub fn signed_bargraph(
 }
 
 pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {
-
     let max = if let Some(m) = max {
         m
     } else {
@@ -270,7 +302,12 @@ pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {
     };
     assert!(data.iter().all(|&x| x >= 0.0));
 
-    let col_func = |val: f32| -> String { val_to_column(val, height, max) };
+    let col_func = |val: f32| -> String {
+        val_to_column(val, height, max)
+            .into_iter()
+            .map(|g| g.to_string())
+            .join("\n")
+    };
 
     let columns = data.iter().map(|x| col_func(*x)).collect_vec();
     let graph = horiz_concat_strings_with_vbias(&columns, 0, ConcatVBias::Bottom).framed();
