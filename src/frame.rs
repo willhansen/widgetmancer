@@ -42,6 +42,9 @@ impl Frame {
         });
         frame
     }
+    pub fn from_column_glyphs(col_glyphs: Vec<GlyphWithTransparency>) -> Self {
+        col_glyphs.into_iter().map(|g| vec![g]).collect_vec().into()
+    }
     pub fn width(&self) -> usize {
         self.grid[0].len()
     }
@@ -432,6 +435,7 @@ impl From<Vec<Vec<Glyph>>> for Frame {
             .into()
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::glyph_constants::named_colors;

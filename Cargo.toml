@@ -17,6 +17,7 @@ utility.workspace = true
 regex = "1.11.1"
 fancy-regex = "0.15.0"
 regex_static = "0.1.1"
+stdext = "0.3.3"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
