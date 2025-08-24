@@ -60,6 +60,7 @@ impl Frame {
         self.row_to_y(y)
     }
 
+    // zero indexed
     pub fn get_xy(&self, frame_point: [usize; 2]) -> GlyphWithTransparency {
         let [x, y] = frame_point;
         assert!(
