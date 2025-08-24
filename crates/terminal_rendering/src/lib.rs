@@ -160,7 +160,8 @@ pub fn horiz_concat_strings_with_vbias(
     horiz_concat_equal_height_strings(&out_strings, spaces)
 }
 pub fn horiz_concat_equal_height_strings(strings: &[String], spaces: usize) -> String {
-    assert!(strings.iter().map(|col| col.height()).all_equal());
+    let col_heights = strings.iter().map(|col| col.height()).collect_vec();
+    assert!(col_heights.iter().all_equal(), "{col_heights:?}");
     assert!(strings.iter().map(|col| col.is_rectangular()).all(|x| x));
     let mut out = String::new();
     let num_cols = strings.len();
@@ -218,7 +219,7 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
 }
 
 pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTransparency> {
-    assert!(max_abs > 0.0);
+    assert!(max_abs > 0.0, "{max_abs} > 0.0");
 
     let val_in_blocks = (val / max_abs) * height as f32;
 
@@ -278,28 +279,113 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
     if val < 0.0 {
         out.reverse();
     }
+    assert_eq!(out.len(), height);
     out
 }
 
-pub fn signed_bargraph(
-    data: Vec<f32>,
-    height: usize,
-    min: Option<f32>,
-    max: Option<f32>,
-) -> String {
-    todo!()
+pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Option<f32>) -> String {
+    min.map(|x| assert!(x <= 0.0));
+    max.map(|x| assert!(x >= 0.0));
+
+    let min = min.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.min(b)).unwrap());
+    let max = max.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.max(b)).unwrap());
+
+    if max == min {
+        return "Graph is flat".to_string();
+    }
+
+    // zero must fall on a character boundary, because that's where colors switch
+    // either max or min is locked in place, while the other shifts to allow for a full integer
+    // number of blocks in the total height
+
+    let naive_height_per_dist = height as f32 / (max - min);
+
+    let naive_max_in_blocks = max * naive_height_per_dist;
+    let naive_min_in_blocks = min * naive_height_per_dist;
+
+    let remainder_on_positive_side = naive_max_in_blocks.fract();
+
+    let positive_height;
+    let negative_height;
+    let height_per_dist;
+
+    let (min_in_blocks, max_in_blocks) = if remainder_on_positive_side == 0.0 {
+        positive_height = naive_max_in_blocks.floor() as usize;
+        negative_height = height - positive_height;
+        height_per_dist = naive_height_per_dist;
+        (naive_min_in_blocks, naive_max_in_blocks)
+    } else if remainder_on_positive_side < 0.5 {
+        // keep max and expand the negative region
+        positive_height = naive_max_in_blocks.floor() as usize;
+        negative_height = height - positive_height;
+
+        height_per_dist = positive_height as f32 / naive_max_in_blocks;
+        let min_in_blocks = negative_height as f32 / height_per_dist * -1.0;
+        (min_in_blocks, naive_max_in_blocks)
+    } else {
+        // keep min and expand the positive region
+        negative_height = naive_min_in_blocks.abs().floor() as usize;
+        positive_height = height - negative_height;
+
+        height_per_dist = (negative_height as f32 / naive_min_in_blocks).abs();
+        let max_in_blocks = positive_height as f32 / height_per_dist;
+        (naive_min_in_blocks, max_in_blocks)
+    };
+
+    let min = min_in_blocks / height_per_dist;
+    let max = max_in_blocks / height_per_dist;
+
+    // dbg!(positive_height, negative_height, min, max, height_per_dist);
+
+    let col_func = |val: f32| -> String {
+        let background_glyph = GlyphWithTransparency::from_char('.').with_transparent_secondary();
+        let col_glyphs = if val >= 0.0 {
+            dbg!(val, positive_height, max);
+            let pos_glyphs = val_to_column(val, positive_height, max);
+            assert_eq!(pos_glyphs.len(), positive_height);
+            let neg_glyphs = repeat_n(background_glyph, negative_height);
+            dbg!(&pos_glyphs);
+            pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
+        } else {
+            let pos_glyphs = repeat_n(background_glyph, positive_height);
+            let neg_glyphs = val_to_column(val, negative_height, min.abs());
+            assert_eq!(neg_glyphs.len(), negative_height);
+            pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
+        };
+        col_glyphs.into_iter().map(|g| g.to_string()).join("\n")
+    };
+
+    let columns = data.iter().map(|x| col_func(*x)).collect_vec();
+    let graph = horiz_concat_equal_height_strings(&columns, 0).framed();
+
+    let graph = graph
+        .lines()
+        .enumerate()
+        .map(|(i, l)| {
+            let appendish = |s: String| {
+                l.chars()
+                    .into_iter()
+                    .take(data.len() + 1)
+                    .collect::<String>()
+                    + &s
+            };
+            if i == 0 {
+                appendish(format!("┬─{max}"))
+            } else if i == height + 1 {
+                appendish(format!("┴─{min}"))
+            } else if i == positive_height {
+                appendish("🭽▔0.0".to_string())
+            } else {
+                l.to_string()
+            }
+        })
+        .join("\n");
+
+    format!("{graph}")
 }
 
-pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {
-    let max = if let Some(m) = max {
-        m
-    } else {
-        data.iter()
-            .map(|&x| OrderedFloat(x))
-            .max()
-            .unwrap()
-            .into_inner()
-    };
+pub fn bargraph(data: &[f32], height: usize, max: Option<f32>) -> String {
+    let max = max.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.max(b)).unwrap());
     assert!(data.iter().all(|&x| x >= 0.0));
 
     let col_func = |val: f32| -> String {
@@ -339,11 +425,184 @@ pub fn bargraph(data: Vec<f32>, height: usize, max: Option<f32>) -> String {
     format!("{graph}")
 }
 
+pub mod test_utils {
+    use super::*;
+    use std::str::FromStr;
+    pub use stdext::function_name;
+    use std::path::PathBuf;
+
+
+    #[macro_export]
+    macro_rules! data_dir_for_test {
+        () => {
+            {
+                let main_dir: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
+
+                let test_name: String = function_name!().replace(":", "_");
+
+                let test_dir = main_dir.join(test_name);
+
+                std::fs::create_dir_all(&test_dir).ok();
+
+                test_dir
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! assert_value_not_less_than_past {
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            assert_each_of_array_not_fn_than_past_fn(&[$val], file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
+        };
+    }
+    #[macro_export]
+    macro_rules! assert_value_not_more_than_past {
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            assert_each_of_array_not_fn_than_past_fn(&[$val], file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
+        };
+    }
+    #[macro_export]
+    macro_rules! assert_array_not_less_than_past {
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            assert_each_of_array_not_fn_than_past_fn($val, file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
+        };
+    }
+
+
+    #[macro_export]
+    macro_rules! get_past_array {
+        ($key:expr) => { {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            // file_path.read
+            // assert_each_of_array_not_fn_than_past_fn($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
+            get_blessed_string(file_path).unwrap().lines().map(|line|
+                 f32::from_str(line).unwrap()
+            ).collect_vec()
+        } };
+    }
+
+    #[macro_export]
+    macro_rules! assert_array_not_more_than_past {
+        ($val:expr, $key:expr) => {
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            assert_each_of_array_not_fn_than_past_fn($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
+        };
+    }
+
+    #[macro_export]
+    macro_rules! assert_frame_same_as_past {
+        ($frame:ident, $key:expr, $verbose:expr) => {
+            if !$key.is_empty() {
+                println!("Key: {}", $key);
+            }
+            let file_path = data_dir_for_test!().join($key).with_extension("txt");
+            assert_frame_same_as_past_fn($frame, file_path, $verbose)
+        };
+        ($frame:ident, $key:expr) => {
+            assert_frame_same_as_past!($frame, $key, false)
+        };
+    }
+
+    fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
+        const BLESS_NEWBORNS: bool = false;
+
+        let blessed = option_env!("BLESS_TESTS").is_some() || (BLESS_NEWBORNS && !path.is_file());
+        if blessed {
+            std::fs::write(path, candidate).unwrap();
+            return None;
+        }
+
+        let correct_string = std::fs::read_to_string(path.clone()).expect(
+        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate:?}"),
+        );
+        Some(correct_string)
+
+    }
+    pub fn get_blessed_string(path: PathBuf) -> Option<String> {
+        macro_rules! the_var { () => { "ALLOW_SKIP_BLESSED_FILE"}}
+        if option_env!(the_var!()).is_some() {
+            return None;
+        }
+
+        Some( std::fs::read_to_string(path.clone()).expect(
+        &format!("No existing blessed file found at {}.  Set {} to skip.", path.display(), the_var!()),
+        ))
+    }
+
+
+    pub fn assert_each_of_array_not_fn_than_past_fn(candidate_value: &[f32], file_path: PathBuf, fail_func: fn(&f32, &f32) -> bool, format_func: fn(f32, f32) -> String) {
+        let candidate_string = candidate_value.iter().map(|x|x.to_string()).join("\n");
+        let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
+            return;
+        };
+        let array_len = candidate_value.len();
+        correct_string.lines().enumerate().zip(candidate_value).for_each(|((i, line), &candidate_value)| {
+
+            let correct_val = f32::from_str(line).unwrap();
+            assert!(!fail_func(&candidate_value, &correct_val), "{}{}", format_func(candidate_value, correct_val), if array_len > 1 {format!(" at index {i}")} else {"".to_string()});
+        });
+        // TODO: replace file if passed and different
+
+    }
+
+    pub fn assert_frame_same_as_past_fn(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
+        let candidate_string = candidate_frame.string_for_regular_display();
+
+
+        let Some(correct_string) = get_or_set_blessed_string(candidate_string, blessed_file_path) else {
+            return;
+        };
+
+        let correct_frame = Frame::parse_regular_display_string(
+        correct_string
+        );
+
+        let good = candidate_frame.string_for_regular_display() == correct_frame.string_for_regular_display();
+
+        if !good {
+
+            let f = if verbose {
+                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", 
+                    format!("{:?}", &frame).indent(), 
+                    frame.escaped_regular_display_string().indent(), frame.readable_string().indent())
+            } else {
+                |frame: &Frame| format!("Frame:\n{:?}\n", &frame)
+            };
+
+
+
+            let mut err_string = 
+            format!(
+            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}\n",
+            f(&correct_frame).indent(),
+            f(&candidate_frame).indent(),
+            diff1 = correct_frame.diff_from(&candidate_frame),
+            diff2 = candidate_frame.diff_from(&correct_frame)
+        );
+
+
+            err_string += "❌";
+        assert!(good, "{}", err_string);
+
+        }
+
+
+        eprintln!("{candidate_frame:?}\n✅");
+    }
+
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32::consts::TAU;
 
     use pretty_assertions::{assert_eq, assert_ne};
+    use stdext::function_name;
+    use std::path::PathBuf;
+    use test_utils::*;
 
     use super::*;
 
@@ -410,4 +669,16 @@ mod tests {
         println!("out:\n{}\n\ncorrect:\n{}", out_string, correct_string);
         assert_eq!(&out_string, correct_string);
     }
+    #[test]
+    fn test_val_to_column() {
+        let col = val_to_column(1.5, 4, 4.0);
+        
+        let frame = Frame::from_column_glyphs(col);
+        dbg!(&frame);
+        assert_frame_same_as_past!(frame, "a", true);
+        panic!();
+
+
+    }
+
 }

@@ -940,9 +940,11 @@ mod tests {
     use ordered_float::OrderedFloat;
     use pretty_assertions::assert_str_eq;
     use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
-    use stdext::function_name;
     use termion::event::MouseEvent;
     use std::str::FromStr;
+    use terminal_rendering::test_utils::*;
+    use terminal_rendering::*;
+    use terminal_rendering::assert_array_not_more_than_past;
 
     #[test]
     fn test_simple_output() {
@@ -966,158 +968,6 @@ mod tests {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(col, row))
     }
 
-    macro_rules! data_dir_for_test {
-        () => {
-            {
-                let main_dir: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data/");
-
-                let test_name: String = function_name!().replace(":", "_");
-
-                let test_dir = main_dir.join(test_name);
-
-                std::fs::create_dir_all(&test_dir).ok();
-
-                test_dir
-            }
-        };
-    }
-
-    macro_rules! assert_value_not_less_than_past {
-        ($val:expr, $key:expr) => {
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
-        };
-    }
-    macro_rules! assert_value_not_more_than_past {
-        ($val:expr, $key:expr) => {
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            assert_each_of_array_not_fn_than_past(&[$val], file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
-        };
-    }
-    macro_rules! assert_array_not_less_than_past {
-        ($val:expr, $key:expr) => {
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            assert_each_of_array_not_fn_than_past($val, file_path, f32::lt, |new, past| format!("Error: {new}<{past}"))
-        };
-    }
-
-    macro_rules! get_past_array {
-        ($key:expr) => { {
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            // file_path.read
-            // assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
-            get_blessed_string(file_path).unwrap().lines().map(|line|
-                 f32::from_str(line).unwrap()
-            ).collect_vec()
-        } };
-    }
-
-    macro_rules! assert_array_not_more_than_past {
-        ($val:expr, $key:expr) => {
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            assert_each_of_array_not_fn_than_past($val, file_path, f32::gt, |new, past| format!("Error: {new}>{past}"))
-        };
-    }
-
-    macro_rules! assert_frame_same_as_past {
-        ($frame:ident, $key:expr, $verbose:expr) => {
-            if !$key.is_empty() {
-                println!("Key: {}", $key);
-            }
-            let file_path = data_dir_for_test!().join($key).with_extension("txt");
-            assert_frame_same_as_past($frame, file_path, $verbose)
-        };
-        ($frame:ident, $key:expr) => {
-            assert_frame_same_as_past!($frame, $key, false)
-        };
-    }
-
-    fn get_or_set_blessed_string(candidate: String, path: PathBuf) -> Option<String> {
-        const BLESS_NEWBORNS: bool = false;
-
-        let blessed = option_env!("BLESS_TESTS").is_some() || (BLESS_NEWBORNS && !path.is_file());
-        if blessed {
-            std::fs::write(path, candidate).unwrap();
-            return None;
-        }
-
-        let correct_string = std::fs::read_to_string(path.clone()).expect(
-        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate:?}"),
-        );
-        Some(correct_string)
-
-    }
-    fn get_blessed_string(path: PathBuf) -> Option<String> {
-        macro_rules! the_var { () => { "ALLOW_SKIP_BLESSED_FILE"}}
-        if option_env!(the_var!()).is_some() {
-            return None;
-        }
-
-        Some( std::fs::read_to_string(path.clone()).expect(
-        &format!("No existing blessed file found at {}.  Set {} to skip.", path.display(), the_var!()),
-        ))
-    }
-
-
-    fn assert_each_of_array_not_fn_than_past(candidate_value: &[f32], file_path: PathBuf, fail_func: fn(&f32, &f32) -> bool, format_func: fn(f32, f32) -> String) {
-        let candidate_string = candidate_value.iter().map(|x|x.to_string()).join("\n");
-        let Some(correct_string) = get_or_set_blessed_string(candidate_string, file_path) else {
-            return;
-        };
-        let array_len = candidate_value.len();
-        correct_string.lines().enumerate().zip(candidate_value).for_each(|((i, line), &candidate_value)| {
-
-            let correct_val = f32::from_str(line).unwrap();
-            assert!(!fail_func(&candidate_value, &correct_val), "{}{}", format_func(candidate_value, correct_val), if array_len > 1 {format!(" at index {i}")} else {"".to_string()});
-        });
-        // TODO: replace file if passed and different
-
-    }
-
-    fn assert_frame_same_as_past(candidate_frame: Frame, blessed_file_path: PathBuf, verbose: bool) {
-        let candidate_string = candidate_frame.string_for_regular_display();
-
-
-        let Some(correct_string) = get_or_set_blessed_string(candidate_string, blessed_file_path) else {
-            return;
-        };
-
-        let correct_frame = Frame::parse_regular_display_string(
-        correct_string
-        );
-
-        let good = candidate_frame.string_for_regular_display() == correct_frame.string_for_regular_display();
-
-        if !good {
-
-            let f = if verbose {
-                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", 
-                    format!("{:?}", &frame).indent(), 
-                    frame.escaped_regular_display_string().indent(), frame.readable_string().indent())
-            } else {
-                |frame: &Frame| format!("Frame:\n{:?}\n", &frame)
-            };
-
-
-
-            let mut err_string = 
-            format!(
-            "Frames do not match.  Set the BLESS_TESTS env var to lock-in current string as correct.\n\nCorrect:\n{}\n\nGiven:\n{}\n\nDifferences only:\n{diff1:?}\n\n{diff2:?}\n",
-            f(&correct_frame).indent(),
-            f(&candidate_frame).indent(),
-            diff1 = correct_frame.diff_from(&candidate_frame),
-            diff2 = candidate_frame.diff_from(&correct_frame)
-        );
-
-
-            err_string += "❌";
-        assert!(good, "{}", err_string);
-
-        }
-
-
-        eprintln!("{candidate_frame:?}\n✅");
-    }
 
     #[test]
     fn test_click_a() {
@@ -1464,6 +1314,7 @@ mod tests {
             let (dists, avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(smoothed_path);
             let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
 
+            assert_array_not_more_than_past!(&dists, name.to_string() + "_dists");
 
             let blessed_dists: Vec<f32> = get_past_array!(name.to_string() + "_dists");
 
@@ -1471,8 +1322,8 @@ mod tests {
             let vs_naive = dists.iter().zip(naive_dists.iter()).map(|(a, b)| a - b).collect_vec();
             let vs_blessed = dists.iter().zip(blessed_dists.iter()).map(|(a, b)| a - b).collect_vec();
 
-            println!("\nVs Naive:\n{}", signed_bargraph(vs_naive, 5, None, None));
-            println!("\nVs Blessed:\n{}", signed_bargraph(vs_blessed, 5, None, None));
+            println!("\nVs Naive:\n{}", signed_bargraph(&vs_naive, 5, None, None));
+            println!("\nVs Blessed:\n{}", signed_bargraph(&vs_blessed, 5, None, None));
 
 
             let max_dist = *dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
@@ -1480,18 +1331,17 @@ mod tests {
             let max_any_dist = max_dist.max(max_naive_dist); 
 
 
-            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(dists.clone(), 5, Some(max_any_dist))).indent();
+            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(&dists, 5, Some(max_any_dist))).indent();
 
             let b = format!(
                 "Naive path dist error:\n{}\n\n\tAvg: {naive_avg_dist}\n\n",
-                bargraph(naive_dists,
+                bargraph(&naive_dists,
                     5, Some(max_any_dist)
                 )
             ).indent();
             println!("{a}\n{b}");
             assert_value_not_more_than_past!(max_dist, name.to_string() + "_max_dist");
             assert_value_not_more_than_past!(avg_dist, name.to_string() + "_avg_dist");
-            assert_array_not_more_than_past!(&dists, name.to_string() + "_dists");
         }
         panic!();
     }
