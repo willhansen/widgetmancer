@@ -1683,6 +1683,15 @@ where
         .unwrap()
 }
 
+// trunc, but away from zero instead of towards zero
+pub fn trunceil(x: f32) -> f32 {
+    if x == x.trunc() {
+        x
+    } else {
+        x.trunc() + x.signum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
