@@ -27,6 +27,7 @@ use utility::geometry2::IPointExt;
 pub use utility::*;
 
 use crate::glyph::glyph_constants::named_colors::*;
+use crate::glyph_constants::named_chars;
 use crate::glyph_constants::FULL_BLOCK;
 
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
@@ -254,8 +255,8 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
                 floating_square_offset,
             );
             match remainder_character {
-                FULL_BLOCK => (num_full_blocks + 1, None),
-                SPACE => (num_full_blocks, None),
+                named_chars::FULL_BLOCK => (num_full_blocks + 1, None),
+                named_chars::SPACE => (num_full_blocks, None),
                 _ => (
                     num_full_blocks,
                     Some(
@@ -267,8 +268,11 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
         }
     };
 
+
     let full_block_glyph = GlyphWithTransparency::from_char(FULL_BLOCK);
-    let num_blanks = num_full_blocks + if maybe_last_glyph.is_some() { 1 } else { 0 };
+    let num_occupied_squares =num_full_blocks + if maybe_last_glyph.is_some() { 1 } else { 0 }; 
+    let num_blanks = height - num_occupied_squares;
+
 
     let mut out: Vec<GlyphWithTransparency> =
         repeat_n(GlyphWithTransparency::transparent(), num_blanks)
@@ -604,6 +608,8 @@ mod tests {
     use std::path::PathBuf;
     use test_utils::*;
 
+    use crate::glyph_constants::LOWER_HALF_BLOCK;
+
     use super::*;
 
     #[test]
@@ -671,14 +677,16 @@ mod tests {
     }
     #[test]
     fn test_val_to_column() {
-        let col = val_to_column(1.5, 4, 4.0);
+        let h = 4;
+        let col = val_to_column(1.5, h, 4.0);
         
         let frame = Frame::from_column_glyphs(col);
         dbg!(&frame);
+        assert_eq!(frame.height(), h);
+        assert_eq!(frame.width(), 1);
+        assert_eq!(frame.get_xy([0,1]).character, LOWER_HALF_BLOCK);
+        assert_eq!(frame.get_xy([0,0]).character, FULL_BLOCK);
         assert_frame_same_as_past!(frame, "a", true);
-        panic!();
-
-
     }
 
 }
