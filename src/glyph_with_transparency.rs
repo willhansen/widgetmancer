@@ -17,6 +17,14 @@ pub struct GlyphWithTransparency {
 }
 
 impl GlyphWithTransparency {
+    pub fn new(character: char, fg: RGBA8, bg: RGBA8) -> Self {
+        Self {
+            character,
+            primary_color: fg,
+            secondary_color: bg,
+            fg_is_primary: true,
+        }
+    }
     pub fn transparent() -> Self {
         GlyphWithTransparency {
             character: SPACE,
@@ -48,6 +56,16 @@ impl GlyphWithTransparency {
     pub fn with_primary_rgb(&self, color: RGB8) -> Self {
         let mut x = self.clone();
         *x.primary_color.rgb_mut() = color;
+        x
+    }
+    pub fn with_primary_color(&self, color: RGBA8) -> Self {
+        let mut x = self.clone();
+        x.primary_color = color;
+        x
+    }
+    pub fn with_secondary_color(&self, color: RGBA8) -> Self {
+        let mut x = self.clone();
+        x.secondary_color = color;
         x
     }
     pub fn with_secondary_rgb(&self, color: RGB8) -> Self {
