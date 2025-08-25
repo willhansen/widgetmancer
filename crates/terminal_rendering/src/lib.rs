@@ -344,11 +344,9 @@ pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Optio
     let col_func = |val: f32| -> String {
         let background_glyph = GlyphWithTransparency::from_char('.').with_transparent_secondary();
         let col_glyphs = if val >= 0.0 {
-            dbg!(val, positive_height, max);
             let pos_glyphs = val_to_column(val, positive_height, max);
             assert_eq!(pos_glyphs.len(), positive_height);
             let neg_glyphs = repeat_n(background_glyph, negative_height);
-            dbg!(&pos_glyphs);
             pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
         } else {
             let pos_glyphs = repeat_n(background_glyph, positive_height);

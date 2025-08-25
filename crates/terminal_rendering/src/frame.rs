@@ -14,16 +14,22 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn blank(width: usize, height: usize) -> Self {
+    pub fn new_from_repeated_glyph(
+        width: usize,
+        height: usize,
+        glyph: GlyphWithTransparency,
+    ) -> Self {
         Self {
-            grid: (0..height)
-                .map(|_row| {
-                    (0..width)
-                        .map(|_col| Glyph::solid_color(named_colors::BLACK).into())
-                        .collect::<Vec<GlyphWithTransparency>>()
-                })
-                .collect_vec(),
+            grid: repeat_n(repeat_n(glyph, width).collect_vec(), height).collect_vec(),
         }
+    }
+    pub fn blank(width: usize, height: usize) -> Self {
+        let glyph: GlyphWithTransparency = Glyph::solid_color(named_colors::BLACK).into();
+        Self::new_from_repeated_glyph(width, height, glyph)
+    }
+    pub fn transparent(width: usize, height: usize) -> Self {
+        let glyph = GlyphWithTransparency::transparent();
+        Self::new_from_repeated_glyph(width, height, glyph)
     }
     pub fn save_to_file(&self, path: PathBuf) {
         File::create(path)
@@ -50,6 +56,9 @@ impl Frame {
     }
     pub fn height(&self) -> usize {
         self.grid.len()
+    }
+    pub fn size_rows_cols(&self) -> [usize; 2] {
+        [self.height(), self.width()]
     }
 
     pub fn row_to_y(&self, row: usize) -> usize {
@@ -168,7 +177,10 @@ impl Frame {
     }
 
     pub fn escaped_regular_display_string(&self) -> String {
-        self.string_for_regular_display().escape_debug().to_string().replace("\\n", "\n")
+        self.string_for_regular_display()
+            .escape_debug()
+            .to_string()
+            .replace("\\n", "\n")
     }
 
     pub fn parse_regular_display_string(input_string: String) -> Self {
@@ -568,5 +580,69 @@ ghi",
             .map(|nth| nth[1].to_string())
             .collect_vec();
         assert_eq!(contents, vec!["48;2;0;0;0", "38;2;255;255;255", "49", "39"]);
+    }
+    #[test]
+    fn test_transparent_frame_to_string() {
+        let f1 = Frame::blank(3, 3);
+        let f2 = Frame::transparent(3, 3);
+        assert_ne!(f1, f2);
+        assert_eq!(f1.size_rows_cols(), f2.size_rows_cols());
+        assert_eq!(f2.get_xy([0, 0]).character, ' ');
+
+        let s = f2.string_for_regular_display();
+        let set_bg_code = "\u{1b}[38";
+        let clear_bg_code = "\u{1b}[39m";
+        assert!(!s.contains(set_bg_code));
+        assert!(s.contains(clear_bg_code));
+        s.lines().for_each(|line|
+            // reset bg at start of line, and also at end of line
+            // TODO: skip the end of line reset if not necessary
+            assert_eq!(line.matches(clear_bg_code).count(), 2));
+    }
+    #[test]
+    fn test_partial_transparency_conversion_to_display_string() {
+        let alphas: [u8; _] = [255, 127, 1, 0];
+
+        let reds = alphas.map(|a| RED.with_alpha(a));
+        let greens = alphas.map(|a| GREEN.with_alpha(a));
+
+        let fg_bgs = reds.map(|r| greens.map(|g| (r, g)));
+
+        let glyphs = fg_bgs.map(|row| row.map(|(fg, bg)| GlyphWithTransparency::new('a', fg, bg)));
+
+        // dbg!(&glyphs);
+
+        let glyphs_and_strings: [[(GlyphWithTransparency, String); _]; _] = glyphs.map(|row| {
+            row.map(|g| {
+                let s = Frame::new_from_repeated_glyph(1, 1, g).string_for_regular_display();
+                print!("{s}");
+                (g, s)
+            })
+        });
+
+        const code_for_set_fg: &str = "\u{1b}[48";
+        const code_for_set_bg: &str = "\u{1b}[38";
+        const code_for_clear_fg: &str = "\u{1b}[49m";
+        const code_for_clear_bg: &str = "\u{1b}[39m";
+
+        glyphs_and_strings.map(|row| {
+            row.map(|(g, s)| {
+                if g.fg_color().a > 0 {
+                    assert_eq!(s.matches(code_for_set_fg).count(), 1);
+                    assert_eq!(s.matches(code_for_clear_fg).count(), 1);
+                } else {
+                    assert_eq!(s.matches(code_for_set_fg).count(), 0);
+                    assert_eq!(s.matches(code_for_clear_fg).count(), 2); // TODO: reduce to 1
+                }
+                if g.bg_color().a > 0 {
+                    assert_eq!(s.matches(code_for_set_bg).count(), 1);
+                    assert_eq!(s.matches(code_for_clear_bg).count(), 1);
+                } else {
+                    assert_eq!(s.matches(code_for_set_bg).count(), 0);
+                    assert_eq!(s.matches(code_for_clear_bg).count(), 2); // TODO: reduce to 1
+                }
+            })
+        });
+        panic!();
     }
 }
