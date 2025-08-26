@@ -537,6 +537,7 @@ where
     }
 }
 
+
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
     type Output = Line<f32, U>;
 
