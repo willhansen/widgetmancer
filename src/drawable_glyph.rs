@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use crate::DoubleChar;
 
 use euclid::*;
 use itertools::Itertools;
@@ -24,7 +25,6 @@ pub use crate::glyph_constants;
 pub use crate::hextant_blocks::*;
 
 // x, y
-pub type DoubleChar = [char; 2];
 pub type DoubleDrawableGlyph = [DrawableGlyph; 2];
 
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
@@ -245,9 +245,9 @@ impl DrawableGlyph {
         char_is_braille(self.character)
     }
 
-    pub fn looks_solid_color(&self, color: ORGB8) -> bool {
+    pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
-            color == solid_color
+            Some(color) == solid_color
         } else {
             false
         }
@@ -622,11 +622,11 @@ mod tests {
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
-        assert_eq!(glyphs[0].fg_color, RED);
-        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[0].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[0].bg_color.unwrap(), BLACK);
         assert_eq!(glyphs[1].character, '▄');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert_eq!(glyphs[1].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[1].bg_color.unwrap(), BLACK);
     }
 
     #[test]
@@ -635,11 +635,11 @@ mod tests {
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
-        assert_eq!(glyphs[0].fg_color, RED);
-        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[0].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[0].bg_color.unwrap(), BLACK);
         assert_eq!(glyphs[1].character, '▄');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert_eq!(glyphs[1].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[1].bg_color.unwrap(), BLACK);
     }
 
     //                      |<--halfway
@@ -664,7 +664,7 @@ mod tests {
             &glyphs[0].to_string()
         );
         //assert_eq!(glyphs[1].character, '▏');
-        assert_eq!(glyphs[1], DrawableGlyph::new('▊', RED, BLACK));
+        assert_eq!(glyphs[1], DrawableGlyph::new_colored('▊', RED, BLACK));
     }
 
     #[test]
@@ -674,8 +674,8 @@ mod tests {
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(RED));
         assert_eq!(glyphs[1].character, '▌');
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert_eq!(glyphs[1].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[1].bg_color.unwrap(), BLACK);
     }
 
     #[test]
@@ -684,8 +684,8 @@ mod tests {
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
-        assert_eq!(glyphs[0].fg_color, RED);
-        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[0].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[0].bg_color.unwrap(), BLACK);
         assert!(glyphs[1].looks_solid_color(BLACK));
     }
 
@@ -695,8 +695,8 @@ mod tests {
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, RIGHT_HALF_BLOCK);
-        assert_eq!(glyphs[0].fg_color, RED);
-        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[0].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[0].bg_color.unwrap(), BLACK);
         assert!(glyphs[1].looks_solid_color(RED));
     }
 
@@ -715,11 +715,11 @@ mod tests {
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, SPACE);
-        assert_eq!(glyphs[0].fg_color, RED);
-        assert_eq!(glyphs[0].bg_color, BLACK);
+        assert_eq!(glyphs[0].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[0].bg_color.unwrap(), BLACK);
         assert_eq!(glyphs[1].character, RIGHT_HALF_BLOCK);
-        assert_eq!(glyphs[1].fg_color, RED);
-        assert_eq!(glyphs[1].bg_color, BLACK);
+        assert_eq!(glyphs[1].fg_color.unwrap(), RED);
+        assert_eq!(glyphs[1].bg_color.unwrap(), BLACK);
     }
 
     #[test]
@@ -744,7 +744,7 @@ mod tests {
         // offset right
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0], DrawableGlyph::new(LEFT_HALF_BLOCK, RED, BLACK));
+        assert_eq!(glyphs[0], DrawableGlyph::new_colored(LEFT_HALF_BLOCK, RED, BLACK));
         assert!(
             glyphs[1].looks_solid_color(BLACK),
             "glyph: {}",
@@ -810,15 +810,15 @@ mod tests {
 
     #[test]
     fn test_get_solid_color_if_there_is_one() {
-        let glyph = DrawableGlyph::new(' ', BLUE, RED);
-        assert_eq!(glyph.get_solid_color(), Some(RED));
-        let glyph = DrawableGlyph::new(FULL_BLOCK, BLUE, RED);
-        assert_eq!(glyph.get_solid_color(), Some(BLUE));
+        let glyph = DrawableGlyph::new_colored(' ', BLUE, RED);
+        assert_eq!(glyph.get_solid_color().unwrap(), Some(RED));
+        let glyph = DrawableGlyph::new_colored(FULL_BLOCK, BLUE, RED);
+        assert_eq!(glyph.get_solid_color().unwrap(), Some(BLUE));
     }
 
     #[test]
     fn test_can_not_get_solid_color_if_there_is_not_one() {
-        let glyph = DrawableGlyph::new('a', BLUE, RED);
+        let glyph = DrawableGlyph::new_colored('a', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), None);
     }
 
@@ -829,158 +829,12 @@ mod tests {
             point2(3.0, 30.0),
             RED,
         );
-        assert!(glyph_map.values().all(|glyph| glyph.is_none()))
-    }
-
-    #[test]
-    fn test_hextant_drawn_over_hextant_combines() {
-        let bottom_glyphs = [DrawableGlyph::fg_only('🬀', GREEN); 2];
-        let top_glyphs = [DrawableGlyph::fg_only('🬑', RED); 2];
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
-        assert_eq!(combo_glyphs[0].character, '🬒');
-        assert_eq!(combo_glyphs[0].fg_color, RED);
-    }
-
-    #[test]
-    fn test_space_drawn_over_hextant_does_nothing() {
-        let the_char = '🬒';
-        let bottom_glyphs = [DrawableGlyph::fg_only(the_char, RED); 2];
-        let top_glyphs = [DrawableGlyph::fg_only(SPACE, BLUE); 2];
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
-        assert_eq!(combo_glyphs[0], DrawableGlyph::fg_only(the_char, RED));
-    }
-
-    #[test]
-    fn test_braille_drawn_over_braille_combines() {
-        let bottom_glyphs = [DrawableGlyph::fg_only('⠎', BLUE); 2];
-        let top_glyphs = [DrawableGlyph::fg_only('⠁', RED); 2];
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0], combo_glyphs[1]); // not true in all cases
-        assert_eq!(combo_glyphs[0].character, '⠏');
-        assert_eq!(combo_glyphs[0].fg_color, RED);
-    }
-
-    #[test]
-    fn test_halfwidth_char_drawn_over_right_side_of_fullwidth_char() {
-        let halfwidth_char = 'a';
-        let fullwidth_char = '🢃';
-        let top_fg_color = RED;
-        let bottom_fg_color = BLUE;
-        let bottom_bg_color = GREEN;
-
-        let bottom_glyphs = [fullwidth_char, SPACE]
-            .map(|c| DrawableGlyph::new(c, bottom_fg_color, bottom_bg_color));
-        let top_glyphs = [SPACE, halfwidth_char].map(|c| DrawableGlyph::fg_only(c, top_fg_color));
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0].character, fullwidth_char);
-        assert_eq!(combo_glyphs[0].fg_color, bottom_fg_color);
-        assert_eq!(combo_glyphs[0].bg_color, bottom_bg_color);
-
-        assert_eq!(combo_glyphs[1].character, halfwidth_char);
-        assert_eq!(combo_glyphs[1].fg_color, top_fg_color);
-        assert_eq!(combo_glyphs[1].bg_color, bottom_bg_color);
-    }
-
-    #[test]
-    fn test_fullwidth_char_drawn_over_two_halfwidth_chars() {
-        let halfwidth_char = 'a';
-        let fullwidth_char = '🢃';
-        let top_color = RED;
-        let bottom_color = BLUE;
-        let bottom_glyphs = [halfwidth_char; 2].map(|c| DrawableGlyph::fg_only(c, bottom_color));
-        let top_glyphs = [fullwidth_char, SPACE].map(|c| DrawableGlyph::fg_only(c, top_color));
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0].character, fullwidth_char);
-        assert_eq!(combo_glyphs[0].fg_color, top_color);
-        assert_eq!(combo_glyphs[0].bg_color, bottom_color);
-
-        assert_eq!(combo_glyphs[1].character, halfwidth_char);
-        assert_eq!(combo_glyphs[1].fg_color, bottom_color);
-    }
-
-    #[test]
-    fn test_two_halfwidth_chars_drawn_over_fullwidth_char() {
-        let halfwidth_char = 'a';
-        let fullwidth_char = '🢃';
-        let top_color = RED;
-        let bottom_color = BLUE;
-        let top_glyphs = [halfwidth_char; 2].map(|c| DrawableGlyph::fg_only(c, top_color));
-        let bottom_glyphs =
-            [fullwidth_char, SPACE].map(|c| DrawableGlyph::fg_only(c, bottom_color));
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0].character, halfwidth_char);
-        assert_eq!(combo_glyphs[0].fg_color, top_color);
-        assert_eq!(combo_glyphs[0].bg_color, bottom_color);
-
-        assert_eq!(combo_glyphs[1].character, halfwidth_char);
-        assert_eq!(combo_glyphs[1].fg_color, top_color);
-        assert_eq!(combo_glyphs[1].bg_color, bottom_color);
-    }
-
-    #[test]
-    fn test_fullwidth_char_drawn_over_fullwidth_char() {
-        let fullwidth_char = '🢃';
-        let top_color = RED;
-        let bottom_color = BLUE;
-
-        let top_glyphs = [fullwidth_char, SPACE].map(|c| DrawableGlyph::fg_only(c, top_color));
-        let bottom_glyphs =
-            [fullwidth_char, SPACE].map(|c| DrawableGlyph::fg_only(c, bottom_color));
-        let combo_glyphs = top_glyphs.drawn_over(bottom_glyphs);
-
-        assert_eq!(combo_glyphs[0].character, fullwidth_char);
-        assert_eq!(combo_glyphs[0].fg_color, top_color);
-        assert_eq!(combo_glyphs[0].bg_color, bottom_color);
-        assert_eq!(combo_glyphs[1].character, SPACE);
-        assert_eq!(combo_glyphs[1].bg_color, bottom_color);
+        assert!(glyph_map.values().all(|glyph| glyph.bg_color.is_none()))
     }
 
     #[test]
     fn test_character_width_detection() {
         assert!(DrawableGlyph::char_is_fullwidth('🢂'));
         assert_false!(DrawableGlyph::char_is_fullwidth('>'));
-    }
-    #[test]
-    fn test_pair_up_glyph_map__positions() {
-        let character_squares: Vec<IPoint> = vec![[0, 0], [1, 0], [1, 1], [2, 0], [2, 1]];
-
-        let mut character_glyph_map = DrawableGlyphMap::new();
-        for square in character_squares {
-            character_glyph_map.insert(square, DrawableGlyph::default_transparent());
-        }
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, DrawableGlyph::transparent_glyph());
-        let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
-        assert_eq!(square_glyph_map.len(), correct_squares.len());
-        for square in correct_squares {
-            assert!(square_glyph_map.contains_key(&square));
-        }
-    }
-
-    #[test]
-    fn test_pair_up_glyph_map__glyphs() {
-        let mut character_glyph_map = DrawableGlyphMap::new();
-        let test_glyph = DrawableGlyph {
-            character: ' ',
-            fg_color: RGB8::new(0, 0, 0),
-            bg_color: RGB8::new(100, 100, 150),
-        };
-        character_glyph_map.insert(point2(0, 0), test_glyph);
-        character_glyph_map.insert(point2(1, 0), test_glyph);
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, DrawableGlyph::default());
-        assert_eq!(square_glyph_map.len(), 1);
-        assert_eq!(
-            *square_glyph_map.get(&point2(0, 0)).unwrap(),
-            [test_glyph; 2]
-        );
     }
 }

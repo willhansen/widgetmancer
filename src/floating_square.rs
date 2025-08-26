@@ -1,6 +1,6 @@
 use crate::glyph_constants::*;
 use crate::hextant_blocks::hextant_block_by_offset;
-use crate::glyph::DoubleChar;
+use crate::DoubleChar;
 use crate::screen::{
     world_character_point_to_world_character_square, WorldCharacterPoint, WorldCharacterSquare,
 };

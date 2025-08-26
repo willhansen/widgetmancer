@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use crate::DoubleChar;
 
 use euclid::*;
 use itertools::Itertools;
@@ -25,7 +26,6 @@ pub use crate::hextant_blocks::*;
 pub use crate::glyph_constants;
 
 // x, y
-pub type DoubleChar = [char; 2];
 pub type DoubleGlyph = [Glyph; 2];
 
 pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
