@@ -1,4 +1,5 @@
 pub mod glyph;
+pub mod drawable_glyph;
 use std::collections::HashMap;
 use std::iter::once;
 use std::iter::repeat_n;
@@ -10,6 +11,7 @@ use geometry2::FPoint;
 use geometry2::FPointExt;
 use geometry2::IPoint;
 pub use glyph::*;
+pub use drawable_glyph::*;
 
 pub mod glyph_with_transparency;
 pub use glyph_with_transparency::*;
@@ -22,6 +24,11 @@ pub use screen::*;
 
 pub mod frame;
 pub use frame::*;
+
+
+pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
+
+pub mod glyph_constants;
 
 use utility::geometry2::IPointExt;
 pub use utility::*;

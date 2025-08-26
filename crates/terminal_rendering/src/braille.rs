@@ -252,11 +252,11 @@ pub fn local_braille_squares_to_braille_char2(squares: Vec<geometry2::IPoint>) -
 }
 
 pub fn get_chars_for_braille_line(
-    start_pos: WorldPoint,
-    end_pos: WorldPoint,
+    start_pos: impl Into<WorldPoint>,
+    end_pos: impl Into<WorldPoint>,
 ) -> WorldCharacterSquareToCharMap {
-    let start_char_point = world_point_to_world_character_point(start_pos);
-    let end_char_point = world_point_to_world_character_point(end_pos);
+    let start_char_point = world_point_to_world_character_point(start_pos.into());
+    let end_char_point = world_point_to_world_character_point(end_pos.into());
 
     let mut char_map = WorldCharacterSquareToCharMap::new();
 
@@ -297,12 +297,13 @@ pub fn get_braille_arrays_for_braille_line(
         })
         .collect()
 }
-pub fn points_to_braille_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareToCharMap {
+pub fn points_to_braille_chars(points: Vec<impl Into<WorldPoint>>) -> WorldCharacterSquareToCharMap {
     // bin braille squares by world character squares
     let mut local_braille_squares_by_character_square =
         HashMap::<WorldCharacterSquare, HashSet<WorldBrailleSquare>>::new();
 
     for point in points {
+        let point: WorldPoint = point.into();
         let char_point = world_point_to_world_character_point(point);
         let char_square = char_point.round().to_i32();
         let braille_square = world_character_point_to_braille_point(char_point)
