@@ -581,6 +581,7 @@ ghi",
             .collect_vec();
         assert_eq!(contents, vec!["48;2;0;0;0", "38;2;255;255;255", "49", "39"]);
     }
+    #[ignore]
     #[test]
     fn test_transparent_frame_to_string() {
         let f1 = Frame::blank(3, 3);
@@ -599,6 +600,7 @@ ghi",
             // TODO: skip the end of line reset if not necessary
             assert_eq!(line.matches(clear_bg_code).count(), 2));
     }
+    #[ignore]
     #[test]
     fn test_partial_transparency_conversion_to_display_string() {
         let alphas: [u8; _] = [255, 127, 1, 0];

@@ -57,60 +57,52 @@ pub fn grey(x: u8) -> RGB8 {
     RGB8::new(x, x, x)
 }
 
+pub type ORGB8 = Option<RGB8>;
+
+// No transparency, but accounts for default colors
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Glyph {
     pub character: char,
-    pub fg_color: RGB8,
-    pub bg_color: RGB8,
-    pub bg_transparent: bool,
+    pub fg_color: Option<RGB8>,
+    pub bg_color: Option<RGB8>,
 }
 
 impl Glyph {
-    pub const default_fg_color: RGB8 = named_colors::WHITE;
-    pub const default_bg_color: RGB8 = named_colors::BLACK;
-    pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
+    pub fn new(character: char, fg_color: ORGB8, bg_color: ORGB8) -> Glyph {
         Glyph {
             character,
             fg_color,
             bg_color,
-            bg_transparent: false,
         }
     }
-    pub fn default_transparent() -> Glyph {
-        Glyph::fg_only(' ', Glyph::default_fg_color)
+    pub fn new_colored(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
+        Self::new(character, Some(fg_color), Some(bg_color))
     }
 
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
-        Glyph {
-            character,
-            fg_color,
-            bg_color: Glyph::default_bg_color,
-            bg_transparent: true,
-        }
+        Glyph::new(character, Some(fg_color), None)
     }
     fn tinted(&self, color: RGB8, strength: f32) -> Self {
         Glyph {
-            fg_color: tint_color(self.fg_color, color, strength),
-            bg_color: tint_color(self.bg_color, color, strength),
+            fg_color: self.fg_color.map(|c| tint_color(c, color, strength)),
+            bg_color: self.bg_color.map(|c| tint_color(c, color, strength)),
             ..*self
         }
     }
 
     pub fn fg_color_string(&self) -> String {
-        color::Fg(color::Rgb(
-            self.fg_color.r,
-            self.fg_color.g,
-            self.fg_color.b,
-        ))
-        .to_string()
+        if let Some(col) = self.fg_color {
+            color::Fg(color::Rgb(col.r, col.g, col.b)).to_string()
+        } else {
+            color::Fg(color::Reset).to_string()
+        }
     }
     pub fn bg_color_string(&self) -> String {
-        color::Bg(color::Rgb(
-            self.bg_color.r,
-            self.bg_color.g,
-            self.bg_color.b,
-        ))
-        .to_string()
+        if let Some(col) = self.bg_color {
+            color::Bg(color::Rgb(col.r, col.g, col.b)).to_string()
+        } else {
+            color::Bg(color::Reset).to_string()
+        }
     }
     pub fn color_string(&self) -> String {
         self.bg_color_string() + &self.fg_color_string()
@@ -145,7 +137,7 @@ impl Glyph {
     }
 
     pub fn from_char(character: char) -> Glyph {
-        Glyph::new(character, Glyph::default_fg_color, Glyph::default_bg_color)
+        Glyph::new(character, None, None)
     }
 
     pub fn with_char(&self, new_char: char) -> Glyph {
@@ -155,17 +147,12 @@ impl Glyph {
     }
     pub fn with_fg(&self, new_fg: RGB8) -> Glyph {
         let mut dup = self.clone();
-        dup.fg_color = new_fg;
+        dup.fg_color = Some(new_fg);
         dup
     }
     pub fn with_bg(&self, new_bg: RGB8) -> Glyph {
         let mut dup = self.clone();
-        dup.bg_color = new_bg;
-        dup
-    }
-    pub fn with_transparent_bg(&self, bg_transparent: bool) -> Glyph {
-        let mut dup = self.clone();
-        dup.bg_transparent = bg_transparent;
+        dup.bg_color = Some(new_bg);
         dup
     }
 
@@ -194,7 +181,7 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             )
             .map(|character_offset| {
-                Glyph::new(
+                Glyph::new_colored(
                     character_for_half_square_with_1d_offset(true, character_offset),
                     square_color,
                     background_color,
@@ -205,7 +192,7 @@ impl Glyph {
                 offset_magnitude_within_one_period_symmetric_about_zero,
             );
             character_offsets.map(|character_offset| {
-                Glyph::new(
+                Glyph::new_colored(
                     character_for_half_square_with_1d_offset(false, character_offset),
                     square_color,
                     background_color,
@@ -246,22 +233,6 @@ impl Glyph {
         char_is_braille(self.character)
     }
 
-    #[deprecated(note = "Use ArrowDrawable instead")]
-    pub fn get_glyphs_for_player(faced_direction: KingWorldStep) -> DoubleGlyph {
-        // ⭠⭢⭡⭣ ⭦⭧⭨⭩
-
-        let mut glyphs = [
-            Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
-                faced_direction.into(),
-                THICK_ARROWS,
-            ))
-            .with_transparent_bg(true),
-            Glyph::transparent_glyph(),
-        ];
-        glyphs[0].fg_color = PLAYER_COLOR;
-
-        glyphs
-    }
 
     pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
@@ -279,12 +250,7 @@ impl Glyph {
         Glyph::fg_only(FULL_BLOCK, color)
     }
     pub fn solid_bg(color: RGB8) -> Glyph {
-        Glyph {
-            character: SPACE,
-            fg_color: Glyph::default_fg_color,
-            bg_color: color,
-            bg_transparent: false,
-        }
+        Glyph::new(SPACE, None, Some(color))
     }
     pub fn solid_color(color: RGB8) -> Glyph {
         Self::solid_bg(color)
@@ -292,11 +258,11 @@ impl Glyph {
 
     pub fn get_solid_color(&self) -> Option<RGB8> {
         if KNOWN_FG_ONLY_CHARS.contains(&self.character) {
-            Some(self.fg_color)
+            self.fg_color
         } else if KNOWN_BG_ONLY_CHARS.contains(&self.character) {
-            Some(self.bg_color)
+            self.bg_color
         } else if self.fg_color == self.bg_color {
-            Some(self.fg_color)
+            self.fg_color
         } else {
             None
         }
@@ -313,12 +279,6 @@ impl Glyph {
 
     pub fn char_is_empty(c: char) -> bool {
         KNOWN_BG_ONLY_CHARS.contains(&c)
-    }
-    pub fn is_fully_transparent(&self) -> bool {
-        self.has_no_fg() && self.bg_transparent
-    }
-    pub fn is_bg_only(&self) -> bool {
-        self.has_no_fg() && !self.bg_transparent
     }
 
     pub fn is_fullwidth(&self) -> bool {
@@ -383,48 +343,15 @@ impl Glyph {
         SOLID_CHESS_PIECES.contains(&c)
     }
 
-    pub fn transparent_glyph() -> Glyph {
-        Glyph::fg_only(' ', Glyph::default_bg_color)
-    }
-    pub fn transparent_square_glyphs() -> DoubleGlyph {
-        [Glyph::fg_only(' ', Glyph::default_bg_color); 2]
-    }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
-        [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
+        [Glyph::new_colored(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
     }
 
     // ╳
     pub fn block_glyphs() -> DoubleGlyph {
-        [Glyph::new(FULL_BLOCK, BLOCK_FG, BLOCK_BG); 2]
+        [Glyph::new_colored(FULL_BLOCK, BLOCK_FG, BLOCK_BG); 2]
     }
 
-    pub fn drawn_over(&self, bottom: Glyph) -> Glyph {
-        let top = *self;
-
-        if top.has_fg() {
-            let maybe_combined = combine_characters(top.character, bottom.character);
-            if top.bg_transparent && maybe_combined.is_some() {
-                let combined_character = maybe_combined.unwrap();
-                Glyph::new(combined_character, top.fg_color, bottom.bg_color)
-            } else {
-                let bg = if !top.bg_transparent {
-                    top.bg_color
-                } else if bottom.has_fg() {
-                    bottom.fg_color
-                } else {
-                    bottom.bg_color
-                };
-
-                Glyph::new(top.character, top.fg_color, bg)
-            }
-        } else if !top.bg_transparent {
-            Glyph::solid_bg(top.bg_color)
-        } else if bottom.has_fg() {
-            bottom
-        } else {
-            Glyph::solid_bg(bottom.bg_color)
-        }
-    }
 
     pub fn char_map_to_fg_only_glyph_map<T: Hash + Eq + Copy>(
         char_map: HashMap<T, char>,
@@ -468,7 +395,7 @@ impl Glyph {
         self.fg_color = tmp;
     }
 
-    pub fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8> {
+    pub fn colors_mut(&mut self) -> impl Iterator<Item = &mut ORGB8> {
         use std::iter::once;
         once(&mut self.fg_color).chain(once(&mut self.bg_color))
     }
@@ -480,12 +407,10 @@ impl Debug for Glyph {
             f,
             "char: {}\n\
              fg: {}\n\
-             bg: {}\n\
-             bg_transparent: {}",
+             bg: {}",
             self.character,
-            rgb_to_string(self.fg_color),
-            rgb_to_string(self.bg_color),
-            self.bg_transparent
+            self.fg_color.map(|c|rgb_to_string(c)),
+            self.bg_color.map(|c|rgb_to_string(c)),
         )
     }
 }
@@ -520,7 +445,7 @@ pub trait DoubleGlyphFunctions {
             .try_into()
             .unwrap()
     }
-    fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8>;
+    fn colors_mut(&mut self) -> impl Iterator<Item = &mut ORGB8>;
 }
 
 impl DoubleGlyphFunctions for DoubleGlyph {
@@ -614,7 +539,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         self.map(|g| g.tinted(color, strength))
     }
 
-    fn colors_mut(&mut self) -> impl Iterator<Item = &mut RGB8> {
+    fn colors_mut(&mut self) -> impl Iterator<Item = &mut ORGB8> {
         self.iter_mut().flat_map(|g| g.colors_mut())
     }
 }
