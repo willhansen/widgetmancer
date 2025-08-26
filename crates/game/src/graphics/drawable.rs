@@ -514,7 +514,7 @@ impl Drawable for OffsetSquareDrawable {
 mod tests {
     use euclid::point2;
     use pretty_assertions::{assert_eq, assert_ne};
-    use terminal_rendering::glyph::braille::EMPTY_BRAILLE;
+    use terminal_rendering::braille::EMPTY_BRAILLE;
 
     use terminal_rendering::glyph::glyph_constants::{BLACK, BLUE, GREEN, SPACE, THICK_ARROWS};
     use utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};

@@ -37,6 +37,8 @@ use crate::glyph::glyph_constants::named_colors::*;
 use crate::glyph_constants::named_chars;
 use crate::glyph_constants::FULL_BLOCK;
 
+pub type DoubleChar = [char; 2];
+
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ConcatVBias {
     Top,

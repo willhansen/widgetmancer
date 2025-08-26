@@ -1138,7 +1138,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
-    use terminal_rendering::glyph::angled_blocks::{
+    use terminal_rendering::angled_blocks::{
         angle_block_char_complement, angle_block_chars_are_horizontally_continuous,
         angled_block_char_to_snap_points_map, angled_block_flip_y, SnapGridPoint,
     };

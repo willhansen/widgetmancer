@@ -18,6 +18,7 @@ use std::thread::{self, sleep_ms};
 use std::time::{Duration, Instant};
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::*;
+use terminal_rendering::drawable_glyph::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
     event::{Event, Key},

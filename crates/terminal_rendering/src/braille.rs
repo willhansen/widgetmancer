@@ -1,5 +1,5 @@
 use crate::glyph::glyph_constants::SPACE;
-use crate::glyph::DoubleChar;
+use crate::DoubleChar;
 use crate::{pair_up_character_square_map, screen::*};
 use utility::coordinate_frame_conversions::*;
 use utility::geometry2::{FPointExt, IPointExt};
