@@ -241,7 +241,7 @@ impl Frame {
                     }
 
                     utf8_until_next.chars().for_each(|c| {
-                        glyphs_out.push(DrawableGlyph::new_colored(c, fg.unwrap(), bg.unwrap()))
+                        glyphs_out.push(DrawableGlyph::new(c, fg, bg))
                     });
                 }
                 glyphs_out
@@ -653,5 +653,9 @@ ghi",
             })
         });
         panic!();
+    }
+    #[test]
+    fn test_display() {
+        let frame = Frame::new_from_repeated_glyph(1,1, GlyphWithTransparency::new('a', RED.into(), RGBA8::transparent))
     }
 }
