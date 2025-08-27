@@ -730,8 +730,8 @@ impl WorldState {
                             .into_iter()
                             .rev()
                             .fold(
-                                DoubleGlyph::solid_color(BLACK)
-                                    .map(|g| GlyphWithTransparency::from_glyph(g)),
+                                DoubleDrawableGlyph::solid_color(Some(BLACK))
+                                    .map(|g| GlyphWithTransparency::from(g)),
                                 |below, above| [0, 1].map(|i| above[i].over(below[i])),
                             )
                             .map(|g| g.over_solid_bg(BLACK))
@@ -1251,7 +1251,7 @@ mod tests {
         assert!(xy.dist([3.0,1.0]) < 0.1, "{xy:?}");
     }
 
-    // #[ignore]
+    #[ignore]
     #[test]
     fn test_smoothed_mouse_motion_accuracy() {
         let path_funcs: &[(&str, fn(f32) -> FPoint)] = &[
