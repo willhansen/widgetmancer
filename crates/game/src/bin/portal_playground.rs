@@ -16,9 +16,9 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::{self, sleep_ms};
 use std::time::{Duration, Instant};
+use terminal_rendering::drawable_glyph::*;
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::*;
-use terminal_rendering::drawable_glyph::*;
 use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
 use termion::{
     event::{Event, Key},
@@ -153,20 +153,31 @@ impl Game {
     }
     pub fn process_events_in_queue(&mut self) -> usize {
         let mut n = 0;
-        while self.try_process_next_event() { n += 1;}
+        while self.try_process_next_event() {
+            n += 1;
+        }
         n
     }
     pub fn render_with_mouse(&mut self, fov_center: Option<IPoint>) -> Frame {
         self.render_with_mouse_now(fov_center)
     }
-    pub fn render_with_mouse_at_time(&mut self, fov_center: Option<IPoint>, time_from_start_s: f32) -> Frame {
+    pub fn render_with_mouse_at_time(
+        &mut self,
+        fov_center: Option<IPoint>,
+        time_from_start_s: f32,
+    ) -> Frame {
         let frame = self.world_state.render(fov_center);
         self.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         self.ui_handler.draw_mouse_at_time(time_from_start_s);
         self.ui_handler.screen_buffer.clone()
     }
     pub fn render_with_mouse_now(&mut self, fov_center: Option<IPoint>) -> Frame {
-        self.render_with_mouse_at_time(fov_center, Instant::now().duration_since(self.ui_handler.start_time).as_secs_f32() )
+        self.render_with_mouse_at_time(
+            fov_center,
+            Instant::now()
+                .duration_since(self.ui_handler.start_time)
+                .as_secs_f32(),
+        )
     }
 }
 
@@ -184,10 +195,10 @@ impl Camera {
     }
     pub fn new_square(s: usize) -> Self {
         Camera {
-            lower_left_local_square_in_world: [0,0],
-            upper_right_local_square_in_world: [s as i32,s as i32],
+            lower_left_local_square_in_world: [0, 0],
+            upper_right_local_square_in_world: [s as i32, s as i32],
             // Note that screen is 1-indexed
-            upper_left_row_col_char_on_screen: [1,1]
+            upper_left_row_col_char_on_screen: [1, 1],
         }
     }
     pub fn size_in_world(&self) -> [u32; 2] {
@@ -236,23 +247,31 @@ impl Camera {
         self.local_screen_row_col_point_to_local_world_point(screen_row_col_point)
     }
 
-    pub fn screen_row_col_char_to_camera_local_row_col_char(&self, screen_row_col_char: [u16;2]) -> [u16;2] {
+    pub fn screen_row_col_char_to_camera_local_row_col_char(
+        &self,
+        screen_row_col_char: [u16; 2],
+    ) -> [u16; 2] {
         screen_row_col_char
     }
-    pub fn camera_local_row_col_char_to_camera_local_world_square(&self, camera_local_row_col_char: [u16;2]) -> IPoint {
+    pub fn camera_local_row_col_char_to_camera_local_world_square(
+        &self,
+        camera_local_row_col_char: [u16; 2],
+    ) -> IPoint {
         [
-            (camera_local_row_col_char[1] as i32 - 1)/ 2,
+            (camera_local_row_col_char[1] as i32 - 1) / 2,
             self.height_in_world() as i32 - (camera_local_row_col_char[0] as i32 - 1) - 1,
         ]
     }
-    pub fn camera_local_world_square_to_world_square(&self, camera_local_world_square:IPoint) -> IPoint {
+    pub fn camera_local_world_square_to_world_square(
+        &self,
+        camera_local_world_square: IPoint,
+    ) -> IPoint {
         camera_local_world_square
-
     }
-    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16;2]) -> IPoint {
+    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
         let p = self.screen_row_col_char_to_camera_local_row_col_char(screen_row_col_char);
         let p = self.camera_local_row_col_char_to_camera_local_world_square(p);
-         self.camera_local_world_square_to_world_square(p)
+        self.camera_local_world_square_to_world_square(p)
     }
 }
 
@@ -264,34 +283,65 @@ mod camera_tests {
         let s: i32 = 32;
         let camera = Camera::new_square(s as usize);
 
-        assert_eq!(camera.screen_row_col_char_to_world_square([1,1]), [0, s-1]);
+        assert_eq!(
+            camera.screen_row_col_char_to_world_square([1, 1]),
+            [0, s - 1]
+        );
 
-        assert_eq!(camera.screen_row_col_char_to_camera_local_row_col_char([1,1]), [1,1]);
+        assert_eq!(
+            camera.screen_row_col_char_to_camera_local_row_col_char([1, 1]),
+            [1, 1]
+        );
 
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,1]), [0,s-1]);
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,2]), [0,s-1]);
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([1, 1]),
+            [0, s - 1]
+        );
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([1, 2]),
+            [0, s - 1]
+        );
 
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([2,1]), [0,s-2]);
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([2,2]), [0,s-2]);
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([2, 1]),
+            [0, s - 2]
+        );
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([2, 2]),
+            [0, s - 2]
+        );
 
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,3]), [1,s-1]);
-        assert_eq!(camera.camera_local_row_col_char_to_camera_local_world_square([1,4]), [1,s-1]);
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([1, 3]),
+            [1, s - 1]
+        );
+        assert_eq!(
+            camera.camera_local_row_col_char_to_camera_local_world_square([1, 4]),
+            [1, s - 1]
+        );
 
-        assert_eq!(camera.camera_local_world_square_to_world_square([0,s-1]), [0,s-1]);
-        assert_eq!(camera.camera_local_world_square_to_world_square([0,0]), [0,0]);
-
+        assert_eq!(
+            camera.camera_local_world_square_to_world_square([0, s - 1]),
+            [0, s - 1]
+        );
+        assert_eq!(
+            camera.camera_local_world_square_to_world_square([0, 0]),
+            [0, 0]
+        );
     }
     fn test_screen_to_world_floating_point() {
         let camera = Camera::new();
 
-        assert_eq!(camera.screen_row_col_point_to_world_point([1.0,1.0]), [0.0, camera.height_in_world() as f32]);
+        assert_eq!(
+            camera.screen_row_col_point_to_world_point([1.0, 1.0]),
+            [0.0, camera.height_in_world() as f32]
+        );
     }
     #[test]
     fn test_size() {
         let camera = Camera::new();
-        assert_eq!(camera.size_in_world(), [25,25]);
+        assert_eq!(camera.size_in_world(), [25, 25]);
     }
-
 }
 
 // struct PortalUnderConstruction {
@@ -379,28 +429,29 @@ impl UiHandler {
         self.mouse_screen_xy_char().map(|p| [p[0] / 2, p[1]])
     }
     fn mouse_screen_xy_char(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col.map(|x|self.screen_row_col_char_to_screen_xy_char(x))
+        self.last_mouse_screen_row_col
+            .map(|x| self.screen_row_col_char_to_screen_xy_char(x))
     }
     fn screen_row_col_char_to_screen_xy_char(&self, row_col_char: ScreenRowColCharPos) -> IPoint {
         let [screen_row, screen_col] = row_col_char;
         let screen_y: i32 = self.height() as i32 - i32::from(screen_row) - 1;
         [i32::from(screen_col), screen_y]
-
     }
     fn screen_row_col_point_to_screen_xy_point(&self, row_col_point: FPoint) -> FPoint {
-         [
-                    row_col_point[1] - 1.0, // No longer one-indexed
-                    self.height() as f32 - (row_col_point[0] - 1.0),
+        [
+            row_col_point[1] - 1.0, // No longer one-indexed
+            self.height() as f32 - (row_col_point[0] - 1.0),
         ]
     }
     fn screen_xy_point_to_screen_row_col_point(&self, xy_point: FPoint) -> FPoint {
-         [
-                    self.height() as f32 - (xy_point[1]) + 1.0,
-                    xy_point[0] + 1.0, // back to 1-indexed
+        [
+            self.height() as f32 - (xy_point[1]) + 1.0,
+            xy_point[0] + 1.0, // back to 1-indexed
         ]
     }
     fn mouse_world_square(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col.map(|row_col| self.camera.screen_row_col_char_to_world_square(row_col))
+        self.last_mouse_screen_row_col
+            .map(|row_col| self.camera.screen_row_col_char_to_world_square(row_col))
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
         let (sender, receiver) = channel();
@@ -428,8 +479,7 @@ impl UiHandler {
         }
     }
     pub fn draw_mouse(&mut self) {
-            let t = 
-                (Instant::now() - self.start_time).as_secs_f32();
+        let t = (Instant::now() - self.start_time).as_secs_f32();
         self.draw_mouse_at_time(t)
     }
     pub fn draw_mouse_at_time(&mut self, time_from_start_s: f32) {
@@ -441,28 +491,28 @@ impl UiHandler {
         }
     }
     pub fn draw_smoothed_mouse(&mut self, time_from_start_s: f32) {
-            if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col(
-                time_from_start_s,
-            ) {
-                let smoothed_mouse_pos_xy = self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
+        if let Some(smoothed_mouse_pos_row_col) =
+            self.smoothed_mouse_position_screen_row_col(time_from_start_s)
+        {
+            let smoothed_mouse_pos_xy =
+                self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
-                let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
-                let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
-                assert!(row_1i > 0, "{row_1i}");
-                assert!(row_1i <= self.height() as i32, "{row_1i}");
-                assert!(col_1i > 0, "{col_1i}");
-                assert!(col_1i <= self.width() as i32, "{col_1i}");
-                let[row, col] = [row_1i as usize-1, col_1i as usize-1];
-                self.screen_buffer.grid[row][col].character = the_char;
-            }
-
+            let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
+            let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
+            assert!(row_1i > 0, "{row_1i}");
+            assert!(row_1i <= self.height() as i32, "{row_1i}");
+            assert!(col_1i > 0, "{col_1i}");
+            assert!(col_1i <= self.width() as i32, "{col_1i}");
+            let [row, col] = [row_1i as usize - 1, col_1i as usize - 1];
+            self.screen_buffer.grid[row][col].character = the_char;
+        }
     }
     pub fn draw_mouse_square(&mut self) {
-
-            if let Some([row, col]) = self.last_mouse_screen_row_col {
-                assert!(row > 0 && col > 0, "row: {row}, col: {col}");
-                self.screen_buffer.grid[row as usize - 1][col as usize - 1] = GlyphWithTransparency::solid_color(RED);
-            }
+        if let Some([row, col]) = self.last_mouse_screen_row_col {
+            assert!(row > 0 && col > 0, "row: {row}, col: {col}");
+            self.screen_buffer.grid[row as usize - 1][col as usize - 1] =
+                GlyphWithTransparency::solid_color(RED);
+        }
     }
     pub fn draw_screen(&mut self) {
         draw_frame(
@@ -494,10 +544,8 @@ impl UiHandler {
     fn log_event(&mut self, e: (f32, Event)) {
         self.event_log.push_back(e);
         while self.event_log.len() > 20 {
-
             self.event_log.pop_front();
         }
-
     }
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
         self.fake_event_sender
@@ -729,14 +777,9 @@ impl WorldState {
                         glyph_layers_to_combine
                             .into_iter()
                             .rev()
-                            .fold(
-                                DoubleDrawableGlyph::solid_color(Some(BLACK))
-                                    .map(|g| GlyphWithTransparency::from(g)),
-                                |below, above| [0, 1].map(|i| above[i].over(below[i])),
-                            )
-                            .map(|g| g.over_solid_bg(BLACK))
+                            .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i]))).unwrap()
                         // glyph_layers_to_combine[0]
-                    })
+                    }).flatten()
                     .collect_vec()
             })
             .collect_vec()
@@ -868,7 +911,6 @@ impl WorldState {
     }
 }
 
-
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
     writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
     writable.flush();
@@ -940,12 +982,12 @@ mod tests {
     use game::fov_stuff::LocalSquareHalfPlane;
     use ordered_float::OrderedFloat;
     use pretty_assertions::assert_str_eq;
-    use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
-    use termion::event::MouseEvent;
     use std::str::FromStr;
+    use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
+    use terminal_rendering::assert_array_not_more_than_past;
     use terminal_rendering::test_utils::*;
     use terminal_rendering::*;
-    use terminal_rendering::assert_array_not_more_than_past;
+    use termion::event::MouseEvent;
 
     #[test]
     fn test_simple_output() {
@@ -968,7 +1010,6 @@ mod tests {
     fn release_mouse(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Release(col, row))
     }
-
 
     #[test]
     fn test_click_a() {
@@ -1095,11 +1136,7 @@ mod tests {
             let glyphs = game
                 .world_state
                 .render_one_view_of_a_square(&visible_portion);
-            frame.set_by_double_wide_grid(
-                1,
-                2 * i as usize + 1,
-                glyphs,
-            );
+            frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
         }
 
         assert_frame_same_as_past!(frame, "a");
@@ -1179,7 +1216,7 @@ mod tests {
         square_entry_events: &[(f32, IPoint)],
         sample_rate: f32,
         end_t: f32,
-        smoothing_function: fn(&[(f32, IPoint)], f32) ->  FPoint
+        smoothing_function: fn(&[(f32, IPoint)], f32) -> FPoint,
     ) -> Vec<(f32, FPoint)> {
         assert!(square_entry_events.len() > 0);
         let t0 = square_entry_events[0].0;
@@ -1205,19 +1242,33 @@ mod tests {
         // .....
         // .....
 
-        let row_col_point_upper_left = [1.0,1.0];
-        let xy_point_upper_left = [0.0,5.0];
+        let row_col_point_upper_left = [1.0, 1.0];
+        let xy_point_upper_left = [0.0, 5.0];
 
-        let row_col_point_lower_left = [6.0,1.0];
-        let xy_point_lower_left = [0.0,0.0];
+        let row_col_point_lower_left = [6.0, 1.0];
+        let xy_point_lower_left = [0.0, 0.0];
 
-        assert_eq!(game.ui_handler.screen_row_col_point_to_screen_xy_point(row_col_point_upper_left), xy_point_upper_left);
-        assert_eq!(game.ui_handler.screen_xy_point_to_screen_row_col_point(xy_point_upper_left), row_col_point_upper_left);
+        assert_eq!(
+            game.ui_handler
+                .screen_row_col_point_to_screen_xy_point(row_col_point_upper_left),
+            xy_point_upper_left
+        );
+        assert_eq!(
+            game.ui_handler
+                .screen_xy_point_to_screen_row_col_point(xy_point_upper_left),
+            row_col_point_upper_left
+        );
 
-        assert_eq!(game.ui_handler.screen_row_col_point_to_screen_xy_point(row_col_point_lower_left), xy_point_lower_left);
-        assert_eq!(game.ui_handler.screen_xy_point_to_screen_row_col_point(xy_point_lower_left), row_col_point_lower_left);
-        
-
+        assert_eq!(
+            game.ui_handler
+                .screen_row_col_point_to_screen_xy_point(row_col_point_lower_left),
+            xy_point_lower_left
+        );
+        assert_eq!(
+            game.ui_handler
+                .screen_xy_point_to_screen_row_col_point(xy_point_lower_left),
+            row_col_point_lower_left
+        );
     }
 
     #[test]
@@ -1227,7 +1278,10 @@ mod tests {
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
         println!("{}", &frame.escaped_regular_display_string());
-        assert!(char_is_braille(frame.grid[0][0].character), "Char is not braille:\n\n{frame:?}");
+        assert!(
+            char_is_braille(frame.grid[0][0].character),
+            "Char is not braille:\n\n{frame:?}"
+        );
         assert_frame_same_as_past!(frame, "a", true);
     }
     // #[ignore]
@@ -1235,8 +1289,8 @@ mod tests {
     fn test_render_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_one_to_one_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
-        game.ui_handler.give_fake_event((0.0, press_left(1,1)));
-        game.ui_handler.give_fake_event((0.2, drag_mouse_to(2,1)));
+        game.ui_handler.give_fake_event((0.0, press_left(1, 1)));
+        game.ui_handler.give_fake_event((0.2, drag_mouse_to(2, 1)));
         let n = game.process_events_in_queue();
         assert_eq!(n, 2);
 
@@ -1247,8 +1301,8 @@ mod tests {
 
     #[test]
     fn test_smooth_mouse() {
-        let xy = smoothed_mouse_position(&[(0.1, [1,1]), (0.2,[2,1])], 0.3);
-        assert!(xy.dist([3.0,1.0]) < 0.1, "{xy:?}");
+        let xy = smoothed_mouse_position(&[(0.1, [1, 1]), (0.2, [2, 1])], 0.3);
+        assert!(xy.dist([3.0, 1.0]) < 0.1, "{xy:?}");
     }
 
     #[ignore]
@@ -1259,87 +1313,104 @@ mod tests {
             ("horiz_fast", |t: f32| [t * 15.0, 0.0]),
             ("diag", |t: f32| [t * 15.0, t * 10.0]),
             ("sin", |t: f32| [t * 10.0, (t * 5.0).sin() * 3.0]),
-            ("arc", |t: f32| [ 3.0 * (t).cos(), 3.0 * (t).sin()]),
+            ("arc", |t: f32| [3.0 * (t).cos(), 3.0 * (t).sin()]),
         ];
         for (name, path_func) in path_funcs {
             let sim_path: Vec<(f32, FPoint)> = sim_mouse_path(path_func, 6.0, 3.0);
             let get_drawn_path = |path: &Vec<(f32, FPoint)>| {
-
-                draw_points_in_character_grid(
-                    &path.iter().cloned().map(|(t, p)| p).collect_vec()
-                ).framed()
+                draw_points_in_character_grid(&path.iter().cloned().map(|(t, p)| p).collect_vec())
+                    .framed()
             };
 
             let square_entry_events: Vec<(f32, IPoint)> = path_to_square_entry_events(&sim_path);
             assert_eq!(square_entry_events[0].0, sim_path[0].0);
 
-            let naive_smoothing_function = |entry_events: &[(f32, IPoint)], t| {
-                 entry_events.last().unwrap().1.to_float()
-            };
+            let naive_smoothing_function =
+                |entry_events: &[(f32, IPoint)], t| entry_events.last().unwrap().1.to_float();
 
-            let naive_smoothed_path = smoothed_mouse_path(&square_entry_events, 6.0, 3.0, naive_smoothing_function);
-            let smoothed_path = smoothed_mouse_path(&square_entry_events, 6.0, 3.0, smoothed_mouse_position);
+            let naive_smoothed_path =
+                smoothed_mouse_path(&square_entry_events, 6.0, 3.0, naive_smoothing_function);
+            let smoothed_path =
+                smoothed_mouse_path(&square_entry_events, 6.0, 3.0, smoothed_mouse_position);
 
-            println!("{}", horiz_concat_strings(
-                &[
-                    format!(
-                        "Truth:\n{}",
-                        get_drawn_path(&sim_path)
-                    ), 
-                    format!(
-                        "Naive (rounded to last character):\n{}",
-                        get_drawn_path(&naive_smoothed_path)
-                    ), 
-                    format!(
-                        "\"Smoothed\":\n{}", 
-                        get_drawn_path(&smoothed_path)
-                    )
-                ], 
-                3
-            ));
+            println!(
+                "{}",
+                horiz_concat_strings(
+                    &[
+                        format!("Truth:\n{}", get_drawn_path(&sim_path)),
+                        format!(
+                            "Naive (rounded to last character):\n{}",
+                            get_drawn_path(&naive_smoothed_path)
+                        ),
+                        format!("\"Smoothed\":\n{}", get_drawn_path(&smoothed_path))
+                    ],
+                    3
+                )
+            );
 
+            assert_eq!(
+                sim_path.len(),
+                smoothed_path.len(),
+                "sim_path:\n{:?}\n\nsmoothed_path:\n{:?}",
+                &sim_path.iter().map(|(t, p)| t).collect_vec(),
+                &smoothed_path.iter().map(|(t, p)| t).collect_vec()
+            );
 
-            assert_eq!(sim_path.len(), smoothed_path.len(), "sim_path:\n{:?}\n\nsmoothed_path:\n{:?}", &sim_path.iter().map(|(t,p)|t).collect_vec(), &smoothed_path.iter().map(|(t,p)|t).collect_vec());
+            let get_dists_and_avg_dist = |candidate_path: Vec<(f32, FPoint)>| {
+                let dists = sim_path
+                    .iter()
+                    .zip(candidate_path.iter())
+                    .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2))
+                    .collect_vec();
 
-            let get_dists_and_avg_dist = |candidate_path: Vec<(f32,FPoint)>| {
-             let dists = sim_path
-                .iter()
-                .zip(candidate_path.iter())
-                .map(|(&(t1, p1), &(t2, p2))| p1.dist(p2))
-                .collect_vec();
-
-                let avg =&dists.iter().sum::<f32>() / dists.len() as f32; 
+                let avg = &dists.iter().sum::<f32>() / dists.len() as f32;
                 (dists, avg)
             };
 
             let (dists, avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(smoothed_path);
-            let (naive_dists, naive_avg_dist): (Vec<f32>, f32) = get_dists_and_avg_dist(naive_smoothed_path);
+            let (naive_dists, naive_avg_dist): (Vec<f32>, f32) =
+                get_dists_and_avg_dist(naive_smoothed_path);
 
             assert_array_not_more_than_past!(&dists, name.to_string() + "_dists");
 
             let blessed_dists: Vec<f32> = get_past_array!(name.to_string() + "_dists");
 
             // TODO: less verbose elementwise operators
-            let vs_naive = dists.iter().zip(naive_dists.iter()).map(|(a, b)| a - b).collect_vec();
-            let vs_blessed = dists.iter().zip(blessed_dists.iter()).map(|(a, b)| a - b).collect_vec();
+            let vs_naive = dists
+                .iter()
+                .zip(naive_dists.iter())
+                .map(|(a, b)| a - b)
+                .collect_vec();
+            let vs_blessed = dists
+                .iter()
+                .zip(blessed_dists.iter())
+                .map(|(a, b)| a - b)
+                .collect_vec();
 
             println!("\nVs Naive:\n{}", signed_bargraph(&vs_naive, 5, None, None));
-            println!("\nVs Blessed:\n{}", signed_bargraph(&vs_blessed, 5, None, None));
-
+            println!(
+                "\nVs Blessed:\n{}",
+                signed_bargraph(&vs_blessed, 5, None, None)
+            );
 
             let max_dist = *dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
-            let max_naive_dist=*naive_dists.iter().max_by_key(|&&x| OrderedFloat(x)).unwrap();
-            let max_any_dist = max_dist.max(max_naive_dist); 
+            let max_naive_dist = *naive_dists
+                .iter()
+                .max_by_key(|&&x| OrderedFloat(x))
+                .unwrap();
+            let max_any_dist = max_dist.max(max_naive_dist);
 
-
-            let a = format!("Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n", bargraph(&dists, 5, Some(max_any_dist))).indent();
+            let a = format!(
+                "Dist error:\n{}\n\n\tAvg: {avg_dist}\n\n",
+                bargraph(&dists, 5, Some(max_any_dist))
+            )
+            .indent();
 
             let b = format!(
                 "Naive path dist error:\n{}\n\n\tAvg: {naive_avg_dist}\n\n",
-                bargraph(&naive_dists,
-                    5, Some(max_any_dist)
-                )
-            ).indent();
+                bargraph(&naive_dists, 5, Some(max_any_dist))
+            )
+            .indent();
             println!("{a}\n{b}");
             assert_value_not_more_than_past!(max_dist, name.to_string() + "_max_dist");
             assert_value_not_more_than_past!(avg_dist, name.to_string() + "_avg_dist");
