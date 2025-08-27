@@ -4,7 +4,7 @@ use rgb::{RGB8, RGBA8};
 use utility::array_zip;
 
 use crate::glyph_constants::{named_colors::*, SPACE};
-use crate::{DoubleGlyph, Glyph};
+use crate::DrawableGlyph;
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq)]
 pub struct GlyphWithTransparency {
@@ -28,22 +28,14 @@ impl GlyphWithTransparency {
     pub fn transparent() -> Self {
         GlyphWithTransparency {
             character: SPACE,
-            primary_color: RGBA8::from(Glyph::default_fg_color).with_alpha(0),
-            secondary_color: RGBA8::from(Glyph::default_bg_color).with_alpha(0),
+            primary_color: RGBA8::from(BLACK).with_alpha(0),
+            secondary_color: RGBA8::from(BLACK).with_alpha(0),
             fg_is_primary: false,
         }
     }
 
-    pub fn from_glyph(glyph: Glyph) -> Self {
-        Self {
-            character: glyph.character,
-            primary_color: glyph.fg_color.with_alpha(255),
-            secondary_color: glyph.bg_color.with_alpha(255),
-            fg_is_primary: true,
-        }
-    }
     pub fn from_char(c: char) -> Self {
-        Self::from_glyph(Glyph::from_char(c))
+        DrawableGlyph::from_char(c).into()
     }
     pub fn with_primary_only(&self) -> Self {
         self.with_transparent_secondary()
@@ -111,11 +103,11 @@ impl GlyphWithTransparency {
         out.secondary_color = color_combine(self.secondary_color, other.primary_color);
         out
     }
-    pub fn over_solid_bg(&self, c: RGB8) -> Glyph {
+    pub fn over_solid_bg(&self, c: RGB8) -> DrawableGlyph {
         let mut bg = Self::from_char(' ').with_primary_rgb(c);
         bg.fg_is_primary = false;
         let result = self.over(bg);
-        Glyph::new(
+        DrawableGlyph::new_colored(
             self.character,
             result.fg_color().rgb(),
             result.bg_color().rgb(),
@@ -125,7 +117,7 @@ impl GlyphWithTransparency {
         Self {
             character: window,
             primary_color: self.primary_color,
-            secondary_color: Glyph::default_bg_color.with_alpha(0),
+            secondary_color: BLACK.with_alpha(0),
             fg_is_primary: true,
         }
     }
@@ -144,14 +136,29 @@ impl GlyphWithTransparency {
     }
 }
 
-impl Into<Glyph> for GlyphWithTransparency {
-    fn into(self) -> Glyph {
-        self.over_solid_bg(BLACK)
+impl Into<DrawableGlyph> for GlyphWithTransparency {
+    fn into(self) -> DrawableGlyph {
+        let fg = self.fg_color();
+        let bg = self.bg_color();
+        DrawableGlyph::new(
+            self.character,
+            if fg.a == 0 { None } else { Some(fg.rgb()) },
+            if bg.a == 0 { None } else { Some(bg.rgb()) },
+        )
     }
 }
-impl From<Glyph> for GlyphWithTransparency {
-    fn from(value: Glyph) -> Self {
-        Self::from_glyph(value)
+impl From<DrawableGlyph> for GlyphWithTransparency {
+    fn from(value: DrawableGlyph) -> Self {
+        Self::new(value.character, 
+            match value.fg_color {
+            None => BLACK.with_alpha(0),
+            Some(c) => c.into()
+        }, 
+            match value.bg_color {
+            None => BLACK.with_alpha(0),
+            Some(c) => c.into()
+        }, 
+        )
     }
 }
 
@@ -214,8 +221,8 @@ mod tests {
 
     #[test]
     fn test_glyph_to_aglyph() {
-        let glyph = Glyph::from_char('a');
-        let b = GlyphWithTransparency::from_glyph(glyph);
+        let glyph = DrawableGlyph::from_char('a');
+        let b: GlyphWithTransparency = glyph.into();
     }
     #[test]
     fn test_letter_over_letter() {

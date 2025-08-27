@@ -1,5 +1,9 @@
-use crate::glyph_constants::named_colors;
-use crate::*;
+use crate::drawable_glyph::*;
+use crate::glyph_constants::named_colors::*;
+use crate::glyph_with_transparency::*;
+use crate::horiz_concat_strings;
+use crate::MultilineStringExt;
+use itertools::*;
 
 use itertools::Itertools;
 use rgb::RGB8;
@@ -24,7 +28,7 @@ impl Frame {
         }
     }
     pub fn blank(width: usize, height: usize) -> Self {
-        let glyph: GlyphWithTransparency = Glyph::solid_color(named_colors::BLACK).into();
+        let glyph: GlyphWithTransparency = DrawableGlyph::solid_color(BLACK).into();
         Self::new_from_repeated_glyph(width, height, glyph)
     }
     pub fn transparent(width: usize, height: usize) -> Self {
@@ -42,9 +46,9 @@ impl Frame {
         let width = lines.iter().map(|l| l.len()).max().unwrap();
         let mut frame = Frame::blank(width, height);
         lines.into_iter().enumerate().for_each(|(row, line)| {
-            line.chars()
-                .enumerate()
-                .for_each(|(col, char)| frame.grid[row][col] = Glyph::from_char(char).into())
+            line.chars().enumerate().for_each(|(col, char)| {
+                frame.grid[row][col] = DrawableGlyph::from_char(char).into()
+            })
         });
         frame
     }
@@ -106,7 +110,7 @@ impl Frame {
                 break;
             }
             if row < self.height() && col < self.width() {
-                self.grid[row][col] = Glyph::from_char(char).into();
+                self.grid[row][col] = DrawableGlyph::from_char(char).into();
             }
         }
     }
@@ -118,14 +122,14 @@ impl Frame {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
-            *glyph.fg_color_mut() = named_colors::BLACK.into();
+            *glyph.fg_color_mut() = BLACK.into();
         });
         f
     }
     pub fn fg_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            *glyph.bg_color_mut() = named_colors::BLACK.into();
+            *glyph.bg_color_mut() = BLACK.into();
         });
         f
     }
@@ -134,15 +138,15 @@ impl Frame {
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
             *glyph.bg_color_mut() = glyph.fg_color();
-            *glyph.fg_color_mut() = named_colors::BLACK.into();
+            *glyph.fg_color_mut() = BLACK.into();
         });
         f
     }
     pub fn characters_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            *glyph.fg_color_mut() = named_colors::WHITE.into();
-            *glyph.bg_color_mut() = named_colors::BLACK.into();
+            *glyph.fg_color_mut() = WHITE.into();
+            *glyph.bg_color_mut() = BLACK.into();
         });
         f
     }
@@ -156,10 +160,10 @@ impl Frame {
         for row in 0..self.height() {
             for col in 0..self.width() {
                 if out.grid[row][col].bg_color() == other.grid[row][col].bg_color() {
-                    *out.grid[row][col].bg_color_mut() = Glyph::default_bg_color.into();
+                    *out.grid[row][col].bg_color_mut() = BLACK.into();
                 }
                 if out.grid[row][col].fg_color() == other.grid[row][col].fg_color() {
-                    *out.grid[row][col].fg_color_mut() = Glyph::default_fg_color.into();
+                    *out.grid[row][col].fg_color_mut() = BLACK.into();
                 }
                 if out.grid[row][col].character == other.grid[row][col].character {
                     out.grid[row][col].character = ' ';
@@ -236,9 +240,9 @@ impl Frame {
                         x => panic!("Invalid escape code: {x:?}"),
                     }
 
-                    utf8_until_next
-                        .chars()
-                        .for_each(|c| glyphs_out.push(Glyph::new(c, fg.unwrap(), bg.unwrap())));
+                    utf8_until_next.chars().for_each(|c| {
+                        glyphs_out.push(DrawableGlyph::new_colored(c, fg.unwrap(), bg.unwrap()))
+                    });
                 }
                 glyphs_out
             })
@@ -262,13 +266,13 @@ impl Frame {
         let is_simple_draw_case = maybe_old_frame.is_none() && colored;
 
         let mut prev_written_row_col: Option<[usize; 2]> = None;
-        let mut prev_written_glyph: Option<Glyph> = None;
+        let mut prev_written_glyph: Option<DrawableGlyph> = None;
         for row in 0..self.height() {
             for col in 0..self.width() {
-                let new_glyph: Glyph = self.grid[row][col].into();
+                let new_glyph: DrawableGlyph = self.grid[row][col].into();
 
                 if let Some(old_frame) = maybe_old_frame {
-                    let old_glyph: Glyph = old_frame.grid[row][col].into();
+                    let old_glyph: DrawableGlyph = old_frame.grid[row][col].into();
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -287,7 +291,7 @@ impl Frame {
                     // Do nothing
                 } else if should_do_linewrap {
                     if is_simple_draw_case {
-                        output += &Glyph::color_reset_string();
+                        output += &DrawableGlyph::color_reset_string();
                     }
                     output += "\n\r";
                 } else if down_right {
@@ -311,7 +315,7 @@ impl Frame {
             }
         }
         if is_simple_draw_case {
-            output += &Glyph::color_reset_string();
+            output += &DrawableGlyph::color_reset_string();
         }
         output
     }
@@ -418,8 +422,8 @@ impl std::fmt::Debug for Frame {
     }
 }
 
-impl From<Vec<Vec<DoubleGlyph>>> for Frame {
-    fn from(value: Vec<Vec<DoubleGlyph>>) -> Self {
+impl From<Vec<Vec<DoubleDrawableGlyph>>> for Frame {
+    fn from(value: Vec<Vec<DoubleDrawableGlyph>>) -> Self {
         value
             .into_iter()
             .map(|row| row.into_iter().flat_map(|dg| dg.into_iter()).collect_vec())
@@ -435,13 +439,13 @@ impl From<Vec<Vec<GlyphWithTransparency>>> for Frame {
         Frame { grid: value }
     }
 }
-impl From<Vec<Vec<Glyph>>> for Frame {
-    fn from(value: Vec<Vec<Glyph>>) -> Self {
+impl From<Vec<Vec<DrawableGlyph>>> for Frame {
+    fn from(value: Vec<Vec<DrawableGlyph>>) -> Self {
         value
             .iter()
             .map(|row| {
                 row.iter()
-                    .map(|&g| GlyphWithTransparency::from_glyph(g))
+                    .map(|&g| GlyphWithTransparency::from(g))
                     .collect_vec()
             })
             .collect_vec()
@@ -451,23 +455,27 @@ impl From<Vec<Vec<Glyph>>> for Frame {
 
 #[cfg(test)]
 mod tests {
-    use crate::glyph_constants::named_colors;
 
     use super::*;
     use pretty_assertions::assert_eq;
 
     fn small_color_frame() -> Frame {
-        use named_colors::*;
         vec![
-            vec![Glyph::solid_color(RED), Glyph::solid_color(GREEN)],
-            vec![Glyph::solid_color(BLUE), Glyph::solid_color(YELLOW)],
+            vec![
+                DrawableGlyph::solid_color(RED),
+                DrawableGlyph::solid_color(GREEN),
+            ],
+            vec![
+                DrawableGlyph::solid_color(BLUE),
+                DrawableGlyph::solid_color(YELLOW),
+            ],
         ]
         .into()
     }
     fn small_letter_frame() -> Frame {
         vec![
-            vec![Glyph::from_char('a'), Glyph::from_char('b')],
-            vec![Glyph::from_char('c'), Glyph::from_char('d')],
+            vec![DrawableGlyph::from_char('a'), DrawableGlyph::from_char('b')],
+            vec![DrawableGlyph::from_char('c'), DrawableGlyph::from_char('d')],
         ]
         .into()
     }
@@ -559,11 +567,11 @@ ghi",
         dbg!(&b);
         assert_eq!(frame, b);
 
-        *frame.grid[0][2].bg_color_mut() = named_colors::WHITE.into();
-        *frame.grid[0][2].fg_color_mut() = named_colors::RED.into();
+        *frame.grid[0][2].bg_color_mut() = WHITE.into();
+        *frame.grid[0][2].fg_color_mut() = RED.into();
 
-        *frame.grid[1][0].bg_color_mut() = named_colors::BLUE.into();
-        *frame.grid[2][2].fg_color_mut() = named_colors::GREEN.into();
+        *frame.grid[1][0].bg_color_mut() = BLUE.into();
+        *frame.grid[2][2].fg_color_mut() = GREEN.into();
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
         assert_eq!(frame, b);
@@ -589,6 +597,7 @@ ghi",
         assert_eq!(f1.size_rows_cols(), f2.size_rows_cols());
         assert_eq!(f2.get_xy([0, 0]).character, ' ');
 
+        dbg!(&f2);
         let s = f2.string_for_regular_display();
         let set_bg_code = "\u{1b}[38";
         let clear_bg_code = "\u{1b}[39m";
