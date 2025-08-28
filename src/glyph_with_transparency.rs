@@ -33,6 +33,9 @@ impl GlyphWithTransparency {
             fg_is_primary: false,
         }
     }
+    pub fn fg_only(c: char, fg: RGBA8) -> Self {
+        Self::new(c, fg, BLACK.with_alpha(0))
+    }
 
     pub fn from_char(c: char) -> Self {
         DrawableGlyph::from_char(c).into()
@@ -151,7 +154,7 @@ impl From<DrawableGlyph> for GlyphWithTransparency {
     fn from(value: DrawableGlyph) -> Self {
         Self::new(value.character, 
             match value.fg_color {
-            None => BLACK.with_alpha(0),
+            None => WHITE.with_alpha(255),
             Some(c) => c.into()
         }, 
             match value.bg_color {
