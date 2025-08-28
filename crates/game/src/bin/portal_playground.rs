@@ -1026,6 +1026,8 @@ mod tests {
         let mut game = Game::new_headless_one_to_one_square(2);
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
+        // dbg!(&frame);
+        // dbg!(&frame.grid);
         assert_frame_same_as_past!(frame, "a", true);
     }
     #[test]

@@ -146,7 +146,7 @@ impl Frame {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             *glyph.fg_color_mut() = WHITE.into();
-            *glyph.bg_color_mut() = BLACK.into();
+            *glyph.bg_color_mut() = BLACK.with_alpha(0);
         });
         f
     }
@@ -240,9 +240,9 @@ impl Frame {
                         x => panic!("Invalid escape code: {x:?}"),
                     }
 
-                    utf8_until_next.chars().for_each(|c| {
-                        glyphs_out.push(DrawableGlyph::new(c, fg, bg))
-                    });
+                    utf8_until_next
+                        .chars()
+                        .for_each(|c| glyphs_out.push(DrawableGlyph::new(c, fg, bg)));
                 }
                 glyphs_out
             })
@@ -455,9 +455,15 @@ impl From<Vec<Vec<DrawableGlyph>>> for Frame {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use pretty_assertions::assert_eq;
+    use rgb::RGBA8;
+
+    const code_for_set_fg: &str = "\u{1b}[38";
+    const code_for_set_bg: &str = "\u{1b}[48";
+    const code_for_clear_fg: &str = "\u{1b}[39m";
+    const code_for_clear_bg: &str = "\u{1b}[49m";
+
 
     fn small_color_frame() -> Frame {
         vec![
@@ -629,10 +635,6 @@ ghi",
             })
         });
 
-        const code_for_set_fg: &str = "\u{1b}[48";
-        const code_for_set_bg: &str = "\u{1b}[38";
-        const code_for_clear_fg: &str = "\u{1b}[49m";
-        const code_for_clear_bg: &str = "\u{1b}[39m";
 
         glyphs_and_strings.map(|row| {
             row.map(|(g, s)| {
@@ -656,6 +658,14 @@ ghi",
     }
     #[test]
     fn test_display() {
-        let frame = Frame::new_from_repeated_glyph(1,1, GlyphWithTransparency::new('a', RED.into(), RGBA8::transparent))
+        let frame =
+            Frame::new_from_repeated_glyph(1, 1, GlyphWithTransparency::fg_only('a', RED.into()));
+        let s = frame.string_for_regular_display();
+        dbg!(&frame);
+        dbg!(&s);
+        assert!(s.contains(code_for_set_fg));
+        assert!(s.contains(code_for_clear_fg));
+        assert!(!s.contains(code_for_set_bg));
+        // assert!(!s.contains(code_for_clear_bg));
     }
 }
