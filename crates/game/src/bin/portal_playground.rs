@@ -511,7 +511,7 @@ impl UiHandler {
         if let Some([row, col]) = self.last_mouse_screen_row_col {
             assert!(row > 0 && col > 0, "row: {row}, col: {col}");
             self.screen_buffer.grid[row as usize - 1][col as usize - 1] =
-                GlyphWithTransparency::solid_color(RED);
+                DrawableGlyph::solid_color(RED);
         }
     }
     pub fn draw_screen(&mut self) {
@@ -769,7 +769,7 @@ impl WorldState {
                                     debug_frame.set_by_double_wide_grid(
                                         camera_row,
                                         camera_col,
-                                        double_glyph.map(|g| g),
+                                        double_glyph.map(|g| g.to_drawable_with_transparent_as_default()),
                                     );
                                 });
                         }
@@ -779,7 +779,7 @@ impl WorldState {
                             .rev()
                             .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i]))).unwrap()
                         // glyph_layers_to_combine[0]
-                    }).flatten()
+                    }).flatten().map(|g| g.to_drawable_with_transparent_as_default())
                     .collect_vec()
             })
             .collect_vec()
@@ -1037,8 +1037,8 @@ mod tests {
         let frame = game.render_with_mouse(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
-        assert_ne!(frame.get_xy([2, 2]).bg_color(), RED.into());
-        assert_eq!(frame.get_xy([3, 2]).bg_color(), RED.into());
+        assert_ne!(frame.get_xy([2, 2]).bg_color, RED.into());
+        assert_eq!(frame.get_xy([3, 2]).bg_color, RED.into());
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1137,7 +1137,7 @@ mod tests {
             };
             let glyphs = game
                 .world_state
-                .render_one_view_of_a_square(&visible_portion);
+                .render_one_view_of_a_square(&visible_portion).map(|g|g.to_drawable_with_transparent_as_default());
             frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
         }
 
