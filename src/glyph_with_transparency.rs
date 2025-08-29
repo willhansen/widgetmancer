@@ -38,7 +38,7 @@ impl GlyphWithTransparency {
     }
 
     pub fn from_char(c: char) -> Self {
-        DrawableGlyph::from_char(c).into()
+        Self::from_drawable_with_default_as_white_on_transparent(DrawableGlyph::from_char(c))
     }
     pub fn with_primary_only(&self) -> Self {
         self.with_transparent_secondary()
@@ -137,10 +137,7 @@ impl GlyphWithTransparency {
             .with_primary_rgb(color)
             .with_bg_as_primary()
     }
-}
-
-impl Into<DrawableGlyph> for GlyphWithTransparency {
-    fn into(self) -> DrawableGlyph {
+    pub fn to_drawable_with_transparent_as_default(&self) -> DrawableGlyph {
         let fg = self.fg_color();
         let bg = self.bg_color();
         DrawableGlyph::new(
@@ -149,18 +146,27 @@ impl Into<DrawableGlyph> for GlyphWithTransparency {
             if bg.a == 0 { None } else { Some(bg.rgb()) },
         )
     }
-}
-impl From<DrawableGlyph> for GlyphWithTransparency {
-    fn from(value: DrawableGlyph) -> Self {
-        Self::new(value.character, 
-            match value.fg_color {
-            None => WHITE.with_alpha(255),
-            Some(c) => c.into()
-        }, 
-            match value.bg_color {
-            None => BLACK.with_alpha(0),
-            Some(c) => c.into()
-        }, 
+    pub fn from_drawable_with_default_as_transparent(drawable: DrawableGlyph) -> Self {
+        Self::from_drawable_with_default_as(drawable, BLACK.with_alpha(0), BLACK.with_alpha(0))
+    }
+    pub fn from_drawable_with_default_as_white_on_transparent(drawable: DrawableGlyph) -> Self {
+        Self::from_drawable_with_default_as(drawable, WHITE.with_alpha(255), BLACK.with_alpha(0))
+    }
+    fn from_drawable_with_default_as(
+        drawable: DrawableGlyph,
+        default_fg_color: RGBA8,
+        default_bg_color: RGBA8,
+    ) -> Self {
+        Self::new(
+            drawable.character,
+            match drawable.fg_color {
+                None => default_fg_color,
+                Some(c) => c.into(),
+            },
+            match drawable.bg_color {
+                None => default_bg_color,
+                Some(c) => c.into(),
+            },
         )
     }
 }
@@ -222,11 +228,6 @@ mod tests {
         assert_eq!(color_combine(a, b), b);
     }
 
-    #[test]
-    fn test_glyph_to_aglyph() {
-        let glyph = DrawableGlyph::from_char('a');
-        let b: GlyphWithTransparency = glyph.into();
-    }
     #[test]
     fn test_letter_over_letter() {
         let a = GlyphWithTransparency::from_char('a')

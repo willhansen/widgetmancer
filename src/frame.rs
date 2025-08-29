@@ -28,7 +28,7 @@ impl Frame {
         }
     }
     pub fn blank(width: usize, height: usize) -> Self {
-        let glyph: GlyphWithTransparency = DrawableGlyph::solid_color(BLACK).into();
+        let glyph = GlyphWithTransparency::transparent();
         Self::new_from_repeated_glyph(width, height, glyph)
     }
     pub fn transparent(width: usize, height: usize) -> Self {
@@ -47,7 +47,7 @@ impl Frame {
         let mut frame = Frame::blank(width, height);
         lines.into_iter().enumerate().for_each(|(row, line)| {
             line.chars().enumerate().for_each(|(col, char)| {
-                frame.grid[row][col] = DrawableGlyph::from_char(char).into()
+                frame.grid[row][col] = GlyphWithTransparency::from_char(char)
             })
         });
         frame
@@ -110,7 +110,7 @@ impl Frame {
                 break;
             }
             if row < self.height() && col < self.width() {
-                self.grid[row][col] = DrawableGlyph::from_char(char).into();
+                self.grid[row][col] = GlyphWithTransparency::from_char(char);
             }
         }
     }
@@ -210,7 +210,7 @@ impl Frame {
         let grid = input_string
             .lines()
             .map(|line| {
-                let mut glyphs_out = Vec::new();
+                let mut glyphs_out: Vec<GlyphWithTransparency> = Vec::new();
 
                 let mut fg: Option<RGB8> = None;
                 let mut bg: Option<RGB8> = None;
@@ -242,7 +242,7 @@ impl Frame {
 
                     utf8_until_next
                         .chars()
-                        .for_each(|c| glyphs_out.push(DrawableGlyph::new(c, fg, bg)));
+                        .for_each(|c| glyphs_out.push(GlyphWithTransparency::from_drawable_with_default_as_white_on_transparent(DrawableGlyph::new(c, fg, bg))));
                 }
                 glyphs_out
             })
@@ -259,7 +259,7 @@ impl Frame {
             .join("\n")
     }
     fn simple_raw_display_string(&self) -> String {
-        String::from_utf8(self.bytes_for_raw_display_over(&None)).unwrap()
+        self.string_for_raw_display_over(&None)
     }
     fn raw_string(&self, maybe_old_frame: &Option<Frame>, colored: bool) -> String {
         let mut output = String::new();
@@ -269,10 +269,12 @@ impl Frame {
         let mut prev_written_glyph: Option<DrawableGlyph> = None;
         for row in 0..self.height() {
             for col in 0..self.width() {
-                let new_glyph: DrawableGlyph = self.grid[row][col].into();
+                let new_glyph: DrawableGlyph =
+                    self.grid[row][col].to_drawable_with_transparent_as_default();
 
                 if let Some(old_frame) = maybe_old_frame {
-                    let old_glyph: DrawableGlyph = old_frame.grid[row][col].into();
+                    let old_glyph: DrawableGlyph =
+                        old_frame.grid[row][col].to_drawable_with_transparent_as_default();
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -320,9 +322,6 @@ impl Frame {
         output
     }
 
-    pub fn bytes_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> Vec<u8> {
-        self.raw_string(maybe_old_frame, true).into_bytes()
-    }
     pub fn string_for_raw_display_over(&self, maybe_old_frame: &Option<Frame>) -> String {
         self.raw_string(maybe_old_frame, true)
     }
@@ -422,34 +421,12 @@ impl std::fmt::Debug for Frame {
     }
 }
 
-impl From<Vec<Vec<DoubleDrawableGlyph>>> for Frame {
-    fn from(value: Vec<Vec<DoubleDrawableGlyph>>) -> Self {
-        value
-            .into_iter()
-            .map(|row| row.into_iter().flat_map(|dg| dg.into_iter()).collect_vec())
-            .collect_vec()
-            .into()
-    }
-}
 impl From<Vec<Vec<GlyphWithTransparency>>> for Frame {
     fn from(value: Vec<Vec<GlyphWithTransparency>>) -> Self {
         assert!(value.len() > 0);
         assert!(value[0].len() > 0);
         assert!(value.iter().map(|row| row.len()).all_equal());
         Frame { grid: value }
-    }
-}
-impl From<Vec<Vec<DrawableGlyph>>> for Frame {
-    fn from(value: Vec<Vec<DrawableGlyph>>) -> Self {
-        value
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|&g| GlyphWithTransparency::from(g))
-                    .collect_vec()
-            })
-            .collect_vec()
-            .into()
     }
 }
 
@@ -463,7 +440,6 @@ mod tests {
     const code_for_set_bg: &str = "\u{1b}[48";
     const code_for_clear_fg: &str = "\u{1b}[39m";
     const code_for_clear_bg: &str = "\u{1b}[49m";
-
 
     fn small_color_frame() -> Frame {
         vec![
@@ -578,6 +554,8 @@ ghi",
 
         *frame.grid[1][0].bg_color_mut() = BLUE.into();
         *frame.grid[2][2].fg_color_mut() = GREEN.into();
+        *frame.grid[0][1].fg_color_mut() = MAGENTA.into();
+        *frame.grid[0][1].bg_color_mut() = WHITE.with_alpha(0);
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
         assert_eq!(frame, b);
@@ -634,7 +612,6 @@ ghi",
                 (g, s)
             })
         });
-
 
         glyphs_and_strings.map(|row| {
             row.map(|(g, s)| {
