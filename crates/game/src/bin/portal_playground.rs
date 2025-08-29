@@ -912,7 +912,7 @@ impl WorldState {
 }
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
-    writable.write(&new_frame.bytes_for_raw_display_over(maybe_old_frame));
+    writable.write(&new_frame.string_for_raw_display_over(maybe_old_frame).into_bytes());
     writable.flush();
 }
 
