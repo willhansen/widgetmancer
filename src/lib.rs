@@ -221,14 +221,14 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
     let mut frame = Frame::from_plain_string(&display_string);
     for g in frame.glyphs() {
         if char_is_braille(g.character) {
-            g.primary_color = WHITE.into();
-            g.secondary_color = grey(20).into();
+            g.fg_color = None;
+            g.bg_color = grey(20).into();
         }
     }
     frame.string_for_regular_display()
 }
 
-pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTransparency> {
+pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<DrawableGlyph> {
     assert!(max_abs > 0.0, "{max_abs} > 0.0");
 
     let val_in_blocks = (val / max_abs) * height as f32;
@@ -236,12 +236,7 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
     let (num_full_blocks, maybe_last_glyph) = if val_in_blocks.abs() > max_abs {
         (
             height - 1,
-            Some(
-                GlyphWithTransparency::from_char('+')
-                    .with_bg_as_primary()
-                    .with_primary_rgb(WHITE)
-                    .with_transparent_secondary(),
-            ),
+            Some( DrawableGlyph::new('+', BLACK.into(), WHITE.into())),
         )
     } else {
         let num_full_blocks = val_in_blocks.trunc();
@@ -269,8 +264,7 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
                 _ => (
                     num_full_blocks,
                     Some(
-                        GlyphWithTransparency::from_char(remainder_character)
-                            .with_transparent_secondary(),
+                        DrawableGlyph::from_char(remainder_character) 
                     ),
                 ),
             }
@@ -278,13 +272,13 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<GlyphWithTran
     };
 
 
-    let full_block_glyph = GlyphWithTransparency::from_char(FULL_BLOCK);
+    let full_block_glyph = DrawableGlyph::from_char(FULL_BLOCK);
     let num_occupied_squares =num_full_blocks + if maybe_last_glyph.is_some() { 1 } else { 0 }; 
     let num_blanks = height - num_occupied_squares;
 
 
-    let mut out: Vec<GlyphWithTransparency> =
-        repeat_n(GlyphWithTransparency::transparent(), num_blanks)
+    let mut out: Vec<DrawableGlyph> =
+        repeat_n(DrawableGlyph::default(), num_blanks)
             .chain(once(maybe_last_glyph).filter_map(|x| x))
             .chain(repeat_n(full_block_glyph, num_full_blocks))
             .collect_vec();
@@ -351,7 +345,7 @@ pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Optio
     // dbg!(positive_height, negative_height, min, max, height_per_dist);
 
     let col_func = |val: f32| -> String {
-        let background_glyph = GlyphWithTransparency::from_char('.').with_transparent_secondary();
+        let background_glyph = DrawableGlyph::default();
         let col_glyphs = if val >= 0.0 {
             let pos_glyphs = val_to_column(val, positive_height, max);
             assert_eq!(pos_glyphs.len(), positive_height);

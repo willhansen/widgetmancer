@@ -14,25 +14,21 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Clone)]
 pub struct Frame {
-    pub grid: Vec<Vec<GlyphWithTransparency>>,
+    pub grid: Vec<Vec<DrawableGlyph>>,
 }
 
 impl Frame {
     pub fn new_from_repeated_glyph(
         width: usize,
         height: usize,
-        glyph: GlyphWithTransparency,
+        glyph: DrawableGlyph,
     ) -> Self {
         Self {
             grid: repeat_n(repeat_n(glyph, width).collect_vec(), height).collect_vec(),
         }
     }
     pub fn blank(width: usize, height: usize) -> Self {
-        let glyph = GlyphWithTransparency::transparent();
-        Self::new_from_repeated_glyph(width, height, glyph)
-    }
-    pub fn transparent(width: usize, height: usize) -> Self {
-        let glyph = GlyphWithTransparency::transparent();
+        let glyph = DrawableGlyph::default();
         Self::new_from_repeated_glyph(width, height, glyph)
     }
     pub fn save_to_file(&self, path: PathBuf) {
@@ -47,12 +43,12 @@ impl Frame {
         let mut frame = Frame::blank(width, height);
         lines.into_iter().enumerate().for_each(|(row, line)| {
             line.chars().enumerate().for_each(|(col, char)| {
-                frame.grid[row][col] = GlyphWithTransparency::from_char(char)
+                frame.grid[row][col] = DrawableGlyph::from_char(char)
             })
         });
         frame
     }
-    pub fn from_column_glyphs(col_glyphs: Vec<GlyphWithTransparency>) -> Self {
+    pub fn from_column_glyphs(col_glyphs: Vec<DrawableGlyph>) -> Self {
         col_glyphs.into_iter().map(|g| vec![g]).collect_vec().into()
     }
     pub fn width(&self) -> usize {
@@ -74,7 +70,7 @@ impl Frame {
     }
 
     // zero indexed
-    pub fn get_xy(&self, frame_point: [usize; 2]) -> GlyphWithTransparency {
+    pub fn get_xy(&self, frame_point: [usize; 2]) -> DrawableGlyph {
         let [x, y] = frame_point;
         assert!(
             x < self.width() && y < self.height(),
@@ -110,11 +106,11 @@ impl Frame {
                 break;
             }
             if row < self.height() && col < self.width() {
-                self.grid[row][col] = GlyphWithTransparency::from_char(char);
+                self.grid[row][col] = DrawableGlyph::from_char(char);
             }
         }
     }
-    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut GlyphWithTransparency> {
+    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut DrawableGlyph> {
         self.grid.iter_mut().flat_map(|row| row.iter_mut())
     }
 
@@ -122,31 +118,31 @@ impl Frame {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
-            *glyph.fg_color_mut() = BLACK.into();
+            glyph.fg_color = None;
         });
         f
     }
     pub fn fg_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            *glyph.bg_color_mut() = BLACK.into();
+            glyph.bg_color = None;
         });
         f
     }
-    pub fn fg_colors(&self) -> Self {
+    pub fn fg_colors_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
             glyph.character = ' ';
-            *glyph.bg_color_mut() = glyph.fg_color();
-            *glyph.fg_color_mut() = BLACK.into();
+            glyph.bg_color = glyph.fg_color;
+            glyph.fg_color = None;
         });
         f
     }
     pub fn characters_only(&self) -> Self {
         let mut f = self.clone();
         f.glyphs().for_each(|glyph| {
-            *glyph.fg_color_mut() = WHITE.into();
-            *glyph.bg_color_mut() = BLACK.with_alpha(0);
+            glyph.fg_color = None;
+            glyph.bg_color = None;
         });
         f
     }
@@ -159,11 +155,11 @@ impl Frame {
 
         for row in 0..self.height() {
             for col in 0..self.width() {
-                if out.grid[row][col].bg_color() == other.grid[row][col].bg_color() {
-                    *out.grid[row][col].bg_color_mut() = BLACK.into();
+                if out.grid[row][col].bg_color == other.grid[row][col].bg_color {
+                    out.grid[row][col].bg_color = None;
                 }
-                if out.grid[row][col].fg_color() == other.grid[row][col].fg_color() {
-                    *out.grid[row][col].fg_color_mut() = BLACK.into();
+                if out.grid[row][col].fg_color == other.grid[row][col].fg_color {
+                    out.grid[row][col].fg_color = None;
                 }
                 if out.grid[row][col].character == other.grid[row][col].character {
                     out.grid[row][col].character = ' ';
@@ -210,7 +206,7 @@ impl Frame {
         let grid = input_string
             .lines()
             .map(|line| {
-                let mut glyphs_out: Vec<GlyphWithTransparency> = Vec::new();
+                let mut glyphs_out: Vec<DrawableGlyph> = Vec::new();
 
                 let mut fg: Option<RGB8> = None;
                 let mut bg: Option<RGB8> = None;
@@ -242,7 +238,7 @@ impl Frame {
 
                     utf8_until_next
                         .chars()
-                        .for_each(|c| glyphs_out.push(GlyphWithTransparency::from_drawable_with_default_as_white_on_transparent(DrawableGlyph::new(c, fg, bg))));
+                        .for_each(|c| glyphs_out.push(DrawableGlyph::new(c, fg, bg)));
                 }
                 glyphs_out
             })
@@ -270,11 +266,11 @@ impl Frame {
         for row in 0..self.height() {
             for col in 0..self.width() {
                 let new_glyph: DrawableGlyph =
-                    self.grid[row][col].to_drawable_with_transparent_as_default();
+                    self.grid[row][col];
 
                 if let Some(old_frame) = maybe_old_frame {
                     let old_glyph: DrawableGlyph =
-                        old_frame.grid[row][col].to_drawable_with_transparent_as_default();
+                        old_frame.grid[row][col];
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -333,7 +329,7 @@ impl Frame {
         &mut self,
         row: usize,
         wide_col: usize,
-        val: DoubleGlyphWithTransparency,
+        val: DoubleDrawableGlyph,
     ) {
         let left_narrow_col = wide_col * 2;
         self.grid[row][left_narrow_col] = val[0];
@@ -401,7 +397,7 @@ impl std::fmt::Debug for Frame {
             &[
                 ("Full", self),
                 ("BG Colors", &self.bg_only()),
-                ("FG Colors", &self.fg_colors()),
+                ("FG Colors", &self.fg_colors_only()),
                 ("Characters", &self.characters_only()),
             ]
             .map(|(title, frame)| {
@@ -421,8 +417,8 @@ impl std::fmt::Debug for Frame {
     }
 }
 
-impl From<Vec<Vec<GlyphWithTransparency>>> for Frame {
-    fn from(value: Vec<Vec<GlyphWithTransparency>>) -> Self {
+impl From<Vec<Vec<DrawableGlyph>>> for Frame {
+    fn from(value: Vec<Vec<DrawableGlyph>>) -> Self {
         assert!(value.len() > 0);
         assert!(value[0].len() > 0);
         assert!(value.iter().map(|row| row.len()).all_equal());
@@ -549,13 +545,13 @@ ghi",
         dbg!(&b);
         assert_eq!(frame, b);
 
-        *frame.grid[0][2].bg_color_mut() = WHITE.into();
-        *frame.grid[0][2].fg_color_mut() = RED.into();
+        frame.grid[0][2].bg_color = WHITE.into();
+        frame.grid[0][2].fg_color = RED.into();
 
-        *frame.grid[1][0].bg_color_mut() = BLUE.into();
-        *frame.grid[2][2].fg_color_mut() = GREEN.into();
-        *frame.grid[0][1].fg_color_mut() = MAGENTA.into();
-        *frame.grid[0][1].bg_color_mut() = WHITE.with_alpha(0);
+        frame.grid[1][0].bg_color = BLUE.into();
+        frame.grid[2][2].fg_color = GREEN.into();
+        frame.grid[0][1].fg_color = MAGENTA.into();
+        frame.grid[0][1].bg_color = None;
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
         assert_eq!(frame, b);
@@ -573,70 +569,70 @@ ghi",
             .collect_vec();
         assert_eq!(contents, vec!["48;2;0;0;0", "38;2;255;255;255", "49", "39"]);
     }
-    #[test]
-    fn test_transparent_frame_to_string() {
-        let f1 = Frame::blank(3, 3);
-        let f2 = Frame::transparent(3, 3);
-        assert_ne!(f1, f2);
-        assert_eq!(f1.size_rows_cols(), f2.size_rows_cols());
-        assert_eq!(f2.get_xy([0, 0]).character, ' ');
+    // #[test]
+    // fn test_transparent_frame_to_string() {
+    //     let f1 = Frame::blank(3, 3);
+    //     let f2 = Frame::transparent(3, 3);
+    //     assert_ne!(f1, f2);
+    //     assert_eq!(f1.size_rows_cols(), f2.size_rows_cols());
+    //     assert_eq!(f2.get_xy([0, 0]).character, ' ');
 
-        dbg!(&f2);
-        let s = f2.string_for_regular_display();
-        let set_bg_code = "\u{1b}[38";
-        let clear_bg_code = "\u{1b}[39m";
-        assert!(!s.contains(set_bg_code));
-        assert!(s.contains(clear_bg_code));
-        s.lines().for_each(|line|
-            // reset bg at start of line, and also at end of line
-            // TODO: skip the end of line reset if not necessary
-            assert_eq!(line.matches(clear_bg_code).count(), 2));
-    }
-    #[test]
-    fn test_partial_transparency_conversion_to_display_string() {
-        let alphas: [u8; _] = [255, 127, 1, 0];
+    //     dbg!(&f2);
+    //     let s = f2.string_for_regular_display();
+    //     let set_bg_code = "\u{1b}[38";
+    //     let clear_bg_code = "\u{1b}[39m";
+    //     assert!(!s.contains(set_bg_code));
+    //     assert!(s.contains(clear_bg_code));
+    //     s.lines().for_each(|line|
+    //         // reset bg at start of line, and also at end of line
+    //         // TODO: skip the end of line reset if not necessary
+    //         assert_eq!(line.matches(clear_bg_code).count(), 2));
+    // }
+    // #[test]
+    // fn test_partial_transparency_conversion_to_display_string() {
+    //     let alphas: [u8; _] = [255, 127, 1, 0];
 
-        let reds = alphas.map(|a| RED.with_alpha(a));
-        let greens = alphas.map(|a| GREEN.with_alpha(a));
+    //     let reds = alphas.map(|a| RED.with_alpha(a));
+    //     let greens = alphas.map(|a| GREEN.with_alpha(a));
 
-        let fg_bgs = reds.map(|r| greens.map(|g| (r, g)));
+    //     let fg_bgs = reds.map(|r| greens.map(|g| (r, g)));
 
-        let glyphs = fg_bgs.map(|row| row.map(|(fg, bg)| GlyphWithTransparency::new('a', fg, bg)));
+    //     let glyphs = fg_bgs.map(|row| row.map(|(fg, bg)| GlyphWithTransparency::new('a', fg, bg)));
 
-        // dbg!(&glyphs);
+    //     // dbg!(&glyphs);
 
-        let glyphs_and_strings: [[(GlyphWithTransparency, String); _]; _] = glyphs.map(|row| {
-            row.map(|g| {
-                let s = Frame::new_from_repeated_glyph(1, 1, g).string_for_regular_display();
-                print!("{s}");
-                (g, s)
-            })
-        });
+    //     let glyphs_and_strings: [[(GlyphWithTransparency, String); _]; _] = glyphs.map(|row| {
+    //         row.map(|g| {
+    //             let s = Frame::new_from_repeated_glyph(1, 1, g).string_for_regular_display();
+    //             print!("{s}");
+    //             (g, s)
+    //         })
+    //     });
 
-        glyphs_and_strings.map(|row| {
-            row.map(|(g, s)| {
-                if g.fg_color().a > 0 {
-                    assert_eq!(s.matches(code_for_set_fg).count(), 1);
-                    assert_eq!(s.matches(code_for_clear_fg).count(), 1);
-                } else {
-                    assert_eq!(s.matches(code_for_set_fg).count(), 0);
-                    assert_eq!(s.matches(code_for_clear_fg).count(), 2); // TODO: reduce to 1
-                }
-                if g.bg_color().a > 0 {
-                    assert_eq!(s.matches(code_for_set_bg).count(), 1);
-                    assert_eq!(s.matches(code_for_clear_bg).count(), 1);
-                } else {
-                    assert_eq!(s.matches(code_for_set_bg).count(), 0);
-                    assert_eq!(s.matches(code_for_clear_bg).count(), 2); // TODO: reduce to 1
-                }
-            })
-        });
-        panic!();
-    }
+    //     glyphs_and_strings.map(|row| {
+    //         row.map(|(g, s)| {
+    //             if g.fg_color().a > 0 {
+    //                 assert_eq!(s.matches(code_for_set_fg).count(), 1);
+    //                 assert_eq!(s.matches(code_for_clear_fg).count(), 1);
+    //             } else {
+    //                 assert_eq!(s.matches(code_for_set_fg).count(), 0);
+    //                 assert_eq!(s.matches(code_for_clear_fg).count(), 2); // TODO: reduce to 1
+    //             }
+    //             if g.bg_color().a > 0 {
+    //                 assert_eq!(s.matches(code_for_set_bg).count(), 1);
+    //                 assert_eq!(s.matches(code_for_clear_bg).count(), 1);
+    //             } else {
+    //                 assert_eq!(s.matches(code_for_set_bg).count(), 0);
+    //                 assert_eq!(s.matches(code_for_clear_bg).count(), 2); // TODO: reduce to 1
+    //             }
+    //         })
+    //     });
+    //     panic!();
+    // }
     #[test]
     fn test_display() {
         let frame =
-            Frame::new_from_repeated_glyph(1, 1, GlyphWithTransparency::fg_only('a', RED.into()));
+            Frame::new_from_repeated_glyph(1, 1, DrawableGlyph::fg_only('a', RED.into()));
         let s = frame.string_for_regular_display();
         dbg!(&frame);
         dbg!(&s);
