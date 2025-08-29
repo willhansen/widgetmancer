@@ -701,6 +701,8 @@ impl WorldState {
             &portal_geometry,
         );
 
+        let shadow_glyph = GlyphWithTransparency::from_char('.');
+
         // Key is (depth, absolute_position, rotation from portal)
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
@@ -777,7 +779,7 @@ impl WorldState {
                         glyph_layers_to_combine
                             .into_iter()
                             .rev()
-                            .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i]))).unwrap()
+                            .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i]))).unwrap_or([shadow_glyph;2])
                         // glyph_layers_to_combine[0]
                     }).flatten().map(|g| g.to_drawable_with_transparent_as_default())
                     .collect_vec()
