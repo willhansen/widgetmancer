@@ -100,6 +100,10 @@ impl GlyphWithTransparency {
         self.with_primary_rgb(primary_rgb)
             .with_secondary_rgb(secondary_rgb)
     }
+    pub fn with_colors(&self, primary_color: RGBA8, secondary_color: RGBA8) -> Self {
+        self.with_primary_color(primary_color)
+            .with_secondary_color(secondary_color)
+    }
     pub fn over(&self, other: Self) -> Self {
         let mut out = self.clone();
         out.primary_color = color_combine(self.primary_color, other.primary_color);
@@ -234,7 +238,7 @@ mod tests {
             .with_primary_only()
             .with_primary_rgb(BLUE);
         let b = GlyphWithTransparency::from_char('b').with_primary_rgb(GREEN);
-        let c = GlyphWithTransparency::from_char('a').with_rgbs(BLUE, GREEN);
+        let c = GlyphWithTransparency::from_char('a').with_colors(BLUE.into(), GREEN.into());
         dbg!(&a, &b, &c);
         assert_eq!(a.over(b), c);
     }
@@ -254,17 +258,17 @@ mod tests {
         assert_eq!(a.over(b), c);
     }
     #[test]
-    fn test_multiply_partially_occluded_letter() {
+    fn test_stacked_partially_occluded_letter() {
         let mut a = GlyphWithTransparency::from_char(LOWER_HALF_BLOCK);
         a.secondary_color.a = 0;
         *a.primary_color.rgb_mut() = RED;
         let mut b = GlyphWithTransparency::from_char(RIGHT_HALF_BLOCK);
         b.secondary_color.a = 0;
         *b.primary_color.rgb_mut() = BLUE;
-        let mut c = GlyphWithTransparency::from_char('c').with_rgbs(PURPLE, GREEN);
+        let mut c = GlyphWithTransparency::from_char('c').with_colors(PURPLE.into(), GREEN.into());
         assert_eq!(
             a.over(b.over(c)),
-            GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_rgbs(RED, BLUE)
+            GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_colors(RED.into(), BLUE.into())
         );
     }
 }

@@ -18,11 +18,7 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new_from_repeated_glyph(
-        width: usize,
-        height: usize,
-        glyph: DrawableGlyph,
-    ) -> Self {
+    pub fn new_from_repeated_glyph(width: usize, height: usize, glyph: DrawableGlyph) -> Self {
         Self {
             grid: repeat_n(repeat_n(glyph, width).collect_vec(), height).collect_vec(),
         }
@@ -42,9 +38,9 @@ impl Frame {
         let width = lines.iter().map(|l| l.len()).max().unwrap();
         let mut frame = Frame::blank(width, height);
         lines.into_iter().enumerate().for_each(|(row, line)| {
-            line.chars().enumerate().for_each(|(col, char)| {
-                frame.grid[row][col] = DrawableGlyph::from_char(char)
-            })
+            line.chars()
+                .enumerate()
+                .for_each(|(col, char)| frame.grid[row][col] = DrawableGlyph::from_char(char))
         });
         frame
     }
@@ -206,12 +202,49 @@ impl Frame {
         let grid = input_string
             .lines()
             .map(|line| {
+                dbg!(&line);
                 let mut glyphs_out: Vec<DrawableGlyph> = Vec::new();
 
                 let mut fg: Option<RGB8> = None;
                 let mut bg: Option<RGB8> = None;
+                let mut start_byte_index: usize = 0;
+                let mut end_byte_index: usize;
 
-                let mut found_color_command_iter = escape_regex.captures_iter(line).peekable();
+                let matches = escape_regex.captures_iter(line).map(|cap| { cap.get(0).unwrap() }).collect_vec();
+
+                let span_starts = once(0).chain(matches.iter().map(|m| m.start())).collect_vec();
+                let span_ends = matches.iter().map(|m| m.start()).chain(once(line.len())).collect_vec();
+                let span_colors = once((fg, bg)).chain(matches.iter().map(|m| {
+                    asdfasdf
+                    let cmd_code = &color_command[..2];
+                    let rest_of_cmd = &color_command[2..];
+                    match cmd_code {
+                        fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                        bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                        fg_reset => fg = None,
+                        bg_reset => bg = None,
+                        x => panic!("Invalid escape code: {x:?}"),
+                    }
+
+                })).collect_vec();
+
+                matches.for_each(|the_match| {
+                    end_byte_index = the_match.start();
+
+                    
+                    // now have valid start, end, fg, and bg for text span until this matched
+                    // command.
+                    let text_until_next = &line[start_byte_index..end_byte_index];
+                    let utf8_until_next = String::from_utf8(text_until_next.into()).unwrap();
+
+
+                    // modify current colors based on command
+
+                    start_byte_index = the_match.end();
+
+                });
+                color_command_matches.into_iter().map()
+
                 while let Some(found_color_command) = found_color_command_iter.next() {
                     // let color_command = &line[found_color_command.range()];
                     let color_command = &found_color_command[1];
@@ -243,6 +276,7 @@ impl Frame {
                 glyphs_out
             })
             .collect_vec();
+        dbg!(&grid);
         grid.into()
     }
     fn non_raw_render_string(&self, _colored: bool) -> String {
@@ -257,20 +291,30 @@ impl Frame {
     fn simple_raw_display_string(&self) -> String {
         self.string_for_raw_display_over(&None)
     }
+    // Assumes cursor starts with default colors
     fn raw_string(&self, maybe_old_frame: &Option<Frame>, colored: bool) -> String {
         let mut output = String::new();
         let is_simple_draw_case = maybe_old_frame.is_none() && colored;
 
         let mut prev_written_row_col: Option<[usize; 2]> = None;
-        let mut prev_written_glyph: Option<DrawableGlyph> = None;
+        let mut fg: ORGB8 = None;
+        let mut bg: ORGB8 = None;
+        let mut neutralize_colors = |fg: &mut ORGB8, bg: &mut ORGB8, output: &mut String| {
+            if fg.is_some() {
+                *output += &DrawableGlyph::fg_color_reset_string();
+                *fg = None;
+            }
+            if bg.is_some() {
+                *output += &DrawableGlyph::bg_color_reset_string();
+                *bg = None;
+            }
+        };
         for row in 0..self.height() {
             for col in 0..self.width() {
-                let new_glyph: DrawableGlyph =
-                    self.grid[row][col];
+                let new_glyph: DrawableGlyph = self.grid[row][col];
 
                 if let Some(old_frame) = maybe_old_frame {
-                    let old_glyph: DrawableGlyph =
-                        old_frame.grid[row][col];
+                    let old_glyph: DrawableGlyph = old_frame.grid[row][col];
                     let this_square_is_same = new_glyph == old_glyph;
                     if this_square_is_same {
                         continue;
@@ -289,7 +333,7 @@ impl Frame {
                     // Do nothing
                 } else if should_do_linewrap {
                     if is_simple_draw_case {
-                        output += &DrawableGlyph::color_reset_string();
+                        neutralize_colors(&mut fg, &mut bg, &mut output);
                     }
                     output += "\n\r";
                 } else if down_right {
@@ -299,21 +343,24 @@ impl Frame {
                         &termion::cursor::Goto((col + 1) as u16, (row + 1) as u16).to_string();
                 }
 
-                output += &if colored {
-                    if should_do_linewrap {
-                        new_glyph.to_string_after(None)
-                    } else {
-                        new_glyph.to_string_after(prev_written_glyph)
+                if colored {
+                    if new_glyph.fg_color.is_some() && new_glyph.fg_color != fg {
+                        output += &new_glyph.fg_color_string();
+                        fg = new_glyph.fg_color;
                     }
-                } else {
-                    new_glyph.character.to_string()
-                };
-                prev_written_glyph = Some(new_glyph);
+                    if new_glyph.bg_color.is_some() && new_glyph.bg_color != bg {
+                        output += &new_glyph.bg_color_string();
+                        bg = new_glyph.bg_color;
+                    }
+                }
+
+                output += &new_glyph.character.to_string();
+
                 prev_written_row_col = Some([row, col]);
             }
         }
         if is_simple_draw_case {
-            output += &DrawableGlyph::color_reset_string();
+            neutralize_colors(&mut fg, &mut bg, &mut output);
         }
         output
     }
@@ -631,8 +678,7 @@ ghi",
     // }
     #[test]
     fn test_display() {
-        let frame =
-            Frame::new_from_repeated_glyph(1, 1, DrawableGlyph::fg_only('a', RED.into()));
+        let frame = Frame::new_from_repeated_glyph(1, 1, DrawableGlyph::fg_only('a', RED.into()));
         let s = frame.string_for_regular_display();
         dbg!(&frame);
         dbg!(&s);

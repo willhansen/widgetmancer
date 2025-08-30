@@ -222,7 +222,7 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
     for g in frame.glyphs() {
         if char_is_braille(g.character) {
             g.fg_color = None;
-            g.bg_color = grey(20).into();
+            g.bg_color = None;
         }
     }
     frame.string_for_regular_display()
