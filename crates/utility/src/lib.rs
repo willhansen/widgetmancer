@@ -1,12 +1,15 @@
+#![allow(dead_code)]
+#![allow(deprecated)]
+
 extern crate num;
 
-#[feature(unboxed_closures)]
+
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
-use std::ops::{Add, AddAssign, Neg, Sub};
+use std::ops::{Add, Neg, Sub};
 
 use derive_more::{AddAssign, Constructor, Neg};
 use euclid::approxeq::ApproxEq;

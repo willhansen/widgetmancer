@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(deprecated)]
+
 use color_hex::color_from_hex;
 use euclid::point2;
 use game::fov_stuff::{
@@ -505,6 +508,7 @@ impl UiHandler {
             assert!(col_1i <= self.width() as i32, "{col_1i}");
             let [row, col] = [row_1i as usize - 1, col_1i as usize - 1];
             self.screen_buffer.grid[row][col].character = the_char;
+            self.screen_buffer.grid[row][col].fg_color = BLACK.into();
         }
     }
     pub fn draw_mouse_square(&mut self) {
