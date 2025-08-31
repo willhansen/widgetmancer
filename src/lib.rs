@@ -295,10 +295,10 @@ pub fn signed_bargraph_frame(data: &[f32], height: usize, min: Option<f32>, max:
     max.map(|x| assert!(x >= 0.0));
 
     let min = min.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.min(b)).unwrap());
-    let max = max.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.max(b)).unwrap());
+    let mut max = max.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.max(b)).unwrap());
 
     if max == min {
-        panic!("Graph is flat");
+        max = 1.0;
     }
 
     // zero must fall on a character boundary, because that's where colors switch
@@ -367,9 +367,9 @@ pub fn signed_bargraph_frame(data: &[f32], height: usize, min: Option<f32>, max:
     let mut frame: Frame = frame.with_border().widened(right_margin);
 
     let margin_col = frame.width()-1-right_margin;
+    frame.draw_text("▔ 0.0".to_string(), [positive_height+1,margin_col+1]);
     frame.draw_text(format!("┬─ {max}"), [0,margin_col]);
     frame.draw_text(format!("┴─ {min}"), [frame.height()-1,margin_col]);
-    frame.draw_text("▔ 0.0".to_string(), [positive_height+1,margin_col+1]);
     frame
 
 
