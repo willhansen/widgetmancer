@@ -37,7 +37,7 @@ impl Frame {
     pub fn from_plain_string(s: &str) -> Self {
         let lines = s.lines().collect_vec();
         let height = lines.len();
-        let width = lines.iter().map(|l| l.len()).max().unwrap();
+        let width = lines.iter().map(|l| l.chars().count()).max().unwrap();
         let mut frame = Frame::blank(width, height);
         lines.into_iter().enumerate().for_each(|(row, line)| {
             line.chars()
