@@ -218,7 +218,7 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
         })
         .collect();
     let display_string = char_map_to_string(char_map);
-    let mut frame = Frame::from_plain_string(&display_string);
+    let mut frame = Frame::from_string(&display_string);
     for g in frame.glyphs_mut() {
         if char_is_braille(g.character) {
             g.fg_color = None;
@@ -290,7 +290,7 @@ pub fn val_to_column(val: f32, height: usize, max_abs: f32) -> Vec<DrawableGlyph
     out
 }
 
-pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Option<f32>) -> String {
+pub fn signed_bargraph_frame(data: &[f32], height: usize, min: Option<f32>, max: Option<f32>) -> Frame {
     min.map(|x| assert!(x <= 0.0));
     max.map(|x| assert!(x >= 0.0));
 
@@ -298,7 +298,7 @@ pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Optio
     let max = max.unwrap_or_else(|| data.iter().cloned().reduce(|a, b| a.max(b)).unwrap());
 
     if max == min {
-        return "Graph is flat".to_string();
+        panic!("Graph is flat");
     }
 
     // zero must fall on a character boundary, because that's where colors switch
@@ -344,49 +344,38 @@ pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Optio
 
     // dbg!(positive_height, negative_height, min, max, height_per_dist);
 
-    let col_func = |val: f32| -> String {
+    let col_glyphs = |val: f32| -> Vec<DrawableGlyph> {
         let background_glyph = DrawableGlyph::default();
+        let pos_glyphs;
+        let neg_glyphs;
         let col_glyphs = if val >= 0.0 {
-            let pos_glyphs = val_to_column(val, positive_height, max);
+            pos_glyphs = val_to_column(val, positive_height, max);
             assert_eq!(pos_glyphs.len(), positive_height);
-            let neg_glyphs = repeat_n(background_glyph, negative_height);
-            pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
+            neg_glyphs = repeat_n(background_glyph, negative_height).collect_vec();
         } else {
-            let pos_glyphs = repeat_n(background_glyph, positive_height);
-            let neg_glyphs = val_to_column(val, negative_height, min.abs());
+            pos_glyphs = repeat_n(background_glyph, positive_height).collect_vec();
+            neg_glyphs = val_to_column(val, negative_height, min.abs());
             assert_eq!(neg_glyphs.len(), negative_height);
-            pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
         };
-        col_glyphs.into_iter().map(|g| g.to_string()).join("\n")
+        pos_glyphs.into_iter().chain(neg_glyphs).collect_vec()
     };
 
-    let columns = data.iter().map(|x| col_func(*x)).collect_vec();
-    let graph = horiz_concat_equal_height_strings(&columns, 0).framed();
+    let columns = data.iter().map(|x| col_glyphs(*x)).collect_vec();
+    let grid = transpose_grid(&columns);
+    let frame: Frame = grid.into();
+    let right_margin = 7;
+    let mut frame: Frame = frame.with_border().widened(right_margin);
 
-    let graph = graph
-        .lines()
-        .enumerate()
-        .map(|(i, l)| {
-            let appendish = |s: String| {
-                l.chars()
-                    .into_iter()
-                    .take(data.len() + 1)
-                    .collect::<String>()
-                    + &s
-            };
-            if i == 0 {
-                appendish(format!("┬─{max}"))
-            } else if i == height + 1 {
-                appendish(format!("┴─{min}"))
-            } else if i == positive_height {
-                appendish("🭽▔0.0".to_string())
-            } else {
-                l.to_string()
-            }
-        })
-        .join("\n");
+    let margin_col = frame.width()-1-right_margin;
+    frame.draw_text(format!("┬─ {max}"), [0,margin_col]);
+    frame.draw_text(format!("┴─ {min}"), [frame.height()-1,margin_col]);
+    frame.draw_text("▔ 0.0".to_string(), [positive_height+1,margin_col+1]);
+    frame
 
-    format!("{graph}")
+
+}
+pub fn signed_bargraph(data: &[f32], height: usize, min: Option<f32>, max: Option<f32>) -> String {
+    signed_bargraph_frame(data, height, min, max).string_for_regular_display()
 }
 
 pub fn bargraph(data: &[f32], height: usize, max: Option<f32>) -> String {
@@ -521,7 +510,7 @@ pub mod test_utils {
         }
 
         let correct_string = std::fs::read_to_string(path.clone()).expect(
-        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate:?}"),
+        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate}"),
         );
         Some(correct_string)
 
@@ -571,7 +560,7 @@ pub mod test_utils {
 
             let f = if verbose {
                 |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", 
-                    format!("{:?}", &frame).indent(), 
+                    format!("{}", &frame.string_for_regular_display()).indent(), 
                     frame.escaped_regular_display_string().indent(), frame.readable_string().indent())
             } else {
                 |frame: &Frame| format!("Frame:\n{:?}\n", &frame)
@@ -688,6 +677,15 @@ mod tests {
         assert_eq!(frame.get_xy([0,1]).character, LOWER_HALF_BLOCK);
         assert_eq!(frame.get_xy([0,0]).character, FULL_BLOCK);
         assert_frame_same_as_past!(frame, "a", true);
+    }
+    #[test]
+    fn test_signed_bargraph() {
+        let vals = [0.2, 1.0, -0.5, -0.6, 0.7];
+        let bargraph_string = signed_bargraph(&vals, 5, None, None);
+        let bargraph_frame = Frame::from_string(&bargraph_string);
+        // println!("{}",bargraph_string);
+        // dbg!(&bargraph_frame);
+        assert_frame_same_as_past!(bargraph_frame, "a", true);
     }
 
 }
