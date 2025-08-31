@@ -1696,6 +1696,17 @@ pub fn trunceil(x: f32) -> f32 {
     }
 }
 
+pub fn transpose_grid<T: Copy>(grid: &Vec<Vec<T>>) -> Vec<Vec<T>> {
+    let height = grid.len();
+    let width = grid[0].len();
+
+    (0..width).map(|col| {
+        (0..height).map(|row| {
+            grid[row][col]
+        }).collect_vec()
+    }).collect_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use ntest::{assert_about_eq, assert_false};
