@@ -129,7 +129,7 @@ impl DrawableGlyph {
         color::Bg(color::Reset).to_string() + &color::Fg(color::Reset).to_string()
     }
 
-    pub fn custom_to_string(&self) -> String {
+    pub fn render(&self) -> String {
         self.color_string() + &self.character.to_string() + &DrawableGlyph::color_reset_string()
     }
     pub fn to_string_after(&self, prev: Option<Self>) -> String {
@@ -270,6 +270,13 @@ impl DrawableGlyph {
     pub fn solid_color(color: RGB8) -> DrawableGlyph {
         Self::solid_bg(color)
     }
+    pub fn solid_maybe_color(color: ORGB8) -> DrawableGlyph {
+        DrawableGlyph {
+            character: SPACE,
+            fg_color: None,
+            bg_color: color,
+        }
+    }
 
     pub fn get_solid_color(&self) -> Option<ORGB8> {
         if KNOWN_FG_ONLY_CHARS.contains(&self.character) {
@@ -404,19 +411,19 @@ impl Debug for DrawableGlyph {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "char: {}\n\
-             fg: {:?}\n\
-             bg: {:?}",
-            self.character,
-            self.fg_color.map(|c| rgb_to_string(c)),
-            self.bg_color.map(|c| rgb_to_string(c)),
+            // "[{}|fg:{}|bg:{}|char:{}]",
+            "[{}|{}|{}|{}]",
+            self.render(),
+            Self::from_char(self.character).render(),
+            Self::solid_maybe_color(self.fg_color).render(),
+            Self::solid_maybe_color(self.bg_color).render(),
         )
     }
 }
 
 impl Display for DrawableGlyph {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.custom_to_string())
+        write!(f, "{}", self.render())
     }
 }
 

@@ -7,9 +7,11 @@ use itertools::*;
 
 use itertools::Itertools;
 use rgb::RGB8;
+use utility::ToDebug;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Write;
+use std::iter::once;
 use std::path::PathBuf;
 
 #[derive(PartialEq, Clone)]
@@ -202,81 +204,61 @@ impl Frame {
         let grid = input_string
             .lines()
             .map(|line| {
-                dbg!(&line);
                 let mut glyphs_out: Vec<DrawableGlyph> = Vec::new();
 
+                // spans of text do not overlap with commands
+
+                let (full_matches, internal_matches): (Vec<_>, Vec<_>) = escape_regex
+                    .captures_iter(line)
+                    .map(|cap| (cap.get(0).unwrap(), cap.get(1).unwrap())).unzip();
+
+                let span_start_bytes_indexes = once(0)
+                    .chain(full_matches.iter().map(|m| m.end()))
+                    .collect_vec();
+                let span_end_byte_indexes = full_matches
+                    .iter()
+                    .map(|m| m.start())
+                    .chain(once(line.len()))
+                    .collect_vec();
                 let mut fg: Option<RGB8> = None;
                 let mut bg: Option<RGB8> = None;
-                let mut start_byte_index: usize = 0;
-                let mut end_byte_index: usize;
+                let span_colors = once((None, None))
+                    .chain(internal_matches.iter().map(|m| {
+                        let color_command = m.as_str();
+                        let cmd_code = &color_command[..2];
+                        let rest_of_cmd = &color_command[2..];
+                        match cmd_code {
+                            fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                            bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                            fg_reset => fg = None,
+                            bg_reset => bg = None,
+                            x => panic!("Invalid escape code: {x:?}"),
+                        }
+                        (fg, bg)
+                    }))
+                    .collect_vec();
 
-                let matches = escape_regex.captures_iter(line).map(|cap| { cap.get(0).unwrap() }).collect_vec();
+                let glyphs_for_line = span_start_bytes_indexes
+                    .into_iter()
+                    .zip(span_end_byte_indexes)
+                    .zip(span_colors)
+                    .map(|((start, end), (fg, bg))| {
+                        // now have valid start, end, fg, and bg for text span until this matched
+                        // command.
+                        let text_until_next = &line[start..end];
+                        let utf8_until_next = String::from_utf8(text_until_next.into()).unwrap();
 
-                let span_starts = once(0).chain(matches.iter().map(|m| m.start())).collect_vec();
-                let span_ends = matches.iter().map(|m| m.start()).chain(once(line.len())).collect_vec();
-                let span_colors = once((fg, bg)).chain(matches.iter().map(|m| {
-                    asdfasdf
-                    let cmd_code = &color_command[..2];
-                    let rest_of_cmd = &color_command[2..];
-                    match cmd_code {
-                        fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                        bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                        fg_reset => fg = None,
-                        bg_reset => bg = None,
-                        x => panic!("Invalid escape code: {x:?}"),
-                    }
-
-                })).collect_vec();
-
-                matches.for_each(|the_match| {
-                    end_byte_index = the_match.start();
-
-                    
-                    // now have valid start, end, fg, and bg for text span until this matched
-                    // command.
-                    let text_until_next = &line[start_byte_index..end_byte_index];
-                    let utf8_until_next = String::from_utf8(text_until_next.into()).unwrap();
-
-
-                    // modify current colors based on command
-
-                    start_byte_index = the_match.end();
-
-                });
-                color_command_matches.into_iter().map()
-
-                while let Some(found_color_command) = found_color_command_iter.next() {
-                    // let color_command = &line[found_color_command.range()];
-                    let color_command = &found_color_command[1];
-
-                    let end = if let Some(next_capture) = found_color_command_iter.peek() {
-                        next_capture.get(0).unwrap().start()
-                    } else {
-                        line.len()
-                    };
-
-                    let text_until_next = &line[found_color_command.get(0).unwrap().end()..end];
-                    let utf8_until_next = String::from_utf8(text_until_next.into()).unwrap();
-
-                    // modify current colors based on command
-                    let cmd_code = &color_command[..2];
-                    let rest_of_cmd = &color_command[2..];
-                    match cmd_code {
-                        fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                        bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                        fg_reset => fg = None,
-                        bg_reset => bg = None,
-                        x => panic!("Invalid escape code: {x:?}"),
-                    }
-
-                    utf8_until_next
-                        .chars()
-                        .for_each(|c| glyphs_out.push(DrawableGlyph::new(c, fg, bg)));
-                }
-                glyphs_out
+                        let glyphs_for_span = utf8_until_next
+                            .chars()
+                            // .map(move |c| DrawableGlyph::new(c, fg, bg)).collect_vec();
+                            .map(move |c| dbg!(DrawableGlyph::new(c, fg, bg))).collect_vec();
+                        glyphs_for_span
+                    })
+                    .flatten()
+                    .collect_vec();
+                glyphs_for_line
             })
             .collect_vec();
-        dbg!(&grid);
         grid.into()
     }
     fn non_raw_render_string(&self, _colored: bool) -> String {
@@ -455,12 +437,12 @@ impl std::fmt::Debug for Frame {
             5,
         );
 
-        // f.write_str(&format!(
-        //     "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
-        //     display_string_to_readable_string(self.non_raw_render_string(true)),
-        //     self.simple_raw_display_string().to_debug(),
-        // ))
-        f.write_str(&format!("\n{s}\n"))
+        f.write_str(&format!(
+            "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
+            display_string_to_readable_string(self.non_raw_render_string(true)),
+            self.escaped_regular_display_string(),
+        ))
+        // f.write_str(&format!("\n{s}\n"))
     }
 }
 
@@ -468,7 +450,7 @@ impl From<Vec<Vec<DrawableGlyph>>> for Frame {
     fn from(value: Vec<Vec<DrawableGlyph>>) -> Self {
         assert!(value.len() > 0);
         assert!(value[0].len() > 0);
-        assert!(value.iter().map(|row| row.len()).all_equal());
+        assert!(value.iter().map(|row| row.len()).all_equal(), "{value:#?}");
         Frame { grid: value }
     }
 }
@@ -587,9 +569,7 @@ aaa121
 def
 ghi",
         );
-        dbg!(&frame);
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
-        dbg!(&b);
         assert_eq!(frame, b);
 
         frame.grid[0][2].bg_color = WHITE.into();
@@ -601,6 +581,8 @@ ghi",
         frame.grid[0][1].bg_color = None;
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
+        dbg!(&b, &frame);
+        assert_eq!(frame.escaped_regular_display_string(), b.escaped_regular_display_string());
         assert_eq!(frame, b);
     }
     #[test]
