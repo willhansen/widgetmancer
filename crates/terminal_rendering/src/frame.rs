@@ -34,7 +34,7 @@ impl Frame {
             .unwrap()
             .write_all(&self.string_for_regular_display().as_bytes());
     }
-    pub fn from_plain_string(s: &str) -> Self {
+    pub fn from_string(s: &str) -> Self {
         let lines = s.lines().collect_vec();
         let height = lines.len();
         let width = lines.iter().map(|l| l.chars().count()).max().unwrap();
@@ -95,6 +95,14 @@ impl Frame {
                 self.grid[row][col] = other.grid[other_row][other_col];
             }
         }
+    }
+    pub fn resized_by_delta(&self, d_left: i32, d_right: i32, d_bottom: i32, d_top: i32 ) -> Self {
+        todo!();
+    }
+    pub fn widened(&self, n: usize) -> Self {
+        let newglyph = DrawableGlyph::default();
+        self.grid.iter().map(|row| row.iter().cloned().chain(repeat_n(newglyph, n)).collect_vec()).collect_vec().into()
+
     }
     pub fn draw_text(&mut self, txt: String, rowcol: [usize; 2]) {
         for (i, char) in txt.chars().enumerate() {
@@ -170,6 +178,10 @@ impl Frame {
         out
     }
 
+    pub fn with_border(&self) -> Self {
+        Self::from_string(&self.string_for_regular_display().framed())
+
+    }
     pub fn framed(&self) -> String {
         self.string_for_regular_display().framed()
     }
@@ -524,17 +536,17 @@ mod tests {
     }
     #[test]
     fn test_render_string_directly_below() {
-        let frame_a = Frame::from_plain_string(
+        let frame_a = Frame::from_string(
             "aaa111
 aaa111
 ",
         );
-        let frame_b = Frame::from_plain_string(
+        let frame_b = Frame::from_string(
             "aaa211
 aaa211
 ",
         );
-        let frame_c = Frame::from_plain_string(
+        let frame_c = Frame::from_string(
             "aaa211
 aaa121
 ",
@@ -567,7 +579,7 @@ aaa121
     }
     #[test]
     fn test_frame_to_regular_display_string_back_to_frame() {
-        let mut frame = Frame::from_plain_string(
+        let mut frame = Frame::from_string(
             "abc
 def
 ghi",
@@ -671,5 +683,14 @@ ghi",
         assert!(s.contains(code_for_clear_fg));
         assert!(!s.contains(code_for_set_bg));
         // assert!(!s.contains(code_for_clear_bg));
+    }
+    #[test]
+    fn test_framed_string_same_as_frame_with_border() {
+        let s = "abc
+def
+ghi";
+        let frame = Frame::from_string(s);
+        assert_eq!(s.framed(), frame.with_border().string_for_regular_display());
+        assert_eq!(Frame::from_string(&s.framed()), frame.with_border());
     }
 }

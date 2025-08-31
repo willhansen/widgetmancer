@@ -1292,7 +1292,6 @@ mod tests {
         );
         assert_frame_same_as_past!(frame, "a", true);
     }
-    // #[ignore]
     #[test]
     fn test_render_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_one_to_one_square(3);
@@ -1313,7 +1312,7 @@ mod tests {
         assert!(xy.dist([3.0, 1.0]) < 0.1, "{xy:?}");
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_smoothed_mouse_motion_accuracy() {
         let path_funcs: &[(&str, fn(f32) -> FPoint)] = &[
