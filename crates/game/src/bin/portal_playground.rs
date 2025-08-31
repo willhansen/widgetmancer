@@ -356,6 +356,7 @@ mod camera_tests {
 
 struct UiHandler {
     pub start_time: Instant,
+    // newest events are added via `push_back`
     pub event_log: VecDeque<(f32, Event)>,
     // 1-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
@@ -387,8 +388,20 @@ impl UiHandler {
         Some(smoothed_mouse_position(&formatted, t - t0))
     }
 
+    // time and screen positions of square entry events.  Including intial click.
+    // Does not extend past last mouse click
     fn recent_mouse_screen_char_entry_events_row_col(&self) -> Vec<(f32, u16, u16)> {
-        self.event_log
+        let mut mouse_events_since_last_release = self
+            .event_log
+            .iter()
+            .rev() // newer to older
+            .take_while(|(_t, e)| {
+                !matches!(e, Event::Mouse(termion::event::MouseEvent::Release(_, _)))
+            })
+            .collect_vec();
+        mouse_events_since_last_release.reverse(); // older to newer
+
+        mouse_events_since_last_release
             .iter()
             .filter_map(|(t, e)| {
                 let (row, col) = match e {
@@ -775,7 +788,8 @@ impl WorldState {
                                     debug_frame.set_by_double_wide_grid(
                                         camera_row,
                                         camera_col,
-                                        double_glyph.map(|g| g.to_drawable_with_transparent_as_default()),
+                                        double_glyph
+                                            .map(|g| g.to_drawable_with_transparent_as_default()),
                                     );
                                 });
                         }
@@ -783,9 +797,12 @@ impl WorldState {
                         glyph_layers_to_combine
                             .into_iter()
                             .rev()
-                            .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i]))).unwrap_or([shadow_glyph;2])
+                            .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i])))
+                            .unwrap_or([shadow_glyph; 2])
                         // glyph_layers_to_combine[0]
-                    }).flatten().map(|g| g.to_drawable_with_transparent_as_default())
+                    })
+                    .flatten()
+                    .map(|g| g.to_drawable_with_transparent_as_default())
                     .collect_vec()
             })
             .collect_vec()
@@ -918,7 +935,11 @@ impl WorldState {
 }
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
-    writable.write(&new_frame.string_for_raw_display_over(maybe_old_frame).into_bytes());
+    writable.write(
+        &new_frame
+            .string_for_raw_display_over(maybe_old_frame)
+            .into_bytes(),
+    );
     writable.flush();
 }
 
@@ -1143,7 +1164,8 @@ mod tests {
             };
             let glyphs = game
                 .world_state
-                .render_one_view_of_a_square(&visible_portion).map(|g|g.to_drawable_with_transparent_as_default());
+                .render_one_view_of_a_square(&visible_portion)
+                .map(|g| g.to_drawable_with_transparent_as_default());
             frame.set_by_double_wide_grid(1, 2 * i as usize + 1, glyphs);
         }
 
