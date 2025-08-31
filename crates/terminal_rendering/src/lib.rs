@@ -219,7 +219,7 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
         .collect();
     let display_string = char_map_to_string(char_map);
     let mut frame = Frame::from_plain_string(&display_string);
-    for g in frame.glyphs() {
+    for g in frame.glyphs_mut() {
         if char_is_braille(g.character) {
             g.fg_color = None;
             g.bg_color = None;

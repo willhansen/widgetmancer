@@ -108,13 +108,16 @@ impl Frame {
             }
         }
     }
-    pub fn glyphs(&mut self) -> impl Iterator<Item = &mut DrawableGlyph> {
+    pub fn glyphs_mut(&mut self) -> impl Iterator<Item = &mut DrawableGlyph> {
         self.grid.iter_mut().flat_map(|row| row.iter_mut())
+    }
+    pub fn glyphs(& self) -> impl Iterator<Item = &DrawableGlyph> {
+        self.grid.iter().flat_map(|row| row.iter())
     }
 
     pub fn bg_only(&self) -> Self {
         let mut f = self.clone();
-        f.glyphs().for_each(|glyph| {
+        f.glyphs_mut().for_each(|glyph| {
             glyph.character = ' ';
             glyph.fg_color = None;
         });
@@ -122,14 +125,14 @@ impl Frame {
     }
     pub fn fg_only(&self) -> Self {
         let mut f = self.clone();
-        f.glyphs().for_each(|glyph| {
+        f.glyphs_mut().for_each(|glyph| {
             glyph.bg_color = None;
         });
         f
     }
     pub fn fg_colors_only(&self) -> Self {
         let mut f = self.clone();
-        f.glyphs().for_each(|glyph| {
+        f.glyphs_mut().for_each(|glyph| {
             glyph.character = ' ';
             glyph.bg_color = glyph.fg_color;
             glyph.fg_color = None;
@@ -138,7 +141,7 @@ impl Frame {
     }
     pub fn characters_only(&self) -> Self {
         let mut f = self.clone();
-        f.glyphs().for_each(|glyph| {
+        f.glyphs_mut().for_each(|glyph| {
             glyph.fg_color = None;
             glyph.bg_color = None;
         });
@@ -250,8 +253,8 @@ impl Frame {
 
                         let glyphs_for_span = utf8_until_next
                             .chars()
-                            // .map(move |c| DrawableGlyph::new(c, fg, bg)).collect_vec();
-                            .map(move |c| dbg!(DrawableGlyph::new(c, fg, bg))).collect_vec();
+                            .map(move |c| DrawableGlyph::new(c, fg, bg)).collect_vec();
+                            // .map(move |c| dbg!(DrawableGlyph::new(c, fg, bg))).collect_vec();
                         glyphs_for_span
                     })
                     .flatten()
@@ -326,11 +329,11 @@ impl Frame {
                 }
 
                 if colored {
-                    if new_glyph.fg_color.is_some() && new_glyph.fg_color != fg {
+                    if  new_glyph.fg_color != fg {
                         output += &new_glyph.fg_color_string();
                         fg = new_glyph.fg_color;
                     }
-                    if new_glyph.bg_color.is_some() && new_glyph.bg_color != bg {
+                    if  new_glyph.bg_color != bg {
                         output += &new_glyph.bg_color_string();
                         bg = new_glyph.bg_color;
                     }
@@ -581,7 +584,7 @@ ghi",
         frame.grid[0][1].bg_color = None;
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
-        dbg!(&b, &frame);
+        &frame.glyphs().for_each(|x|{dbg!(x);});
         assert_eq!(frame.escaped_regular_display_string(), b.escaped_regular_display_string());
         assert_eq!(frame, b);
     }
