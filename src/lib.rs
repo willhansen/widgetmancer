@@ -1767,7 +1767,7 @@ mod tests {
     }
 
     #[test]
-    fn test_line_intersections_with_square_are_in_same_order_as_input_line__vertical_line_on_left_edge(
+    fn test_line_intersections_with_square_are_in_same_order_as_input_line_vertical_line_on_left_edge(
     ) {
         let input_line: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(-0.5, -0.5), point2(-0.5, 0.5));
@@ -1777,7 +1777,7 @@ mod tests {
     }
 
     #[test]
-    fn test_same_side_of_line__vertical_line() {
+    fn test_same_side_of_line_vertical_line() {
         let line = Line::new(WorldPoint::new(-0.5, -0.5), point2(-0.5, 0.5));
         let origin = point2(0.0, 0.0);
         let neg_point = point2(-20.0, 0.0);
@@ -1809,7 +1809,7 @@ mod tests {
     }
 
     #[test]
-    fn test_half_plane_complementary_check__different_lines() {
+    fn test_half_plane_complementary_check_different_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let line2: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(0.1, 0.0), point2(1.0, 1.0));
@@ -1828,7 +1828,7 @@ mod tests {
     }
 
     #[test]
-    fn test_half_plane_complementary_check__equivalent_lines() {
+    fn test_half_plane_complementary_check_equivalent_lines() {
         let line: Line<f32, SquareGridInWorldFrame> = Line::new(point2(0.0, 0.0), point2(1.0, 1.0));
         let line2: Line<f32, SquareGridInWorldFrame> =
             Line::new(point2(2.0, 2.0), point2(5.0, 5.0));
@@ -1892,7 +1892,7 @@ mod tests {
     }
 
     #[test]
-    fn test_line_intersections__observed_3_intersections() {
+    fn test_line_intersections_observed_3_intersections() {
         Line::new(
             WorldPoint::new(-29.5, 5.0),
             WorldPoint::new(-27.589872, 4.703601),
@@ -2102,7 +2102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ray_hit_face__simple() {
+    fn test_ray_hit_face_simple() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
@@ -2119,7 +2119,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ray_hit_face__face_must_face_ray() {
+    fn test_ray_hit_face_face_must_face_ray() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
@@ -2135,7 +2135,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    fn test_ray_hit_face__miss() {
+    fn test_ray_hit_face_miss() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 5.0;
@@ -2151,7 +2151,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    fn test_ray_hit_face__under_ranged() {
+    fn test_ray_hit_face_under_ranged() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 1.49;
@@ -2167,7 +2167,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    fn test_ray_hit_face__just_within_range() {
+    fn test_ray_hit_face_just_within_range() {
         let start_point = point2(5.0, 5.0);
         let degrees = 90;
         let range = 01.501;
@@ -2183,7 +2183,7 @@ mod tests {
         assert!(result);
     }
     #[test]
-    fn test_ray_hit_face__just_out_of_closer_range() {
+    fn test_ray_hit_face_just_out_of_closer_range() {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
         let range = 1.0;
@@ -2199,7 +2199,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    fn test_ray_hit_face__just_within_closer_range() {
+    fn test_ray_hit_face_just_within_closer_range() {
         let start_point = point2(5.0, 5.49);
         let degrees = 90;
         let range = 1.02;
@@ -2215,7 +2215,7 @@ mod tests {
         assert!(result);
     }
     #[test]
-    fn test_ray_hit_face__just_out_of_really_close_range() {
+    fn test_ray_hit_face_just_out_of_really_close_range() {
         let start_point = point2(5.0, 6.49);
         let degrees = 90;
         let range = 0.001;
@@ -2231,7 +2231,7 @@ mod tests {
         assert_false!(result);
     }
     #[test]
-    fn test_ray_hit_face__just_within_really_close_range() {
+    fn test_ray_hit_face_just_within_really_close_range() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.0, 6.49),
             Angle::degrees(90.0),
@@ -2240,7 +2240,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_ray_hit_face__angled_miss() {
+    fn test_ray_hit_face_angled_miss() {
         assert_false!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.49),
             Angle::degrees(45.0),
@@ -2249,7 +2249,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_ray_hit_face__angled_hit() {
+    fn test_ray_hit_face_angled_hit() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.49),
             Angle::degrees(45.0),
@@ -2258,7 +2258,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_ray_hit_face__just_barely_touching_still_counts() {
+    fn test_ray_hit_face_just_barely_touching_still_counts() {
         assert!(does_ray_hit_oriented_square_face(
             point2(5.5, 5.0),
             Angle::degrees(90.0),
@@ -2267,7 +2267,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_ray_hit_face__parallel_hit_does_not_count() {
+    fn test_ray_hit_face_parallel_hit_does_not_count() {
         assert_false!(does_ray_hit_oriented_square_face(
             point2(5.0, 5.5),
             Angle::degrees(0.0),
@@ -2276,7 +2276,7 @@ mod tests {
         ));
     }
     #[test]
-    fn test_line_line_intersection__easy_orthogonal_hit() {
+    fn test_line_line_intersection_easy_orthogonal_hit() {
         assert_about_eq_2d(
             WorldLine::new(point2(0.0, 0.0), point2(0.0, 4.0))
                 .intersection_point_with_other_line(&WorldLine::new(
@@ -2288,7 +2288,7 @@ mod tests {
         )
     }
     #[test]
-    fn test_line_line_intersection__diagonal_intersection() {
+    fn test_line_line_intersection_diagonal_intersection() {
         assert_about_eq_2d(
             WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
                 .intersection_point_with_other_line(&WorldLine::new(
@@ -2300,7 +2300,7 @@ mod tests {
         )
     }
     #[test]
-    fn test_line_line_intersection__miss() {
+    fn test_line_line_intersection_miss() {
         assert!(WorldLine::new(point2(0.0, 0.0), point2(1.0, 1.0))
             .intersection_point_with_other_line(&WorldLine::new(
                 point2(100.0, 1000.0),
@@ -2309,7 +2309,7 @@ mod tests {
             .is_none())
     }
     #[test]
-    fn test_line_line_intersection__endpoint_touch_mid_counts() {
+    fn test_line_line_intersection_endpoint_touch_mid_counts() {
         assert_about_eq_2d(
             WorldLine::new(point2(5.0, 5.0), point2(7.0, 5.0))
                 .intersection_point_with_other_line(&WorldLine::new(
@@ -2321,7 +2321,7 @@ mod tests {
         )
     }
     #[test]
-    fn test_line_line_intersection__perpendicular_endpoints_touch() {
+    fn test_line_line_intersection_perpendicular_endpoints_touch() {
         assert_about_eq_2d(
             WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
                 .intersection_point_with_other_line(&WorldLine::new(
@@ -2333,7 +2333,7 @@ mod tests {
         )
     }
     #[test]
-    fn test_line_line_intersection__parallel_endpoints_touch() {
+    fn test_line_line_intersection_parallel_endpoints_touch() {
         let line1 = WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0));
         let line2 = WorldLine::new(point2(10.0, 5.0), point2(20.0, 5.0));
         assert_about_eq_2d(
@@ -2362,7 +2362,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_line_line_intersection__parallel_miss() {
+    fn test_line_line_intersection_parallel_miss() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
                 point2(11.0, 5.0),
@@ -2371,7 +2371,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    fn test_line_line_intersection__parallel_overlap_does_not_count() {
+    fn test_line_line_intersection_parallel_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
                 point2(9.0, 5.0),
@@ -2380,7 +2380,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    fn test_line_line_intersection__parallel_full_overlap_does_not_count() {
+    fn test_line_line_intersection_parallel_full_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
                 point2(0.0, 5.0),
@@ -2389,7 +2389,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    fn test_line_line_intersection__parallel_exact_overlap_does_not_count() {
+    fn test_line_line_intersection_parallel_exact_overlap_does_not_count() {
         assert!(WorldLine::new(point2(5.0, 5.0), point2(10.0, 5.0))
             .intersection_point_with_other_line(&WorldLine::new(
                 point2(5.0, 5.0),
@@ -2398,7 +2398,7 @@ mod tests {
             .is_none(),)
     }
     #[test]
-    fn test_first_inside_square_face_hit_by_ray__simple_case() {
+    fn test_first_inside_square_face_hit_by_ray_simple_case() {
         let inside_faces = HashSet::from([
             (point2(5, 6), STEP_UP).into(),
             (point2(5, 7), STEP_DOWN).into(),
