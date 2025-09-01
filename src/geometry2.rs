@@ -48,6 +48,10 @@ pub trait IPointExt: Sized {
     fn to_string(&self) -> String {
         format!("[{}, {}]", self.x(), self.y())
     }
+    fn squared_length(&self) -> i32 {
+        self.x().pow(2) + self.y().pow(2)
+
+    }
 }
 
 impl IPointExt for IPoint {
@@ -104,10 +108,18 @@ impl FPointExt for FPoint {
 
 pub trait OrthoPoseExt {
     fn rotate(&self, quarter_turns_ccw: i32) -> Self;
+    fn reversed(&self) -> Self;
+    fn stepped(&self) -> Self;
 }
 impl OrthoPoseExt for ([i32; 2], i32) {
     fn rotate(&self, quarter_turns_ccw: i32) -> Self {
         (self.0, (self.1 + quarter_turns_ccw).rem_euclid(4))
+    }
+    fn reversed(&self) -> Self {
+        (self.0, (self.1+2)%4)
+    }
+    fn stepped(&self) -> Self {
+        (self.0.add(step_in_direction(self.1)), self.1)
     }
 }
 
