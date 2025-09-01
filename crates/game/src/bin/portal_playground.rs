@@ -173,7 +173,7 @@ impl Game {
         fov_center: Option<IPoint>,
         time_from_start_s: f32,
     ) -> Frame {
-        let frame = self.world_state.render(fov_center);
+        let frame = self.render(fov_center);
         self.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         self.ui_handler.draw_mouse_at_time(time_from_start_s);
         self.ui_handler.screen_buffer.clone()
@@ -205,6 +205,23 @@ impl Game {
     }
     pub fn try_move_player(&mut self, step: IPoint) {
         self.try_move_player_at_time(step, self.ui_handler.now_as_s_from_start())
+    }
+    pub fn now_as_s_from_start(&self) -> f32 {
+        self.ui_handler.now_as_s_from_start()
+    }
+    pub fn render_now_with_debug(&self, fov_center: Option<IPoint>) -> (Frame, Vec<Frame>) {
+        self.world_state
+            .render_with_options(true, fov_center, self.now_as_s_from_start())
+    }
+    pub fn render(&self, fov_center: Option<IPoint>) -> Frame {
+        self.world_state
+            .render_with_options(false, fov_center, self.now_as_s_from_start())
+            .0
+    }
+    pub fn render_at_time(&self, fov_center: Option<IPoint>, s_from_start: f32) -> Frame {
+        self.world_state
+            .render_with_options(false, fov_center, s_from_start)
+            .0
     }
 }
 
@@ -592,7 +609,7 @@ impl UiHandler {
     }
 
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
-        let t = self.time_after_start(event.0).clone();
+        let t = self.s_from_start_to_instant(event.0).clone();
         self.fake_event_sender
             .as_mut()
             .unwrap()
@@ -609,7 +626,7 @@ impl UiHandler {
     pub fn now_as_s_from_start(&self) -> f32 {
         Instant::now().duration_since(self.start_time).as_secs_f32()
     }
-    pub fn time_after_start(&self, s_after_start: f32) -> Instant {
+    pub fn s_from_start_to_instant(&self, s_after_start: f32) -> Instant {
         self.start_time + Duration::from_secs_f32(s_after_start)
     }
 }
@@ -739,6 +756,15 @@ impl WorldState {
         &self,
         is_debug: bool,
         fov_center: Option<IPoint>,
+        t: f32,
+    ) -> (Frame, Vec<Frame>) {
+        self.render_with_options(is_debug, fov_center, t)
+    }
+    fn render_with_options(
+        &self,
+        is_debug: bool,
+        fov_center: Option<IPoint>,
+        s_from_start: f32,
     ) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
@@ -765,8 +791,7 @@ impl WorldState {
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..self
-            .height)
+        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..self.height)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row as i32 - 1;
                 (0..self.width as i32)
@@ -844,6 +869,7 @@ impl WorldState {
                     .collect_vec()
             })
             .collect_vec();
+
         let frame = transpareny_frame
             .into_iter()
             .map(|row| {
@@ -907,8 +933,8 @@ impl WorldState {
         None
     }
 
-    pub fn render(&self, fov_center: Option<IPoint>) -> Frame {
-        self.render_with_debug_deconstruction(false, fov_center).0
+    pub fn render(&self, fov_center: Option<IPoint>, s_from_start: f32) -> Frame {
+        self.render_with_options(false, fov_center, s_from_start).0
     }
     fn render_one_view_of_a_square(
         &self,
@@ -1017,9 +1043,7 @@ fn main() {
         let now = std::time::Instant::now();
         game.process_events_in_queue();
 
-        let frame = game
-            .world_state
-            .render(game.ui_handler.mouse_world_square());
+        let frame = game.render(game.ui_handler.mouse_world_square());
         game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         game.ui_handler.screen_buffer.draw_text(
             format!(
@@ -1079,7 +1103,7 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render(None);
+        let frame = state.render(None, 5.0);
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
@@ -1172,7 +1196,7 @@ mod tests {
         game.world_state
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.world_state.render(None);
+        let frame = game.render(None);
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1241,9 +1265,7 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game
-            .world_state
-            .render_with_debug_deconstruction(true, None);
+        let (frame, layers) = game.render_now_with_debug(None);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1266,9 +1288,7 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game
-            .world_state
-            .render_with_debug_deconstruction(true, None);
+        let (frame, layers) = game.render_now_with_debug( None);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
