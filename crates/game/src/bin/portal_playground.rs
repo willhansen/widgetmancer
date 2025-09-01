@@ -187,22 +187,24 @@ impl Game {
         )
     }
 
-    pub fn try_move_player(&mut self, step: IPoint) {
+    pub fn try_move_player_at_time(&mut self, step: IPoint, s_from_start: f32) {
         assert!(step.squared_length() == 1);
         let dir = closest_ortho_dir(step).unwrap();
         let (new_pos, end_dir) = self
             .world_state
             .portal_step(self.world_state.player_square, dir);
         if self.world_state.on_board(new_pos) {
-            self.world_state.player_square_history.push_back((
-                self.ui_handler.now_as_s_from_start(),
-                self.world_state.player_square,
-            ));
+            self.world_state
+                .player_square_history
+                .push_back((s_from_start, self.world_state.player_square));
             while self.world_state.player_square_history.len() > 5 {
                 self.world_state.player_square_history.pop_front();
             }
             self.world_state.player_square = new_pos;
         }
+    }
+    pub fn try_move_player(&mut self, step: IPoint) {
+        self.try_move_player_at_time(step, self.ui_handler.now_as_s_from_start())
     }
 }
 
@@ -629,7 +631,7 @@ struct WorldState {
 }
 impl WorldState {
     pub fn new(width: usize, height: usize) -> Self {
-        WorldState {
+        let mut state = WorldState {
             running: true,
             width,
             height,
@@ -640,7 +642,11 @@ impl WorldState {
             portal_rendering: PortalRenderingOption::LineOnFloor,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
-        }
+        };
+        state
+            .player_square_history
+            .push_back((0.0, state.player_square));
+        state
     }
     fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
         let is_white = ((square[0] / 3).rem_euclid(2) == 0) == ((square[1] / 3).rem_euclid(2) == 0);
@@ -759,7 +765,8 @@ impl WorldState {
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let mut frame: Frame = (0..self.height)
+        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..self
+            .height)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row as i32 - 1;
                 (0..self.width as i32)
@@ -790,7 +797,7 @@ impl WorldState {
                             PortalRenderingOption::Absolute => todo!(),
                         };
 
-                        let glyph_layers_to_combine: Vec<[GlyphWithTransparency; 2]> =
+                        let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> =
                             visible_portions_at_relative_square
                                 .clone()
                                 .into_iter()
@@ -828,14 +835,19 @@ impl WorldState {
                                     );
                                 });
                         }
-                        // TODO: combine properly
                         glyph_layers_to_combine
                             .into_iter()
                             .rev()
                             .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i])))
                             .unwrap_or([shadow_glyph; 2])
-                        // glyph_layers_to_combine[0]
                     })
+                    .collect_vec()
+            })
+            .collect_vec();
+        let frame = transpareny_frame
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
                     .flatten()
                     .map(|g| g.to_drawable_with_transparent_as_default())
                     .collect_vec()
@@ -976,6 +988,9 @@ impl WorldState {
         } else {
             pose.stepped()
         }
+    }
+    pub fn smoothed_player_pos_at_time(&self, s_from_start: f32) -> IPoint {
+        todo!();
     }
 }
 
