@@ -108,6 +108,10 @@ impl Game {
                         PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
                     }
                 }
+                Key::Char('w') => self.try_move_player([0,1]),
+                Key::Char('a') => self.try_move_player([-1,0]),
+                Key::Char('s') => self.try_move_player([0,-1]),
+                Key::Char('d') => self.try_move_player([1,0]),
                 // Key::Backspace => todo!(),
                 // Key::Left => todo!(),
                 // Key::Right => todo!(),
@@ -181,6 +185,19 @@ impl Game {
                 .duration_since(self.ui_handler.start_time)
                 .as_secs_f32(),
         )
+    }
+
+    pub fn try_move_player(&mut self, step: IPoint) {
+        assert!(step.squared_length() == 1);
+        let dir = closest_ortho_dir(step).unwrap();
+        let (new_pos, end_dir) = self.world_state.portal_step(self.world_state.player_square, dir);
+        if self.world_state.on_board(new_pos) {
+            self.world_state.player_square_history.push_back((self.ui_handler.now_as_s_from_start(), self.world_state.player_square));
+            while self.world_state.player_square_history.len() > 5 {
+                self.world_state.player_square_history.pop_front();
+            }
+            self.world_state.player_square = new_pos;
+        }
     }
 }
 
@@ -355,6 +372,8 @@ mod camera_tests {
 // }
 
 struct UiHandler {
+    // This instant is the link between the real world and "seconds from start".  The game world
+    // has no use for real-time reference points that are instants
     pub start_time: Instant,
     // newest events are added via `push_back`
     pub event_log: VecDeque<(f32, Event)>,
@@ -568,7 +587,7 @@ impl UiHandler {
         self.fake_event_sender
             .as_mut()
             .unwrap()
-            .send((self.start_time + Duration::from_secs_f32(event.0), event.1))
+            .send((self.time_after_start(event.0).clone(), event.1))
             .unwrap()
     }
     pub fn give_fake_event_now(&mut self, event: Event) {
@@ -578,6 +597,12 @@ impl UiHandler {
             .send((Instant::now(), event))
             .unwrap()
     }
+    pub fn now_as_s_from_start(&self) -> f32 {
+        Instant::now().duration_since(self.start_time).as_secs_f32()
+    }
+    pub fn time_after_start(&self, s_after_start: f32) -> Instant {
+        self.start_time + Duration::from_secs_f32(s_after_start)
+    }
 }
 
 struct WorldState {
@@ -585,6 +610,8 @@ struct WorldState {
     width: usize,
     height: usize,
     player_square: IPoint,
+    // seconds from start and squares
+    player_square_history: VecDeque<(f32, IPoint)>,
     player_is_alive: bool,
 
     portals: HashMap<PortalSide, PortalSide>,
@@ -600,6 +627,7 @@ impl WorldState {
             width,
             height,
             player_square: [5, 5],
+            player_square_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
             portal_rendering: PortalRenderingOption::LineOnFloor,
@@ -931,6 +959,17 @@ impl WorldState {
                 .unwrap()
         }
         glyphs
+    }
+    // given single square step from the start point in the direction, where do you end up, and
+    // from what direction did you come?
+    pub fn portal_step(&self, start: IPoint, dir: OrthoDir) -> (IPoint, OrthoDir) {
+        let pose = (start, dir);
+        if let Some(reverse_entrance) = self.portals.get(&pose) {
+            reverse_entrance.reversed()
+        }
+        else {
+            pose.stepped()
+        }
     }
 }
 
@@ -1444,6 +1483,17 @@ mod tests {
             assert_value_not_more_than_past!(max_dist, name.to_string() + "_max_dist");
             assert_value_not_more_than_past!(avg_dist, name.to_string() + "_avg_dist");
         }
-        panic!();
+        // panic!();
+    }
+    #[test]
+    fn test_player_step_through_portal() {
+
+        let mut game = Game::new_headless_one_to_one_square(5);
+        game.world_state
+            .place_portal(([1, 2], DIR_RIGHT), ([3, 2], DIR_LEFT));
+        game.world_state.player_square = [1,2];
+
+        game.try_move_player([1,0]);
+        assert_eq!(game.world_state.player_square, [3,2]);
     }
 }
