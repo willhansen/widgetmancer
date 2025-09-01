@@ -108,10 +108,10 @@ impl Game {
                         PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
                     }
                 }
-                Key::Char('w') => self.try_move_player([0,1]),
-                Key::Char('a') => self.try_move_player([-1,0]),
-                Key::Char('s') => self.try_move_player([0,-1]),
-                Key::Char('d') => self.try_move_player([1,0]),
+                Key::Char('w') => self.try_move_player([0, 1]),
+                Key::Char('a') => self.try_move_player([-1, 0]),
+                Key::Char('s') => self.try_move_player([0, -1]),
+                Key::Char('d') => self.try_move_player([1, 0]),
                 // Key::Backspace => todo!(),
                 // Key::Left => todo!(),
                 // Key::Right => todo!(),
@@ -190,9 +190,14 @@ impl Game {
     pub fn try_move_player(&mut self, step: IPoint) {
         assert!(step.squared_length() == 1);
         let dir = closest_ortho_dir(step).unwrap();
-        let (new_pos, end_dir) = self.world_state.portal_step(self.world_state.player_square, dir);
+        let (new_pos, end_dir) = self
+            .world_state
+            .portal_step(self.world_state.player_square, dir);
         if self.world_state.on_board(new_pos) {
-            self.world_state.player_square_history.push_back((self.ui_handler.now_as_s_from_start(), self.world_state.player_square));
+            self.world_state.player_square_history.push_back((
+                self.ui_handler.now_as_s_from_start(),
+                self.world_state.player_square,
+            ));
             while self.world_state.player_square_history.len() > 5 {
                 self.world_state.player_square_history.pop_front();
             }
@@ -583,11 +588,13 @@ impl UiHandler {
             self.event_log.pop_front();
         }
     }
+
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
+        let t = self.time_after_start(event.0).clone();
         self.fake_event_sender
             .as_mut()
             .unwrap()
-            .send((self.time_after_start(event.0).clone(), event.1))
+            .send((t, event.1))
             .unwrap()
     }
     pub fn give_fake_event_now(&mut self, event: Event) {
@@ -966,8 +973,7 @@ impl WorldState {
         let pose = (start, dir);
         if let Some(reverse_entrance) = self.portals.get(&pose) {
             reverse_entrance.reversed()
-        }
-        else {
+        } else {
             pose.stepped()
         }
     }
@@ -1487,13 +1493,12 @@ mod tests {
     }
     #[test]
     fn test_player_step_through_portal() {
-
         let mut game = Game::new_headless_one_to_one_square(5);
         game.world_state
             .place_portal(([1, 2], DIR_RIGHT), ([3, 2], DIR_LEFT));
-        game.world_state.player_square = [1,2];
+        game.world_state.player_square = [1, 2];
 
-        game.try_move_player([1,0]);
-        assert_eq!(game.world_state.player_square, [3,2]);
+        game.try_move_player([1, 0]);
+        assert_eq!(game.world_state.player_square, [3, 2]);
     }
 }
