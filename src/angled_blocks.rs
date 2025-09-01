@@ -343,7 +343,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_line_and_inside_point_to_angled_block_character__left_edge_full_block() {
+    fn test_line_and_inside_point_to_angled_block_character_left_edge_full_block() {
         let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
             half_plane_to_angled_block_character(
@@ -361,7 +361,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_line_and_inside_point_to_angled_block_character__left_edge_empty_block() {
+    fn test_line_and_inside_point_to_angled_block_character_left_edge_empty_block() {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::from_line_and_point_on_half_plane(
@@ -378,7 +378,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_line_and_inside_point_to_angled_block_character__lower_right_diagonal() {
+    fn test_line_and_inside_point_to_angled_block_character_lower_right_diagonal() {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::from_line_and_point_on_half_plane(
@@ -395,7 +395,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_line_and_inside_point_to_angled_block_character__notch_off_bottom_right() {
+    fn test_line_and_inside_point_to_angled_block_character_notch_off_bottom_right() {
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::from_line_and_point_on_half_plane(
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_half_plane_to_character__from_failure_data() {
+    fn test_half_plane_to_character_from_failure_data() {
         let half_plane = HalfPlane::from_line_and_point_on_half_plane(
             Line {
                 p1: point2(-1.5, -1.0),
