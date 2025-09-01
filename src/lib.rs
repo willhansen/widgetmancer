@@ -116,12 +116,10 @@ impl QuarterTurnsAnticlockwise {
             } else {
                 3
             }
+        } else if dir.x > 0 {
+            0
         } else {
-            if dir.x > 0 {
-                0
-            } else {
-                2
-            }
+            2
         })
     }
 
@@ -173,9 +171,9 @@ impl Sub for QuarterTurnsAnticlockwise {
     }
 }
 
-impl Into<i32> for QuarterTurnsAnticlockwise {
-    fn into(self) -> i32 {
-        self.quarter_turns()
+impl From<QuarterTurnsAnticlockwise> for i32 {
+    fn from(val: QuarterTurnsAnticlockwise) -> Self {
+        val.quarter_turns()
     }
 }
 impl From<i32> for QuarterTurnsAnticlockwise {
@@ -234,12 +232,12 @@ where
         mem::swap(&mut self.p2, &mut self.p1);
     }
     pub fn reversed(&self) -> Self {
-        Self::new(self.p2.clone(), self.p1.clone())
+        Self::new(self.p2, self.p1)
     }
     pub fn get(&self, index: u32) -> Point2D<T, U> {
         match index {
-            0 => self.p1.clone(),
-            1 => self.p2.clone(),
+            0 => self.p1,
+            1 => self.p2,
             _ => panic!("only two points defining the line"),
         }
     }
@@ -250,7 +248,7 @@ where
                 quarter_rotations_anticlockwise,
             )
         });
-        Self::new(new_points[0].clone(), new_points[1].clone())
+        Self::new(new_points[0], new_points[1])
     }
     pub fn square_length(&self) -> T {
         (self.p1 - self.p2).square_length()
