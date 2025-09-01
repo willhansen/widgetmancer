@@ -1154,7 +1154,7 @@ mod tests {
     const SIGHT_RADIUS: u32 = 16;
 
     #[test]
-    fn test_square_view_angle__horizontal() {
+    fn test_square_view_angle_horizontal() {
         let view_angle = AngleInterval::from_square(vec2(3, 0));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(2.5, 0.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(2.5, -0.5));
@@ -1170,7 +1170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_view_angle__diagonalish() {
+    fn test_square_view_angle_diagonalish() {
         let view_angle = AngleInterval::from_square(vec2(5, 3));
         let correct_start_angle = better_angle_from_x_axis(WorldMove::new(4.5, 3.5));
         let correct_end_angle = better_angle_from_x_axis(WorldMove::new(5.5, 2.5));
@@ -1364,7 +1364,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fov_square_sequence__detailed() {
+    fn test_fov_square_sequence_detailed() {
         let mut sequence = OctantFOVSquareSequenceIter::new(Octant::new(1), 0);
         let correct_sequence = vec![
             vec2(0, 0),
@@ -1379,7 +1379,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__one_step_up() {
+    fn test_partial_visibility_of_one_square_one_step_up() {
         let arc = AngleInterval::from_degrees(90.0, 135.0);
         let square = WorldStep::new(0, 1);
         let partial = square_visibility_from_one_view_arc(arc, square);
@@ -1411,7 +1411,7 @@ mod tests {
     }
 
     #[test]
-    fn test_no_sharp_corners_in_shadows__mid_square() {
+    fn test_no_sharp_corners_in_shadows_mid_square() {
         let player_square = point2(5, 5);
         let block_square = player_square + STEP_DOWN_LEFT;
         let sight_blockers = HashSet::from([block_square]);
@@ -1467,7 +1467,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__observed_discontinuity_1() {
+    fn test_partial_visibility_of_one_square_observed_discontinuity_1() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
                 square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)).unwrap(),
@@ -1477,7 +1477,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__observed_discontinuity_2() {
+    fn test_partial_visibility_of_one_square_observed_discontinuity_2() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
                 square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)).unwrap(),
@@ -1487,7 +1487,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__observed_discontinuity_3() {
+    fn test_partial_visibility_of_one_square_observed_discontinuity_3() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
                 square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)).unwrap(),
@@ -1497,7 +1497,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__observed_discontinuity_4() {
+    fn test_partial_visibility_of_one_square_observed_discontinuity_4() {
         assert_shadow_is_horizontally_continuous(
             PartialVisibilityDrawable::from_square_visibility(
                 square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)).unwrap(),
@@ -1513,7 +1513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_visibility_of_one_square__observed_random_discontinuity() {
+    fn test_partial_visibility_of_one_square_observed_random_discontinuity() {
         // highest i observed before failure: 9
         for i in 0..30 {
             assert_shadow_is_horizontally_continuous(
@@ -1810,7 +1810,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_fully_inside_view_arc__near_edge() {
+    fn test_square_fully_inside_view_arc_near_edge() {
         let square = vec2(1, -2);
         let arc = AngleInterval::from_radians(-PI / 2.0, -PI / 4.0);
         assert!(visibility_of_square(arc, square)
@@ -1972,7 +1972,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fov_relative_to_absolute__top_level() {
+    fn test_fov_relative_to_absolute_top_level() {
         let main_center = point2(5, 5);
 
         let mut fov = FieldOfViewResult::new_empty_fov_at(main_center);
@@ -2000,7 +2000,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fov_relative_to_absolute__sub_view_no_rotation() {
+    fn test_fov_relative_to_absolute_sub_view_no_rotation() {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
 
@@ -2025,7 +2025,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fov_relative_to_absolute__sub_view_with_rotation() {
+    fn test_fov_relative_to_absolute_sub_view_with_rotation() {
         let main_center = point2(5, 5);
         let sub_center = point2(34, -7);
 

@@ -51,7 +51,6 @@ impl AngleInterval {
     }
     pub fn from_octant(octant: Octant) -> Self {
         let n = octant.number();
-        let positive_y = n < 4;
 
         let step_length = PI / 4.0;
         Self::from_radians(n as f32 * step_length, (n + 1) as f32 * step_length)
@@ -579,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn num_contained_edges_is_symmetric__weird_wrapping_case() {
+    fn num_contained_edges_is_symmetric_weird_wrapping_case() {
         let arc_a = AngleInterval::from_degrees(45.0, 0.0);
         let arc_b = AngleInterval::from_degrees(-45.0, 45.0);
         assert_eq!(
@@ -589,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    fn num_contained_edges_is_symmetric__regular_case() {
+    fn num_contained_edges_is_symmetric_regular_case() {
         let arc_a = AngleInterval::from_degrees(0.0, 20.0);
         let arc_b = AngleInterval::from_degrees(10.0, 30.0);
         assert_eq!(
@@ -664,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_interval_intersection__simple_overlap() {
+    fn test_angle_interval_intersection_simple_overlap() {
         assert_eq!(
             AngleInterval::from_degrees(80.0, 100.0)
                 .intersection(AngleInterval::from_degrees(40.0, 90.0)),
@@ -675,13 +674,13 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_angle_interval_intersection__no_overlap() {
+    fn test_angle_interval_intersection_no_overlap() {
         AngleInterval::from_degrees(95.0, 100.0)
             .intersection(AngleInterval::from_degrees(40.0, 90.0));
     }
 
     #[test]
-    fn test_angle_interval_intersection__full_overlap() {
+    fn test_angle_interval_intersection_full_overlap() {
         let small = AngleInterval::from_degrees(80.0, 100.0);
         let big = AngleInterval::from_degrees(60.0, 120.0);
         assert_eq!(big.intersection(small), small);
@@ -690,14 +689,14 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_angle_interval_intersection__wraparound_double_overlap() {
+    fn test_angle_interval_intersection_wraparound_double_overlap() {
         let small = AngleInterval::from_degrees(80.0, 100.0);
         let big = AngleInterval::from_degrees(60.0, 120.0);
         big.intersection(small.complement());
     }
 
     #[test]
-    fn test_angle_interval_set__standardization() {
+    fn test_angle_interval_set_standardization() {
         let mut angle_interval_set = AngleIntervalSet {
             intervals: vec![
                 AngleInterval::from_degrees(10.0, 15.0),
@@ -716,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_interval_set__standardize_with_one() {
+    fn test_angle_interval_set_standardize_with_one() {
         let interval = AngleInterval::from_degrees(15.0, 30.0);
         let mut angle_interval_set = AngleIntervalSet {
             intervals: vec![interval],
@@ -728,7 +727,7 @@ mod tests {
 
     #[ignore = "moving away from angle sets"]
     #[test]
-    fn test_angle_interval_set__overlap_and_adding() {
+    fn test_angle_interval_set_overlap_and_adding() {
         let mut angle_interval_set = AngleIntervalSet::default();
         assert!(angle_interval_set.intervals.is_empty());
 
@@ -773,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn test_interval_fully_contain_other_interval__edge_cases() {
+    fn test_interval_fully_contain_other_interval_edge_cases() {
         let z = 70.374;
         let a = 50.342;
         let aa = 30.342;
@@ -810,7 +809,7 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_interval_set__standardize_but_no_change_required() {
+    fn test_angle_interval_set_standardize_but_no_change_required() {
         let mut the_set = AngleIntervalSet {
             intervals: vec![
                 AngleInterval::from_degrees(30.0, 40.0),
@@ -956,7 +955,7 @@ mod tests {
     }
 
     #[test]
-    fn test_interval_subtraction__touching_from_inside() {
+    fn test_interval_subtraction_touching_from_inside() {
         let new_arcs = assert_eq!(
             AngleInterval::from_degrees(0.0, 30.0)
                 .subtract(AngleInterval::from_degrees(-10.0, 30.0)),
@@ -981,7 +980,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_overlap_includes_almost_peaking_out__wraparound_case() {
+    fn test_partial_overlap_includes_almost_peaking_out_wraparound_case() {
         assert!(AngleInterval::from_degrees(315.0, 270.0)
             .partially_overlaps_other_while_including_edges(AngleInterval::from_degrees(
                 225.0, 315.0,
@@ -1024,7 +1023,7 @@ mod tests {
     }
 
     #[test]
-    fn test_arc_from_square_face__observed_failure_at_right_face_of_one_block_right() {
+    fn test_arc_from_square_face_observed_failure_at_right_face_of_one_block_right() {
         assert_about_eq!(
             AngleInterval::from_square_face(STEP_RIGHT, STEP_RIGHT.into())
                 .anticlockwise_end

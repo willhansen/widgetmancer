@@ -3301,7 +3301,7 @@ mod tests {
     }
 
     #[test]
-    fn test_observed_crash_from_being_near_portal__2() {
+    fn test_observed_crash_from_being_near_portal_2() {
         let mut game = set_up_nxn_game(20);
         game.place_player(point2(5, 5));
         game.place_single_sided_one_way_portal(
@@ -3704,7 +3704,7 @@ mod tests {
     }
 
     #[test]
-    fn test_portal_edges_are_stable__dense_horizontal() {
+    fn test_portal_edges_are_stable_dense_horizontal() {
         let player_square = point2(0, 5);
         let mut game = set_up_nxm_game(10, 30);
         game.place_player(player_square);
@@ -3714,7 +3714,7 @@ mod tests {
     }
 
     #[test]
-    fn test_portal_edges_are_stable__simple_case() {
+    fn test_portal_edges_are_stable_simple_case() {
         let player_square = point2(0, 2);
         let mut game = set_up_nxm_game(5, 5);
         game.place_player(player_square);
@@ -3725,7 +3725,7 @@ mod tests {
     }
 
     #[test]
-    fn test_portal_edges_are_stable__two_deep() {
+    fn test_portal_edges_are_stable_two_deep() {
         let player_square = point2(0, 2);
         let mut game = set_up_nxm_game(5, 10);
         game.place_player(player_square);
@@ -4420,7 +4420,7 @@ mod tests {
     }
 
     #[test]
-    fn test_floating_hunter_drone__place_and_draw() {
+    fn test_floating_hunter_drone_place_and_draw() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(4, 5));
         game.place_floating_hunter_drone(
@@ -4447,7 +4447,7 @@ mod tests {
     }
 
     #[test]
-    fn test_floating_hunter_drone__rotate_over_time() {
+    fn test_floating_hunter_drone_rotate_over_time() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
             WorldPoint::new(5.0, 5.0),
@@ -4465,7 +4465,7 @@ mod tests {
     }
 
     #[test]
-    fn test_floating_hunter_drone__move_over_time() {
+    fn test_floating_hunter_drone_move_over_time() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
             WorldPoint::new(5.0, 5.0),
@@ -4483,7 +4483,7 @@ mod tests {
     }
 
     #[test]
-    fn test_floating_hunter_drone__bounce_off_board_edge() {
+    fn test_floating_hunter_drone_bounce_off_board_edge() {
         let mut game = set_up_10x10_game();
         game.place_floating_hunter_drone(
             WorldPoint::new(9.0, 5.0),
@@ -4578,7 +4578,7 @@ mod tests {
         assert_eq!(lower_glyphs.chars(), [named_chars::SPACE, '⡇']); // Might need to flip horizontally at some point
     }
     #[test]
-    fn test_conveyor_belt__place_and_draw() {
+    fn test_conveyor_belt_place_and_draw() {
         let mut game = set_up_10x10_game();
         let player_square = point2(4, 5);
         game.place_player(player_square);
@@ -4613,7 +4613,7 @@ mod tests {
     }
 
     #[test]
-    fn test_conveyor_belt__push_player() {
+    fn test_conveyor_belt_push_player() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_player(square);
@@ -4625,7 +4625,7 @@ mod tests {
         assert_eq!(game.player_square(), square + dir);
     }
     #[test]
-    fn test_conveyor_belt__push_widget() {
+    fn test_conveyor_belt_push_widget() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_widget(Widget::new(5), square);
@@ -4637,7 +4637,7 @@ mod tests {
         assert!(game.widgets.contains_key(&(square + dir)));
     }
     #[test]
-    fn test_conveyor_belt__push_hunter_drone() {
+    fn test_conveyor_belt_push_hunter_drone() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_floating_hunter_drone(square.to_f32(), STEP_ZERO.to_f32(), Angle::degrees(0.0));
@@ -4658,7 +4658,7 @@ mod tests {
         assert!((new_pos - new_correct_pos).length() < 0.001);
     }
     #[test]
-    fn test_conveyor_belt__pushes_death_cube() {
+    fn test_conveyor_belt_pushes_death_cube() {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_linear_death_cube(square.to_f32(), vec2(0.0, 0.0));
@@ -4764,13 +4764,13 @@ mod tests {
         assert_about_eq!(start_vel.length(), end_vel.length());
     }
     #[test]
-    fn test_raycast__hit_nothing() {
+    fn test_raycast_hit_nothing() {
         let game = set_up_10x10_game();
         let result = game.raycast(point2(5.0, 5.0), Angle::degrees(0.0), 3.0);
         assert!(result.grid_entities.is_empty());
     }
     #[test]
-    fn test_raycast__hit_block() {
+    fn test_raycast_hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
         game.place_block(block_square);
@@ -4782,7 +4782,7 @@ mod tests {
         assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
     }
     #[test]
-    fn test_raycast__not_enough_range_to_hit_block() {
+    fn test_raycast_not_enough_range_to_hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
         game.place_block(block_square);
@@ -4794,7 +4794,7 @@ mod tests {
         assert!(result.grid_entities.is_empty());
     }
     #[test]
-    fn test_raycast__barely_hit_block() {
+    fn test_raycast_barely_hit_block() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
         game.place_block(block_square);
@@ -4806,7 +4806,7 @@ mod tests {
         assert_eq!(result.grid_entities[0], (STEP_RIGHT * 4, GridEntity::Block));
     }
     #[test]
-    fn test_raycast__barely_out_of_range() {
+    fn test_raycast_barely_out_of_range() {
         let mut game = set_up_10x10_game();
         let block_square = point2(9, 5);
         game.place_block(block_square);

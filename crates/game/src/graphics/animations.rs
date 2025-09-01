@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_animation_has_smooth_animation__at_start_of_recoil_left() {
+    fn test_recoil_animation_has_smooth_animation_at_start_of_recoil_left() {
         let board_length = 5;
         let animation = RecoilingBoardAnimation::new(
             BoardSize::new(board_length, board_length),
@@ -200,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__start_at_zero() {
+    fn test_recoil_function_start_at_zero() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(0.0),
             0.0
@@ -208,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__start_fast() {
+    fn test_recoil_function_start_fast() {
         assert!(
             derivative(
                 RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__hit_peak() {
+    fn test_recoil_function_hit_peak() {
         assert_eq!(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
                 RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32()
@@ -229,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__flat_peak() {
+    fn test_recoil_function_flat_peak() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
             RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32(),
@@ -239,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__fully_relax() {
+    fn test_recoil_function_fully_relax() {
         let height = RecoilingBoardAnimation::recoil_distance_in_squares_at_age(
             RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),
         );
@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recoil_function__relax_flat() {
+    fn test_recoil_function_relax_flat() {
         let slope = derivative(
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age,
             RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32(),

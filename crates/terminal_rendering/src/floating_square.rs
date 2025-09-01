@@ -472,7 +472,7 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    fn test_character_square_horizontal_offset__base_case() {
+    fn test_character_square_horizontal_offset_base_case() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, 0.0),
             FULL_BLOCK
@@ -480,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn test_character_square_horizontal_offset__round_to_zero() {
+    fn test_character_square_horizontal_offset_round_to_zero() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.001),
             FULL_BLOCK
@@ -493,13 +493,13 @@ mod tests {
     }
 
     #[test]
-    fn test_character_square_horizontal_offset__out_of_range() {
+    fn test_character_square_horizontal_offset_out_of_range() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.5), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.5), SPACE);
     }
 
     #[test]
-    fn test_character_square_horizontal_offset__halfway() {
+    fn test_character_square_horizontal_offset_halfway() {
         assert_eq!(
             character_for_half_square_with_1d_offset(false, -0.5),
             EIGHTH_BLOCKS_FROM_LEFT[4]
@@ -511,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn test_character_square_horizontal_offset__match_opposite_ends() {
+    fn test_character_square_horizontal_offset_match_opposite_ends() {
         assert_eq!(character_for_half_square_with_1d_offset(false, -1.0), SPACE);
         assert_eq!(character_for_half_square_with_1d_offset(false, 1.0), SPACE);
     }
@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn test_chars_for_floating_square__at_origin() {
+    fn test_chars_for_floating_square_at_origin() {
         let chars = character_map_for_full_square_at_point(point2(0.0, 0.0));
         assert_eq!(chars.len(), 3);
         assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
@@ -575,7 +575,7 @@ mod tests {
         assert_eq!(chars.get(&point2(1, 0)), Some(&LEFT_HALF_BLOCK));
     }
     #[test]
-    fn test_chars_for_floating_square__at_square_center() {
+    fn test_chars_for_floating_square_at_square_center() {
         let chars = character_map_for_full_square_at_point(point2(0.5, 0.0));
         assert_eq!(chars.len(), 2);
         assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));

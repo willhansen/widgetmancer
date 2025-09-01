@@ -744,7 +744,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_double_glyph_square_offset__up() {
+    fn test_double_glyph_square_offset_up() {
         // offset up
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, UPPER_HALF_BLOCK);
@@ -756,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__150_up() {
+    fn test_double_glyph_square_offset_150_up() {
         // offset up
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, 1.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
@@ -768,7 +768,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__50_down() {
+    fn test_double_glyph_square_offset_50_down() {
         // offset down
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.0, -0.5), RED, BLACK);
         assert_eq!(glyphs[0].character, '▄');
@@ -782,7 +782,7 @@ mod tests {
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
-    fn test_double_glyph_square_offset__1_left() {
+    fn test_double_glyph_square_offset_1_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.01, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(RED));
@@ -790,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__14_left() {
+    fn test_double_glyph_square_offset_14_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.14, 0.0), RED, BLACK);
         assert!(
@@ -803,7 +803,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__25_left() {
+    fn test_double_glyph_square_offset_25_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.25, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(RED));
@@ -813,7 +813,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__75_left() {
+    fn test_double_glyph_square_offset_75_left() {
         // offset left
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(-0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, '▌');
@@ -823,7 +823,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__25_right() {
+    fn test_double_glyph_square_offset_25_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, RIGHT_HALF_BLOCK);
@@ -833,7 +833,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__50_right() {
+    fn test_double_glyph_square_offset_50_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.50, 0.0), RED, BLACK);
         assert!(glyphs[0].looks_solid_color(BLACK));
@@ -841,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__75_right() {
+    fn test_double_glyph_square_offset_75_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(0.75, 0.0), RED, BLACK);
         assert_eq!(glyphs[0].character, SPACE);
@@ -853,7 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__slightly_past_full_square_right() {
+    fn test_double_glyph_square_offset_slightly_past_full_square_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.02, 0.0), RED, BLACK);
         assert!(
@@ -869,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_glyph_square_offset__partial_character_past_full_square_right() {
+    fn test_double_glyph_square_offset_partial_character_past_full_square_right() {
         // offset right
         let glyphs = Glyph::orthogonally_offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
         assert_eq!(glyphs[0], Glyph::new(LEFT_HALF_BLOCK, RED, BLACK));
@@ -881,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__zeros() {
+    fn test_square_offset_to_character_offsets_zeros() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.0),
             [0.0, 0.0]
@@ -889,7 +889,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_4_left() {
+    fn test_square_offset_to_character_offsets_1_4_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.25),
             [0.0, -0.5]
@@ -897,7 +897,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_4_right() {
+    fn test_square_offset_to_character_offsets_1_4_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.25),
             [0.5, 0.0]
@@ -905,7 +905,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_2_right() {
+    fn test_square_offset_to_character_offsets_1_2_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(0.5),
             [1.0, 0.0]
@@ -913,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_2_left() {
+    fn test_square_offset_to_character_offsets_1_2_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-0.5),
             [0.0, -1.0]
@@ -921,7 +921,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_left() {
+    fn test_square_offset_to_character_offsets_1_left() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(-1.0),
             [-1.0, -1.0]
@@ -929,7 +929,7 @@ mod tests {
     }
 
     #[test]
-    fn test_square_offset_to_character_offsets__1_right() {
+    fn test_square_offset_to_character_offsets_1_right() {
         assert_eq!(
             Glyph::horizontal_square_offset_to_character_offsets(1.0),
             [1.0, 1.0]
@@ -1100,7 +1100,7 @@ mod tests {
         assert_false!(Glyph::char_is_fullwidth('>'));
     }
     #[test]
-    fn test_pair_up_glyph_map__positions() {
+    fn test_pair_up_glyph_map_positions() {
         let character_squares: Vec<WorldCharacterSquare> = vec![
             point2(0, 0),
             point2(1, 0),
@@ -1123,7 +1123,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pair_up_glyph_map__glyphs() {
+    fn test_pair_up_glyph_map_glyphs() {
         let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
         let test_glyph = Glyph {
             character: ' ',

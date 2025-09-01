@@ -112,7 +112,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_screen_to_world__lower_left() {
+    fn test_screen_to_world_lower_left() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 50);
         let world_pos = input_map.screen_to_world(&terminal_pos);
@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn test_screen_to_world__upper_left() {
+    fn test_screen_to_world_upper_left() {
         // 50 squares x 50 squares
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (1, 1);
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn test_screen_to_world__lower_right() {
+    fn test_screen_to_world_lower_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 50);
         let world_pos = input_map.screen_to_world(&terminal_pos);
@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn test_screen_to_world__upper_right() {
+    fn test_screen_to_world_upper_right() {
         let input_map = InputMap::new(100, 50);
         let terminal_pos: (u16, u16) = (100, 1);
         let world_pos = input_map.screen_to_world(&terminal_pos);
@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn test_screen_to_world__two_characters_one_square() {
+    fn test_screen_to_world_two_characters_one_square() {
         let input_map = InputMap::new(100, 50);
         // odd to even, moving right, is same square
         let terminal_pos1: (u16, u16) = (35, 25);

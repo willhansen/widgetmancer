@@ -580,7 +580,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_conveyor_belt_drawable__half_down() {
+    fn test_conveyor_belt_drawable_half_down() {
         let drawable = ConveyorBeltDrawable::new(STEP_DOWN.into(), 0.25);
         assert_eq!(drawable.to_glyphs().to_clean_string(), "▄▄")
     }

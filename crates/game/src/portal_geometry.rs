@@ -452,7 +452,7 @@ mod tests {
         }
     }
     #[test]
-    fn test_transform_ray__simple_translation() {
+    fn test_transform_ray_simple_translation() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(3, 4), STEP_RIGHT).into(),
             (point2(4, 4), STEP_RIGHT).into(),
@@ -462,7 +462,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), 90.0);
     }
     #[test]
-    fn test_transform_ray__simple_rotation() {
+    fn test_transform_ray_simple_rotation() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(3, 4), STEP_RIGHT).into(),
             (point2(3, 4), STEP_DOWN).into(),
@@ -472,7 +472,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), -45.0);
     }
     #[test]
-    fn test_transform_ray__move_and_rotate() {
+    fn test_transform_ray_move_and_rotate() {
         let tf = RigidTransform::from_start_and_end_poses(
             (point2(5, 5), STEP_LEFT).into(),
             (point2(-10, 20), STEP_UP).into(),
@@ -482,7 +482,7 @@ mod tests {
         assert_about_eq!(new_direction.to_degrees(), 80.0, 0.001);
     }
     #[test]
-    fn test_ray_to_naive_line_segments__no_counting_behind_portal() {
+    fn test_ray_to_naive_line_segments_no_counting_behind_portal() {
         let mut portal_geometry = PortalGeometry::default();
         portal_geometry.create_portal(
             (WorldSquare::new(3, 3), STEP_UP).into(),
