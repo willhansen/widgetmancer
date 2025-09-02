@@ -10,8 +10,8 @@ use ordered_float::OrderedFloat;
 use crate::coordinate_frame_conversions::{WorldMove, WorldStep};
 use crate::{
     abs_angle_distance, better_angle_from_x_axis, rotated_n_quarter_turns_counter_clockwise,
-    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise,
-    STEP_DOWN_LEFT, STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
+    standardize_angle, Octant, OrthogonalWorldStep, QuarterTurnsAnticlockwise, STEP_DOWN_LEFT,
+    STEP_DOWN_RIGHT, STEP_UP_LEFT, STEP_UP_RIGHT,
 };
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, CopyGetters)]
@@ -57,14 +57,19 @@ impl AngleInterval {
     }
 
     pub fn from_square(relative_square: WorldStep) -> Self {
+        Self::from_square_and_center_offset(relative_square, [0.0; 2].into())
+    }
+    pub fn from_square_and_center_offset(
+        relative_square: WorldStep,
+        center_offset: WorldMove,
+    ) -> Self {
         assert_ne!(relative_square, vec2(0, 0));
         let rel_square_center = relative_square.to_f32();
-        let rel_square_corners: Vec<WorldMove> = vec![
-            rel_square_center + STEP_UP_RIGHT.to_f32() * 0.5,
-            rel_square_center + STEP_UP_LEFT.to_f32() * 0.5,
-            rel_square_center + STEP_DOWN_LEFT.to_f32() * 0.5,
-            rel_square_center + STEP_DOWN_RIGHT.to_f32() * 0.5,
-        ];
+        let rel_square_corners: Vec<WorldMove> =
+            vec![STEP_UP_RIGHT, STEP_UP_LEFT, STEP_DOWN_LEFT, STEP_DOWN_RIGHT]
+                .into_iter()
+                .map(|step| rel_square_center + step.to_f32() * 0.5 - center_offset)
+                .collect_vec();
 
         let center_angle = better_angle_from_x_axis(rel_square_center);
         let corner_angles: Vec<Angle<f32>> = rel_square_corners
@@ -90,13 +95,20 @@ impl AngleInterval {
         relative_square: WorldStep,
         face_direction: OrthogonalWorldStep,
     ) -> Self {
+        Self::from_square_face_and_center_offset(relative_square, face_direction, [0.0;2].into())
+    }
+    pub fn from_square_face_and_center_offset(
+        relative_square: WorldStep,
+        face_direction: OrthogonalWorldStep,
+        center_offset: WorldMove
+    ) -> Self {
         let square_center = relative_square.to_f32();
-        let face_center = square_center + face_direction.step().to_f32() / 2.0;
+        let face_center = square_center + face_direction.step().to_f32() / 2.0 - center_offset;
         let face_corners = [1, -1].map(|sign| {
             face_center
                 + rotated_n_quarter_turns_counter_clockwise(
-                face_direction.step().to_f32() / 2.0,
-                sign,
+                    face_direction.step().to_f32() / 2.0,
+                    sign,
                 )
         });
 
@@ -515,10 +527,10 @@ impl Display for AngleIntervalSet {
 
 #[cfg(test)]
 mod tests {
+    use crate::ORTHOGONAL_STEPS;
     use ntest::{assert_about_eq, assert_false};
     use num::zero;
     use pretty_assertions::{assert_eq, assert_ne};
-    use crate::ORTHOGONAL_STEPS;
 
     use crate::{STEP_DOWN, STEP_RIGHT, STEP_UP};
 
