@@ -1,5 +1,6 @@
 
 pub type IPoint = [i32; 2];
+pub type UPoint = [u32; 2];
 pub type FPoint = [f32; 2];
 pub type OrthoDir = i32;
 pub type SquareEdge = (IPoint, OrthoDir);
@@ -63,6 +64,15 @@ impl IPointExt for IPoint {
     }
     fn new(x: i32, y: i32) -> Self {
         [x, y]
+    }
+}
+pub trait UPointExt {
+    fn to_signed(&self) -> IPoint;
+}
+impl UPointExt for UPoint {
+
+    fn to_signed(&self) -> IPoint {
+        [self[0] as i32, self[1] as i32]
     }
 }
 

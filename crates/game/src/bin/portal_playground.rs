@@ -195,10 +195,10 @@ impl Game {
             .portal_step(self.world_state.player_square, dir);
         if self.world_state.on_board(new_pos) {
             self.world_state
-                .player_square_history
-                .push_back((s_from_start, self.world_state.player_square));
-            while self.world_state.player_square_history.len() > 5 {
-                self.world_state.player_square_history.pop_front();
+                .player_step_history
+                .push_back((s_from_start, step));
+            while self.world_state.player_step_history.len() > 5 {
+                self.world_state.player_step_history.pop_front();
             }
             self.world_state.player_square = new_pos;
         }
@@ -225,32 +225,55 @@ impl Game {
     }
 }
 
+#[derive(Clone, Debug, Copy, Eq, PartialEq)]
 struct Camera {
-    lower_left_local_square_in_world: [i32; 2],
-    upper_right_local_square_in_world: [i32; 2],
-    // Note that screen is 1-indexed
-    upper_left_row_col_char_on_screen: [u16; 2],
+    lower_left_square: [i32; 2],
+    upper_right_square: [i32; 2],
 }
 
-// All screen character coordinates are 1-indexed.  This includes the camera-local ones.
+// TODO: frame coordinates should be distinct from screen coordinates, and the camera should only
+// deal with frame coordinates.
+// Most coordinates are in squares unless noted
 impl Camera {
     pub fn new() -> Self {
         Self::new_square(25)
     }
     pub fn new_square(s: usize) -> Self {
         Camera {
-            lower_left_local_square_in_world: [0, 0],
-            upper_right_local_square_in_world: [s as i32, s as i32],
-            // Note that screen is 1-indexed
-            upper_left_row_col_char_on_screen: [1, 1],
+            lower_left_square: [0, 0],
+            upper_right_square: [s as i32 - 1; 2],
         }
+    }
+    pub fn set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
+        let new = self.with_bottom_left_square(bottom_left_square);
+        self.lower_left_square = new.lower_left_square;
+        self.upper_right_square = new.upper_right_square;
+    }
+    pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
+        Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world())
+    }
+    pub fn from_bottom_left_and_size(bottom_left_square: IPoint, width_height: [u32; 2]) -> Self {
+        Self {
+            lower_left_square: bottom_left_square,
+            upper_right_square: bottom_left_square
+                .add(width_height.to_signed())
+                .sub([1, 1]),
+        }
+    }
+    pub fn bottom_left_square(&self) -> IPoint {
+        self.lower_left_square
+    }
+    pub fn translate(&mut self, movement: IPoint) {
+        self.set_bottom_left_square(self.bottom_left_square().add(movement))
     }
     pub fn size_in_world(&self) -> [u32; 2] {
         [
-            (self.upper_right_local_square_in_world[0] - self.lower_left_local_square_in_world[0])
-                as u32,
-            (self.upper_right_local_square_in_world[1] - self.lower_left_local_square_in_world[1])
-                as u32,
+            (self.upper_right_square[0] - self.lower_left_square[0])
+                as u32
+                + 1,
+            (self.upper_right_square[1] - self.lower_left_square[1])
+                as u32
+                + 1,
         ]
     }
     pub fn width_in_world(&self) -> u32 {
@@ -259,16 +282,20 @@ impl Camera {
     pub fn height_in_world(&self) -> u32 {
         self.size_in_world()[1]
     }
-    pub fn local_to_world_square(&self, local_v: IPoint) -> IPoint {
+    pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.lower_left_local_square_in_world)
+            .add(self.lower_left_square)
+    }
+    pub fn absolute_to_local_world_square(&self, absolute_world_square: IPoint) -> IPoint {
+        // TODO: rotation
+        absolute_world_square.sub(self.lower_left_square)
     }
     pub fn local_to_world_ortho_dir(&self, dir: OrthoDir) -> OrthoDir {
         (dir + self.quarter_turns_ccw_from_world()).rem_euclid(4)
     }
     pub fn quarter_turns_ccw_from_world(&self) -> OrthoDir {
-        let [x1, y1] = self.lower_left_local_square_in_world;
-        let [x2, y2] = self.upper_right_local_square_in_world;
+        let [x1, y1] = self.lower_left_square;
+        let [x2, y2] = self.upper_right_square;
 
         match (x1 < x2, y1 < y2) {
             (true, true) => 0,
@@ -277,27 +304,14 @@ impl Camera {
             (false, false) => 2,
         }
     }
-    pub fn local_screen_row_col_point_to_local_world_point(
-        &self,
-        screen_row_col_point: FPoint,
-    ) -> FPoint {
+    pub fn frame_row_col_point_to_local_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         [
             (screen_row_col_point[1] - 1.0) / 2.0,
             self.height_in_world() as f32 - (screen_row_col_point[0] - 1.0),
         ]
     }
-    // TODO: account for non-default positioning and rotation
-    pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        self.local_screen_row_col_point_to_local_world_point(screen_row_col_point)
-    }
-
-    pub fn screen_row_col_char_to_camera_local_row_col_char(
-        &self,
-        screen_row_col_char: [u16; 2],
-    ) -> [u16; 2] {
-        screen_row_col_char
-    }
-    pub fn camera_local_row_col_char_to_camera_local_world_square(
+    // Not one-to-one.  each square has two characters that map to it
+    pub fn frame_row_col_char_to_local_world_square(
         &self,
         camera_local_row_col_char: [u16; 2],
     ) -> IPoint {
@@ -306,16 +320,28 @@ impl Camera {
             self.height_in_world() as i32 - (camera_local_row_col_char[0] as i32 - 1) - 1,
         ]
     }
-    pub fn camera_local_world_square_to_world_square(
+    pub fn frame_row_col_char_to_absolute_world_square(
         &self,
-        camera_local_world_square: IPoint,
+        frame_row_col_char: [u16; 2],
     ) -> IPoint {
-        camera_local_world_square
+        self.local_to_absolute_world_square(
+            self.frame_row_col_char_to_local_world_square(frame_row_col_char),
+        )
     }
-    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
-        let p = self.screen_row_col_char_to_camera_local_row_col_char(screen_row_col_char);
-        let p = self.camera_local_row_col_char_to_camera_local_world_square(p);
-        self.camera_local_world_square_to_world_square(p)
+    pub fn absolute_world_square_to_left_frame_row_col(
+        &self,
+        absolute_world_square: IPoint,
+    ) -> IPoint {
+        self.local_world_square_to_left_frame_row_col(self.absolute_to_local_world_square(absolute_world_square))
+    }
+    pub fn local_world_square_to_left_frame_row_col(&self, local_world_square: IPoint) -> IPoint {
+        [local_world_square[0] * 2, local_world_square[1]]
+    }
+    pub fn local_world_square_in_frame(&self, local_world_square: IPoint) -> bool {
+        todo!();
+    }
+    pub fn char_row_col_in_frame(&self, char_row_col: IPoint) -> bool {
+        todo!();
     }
 }
 
@@ -323,61 +349,53 @@ impl Camera {
 mod camera_tests {
     use super::*;
     #[test]
-    fn test_screen_to_world_inegers() {
+    fn test_frame_to_world_integers() {
         let s: i32 = 32;
         let camera = Camera::new_square(s as usize);
 
         assert_eq!(
-            camera.screen_row_col_char_to_world_square([1, 1]),
+            camera.frame_row_col_char_to_absolute_world_square([1, 1]),
             [0, s - 1]
         );
 
         assert_eq!(
-            camera.screen_row_col_char_to_camera_local_row_col_char([1, 1]),
-            [1, 1]
-        );
-
-        assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([1, 1]),
+            camera.frame_row_col_char_to_local_world_square([1, 1]),
             [0, s - 1]
         );
         assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([1, 2]),
+            camera.frame_row_col_char_to_local_world_square([1, 2]),
             [0, s - 1]
         );
 
         assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([2, 1]),
+            camera.frame_row_col_char_to_local_world_square([2, 1]),
             [0, s - 2]
         );
         assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([2, 2]),
+            camera.frame_row_col_char_to_local_world_square([2, 2]),
             [0, s - 2]
         );
 
         assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([1, 3]),
+            camera.frame_row_col_char_to_local_world_square([1, 3]),
             [1, s - 1]
         );
         assert_eq!(
-            camera.camera_local_row_col_char_to_camera_local_world_square([1, 4]),
+            camera.frame_row_col_char_to_local_world_square([1, 4]),
             [1, s - 1]
         );
 
         assert_eq!(
-            camera.camera_local_world_square_to_world_square([0, s - 1]),
+            camera.local_to_absolute_world_square([0, s - 1]),
             [0, s - 1]
         );
-        assert_eq!(
-            camera.camera_local_world_square_to_world_square([0, 0]),
-            [0, 0]
-        );
+        assert_eq!(camera.local_to_absolute_world_square([0, 0]), [0, 0]);
     }
-    fn test_screen_to_world_floating_point() {
+    fn test_frame_to_world_floating_point() {
         let camera = Camera::new();
 
         assert_eq!(
-            camera.screen_row_col_point_to_world_point([1.0, 1.0]),
+            camera.frame_row_col_point_to_local_world_point([1.0, 1.0]),
             [0.0, camera.height_in_world() as f32]
         );
     }
@@ -385,6 +403,44 @@ mod camera_tests {
     fn test_size() {
         let camera = Camera::new();
         assert_eq!(camera.size_in_world(), [25, 25]);
+    }
+    #[test]
+    fn test_local_to_absolute_world_squares_simple() {
+        let camera = Camera::new();
+        let p = [3, 5];
+        assert_eq!(
+            p,
+            camera.local_to_absolute_world_square(camera.absolute_to_local_world_square(p))
+        );
+        assert_eq!(
+            p,
+            camera.absolute_to_local_world_square(camera.local_to_absolute_world_square(p))
+        );
+    }
+    #[test]
+    fn test_get_set_bottom_left_invariant() {
+        let mut camera = Camera::new();
+        assert_eq!(
+            camera,
+            camera.with_bottom_left_square(camera.bottom_left_square())
+        );
+    }
+    #[test]
+    fn test_local_to_absolute_world_squares_translation() {
+        let mut camera = Camera::new();
+        let p = [3, 5];
+        dbg!(&camera);
+        camera.translate([-2, 0]);
+        dbg!(camera);
+        assert_eq!(camera.local_to_absolute_world_square(p), [1, 5]);
+        assert_eq!(
+            p,
+            camera.local_to_absolute_world_square(camera.absolute_to_local_world_square(p))
+        );
+        assert_eq!(
+            p,
+            camera.absolute_to_local_world_square(camera.local_to_absolute_world_square(p))
+        );
     }
 }
 
@@ -510,7 +566,7 @@ impl UiHandler {
     }
     fn mouse_world_square(&self) -> Option<IPoint> {
         self.last_mouse_screen_row_col
-            .map(|row_col| self.camera.screen_row_col_char_to_world_square(row_col))
+            .map(|row_col| self.screen_row_col_char_to_world_square(row_col))
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
         let (sender, receiver) = channel();
@@ -629,6 +685,23 @@ impl UiHandler {
     pub fn s_from_start_to_instant(&self, s_after_start: f32) -> Instant {
         self.start_time + Duration::from_secs_f32(s_after_start)
     }
+    pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
+        self.camera
+            .frame_row_col_point_to_local_world_point(screen_row_col_point)
+    }
+
+    pub fn screen_row_col_char_to_camera_frame_row_col_char(
+        &self,
+        screen_row_col_char: [u16; 2],
+    ) -> [u16; 2] {
+        screen_row_col_char
+    }
+
+    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
+        let p = self.screen_row_col_char_to_camera_frame_row_col_char(screen_row_col_char);
+        let p = self.camera.frame_row_col_char_to_local_world_square(p);
+        self.camera.local_to_absolute_world_square(p)
+    }
 }
 
 struct WorldState {
@@ -636,8 +709,8 @@ struct WorldState {
     width: usize,
     height: usize,
     player_square: IPoint,
-    // seconds from start and squares
-    player_square_history: VecDeque<(f32, IPoint)>,
+    // seconds from start and recent steps
+    player_step_history: VecDeque<(f32, IPoint)>,
     player_is_alive: bool,
 
     portals: HashMap<PortalSide, PortalSide>,
@@ -653,16 +726,13 @@ impl WorldState {
             width,
             height,
             player_square: [5, 5],
-            player_square_history: Default::default(),
+            player_step_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
             portal_rendering: PortalRenderingOption::LineOnFloor,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
         };
-        state
-            .player_square_history
-            .push_back((0.0, state.player_square));
         state
     }
     fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
@@ -1099,6 +1169,7 @@ mod tests {
     use terminal_rendering::test_utils::*;
     use terminal_rendering::*;
     use termion::event::MouseEvent;
+    use utility::geometry2::STEP_RIGHT;
 
     #[test]
     fn test_simple_output() {
@@ -1288,7 +1359,7 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.render_now_with_debug( None);
+        let (frame, layers) = game.render_now_with_debug(None);
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1535,5 +1606,26 @@ mod tests {
 
         game.try_move_player([1, 0]);
         assert_eq!(game.world_state.player_square, [3, 2]);
+    }
+    #[test]
+    fn test_player_step_history_starts_empty() {
+        let mut game = Game::new_headless_one_to_one_square(5);
+        assert!(game.world_state.player_step_history.is_empty());
+    }
+    #[ignore]
+    #[test]
+    fn test_draw_smoothed_player_position() {
+        let mut game = Game::new_headless_one_to_one_square(5);
+        game.world_state.player_square = [0, 2];
+        game.try_move_player_at_time(STEP_RIGHT, 0.5);
+        game.try_move_player_at_time(STEP_RIGHT, 1.0);
+        let frame = game.render_at_time(None, 1.5);
+        let player_pos_in_frame = game
+            .ui_handler
+            .camera
+            .absolute_world_square_to_left_frame_row_col(game.world_state.player_square);
+        let [row, left_col] = player_pos_in_frame.map(|x| x as usize);
+        let right_player_glyph: DrawableGlyph = frame.grid[row][left_col + 1];
+        assert!(char_is_braille(right_player_glyph.character));
     }
 }
