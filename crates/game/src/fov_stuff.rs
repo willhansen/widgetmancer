@@ -1007,13 +1007,27 @@ pub fn single_octant_field_of_view(
     fov_result.add_fully_visible_square(STEP_ZERO);
     fov_result
 }
-
 pub fn portal_aware_field_of_view_from_square(
     center_square: WorldSquare,
     radius: u32,
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfViewResult {
+    portal_aware_field_of_view_from_point(
+        center_square.to_f32(),
+        radius,
+        sight_blockers,
+        portal_geometry,
+    )
+}
+
+pub fn portal_aware_field_of_view_from_point(
+    center_point: WorldPoint,
+    radius: u32,
+    sight_blockers: &SquareSet,
+    portal_geometry: &PortalGeometry,
+) -> FieldOfViewResult {
+    let center_square = world_point_to_world_square(center_point);
     (0..8)
         .fold(
             FieldOfViewResult::new_empty_fov_at(center_square),
