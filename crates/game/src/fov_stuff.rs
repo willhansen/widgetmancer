@@ -1085,14 +1085,14 @@ pub fn portal_aware_field_of_view_from_point(
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
 }
-// Note that the center_offset is not the offset of the square, but the offset of the view_arc's
-// center
 fn visibility_of_square(
     view_arc: AngleInterval,
     rel_square: WorldStep,
 ) -> Option<SquareVisibility> {
     visibility_of_offset_square(view_arc, rel_square, Default::default())
 }
+// Note that the center_offset is not the offset of the square, but the offset of the view_arc's
+// center
 fn visibility_of_offset_square(
     view_arc: AngleInterval,
     rel_square: WorldStep,
@@ -1485,8 +1485,8 @@ mod tests {
         let correct_drawn_chars = [
             [SPACE; 2],
             // [UPPER_HALF_BLOCK; 2],
-            [UPPER_ONE_THIRD_BLOCK; 2], // TODO: maybe allow more precision on partially visible
-            // blocks
+            [UPPER_ONE_THIRD_BLOCK; 2], // TODO: maybe use eighth blocks rather than just the
+            // angled block snap points
             [FULL_BLOCK; 2],
         ];
         let actually_drawn = offsets.map(|center_offset| {

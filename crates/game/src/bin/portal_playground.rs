@@ -165,12 +165,12 @@ impl Game {
         }
         n
     }
-    pub fn render_with_mouse(&mut self, fov_center: Option<IPoint>) -> Frame {
+    pub fn render_with_mouse(&mut self, fov_center: Option<FPoint>) -> Frame {
         self.render_with_mouse_now(fov_center)
     }
     pub fn render_with_mouse_at_time(
         &mut self,
-        fov_center: Option<IPoint>,
+        fov_center: Option<FPoint>,
         time_from_start_s: f32,
     ) -> Frame {
         let frame = self.render(fov_center);
@@ -178,7 +178,7 @@ impl Game {
         self.ui_handler.draw_mouse_at_time(time_from_start_s);
         self.ui_handler.screen_buffer.clone()
     }
-    pub fn render_with_mouse_now(&mut self, fov_center: Option<IPoint>) -> Frame {
+    pub fn render_with_mouse_now(&mut self, fov_center: Option<FPoint>) -> Frame {
         self.render_with_mouse_at_time(
             fov_center,
             Instant::now()
@@ -209,16 +209,16 @@ impl Game {
     pub fn now_as_s_from_start(&self) -> f32 {
         self.ui_handler.now_as_s_from_start()
     }
-    pub fn render_now_with_debug(&self, fov_center: Option<IPoint>) -> (Frame, Vec<Frame>) {
+    pub fn render_now_with_debug(&self, fov_center: Option<FPoint>) -> (Frame, Vec<Frame>) {
         self.world_state
             .render_with_options(true, fov_center, self.now_as_s_from_start())
     }
-    pub fn render(&self, fov_center: Option<IPoint>) -> Frame {
+    pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
         self.world_state
             .render_with_options(false, fov_center, self.now_as_s_from_start())
             .0
     }
-    pub fn render_at_time(&self, fov_center: Option<IPoint>, s_from_start: f32) -> Frame {
+    pub fn render_at_time(&self, fov_center: Option<FPoint>, s_from_start: f32) -> Frame {
         self.world_state
             .render_with_options(false, fov_center, s_from_start)
             .0
@@ -568,6 +568,10 @@ impl UiHandler {
         self.last_mouse_screen_row_col
             .map(|row_col| self.screen_row_col_char_to_world_square(row_col))
     }
+    fn mouse_world_point(&self, s_from_start: f32) -> Option<FPoint> {
+        let screen_mouse_point = self.smoothed_mouse_position_screen_row_col(s_from_start);
+        screen_mouse_point.map(|p|self.screen_row_col_point_to_world_point(p))
+    }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
         let (sender, receiver) = channel();
         let mut handler = Self::new_maybe_headless(screen_height, screen_width, None, receiver);
@@ -680,7 +684,11 @@ impl UiHandler {
             .unwrap()
     }
     pub fn now_as_s_from_start(&self) -> f32 {
-        Instant::now().duration_since(self.start_time).as_secs_f32()
+        self.instant_to_s_from_start(Instant::now())
+    }
+    pub fn instant_to_s_from_start(&self, instant: Instant) -> f32 {
+        instant.duration_since(self.start_time).as_secs_f32()
+
     }
     pub fn s_from_start_to_instant(&self, s_after_start: f32) -> Instant {
         self.start_time + Duration::from_secs_f32(s_after_start)
@@ -825,7 +833,7 @@ impl WorldState {
     fn render_with_debug_deconstruction(
         &self,
         is_debug: bool,
-        fov_center: Option<IPoint>,
+        fov_center: Option<FPoint>,
         t: f32,
     ) -> (Frame, Vec<Frame>) {
         self.render_with_options(is_debug, fov_center, t)
@@ -833,7 +841,7 @@ impl WorldState {
     fn render_with_options(
         &self,
         is_debug: bool,
-        fov_center: Option<IPoint>,
+        fov_center: Option<FPoint>,
         s_from_start: f32,
     ) -> (Frame, Vec<Frame>) {
         let portal_geometry =
@@ -846,9 +854,9 @@ impl WorldState {
 
         let fov_center = match fov_center {
             Some(x) => x,
-            None => self.player_square,
+            None => self.player_square.to_float(),
         };
-        let fov = game::fov_stuff::portal_aware_field_of_view_from_square(
+        let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
             fov_center.into(),
             10,
             &Default::default(),
@@ -871,7 +879,7 @@ impl WorldState {
                         // let y = self.height - row - 1;
                         let camera_pos: WorldSquare = [camera_x, camera_y].into();
                         let camera_pos_relative_to_fov_center =
-                            camera_pos - WorldSquare::from(fov_center);
+                            camera_pos - WorldSquare::from(fov_center.rounded());
                         let visible_portions_at_relative_square: Vec<
                             PositionedSquareVisibilityInFov,
                         > = match self.portal_rendering {
@@ -1003,7 +1011,7 @@ impl WorldState {
         None
     }
 
-    pub fn render(&self, fov_center: Option<IPoint>, s_from_start: f32) -> Frame {
+    pub fn render(&self, fov_center: Option<FPoint>, s_from_start: f32) -> Frame {
         self.render_with_options(false, fov_center, s_from_start).0
     }
     fn render_one_view_of_a_square(
@@ -1113,7 +1121,7 @@ fn main() {
         let now = std::time::Instant::now();
         game.process_events_in_queue();
 
-        let frame = game.render(game.ui_handler.mouse_world_square());
+        let frame = game.render(game.ui_handler.mouse_world_point(game.ui_handler.instant_to_s_from_start(now)));
         game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         game.ui_handler.screen_buffer.draw_text(
             format!(
