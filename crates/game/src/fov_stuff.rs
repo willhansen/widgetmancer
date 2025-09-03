@@ -1014,8 +1014,7 @@ pub fn field_of_view_within_arc_in_single_octant(
 
 pub fn single_octant_field_of_view(
     center_square: WorldSquare,
-    // TODO
-    // center_offset: WorldMove,
+    center_offset: WorldMove,
     radius: u32,
     octant: Octant,
     sight_blockers: &HashSet<WorldSquare>,
@@ -1028,7 +1027,7 @@ pub fn single_octant_field_of_view(
         portal_geometry,
         center_square,
         STEP_UP.into(),
-        [0.0; 2].into(), // TODO: use real val
+        center_offset,
         radius,
         octant,
         AngleInterval::from_octant(octant),
@@ -1057,13 +1056,18 @@ pub fn portal_aware_field_of_view_from_point(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfViewResult {
+    // Split into square and offset to avoid rounding issues with all the rotations the center
+    // point is going to go through.  Don't want incosistencies if a rotation causes just enough
+    // rounding error to cause it to round to a different center square.
     let center_square = world_point_to_world_square(center_point);
+    let center_offset = center_point - center_square.to_f32();
     (0..8)
         .fold(
             FieldOfViewResult::new_empty_fov_at_square(center_square),
             |fov_result_accumulator: FieldOfViewResult, octant_number: i32| {
                 let new_fov_result = single_octant_field_of_view(
                     center_square,
+                    center_offset,
                     radius,
                     Octant::new(octant_number),
                     sight_blockers,
@@ -1443,6 +1447,7 @@ mod tests {
             HashSet::from([mid_square + STEP_RIGHT * 4, mid_square + STEP_RIGHT * 5]);
         let fov_result = single_octant_field_of_view(
             mid_square,
+            Default::default(),
             10,
             Octant::new(0),
             &sight_blockers,
@@ -1757,6 +1762,7 @@ mod tests {
 
         let fov_result = single_octant_field_of_view(
             center,
+            Default::default(),
             3,
             Octant::new(0),
             &Default::default(),
@@ -1790,6 +1796,7 @@ mod tests {
 
         let fov_result = single_octant_field_of_view(
             center,
+            Default::default(),
             3,
             Octant::new(0),
             &Default::default(),
@@ -2228,6 +2235,7 @@ mod tests {
         let center = point2(5, 5);
         let new_fov_result = single_octant_field_of_view(
             center,
+            Default::default(),
             1,
             Octant::new(0),
             &Default::default(),
@@ -2335,6 +2343,7 @@ mod tests {
         });
         let new_fov_result = single_octant_field_of_view(
             center,
+            Default::default(),
             8,
             Octant::new(0),
             &Default::default(),
