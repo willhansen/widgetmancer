@@ -1636,4 +1636,10 @@ mod tests {
         let right_player_glyph: DrawableGlyph = frame.grid[row][left_col + 1];
         assert!(char_is_braille(right_player_glyph.character));
     }
+    #[test]
+    fn test_render_with_center_offset() {
+        let mut game = Game::new_headless_one_to_one_square(15);
+        let frame = game.render(Some([8.3, 7.4]));
+        assert_frame_same_as_past!(frame, "a");
+    }
 }
