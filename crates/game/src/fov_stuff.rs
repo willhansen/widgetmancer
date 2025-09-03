@@ -41,10 +41,14 @@ impl SquareVisibility {
     pub fn is_fully_visible(&self) -> bool {
         self.visible_portion.is_none()
     }
+    pub fn is_partially_visible(&self) -> bool {
+        !self.is_fully_visible()
+    }
     pub fn is_only_nearly_fully_visible(&self, tolerance: f32) -> bool {
         self.visible_portion
             .is_some_and(|v: LocalSquareHalfPlane| v.fully_covers_expanded_unit_square(-tolerance))
     }
+    // TODO: does this exclude fully visible?
     pub fn is_at_least_partially_visible(&self) -> bool {
         self.visible_portion.is_some_and(|visible_half_plane| {
             visible_half_plane.at_least_partially_covers_unit_square()
@@ -832,7 +836,6 @@ pub fn field_of_view_within_arc_in_single_octant(
     portal_geometry: &PortalGeometry,
     center_square: WorldSquare,
     key_direction: OrthogonalWorldStep,
-    // TODO: use
     center_offset: WorldMove,
     radius: u32,
     octant: Octant,
@@ -859,7 +862,7 @@ pub fn field_of_view_within_arc_in_single_octant(
         let view_arc_of_this_square = if relative_square == STEP_ZERO {
             AngleInterval::from_octant(octant)
         } else {
-            AngleInterval::from_square(relative_square)
+            AngleInterval::from_square_and_center_offset(relative_square, center_offset)
         };
 
         if !view_arc_of_this_square.overlaps_other_by_at_least_this_much(
@@ -873,7 +876,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             if relative_square == STEP_ZERO {
                 Some(SquareVisibility::new_fully_visible())
             } else {
-                visibility_of_square(view_arc, relative_square)
+                visibility_of_offset_square(view_arc, relative_square, center_offset)
             };
 
         if let Some(visibility_of_this_square) = maybe_visibility_of_this_square {
@@ -911,9 +914,10 @@ pub fn field_of_view_within_arc_in_single_octant(
                 .map(|&portal: &Portal| {
                     (
                         portal.clone(),
-                        AngleInterval::from_square_face(
+                        AngleInterval::from_square_face_and_center_offset(
                             relative_square,
                             portal.entrance().direction(),
+                            center_offset,
                         ),
                     )
                 })
@@ -1083,16 +1087,24 @@ pub fn portal_aware_field_of_view_from_point(
 fn point_in_view_arc(view_arc: AngleInterval) -> WorldMove {
     unit_vector_from_angle(view_arc.center_angle()).cast_unit()
 }
-
+// Note that the center_offset is not the offset of the square, but the offset of the view_arc's
+// center
 fn visibility_of_square(
     view_arc: AngleInterval,
     rel_square: WorldStep,
 ) -> Option<SquareVisibility> {
-    let square_arc = AngleInterval::from_square(rel_square);
+    visibility_of_offset_square(view_arc, rel_square, Default::default())
+}
+fn visibility_of_offset_square(
+    view_arc: AngleInterval,
+    rel_square: WorldStep,
+    center_offset: WorldMove,
+) -> Option<SquareVisibility> {
+    let square_arc = AngleInterval::from_square_and_center_offset(rel_square, center_offset);
     if view_arc.at_least_fully_overlaps(square_arc) {
         Some(SquareVisibility::new_fully_visible())
     } else if view_arc.overlapping_but_not_exactly_touching(square_arc) {
-        square_visibility_from_one_view_arc(view_arc, rel_square)
+        square_visibility_from_one_view_arc_with_center_offset(view_arc, rel_square, center_offset)
     } else {
         None
     }
@@ -1102,10 +1114,25 @@ fn square_visibility_from_one_view_arc(
     visibility_arc: AngleInterval,
     square_relative_to_center: WorldStep,
 ) -> Option<SquareVisibility> {
-    let square_arc = AngleInterval::from_square(square_relative_to_center);
+    square_visibility_from_one_view_arc_with_center_offset(
+        visibility_arc,
+        square_relative_to_center,
+        Default::default(),
+    )
+}
+fn square_visibility_from_one_view_arc_with_center_offset(
+    visibility_arc: AngleInterval,
+    square_relative_to_center: WorldStep,
+    center_offset: WorldMove,
+) -> Option<SquareVisibility> {
+    let square_arc =
+        AngleInterval::from_square_and_center_offset(square_relative_to_center, center_offset);
     assert!(visibility_arc.touches_or_overlaps(square_arc));
 
     let shadow_arc = visibility_arc.complement();
+
+    // TODO: May not need to choose one shadow per block in all cases (limited by rendering with
+    // unicode)
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
     let shadow_line_from_center: WorldLine = Line {
@@ -1192,6 +1219,7 @@ mod tests {
     };
     use terminal_rendering::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use terminal_rendering::glyph::DoubleGlyphFunctions;
+    use terminal_rendering::glyph_constants::UPPER_HALF_BLOCK;
     use utility::{
         better_angle_from_x_axis, QuarterTurnsAnticlockwise, SquareWithKingDir,
         SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,
@@ -1439,6 +1467,64 @@ mod tests {
             [FULL_BLOCK, SPACE].into_iter().collect::<String>()
         );
     }
+    #[test]
+    fn test_partial_visibility_of_offset_square() {
+        let first_quadrant = AngleInterval::from_degrees(0.0, 90.0);
+        let square_off_to_the_right = WorldStep::new(5, 0);
+
+        let nearly_top = [0.0, 0.49].into();
+        let no_offset = [0.0, 0.0].into();
+        let nearly_bottom = [0.0, -0.49].into();
+        let offsets = [nearly_top, no_offset, nearly_bottom];
+        let correct_drawn_chars = [[SPACE; 2], [UPPER_HALF_BLOCK; 2], [FULL_BLOCK; 2]];
+        let actually_drawn = offsets.map(|center_offset| {
+            let partial = square_visibility_from_one_view_arc_with_center_offset(
+                first_quadrant,
+                square_off_to_the_right,
+                nearly_top,
+            );
+            assert!(!partial.unwrap().is_fully_visible());
+            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
+                .to_glyphs()
+                .chars()
+        });
+        assert_eq!(correct_drawn_chars, actually_drawn);
+        dbg!(correct_drawn_chars, actually_drawn);
+        todo!();
+    }
+    #[test]
+    fn test_center_offset_can_make_square_not_visible() {
+        let slightly_less_than_first_quadrant = AngleInterval::from_degrees(5.0, 90.0);
+        let square_off_to_the_right = WorldStep::new(5, 0);
+        let visibility_without_offset = square_visibility_from_one_view_arc(
+            slightly_less_than_first_quadrant,
+            square_off_to_the_right,
+        );
+        assert!(visibility_without_offset.is_some_and(|viz| viz.is_partially_visible()));
+        let visibility_with_upwards_offset = square_visibility_from_one_view_arc_with_center_offset(
+            slightly_less_than_first_quadrant,
+            square_off_to_the_right,
+            [0.0, 0.49].into()
+        );
+        assert!(visibility_with_upwards_offset.is_none());
+    }
+    #[test]
+    fn test_center_offset_can_make_square_fully_visible() {
+        let slightly_more_than_first_quadrant = AngleInterval::from_degrees(-5.0, 90.0);
+        let square_off_to_the_right = WorldStep::new(5, 0);
+        let visibility_without_offset = square_visibility_from_one_view_arc(
+            slightly_more_than_first_quadrant,
+            square_off_to_the_right,
+        );
+        assert!(visibility_without_offset.is_some_and(|viz| viz.is_partially_visible()));
+        let visibility_with_downward_offset = square_visibility_from_one_view_arc_with_center_offset(
+            slightly_more_than_first_quadrant,
+            square_off_to_the_right,
+            [0.0, -0.49].into()
+        );
+        assert!(visibility_with_downward_offset.is_some_and(|viz| viz.is_fully_visible()));
+    }
+
 
     #[test]
     fn test_visibility_near_two_blocks() {
