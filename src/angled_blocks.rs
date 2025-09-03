@@ -11,7 +11,9 @@ use crate::glyph::glyph_constants::{
     UPPER_TWO_THIRD_BLOCK,
 };
 use crate::screen::{CharacterGridInLocalCharacterFrame, LocalCharacterPoint};
-use utility::{is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line};
+use utility::{
+    is_clockwise, point_to_string, snap_angle_to_diagonal, unit_vector_from_angle, HalfPlane, Line,
+};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct AngleBlockSnapGridInLocalFrame;
@@ -112,68 +114,67 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
     let mut block_map = HashMap::<(SnapGridPoint, SnapGridPoint), char>::new();
 
     // TODO: find an actual pattern for these
-    block_map.insert((point2(0, 1), point2(1, 0)), '🬼');
-    block_map.insert((point2(0, 1), point2(2, 0)), '🬽');
-    block_map.insert((point2(0, 2), point2(1, 0)), '🬾');
-    block_map.insert((point2(0, 2), point2(2, 0)), '🬿');
-    block_map.insert((point2(0, 3), point2(1, 0)), '🭀');
-    block_map.insert((point2(0, 2), point2(1, 3)), '🭁');
-    block_map.insert((point2(0, 2), point2(2, 3)), '🭂');
-    block_map.insert((point2(0, 1), point2(1, 3)), '🭃');
-    block_map.insert((point2(0, 1), point2(2, 3)), '🭄');
-    block_map.insert((point2(0, 0), point2(1, 3)), '🭅');
-    block_map.insert((point2(0, 1), point2(2, 2)), '🭆');
-    block_map.insert((point2(1, 0), point2(2, 1)), '🭇');
-    block_map.insert((point2(0, 0), point2(2, 1)), '🭈');
-    block_map.insert((point2(1, 0), point2(2, 2)), '🭉');
-    block_map.insert((point2(0, 0), point2(2, 2)), '🭊');
-    block_map.insert((point2(1, 0), point2(2, 3)), '🭋');
-    block_map.insert((point2(1, 3), point2(2, 2)), '🭌');
-    block_map.insert((point2(0, 3), point2(2, 2)), '🭍');
-    block_map.insert((point2(1, 3), point2(2, 1)), '🭎');
-    block_map.insert((point2(0, 3), point2(2, 1)), '🭏');
-    block_map.insert((point2(1, 3), point2(2, 0)), '🭐');
-    block_map.insert((point2(0, 2), point2(2, 1)), '🭑');
-    block_map.insert((point2(1, 0), point2(0, 1)), '🭒');
-    block_map.insert((point2(2, 0), point2(0, 1)), '🭓');
-    block_map.insert((point2(1, 0), point2(0, 2)), '🭔');
-    block_map.insert((point2(2, 0), point2(0, 2)), '🭕');
-    block_map.insert((point2(1, 0), point2(0, 3)), '🭖');
-    block_map.insert((point2(1, 3), point2(0, 2)), '🭗');
-    block_map.insert((point2(2, 3), point2(0, 2)), '🭘');
-    block_map.insert((point2(1, 3), point2(0, 1)), '🭙');
-    block_map.insert((point2(2, 3), point2(0, 1)), '🭚');
-    block_map.insert((point2(1, 3), point2(0, 0)), '🭛');
-    block_map.insert((point2(2, 2), point2(0, 1)), '🭜');
-    block_map.insert((point2(2, 1), point2(1, 0)), '🭝');
-    block_map.insert((point2(2, 1), point2(0, 0)), '🭞');
-    block_map.insert((point2(2, 2), point2(1, 0)), '🭟');
-    block_map.insert((point2(2, 2), point2(0, 0)), '🭠');
-    block_map.insert((point2(2, 3), point2(1, 0)), '🭡');
-    block_map.insert((point2(2, 2), point2(1, 3)), '🭢');
-    block_map.insert((point2(2, 2), point2(0, 3)), '🭣');
-    block_map.insert((point2(2, 1), point2(1, 3)), '🭤');
-    block_map.insert((point2(2, 1), point2(0, 3)), '🭥');
-    block_map.insert((point2(2, 0), point2(1, 3)), '🭦');
-    block_map.insert((point2(2, 1), point2(0, 2)), '🭧');
+    [
+        ([0, 1], [1, 0], '🬼'),
+        ([0, 1], [2, 0], '🬽'),
+        ([0, 2], [1, 0], '🬾'),
+        ([0, 2], [2, 0], '🬿'),
+        ([0, 3], [1, 0], '🭀'),
+        ([0, 2], [1, 3], '🭁'),
+        ([0, 2], [2, 3], '🭂'),
+        ([0, 1], [1, 3], '🭃'),
+        ([0, 1], [2, 3], '🭄'),
+        ([0, 0], [1, 3], '🭅'),
+        ([0, 1], [2, 2], '🭆'),
+        ([1, 0], [2, 1], '🭇'),
+        ([0, 0], [2, 1], '🭈'),
+        ([1, 0], [2, 2], '🭉'),
+        ([0, 0], [2, 2], '🭊'),
+        ([1, 0], [2, 3], '🭋'),
+        ([1, 3], [2, 2], '🭌'),
+        ([0, 3], [2, 2], '🭍'),
+        ([1, 3], [2, 1], '🭎'),
+        ([0, 3], [2, 1], '🭏'),
+        ([1, 3], [2, 0], '🭐'),
+        ([0, 2], [2, 1], '🭑'),
+        ([1, 0], [0, 1], '🭒'),
+        ([2, 0], [0, 1], '🭓'),
+        ([1, 0], [0, 2], '🭔'),
+        ([2, 0], [0, 2], '🭕'),
+        ([1, 0], [0, 3], '🭖'),
+        ([1, 3], [0, 2], '🭗'),
+        ([2, 3], [0, 2], '🭘'),
+        ([1, 3], [0, 1], '🭙'),
+        ([2, 3], [0, 1], '🭚'),
+        ([1, 3], [0, 0], '🭛'),
+        ([2, 2], [0, 1], '🭜'),
+        ([2, 1], [1, 0], '🭝'),
+        ([2, 1], [0, 0], '🭞'),
+        ([2, 2], [1, 0], '🭟'),
+        ([2, 2], [0, 0], '🭠'),
+        ([2, 3], [1, 0], '🭡'),
+        ([2, 2], [1, 3], '🭢'),
+        ([2, 2], [0, 3], '🭣'),
+        ([2, 1], [1, 3], '🭤'),
+        ([2, 1], [0, 3], '🭥'),
+        ([2, 0], [1, 3], '🭦'),
+        ([2, 1], [0, 2], '🭧'),
+        ([1, 0], [1, 3], RIGHT_HALF_BLOCK),
+        ([1, 3], [1, 0], LEFT_HALF_BLOCK),
+        ([0, 1], [2, 1], LOWER_ONE_THIRD_BLOCK),
+        ([0, 2], [2, 2], LOWER_TWO_THIRD_BLOCK),
+        ([2, 1], [0, 1], UPPER_TWO_THIRD_BLOCK),
+        ([2, 2], [0, 2], UPPER_ONE_THIRD_BLOCK),
+        ([0, 0], [2, 3], LOWER_RIGHT_HALF_BLOCK_TRIANGLE),
+        ([2, 3], [0, 0], UPPER_LEFT_HALF_BLOCK_TRIANGLE),
+        ([2, 0], [0, 3], UPPER_RIGHT_HALF_BLOCK_TRIANGLE),
+        ([0, 3], [2, 0], LOWER_LEFT_HALF_BLOCK_TRIANGLE),
+    ]
+    .into_iter()
+    .for_each(|(p1, p2, c)| {
+        block_map.insert((p1.into(), p2.into()), c);
+    });
 
-    block_map.insert((point2(1, 0), point2(1, 3)), RIGHT_HALF_BLOCK);
-    block_map.insert((point2(1, 3), point2(1, 0)), LEFT_HALF_BLOCK);
-    block_map.insert((point2(0, 1), point2(2, 1)), LOWER_ONE_THIRD_BLOCK);
-    block_map.insert((point2(0, 2), point2(2, 2)), LOWER_TWO_THIRD_BLOCK);
-    block_map.insert((point2(2, 1), point2(0, 1)), UPPER_TWO_THIRD_BLOCK);
-    block_map.insert((point2(2, 2), point2(0, 2)), UPPER_ONE_THIRD_BLOCK);
-
-    block_map.insert(
-        (point2(0, 0), point2(2, 3)),
-        LOWER_RIGHT_HALF_BLOCK_TRIANGLE,
-    );
-    block_map.insert((point2(2, 3), point2(0, 0)), UPPER_LEFT_HALF_BLOCK_TRIANGLE);
-    block_map.insert(
-        (point2(2, 0), point2(0, 3)),
-        UPPER_RIGHT_HALF_BLOCK_TRIANGLE,
-    );
-    block_map.insert((point2(0, 3), point2(2, 0)), LOWER_LEFT_HALF_BLOCK_TRIANGLE);
     block_map
 }
 
@@ -337,8 +338,8 @@ pub fn angle_block_chars_are_horizontally_continuous(left_char: char, right_char
 #[cfg(test)]
 mod tests {
     use crate::glyph::glyph_constants::{LOWER_ONE_THIRD_BLOCK, RIGHT_HALF_BLOCK};
-    use utility::Line;
     use pretty_assertions::assert_eq;
+    use utility::Line;
 
     use super::*;
 
