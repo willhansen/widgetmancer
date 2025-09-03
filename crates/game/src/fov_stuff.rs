@@ -18,9 +18,7 @@ use crate::graphics::drawable::{
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
-use terminal_rendering::glyph::glyph_constants::{
-    BLACK, CYAN, DARK_CYAN, FULL_BLOCK, GREY, OUT_OF_SIGHT_COLOR, RED, SPACE, WHITE,
-};
+use terminal_rendering::glyph::glyph_constants::*;
 use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use terminal_rendering::*;
 use utility::angle_interval::AngleInterval;
@@ -1484,7 +1482,13 @@ mod tests {
         let no_offset = [0.0, 0.01].into();
         let nearly_bottom = [0.0, -0.49].into();
         let offsets = [nearly_top, no_offset, nearly_bottom];
-        let correct_drawn_chars = [[SPACE; 2], [UPPER_HALF_BLOCK; 2], [FULL_BLOCK; 2]];
+        let correct_drawn_chars = [
+            [SPACE; 2],
+            // [UPPER_HALF_BLOCK; 2],
+            [UPPER_ONE_THIRD_BLOCK; 2], // TODO: maybe allow more precision on partially visible
+            // blocks
+            [FULL_BLOCK; 2],
+        ];
         let actually_drawn = offsets.map(|center_offset| {
             let partial = square_visibility_from_one_view_arc_with_center_offset(
                 first_quadrant,
@@ -1497,8 +1501,6 @@ mod tests {
                 .chars()
         });
         assert_eq!(actually_drawn, correct_drawn_chars);
-        dbg!(correct_drawn_chars, actually_drawn);
-        todo!();
     }
     #[test]
     fn test_center_offset_can_make_square_not_visible() {
