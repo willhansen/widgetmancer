@@ -1127,23 +1127,30 @@ fn square_visibility_from_one_view_arc_with_center_offset(
 ) -> Option<SquareVisibility> {
     let square_arc =
         AngleInterval::from_square_and_center_offset(square_relative_to_center, center_offset);
-    assert!(visibility_arc.touches_or_overlaps(square_arc));
+    if !visibility_arc.touches_or_overlaps(square_arc) {
+        return None;
+    }
 
     let shadow_arc = visibility_arc.complement();
+    if !shadow_arc.touches_or_overlaps(square_arc) {
+        return Some(SquareVisibility::new_fully_visible());
+    }
 
     // TODO: May not need to choose one shadow per block in all cases (limited by rendering with
     // unicode)
     let overlapped_shadow_edge = shadow_arc.most_overlapped_edge_of_self(square_arc);
 
     let shadow_line_from_center: WorldLine = Line {
-        p1: point2(0.0, 0.0),
+        p1: center_offset.to_point(),
         p2: unit_vector_from_angle(overlapped_shadow_edge.angle())
             .to_point()
-            .cast_unit(),
+            .cast_unit()
+            + center_offset,
     };
     let point_in_shadow: WorldPoint = unit_vector_from_angle(shadow_arc.center_angle())
         .to_point()
-        .cast_unit();
+        .cast_unit()
+        + center_offset;
 
     let shadow_half_plane =
         HalfPlane::from_line_and_point_on_half_plane(shadow_line_from_center, point_in_shadow);
@@ -1473,7 +1480,8 @@ mod tests {
         let square_off_to_the_right = WorldStep::new(5, 0);
 
         let nearly_top = [0.0, 0.49].into();
-        let no_offset = [0.0, 0.0].into();
+        // Nudged a smidge up to remove questions of rounding
+        let no_offset = [0.0, 0.01].into();
         let nearly_bottom = [0.0, -0.49].into();
         let offsets = [nearly_top, no_offset, nearly_bottom];
         let correct_drawn_chars = [[SPACE; 2], [UPPER_HALF_BLOCK; 2], [FULL_BLOCK; 2]];
@@ -1481,14 +1489,14 @@ mod tests {
             let partial = square_visibility_from_one_view_arc_with_center_offset(
                 first_quadrant,
                 square_off_to_the_right,
-                nearly_top,
+                center_offset,
             );
             assert!(!partial.unwrap().is_fully_visible());
             PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
                 .to_glyphs()
                 .chars()
         });
-        assert_eq!(correct_drawn_chars, actually_drawn);
+        assert_eq!(actually_drawn, correct_drawn_chars);
         dbg!(correct_drawn_chars, actually_drawn);
         todo!();
     }
@@ -1504,7 +1512,7 @@ mod tests {
         let visibility_with_upwards_offset = square_visibility_from_one_view_arc_with_center_offset(
             slightly_less_than_first_quadrant,
             square_off_to_the_right,
-            [0.0, 0.49].into()
+            [0.0, 0.49].into(),
         );
         assert!(visibility_with_upwards_offset.is_none());
     }
@@ -1517,14 +1525,14 @@ mod tests {
             square_off_to_the_right,
         );
         assert!(visibility_without_offset.is_some_and(|viz| viz.is_partially_visible()));
-        let visibility_with_downward_offset = square_visibility_from_one_view_arc_with_center_offset(
-            slightly_more_than_first_quadrant,
-            square_off_to_the_right,
-            [0.0, -0.49].into()
-        );
+        let visibility_with_downward_offset =
+            square_visibility_from_one_view_arc_with_center_offset(
+                slightly_more_than_first_quadrant,
+                square_off_to_the_right,
+                [0.0, -0.49].into(),
+            );
         assert!(visibility_with_downward_offset.is_some_and(|viz| viz.is_fully_visible()));
     }
-
 
     #[test]
     fn test_visibility_near_two_blocks() {
