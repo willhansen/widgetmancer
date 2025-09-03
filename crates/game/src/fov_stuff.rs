@@ -311,10 +311,13 @@ pub struct FieldOfViewResult {
 }
 
 impl FieldOfViewResult {
-    pub fn new_empty_fov_with_root(root: SquareWithOrthogonalDir) -> Self {
+    pub fn new_empty_fov_with_root(center: WorldSquare, key_direction: WorldStep) -> Self {
         FieldOfViewResult {
-            root_square_with_direction: root,
-            center_offset: [0.0;2].into(),
+            root_square_with_direction: SquareWithOrthogonalDir::from_square_and_step(
+                center,
+                key_direction,
+            ),
+            center_offset: [0.0; 2].into(),
             visible_relative_squares_in_main_view_only: Default::default(),
             transformed_sub_fovs: vec![],
         }
@@ -323,10 +326,7 @@ impl FieldOfViewResult {
         Self::new_empty_fov_at_point(new_center.to_f32())
     }
     pub fn new_empty_fov_at_point(new_center: WorldPoint) -> Self {
-        Self::new_empty_fov_with_root(SquareWithOrthogonalDir::from_square_and_step(
-            new_center.round().to_i32(),
-            STEP_UP.into(),
-        ))
+        Self::new_empty_fov_with_root(new_center.round().to_i32(), STEP_UP.into())
     }
     pub fn root_square(&self) -> WorldSquare {
         self.root_square_with_direction.square()
@@ -510,11 +510,12 @@ impl FieldOfViewResult {
             .into_iter()
             .map(
                 |(root, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfViewResult>)| {
-                    fov_list.into_iter().reduce(
-                        |acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
+                    fov_list
+                        .into_iter()
+                        .reduce(|acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
                             acc.combined_with(&next_fov)
-                        },
-                    ).unwrap()
+                        })
+                        .unwrap()
                 },
             )
             .collect();
@@ -831,7 +832,7 @@ pub fn field_of_view_within_arc_in_single_octant(
     view_arc: AngleInterval,
     starting_step_in_fov_sequence: u32,
 ) -> FieldOfViewResult {
-    let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(oriented_center_square);
+    let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(oriented_center_square.square(), oriented_center_square.direction().into());
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
@@ -2057,12 +2058,8 @@ mod tests {
             fov.root_square_with_direction.direction().step(),
             quarter_turns,
         );
-        let mut sub_fov = FieldOfViewResult::new_empty_fov_with_root(
-            SquareWithOrthogonalDir::from_square_and_worldstep(
-                sub_center,
-                sub_fov_direction.into(),
-            ),
-        );
+        let mut sub_fov =
+            FieldOfViewResult::new_empty_fov_with_root(sub_center, sub_fov_direction.into());
 
         let rel_square = STEP_DOWN_LEFT * 3;
         let rotated_rel_square =
