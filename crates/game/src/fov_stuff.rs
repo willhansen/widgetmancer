@@ -312,7 +312,10 @@ pub struct FieldOfViewResult {
 }
 
 impl FieldOfViewResult {
-    pub fn new_empty_fov_with_root(center_square: WorldSquare, key_direction: OrthogonalWorldStep) -> Self {
+    pub fn new_empty_fov_with_root(
+        center_square: WorldSquare,
+        key_direction: OrthogonalWorldStep,
+    ) -> Self {
         FieldOfViewResult {
             center_square,
             key_direction,
@@ -322,10 +325,7 @@ impl FieldOfViewResult {
         }
     }
     pub fn new_empty_fov_at_square(new_center: WorldSquare) -> Self {
-        Self::new_empty_fov_at_point(new_center.to_f32())
-    }
-    pub fn new_empty_fov_at_point(new_center: WorldPoint) -> Self {
-        Self::new_empty_fov_with_root(new_center.round().to_i32(), STEP_UP.into())
+        Self::new_empty_fov_with_root(new_center, STEP_UP.into())
     }
     pub fn root_square(&self) -> WorldSquare {
         self.center_square
@@ -830,16 +830,16 @@ impl Iterator for OctantFOVSquareSequenceIter {
 pub fn field_of_view_within_arc_in_single_octant(
     sight_blockers: &SquareSet,
     portal_geometry: &PortalGeometry,
-    oriented_center_square: SquareWithOrthogonalDir,
+    center_square: WorldSquare,
+    key_direction: OrthogonalWorldStep,
+    // TODO: use
+    center_offset: WorldMove,
     radius: u32,
     octant: Octant,
     view_arc: AngleInterval,
     starting_step_in_fov_sequence: u32,
 ) -> FieldOfViewResult {
-    let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(
-        oriented_center_square.square(),
-        oriented_center_square.direction().into(),
-    );
+    let mut fov_result = FieldOfViewResult::new_empty_fov_with_root(center_square, key_direction);
 
     // TODO: Stop being an iterator, just be a function
     let rel_squares_in_fov_sequence =
@@ -854,7 +854,7 @@ pub fn field_of_view_within_arc_in_single_octant(
             break;
         }
 
-        let absolute_square = oriented_center_square.square() + relative_square;
+        let absolute_square = center_square + relative_square;
 
         let view_arc_of_this_square = if relative_square == STEP_ZERO {
             AngleInterval::from_octant(octant)
@@ -934,14 +934,24 @@ pub fn field_of_view_within_arc_in_single_octant(
             significantly_visible_portals_in_sight.iter().for_each(
                 |(&portal, &portal_view_arc): (&Portal, &AngleInterval)| {
                     let transform = portal.get_transform();
-                    let transformed_center = transform.transform_pose(oriented_center_square);
+                    let transformed_center =
+                        transform.transform_pose(SquareWithOrthogonalDir::from_square_and_step(
+                            center_square,
+                            key_direction.into(),
+                        ));
                     let visible_arc_of_portal = view_arc.intersection(portal_view_arc);
                     let transformed_visible_arc_of_portal =
                         transform.transform_arc(visible_arc_of_portal);
+                    let rotated_center_offset = rotated_n_quarter_turns_counter_clockwise(
+                        center_offset,
+                        transform.rotation().quarter_turns(),
+                    );
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
-                        transformed_center,
+                        transformed_center.square(),
+                        transformed_center.direction(),
+                        rotated_center_offset,
                         radius,
                         transform.transform_octant(octant),
                         transformed_visible_arc_of_portal,
@@ -986,7 +996,9 @@ pub fn field_of_view_within_arc_in_single_octant(
                     let sub_arc_fov = field_of_view_within_arc_in_single_octant(
                         sight_blockers,
                         portal_geometry,
-                        oriented_center_square,
+                        center_square,
+                        key_direction,
+                        center_offset,
                         radius,
                         octant,
                         new_sub_arc,
@@ -1002,6 +1014,8 @@ pub fn field_of_view_within_arc_in_single_octant(
 
 pub fn single_octant_field_of_view(
     center_square: WorldSquare,
+    // TODO
+    // center_offset: WorldMove,
     radius: u32,
     octant: Octant,
     sight_blockers: &HashSet<WorldSquare>,
@@ -1012,7 +1026,9 @@ pub fn single_octant_field_of_view(
     let mut fov_result = field_of_view_within_arc_in_single_octant(
         sight_blockers,
         portal_geometry,
-        SquareWithOrthogonalDir::from_square_and_step(center_square, STEP_UP.into()),
+        center_square,
+        STEP_UP.into(),
+        [0.0; 2].into(), // TODO: use real val
         radius,
         octant,
         AngleInterval::from_octant(octant),
@@ -1667,7 +1683,9 @@ mod tests {
         let mut fov_result = field_of_view_within_arc_in_single_octant(
             &Default::default(),
             &portal_geometry,
-            SquareWithOrthogonalDir::from_square_and_step(center, STEP_UP.into()),
+            center,
+            STEP_UP.into(),
+            [0.0; 2].into(),
             radius,
             Octant::new(0),
             view_arc,
@@ -2061,10 +2079,8 @@ mod tests {
 
         let quarter_turns = 3;
 
-        let sub_fov_direction = rotated_n_quarter_turns_counter_clockwise(
-            fov.key_direction.step(),
-            quarter_turns,
-        );
+        let sub_fov_direction =
+            rotated_n_quarter_turns_counter_clockwise(fov.key_direction.step(), quarter_turns);
         let mut sub_fov =
             FieldOfViewResult::new_empty_fov_with_root(sub_center, sub_fov_direction.into());
 
