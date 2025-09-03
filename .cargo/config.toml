@@ -1,6 +1,6 @@
 [build]
 rustflags = [
-  '-Cinstrument-coverage',
+  # '-Cinstrument-coverage',
   '-Cforce-frame-pointers=yes',
   '-Zinstrument-mcount',
   '-Cpasses=ee-instrument<post-inline>'
