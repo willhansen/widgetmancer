@@ -1424,9 +1424,8 @@ mod tests {
         );
         assert_frame_same_as_past!(frame, "a", true);
     }
-    #[ignore]
     #[test]
-    fn test_render_smoothed_mouse_linear_move() {
+    fn test_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_one_to_one_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_fake_event((0.0, press_left(1, 1)));
@@ -1434,9 +1433,14 @@ mod tests {
         let n = game.process_events_in_queue();
         assert_eq!(n, 2);
 
-        let frame = game.render_with_mouse_at_time(None, 0.4);
-        assert!(char_is_braille(frame.grid[0][2].character), "{frame:?}");
-        assert_frame_same_as_past!(frame, "a", true);
+        let pos = game.ui_handler.smoothed_mouse_position_screen_row_col(0.21).unwrap();
+        dbg!(pos);
+        assert!(pos[0] > 1.0);
+        assert!(pos[0] < 1.1);
+        let pos = game.ui_handler.smoothed_mouse_position_screen_row_col(5.0).unwrap();
+        dbg!(pos);
+        assert!(pos[0] - 2.0 < 0.0001);
+        // assert_frame_same_as_past!(frame, "a", true);
     }
 
 
