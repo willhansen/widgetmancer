@@ -1,11 +1,10 @@
-
 pub type IPoint = [i32; 2];
 pub type UPoint = [u32; 2];
 pub type FPoint = [f32; 2];
 pub type OrthoDir = i32;
 pub type SquareEdge = (IPoint, OrthoDir);
 // 1-indexed
-pub type ScreenRowColCharPos = [u16;2];
+pub type ScreenRowColCharPos = [u16; 2];
 
 pub const DIR_RIGHT: i32 = 0;
 pub const DIR_UP: i32 = 1;
@@ -51,7 +50,6 @@ pub trait IPointExt: Sized {
     }
     fn squared_length(&self) -> i32 {
         self.x().pow(2) + self.y().pow(2)
-
     }
 }
 
@@ -70,13 +68,12 @@ pub trait UPointExt {
     fn to_signed(&self) -> IPoint;
 }
 impl UPointExt for UPoint {
-
     fn to_signed(&self) -> IPoint {
         [self[0] as i32, self[1] as i32]
     }
 }
 
-pub trait FPointExt: Sized {
+pub trait FPointExt: Sized + Clone {
     fn x(&self) -> f32;
     fn y(&self) -> f32;
     fn new(x: f32, y: f32) -> Self;
@@ -85,6 +82,9 @@ pub trait FPointExt: Sized {
     }
     fn mul(&self, rhs: f32) -> Self {
         Self::new(self.x() * rhs, self.y() * rhs)
+    }
+    fn div(&self, rhs: f32) -> Self {
+        self.mul(1.0 / rhs)
     }
     fn neg(&self) -> Self {
         Self::new(-self.x(), -self.y())
@@ -98,10 +98,24 @@ pub trait FPointExt: Sized {
     fn rounded(&self) -> IPoint {
         [self.x().round() as i32, self.y().round() as i32]
     }
+    fn length(&self) -> f32 {
+        (self.x().powi(2) + self.y().powi(2)).sqrt()
+    }
     fn dist(&self, other: Self) -> f32 {
-        let dx = other.x() - self.x();
-        let dy = other.y() - self.y();
-        dx.powi(2) + dy.powi(2)
+        other.sub(self.clone()).length()
+    }
+    fn lerp(&self, other: Self, t: f32) -> Self {
+        if t == 0.0 {
+            return self.clone();
+        }
+        if t == 1.0 {
+            return other;
+        }
+        let dp = other.sub(self.clone());
+        self.add(dp.mul(t))
+    }
+    fn normalized(&self) -> Self {
+        self.div(self.length())
     }
 }
 impl FPointExt for FPoint {
@@ -126,7 +140,7 @@ impl OrthoPoseExt for ([i32; 2], i32) {
         (self.0, (self.1 + quarter_turns_ccw).rem_euclid(4))
     }
     fn reversed(&self) -> Self {
-        (self.0, (self.1+2)%4)
+        (self.0, (self.1 + 2) % 4)
     }
     fn stepped(&self) -> Self {
         (self.0.add(step_in_direction(self.1)), self.1)

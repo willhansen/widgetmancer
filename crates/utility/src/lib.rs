@@ -3,9 +3,8 @@
 
 extern crate num;
 
-
 use std::collections::{HashMap, HashSet};
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::{LN_2, PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
@@ -29,6 +28,8 @@ pub use angle_interval::*;
 
 pub mod coordinate_frame_conversions;
 pub use coordinate_frame_conversions::*;
+
+use crate::geometry2::FPointExt;
 
 pub mod geometry2;
 
@@ -537,7 +538,6 @@ where
         )
     }
 }
-
 
 impl<U> Add<Vector2D<f32, U>> for Line<f32, U> {
     type Output = Line<f32, U>;
@@ -1698,11 +1698,77 @@ pub fn transpose_grid<T: Copy>(grid: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     let height = grid.len();
     let width = grid[0].len();
 
-    (0..width).map(|col| {
-        (0..height).map(|row| {
-            grid[row][col]
-        }).collect_vec()
-    }).collect_vec()
+    (0..width)
+        .map(|col| (0..height).map(|row| grid[row][col]).collect_vec())
+        .collect_vec()
+}
+pub fn exponential_approach(
+    start_pos: geometry2::FPoint,
+    target_pos: geometry2::FPoint,
+    dt: f32,
+    dist_halflife: f32,
+) -> geometry2::FPoint {
+    let time_constant = dist_halflife / LN_2;
+    let dp = target_pos.sub(start_pos);
+    let dist = dp.length();
+    let end_dist = dist * (-dt / time_constant).exp();
+    target_pos.sub(dp.normalized().mul(end_dist))
+}
+pub fn linear_approach(
+    start_pos: geometry2::FPoint,
+    target_pos: geometry2::FPoint,
+    dt: f32,
+    speed: f32,
+) -> geometry2::FPoint {
+    let dp = target_pos.sub(start_pos);
+    let dist = dp.length();
+    let arrival_dt = dist / speed;
+    if arrival_dt < dt {
+        return target_pos;
+    }
+
+    start_pos.lerp(target_pos, dt / arrival_dt)
+}
+
+pub fn exponential_approach_with_min_speed(
+    start_pos: geometry2::FPoint,
+    target_pos: geometry2::FPoint,
+    dt: f32,
+    dist_halflife: f32,
+    min_speed: f32,
+) -> geometry2::FPoint {
+    let delta_pos = target_pos.sub(start_pos);
+    let start_dist = delta_pos.length();
+
+    let time_constant = dist_halflife / LN_2;
+
+    let speed_at_start = start_dist / time_constant * (-dt / time_constant).exp();
+
+    let time_until_transition = time_constant * (start_dist / (min_speed * time_constant)).ln();
+
+    if time_until_transition > dt {
+        return exponential_approach(start_pos,  target_pos, dt, dist_halflife);
+    }
+
+    let linear_start_pos;
+    let linear_dt;
+    if time_until_transition < 0.0 {
+        linear_start_pos = start_pos;
+        linear_dt = dt;
+    } else {
+        linear_dt = dt - time_until_transition;
+        let movement_direction = delta_pos.normalized();
+        let dist_that_decay_reaches_min_speed = min_speed * time_constant;
+        linear_start_pos =
+            target_pos.sub(movement_direction.mul(dist_that_decay_reaches_min_speed));
+    }
+
+    linear_approach(
+        linear_start_pos,
+        target_pos,
+        linear_dt,
+        min_speed,
+    )
 }
 
 #[cfg(test)]
