@@ -94,10 +94,6 @@ impl Game {
             ui_handler: UiHandler::new_headless(screen_height, screen_width),
         }
     }
-    pub fn give_and_process_fake_event_now(&mut self, event: Event) {
-        self.ui_handler.give_fake_event_now(event);
-        assert!(self.try_process_next_event());
-    }
     pub fn process_event(&mut self, time: f32, event: Event) {
         self.ui_handler.advance_time_to(time);
         match event {
@@ -147,24 +143,24 @@ impl Game {
             Event::Unsupported(items) => todo!(),
         };
     }
-    pub fn process_next_event(&mut self) {
-        let (time, event) = self.ui_handler.next_event();
-        self.process_event(time, event)
+    pub fn advance_time_by(&mut self, dt_s: f32) {
+        assert!(dt_s >= 0.0);
+        let s_from_start = self.ui_handler.s_from_start + dt_s;
+        self.advance_time_to(s_from_start);
     }
-    pub fn try_process_next_event(&mut self) -> bool {
-        // true if processed, false if no next found
-        let Some((time, event)) = self.ui_handler.try_get_next_event() else {
-            return false;
-        };
-        self.process_event(time, event);
+    pub fn advance_time_to(&mut self, s_from_start: f32) {
+        self.ui_handler.advance_time_to(s_from_start);
+        self.world_state.advance_time_to(s_from_start);
 
-        true
     }
-    pub fn process_events_in_queue(&mut self) -> usize {
-        let mut n = 0;
-        while self.try_process_next_event() {
-            n += 1;
-        }
+    pub fn process_events(&mut self) -> usize {
+        self.ui_handler.receive_events();
+        let to_process = self.ui_handler.take_unprocessed_past_events();
+        let n = to_process.len();
+        to_process.into_iter().for_each(|e| {
+            self.process_event(e.0, e.1.clone());
+            self.ui_handler.event_log.push_back(e);
+        });
         n
     }
     pub fn render_with_mouse(&mut self, fov_center: Option<FPoint>) -> Frame {
@@ -212,13 +208,10 @@ impl Game {
         self.ui_handler.now_as_s_from_start()
     }
     pub fn render_now_with_debug(&self, fov_center: Option<FPoint>) -> (Frame, Vec<Frame>) {
-        self.world_state
-            .render_with_options(true, fov_center)
+        self.world_state.render_with_options(true, fov_center)
     }
     pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
-        self.world_state
-            .render_with_options(false, fov_center)
-            .0
+        self.world_state.render_with_options(false, fov_center).0
     }
 }
 
@@ -449,14 +442,18 @@ struct UiHandler {
     // has no use for real-time reference points that are instants
     pub start_time: Instant,
     pub s_from_start: f32,
-    // newest events are added via `push_back`
-    pub event_log: VecDeque<(f32, Event)>,
     // 1-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
     pub smoothed_mouse_screen_row_col: Option<FPoint>,
     pub output_writable: Option<Box<dyn Write>>,
-    pub event_receiver: Receiver<(Instant, Event)>,
     pub copy_of_event_sender: Sender<(Instant, Event)>,
+
+    pub event_receiver: Receiver<(Instant, Event)>,
+    // This stores events between receiving and processing
+    pub event_queue: VecDeque<(f32, Event)>,
+    // This stores events after processing
+    // newest events are added via `push_back`
+    pub event_log: VecDeque<(f32, Event)>,
     pub prev_drawn: Option<Frame>,
     pub screen_buffer: Frame,
     pub enable_mouse_smoothing: bool,
@@ -473,19 +470,19 @@ impl UiHandler {
             return;
         };
         let target_pos = mouse_screen_square.map(|x| x as f32);
-        let Some( prev_pos) = self.smoothed_mouse_screen_row_col else {
+        let Some(prev_pos) = self.smoothed_mouse_screen_row_col else {
             self.smoothed_mouse_screen_row_col = Some(target_pos);
             return;
         };
 
-        self.smoothed_mouse_screen_row_col = Some(exponential_approach_with_min_speed(prev_pos, target_pos, dt_s, 0.5, 5.0));
-
+        self.smoothed_mouse_screen_row_col = Some(exponential_approach_with_min_speed(
+            prev_pos, target_pos, dt_s, 0.5, 5.0,
+        ));
     }
 
     pub fn advance_time_to(&mut self, new_s_from_start: f32) {
         let dt = new_s_from_start - self.s_from_start;
         self.advance_time_by(dt);
-
     }
     pub fn advance_time_by(&mut self, dt_s: f32) {
         assert!(dt_s > 0.0, "dt must be positive. dt: {dt_s}");
@@ -508,11 +505,7 @@ impl UiHandler {
             .into_alternate_screen()
             .unwrap(),
         );
-        let ui_handler = Self::new_maybe_headless(
-            term_height,
-            term_width,
-            Some(output_writable),
-        );
+        let ui_handler = Self::new_maybe_headless(term_height, term_width, Some(output_writable));
         set_up_input_thread_given_sender(ui_handler.copy_of_event_sender.clone());
         ui_handler
     }
@@ -550,7 +543,7 @@ impl UiHandler {
         screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
-         Self::new_maybe_headless(screen_height, screen_width, None)
+        Self::new_maybe_headless(screen_height, screen_width, None)
     }
     pub fn new_maybe_headless(
         screen_height: u16,
@@ -561,12 +554,13 @@ impl UiHandler {
         UiHandler {
             start_time: Instant::now(),
             s_from_start: 0.0,
-            event_log: Default::default(),
             last_mouse_screen_row_col: None,
             smoothed_mouse_screen_row_col: None,
             output_writable,
             event_receiver,
             copy_of_event_sender: event_sender,
+            event_queue: Default::default(),
+            event_log: Default::default(),
             prev_drawn: None,
             screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
             enable_mouse_smoothing: false,
@@ -587,9 +581,7 @@ impl UiHandler {
         }
     }
     pub fn draw_smoothed_mouse(&mut self) {
-        if let Some(smoothed_mouse_pos_row_col) =
-            self.smoothed_mouse_position_screen_row_col()
-        {
+        if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col() {
             let smoothed_mouse_pos_xy =
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
@@ -620,41 +612,43 @@ impl UiHandler {
         self.prev_drawn = Some(self.screen_buffer.clone());
     }
 
-    pub fn try_get_next_event(&mut self) -> Option<(f32, Event)> {
-        self.event_receiver.try_recv().ok().map(|(instant, event)| {
+    pub fn receive_events(&mut self) {
+        self.event_receiver.try_iter().for_each(|(instant, event)| {
             let t = instant.duration_since(self.start_time).as_secs_f32();
-            self.log_event((t, event.clone()));
-            (t, event)
-        })
-    }
-    pub fn next_event(&mut self) -> (f32, Event) {
-        self.event_receiver
-            .recv()
-            .ok()
-            .map(|(instant, event)| {
-                let t = instant.duration_since(self.start_time).as_secs_f32();
-                self.log_event((t, event.clone()));
-                (t, event)
-            })
-            .unwrap()
-    }
-    fn log_event(&mut self, e: (f32, Event)) {
-        self.event_log.push_back(e);
-        while self.event_log.len() > 20 {
-            self.event_log.pop_front();
-        }
+            self.event_queue.push_back((t, event.clone()))
+        });
     }
 
-    pub fn give_fake_event(&mut self, event: (f32, Event)) {
-        let t = self.s_from_start_to_instant(event.0).clone();
-        self.copy_of_event_sender
-            .send((t, event.1))
-            .unwrap()
+    pub fn take_unprocessed_past_events(&mut self) -> Vec<(f32, Event)> {
+        let mut past_events: Vec<(f32, Event)> = Default::default();
+        loop {
+            if let Some(next_event) = self.event_queue.pop_front() {
+                if next_event.0 <= self.s_from_start {
+                    past_events.push(next_event);
+                } else {
+                    self.event_queue.push_front(next_event);
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        past_events
     }
-    pub fn give_fake_event_now(&mut self, event: Event) {
-        self.copy_of_event_sender
-            .send((Instant::now(), event))
-            .unwrap()
+
+    pub fn give_future_event_absolute(&mut self, event: Event, s_from_start: f32) {
+        assert!(s_from_start >= self.s_from_start);
+        let t = self.s_from_start_to_instant(s_from_start);
+        self.copy_of_event_sender.send((t, event)).unwrap()
+    }
+    pub fn give_future_event_relative(&mut self, event: Event, dt_s: f32) {
+        assert!(dt_s >= 0.0);
+        let s_from_start = self.s_from_start + dt_s;
+        let t = self.s_from_start_to_instant(s_from_start);
+        self.copy_of_event_sender.send((t, event)).unwrap()
+    }
+    pub fn give_event(&mut self, event: Event) {
+        self.give_future_event_absolute(event, self.s_from_start);
     }
     pub fn now_as_s_from_start(&self) -> f32 {
         self.instant_to_s_from_start(Instant::now())
@@ -684,6 +678,47 @@ impl UiHandler {
     }
 }
 
+#[cfg(test)]
+mod ui_handler_tests {
+    use super::*;
+    use termion::event::*;
+    fn press_char(c: char) -> Event {
+        Event::Key(Key::Char(c))
+    }
+    #[test]
+    fn test_give_events_and_advance_time() {
+        let mut ui_handler = UiHandler::new_headless(30, 10);
+        ui_handler.advance_time_by(1.0);
+        ui_handler.give_event(press_char('a'));
+        assert_eq!(ui_handler.event_queue.len(), 1);
+        ui_handler.advance_time_by(1.0);
+        assert_eq!(ui_handler.event_log.len(), 1);
+        assert_eq!(ui_handler.event_queue.len(), 0);
+        ui_handler.give_future_event_absolute(press_char('b'), 2.5);
+        ui_handler.give_future_event_relative(press_char('c'), 0.7);
+        assert_eq!(ui_handler.event_queue.len(), 2);
+        assert_eq!(ui_handler.event_log.len(), 1);
+        ui_handler.advance_time_by(0.6);
+        assert_eq!(ui_handler.event_log.len(), 2);
+        assert_eq!(ui_handler.event_queue.len(), 1);
+        ui_handler.advance_time_by(300.0);
+        assert_eq!(ui_handler.event_log.len(), 3);
+        assert_eq!(ui_handler.event_queue.len(), 0);
+    }
+    #[test]
+    fn test_give_and_process_event_with_no_time_advancement() {
+        let mut ui_handler = UiHandler::new_headless(30, 10);
+        ui_handler.advance_time_by(1.0);
+        ui_handler.give_event(press_char('a'));
+        assert_eq!(ui_handler.event_queue.len(), 1);
+        assert_eq!(ui_handler.event_log.len(), 0);
+
+        ui_handler.advance_time_by(0.0);
+        assert_eq!(ui_handler.event_log.len(), 1);
+        assert_eq!(ui_handler.event_queue.len(), 0);
+    }
+}
+
 struct WorldState {
     running: bool,
     s_from_start: f32,
@@ -703,7 +738,7 @@ struct WorldState {
 }
 impl WorldState {
     pub fn new(width: usize, height: usize) -> Self {
-        let player_square= [width, height].to_int().div(2);
+        let player_square = [width, height].to_int().div(2);
         let mut state = WorldState {
             running: true,
             s_from_start: 0.0,
@@ -1077,7 +1112,13 @@ impl WorldState {
     }
 
     pub fn advance_smoothed_player_pos(&mut self, dt_s: f32) {
-        self.smoothed_player_pos = exponential_approach_with_min_speed(self.smoothed_player_pos, self.player_square.to_float(), dt_s, 0.2, 15.0);
+        self.smoothed_player_pos = exponential_approach_with_min_speed(
+            self.smoothed_player_pos,
+            self.player_square.to_float(),
+            dt_s,
+            0.2,
+            15.0,
+        );
     }
 }
 
@@ -1104,9 +1145,9 @@ fn main() {
     while game.world_state.running {
         let now = std::time::Instant::now();
         let s_from_start = game.ui_handler.instant_to_s_from_start(now);
-        game.process_events_in_queue();
-
         game.ui_handler.advance_time_to(s_from_start);
+        game.process_events();
+
         let smooth_mouse_pos = game.ui_handler.mouse_world_point();
         let frame = game.render(smooth_mouse_pos);
         game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
@@ -1169,7 +1210,8 @@ mod tests {
     fn test_click_a() {
         let mut game = Game::new_headless_square(12);
 
-        game.give_and_process_fake_event_now(press_left(1, 1));
+        game.ui_handler.give_event(press_left(1, 1));
+        game.process_events();
         let frame = game.render_with_mouse(None);
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
@@ -1178,7 +1220,8 @@ mod tests {
     #[test]
     fn test_click_a_small() {
         let mut game = Game::new_headless_square(2);
-        game.give_and_process_fake_event_now(press_left(1, 1));
+        game.ui_handler.give_event(press_left(1, 1));
+        game.process_events();
         let frame = game.render_with_mouse(None);
         // dbg!(&frame);
         // dbg!(&frame.grid);
@@ -1187,7 +1230,8 @@ mod tests {
     #[test]
     fn test_click_b() {
         let mut game = Game::new_headless_square(12);
-        game.give_and_process_fake_event_now(press_left(4, 10));
+        game.ui_handler.give_event(press_left(4, 10));
+        game.process_events();
         let frame = game.render_with_mouse(None);
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
@@ -1198,11 +1242,14 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = Game::new_headless(12, 24, 12, 12);
-        game.give_and_process_fake_event_now(press_left(4, 4));
+        game.ui_handler.give_event(press_left(4, 4));
+        game.process_events();
         let frame_1 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse_to(5, 4));
+        game.ui_handler.give_event(drag_mouse_to(5, 4));
+        game.process_events();
         let frame_2 = game.render_with_mouse(None);
-        game.give_and_process_fake_event_now(drag_mouse_to(6, 4));
+        game.ui_handler.give_event(drag_mouse_to(6, 4));
+        game.process_events();
         let frame_3 = game.render_with_mouse(None);
         // dbg!(&frame_1, &frame_2, &frame_3);
         assert_frame_same_as_past!(frame_1, "1");
@@ -1301,7 +1348,7 @@ mod tests {
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut game = Game::new_headless_square(12);
-        game.world_state.player_square = [5,5];
+        game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = WorldState::radial_sin_board_colors;
         game.world_state
@@ -1318,7 +1365,7 @@ mod tests {
     #[test]
     fn test_portal_with_rotation() {
         let mut game = Game::new_headless_square(12);
-        game.world_state.player_square = [5,5];
+        game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = |world_state, square| {
             let n = 10;
@@ -1430,7 +1477,8 @@ mod tests {
     fn test_render_smoothed_mouse_stationary() {
         let mut game = Game::new_headless_square(2);
         game.ui_handler.enable_mouse_smoothing = true;
-        game.give_and_process_fake_event_now(press_left(1, 1));
+        game.ui_handler.give_event(press_left(1, 1));
+        game.process_events();
         let frame = game.render_with_mouse(None);
         println!("{}", &frame.escaped_regular_display_string());
         assert!(
@@ -1439,16 +1487,16 @@ mod tests {
         );
         assert_frame_same_as_past!(frame, "a", true);
     }
-    // #[ignore = "TODO"]
+    #[ignore = "TODO"]
     #[test]
     fn test_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
-        game.ui_handler.give_fake_event((0.0, press_left(1, 1)));
-        game.process_events_in_queue();
+        game.ui_handler.give_event(press_left(1, 1));
+        game.process_events();
         game.ui_handler.advance_time_to(0.2);
-        game.ui_handler.give_fake_event((0.2, drag_mouse_to(2, 1)));
-        game.process_events_in_queue();
+        game.ui_handler.give_event(drag_mouse_to(2, 1));
+        game.process_events();
 
         game.ui_handler.advance_time_to(0.21);
         let pos = game
@@ -1502,11 +1550,15 @@ mod tests {
     #[test]
     fn test_render_with_center_offset() {
         let mut game = Game::new_headless_square(25);
-        game.ui_handler.give_fake_event((1.0, press_left(5, 6)));
-        game.process_events_in_queue();
-        game.ui_handler.give_fake_event((2.0, drag_mouse_to(6, 6)));
-        game.process_events_in_queue();
-        let n=43;
+        game.ui_handler
+            .give_future_event_absolute(press_left(5, 6), 1.0);
+        game.advance_time_to(1.0);
+        game.process_events();
+        game.ui_handler
+            .give_future_event_absolute(drag_mouse_to(6, 6), 2.0);
+        game.advance_time_to(2.0);
+        game.process_events();
+        let n = 43;
         (0..n).for_each(|x| {
             let t = 1.5 + x as f32 / 20.0;
             let p = [5.0 + x as f32 / 20.0, 8.0 + x as f32 / n as f32 * 5.0];
@@ -1519,8 +1571,9 @@ mod tests {
     #[test]
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(20, 30, 8, 8);
-        game.ui_handler.give_fake_event((1.0, press_left(5,5)));
-        game.process_events_in_queue();
+        game.ui_handler
+            .give_future_event_absolute(press_left(5, 5), 1.0);
+        game.process_events();
         // let frame = game.render();
         // assert_frame_same_as_past!(frame, "a");
         todo!();

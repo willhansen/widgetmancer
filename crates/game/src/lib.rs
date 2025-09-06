@@ -40,7 +40,6 @@ pub mod piece;
 pub mod portal_geometry;
 pub mod utils_for_tests;
 
-
 fn set_up_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
         stdout().flush().expect("flush stdout");
@@ -49,8 +48,7 @@ fn set_up_panic_hook() {
     }));
 }
 
-pub fn set_up_input_thread_given_sender(sender: Sender<(Instant, Event)>)  {
-
+pub fn set_up_input_thread_given_sender(sender: Sender<(Instant, Event)>) {
     thread::spawn(move || {
         for c in stdin().events() {
             let evt = c.unwrap();
@@ -58,6 +56,7 @@ pub fn set_up_input_thread_given_sender(sender: Sender<(Instant, Event)>)  {
         }
     });
 }
+
 pub fn set_up_input_thread() -> Receiver<(Instant, Event)> {
     let (tx, rx) = channel();
     set_up_input_thread_given_sender(tx);
