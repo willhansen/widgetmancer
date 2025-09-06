@@ -27,6 +27,9 @@ pub trait IPointExt: Sized {
     fn mul(&self, rhs: i32) -> Self {
         Self::new(self.x() * rhs, self.y() * rhs)
     }
+    fn div(&self, rhs: i32) -> Self {
+        Self::new(self.x() / rhs, self.y() / rhs)
+    }
     fn neg(&self) -> Self {
         Self::new(-self.x(), -self.y())
     }
@@ -66,10 +69,14 @@ impl IPointExt for IPoint {
 }
 pub trait UPointExt {
     fn to_signed(&self) -> IPoint;
+    fn to_float(&self) -> FPoint;
 }
 impl UPointExt for UPoint {
     fn to_signed(&self) -> IPoint {
-        [self[0] as i32, self[1] as i32]
+        self.map(|x| x as i32)
+    }
+    fn to_float(&self) -> FPoint {
+        self.map(|x| x as f32)
     }
 }
 
@@ -127,6 +134,15 @@ impl FPointExt for FPoint {
     }
     fn new(x: f32, y: f32) -> Self {
         [x, y]
+    }
+}
+
+pub trait USizePointExt {
+    fn to_int(&self) -> IPoint;
+}
+impl USizePointExt for [usize; 2] {
+    fn to_int(&self) -> IPoint {
+        self.map(|x| x as i32)
     }
 }
 

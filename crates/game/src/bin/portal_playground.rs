@@ -6,6 +6,7 @@ use euclid::point2;
 use game::fov_stuff::{
     FieldOfViewResult, MappedSquare, PositionedSquareVisibilityInFov, SquareVisibility,
 };
+use game::set_up_input_thread_given_sender;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
 use rgb::RGB8;
@@ -79,7 +80,7 @@ impl Game {
             ui_handler: UiHandler::new(),
         }
     }
-    pub fn new_headless_one_to_one_square(s: usize) -> Self {
+    pub fn new_headless_square(s: usize) -> Self {
         Self::new_headless(s as u16, s as u16 * 2, s, s)
     }
     pub fn new_headless(
@@ -98,6 +99,7 @@ impl Game {
         assert!(self.try_process_next_event());
     }
     pub fn process_event(&mut self, time: f32, event: Event) {
+        self.ui_handler.advance_time_to(time);
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.world_state.running = false,
@@ -211,16 +213,11 @@ impl Game {
     }
     pub fn render_now_with_debug(&self, fov_center: Option<FPoint>) -> (Frame, Vec<Frame>) {
         self.world_state
-            .render_with_options(true, fov_center, self.now_as_s_from_start())
+            .render_with_options(true, fov_center)
     }
     pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
         self.world_state
-            .render_with_options(false, fov_center, self.now_as_s_from_start())
-            .0
-    }
-    pub fn render_at_time(&self, fov_center: Option<FPoint>, s_from_start: f32) -> Frame {
-        self.world_state
-            .render_with_options(false, fov_center, s_from_start)
+            .render_with_options(false, fov_center)
             .0
     }
 }
@@ -255,9 +252,7 @@ impl Camera {
     pub fn from_bottom_left_and_size(bottom_left_square: IPoint, width_height: [u32; 2]) -> Self {
         Self {
             lower_left_square: bottom_left_square,
-            upper_right_square: bottom_left_square
-                .add(width_height.to_signed())
-                .sub([1, 1]),
+            upper_right_square: bottom_left_square.add(width_height.to_signed()).sub([1, 1]),
         }
     }
     pub fn bottom_left_square(&self) -> IPoint {
@@ -268,12 +263,8 @@ impl Camera {
     }
     pub fn size_in_world(&self) -> [u32; 2] {
         [
-            (self.upper_right_square[0] - self.lower_left_square[0])
-                as u32
-                + 1,
-            (self.upper_right_square[1] - self.lower_left_square[1])
-                as u32
-                + 1,
+            (self.upper_right_square[0] - self.lower_left_square[0]) as u32 + 1,
+            (self.upper_right_square[1] - self.lower_left_square[1]) as u32 + 1,
         ]
     }
     pub fn width_in_world(&self) -> u32 {
@@ -332,7 +323,9 @@ impl Camera {
         &self,
         absolute_world_square: IPoint,
     ) -> IPoint {
-        self.local_world_square_to_left_frame_row_col(self.absolute_to_local_world_square(absolute_world_square))
+        self.local_world_square_to_left_frame_row_col(
+            self.absolute_to_local_world_square(absolute_world_square),
+        )
     }
     pub fn local_world_square_to_left_frame_row_col(&self, local_world_square: IPoint) -> IPoint {
         [local_world_square[0] * 2, local_world_square[1]]
@@ -455,41 +448,55 @@ struct UiHandler {
     // This instant is the link between the real world and "seconds from start".  The game world
     // has no use for real-time reference points that are instants
     pub start_time: Instant,
+    pub s_from_start: f32,
     // newest events are added via `push_back`
     pub event_log: VecDeque<(f32, Event)>,
     // 1-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
-    pub last_smoothed_mouse_time_and_screen_row_col: Option<(f32, FPoint)>,
+    pub smoothed_mouse_screen_row_col: Option<FPoint>,
     pub output_writable: Option<Box<dyn Write>>,
     pub event_receiver: Receiver<(Instant, Event)>,
-    pub fake_event_sender: Option<Sender<(Instant, Event)>>,
+    pub copy_of_event_sender: Sender<(Instant, Event)>,
     pub prev_drawn: Option<Frame>,
     pub screen_buffer: Frame,
     pub enable_mouse_smoothing: bool,
     pub camera: Camera,
 }
 impl UiHandler {
-    fn smoothed_mouse_position_screen_row_col(&mut self, t: f32) -> Option<FPoint> {
+    fn smoothed_mouse_position_screen_row_col(&mut self) -> Option<FPoint> {
+        self.smoothed_mouse_screen_row_col
+    }
+
+    fn advance_smoothed_mouse(&mut self, dt_s: f32) {
         let Some(mouse_screen_square) = self.last_mouse_screen_row_col else {
-            return None;
+            self.smoothed_mouse_screen_row_col = None;
+            return;
         };
         let target_pos = mouse_screen_square.map(|x| x as f32);
-        let Some((prev_t, prev_pos)) = self.last_smoothed_mouse_time_and_screen_row_col else {
-
-            self.last_smoothed_mouse_time_and_screen_row_col = Some((t, target_pos));
-            return Some(target_pos);
+        let Some( prev_pos) = self.smoothed_mouse_screen_row_col else {
+            self.smoothed_mouse_screen_row_col = Some(target_pos);
+            return;
         };
 
-        let dt = t - prev_t;
-        let new_pos = exponential_approach_with_min_speed(prev_pos, target_pos, dt, 0.5, 5.0);
-        self.last_smoothed_mouse_time_and_screen_row_col = Some((t, new_pos));
-        return Some(new_pos);
+        self.smoothed_mouse_screen_row_col = Some(exponential_approach_with_min_speed(prev_pos, target_pos, dt_s, 0.5, 5.0));
+
     }
 
-    pub fn height(&self) -> usize {
+    pub fn advance_time_to(&mut self, new_s_from_start: f32) {
+        let dt = new_s_from_start - self.s_from_start;
+        self.advance_time_by(dt);
+
+    }
+    pub fn advance_time_by(&mut self, dt_s: f32) {
+        assert!(dt_s > 0.0, "dt must be positive. dt: {dt_s}");
+
+        self.advance_smoothed_mouse(dt_s);
+    }
+
+    pub fn screen_height(&self) -> usize {
         self.screen_buffer.height()
     }
-    pub fn width(&self) -> usize {
+    pub fn screen_width(&self) -> usize {
         self.screen_buffer.width()
     }
     pub fn new() -> UiHandler {
@@ -501,13 +508,13 @@ impl UiHandler {
             .into_alternate_screen()
             .unwrap(),
         );
-        let event_receiver = set_up_input_thread();
-        Self::new_maybe_headless(
+        let ui_handler = Self::new_maybe_headless(
             term_height,
             term_width,
             Some(output_writable),
-            event_receiver,
-        )
+        );
+        set_up_input_thread_given_sender(ui_handler.copy_of_event_sender.clone());
+        ui_handler
     }
     // xy order from bottom left of screen
     fn mouse_screen_xy_square(&self) -> Option<IPoint> {
@@ -519,18 +526,18 @@ impl UiHandler {
     }
     fn screen_row_col_char_to_screen_xy_char(&self, row_col_char: ScreenRowColCharPos) -> IPoint {
         let [screen_row, screen_col] = row_col_char;
-        let screen_y: i32 = self.height() as i32 - i32::from(screen_row) - 1;
+        let screen_y: i32 = self.screen_height() as i32 - i32::from(screen_row) - 1;
         [i32::from(screen_col), screen_y]
     }
     fn screen_row_col_point_to_screen_xy_point(&self, row_col_point: FPoint) -> FPoint {
         [
             row_col_point[1] - 1.0, // No longer one-indexed
-            self.height() as f32 - (row_col_point[0] - 1.0),
+            self.screen_height() as f32 - (row_col_point[0] - 1.0),
         ]
     }
     fn screen_xy_point_to_screen_row_col_point(&self, xy_point: FPoint) -> FPoint {
         [
-            self.height() as f32 - (xy_point[1]) + 1.0,
+            self.screen_height() as f32 - (xy_point[1]) + 1.0,
             xy_point[0] + 1.0, // back to 1-indexed
         ]
     }
@@ -538,30 +545,28 @@ impl UiHandler {
         self.last_mouse_screen_row_col
             .map(|row_col| self.screen_row_col_char_to_world_square(row_col))
     }
-    fn mouse_world_point(&mut self, s_from_start: f32) -> Option<FPoint> {
-        let screen_mouse_point = self.smoothed_mouse_position_screen_row_col(s_from_start);
-        screen_mouse_point.map(|p|self.screen_row_col_point_to_world_point(p))
+    fn mouse_world_point(&mut self) -> Option<FPoint> {
+        let screen_mouse_point = self.smoothed_mouse_position_screen_row_col();
+        screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
     }
     pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
-        let (sender, receiver) = channel();
-        let mut handler = Self::new_maybe_headless(screen_height, screen_width, None, receiver);
-        handler.fake_event_sender = Some(sender);
-        handler
+         Self::new_maybe_headless(screen_height, screen_width, None)
     }
     pub fn new_maybe_headless(
         screen_height: u16,
         screen_width: u16,
         output_writable: Option<Box<dyn Write>>,
-        event_receiver: Receiver<(Instant, Event)>,
     ) -> UiHandler {
+        let (event_sender, event_receiver) = channel();
         UiHandler {
             start_time: Instant::now(),
+            s_from_start: 0.0,
             event_log: Default::default(),
             last_mouse_screen_row_col: None,
-            last_smoothed_mouse_time_and_screen_row_col: None,
+            smoothed_mouse_screen_row_col: None,
             output_writable,
             event_receiver,
-            fake_event_sender: None,
+            copy_of_event_sender: event_sender,
             prev_drawn: None,
             screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
             enable_mouse_smoothing: false,
@@ -573,16 +578,17 @@ impl UiHandler {
         self.draw_mouse_at_time(t)
     }
     pub fn draw_mouse_at_time(&mut self, time_from_start_s: f32) {
+        self.advance_time_to(time_from_start_s);
         // draw mouse position on top
         if self.enable_mouse_smoothing {
-            self.draw_smoothed_mouse(time_from_start_s);
+            self.draw_smoothed_mouse();
         } else {
             self.draw_mouse_square();
         }
     }
-    pub fn draw_smoothed_mouse(&mut self, time_from_start_s: f32) {
+    pub fn draw_smoothed_mouse(&mut self) {
         if let Some(smoothed_mouse_pos_row_col) =
-            self.smoothed_mouse_position_screen_row_col(time_from_start_s)
+            self.smoothed_mouse_position_screen_row_col()
         {
             let smoothed_mouse_pos_xy =
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
@@ -590,9 +596,9 @@ impl UiHandler {
             let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
             let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
             assert!(row_1i > 0, "{row_1i}");
-            assert!(row_1i <= self.height() as i32, "{row_1i}");
+            assert!(row_1i <= self.screen_height() as i32, "{row_1i}");
             assert!(col_1i > 0, "{col_1i}");
-            assert!(col_1i <= self.width() as i32, "{col_1i}");
+            assert!(col_1i <= self.screen_width() as i32, "{col_1i}");
             let [row, col] = [row_1i as usize - 1, col_1i as usize - 1];
             self.screen_buffer.grid[row][col].character = the_char;
             self.screen_buffer.grid[row][col].fg_color = BLACK.into();
@@ -641,16 +647,12 @@ impl UiHandler {
 
     pub fn give_fake_event(&mut self, event: (f32, Event)) {
         let t = self.s_from_start_to_instant(event.0).clone();
-        self.fake_event_sender
-            .as_mut()
-            .unwrap()
+        self.copy_of_event_sender
             .send((t, event.1))
             .unwrap()
     }
     pub fn give_fake_event_now(&mut self, event: Event) {
-        self.fake_event_sender
-            .as_mut()
-            .unwrap()
+        self.copy_of_event_sender
             .send((Instant::now(), event))
             .unwrap()
     }
@@ -659,7 +661,6 @@ impl UiHandler {
     }
     pub fn instant_to_s_from_start(&self, instant: Instant) -> f32 {
         instant.duration_since(self.start_time).as_secs_f32()
-
     }
     pub fn s_from_start_to_instant(&self, s_after_start: f32) -> Instant {
         self.start_time + Duration::from_secs_f32(s_after_start)
@@ -685,9 +686,11 @@ impl UiHandler {
 
 struct WorldState {
     running: bool,
+    s_from_start: f32,
     width: usize,
     height: usize,
     player_square: IPoint,
+    smoothed_player_pos: FPoint,
     // seconds from start and recent steps
     player_step_history: VecDeque<(f32, IPoint)>,
     player_is_alive: bool,
@@ -700,11 +703,14 @@ struct WorldState {
 }
 impl WorldState {
     pub fn new(width: usize, height: usize) -> Self {
+        let player_square= [width, height].to_int().div(2);
         let mut state = WorldState {
             running: true,
+            s_from_start: 0.0,
             width,
             height,
-            player_square: [5, 5],
+            player_square,
+            smoothed_player_pos: player_square.to_float(),
             player_step_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
@@ -805,15 +811,13 @@ impl WorldState {
         &self,
         is_debug: bool,
         fov_center: Option<FPoint>,
-        t: f32,
     ) -> (Frame, Vec<Frame>) {
-        self.render_with_options(is_debug, fov_center, t)
+        self.render_with_options(is_debug, fov_center)
     }
     fn render_with_options(
         &self,
         is_debug: bool,
         fov_center: Option<FPoint>,
-        s_from_start: f32,
     ) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
@@ -981,9 +985,16 @@ impl WorldState {
         }
         None
     }
+    pub fn advance_time_to(&mut self, s_from_start: f32) {
+        let dt = s_from_start - self.s_from_start;
+        assert!(dt > 0.0);
 
-    pub fn render(&self, fov_center: Option<FPoint>, s_from_start: f32) -> Frame {
-        self.render_with_options(false, fov_center, s_from_start).0
+        self.advance_smoothed_player_pos(dt);
+        self.s_from_start = s_from_start;
+    }
+
+    pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
+        self.render_with_options(false, fov_center).0
     }
     fn render_one_view_of_a_square(
         &self,
@@ -1064,8 +1075,9 @@ impl WorldState {
             pose.stepped()
         }
     }
-    pub fn smoothed_player_pos_at_time(&self, s_from_start: f32) -> IPoint {
-        todo!();
+
+    pub fn advance_smoothed_player_pos(&mut self, dt_s: f32) {
+        self.smoothed_player_pos = exponential_approach_with_min_speed(self.smoothed_player_pos, self.player_square.to_float(), dt_s, 0.2, 15.0);
     }
 }
 
@@ -1079,11 +1091,12 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 }
 
 fn main() {
-    let mut game = Game::new(25, 25);
+    let n = 5;
+    let mut game = Game::new(n, n);
     game.world_state.player_is_alive = true;
     game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
-    game.world_state
-        .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
+    // game.world_state
+    //     .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
     game.ui_handler.enable_mouse_smoothing = true;
 
     set_up_panic_hook();
@@ -1093,7 +1106,8 @@ fn main() {
         let s_from_start = game.ui_handler.instant_to_s_from_start(now);
         game.process_events_in_queue();
 
-        let smooth_mouse_pos = game.ui_handler.mouse_world_point(s_from_start);
+        game.ui_handler.advance_time_to(s_from_start);
+        let smooth_mouse_pos = game.ui_handler.mouse_world_point();
         let frame = game.render(smooth_mouse_pos);
         game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
         game.ui_handler.screen_buffer.draw_text(
@@ -1101,12 +1115,12 @@ fn main() {
                 "{:<30}",
                 game.ui_handler.last_mouse_screen_row_col.to_debug()
             ),
-            [(game.ui_handler.height() + 1).into(), 0],
+            [(game.ui_handler.screen_height() + 1).into(), 0],
         );
         for (i, event) in game.ui_handler.event_log.iter().enumerate() {
             game.ui_handler.screen_buffer.draw_text(
                 format!("{:<30}", format!("{:?}", event)),
-                [game.ui_handler.height() as usize + 3 + i, 0],
+                [game.ui_handler.screen_height() as usize + 3 + i, 0],
             );
         }
         game.ui_handler.draw_mouse();
@@ -1114,7 +1128,6 @@ fn main() {
         thread::sleep(Duration::from_millis(21));
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1133,7 +1146,7 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render(None, 5.0);
+        let frame = state.render(None);
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
@@ -1154,7 +1167,7 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
 
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
@@ -1164,7 +1177,7 @@ mod tests {
     }
     #[test]
     fn test_click_a_small() {
-        let mut game = Game::new_headless_one_to_one_square(2);
+        let mut game = Game::new_headless_square(2);
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
         // dbg!(&frame);
@@ -1173,7 +1186,7 @@ mod tests {
     }
     #[test]
     fn test_click_b() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
         game.give_and_process_fake_event_now(press_left(4, 10));
         let frame = game.render_with_mouse(None);
         dbg!(&frame);
@@ -1198,7 +1211,7 @@ mod tests {
     }
     #[test]
     fn test_render_portal_edges() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
         game.world_state
             .place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
         game.world_state
@@ -1231,7 +1244,7 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
@@ -1258,7 +1271,7 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
@@ -1287,7 +1300,8 @@ mod tests {
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
+        game.world_state.player_square = [5,5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = WorldState::radial_sin_board_colors;
         game.world_state
@@ -1303,7 +1317,8 @@ mod tests {
     }
     #[test]
     fn test_portal_with_rotation() {
-        let mut game = Game::new_headless_one_to_one_square(12);
+        let mut game = Game::new_headless_square(12);
+        game.world_state.player_square = [5,5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = |world_state, square| {
             let n = 10;
@@ -1374,7 +1389,7 @@ mod tests {
     }
     #[test]
     fn test_screen_row_col_to_xy_points() {
-        let mut game = Game::new_headless_one_to_one_square(5);
+        let mut game = Game::new_headless_square(5);
 
         // .....
         // .....
@@ -1413,7 +1428,7 @@ mod tests {
 
     #[test]
     fn test_render_smoothed_mouse_stationary() {
-        let mut game = Game::new_headless_one_to_one_square(2);
+        let mut game = Game::new_headless_square(2);
         game.ui_handler.enable_mouse_smoothing = true;
         game.give_and_process_fake_event_now(press_left(1, 1));
         let frame = game.render_with_mouse(None);
@@ -1424,29 +1439,38 @@ mod tests {
         );
         assert_frame_same_as_past!(frame, "a", true);
     }
+    // #[ignore = "TODO"]
     #[test]
     fn test_smoothed_mouse_linear_move() {
-        let mut game = Game::new_headless_one_to_one_square(3);
+        let mut game = Game::new_headless_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_fake_event((0.0, press_left(1, 1)));
+        game.process_events_in_queue();
+        game.ui_handler.advance_time_to(0.2);
         game.ui_handler.give_fake_event((0.2, drag_mouse_to(2, 1)));
-        let n = game.process_events_in_queue();
-        assert_eq!(n, 2);
+        game.process_events_in_queue();
 
-        let pos = game.ui_handler.smoothed_mouse_position_screen_row_col(0.21).unwrap();
+        game.ui_handler.advance_time_to(0.21);
+        let pos = game
+            .ui_handler
+            .smoothed_mouse_position_screen_row_col()
+            .unwrap();
         dbg!(pos);
-        assert!(pos[0] > 1.0);
-        assert!(pos[0] < 1.1);
-        let pos = game.ui_handler.smoothed_mouse_position_screen_row_col(5.0).unwrap();
+        assert!(pos[1] > 1.0);
+        assert!(pos[1] < 1.1);
+        game.ui_handler.advance_time_to(5.0);
+        let pos = game
+            .ui_handler
+            .smoothed_mouse_position_screen_row_col()
+            .unwrap();
         dbg!(pos);
         assert!(pos[0] - 2.0 < 0.0001);
         // assert_frame_same_as_past!(frame, "a", true);
     }
 
-
     #[test]
     fn test_player_step_through_portal() {
-        let mut game = Game::new_headless_one_to_one_square(5);
+        let mut game = Game::new_headless_square(5);
         game.world_state
             .place_portal(([1, 2], DIR_RIGHT), ([3, 2], DIR_LEFT));
         game.world_state.player_square = [1, 2];
@@ -1456,17 +1480,17 @@ mod tests {
     }
     #[test]
     fn test_player_step_history_starts_empty() {
-        let mut game = Game::new_headless_one_to_one_square(5);
+        let mut game = Game::new_headless_square(5);
         assert!(game.world_state.player_step_history.is_empty());
     }
     #[ignore]
     #[test]
     fn test_draw_smoothed_player_position() {
-        let mut game = Game::new_headless_one_to_one_square(5);
+        let mut game = Game::new_headless_square(5);
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
         game.try_move_player_at_time(STEP_RIGHT, 1.0);
-        let frame = game.render_at_time(None, 1.5);
+        let frame = game.render(None);
         let player_pos_in_frame = game
             .ui_handler
             .camera
@@ -1477,8 +1501,28 @@ mod tests {
     }
     #[test]
     fn test_render_with_center_offset() {
-        let mut game = Game::new_headless_one_to_one_square(15);
-        let frame = game.render(Some([8.3, 7.4]));
-        assert_frame_same_as_past!(frame, "a");
+        let mut game = Game::new_headless_square(25);
+        game.ui_handler.give_fake_event((1.0, press_left(5, 6)));
+        game.process_events_in_queue();
+        game.ui_handler.give_fake_event((2.0, drag_mouse_to(6, 6)));
+        game.process_events_in_queue();
+        let n=43;
+        (0..n).for_each(|x| {
+            let t = 1.5 + x as f32 / 20.0;
+            let p = [5.0 + x as f32 / 20.0, 8.0 + x as f32 / n as f32 * 5.0];
+            let frame = game.render(Some(p));
+            // dbg!( &p);
+            frame.glyphs().for_each(|g| assert!(g.looks_solid()));
+        });
+    }
+    #[ignore]
+    #[test]
+    fn test_big_screen_small_world_click() {
+        let mut game = Game::new_headless(20, 30, 8, 8);
+        game.ui_handler.give_fake_event((1.0, press_left(5,5)));
+        game.process_events_in_queue();
+        // let frame = game.render();
+        // assert_frame_same_as_past!(frame, "a");
+        todo!();
     }
 }
