@@ -86,11 +86,11 @@ impl Game {
     pub fn new_headless(
         screen_height: u16,
         screen_width: u16,
-        width: usize,
-        height: usize,
+        world_width: usize,
+        world_height: usize,
     ) -> Self {
         Game {
-            world_state: WorldState::new(width, height),
+            world_state: WorldState::new(world_width, world_height),
             ui_handler: UiHandler::new_headless(screen_height, screen_width),
         }
     }
@@ -205,13 +205,25 @@ struct Camera {
 // deal with frame coordinates.
 // Most coordinates are in squares unless noted
 impl Camera {
-    pub fn new() -> Self {
-        Self::new_square(25)
+    pub fn new_from_screen_size(size_on_screen_rows_cols: USizePoint) -> Self {
+        assert!(size_on_screen_rows_cols[1] %2 == 0, "columns must fit integer number of squares.  cols: {}",size_on_screen_rows_cols[1]);
+        let size_in_squares_width_height = [size_on_screen_rows_cols[1]/2, size_on_screen_rows_cols[0]];
+        Self::new_from_world_size(size_in_squares_width_height)
+    }
+    pub fn new_from_world_size(size_in_squares_width_height: USizePoint) -> Self {
+        let names = ["width", "height"];
+        size_in_squares_width_height.iter().zip(names.iter()).for_each(|(size, name)| {
+            assert!(size %2 == 1, "{name} must be odd to have integer center.  {name}: {size}");
+        });
+        Self::new_pos_and_squares_width_height([0, 0], size_in_squares_width_height)
     }
     pub fn new_square(s: usize) -> Self {
+        Self::new_pos_and_squares_width_height([0, 0], [s; 2])
+    }
+    pub fn new_pos_and_squares_width_height(lower_left: IPoint, width_height: USizePoint) -> Self {
         Camera {
-            lower_left_square: [0, 0],
-            upper_right_square: [s as i32 - 1; 2],
+            lower_left_square: lower_left,
+            upper_right_square: lower_left.add(width_height.to_int().sub([1, 1])),
         }
     }
     pub fn set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
@@ -222,10 +234,10 @@ impl Camera {
     pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
         Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world())
     }
-    pub fn from_bottom_left_and_size(bottom_left_square: IPoint, width_height: [u32; 2]) -> Self {
+    pub fn from_bottom_left_and_size(bottom_left_square: IPoint, width_height_in_squares: [u32; 2]) -> Self {
         Self {
             lower_left_square: bottom_left_square,
-            upper_right_square: bottom_left_square.add(width_height.to_signed()).sub([1, 1]),
+            upper_right_square: bottom_left_square.add(width_height_in_squares.to_signed()).sub([1, 1]),
         }
     }
     pub fn bottom_left_square(&self) -> IPoint {
@@ -246,7 +258,7 @@ impl Camera {
     pub fn height_in_world(&self) -> u32 {
         self.size_in_world()[1]
     }
-    pub fn screen_size_rows_cols(&self) -> [usize; 2] {
+    pub fn size_on_screen_rows_cols(&self) -> [usize; 2] {
         [
             self.height_in_world() as usize,
             self.width_in_world() as usize * 2,
@@ -322,8 +334,21 @@ impl Camera {
         fov_center: FPoint,
         is_debug: bool,
     ) -> (Frame, Vec<Frame>) {
-        let result = world_state.render_with_options(is_debug, fov_center);
-        assert_eq!(self.screen_size_rows_cols(), result.0.size_rows_cols());
+        let radius = self.width_in_world() / 2;
+        let result =
+            world_state.render_with_options(is_debug, fov_center, radius);
+        assert_eq!(
+            result.0.size_rows_cols()[0],
+        radius as usize * 2 + 1
+        );
+        assert_eq!(
+            result.0.size_rows_cols()[1],
+            (radius as usize * 2 + 1)*2
+        );
+        assert_eq!(
+            self.size_on_screen_rows_cols(),
+            result.0.size_rows_cols()
+        );
         result
     }
 }
@@ -374,8 +399,9 @@ mod camera_tests {
         );
         assert_eq!(camera.local_to_absolute_world_square([0, 0]), [0, 0]);
     }
+    #[test]
     fn test_frame_to_world_floating_point() {
-        let camera = Camera::new();
+        let camera = Camera::new_square(10);
 
         assert_eq!(
             camera.frame_row_col_point_to_local_world_point([1.0, 1.0]),
@@ -384,12 +410,13 @@ mod camera_tests {
     }
     #[test]
     fn test_size() {
-        let camera = Camera::new();
+        let camera = Camera::new_square(25);
         assert_eq!(camera.size_in_world(), [25, 25]);
+        assert_eq!(camera.size_on_screen_rows_cols(), [25, 50]);
     }
     #[test]
     fn test_local_to_absolute_world_squares_simple() {
-        let camera = Camera::new();
+        let camera = Camera::new_square(10);
         let p = [3, 5];
         assert_eq!(
             p,
@@ -402,7 +429,7 @@ mod camera_tests {
     }
     #[test]
     fn test_get_set_bottom_left_invariant() {
-        let mut camera = Camera::new();
+        let mut camera = Camera::new_square(10);
         assert_eq!(
             camera,
             camera.with_bottom_left_square(camera.bottom_left_square())
@@ -410,7 +437,7 @@ mod camera_tests {
     }
     #[test]
     fn test_local_to_absolute_world_squares_translation() {
-        let mut camera = Camera::new();
+        let mut camera = Camera::new_square(10);
         let p = [3, 5];
         dbg!(&camera);
         camera.translate([-2, 0]);
@@ -548,10 +575,11 @@ impl UiHandler {
         output_writable: Option<Box<dyn Write>>,
     ) -> UiHandler {
         let (event_sender, event_receiver) = channel();
+        let screen_size_rows_cols =[screen_height as usize, screen_width as usize]; 
         UiHandler {
             start_time: Instant::now(),
             s_from_start: 0.0,
-            screen_size_rows_cols: [screen_height as usize, screen_width as usize],
+            screen_size_rows_cols,
             last_mouse_screen_row_col: None,
             smoothed_mouse_screen_row_col: None,
             output_writable,
@@ -561,7 +589,7 @@ impl UiHandler {
             event_log: Default::default(),
             prev_drawn: None,
             enable_mouse_smoothing: false,
-            camera: Camera::new(),
+            camera: Camera::new_from_screen_size(screen_size_rows_cols),
         }
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
@@ -683,7 +711,8 @@ impl UiHandler {
         fov_center: FPoint,
         is_debug: bool,
     ) -> (Frame, Vec<Frame>) {
-        let (world_frame, debug_frames) = self.camera.render_world(world_state, fov_center, is_debug);
+        let (world_frame, debug_frames) =
+            self.camera.render_world(world_state, fov_center, is_debug);
 
         let mut screen_buffer = Frame::blank(self.screen_width(), self.screen_height());
         screen_buffer.blit(&world_frame, [0, 0]);
@@ -828,10 +857,16 @@ impl WorldState {
         &self,
         is_debug: bool,
         fov_center: FPoint,
+        radius: u32,
     ) -> (Frame, Vec<Frame>) {
-        self.render_with_options(is_debug, fov_center)
+        self.render_with_options(is_debug, fov_center, radius)
     }
-    fn render_with_options(&self, is_debug: bool, fov_center: FPoint) -> (Frame, Vec<Frame>) {
+    fn render_with_options(
+        &self,
+        is_debug: bool,
+        fov_center: FPoint,
+        radius: u32,
+    ) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(), // .iter()
@@ -842,7 +877,7 @@ impl WorldState {
 
         let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
             fov_center.into(),
-            10,
+            radius,
             &Default::default(),
             &portal_geometry,
         );
@@ -853,10 +888,19 @@ impl WorldState {
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..self.height)
+
+        let camera_width = radius as usize * 2 + 1;
+        let camera_height = camera_width;
+        // let fov_center_square = fov_center.rounded();
+        // let camera_min_x = fov_center_square[0] - radius as i32;
+        // let camera_max_x = fov_center_square[0] + radius as i32;
+        // let camera_min_y = fov_center_square[1] - radius as i32;
+        // let camera_max_y = fov_center_square[1] + radius as i32;
+
+        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..camera_height)
             .map(|camera_row| {
                 let camera_y = self.height as i32 - camera_row as i32 - 1;
-                (0..self.width as i32)
+                (0..camera_width as i32)
                     .map(|camera_x| {
                         let camera_col = camera_x as usize;
                         // let x = col;
@@ -1002,8 +1046,8 @@ impl WorldState {
         self.s_from_start = s_from_start;
     }
 
-    pub fn render(&self, fov_center: FPoint) -> Frame {
-        self.render_with_options(false, fov_center).0
+    pub fn render(&self, fov_center: FPoint, radius: u32) -> Frame {
+        self.render_with_options(false, fov_center, radius).0
     }
     fn render_one_view_of_a_square(
         &self,
@@ -1158,7 +1202,7 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render([5.0, 5.0]);
+        let frame = state.render([5.0, 5.0], 10);
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
@@ -1179,7 +1223,7 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(11);
 
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
@@ -1190,7 +1234,7 @@ mod tests {
     }
     #[test]
     fn test_click_a_small() {
-        let mut game = Game::new_headless_square(2);
+        let mut game = Game::new_headless_square(3);
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
         let frame = game.render();
@@ -1200,7 +1244,7 @@ mod tests {
     }
     #[test]
     fn test_click_b() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(11);
         game.ui_handler.give_event(press_left(4, 10));
         game.process_events();
         let frame = game.render();
@@ -1533,7 +1577,7 @@ mod tests {
         (0..n).for_each(|x| {
             let t = 1.5 + x as f32 / 20.0;
             let p = [5.0 + x as f32 / 20.0, 8.0 + x as f32 / n as f32 * 5.0];
-            let frame = game.world_state.render(p);
+            let frame = game.world_state.render(p, 10);
             // dbg!( &p);
             frame.glyphs().for_each(|g| assert!(g.looks_solid()));
         });
@@ -1541,7 +1585,7 @@ mod tests {
     // #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
-        let mut game = Game::new_headless(20, 30, 8, 8);
+        let mut game = Game::new_headless(21, 42, 9, 9);
         game.ui_handler
             .give_future_event_absolute(press_left(5, 5), 1.0);
         game.process_events();
