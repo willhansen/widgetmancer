@@ -137,6 +137,7 @@ impl FPointExt for FPoint {
     }
 }
 
+pub type USizePoint = [usize;2];
 pub trait USizePointExt {
     fn to_int(&self) -> IPoint;
 }
