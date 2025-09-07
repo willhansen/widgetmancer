@@ -94,8 +94,7 @@ impl Game {
             ui_handler: UiHandler::new_headless(screen_height, screen_width),
         }
     }
-    pub fn process_event(&mut self, time: f32, event: Event) {
-        self.ui_handler.advance_time_to(time);
+    pub fn process_event(&mut self, event: Event) {
         match event {
             Event::Key(key) => match key {
                 Key::Char('q') => self.world_state.running = false,
@@ -144,45 +143,23 @@ impl Game {
         };
     }
     pub fn advance_time_by(&mut self, dt_s: f32) {
-        assert!(dt_s >= 0.0);
+        assert!(dt_s > 0.0, "dt must be positive: {dt_s}");
         let s_from_start = self.ui_handler.s_from_start + dt_s;
         self.advance_time_to(s_from_start);
     }
     pub fn advance_time_to(&mut self, s_from_start: f32) {
         self.ui_handler.advance_time_to(s_from_start);
         self.world_state.advance_time_to(s_from_start);
-
     }
     pub fn process_events(&mut self) -> usize {
         self.ui_handler.receive_events();
         let to_process = self.ui_handler.take_unprocessed_past_events();
         let n = to_process.len();
         to_process.into_iter().for_each(|e| {
-            self.process_event(e.0, e.1.clone());
+            self.process_event(e.1.clone());
             self.ui_handler.event_log.push_back(e);
         });
         n
-    }
-    pub fn render_with_mouse(&mut self, fov_center: Option<FPoint>) -> Frame {
-        self.render_with_mouse_now(fov_center)
-    }
-    pub fn render_with_mouse_at_time(
-        &mut self,
-        fov_center: Option<FPoint>,
-        time_from_start_s: f32,
-    ) -> Frame {
-        let frame = self.render(fov_center);
-        self.ui_handler.screen_buffer.blit(&frame, [0, 0]);
-        self.ui_handler.draw_mouse_at_time(time_from_start_s);
-        self.ui_handler.screen_buffer.clone()
-    }
-    pub fn render_with_mouse_now(&mut self, fov_center: Option<FPoint>) -> Frame {
-        self.render_with_mouse_at_time(
-            fov_center,
-            Instant::now()
-                .duration_since(self.ui_handler.start_time)
-                .as_secs_f32(),
-        )
     }
 
     pub fn try_move_player_at_time(&mut self, step: IPoint, s_from_start: f32) {
@@ -207,11 +184,14 @@ impl Game {
     pub fn now_as_s_from_start(&self) -> f32 {
         self.ui_handler.now_as_s_from_start()
     }
-    pub fn render_now_with_debug(&self, fov_center: Option<FPoint>) -> (Frame, Vec<Frame>) {
-        self.world_state.render_with_options(true, fov_center)
+    pub fn render_with_debug(&mut self) -> (Frame, Vec<Frame>) {
+        self.render_with_options(true)
     }
-    pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
-        self.world_state.render_with_options(false, fov_center).0
+    pub fn render(&mut self) -> Frame {
+        self.render_with_options(false).0
+    }
+    fn render_with_options(&mut self, is_debug: bool) -> (Frame, Vec<Frame>) {
+        self.ui_handler.render(&self.world_state, is_debug)
     }
 }
 
@@ -265,6 +245,12 @@ impl Camera {
     }
     pub fn height_in_world(&self) -> u32 {
         self.size_in_world()[1]
+    }
+    pub fn screen_size_rows_cols(&self) -> [usize; 2] {
+        [
+            self.height_in_world() as usize,
+            self.width_in_world() as usize * 2,
+        ]
     }
     pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
@@ -328,6 +314,17 @@ impl Camera {
     }
     pub fn char_row_col_in_frame(&self, char_row_col: IPoint) -> bool {
         todo!();
+    }
+
+    pub fn render_world(
+        &self,
+        world_state: &WorldState,
+        fov_center: FPoint,
+        is_debug: bool,
+    ) -> (Frame, Vec<Frame>) {
+        let result = world_state.render_with_options(is_debug, fov_center);
+        assert_eq!(self.screen_size_rows_cols(), result.0.size_rows_cols());
+        result
     }
 }
 
@@ -442,6 +439,7 @@ struct UiHandler {
     // has no use for real-time reference points that are instants
     pub start_time: Instant,
     pub s_from_start: f32,
+    pub screen_size_rows_cols: [usize; 2],
     // 1-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
     pub smoothed_mouse_screen_row_col: Option<FPoint>,
@@ -455,7 +453,6 @@ struct UiHandler {
     // newest events are added via `push_back`
     pub event_log: VecDeque<(f32, Event)>,
     pub prev_drawn: Option<Frame>,
-    pub screen_buffer: Frame,
     pub enable_mouse_smoothing: bool,
     pub camera: Camera,
 }
@@ -481,20 +478,20 @@ impl UiHandler {
     }
 
     pub fn advance_time_to(&mut self, new_s_from_start: f32) {
-        let dt = new_s_from_start - self.s_from_start;
-        self.advance_time_by(dt);
+        let dt_s = new_s_from_start - self.s_from_start;
+        assert!(dt_s > 0.0, "dt must be positive. dt: {dt_s}");
+        self.advance_smoothed_mouse(dt_s);
+        self.s_from_start = new_s_from_start;
     }
     pub fn advance_time_by(&mut self, dt_s: f32) {
-        assert!(dt_s > 0.0, "dt must be positive. dt: {dt_s}");
-
-        self.advance_smoothed_mouse(dt_s);
+        self.advance_time_to(self.s_from_start + dt_s)
     }
 
     pub fn screen_height(&self) -> usize {
-        self.screen_buffer.height()
+        self.screen_size_rows_cols[0]
     }
     pub fn screen_width(&self) -> usize {
-        self.screen_buffer.width()
+        self.screen_size_rows_cols[1]
     }
     pub fn new() -> UiHandler {
         let (term_width, term_height) = termion::terminal_size().unwrap();
@@ -554,6 +551,7 @@ impl UiHandler {
         UiHandler {
             start_time: Instant::now(),
             s_from_start: 0.0,
+            screen_size_rows_cols: [screen_height as usize, screen_width as usize],
             last_mouse_screen_row_col: None,
             smoothed_mouse_screen_row_col: None,
             output_writable,
@@ -562,25 +560,18 @@ impl UiHandler {
             event_queue: Default::default(),
             event_log: Default::default(),
             prev_drawn: None,
-            screen_buffer: Frame::blank(screen_width as usize, screen_height as usize),
             enable_mouse_smoothing: false,
             camera: Camera::new(),
         }
     }
-    pub fn draw_mouse(&mut self) {
-        let t = (Instant::now() - self.start_time).as_secs_f32();
-        self.draw_mouse_at_time(t)
-    }
-    pub fn draw_mouse_at_time(&mut self, time_from_start_s: f32) {
-        self.advance_time_to(time_from_start_s);
-        // draw mouse position on top
+    pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
         if self.enable_mouse_smoothing {
-            self.draw_smoothed_mouse();
+            self.draw_smoothed_mouse(&mut screen_buffer);
         } else {
-            self.draw_mouse_square();
+            self.draw_mouse_square(&mut screen_buffer);
         }
     }
-    pub fn draw_smoothed_mouse(&mut self) {
+    pub fn draw_smoothed_mouse(&mut self, screen_buffer: &mut Frame) {
         if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col() {
             let smoothed_mouse_pos_xy =
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
@@ -592,24 +583,26 @@ impl UiHandler {
             assert!(col_1i > 0, "{col_1i}");
             assert!(col_1i <= self.screen_width() as i32, "{col_1i}");
             let [row, col] = [row_1i as usize - 1, col_1i as usize - 1];
-            self.screen_buffer.grid[row][col].character = the_char;
-            self.screen_buffer.grid[row][col].fg_color = BLACK.into();
+            screen_buffer.grid[row][col].character = the_char;
+            screen_buffer.grid[row][col].fg_color = BLACK.into();
         }
     }
-    pub fn draw_mouse_square(&mut self) {
+    pub fn draw_mouse_square(&mut self, screen_buffer: &mut Frame) {
         if let Some([row, col]) = self.last_mouse_screen_row_col {
             assert!(row > 0 && col > 0, "row: {row}, col: {col}");
-            self.screen_buffer.grid[row as usize - 1][col as usize - 1] =
+            screen_buffer.grid[row as usize - 1][col as usize - 1] =
                 DrawableGlyph::solid_color(RED);
         }
     }
-    pub fn draw_screen(&mut self) {
+    pub fn draw_screen(&mut self, screen_frame: Frame) {
+        assert_eq!(screen_frame.size_rows_cols(), self.screen_size_rows_cols);
+
         draw_frame(
             &mut self.output_writable.as_mut().unwrap(),
-            &self.screen_buffer,
+            &screen_frame,
             &self.prev_drawn,
         );
-        self.prev_drawn = Some(self.screen_buffer.clone());
+        self.prev_drawn = Some(screen_frame);
     }
 
     pub fn receive_events(&mut self) {
@@ -676,47 +669,36 @@ impl UiHandler {
         let p = self.camera.frame_row_col_char_to_local_world_square(p);
         self.camera.local_to_absolute_world_square(p)
     }
+
+    pub fn render(&mut self, world_state: &WorldState, is_debug: bool) -> (Frame, Vec<Frame>) {
+        let fov_center = self
+            .mouse_world_point()
+            .unwrap_or_else(|| world_state.player_square.to_float());
+        self.render_with_options(world_state, fov_center, is_debug)
+    }
+
+    fn render_with_options(
+        &mut self,
+        world_state: &WorldState,
+        fov_center: FPoint,
+        is_debug: bool,
+    ) -> (Frame, Vec<Frame>) {
+        let (world_frame, debug_frames) = self.camera.render_world(world_state, fov_center, is_debug);
+
+        let mut screen_buffer = Frame::blank(self.screen_width(), self.screen_height());
+        screen_buffer.blit(&world_frame, [0, 0]);
+        self.draw_mouse(&mut screen_buffer);
+        (screen_buffer, debug_frames)
+    }
+}
+fn press_char(c: char) -> Event {
+    Event::Key(Key::Char(c))
 }
 
 #[cfg(test)]
 mod ui_handler_tests {
     use super::*;
     use termion::event::*;
-    fn press_char(c: char) -> Event {
-        Event::Key(Key::Char(c))
-    }
-    #[test]
-    fn test_give_events_and_advance_time() {
-        let mut ui_handler = UiHandler::new_headless(30, 10);
-        ui_handler.advance_time_by(1.0);
-        ui_handler.give_event(press_char('a'));
-        assert_eq!(ui_handler.event_queue.len(), 1);
-        ui_handler.advance_time_by(1.0);
-        assert_eq!(ui_handler.event_log.len(), 1);
-        assert_eq!(ui_handler.event_queue.len(), 0);
-        ui_handler.give_future_event_absolute(press_char('b'), 2.5);
-        ui_handler.give_future_event_relative(press_char('c'), 0.7);
-        assert_eq!(ui_handler.event_queue.len(), 2);
-        assert_eq!(ui_handler.event_log.len(), 1);
-        ui_handler.advance_time_by(0.6);
-        assert_eq!(ui_handler.event_log.len(), 2);
-        assert_eq!(ui_handler.event_queue.len(), 1);
-        ui_handler.advance_time_by(300.0);
-        assert_eq!(ui_handler.event_log.len(), 3);
-        assert_eq!(ui_handler.event_queue.len(), 0);
-    }
-    #[test]
-    fn test_give_and_process_event_with_no_time_advancement() {
-        let mut ui_handler = UiHandler::new_headless(30, 10);
-        ui_handler.advance_time_by(1.0);
-        ui_handler.give_event(press_char('a'));
-        assert_eq!(ui_handler.event_queue.len(), 1);
-        assert_eq!(ui_handler.event_log.len(), 0);
-
-        ui_handler.advance_time_by(0.0);
-        assert_eq!(ui_handler.event_log.len(), 1);
-        assert_eq!(ui_handler.event_queue.len(), 0);
-    }
 }
 
 struct WorldState {
@@ -845,15 +827,11 @@ impl WorldState {
     fn render_with_debug_deconstruction(
         &self,
         is_debug: bool,
-        fov_center: Option<FPoint>,
+        fov_center: FPoint,
     ) -> (Frame, Vec<Frame>) {
         self.render_with_options(is_debug, fov_center)
     }
-    fn render_with_options(
-        &self,
-        is_debug: bool,
-        fov_center: Option<FPoint>,
-    ) -> (Frame, Vec<Frame>) {
+    fn render_with_options(&self, is_debug: bool, fov_center: FPoint) -> (Frame, Vec<Frame>) {
         let portal_geometry =
             game::portal_geometry::PortalGeometry::from_entrances_and_reverse_entrances(
                 self.portals.clone(), // .iter()
@@ -862,10 +840,6 @@ impl WorldState {
             );
         // panic!();
 
-        let fov_center = match fov_center {
-            Some(x) => x,
-            None => self.player_square.to_float(),
-        };
         let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
             fov_center.into(),
             10,
@@ -1021,14 +995,14 @@ impl WorldState {
         None
     }
     pub fn advance_time_to(&mut self, s_from_start: f32) {
-        let dt = s_from_start - self.s_from_start;
-        assert!(dt > 0.0);
+        let dt_s = s_from_start - self.s_from_start;
+        assert!(dt_s > 0.0, "dt must be positive: {dt_s}");
 
-        self.advance_smoothed_player_pos(dt);
+        self.advance_smoothed_player_pos(dt_s);
         self.s_from_start = s_from_start;
     }
 
-    pub fn render(&self, fov_center: Option<FPoint>) -> Frame {
+    pub fn render(&self, fov_center: FPoint) -> Frame {
         self.render_with_options(false, fov_center).0
     }
     fn render_one_view_of_a_square(
@@ -1148,10 +1122,8 @@ fn main() {
         game.ui_handler.advance_time_to(s_from_start);
         game.process_events();
 
-        let smooth_mouse_pos = game.ui_handler.mouse_world_point();
-        let frame = game.render(smooth_mouse_pos);
-        game.ui_handler.screen_buffer.blit(&frame, [0, 0]);
-        game.ui_handler.screen_buffer.draw_text(
+        let mut frame = game.render();
+        frame.draw_text(
             format!(
                 "{:<30}",
                 game.ui_handler.last_mouse_screen_row_col.to_debug()
@@ -1159,13 +1131,12 @@ fn main() {
             [(game.ui_handler.screen_height() + 1).into(), 0],
         );
         for (i, event) in game.ui_handler.event_log.iter().enumerate() {
-            game.ui_handler.screen_buffer.draw_text(
+            frame.draw_text(
                 format!("{:<30}", format!("{:?}", event)),
                 [game.ui_handler.screen_height() as usize + 3 + i, 0],
             );
         }
-        game.ui_handler.draw_mouse();
-        game.ui_handler.draw_screen();
+        game.ui_handler.draw_screen(frame);
         thread::sleep(Duration::from_millis(21));
     }
 }
@@ -1187,7 +1158,7 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render(None);
+        let frame = state.render([5.0, 5.0]);
         assert_eq!(frame.width(), 20);
         assert_eq!(frame.height(), 10);
     }
@@ -1212,7 +1183,7 @@ mod tests {
 
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
-        let frame = game.render_with_mouse(None);
+        let frame = game.render();
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         assert_frame_same_as_past!(frame, "a");
@@ -1222,7 +1193,7 @@ mod tests {
         let mut game = Game::new_headless_square(2);
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
-        let frame = game.render_with_mouse(None);
+        let frame = game.render();
         // dbg!(&frame);
         // dbg!(&frame.grid);
         assert_frame_same_as_past!(frame, "a", true);
@@ -1232,7 +1203,7 @@ mod tests {
         let mut game = Game::new_headless_square(12);
         game.ui_handler.give_event(press_left(4, 10));
         game.process_events();
-        let frame = game.render_with_mouse(None);
+        let frame = game.render();
         dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED.into());
@@ -1244,13 +1215,13 @@ mod tests {
         let mut game = Game::new_headless(12, 24, 12, 12);
         game.ui_handler.give_event(press_left(4, 4));
         game.process_events();
-        let frame_1 = game.render_with_mouse(None);
+        let frame_1 = game.render();
         game.ui_handler.give_event(drag_mouse_to(5, 4));
         game.process_events();
-        let frame_2 = game.render_with_mouse(None);
+        let frame_2 = game.render();
         game.ui_handler.give_event(drag_mouse_to(6, 4));
         game.process_events();
-        let frame_3 = game.render_with_mouse(None);
+        let frame_3 = game.render();
         // dbg!(&frame_1, &frame_2, &frame_3);
         assert_frame_same_as_past!(frame_1, "1");
         assert_frame_same_as_past!(frame_2, "2");
@@ -1286,7 +1257,7 @@ mod tests {
         game.world_state
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.render(None);
+        let frame = game.render();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1356,7 +1327,7 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.render_now_with_debug(None);
+        let (frame, layers) = game.render_with_debug();
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1380,7 +1351,7 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.render_now_with_debug(None);
+        let (frame, layers) = game.render_with_debug();
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1479,7 +1450,7 @@ mod tests {
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
-        let frame = game.render_with_mouse(None);
+        let frame = game.render();
         println!("{}", &frame.escaped_regular_display_string());
         assert!(
             char_is_braille(frame.grid[0][0].character),
@@ -1487,7 +1458,6 @@ mod tests {
         );
         assert_frame_same_as_past!(frame, "a", true);
     }
-    #[ignore = "TODO"]
     #[test]
     fn test_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_square(3);
@@ -1538,7 +1508,8 @@ mod tests {
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
         game.try_move_player_at_time(STEP_RIGHT, 1.0);
-        let frame = game.render(None);
+        let frame = game.render();
+        dbg!(&frame);
         let player_pos_in_frame = game
             .ui_handler
             .camera
@@ -1562,20 +1533,60 @@ mod tests {
         (0..n).for_each(|x| {
             let t = 1.5 + x as f32 / 20.0;
             let p = [5.0 + x as f32 / 20.0, 8.0 + x as f32 / n as f32 * 5.0];
-            let frame = game.render(Some(p));
+            let frame = game.world_state.render(p);
             // dbg!( &p);
             frame.glyphs().for_each(|g| assert!(g.looks_solid()));
         });
     }
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(20, 30, 8, 8);
         game.ui_handler
             .give_future_event_absolute(press_left(5, 5), 1.0);
         game.process_events();
-        // let frame = game.render();
-        // assert_frame_same_as_past!(frame, "a");
+        let frame = game.render();
+        assert_frame_same_as_past!(frame, "a");
         todo!();
+    }
+    #[test]
+    fn test_give_and_process_event_with_no_time_advancement() {
+        let mut game = Game::new_headless_square(30);
+        game.process_events();
+        game.ui_handler.give_event(press_char('a'));
+        game.ui_handler.receive_events();
+        assert_eq!(game.ui_handler.event_queue.len(), 1);
+        assert_eq!(game.ui_handler.event_log.len(), 0);
+
+        game.process_events();
+        assert_eq!(game.ui_handler.event_queue.len(), 0);
+        assert_eq!(game.ui_handler.event_log.len(), 1);
+    }
+    #[test]
+    fn test_give_events_and_advance_time() {
+        let mut game = Game::new_headless_square(30);
+        game.advance_time_by(1.0);
+        game.ui_handler.give_event(press_char('a'));
+        game.ui_handler.receive_events();
+        assert_eq!(game.ui_handler.event_queue.len(), 1);
+        game.advance_time_by(1.0);
+        game.process_events();
+        assert_eq!(game.ui_handler.event_queue.len(), 0);
+        assert_eq!(game.ui_handler.event_log.len(), 1);
+        game.ui_handler
+            .give_future_event_absolute(press_char('b'), 2.5);
+        game.ui_handler
+            .give_future_event_relative(press_char('c'), 0.7);
+        game.process_events();
+        assert_eq!(game.ui_handler.event_queue.len(), 2);
+        assert_eq!(game.ui_handler.event_log.len(), 1);
+        game.advance_time_by(0.6);
+        game.process_events();
+        assert_eq!(game.ui_handler.event_log.len(), 2);
+        assert_eq!(game.ui_handler.event_queue.len(), 1);
+        game.advance_time_by(300.0);
+        game.process_events();
+        assert_eq!(game.ui_handler.event_log.len(), 3);
+        assert_eq!(game.ui_handler.event_queue.len(), 0);
     }
 }
