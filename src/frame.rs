@@ -7,12 +7,13 @@ use itertools::*;
 
 use itertools::Itertools;
 use rgb::RGB8;
-use utility::ToDebug;
+use utility::geometry2::USizePoint;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Write;
 use std::iter::once;
 use std::path::PathBuf;
+use utility::ToDebug;
 
 #[derive(PartialEq, Clone)]
 pub struct Frame {
@@ -80,6 +81,13 @@ impl Frame {
         let row = self.y_to_row(y);
         self.grid[row][col]
     }
+    pub fn try_get_row_col(&self, row_col: USizePoint) -> Option<DrawableGlyph> {
+        let [row, col] = row_col;
+        if row < 0 || row >= self.height() || col < 0 || col >= self.width() {
+            return None;
+        }
+        Some(self.grid[row][col])
+    }
 
     pub fn blit(&mut self, other: &Self, rowcol: [usize; 2]) {
         for other_row in 0..other.height() {
@@ -96,13 +104,21 @@ impl Frame {
             }
         }
     }
-    pub fn resized_by_delta(&self, d_left: i32, d_right: i32, d_bottom: i32, d_top: i32 ) -> Self {
+    pub fn resized_by_delta(&self, d_left: i32, d_right: i32, d_bottom: i32, d_top: i32) -> Self {
         todo!();
     }
     pub fn widened(&self, n: usize) -> Self {
         let newglyph = DrawableGlyph::default();
-        self.grid.iter().map(|row| row.iter().cloned().chain(repeat_n(newglyph, n)).collect_vec()).collect_vec().into()
-
+        self.grid
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .cloned()
+                    .chain(repeat_n(newglyph, n))
+                    .collect_vec()
+            })
+            .collect_vec()
+            .into()
     }
     pub fn draw_text(&mut self, txt: String, rowcol: [usize; 2]) {
         for (i, char) in txt.chars().enumerate() {
@@ -119,7 +135,7 @@ impl Frame {
     pub fn glyphs_mut(&mut self) -> impl Iterator<Item = &mut DrawableGlyph> {
         self.grid.iter_mut().flat_map(|row| row.iter_mut())
     }
-    pub fn glyphs(& self) -> impl Iterator<Item = &DrawableGlyph> {
+    pub fn glyphs(&self) -> impl Iterator<Item = &DrawableGlyph> {
         self.grid.iter().flat_map(|row| row.iter())
     }
 
@@ -158,21 +174,39 @@ impl Frame {
 
     // TODO: actually use.  Probably need to parse render strings to frames from tests
     pub fn diff_from(&self, other: &Self) -> Self {
-        assert_eq!(self.width(), other.width());
-        assert_eq!(self.height(), other.height());
-        let mut out = self.clone();
+        let big_width = self.width().max(other.width());
+        let big_height = self.height().max(other.height());
+        let small_width = self.width().min(other.width());
+        let small_height = self.height().min(other.height());
 
-        for row in 0..self.height() {
-            for col in 0..self.width() {
-                if out.grid[row][col].bg_color == other.grid[row][col].bg_color {
-                    out.grid[row][col].bg_color = None;
-                }
-                if out.grid[row][col].fg_color == other.grid[row][col].fg_color {
-                    out.grid[row][col].fg_color = None;
-                }
-                if out.grid[row][col].character == other.grid[row][col].character {
-                    out.grid[row][col].character = ' ';
-                }
+        assert!(big_width >= small_width);
+        assert!(big_height >= small_height);
+
+        let mut out = Frame::blank(big_width, big_height);
+
+        for row in 0..big_height {
+            for col in 0..big_width {
+                let glyph_a = self.try_get_row_col([row, col]);
+                let glyph_b = other.try_get_row_col([row, col]);
+                out.grid[row][col] = match [glyph_a, glyph_b] {
+                    [None, Some(g)] => g,
+                    [Some(g), None] => g,
+                    [None, None] => panic!("neither defined"),
+                    [Some(a), Some(b)] => {
+                        let mut g = a;
+
+                        if a.bg_color == b.bg_color {
+                            g.bg_color = None;
+                        }
+                        if a.fg_color == b.fg_color {
+                            g.fg_color = None;
+                        }
+                        if a.character == b.character {
+                            g.character = ' ';
+                        }
+                        g
+                    }
+                };
             }
         }
         out
@@ -180,7 +214,6 @@ impl Frame {
 
     pub fn with_border(&self) -> Self {
         Self::from_string(&self.string_for_regular_display().framed())
-
     }
     pub fn framed(&self) -> String {
         self.string_for_regular_display().framed()
@@ -225,7 +258,8 @@ impl Frame {
 
                 let (full_matches, internal_matches): (Vec<_>, Vec<_>) = escape_regex
                     .captures_iter(line)
-                    .map(|cap| (cap.get(0).unwrap(), cap.get(1).unwrap())).unzip();
+                    .map(|cap| (cap.get(0).unwrap(), cap.get(1).unwrap()))
+                    .unzip();
 
                 let span_start_bytes_indexes = once(0)
                     .chain(full_matches.iter().map(|m| m.end()))
@@ -265,8 +299,9 @@ impl Frame {
 
                         let glyphs_for_span = utf8_until_next
                             .chars()
-                            .map(move |c| DrawableGlyph::new(c, fg, bg)).collect_vec();
-                            // .map(move |c| dbg!(DrawableGlyph::new(c, fg, bg))).collect_vec();
+                            .map(move |c| DrawableGlyph::new(c, fg, bg))
+                            .collect_vec();
+                        // .map(move |c| dbg!(DrawableGlyph::new(c, fg, bg))).collect_vec();
                         glyphs_for_span
                     })
                     .flatten()
@@ -341,11 +376,11 @@ impl Frame {
                 }
 
                 if colored {
-                    if  new_glyph.fg_color != fg {
+                    if new_glyph.fg_color != fg {
                         output += &new_glyph.fg_color_string();
                         fg = new_glyph.fg_color;
                     }
-                    if  new_glyph.bg_color != bg {
+                    if new_glyph.bg_color != bg {
                         output += &new_glyph.bg_color_string();
                         bg = new_glyph.bg_color;
                     }
@@ -452,12 +487,12 @@ impl std::fmt::Debug for Frame {
             5,
         );
 
-        f.write_str(&format!(
-            "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
-            display_string_to_readable_string(self.non_raw_render_string(true)),
-            self.escaped_regular_display_string(),
-        ))
-        // f.write_str(&format!("\n{s}\n"))
+        // f.write_str(&format!(
+        //     "\n{s}\n\nReadable:\n\n{}\n\nRaw:\n\n{}",
+        //     display_string_to_readable_string(self.non_raw_render_string(true)),
+        //     self.escaped_regular_display_string(),
+        // ))
+        f.write_str(&format!("\n{s}\n"))
     }
 }
 
@@ -596,8 +631,13 @@ ghi",
         frame.grid[0][1].bg_color = None;
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
-        &frame.glyphs().for_each(|x|{dbg!(x);});
-        assert_eq!(frame.escaped_regular_display_string(), b.escaped_regular_display_string());
+        &frame.glyphs().for_each(|x| {
+            dbg!(x);
+        });
+        assert_eq!(
+            frame.escaped_regular_display_string(),
+            b.escaped_regular_display_string()
+        );
         assert_eq!(frame, b);
     }
     #[test]
