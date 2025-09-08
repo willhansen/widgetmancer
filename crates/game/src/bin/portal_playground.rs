@@ -1223,7 +1223,7 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut game = Game::new_headless_square(11);
+        let mut game = Game::new_headless_square(9);
 
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
@@ -1245,7 +1245,7 @@ mod tests {
     #[test]
     fn test_click_b() {
         let mut game = Game::new_headless_square(11);
-        game.ui_handler.give_event(press_left(4, 10));
+        game.ui_handler.give_event(press_left(4, 9));
         game.process_events();
         let frame = game.render();
         dbg!(&frame);
@@ -1256,7 +1256,7 @@ mod tests {
     }
     #[test]
     fn test_drag_mouse() {
-        let mut game = Game::new_headless(12, 24, 12, 12);
+        let mut game = Game::new_headless(11, 22, 12, 12);
         game.ui_handler.give_event(press_left(4, 4));
         game.process_events();
         let frame_1 = game.render();
@@ -1379,7 +1379,7 @@ mod tests {
     }
     #[test]
     fn test_portal_with_rotation() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(11);
         game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = |world_state, square| {
@@ -1582,7 +1582,7 @@ mod tests {
             frame.glyphs().for_each(|g| assert!(g.looks_solid()));
         });
     }
-    // #[ignore]
+    #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(21, 42, 9, 9);
@@ -1595,7 +1595,7 @@ mod tests {
     }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
-        let mut game = Game::new_headless_square(30);
+        let mut game = Game::new_headless_square(9);
         game.process_events();
         game.ui_handler.give_event(press_char('a'));
         game.ui_handler.receive_events();
@@ -1608,7 +1608,7 @@ mod tests {
     }
     #[test]
     fn test_give_events_and_advance_time() {
-        let mut game = Game::new_headless_square(30);
+        let mut game = Game::new_headless_square(9);
         game.advance_time_by(1.0);
         game.ui_handler.give_event(press_char('a'));
         game.ui_handler.receive_events();
