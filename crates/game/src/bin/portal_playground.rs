@@ -33,6 +33,7 @@ use utility::*;
 
 type PortalSide = SquareEdge;
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum PortalRenderingOption {
     LineOnFloor,
     Absolute,
@@ -130,10 +131,12 @@ impl Game {
             },
             Event::Mouse(mouse_event) => match mouse_event {
                 termion::event::MouseEvent::Press(mouse_button, col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = Some([row, col])
+                    self.ui_handler.last_mouse_screen_row_col = Some([row, col]);
+                    self.ui_handler.smoothed_mouse_screen_row_col = Some([row as f32, col as f32]);
                 }
                 termion::event::MouseEvent::Release(col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = None
+                    self.ui_handler.last_mouse_screen_row_col = None;
+                    self.ui_handler.smoothed_mouse_screen_row_col = None;
                 }
                 termion::event::MouseEvent::Hold(col, row) => {
                     self.ui_handler.last_mouse_screen_row_col = Some([row, col])
@@ -730,6 +733,7 @@ mod ui_handler_tests {
     use termion::event::*;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 struct WorldState {
     running: bool,
     s_from_start: f32,
@@ -1202,9 +1206,9 @@ mod tests {
     #[test]
     fn test_simple_output() {
         let state = WorldState::new(10, 10);
-        let frame = state.render([5.0, 5.0], 10);
-        assert_eq!(frame.width(), 20);
-        assert_eq!(frame.height(), 10);
+        let frame = state.render([5.0, 5.0], 5);
+        assert_eq!(frame.width(), 22);
+        assert_eq!(frame.height(), 11);
     }
 
     fn press_left(col: u16, row: u16) -> termion::event::Event {
@@ -1244,8 +1248,8 @@ mod tests {
     }
     #[test]
     fn test_click_b() {
-        let mut game = Game::new_headless_square(11);
-        game.ui_handler.give_event(press_left(4, 9));
+        let mut game = Game::new_headless_square(13);
+        game.ui_handler.give_event(press_left(4, 11));
         game.process_events();
         let frame = game.render();
         dbg!(&frame);
@@ -1273,7 +1277,7 @@ mod tests {
     }
     #[test]
     fn test_render_portal_edges() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(13);
         game.world_state
             .place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
         game.world_state
@@ -1306,7 +1310,7 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
@@ -1333,7 +1337,7 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
@@ -1362,7 +1366,7 @@ mod tests {
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
-        let mut game = Game::new_headless_square(12);
+        let mut game = Game::new_headless_square(13);
         game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = WorldState::radial_sin_board_colors;
@@ -1379,7 +1383,7 @@ mod tests {
     }
     #[test]
     fn test_portal_with_rotation() {
-        let mut game = Game::new_headless_square(11);
+        let mut game = Game::new_headless_square(13);
         game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = |world_state, square| {
@@ -1490,10 +1494,12 @@ mod tests {
 
     #[test]
     fn test_render_smoothed_mouse_stationary() {
-        let mut game = Game::new_headless_square(2);
+        let mut game = Game::new_headless_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left(1, 1));
         game.process_events();
+        assert_eq!(game.ui_handler.event_log.len(), 1);
+        assert!(game.ui_handler.smoothed_mouse_screen_row_col.is_some());
         let frame = game.render();
         println!("{}", &frame.escaped_regular_display_string());
         assert!(
