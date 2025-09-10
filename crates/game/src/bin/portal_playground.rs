@@ -54,7 +54,7 @@ fn set_up_panic_hook() {
 
         write!(stdout(), "{}", termion::screen::ToMainScreen).expect("switch to main screen");
         let string_out = format!("{:#?}\n\n", panic_info).replace("\n", "\n\r");
-        write!(stdout(), "{string_out}").expect("display panic info");
+        write!(stdout(), "{string_out:?}").expect("display panic info");
 
         if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
             println!("panic occurred: {s:?}");
@@ -81,8 +81,13 @@ impl Game {
             ui_handler: UiHandler::new(),
         }
     }
-    pub fn new_headless_square(s: usize) -> Self {
-        Self::new_headless(s as u16, s as u16 * 2, s, s)
+    pub fn new_headless_square(side_length_in_squares: usize) -> Self {
+        Self::new_headless(
+            side_length_in_squares as u16,
+            side_length_in_squares as u16 * 2,
+            side_length_in_squares,
+            side_length_in_squares,
+        )
     }
     pub fn new_headless(
         screen_height: u16,
@@ -151,9 +156,19 @@ impl Game {
         self.advance_time_to(s_from_start);
     }
     pub fn advance_time_to(&mut self, s_from_start: f32) {
+        self.process_events();
         self.ui_handler.advance_time_to(s_from_start);
         self.world_state.advance_time_to(s_from_start);
+        self.process_events();
     }
+
+    pub fn advance_time_n_steps(&mut self, step_dt_s: f32, n: u32) {
+        (0..n).for_each(|_n| {
+            self.process_events();
+            self.advance_time_by(step_dt_s);
+        });
+    }
+
     pub fn process_events(&mut self) -> usize {
         self.ui_handler.receive_events();
         let to_process = self.ui_handler.take_unprocessed_past_events();
@@ -209,15 +224,21 @@ struct Camera {
 // Most coordinates are in squares unless noted
 impl Camera {
     pub fn new_from_screen_size(size_on_screen_rows_cols: USizePoint) -> Self {
-        assert!(size_on_screen_rows_cols[1] %2 == 0, "columns must fit integer number of squares.  cols: {}",size_on_screen_rows_cols[1]);
-        let size_in_squares_width_height = [size_on_screen_rows_cols[1]/2, size_on_screen_rows_cols[0]];
+        let size_in_squares_width_height =
+            [size_on_screen_rows_cols[1] / 2, size_on_screen_rows_cols[0]];
         Self::new_from_world_size(size_in_squares_width_height)
     }
     pub fn new_from_world_size(size_in_squares_width_height: USizePoint) -> Self {
         let names = ["width", "height"];
-        size_in_squares_width_height.iter().zip(names.iter()).for_each(|(size, name)| {
-            assert!(size %2 == 1, "{name} must be odd to have integer center.  {name}: {size}");
-        });
+        size_in_squares_width_height
+            .iter()
+            .zip(names.iter())
+            .for_each(|(size, name)| {
+                assert!(
+                    size % 2 == 1,
+                    "{name} must be odd to have integer center.  {name}: {size}"
+                );
+            });
         Self::new_pos_and_squares_width_height([0, 0], size_in_squares_width_height)
     }
     pub fn new_square(s: usize) -> Self {
@@ -237,10 +258,15 @@ impl Camera {
     pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
         Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world())
     }
-    pub fn from_bottom_left_and_size(bottom_left_square: IPoint, width_height_in_squares: [u32; 2]) -> Self {
+    pub fn from_bottom_left_and_size(
+        bottom_left_square: IPoint,
+        width_height_in_squares: [u32; 2],
+    ) -> Self {
         Self {
             lower_left_square: bottom_left_square,
-            upper_right_square: bottom_left_square.add(width_height_in_squares.to_signed()).sub([1, 1]),
+            upper_right_square: bottom_left_square
+                .add(width_height_in_squares.to_signed())
+                .sub([1, 1]),
         }
     }
     pub fn bottom_left_square(&self) -> IPoint {
@@ -338,20 +364,10 @@ impl Camera {
         is_debug: bool,
     ) -> (Frame, Vec<Frame>) {
         let radius = self.width_in_world() / 2;
-        let result =
-            world_state.render_with_options(is_debug, fov_center, radius);
-        assert_eq!(
-            result.0.size_rows_cols()[0],
-        radius as usize * 2 + 1
-        );
-        assert_eq!(
-            result.0.size_rows_cols()[1],
-            (radius as usize * 2 + 1)*2
-        );
-        assert_eq!(
-            self.size_on_screen_rows_cols(),
-            result.0.size_rows_cols()
-        );
+        let result = world_state.render_with_options(is_debug, fov_center, radius);
+        assert_eq!(result.0.size_rows_cols()[0], radius as usize * 2 + 1);
+        assert_eq!(result.0.size_rows_cols()[1], (radius as usize * 2 + 1) * 2);
+        assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
         result
     }
 }
@@ -503,7 +519,7 @@ impl UiHandler {
         };
 
         self.smoothed_mouse_screen_row_col = Some(exponential_approach_with_min_speed(
-            prev_pos, target_pos, dt_s, 0.5, 5.0,
+            prev_pos, target_pos, dt_s, 0.1, 15.0,
         ));
     }
 
@@ -578,7 +594,13 @@ impl UiHandler {
         output_writable: Option<Box<dyn Write>>,
     ) -> UiHandler {
         let (event_sender, event_receiver) = channel();
-        let screen_size_rows_cols =[screen_height as usize, screen_width as usize]; 
+        let screen_size_rows_cols = [screen_height as usize, screen_width as usize];
+        // want to be square (for now)
+        let camera_side_length = (screen_height as usize)
+            .min((screen_width as usize) / 2)
+            .min(31);
+        // Needs to be odd size (because radius-based)
+        let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
         UiHandler {
             start_time: Instant::now(),
             s_from_start: 0.0,
@@ -592,7 +614,7 @@ impl UiHandler {
             event_log: Default::default(),
             prev_drawn: None,
             enable_mouse_smoothing: false,
-            camera: Camera::new_from_screen_size(screen_size_rows_cols),
+            camera: Camera::new_square(camera_side_length),
         }
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
@@ -891,7 +913,6 @@ impl WorldState {
         // Key is (depth, absolute_position, rotation from portal)
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
-
 
         let camera_width = radius as usize * 2 + 1;
         let camera_height = camera_width;
@@ -1211,12 +1232,18 @@ mod tests {
         assert_eq!(frame.height(), 11);
     }
 
+    fn press_left_row_col_screen_pos(screen_pos_row_col: [u16; 2]) -> termion::event::Event {
+        press_left(screen_pos_row_col[1], screen_pos_row_col[0])
+    }
     fn press_left(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Press(
             termion::event::MouseButton::Left,
             col,
             row,
         ))
+    }
+    fn drag_mouse_to_screen_pos(row_col: [u16; 2]) -> termion::event::Event {
+        drag_mouse_to(row_col[1], row_col[0])
     }
     fn drag_mouse_to(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col, row))
@@ -1518,7 +1545,7 @@ mod tests {
         game.ui_handler.give_event(drag_mouse_to(2, 1));
         game.process_events();
 
-        game.ui_handler.advance_time_to(0.21);
+        game.ui_handler.advance_time_by(0.0001);
         let pos = game
             .ui_handler
             .smoothed_mouse_position_screen_row_col()
@@ -1638,5 +1665,47 @@ mod tests {
         game.process_events();
         assert_eq!(game.ui_handler.event_log.len(), 3);
         assert_eq!(game.ui_handler.event_queue.len(), 0);
+    }
+    #[test]
+    fn test_odd_screen_sizes() {
+        Game::new_headless_square(9); // odd square
+        Game::new_headless_square(8); // even square
+        Game::new_headless(8, 16, 3, 4);
+        Game::new_headless(10, 20, 30, 30);
+    }
+    #[test]
+    fn test_smoothed_mouse_time_step_length_independence() {
+        let steps = [10, 2];
+        let steps_and_times = steps.map(|n| {
+
+            let mut game = Game::new_headless_square(40);
+            game.ui_handler
+                .give_event(press_left_row_col_screen_pos([10, 3]));
+            let end_time = 1.0;
+            game.advance_time_n_steps(end_time/n as f32, n);
+            (game.ui_handler.smoothed_mouse_position_screen_row_col().unwrap(), game.ui_handler.s_from_start)
+        });
+
+        dbg!(&steps_and_times);
+        assert!(steps_and_times[0].0.dist(steps_and_times[1].0) < 0.0001);
+
+    }
+    #[test]
+    fn test_smoothed_mouse_is_fast() {
+        let mut game = Game::new_headless_square(40);
+        game.ui_handler
+            .give_event(press_left_row_col_screen_pos([10, 3]));
+        game.advance_time_by(0.5);
+        assert_eq!(
+            game.ui_handler.smoothed_mouse_screen_row_col,
+            Some([10.0, 3.0])
+        );
+        game.ui_handler.give_event(drag_mouse_to_screen_pos([10,30]));
+        // Mouse must move really fast
+        game.advance_time_by(0.5);
+        assert_eq!(
+            game.ui_handler.smoothed_mouse_screen_row_col,
+            Some([10.0, 30.0])
+        );
     }
 }
