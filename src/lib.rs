@@ -1773,6 +1773,8 @@ pub fn exponential_approach_with_min_speed(
 
 #[cfg(test)]
 mod tests {
+    use std::f32;
+
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
@@ -2476,5 +2478,15 @@ mod tests {
         );
         assert_eq!(result.unwrap().0, (point2(5, 6), STEP_UP).into());
         assert_about_eq_2d(result.unwrap().1, point2(5.0, 6.5));
+    }
+    #[test]
+    fn test_exponential_approach_with_min_speed() {
+        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, 1.0, 0.0), [5.0, 0.0]);
+        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, f32::INFINITY, 5.0), [5.0, 0.0]);
+
+        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 0.01, 5.0), [0.0, 100.0]);
+        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 5.0, 999.0), [0.0, 100.0]);
+        
+
     }
 }
