@@ -70,6 +70,8 @@ use geometry2::FPoint;
 use geometry2::IPoint;
 use geometry2::*;
 
+const UI_BACKGROUND_COLOR_RGB: [u8;3] =  color_from_hex!("#1b305b");
+
 struct Game {
     pub world_state: WorldState,
     pub ui_handler: UiHandler,
@@ -519,7 +521,7 @@ impl UiHandler {
         };
 
         self.smoothed_mouse_screen_row_col = Some(exponential_approach_with_min_speed(
-            prev_pos, target_pos, dt_s, 0.1, 15.0,
+            prev_pos, target_pos, dt_s, 0.05, 50.0,
         ));
     }
 
@@ -739,7 +741,7 @@ impl UiHandler {
         let (world_frame, debug_frames) =
             self.camera.render_world(world_state, fov_center, is_debug);
 
-        let mut screen_buffer = Frame::blank(self.screen_width(), self.screen_height());
+        let mut screen_buffer = Frame::solid_color(self.screen_width(), self.screen_height(), UI_BACKGROUND_COLOR_RGB.into());
         screen_buffer.blit(&world_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         (screen_buffer, debug_frames)
@@ -1078,13 +1080,18 @@ impl WorldState {
         &self,
         square_viz: &PositionedSquareVisibilityInFov,
     ) -> [GlyphWithTransparency; 2] {
-        let mut glyphs = if let Some(board_color) =
-            (self.board_color_function)(&self, square_viz.absolute_square().into())
-        {
-            DoubleGlyphWithTransparency::solid_color(board_color)
+        let abs_square = square_viz.absolute_square();
+        let square_is_in_world = self.on_board(abs_square.to_array());
+        let default_glyphs = [GlyphWithTransparency::from_char('.'); 2];
+
+        let mut glyphs = if square_is_in_world {
+            if let Some(board_color) = (self.board_color_function)(&self, abs_square.into()) {
+                DoubleGlyphWithTransparency::solid_color(board_color)
+            } else {
+                default_glyphs
+            }
         } else {
-            let g = GlyphWithTransparency::from_char('.');
-            [g, g]
+            default_glyphs
         };
 
         // draw visible portal entrances
@@ -1615,12 +1622,11 @@ mod tests {
             frame.glyphs().for_each(|g| assert!(g.looks_solid()));
         });
     }
-    #[ignore]
+    // #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
-        let mut game = Game::new_headless(21, 42, 9, 9);
-        game.ui_handler
-            .give_future_event_absolute(press_left(5, 5), 1.0);
+        let mut game = Game::new_headless(15, 29, 7, 9);
+        game.ui_handler.give_event(press_left(5, 5));
         game.process_events();
         let frame = game.render();
         assert_frame_same_as_past!(frame, "a");
@@ -1677,18 +1683,21 @@ mod tests {
     fn test_smoothed_mouse_time_step_length_independence() {
         let steps = [10, 2];
         let steps_and_times = steps.map(|n| {
-
             let mut game = Game::new_headless_square(40);
             game.ui_handler
                 .give_event(press_left_row_col_screen_pos([10, 3]));
             let end_time = 1.0;
-            game.advance_time_n_steps(end_time/n as f32, n);
-            (game.ui_handler.smoothed_mouse_position_screen_row_col().unwrap(), game.ui_handler.s_from_start)
+            game.advance_time_n_steps(end_time / n as f32, n);
+            (
+                game.ui_handler
+                    .smoothed_mouse_position_screen_row_col()
+                    .unwrap(),
+                game.ui_handler.s_from_start,
+            )
         });
 
         dbg!(&steps_and_times);
         assert!(steps_and_times[0].0.dist(steps_and_times[1].0) < 0.0001);
-
     }
     #[test]
     fn test_smoothed_mouse_is_fast() {
@@ -1700,7 +1709,8 @@ mod tests {
             game.ui_handler.smoothed_mouse_screen_row_col,
             Some([10.0, 3.0])
         );
-        game.ui_handler.give_event(drag_mouse_to_screen_pos([10,30]));
+        game.ui_handler
+            .give_event(drag_mouse_to_screen_pos([10, 30]));
         // Mouse must move really fast
         game.advance_time_by(0.5);
         assert_eq!(

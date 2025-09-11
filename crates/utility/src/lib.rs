@@ -16,7 +16,6 @@ use euclid::*;
 use getset::CopyGetters;
 use itertools::Itertools;
 use line_drawing::Supercover;
-use num::traits::real::Real;
 use num::traits::Signed;
 use ordered_float::OrderedFloat;
 use rand::rngs::StdRng;
@@ -1572,9 +1571,9 @@ pub fn first_inside_square_face_hit_by_ray(
                 ray_intersection_point_with_oriented_square_face(start, angle, range, face),
             )
         })
-        .filter(|(face, point)| point.is_some())
+        .filter(|(_face, point)| point.is_some())
         .map(|(face, point)| (face, point.unwrap()))
-        .min_by_key(|(face, point)| OrderedFloat((start - *point).length()))
+        .min_by_key(|(_face, point)| OrderedFloat((start - *point).length()))
 }
 pub fn square_face_as_line(square: WorldSquare, face_direction: OrthogonalWorldStep) -> WorldLine {
     let square_center = square.to_f32();
@@ -1775,6 +1774,7 @@ pub fn exponential_approach_with_min_speed(
 mod tests {
     use std::f32;
 
+    use num::traits::real::Real;
     use ntest::{assert_about_eq, assert_false};
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;

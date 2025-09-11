@@ -510,7 +510,7 @@ pub mod test_utils {
         }
 
         let correct_string = std::fs::read_to_string(path.clone()).expect(
-        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{candidate}"),
+        &format!("No existing test output found.  Set BLESS_TESTS to canonize current candidate:\n\n{}", candidate.framed()),
         );
         Some(correct_string)
 

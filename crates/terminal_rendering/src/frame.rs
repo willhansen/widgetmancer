@@ -30,6 +30,11 @@ impl Frame {
         let glyph = DrawableGlyph::default();
         Self::new_from_repeated_glyph(width, height, glyph)
     }
+    pub fn solid_color(width: usize, height: usize, color: RGB8) -> Self {
+        let glyph = DrawableGlyph::solid_color(color);
+        Self::new_from_repeated_glyph(width, height, glyph)
+    }
+
     pub fn save_to_file(&self, path: PathBuf) {
         File::create(path)
             .unwrap()
