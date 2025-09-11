@@ -372,6 +372,19 @@ impl Camera {
         assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
         result
     }
+    pub fn render_world_with_radius(
+        &self,
+        world_state: &WorldState,
+        fov_center: FPoint,
+        fov_range: u32,
+        is_debug: bool,
+    ) -> (Frame, Vec<Frame>) {
+        let result = world_state.render_with_options(is_debug, fov_center, fov_range);
+        assert_eq!(result.0.size_rows_cols()[0], fov_range as usize * 2 + 1);
+        assert_eq!(result.0.size_rows_cols()[1], (fov_range as usize * 2 + 1) * 2);
+        // assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
+        result
+    }
 }
 
 #[cfg(test)]
@@ -503,6 +516,7 @@ struct UiHandler {
     pub prev_drawn: Option<Frame>,
     pub enable_mouse_smoothing: bool,
     pub camera: Camera,
+    pub default_fov_range: u32,
 }
 impl UiHandler {
     fn smoothed_mouse_position_screen_row_col(&mut self) -> Option<FPoint> {
@@ -617,6 +631,7 @@ impl UiHandler {
             prev_drawn: None,
             enable_mouse_smoothing: false,
             camera: Camera::new_square(camera_side_length),
+            default_fov_range: camera_side_length as u32 / 2,
         }
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
@@ -729,17 +744,18 @@ impl UiHandler {
         let fov_center = self
             .mouse_world_point()
             .unwrap_or_else(|| world_state.player_square.to_float());
-        self.render_with_options(world_state, fov_center, is_debug)
+        self.render_with_options(world_state, fov_center,self.default_fov_range,  is_debug)
     }
 
     fn render_with_options(
         &mut self,
         world_state: &WorldState,
         fov_center: FPoint,
+        fov_range: u32,
         is_debug: bool,
     ) -> (Frame, Vec<Frame>) {
         let (world_frame, debug_frames) =
-            self.camera.render_world(world_state, fov_center, is_debug);
+            self.camera.render_world_with_radius(world_state, fov_center, fov_range, is_debug);
 
         let mut screen_buffer = Frame::solid_color(self.screen_width(), self.screen_height(), UI_BACKGROUND_COLOR_RGB.into());
         screen_buffer.blit(&world_frame, [0, 0]);
@@ -1622,16 +1638,6 @@ mod tests {
             frame.glyphs().for_each(|g| assert!(g.looks_solid()));
         });
     }
-    // #[ignore]
-    #[test]
-    fn test_big_screen_small_world_click() {
-        let mut game = Game::new_headless(15, 29, 7, 9);
-        game.ui_handler.give_event(press_left(5, 5));
-        game.process_events();
-        let frame = game.render();
-        assert_frame_same_as_past!(frame, "a");
-        todo!();
-    }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
         let mut game = Game::new_headless_square(9);
@@ -1717,5 +1723,16 @@ mod tests {
             game.ui_handler.smoothed_mouse_screen_row_col,
             Some([10.0, 30.0])
         );
+    }
+    // #[ignore]
+    #[test]
+    fn test_big_screen_small_world_click() {
+        let mut game = Game::new_headless(10, 30, 4, 4);
+        game.ui_handler.default_fov_range = 3;
+        game.ui_handler.give_event(press_left(5, 6));
+        game.process_events();
+        let frame = game.render();
+        dbg!(&frame);
+        assert_frame_same_as_past!(frame, "a");
     }
 }
