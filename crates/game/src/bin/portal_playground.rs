@@ -70,7 +70,10 @@ use geometry2::FPoint;
 use geometry2::IPoint;
 use geometry2::*;
 
-const UI_BACKGROUND_COLOR_RGB: [u8;3] =  color_from_hex!("#1b305b");
+const UI_BACKGROUND_RGB: [u8; 3] = color_from_hex!("#1b305b");
+const ETERNAL_VOID_CHAR: char = '.';
+const OUT_OF_FOV_RANGE_CHAR: char = '╲';
+const SHADOW_CHAR: char = '╳';
 
 struct Game {
     pub world_state: WorldState,
@@ -204,14 +207,8 @@ impl Game {
     pub fn now_as_s_from_start(&self) -> f32 {
         self.ui_handler.now_as_s_from_start()
     }
-    pub fn render_with_debug(&mut self) -> (Frame, Vec<Frame>) {
-        self.render_with_options(true)
-    }
     pub fn render(&mut self) -> Frame {
-        self.render_with_options(false).0
-    }
-    fn render_with_options(&mut self, is_debug: bool) -> (Frame, Vec<Frame>) {
-        self.ui_handler.render(&self.world_state, is_debug)
+        self.ui_handler.render(&self.world_state)
     }
 }
 
@@ -252,10 +249,24 @@ impl Camera {
             upper_right_square: lower_left.add(width_height.to_int().sub([1, 1])),
         }
     }
-    pub fn set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
+    pub fn translate_to_set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
         let new = self.with_bottom_left_square(bottom_left_square);
         self.lower_left_square = new.lower_left_square;
         self.upper_right_square = new.upper_right_square;
+    }
+    pub fn top_right_local_square(&self) -> IPoint {
+        self.upper_right_square.sub(self.lower_left_square)
+    }
+    pub fn top_left_local_square(&self) -> IPoint {
+        rect_corner_by_quadrant(self.top_right_local_square(), 1)
+    }
+    pub fn translate_local_square_to_absolute_square(
+        &mut self,
+        local_square: IPoint,
+        absolute_square: IPoint,
+    ) {
+        let new_absolute_bottom_left = absolute_square.sub(local_square);
+        self.translate_to_set_bottom_left_square(new_absolute_bottom_left);
     }
     pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
         Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world())
@@ -275,7 +286,7 @@ impl Camera {
         self.lower_left_square
     }
     pub fn translate(&mut self, movement: IPoint) {
-        self.set_bottom_left_square(self.bottom_left_square().add(movement))
+        self.translate_to_set_bottom_left_square(self.bottom_left_square().add(movement))
     }
     pub fn size_in_world(&self) -> [u32; 2] {
         [
@@ -317,6 +328,7 @@ impl Camera {
             (false, false) => 2,
         }
     }
+    // zero indexed
     pub fn frame_row_col_point_to_local_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         [
             (screen_row_col_point[1] - 1.0) / 2.0,
@@ -324,15 +336,15 @@ impl Camera {
         ]
     }
     // Not one-to-one.  each square has two characters that map to it
+    // zero indexed
     pub fn frame_row_col_char_to_local_world_square(
         &self,
         camera_local_row_col_char: [u16; 2],
     ) -> IPoint {
-        [
-            (camera_local_row_col_char[1] as i32 - 1) / 2,
-            self.height_in_world() as i32 - (camera_local_row_col_char[0] as i32 - 1) - 1,
-        ]
+        let [row, col] = camera_local_row_col_char.map(|x| x as i32);
+        [col / 2, self.height_in_world() as i32 - row - 1]
     }
+    // zero indexed
     pub fn frame_row_col_char_to_absolute_world_square(
         &self,
         frame_row_col_char: [u16; 2],
@@ -359,31 +371,49 @@ impl Camera {
         todo!();
     }
 
-    pub fn render_world(
-        &self,
-        world_state: &WorldState,
-        fov_center: FPoint,
-        is_debug: bool,
-    ) -> (Frame, Vec<Frame>) {
+    pub fn render_world(&self, world_state: &WorldState, fov_center: FPoint) -> Frame {
         let radius = self.width_in_world() / 2;
-        let result = world_state.render_with_options(is_debug, fov_center, radius);
-        assert_eq!(result.0.size_rows_cols()[0], radius as usize * 2 + 1);
-        assert_eq!(result.0.size_rows_cols()[1], (radius as usize * 2 + 1) * 2);
-        assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
-        result
+        let frame = self.render_world_with_radius(&world_state, fov_center, radius);
+        assert_eq!(frame.size_rows_cols()[0], radius as usize * 2 + 1);
+        assert_eq!(frame.size_rows_cols()[1], (radius as usize * 2 + 1) * 2);
+        assert_eq!(self.size_on_screen_rows_cols(), frame.size_rows_cols());
+        frame
+    }
+    fn blank_frame(&self) -> Frame {
+        let size = self.size_on_screen_rows_cols();
+        let camera_background_default_glyph = DrawableGlyph::new('🮖', None, None);
+        Frame::new_from_repeated_glyph(size[1], size[0], camera_background_default_glyph)
     }
     pub fn render_world_with_radius(
         &self,
         world_state: &WorldState,
         fov_center: FPoint,
         fov_range: u32,
-        is_debug: bool,
-    ) -> (Frame, Vec<Frame>) {
-        let result = world_state.render_with_options(is_debug, fov_center, fov_range);
-        assert_eq!(result.0.size_rows_cols()[0], fov_range as usize * 2 + 1);
-        assert_eq!(result.0.size_rows_cols()[1], (fov_range as usize * 2 + 1) * 2);
+    ) -> Frame {
+        let (fov_frame, debug_layers) =
+            world_state.render_with_options(false, fov_center, fov_range);
+        assert_eq!(fov_frame.size_rows_cols()[0], fov_range as usize * 2 + 1);
+        assert_eq!(
+            fov_frame.size_rows_cols()[1],
+            (fov_range as usize * 2 + 1) * 2
+        );
         // assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
-        result
+
+        // Have rendered world fov frame, but now where to put it in the camera frame?
+        // Camera corners in world are known.  fov center and radius in world are known.
+        // to blit, we need the top-left character pos of the fov
+        // Can get that from the top-left square of the fov in the camera's local world frame
+        let mut camera_frame = self.blank_frame();
+
+        let fov_center_absolute_square = fov_center.rounded();
+        let fov_top_left_absolute_square =
+            fov_center_absolute_square.add([-(fov_range as i32), fov_range as i32]);
+        let fov_top_left_char_row_col =
+            self.absolute_world_square_to_left_frame_row_col(fov_top_left_absolute_square);
+
+        camera_frame.blit(&fov_frame, fov_top_left_char_row_col.map(|x| x as usize));
+
+        camera_frame
     }
 }
 
@@ -395,37 +425,17 @@ mod camera_tests {
         let s: i32 = 32;
         let camera = Camera::new_square(s as usize);
 
-        assert_eq!(
-            camera.frame_row_col_char_to_absolute_world_square([1, 1]),
-            [0, s - 1]
-        );
+        let f = |x| camera.frame_row_col_char_to_absolute_world_square(x);
+        assert_eq!(f([0, 0]), [0, s - 1]);
 
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([1, 1]),
-            [0, s - 1]
-        );
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([1, 2]),
-            [0, s - 1]
-        );
+        assert_eq!(f([0, 0]), [0, s - 1]);
+        assert_eq!(f([0, 1]), [0, s - 1]);
 
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([2, 1]),
-            [0, s - 2]
-        );
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([2, 2]),
-            [0, s - 2]
-        );
+        assert_eq!(f([1, 0]), [0, s - 2]);
+        assert_eq!(f([1, 1]), [0, s - 2]);
 
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([1, 3]),
-            [1, s - 1]
-        );
-        assert_eq!(
-            camera.frame_row_col_char_to_local_world_square([1, 4]),
-            [1, s - 1]
-        );
+        assert_eq!(f([0, 2]), [1, s - 1]);
+        assert_eq!(f([0, 3]), [1, s - 1]);
 
         assert_eq!(
             camera.local_to_absolute_world_square([0, s - 1]),
@@ -470,7 +480,7 @@ mod camera_tests {
         );
     }
     #[test]
-    fn test_local_to_absolute_world_squares_translation() {
+    fn test_local_to_absolute_world_squares_after_translation() {
         let mut camera = Camera::new_square(10);
         let p = [3, 5];
         dbg!(&camera);
@@ -612,11 +622,9 @@ impl UiHandler {
         let (event_sender, event_receiver) = channel();
         let screen_size_rows_cols = [screen_height as usize, screen_width as usize];
         // want to be square (for now)
-        let camera_side_length = (screen_height as usize)
-            .min((screen_width as usize) / 2)
-            .min(31);
+        let camera_side_length = (screen_height as usize).min((screen_width as usize) / 2);
         // Needs to be odd size (because radius-based)
-        let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
+        // let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
         UiHandler {
             start_time: Instant::now(),
             s_from_start: 0.0,
@@ -735,32 +743,35 @@ impl UiHandler {
     }
 
     pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
+        dbg!(&screen_row_col_char);
         let p = self.screen_row_col_char_to_camera_frame_row_col_char(screen_row_col_char);
+        dbg!("camera frame row_col: ", &p);
         let p = self.camera.frame_row_col_char_to_local_world_square(p);
-        self.camera.local_to_absolute_world_square(p)
+        dbg!("local_world_square: ", &p);
+        dbg!("camera: ", &self.camera);
+        let p = self.camera.local_to_absolute_world_square(p);
+        dbg!("absolute_world_square: ", &p);
+        p
     }
 
-    pub fn render(&mut self, world_state: &WorldState, is_debug: bool) -> (Frame, Vec<Frame>) {
+    pub fn render(&mut self, world_state: &WorldState) -> Frame {
         let fov_center = self
             .mouse_world_point()
             .unwrap_or_else(|| world_state.player_square.to_float());
-        self.render_with_options(world_state, fov_center,self.default_fov_range,  is_debug)
-    }
+        let fov_range = self.default_fov_range;
 
-    fn render_with_options(
-        &mut self,
-        world_state: &WorldState,
-        fov_center: FPoint,
-        fov_range: u32,
-        is_debug: bool,
-    ) -> (Frame, Vec<Frame>) {
-        let (world_frame, debug_frames) =
-            self.camera.render_world_with_radius(world_state, fov_center, fov_range, is_debug);
+        let world_frame = self
+            .camera
+            .render_world_with_radius(world_state, fov_center, fov_range);
 
-        let mut screen_buffer = Frame::solid_color(self.screen_width(), self.screen_height(), UI_BACKGROUND_COLOR_RGB.into());
+        let mut screen_buffer = Frame::solid_color(
+            self.screen_width(),
+            self.screen_height(),
+            UI_BACKGROUND_RGB.into(),
+        );
         screen_buffer.blit(&world_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
-        (screen_buffer, debug_frames)
+        screen_buffer
     }
 }
 fn press_char(c: char) -> Event {
@@ -852,6 +863,9 @@ impl WorldState {
         let rainbow = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, MAGENTA];
         rainbow[(depth.saturating_sub(1) as usize).rem_euclid(rainbow.len())]
     }
+    pub fn size_width_height(&self) -> UPoint {
+        [self.width as u32, self.height as u32]
+    }
 
     pub fn on_board(&self, square: IPoint) -> bool {
         square[0] >= 0
@@ -897,13 +911,8 @@ impl WorldState {
     //   sources in future)
     //   - Same transform from local to absolute frame, even if the portals are separated
     //   physically
-    fn render_with_debug_deconstruction(
-        &self,
-        is_debug: bool,
-        fov_center: FPoint,
-        radius: u32,
-    ) -> (Frame, Vec<Frame>) {
-        self.render_with_options(is_debug, fov_center, radius)
+    fn render_with_debug_layers(&self, fov_center: FPoint, radius: u32) -> (Frame, Vec<Frame>) {
+        self.render_with_options(true, fov_center, radius)
     }
     fn render_with_options(
         &self,
@@ -926,7 +935,8 @@ impl WorldState {
             &portal_geometry,
         );
 
-        let shadow_glyph = GlyphWithTransparency::from_char('.');
+        let shadow_glyph = GlyphWithTransparency::from_char(SHADOW_CHAR);
+        let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR);
 
         // Key is (depth, absolute_position, rotation from portal)
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
@@ -941,16 +951,16 @@ impl WorldState {
         // let camera_max_y = fov_center_square[1] + radius as i32;
 
         let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..camera_height)
-            .map(|camera_row| {
-                let camera_y = self.height as i32 - camera_row as i32 - 1;
+            .map(|row_in_camera_frame| {
+                let y_in_camera_frame = self.height as i32 - row_in_camera_frame as i32 - 1;
                 (0..camera_width as i32)
-                    .map(|camera_x| {
-                        let camera_col = camera_x as usize;
+                    .map(|x_in_camera_frame| {
+                        let col_in_camera_frame = x_in_camera_frame as usize;
                         // let x = col;
                         // let y = self.height - row - 1;
-                        let camera_pos: WorldSquare = [camera_x, camera_y].into();
+                        let pos_in_camera_frame: WorldSquare = [x_in_camera_frame, y_in_camera_frame].into();
                         let camera_pos_relative_to_fov_center =
-                            camera_pos - WorldSquare::from(fov_center.rounded());
+                            pos_in_camera_frame - WorldSquare::from(fov_center.rounded());
                         let visible_portions_at_relative_square: Vec<
                             PositionedSquareVisibilityInFov,
                         > = match self.portal_rendering {
@@ -964,12 +974,16 @@ impl WorldState {
                             PortalRenderingOption::LineOnFloor => {
                                 vec![PositionedSquareVisibilityInFov::new_in_top_view(
                                     SquareVisibility::new_fully_visible(),
-                                    camera_pos,
+                                    pos_in_camera_frame,
                                     camera_pos_relative_to_fov_center,
                                 )]
                             }
                             PortalRenderingOption::Absolute => todo!(),
                         };
+                        let current_radius = camera_pos_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
+                        if !visible_portions_at_relative_square.is_empty() {
+                            assert!(current_radius <= radius, "rel_pos: {camera_pos_relative_to_fov_center:?}, fov_radius: {radius}");
+                        }
 
                         let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> =
                             visible_portions_at_relative_square
@@ -1002,18 +1016,20 @@ impl WorldState {
                                         .get_mut(&debug_frames_key)
                                         .unwrap();
                                     debug_frame.set_by_double_wide_grid(
-                                        camera_row,
-                                        camera_col,
+                                        row_in_camera_frame,
+                                        col_in_camera_frame,
                                         double_glyph
                                             .map(|g| g.to_drawable_with_transparent_as_default()),
                                     );
                                 });
                         }
+
+                        let default = if current_radius <= radius {shadow_glyph} else {out_of_range_glyph};
                         glyph_layers_to_combine
                             .into_iter()
                             .rev()
                             .reduce(|below, above| [0, 1].map(|i| above[i].over(below[i])))
-                            .unwrap_or([shadow_glyph; 2])
+                            .unwrap_or([default; 2])
                     })
                     .collect_vec()
             })
@@ -1098,7 +1114,7 @@ impl WorldState {
     ) -> [GlyphWithTransparency; 2] {
         let abs_square = square_viz.absolute_square();
         let square_is_in_world = self.on_board(abs_square.to_array());
-        let default_glyphs = [GlyphWithTransparency::from_char('.'); 2];
+        let default_glyphs = [GlyphWithTransparency::from_char(ETERNAL_VOID_CHAR); 2];
 
         let mut glyphs = if square_is_in_world {
             if let Some(board_color) = (self.board_color_function)(&self, abs_square.into()) {
@@ -1425,8 +1441,11 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.render_with_debug();
-        layers.into_iter().for_each(|frame| {
+        let frame = game.render();
+        let (_, debug_layers) = game
+            .world_state
+            .render_with_debug_layers(game.world_state.smoothed_player_pos, 5);
+        debug_layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
         assert_frame_same_as_past!(frame, "a");
@@ -1449,7 +1468,10 @@ mod tests {
         // game.portal_tint_function = GameState::rainbow_solid;
         // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let (frame, layers) = game.render_with_debug();
+        let (frame, layers) = game.world_state.render_with_debug_layers(
+            game.world_state.smoothed_player_pos,
+            game.ui_handler.default_fov_range,
+        );
         layers.into_iter().for_each(|frame| {
             dbg!(frame);
         });
@@ -1734,5 +1756,47 @@ mod tests {
         let frame = game.render();
         dbg!(&frame);
         assert_frame_same_as_past!(frame, "a");
+    }
+    #[test]
+    fn test_camera_local_world_squares_invariant_to_camera_motion() {
+        let mut game = Game::new_headless(10, 30, 4, 4);
+        let before = game.ui_handler.camera.top_left_local_square();
+        game.ui_handler
+            .camera
+            .translate_local_square_to_absolute_square(
+                game.ui_handler.camera.top_left_local_square(),
+                [0, 3],
+            );
+        let after = game.ui_handler.camera.top_left_local_square();
+        assert_eq!(before, after);
+    }
+    #[test]
+    fn test_screen_to_world() {
+        let mut game = Game::new_headless(10, 30, 4, 4);
+        // let frame = game.render();
+        // game.ui_handler.draw_screen(frame);
+        game.ui_handler
+            .camera
+            .translate_local_square_to_absolute_square(
+                game.ui_handler.camera.top_left_local_square(),
+                [0, 3],
+            );
+        dbg!(game.ui_handler.camera.top_left_local_square());
+        dbg!(game.ui_handler.camera, game.world_state.size_width_height());
+        let f = |p| game.ui_handler.screen_row_col_char_to_world_square(p);
+        let g = |p| game.ui_handler.screen_row_col_point_to_world_point(p);
+        assert_eq!(f([0, 0]), [0, 3]);
+        assert_eq!(f([0, 1]), [0, 3]);
+        assert_eq!(f([0, 2]), [1, 3]);
+        assert_eq!(f([0, 3]), [1, 3]);
+        assert_eq!(f([1, 0]), [0, 2]);
+        assert_eq!(f([1, 1]), [0, 2]);
+
+        assert_eq!(g([0.0, 0.0]), [0.0, 3.0]);
+        assert_eq!(g([0.0, 1.0]), [0.0, 3.0]);
+        assert_eq!(g([0.0, 2.0]), [1.0, 3.0]);
+        assert_eq!(g([0.0, 3.0]), [1.0, 3.0]);
+        assert_eq!(g([1.0, 0.0]), [0.0, 2.0]);
+        assert_eq!(g([1.0, 1.0]), [0.0, 2.0]);
     }
 }

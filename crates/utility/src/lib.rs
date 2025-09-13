@@ -1770,6 +1770,19 @@ pub fn exponential_approach_with_min_speed(
     )
 }
 
+pub fn rect_corner_by_quadrant<T: num::Zero + Copy>(rect_width_height: [T;2], nth_quadrant: i32) -> [T;2] {
+    let [w,h] = rect_width_height;
+    match nth_quadrant.rem_euclid(4) {
+        0 => [w,h],
+        1 => [T::zero(),h],
+        2 => [T::zero(),T::zero()],
+        3 => [w,T::zero()],
+        _ => unreachable!("rem_euclid fail")
+    }
+
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::f32;

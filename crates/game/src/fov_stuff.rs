@@ -782,6 +782,15 @@ impl FieldOfViewResult {
             .reduce(|bottom, top| top.drawn_over(&bottom));
         maybe_drawable
     }
+
+    pub fn relative_limits_lower_left_and_upper_right(&self) -> [[i32; 2]; 2] {
+        let squares = self.at_least_partially_visible_relative_squares_including_subviews();
+        let xmin = squares.iter().map(|p| p.x).min().unwrap();
+        let xmax = squares.iter().map(|p| p.x).max().unwrap();
+        let ymin = squares.iter().map(|p| p.y).min().unwrap();
+        let ymax = squares.iter().map(|p| p.y).max().unwrap();
+        [[xmin, ymin], [xmax, ymax]]
+    }
 }
 
 struct OctantFOVSquareSequenceIter {
