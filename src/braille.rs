@@ -2,6 +2,7 @@ use crate::glyph::glyph_constants::SPACE;
 use crate::DoubleChar;
 use crate::{pair_up_character_square_map, screen::*};
 use utility::coordinate_frame_conversions::*;
+use utility::geometry2::PointExt;
 use utility::geometry2::{FPointExt, IPointExt};
 use utility::*;
 use euclid::{point2, Point2D};

@@ -11,6 +11,7 @@ use termion::color;
 use glyph_constants::*;
 use utility::geometry2::{IPoint, IPointExt};
 use utility::geometry2::{FPoint, FPointExt};
+use utility::geometry2::PointExt;
 
 use crate::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::CharacterGridInWorldFrame;
