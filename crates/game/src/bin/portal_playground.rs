@@ -335,7 +335,7 @@ impl Camera {
     // zero indexed
     pub fn frame_row_col_point_to_local_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         let [row_pos, col_pos] = screen_row_col_point;
-        [col_pos / 2.0, self.height_in_world() as f32 - row_pos - 1.0]
+        [col_pos / 2.0, self.height_in_world() as f32 - row_pos]
     }
     // Not one-to-one.  each square has two characters that map to it
     // zero indexed
@@ -450,7 +450,7 @@ mod camera_tests {
         let camera = Camera::new_square(10);
 
         assert_eq!(
-            camera.frame_row_col_point_to_local_world_point([1.0, 1.0]),
+            camera.frame_row_col_point_to_local_world_point([0.0, 0.0]),
             [0.0, camera.height_in_world() as f32]
         );
     }
@@ -734,12 +734,8 @@ impl UiHandler {
     }
     pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
         let p = self.screen_row_col_point_to_camera_frame_row_col_point(screen_row_col_point);
-        dbg!("camera frame row_col: ", &p);
         let p = self.camera.frame_row_col_point_to_local_world_point(p);
-        dbg!("local_world_square: ", &p);
-        dbg!("camera: ", &self.camera);
         let p = self.camera.local_to_absolute_world_point(p);
-        dbg!("absolute_world_square: ", &p);
         p
     }
 
@@ -1793,12 +1789,12 @@ mod tests {
         dbg!(game.ui_handler.camera.top_left_local_square());
         dbg!(game.ui_handler.camera, game.world_state.size_width_height());
         let screen_world_square_world_point = [
-            ([0, 0], [0, 3], [0.0, 3.0]),
-            ([0, 1], [0, 3], [0.5, 3.0]),
-            ([0, 2], [1, 3], [1.0, 3.0]),
-            ([0, 3], [1, 3], [1.5, 3.0]),
-            ([1, 0], [0, 2], [0.0, 2.0]),
-            ([1, 1], [0, 2], [0.5, 2.0]),
+            ([0, 0], [0, 3], [0.0, 4.0]),
+            ([0, 1], [0, 3], [0.5, 4.0]),
+            ([0, 2], [1, 3], [1.0, 4.0]),
+            ([0, 3], [1, 3], [1.5, 4.0]),
+            ([1, 0], [0, 2], [0.0, 3.0]),
+            ([1, 1], [0, 2], [0.5, 3.0]),
         ]
         .iter()
         .for_each(|(screen, correct_world_square, correct_world_point)| {
