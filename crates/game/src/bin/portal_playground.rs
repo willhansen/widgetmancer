@@ -306,6 +306,10 @@ impl Camera {
             self.width_in_world() as usize * 2,
         ]
     }
+    pub fn local_to_absolute_world_point(&self, local_v: FPoint) -> FPoint {
+        rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
+            .add(self.lower_left_square.to_float())
+    }
     pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
             .add(self.lower_left_square)
@@ -330,10 +334,8 @@ impl Camera {
     }
     // zero indexed
     pub fn frame_row_col_point_to_local_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        [
-            (screen_row_col_point[1] - 1.0) / 2.0,
-            self.height_in_world() as f32 - (screen_row_col_point[0] - 1.0),
-        ]
+        let [row_pos, col_pos] = screen_row_col_point;
+        [col_pos / 2.0, self.height_in_world() as f32 - row_pos - 1.0]
     }
     // Not one-to-one.  each square has two characters that map to it
     // zero indexed
@@ -731,8 +733,14 @@ impl UiHandler {
         self.start_time + Duration::from_secs_f32(s_after_start)
     }
     pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        self.camera
-            .frame_row_col_point_to_local_world_point(screen_row_col_point)
+        let p = self.screen_row_col_point_to_camera_frame_row_col_point(screen_row_col_point);
+        dbg!("camera frame row_col: ", &p);
+        let p = self.camera.frame_row_col_point_to_local_world_point(p);
+        dbg!("local_world_square: ", &p);
+        dbg!("camera: ", &self.camera);
+        let p = self.camera.local_to_absolute_world_point(p);
+        dbg!("absolute_world_square: ", &p);
+        p
     }
 
     pub fn screen_row_col_char_to_camera_frame_row_col_char(
@@ -741,16 +749,17 @@ impl UiHandler {
     ) -> [u16; 2] {
         screen_row_col_char
     }
+    pub fn screen_row_col_point_to_camera_frame_row_col_point(
+        &self,
+        screen_row_col_point: [f32; 2],
+    ) -> [f32; 2] {
+        screen_row_col_point
+    }
 
     pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
-        dbg!(&screen_row_col_char);
         let p = self.screen_row_col_char_to_camera_frame_row_col_char(screen_row_col_char);
-        dbg!("camera frame row_col: ", &p);
         let p = self.camera.frame_row_col_char_to_local_world_square(p);
-        dbg!("local_world_square: ", &p);
-        dbg!("camera: ", &self.camera);
         let p = self.camera.local_to_absolute_world_square(p);
-        dbg!("absolute_world_square: ", &p);
         p
     }
 
@@ -1783,20 +1792,25 @@ mod tests {
             );
         dbg!(game.ui_handler.camera.top_left_local_square());
         dbg!(game.ui_handler.camera, game.world_state.size_width_height());
-        let f = |p| game.ui_handler.screen_row_col_char_to_world_square(p);
-        let g = |p| game.ui_handler.screen_row_col_point_to_world_point(p);
-        assert_eq!(f([0, 0]), [0, 3]);
-        assert_eq!(f([0, 1]), [0, 3]);
-        assert_eq!(f([0, 2]), [1, 3]);
-        assert_eq!(f([0, 3]), [1, 3]);
-        assert_eq!(f([1, 0]), [0, 2]);
-        assert_eq!(f([1, 1]), [0, 2]);
-
-        assert_eq!(g([0.0, 0.0]), [0.0, 3.0]);
-        assert_eq!(g([0.0, 1.0]), [0.0, 3.0]);
-        assert_eq!(g([0.0, 2.0]), [1.0, 3.0]);
-        assert_eq!(g([0.0, 3.0]), [1.0, 3.0]);
-        assert_eq!(g([1.0, 0.0]), [0.0, 2.0]);
-        assert_eq!(g([1.0, 1.0]), [0.0, 2.0]);
+        let screen_world_square_world_point = [
+            ([0, 0], [0, 3], [0.0, 3.0]),
+            ([0, 1], [0, 3], [0.5, 3.0]),
+            ([0, 2], [1, 3], [1.0, 3.0]),
+            ([0, 3], [1, 3], [1.5, 3.0]),
+            ([1, 0], [0, 2], [0.0, 2.0]),
+            ([1, 1], [0, 2], [0.5, 2.0]),
+        ]
+        .iter()
+        .for_each(|(screen, correct_world_square, correct_world_point)| {
+            let world_square = game.ui_handler.screen_row_col_char_to_world_square(*screen);
+            assert_eq!(world_square, *correct_world_square, 
+                "screen_char_row_col: {screen:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
+                let screen_point = screen.to_float();
+            let world_point = game
+                .ui_handler
+                .screen_row_col_point_to_world_point(screen_point);
+            assert_eq!(world_point, *correct_world_point,
+                "screen_point_row_col: {screen_point:?}, world_point: {world_point:?}, correct_world_point: {correct_world_point:?}");
+        });
     }
 }
