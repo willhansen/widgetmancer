@@ -17,10 +17,27 @@ pub const STEP_UP: IPoint = [0, 1];
 pub const STEP_LEFT: IPoint = [-1, 0];
 pub const STEP_DOWN: IPoint = [0, -1];
 
-pub trait IPointExt: Sized {
-    fn x(&self) -> i32;
-    fn y(&self) -> i32;
-    fn new(x: i32, y: i32) -> Self;
+pub trait PointExt<T> {
+
+    fn x(&self) -> T;
+    fn y(&self) -> T;
+    fn new(x: T, y: T) -> Self;
+
+}
+impl<T: Copy> PointExt<T> for [T;2] {
+
+    fn x(&self) -> T {
+        self[0]
+    }
+    fn y(&self) -> T {
+        self[1]
+    }
+    fn new(x: T, y: T) -> Self {
+        [x, y]
+    }
+}
+
+pub trait IPointExt: Sized + PointExt<i32> {
     fn add(&self, rhs: Self) -> Self {
         Self::new(self.x() + rhs.x(), self.y() + rhs.y())
     }
@@ -57,15 +74,6 @@ pub trait IPointExt: Sized {
 }
 
 impl IPointExt for IPoint {
-    fn x(&self) -> i32 {
-        self[0]
-    }
-    fn y(&self) -> i32 {
-        self[1]
-    }
-    fn new(x: i32, y: i32) -> Self {
-        [x, y]
-    }
 }
 pub trait UPointExt {
     fn to_signed(&self) -> IPoint;
@@ -79,11 +87,16 @@ impl UPointExt for UPoint {
         self.map(|x| x as f32)
     }
 }
+impl UPointExt for [u16;2] {
+    fn to_signed(&self) -> IPoint {
+        self.map(|x| x as i32)
+    }
+    fn to_float(&self) -> FPoint {
+        self.map(|x| x as f32)
+    }
+}
 
-pub trait FPointExt: Sized + Clone {
-    fn x(&self) -> f32;
-    fn y(&self) -> f32;
-    fn new(x: f32, y: f32) -> Self;
+pub trait FPointExt: PointExt<f32> + Sized + Clone {
     fn add(&self, rhs: Self) -> Self {
         Self::new(self.x() + rhs.x(), self.y() + rhs.y())
     }
@@ -126,18 +139,9 @@ pub trait FPointExt: Sized + Clone {
     }
 }
 impl FPointExt for FPoint {
-    fn x(&self) -> f32 {
-        self[0]
-    }
-    fn y(&self) -> f32 {
-        self[1]
-    }
-    fn new(x: f32, y: f32) -> Self {
-        [x, y]
-    }
 }
 
-pub type USizePoint = [usize;2];
+pub type USizePoint = [usize; 2];
 pub trait USizePointExt {
     fn to_int(&self) -> IPoint;
 }
@@ -194,7 +198,7 @@ pub fn closest_ortho_dir(square: IPoint) -> Option<OrthoDir> {
     })
 }
 
-pub fn rotate_quarter_turns(v: [i32; 2], turns: i32) -> [i32; 2] {
+pub fn rotate_quarter_turns<T: std::ops::Neg<Output = T> + Copy>(v: [T; 2], turns: i32) -> [T; 2] {
     match turns.rem_euclid(4) {
         0 => v,
         1 => [-v[1], v[0]],
