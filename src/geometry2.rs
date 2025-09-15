@@ -71,9 +71,16 @@ pub trait IPointExt: Sized + PointExt<i32> {
     fn squared_length(&self) -> i32 {
         self.x().pow(2) + self.y().pow(2)
     }
+    fn abs(&self) -> UPoint;
+    fn absmax(&self) -> u32 {
+        *self.abs().iter().max().unwrap()
+    }
 }
 
 impl IPointExt for IPoint {
+    fn abs(&self) -> UPoint {
+        self.map(|x| x.abs() as u32)
+    }
 }
 pub trait UPointExt {
     fn to_signed(&self) -> IPoint;
