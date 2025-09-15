@@ -738,4 +738,11 @@ ghi";
         assert_eq!(s.framed(), frame.with_border().string_for_regular_display());
         assert_eq!(Frame::from_string(&s.framed()), frame.with_border());
     }
+
+    #[test]
+    fn test_frame_is_zero_indexed() {
+        let frame = Frame::new_from_repeated_glyph(1,1, 'a'.into());
+        frame.get_xy([0,0]);
+        frame.try_get_row_col([0,0]).expect("get row col");
+    }
 }

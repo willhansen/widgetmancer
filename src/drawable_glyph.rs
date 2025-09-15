@@ -1,7 +1,7 @@
+use crate::DoubleChar;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
-use crate::DoubleChar;
 
 use euclid::*;
 use itertools::Itertools;
@@ -9,9 +9,9 @@ use rgb::*;
 use termion::color;
 
 use glyph_constants::*;
-use utility::geometry2::{IPoint, IPointExt};
-use utility::geometry2::{FPoint, FPointExt};
 use utility::geometry2::PointExt;
+use utility::geometry2::{FPoint, FPointExt};
+use utility::geometry2::{IPoint, IPointExt};
 
 use crate::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::CharacterGridInWorldFrame;
@@ -364,10 +364,7 @@ impl DrawableGlyph {
         [DrawableGlyph::new_colored(FULL_BLOCK, BLOCK_FG, BLOCK_BG); 2]
     }
 
-    pub fn char_map_to_fg_only_glyph_map(
-        char_map: CharMap,
-        color: RGB8,
-    ) -> DrawableGlyphMap {
+    pub fn char_map_to_fg_only_glyph_map(char_map: CharMap, color: RGB8) -> DrawableGlyphMap {
         char_map
             .iter()
             .map(|(&square, &character)| (square, DrawableGlyph::fg_only(character.clone(), color)))
@@ -380,20 +377,33 @@ impl DrawableGlyph {
         color: RGB8,
     ) -> DrawableGlyphMap {
         DrawableGlyph::char_map_to_fg_only_glyph_map(
-            get_chars_for_braille_line(start_pos, end_pos).into_iter().map(|(p, c)| (p.into(), c)).collect(),
+            get_chars_for_braille_line(start_pos, end_pos)
+                .into_iter()
+                .map(|(p, c)| (p.into(), c))
+                .collect(),
             color,
         )
     }
 
     pub fn points_to_braille_glyphs(points: Vec<FPoint>, color: RGB8) -> DrawableGlyphMap {
-        DrawableGlyph::char_map_to_fg_only_glyph_map(points_to_braille_chars(points).into_iter().map(|(a,b)| (a.into(), b.into())).collect(), color)
+        DrawableGlyph::char_map_to_fg_only_glyph_map(
+            points_to_braille_chars(points)
+                .into_iter()
+                .map(|(a, b)| (a.into(), b.into()))
+                .collect(),
+            color,
+        )
     }
 
     pub fn character_world_pos_to_colored_braille_glyph(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,
     ) -> DrawableGlyph {
-        DrawableGlyph::new(character_world_pos_to_braille_char(world_pos), Some(color), None)
+        DrawableGlyph::new(
+            character_world_pos_to_braille_char(world_pos),
+            Some(color),
+            None,
+        )
     }
 
     pub fn swap_fg_bg(&mut self) {
@@ -405,6 +415,12 @@ impl DrawableGlyph {
     pub fn colors_mut(&mut self) -> impl Iterator<Item = &mut ORGB8> {
         use std::iter::once;
         once(&mut self.fg_color).chain(once(&mut self.bg_color))
+    }
+}
+
+impl From<char> for DrawableGlyph {
+    fn from(value: char) -> Self {
+        Self::from_char(value)
     }
 }
 
@@ -575,9 +591,7 @@ where
         .join("\n")
 }
 pub fn glyph_map_to_string(glyph_map: &DrawableGlyphMap) -> String {
-    map_of_stringables_to_string(
-        glyph_map
-    )
+    map_of_stringables_to_string(glyph_map)
 }
 
 // Order is anticlockwise [right, up, left, down]
@@ -752,7 +766,10 @@ mod tests {
         // offset right
         let glyphs =
             DrawableGlyph::orthogonally_offset_board_square_glyphs(vec2(1.25, 0.0), RED, BLACK);
-        assert_eq!(glyphs[0], DrawableGlyph::new_colored(LEFT_HALF_BLOCK, RED, BLACK));
+        assert_eq!(
+            glyphs[0],
+            DrawableGlyph::new_colored(LEFT_HALF_BLOCK, RED, BLACK)
+        );
         assert!(
             glyphs[1].looks_solid_color(BLACK),
             "glyph: {}",
