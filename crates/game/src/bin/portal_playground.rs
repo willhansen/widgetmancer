@@ -71,6 +71,7 @@ use geometry2::IPoint;
 use geometry2::*;
 
 const UI_BACKGROUND_RGB: [u8; 3] = color_from_hex!("#1b305b");
+const DEFAULT_FRAME_BACKGROUND_CHAR: char = '🮖';
 const ETERNAL_VOID_CHAR: char = '.';
 const OUT_OF_FOV_RANGE_CHAR: char = '╲';
 const SHADOW_CHAR: char = '╳';
@@ -355,7 +356,7 @@ impl Camera {
             self.frame_row_col_char_to_local_world_square(frame_row_col_char),
         )
     }
-    pub fn absolute_world_square_to_left_frame_row_col(
+    pub fn absolute_world_square_to_left_char_frame_row_col(
         &self,
         absolute_world_square: IPoint,
     ) -> IPoint {
@@ -364,7 +365,7 @@ impl Camera {
         )
     }
     pub fn local_world_square_to_left_frame_row_col(&self, local_world_square: IPoint) -> IPoint {
-        [local_world_square[0] * 2, local_world_square[1]]
+        [self.height_in_world() as i32 - local_world_square[1] -1, local_world_square[0] * 2]
     }
     pub fn local_world_square_in_frame(&self, local_world_square: IPoint) -> bool {
         todo!();
@@ -383,7 +384,7 @@ impl Camera {
     }
     fn blank_frame(&self) -> Frame {
         let size = self.size_on_screen_rows_cols();
-        let camera_background_default_glyph = DrawableGlyph::new('🮖', None, None);
+        let camera_background_default_glyph = DrawableGlyph::new(DEFAULT_FRAME_BACKGROUND_CHAR, Some(MAGENTA), Some(BLACK));
         Frame::new_from_repeated_glyph(size[1], size[0], camera_background_default_glyph)
     }
     pub fn render_world_with_radius(
@@ -408,10 +409,13 @@ impl Camera {
         let mut camera_frame = self.blank_frame();
 
         let fov_center_absolute_square = fov_center.rounded();
+        dbg!(fov_center_absolute_square);
         let fov_top_left_absolute_square =
             fov_center_absolute_square.add([-(fov_range as i32), fov_range as i32]);
+        dbg!(fov_top_left_absolute_square);
         let fov_top_left_char_row_col =
-            self.absolute_world_square_to_left_frame_row_col(fov_top_left_absolute_square);
+            self.absolute_world_square_to_left_char_frame_row_col(fov_top_left_absolute_square);
+        dbg!(fov_top_left_char_row_col);
 
         camera_frame.blit(&fov_frame, fov_top_left_char_row_col.map(|x| x as usize));
 
@@ -497,6 +501,13 @@ mod camera_tests {
             p,
             camera.absolute_to_local_world_square(camera.local_to_absolute_world_square(p))
         );
+    }
+    #[test]
+    fn test_absolute_square_to_char_row_col() {
+        let camera = Camera::new_square(10);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([0,0]), [9,0]);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([1,0]), [9,2]);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([2,0]), [9,4]);
     }
 }
 
@@ -769,6 +780,8 @@ impl UiHandler {
             .camera
             .render_world_with_radius(world_state, fov_center, fov_range);
 
+        dbg!(&world_frame);
+
         let mut screen_buffer = Frame::solid_color(
             self.screen_width(),
             self.screen_height(),
@@ -820,7 +833,7 @@ impl WorldState {
             player_step_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
-            portal_rendering: PortalRenderingOption::LineOnFloor,
+            portal_rendering: PortalRenderingOption::LineOfSight,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
         };
@@ -939,6 +952,7 @@ impl WorldState {
             &Default::default(),
             &portal_geometry,
         );
+        dbg!(fov.relative_limits_lower_left_and_upper_right(), fov.root_square());
 
         let shadow_glyph = GlyphWithTransparency::from_char(SHADOW_CHAR);
         let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR);
@@ -947,47 +961,47 @@ impl WorldState {
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
             Default::default();
 
-        let camera_width = radius as usize * 2 + 1;
-        let camera_height = camera_width;
+        let fov_diameter = radius as usize * 2 + 1;
         // let fov_center_square = fov_center.rounded();
         // let camera_min_x = fov_center_square[0] - radius as i32;
         // let camera_max_x = fov_center_square[0] + radius as i32;
         // let camera_min_y = fov_center_square[1] - radius as i32;
         // let camera_max_y = fov_center_square[1] + radius as i32;
+        let fov_center_xy_in_fov_frame = [radius;2].to_signed();
 
-        let mut transpareny_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..camera_height)
-            .map(|row_in_camera_frame| {
-                let y_in_camera_frame = self.height as i32 - row_in_camera_frame as i32 - 1;
-                (0..camera_width as i32)
-                    .map(|x_in_camera_frame| {
-                        let col_in_camera_frame = x_in_camera_frame as usize;
+        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..fov_diameter)
+            .map(|row_in_fov| {
+                let y_in_fov = self.height as i32 - row_in_fov as i32 - 1;
+                (0..fov_diameter as i32)
+                    .map(|x_in_fov| {
+                        let col_in_fov = x_in_fov as usize;
                         // let x = col;
                         // let y = self.height - row - 1;
-                        let pos_in_camera_frame: WorldSquare = [x_in_camera_frame, y_in_camera_frame].into();
-                        let camera_pos_relative_to_fov_center =
-                            pos_in_camera_frame - WorldSquare::from(fov_center.rounded());
+                        let xy_in_fov_frame: WorldStep = [x_in_fov, y_in_fov].into();
+                        let xy_relative_to_fov_center =
+                            xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
                         let visible_portions_at_relative_square: Vec<
                             PositionedSquareVisibilityInFov,
                         > = match self.portal_rendering {
                             PortalRenderingOption::LineOfSight => {
                                 FieldOfViewResult::sorted_by_draw_order(
                                     fov.visibilities_of_relative_square(
-                                        camera_pos_relative_to_fov_center,
+                                        xy_relative_to_fov_center,
                                     ),
                                 )
                             }
                             PortalRenderingOption::LineOnFloor => {
                                 vec![PositionedSquareVisibilityInFov::new_in_top_view(
                                     SquareVisibility::new_fully_visible(),
-                                    pos_in_camera_frame,
-                                    camera_pos_relative_to_fov_center,
+                                     fov.root_square() + xy_relative_to_fov_center,
+                                    xy_relative_to_fov_center,
                                 )]
                             }
                             PortalRenderingOption::Absolute => todo!(),
                         };
-                        let current_radius = camera_pos_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
+                        let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
                         if !visible_portions_at_relative_square.is_empty() {
-                            assert!(current_radius <= radius, "rel_pos: {camera_pos_relative_to_fov_center:?}, fov_radius: {radius}");
+                            assert!(current_radius <= radius, "rel_pos: {xy_relative_to_fov_center:?}, fov_radius: {radius}");
                         }
 
                         let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> =
@@ -1021,8 +1035,8 @@ impl WorldState {
                                         .get_mut(&debug_frames_key)
                                         .unwrap();
                                     debug_frame.set_by_double_wide_grid(
-                                        row_in_camera_frame,
-                                        col_in_camera_frame,
+                                        row_in_fov,
+                                        col_in_fov,
                                         double_glyph
                                             .map(|g| g.to_drawable_with_transparent_as_default()),
                                     );
@@ -1040,7 +1054,7 @@ impl WorldState {
             })
             .collect_vec();
 
-        let frame = transpareny_frame
+        let frame = transparency_frame
             .into_iter()
             .map(|row| {
                 row.into_iter()
@@ -1050,6 +1064,7 @@ impl WorldState {
             })
             .collect_vec()
             .into();
+        dbg!(&frame);
 
         (
             frame,
@@ -1277,9 +1292,9 @@ mod tests {
     }
 
     fn press_left_row_col_screen_pos(screen_pos_row_col: [u16; 2]) -> termion::event::Event {
-        press_left(screen_pos_row_col[1], screen_pos_row_col[0])
+        press_left_1_indexed(screen_pos_row_col[1], screen_pos_row_col[0])
     }
-    fn press_left(col: u16, row: u16) -> termion::event::Event {
+    fn press_left_1_indexed(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Press(
             termion::event::MouseButton::Left,
             col,
@@ -1300,7 +1315,7 @@ mod tests {
     fn test_click_a() {
         let mut game = Game::new_headless_square(9);
 
-        game.ui_handler.give_event(press_left(1, 1));
+        game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         let frame = game.render();
         // let no_color = frame.uncolored_regular_string();
@@ -1310,8 +1325,10 @@ mod tests {
     #[test]
     fn test_click_a_small() {
         let mut game = Game::new_headless_square(3);
-        game.ui_handler.give_event(press_left(1, 1));
+        game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
+        let center_of_top_row_left_char = [0.25, 2.5];
+        assert_about_eq_2d(game.ui_handler.mouse_world_point().unwrap(), center_of_top_row_left_char);
         let frame = game.render();
         // dbg!(&frame);
         // dbg!(&frame.grid);
@@ -1320,10 +1337,9 @@ mod tests {
     #[test]
     fn test_click_b() {
         let mut game = Game::new_headless_square(13);
-        game.ui_handler.give_event(press_left(4, 11));
+        game.ui_handler.give_event(press_left_1_indexed(4, 11));
         game.process_events();
         let frame = game.render();
-        dbg!(&frame);
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED.into());
         assert_eq!(frame.get_xy([3, 2]).bg_color, RED.into());
@@ -1332,7 +1348,7 @@ mod tests {
     #[test]
     fn test_drag_mouse() {
         let mut game = Game::new_headless(11, 22, 12, 12);
-        game.ui_handler.give_event(press_left(4, 4));
+        game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
         let frame_1 = game.render();
         game.ui_handler.give_event(drag_mouse_to(5, 4));
@@ -1341,7 +1357,6 @@ mod tests {
         game.ui_handler.give_event(drag_mouse_to(6, 4));
         game.process_events();
         let frame_3 = game.render();
-        // dbg!(&frame_1, &frame_2, &frame_3);
         assert_frame_same_as_past!(frame_1, "1");
         assert_frame_same_as_past!(frame_2, "2");
         assert_frame_same_as_past!(frame_3, "3");
@@ -1444,7 +1459,6 @@ mod tests {
         game.world_state
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
-        // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
         let frame = game.render();
         let (_, debug_layers) = game
@@ -1471,7 +1485,6 @@ mod tests {
         game.world_state
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
-        // dbg!(game.render(None));
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
         let (frame, layers) = game.world_state.render_with_debug_layers(
             game.world_state.smoothed_player_pos,
@@ -1573,7 +1586,7 @@ mod tests {
     fn test_render_smoothed_mouse_stationary() {
         let mut game = Game::new_headless_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
-        game.ui_handler.give_event(press_left(1, 1));
+        game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         assert_eq!(game.ui_handler.event_log.len(), 1);
         assert!(game.ui_handler.smoothed_mouse_screen_row_col.is_some());
@@ -1589,7 +1602,7 @@ mod tests {
     fn test_smoothed_mouse_linear_move() {
         let mut game = Game::new_headless_square(3);
         game.ui_handler.enable_mouse_smoothing = true;
-        game.ui_handler.give_event(press_left(1, 1));
+        game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         game.ui_handler.advance_time_to(0.2);
         game.ui_handler.give_event(drag_mouse_to(2, 1));
@@ -1600,7 +1613,6 @@ mod tests {
             .ui_handler
             .smoothed_mouse_position_screen_row_col()
             .unwrap();
-        dbg!(pos);
         assert!(pos[1] > 1.0);
         assert!(pos[1] < 1.1);
         game.ui_handler.advance_time_to(5.0);
@@ -1608,7 +1620,6 @@ mod tests {
             .ui_handler
             .smoothed_mouse_position_screen_row_col()
             .unwrap();
-        dbg!(pos);
         assert!(pos[0] - 2.0 < 0.0001);
         // assert_frame_same_as_past!(frame, "a", true);
     }
@@ -1640,7 +1651,7 @@ mod tests {
         let player_pos_in_frame = game
             .ui_handler
             .camera
-            .absolute_world_square_to_left_frame_row_col(game.world_state.player_square);
+            .absolute_world_square_to_left_char_frame_row_col(game.world_state.player_square);
         let [row, left_col] = player_pos_in_frame.map(|x| x as usize);
         let right_player_glyph: DrawableGlyph = frame.grid[row][left_col + 1];
         assert!(char_is_braille(right_player_glyph.character));
@@ -1649,7 +1660,7 @@ mod tests {
     fn test_render_with_center_offset() {
         let mut game = Game::new_headless_square(25);
         game.ui_handler
-            .give_future_event_absolute(press_left(5, 6), 1.0);
+            .give_future_event_absolute(press_left_1_indexed(5, 6), 1.0);
         game.advance_time_to(1.0);
         game.process_events();
         game.ui_handler
@@ -1756,7 +1767,7 @@ mod tests {
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(10, 30, 4, 4);
         game.ui_handler.default_fov_range = 3;
-        game.ui_handler.give_event(press_left(5, 6));
+        game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         let frame = game.render();
         dbg!(&frame);

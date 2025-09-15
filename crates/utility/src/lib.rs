@@ -1609,7 +1609,9 @@ pub fn does_ray_hit_oriented_square_face(
     ray_intersection_point_with_oriented_square_face(start, angle, range, face).is_some()
 }
 
-pub fn assert_about_eq_2d(p1: WorldPoint, p2: WorldPoint) {
+pub fn assert_about_eq_2d(p1: impl Into<WorldPoint>, p2: impl Into<WorldPoint>) {
+    let p1 = p1.into();
+    let p2 = p2.into();
     let tolerance = 0.001;
     assert!(
         (p1 - p2).length().abs() < tolerance,

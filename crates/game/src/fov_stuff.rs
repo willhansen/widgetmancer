@@ -10,6 +10,7 @@ use itertools::*;
 use ntest::assert_false;
 use num::abs;
 use ordered_float::OrderedFloat;
+use utility::geometry2::IPointExt;
 
 use crate::graphics;
 use crate::graphics::drawable::DrawableEnum::SolidColor;
@@ -662,7 +663,6 @@ impl FieldOfViewResult {
         relative_square: WorldStep,
     ) -> Vec<PositionedSquareVisibilityInFov> {
         let mut visibilities: Vec<PositionedSquareVisibilityInFov> = vec![];
-
         if let Some(top_level_visibility) =
             self.visibility_of_relative_square_in_main_view(relative_square)
         {
