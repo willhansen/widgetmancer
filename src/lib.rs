@@ -1785,11 +1785,12 @@ pub fn rect_border(
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
     let [w, h] = width_height;
-    (0..w)
+    let [x1,y1] = width_height.sub([1,1]);
+    (0..x1)
         .map(move |dx| [dx, 0])
-        .chain((0..h).map(move |dy| [w - 1, dy]))
-        .chain((0..w).map(move |dx| [w - 1 - dx, h - 1]))
-        .chain((0..h).map(move |dy| [0, h - 1 - dy]))
+        .chain((0..y1).map(move |dy| [x1, dy]))
+        .chain((0..x1).map(move |dx| [x1 - dx, y1]))
+        .chain((0..y1).map(move |dy| [0, y1 - dy]))
         .map(move |x| bottom_left.add(x))
 }
 pub fn rect_squares(
