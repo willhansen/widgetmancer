@@ -971,9 +971,10 @@ impl WorldState {
             &Default::default(),
             &portal_geometry,
         );
+        dbg!(fov_center);
 
         let shadow_glyph = GlyphWithTransparency::from_char(SHADOW_CHAR);
-        let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR);
+        let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR).with_primary_rgb(GREEN);
 
         // Key is (depth, absolute_position, rotation from portal)
         let mut debug_portal_visualizer_frames: HashMap<(u32, [i32; 2], i32), Frame> =
@@ -987,26 +988,22 @@ impl WorldState {
         // let camera_max_y = fov_center_square[1] + radius as i32;
         let fov_center_xy_in_fov_frame = [radius;2].to_signed();
 
-        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
-
-        let fov_lower_left_square = fov_center.floor().sub([radius;2].to_signed());
-        rect_squares([0,0], [fov_diameter;2])
-
+        // let fov_lower_left_square = fov_center.floor().sub([radius;2].to_signed());
+        
+        let visibilities_in_fov: Vec<Vec<Vec<PositionedSquareVisibilityInFov>>> = 
 
         (0..fov_diameter)
             .map(|row_in_fov| {
-                let y_in_fov = self.height as i32 - row_in_fov as i32 - 1;
-                (0..fov_diameter as i32)
-                    .map(|x_in_fov| {
-                        let col_in_fov = x_in_fov as usize;
+                let y_in_fov = fov_diameter as i32 - row_in_fov as i32 - 1;
+                (0..fov_diameter)
+                    .map(|col_in_fov| {
+                        let x_in_fov = col_in_fov as i32;
                         // let x = col;
                         // let y = self.height - row - 1;
                         let xy_in_fov_frame: WorldStep = [x_in_fov, y_in_fov].into();
                         let xy_relative_to_fov_center =
                             xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
-                        let visible_portions_at_relative_square: Vec<
-                            PositionedSquareVisibilityInFov,
-                        > = match self.portal_rendering {
+                        match self.portal_rendering {
                             PortalRenderingOption::LineOfSight => {
                                 FieldOfViewResult::sorted_by_draw_order(
                                     fov.visibilities_of_relative_square(
@@ -1022,11 +1019,25 @@ impl WorldState {
                                 )]
                             }
                             PortalRenderingOption::Absolute => todo!(),
-                        };
-                        let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
-                        if !visible_portions_at_relative_square.is_empty() {
-                            assert!(current_radius <= radius, "rel_pos: {xy_relative_to_fov_center:?}, fov_radius: {radius}");
                         }
+                    }).collect_vec()
+            }).collect_vec();
+
+        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
+
+        (0..fov_diameter)
+            .map(|row_in_fov| {
+                let y_in_fov = fov_diameter as i32 - row_in_fov as i32 - 1;
+                (0..fov_diameter)
+                    .map(|col_in_fov| {
+                        let x_in_fov = col_in_fov as i32;
+                        // let x = col;
+                        // let y = self.height - row - 1;
+                        let xy_in_fov_frame: WorldStep = [x_in_fov, y_in_fov].into();
+                        let xy_relative_to_fov_center =
+                            xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
+                        let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
+                        let visible_portions_at_relative_square = &visibilities_in_fov[row_in_fov][col_in_fov];
 
                         let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> =
                             visible_portions_at_relative_square
@@ -1157,7 +1168,8 @@ impl WorldState {
         square_viz: &PositionedSquareVisibilityInFov,
     ) -> [GlyphWithTransparency; 2] {
         let abs_square = square_viz.absolute_square();
-        let default_glyphs = [GlyphWithTransparency::from_char(ETERNAL_VOID_CHAR); 2];
+        let eternal_void_glyph = GlyphWithTransparency::from_bg_char(ETERNAL_VOID_CHAR);
+        let default_glyphs = [eternal_void_glyph; 2];
 
         
         let maybe_floor_mark = self.floor_markings.get(&abs_square.to_array());
