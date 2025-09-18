@@ -9,7 +9,7 @@ use game::fov_stuff::{
 use game::set_up_input_thread_given_sender;
 use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
-use rgb::RGB8;
+use rgb::{RGB8, RGBA8};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::fs::File;
@@ -140,17 +140,18 @@ impl Game {
                 // Key::Esc => todo!(),
                 _ => {}
             },
+            // Switch from 1-indexing to 0-indexing here
             Event::Mouse(mouse_event) => match mouse_event {
-                termion::event::MouseEvent::Press(mouse_button, col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = Some([row, col]);
-                    self.ui_handler.smoothed_mouse_screen_row_col = Some([row as f32, col as f32]);
+                termion::event::MouseEvent::Press(mouse_button, col_one_indexed, row_one_indexed) => {
+                    self.ui_handler.last_mouse_screen_row_col = Some([row_one_indexed - 1 , col_one_indexed - 1]);
+                    self.ui_handler.smoothed_mouse_screen_row_col = self.ui_handler.last_mouse_screen_row_col.map(|x| x.to_signed().grid_square_center());
                 }
-                termion::event::MouseEvent::Release(col, row) => {
+                termion::event::MouseEvent::Release(col_one_indexed, row_one_indexed) => {
                     self.ui_handler.last_mouse_screen_row_col = None;
                     self.ui_handler.smoothed_mouse_screen_row_col = None;
                 }
-                termion::event::MouseEvent::Hold(col, row) => {
-                    self.ui_handler.last_mouse_screen_row_col = Some([row, col])
+                termion::event::MouseEvent::Hold(col_one_indexed, row_one_indexed) => {
+                    self.ui_handler.last_mouse_screen_row_col = Some([row_one_indexed - 1, col_one_indexed - 1])
                 }
             },
             Event::Unsupported(items) => todo!(),
@@ -309,7 +310,8 @@ impl Camera {
     }
     pub fn local_to_absolute_world_point(&self, local_v: FPoint) -> FPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.lower_left_square.to_float())
+            .add(self.lower_left_square.to_float()) // Note use of square corner rather than square
+        // center
     }
     pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
@@ -518,13 +520,17 @@ mod camera_tests {
 //     extension_length: Option<u32>
 // }
 
+enum MouseBehavior {
+    DrawMouse,
+    CenterOnMouse,
+}
 struct UiHandler {
     // This instant is the link between the real world and "seconds from start".  The game world
     // has no use for real-time reference points that are instants
     pub start_time: Instant,
     pub s_from_start: f32,
     pub screen_size_rows_cols: [usize; 2],
-    // 1-indexed
+    // 0-indexed
     pub last_mouse_screen_row_col: Option<[u16; 2]>,
     pub smoothed_mouse_screen_row_col: Option<FPoint>,
     pub output_writable: Option<Box<dyn Write>>,
@@ -540,6 +546,7 @@ struct UiHandler {
     pub enable_mouse_smoothing: bool,
     pub camera: Camera,
     pub default_fov_range: u32,
+    pub mouse_behavior: MouseBehavior,
 }
 impl UiHandler {
     fn smoothed_mouse_position_screen_row_col(&mut self) -> Option<FPoint> {
@@ -606,14 +613,14 @@ impl UiHandler {
     }
     fn screen_row_col_point_to_screen_xy_point(&self, row_col_point: FPoint) -> FPoint {
         [
-            row_col_point[1] - 1.0, // No longer one-indexed
-            self.screen_height() as f32 - (row_col_point[0] - 1.0),
+            row_col_point[1],
+            self.screen_height() as f32 - row_col_point[0],
         ]
     }
     fn screen_xy_point_to_screen_row_col_point(&self, xy_point: FPoint) -> FPoint {
         [
-            self.screen_height() as f32 - (xy_point[1]) + 1.0,
-            xy_point[0] + 1.0, // back to 1-indexed
+            self.screen_height() as f32 - xy_point[1],
+            xy_point[0], // back to 1-indexed
         ]
     }
     fn mouse_world_square(&self) -> Option<IPoint> {
@@ -653,6 +660,7 @@ impl UiHandler {
             enable_mouse_smoothing: false,
             camera: Camera::new_square(camera_side_length),
             default_fov_range: camera_side_length as u32 / 2,
+            mouse_behavior: MouseBehavior::DrawMouse,
         }
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
@@ -680,8 +688,7 @@ impl UiHandler {
     }
     pub fn draw_mouse_square(&mut self, screen_buffer: &mut Frame) {
         if let Some([row, col]) = self.last_mouse_screen_row_col {
-            assert!(row > 0 && col > 0, "row: {row}, col: {col}");
-            screen_buffer.grid[row as usize - 1][col as usize - 1] =
+            screen_buffer.grid[row as usize][col as usize] =
                 DrawableGlyph::solid_color(RED);
         }
     }
@@ -771,9 +778,13 @@ impl UiHandler {
     }
 
     pub fn render(&mut self, world_state: &WorldState) -> Frame {
-        let fov_center = self
-            .mouse_world_point()
-            .unwrap_or_else(|| world_state.player_square.to_float());
+        let fov_center = 
+        match self.mouse_behavior {
+            MouseBehavior::DrawMouse => world_state.player_square.grid_square_center(),
+            MouseBehavior::CenterOnMouse => self
+                .mouse_world_point()
+                .unwrap_or_else(|| world_state.player_square.grid_square_center()),
+        };
         let fov_range = self.default_fov_range;
 
         let world_frame = self
@@ -787,6 +798,8 @@ impl UiHandler {
             self.screen_height(),
             UI_BACKGROUND_RGB.into(),
         );
+        dbg!(world_frame.size_rows_cols());
+        dbg!(self.camera);
         screen_buffer.blit(&world_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         screen_buffer
@@ -819,6 +832,8 @@ struct WorldState {
     pub portal_rendering: PortalRenderingOption,
     board_color_function: fn(&WorldState, IPoint) -> Option<RGB8>,
     portal_tint_function: fn(RGB8, u32) -> RGB8,
+    // Effectively drawing on the floor.  on top of board color
+    floor_markings: HashMap<IPoint, DoubleGlyphWithTransparency>,
 }
 impl WorldState {
     pub fn new(width: usize, height: usize) -> Self {
@@ -829,13 +844,14 @@ impl WorldState {
             width,
             height,
             player_square,
-            smoothed_player_pos: player_square.to_float(),
+            smoothed_player_pos: player_square.grid_square_center(),
             player_step_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
             portal_rendering: PortalRenderingOption::LineOfSight,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
+            floor_markings: Default::default(),
         };
         state
     }
@@ -859,6 +875,9 @@ impl WorldState {
         } else {
             None
         }
+    }
+    fn draw_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint, glyphs: DoubleGlyphWithTransparency) {
+        rect_border(bottom_left_square, width_height).for_each(|square| {self.floor_markings.insert(square, glyphs);})
     }
     fn default_portal_tint(color: RGB8, depth: u32) -> RGB8 {
         let tint = RED;
@@ -952,7 +971,6 @@ impl WorldState {
             &Default::default(),
             &portal_geometry,
         );
-        dbg!(fov.relative_limits_lower_left_and_upper_right(), fov.root_square());
 
         let shadow_glyph = GlyphWithTransparency::from_char(SHADOW_CHAR);
         let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR);
@@ -969,7 +987,13 @@ impl WorldState {
         // let camera_max_y = fov_center_square[1] + radius as i32;
         let fov_center_xy_in_fov_frame = [radius;2].to_signed();
 
-        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = (0..fov_diameter)
+        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
+
+        let fov_lower_left_square = fov_center.floor().sub([radius;2].to_signed());
+        rect_squares([0,0], [fov_diameter;2])
+
+
+        (0..fov_diameter)
             .map(|row_in_fov| {
                 let y_in_fov = self.height as i32 - row_in_fov as i32 - 1;
                 (0..fov_diameter as i32)
@@ -1133,10 +1157,15 @@ impl WorldState {
         square_viz: &PositionedSquareVisibilityInFov,
     ) -> [GlyphWithTransparency; 2] {
         let abs_square = square_viz.absolute_square();
-        let square_is_in_world = self.on_board(abs_square.to_array());
         let default_glyphs = [GlyphWithTransparency::from_char(ETERNAL_VOID_CHAR); 2];
 
-        let mut glyphs = if square_is_in_world {
+        
+        let maybe_floor_mark = self.floor_markings.get(&abs_square.to_array());
+
+        let square_is_in_world = self.on_board(abs_square.to_array());
+
+
+         let mut glyphs = if square_is_in_world {
             if let Some(board_color) = (self.board_color_function)(&self, abs_square.into()) {
                 DoubleGlyphWithTransparency::solid_color(board_color)
             } else {
@@ -1145,6 +1174,10 @@ impl WorldState {
         } else {
             default_glyphs
         };
+        
+        if let Some(&floor_mark) = maybe_floor_mark {
+            glyphs = floor_mark.over(glyphs);
+        } else
 
         // draw visible portal entrances
 
@@ -1216,7 +1249,7 @@ impl WorldState {
     pub fn advance_smoothed_player_pos(&mut self, dt_s: f32) {
         self.smoothed_player_pos = exponential_approach_with_min_speed(
             self.smoothed_player_pos,
-            self.player_square.to_float(),
+            self.player_square.grid_square_center(),
             dt_s,
             0.2,
             15.0,
@@ -1762,11 +1795,32 @@ mod tests {
             Some([10.0, 30.0])
         );
     }
+    #[test]
+    fn test_fov_rendering_alignment() {
+        let mut game = Game::new_headless(10, 30, 4, 4);
+        game.ui_handler.default_fov_range = 3;
+        // 🯩🯫
+        // 🭮🭬
+        let the_char = 'a';
+        let the_glyph: DoubleGlyphWithTransparency = [the_char;2].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
+        game.world_state.draw_rect_on_floor([0,0], [7,7], the_glyph);
+        let frame = game.world_state.render([3,3].grid_square_center(), 3);
+        dbg!(&frame);
+        assert_eq!(frame.get_xy([0,0]).character, the_char);
+        assert_eq!(frame.get_xy([0,6]).character, the_char);
+        assert_eq!(frame.get_xy([13,0]).character, the_char);
+        assert_eq!(frame.get_xy([13,6]).character, the_char);
+        assert_frame_same_as_past!(frame, "a");
+    }
     // #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(10, 30, 4, 4);
         game.ui_handler.default_fov_range = 3;
+        // 🯩🯫
+        // 🭮🭬
+        let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
+        game.world_state.draw_rect_on_floor([0,0], [7,7], the_glyph);
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         let frame = game.render();
@@ -1812,7 +1866,7 @@ mod tests {
             let world_square = game.ui_handler.screen_row_col_char_to_world_square(*screen);
             assert_eq!(world_square, *correct_world_square, 
                 "screen_char_row_col: {screen:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
-                let screen_point = screen.to_float();
+                let screen_point = screen.to_signed().grid_square_center();
             let world_point = game
                 .ui_handler
                 .screen_row_col_point_to_world_point(screen_point);
