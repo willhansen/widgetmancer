@@ -28,7 +28,7 @@ pub use angle_interval::*;
 pub mod coordinate_frame_conversions;
 pub use coordinate_frame_conversions::*;
 
-use crate::geometry2::FPointExt;
+use crate::geometry2::{FPointExt, IPointExt};
 
 pub mod geometry2;
 
@@ -1748,7 +1748,7 @@ pub fn exponential_approach_with_min_speed(
     let time_until_transition = time_constant * (start_dist / (min_speed * time_constant)).ln();
 
     if time_until_transition > dt {
-        return exponential_approach(start_pos,  target_pos, dt, dist_halflife);
+        return exponential_approach(start_pos, target_pos, dt, dist_halflife);
     }
 
     let linear_start_pos;
@@ -1764,33 +1764,49 @@ pub fn exponential_approach_with_min_speed(
             target_pos.sub(movement_direction.mul(dist_that_decay_reaches_min_speed));
     }
 
-    linear_approach(
-        linear_start_pos,
-        target_pos,
-        linear_dt,
-        min_speed,
-    )
+    linear_approach(linear_start_pos, target_pos, linear_dt, min_speed)
 }
 
-pub fn rect_corner_by_quadrant<T: num::Zero + Copy>(rect_width_height: [T;2], nth_quadrant: i32) -> [T;2] {
-    let [w,h] = rect_width_height;
+pub fn rect_corner_by_quadrant<T: num::Zero + Copy>(
+    rect_width_height: [T; 2],
+    nth_quadrant: i32,
+) -> [T; 2] {
+    let [w, h] = rect_width_height;
     match nth_quadrant.rem_euclid(4) {
-        0 => [w,h],
-        1 => [T::zero(),h],
-        2 => [T::zero(),T::zero()],
-        3 => [w,T::zero()],
-        _ => unreachable!("rem_euclid fail")
+        0 => [w, h],
+        1 => [T::zero(), h],
+        2 => [T::zero(), T::zero()],
+        3 => [w, T::zero()],
+        _ => unreachable!("rem_euclid fail"),
     }
-
 }
-
+pub fn rect_border(
+    bottom_left: geometry2::IPoint,
+    width_height: geometry2::IPoint,
+) -> impl Iterator<Item = geometry2::IPoint> {
+    let [w, h] = width_height;
+    (0..w)
+        .map(move |dx| [dx, 0])
+        .chain((0..h).map(move |dy| [w - 1, dy]))
+        .chain((0..w).map(move |dx| [w - 1 - dx, h - 1]))
+        .chain((0..h).map(move |dy| [0, h - 1 - dy]))
+        .map(move |x| bottom_left.add(x))
+}
+pub fn rect_squares(
+    bottom_left: geometry2::IPoint,
+    width_height: geometry2::IPoint,
+) -> impl Iterator<Item = geometry2::IPoint> {
+    let [w, h] = width_height;
+    let [x0, y0] = bottom_left;
+    (0..w).map(move |x| (0..h).map(move |y| [x0 + x, y0 + y])).flatten()
+}
 
 #[cfg(test)]
 mod tests {
     use std::f32;
 
-    use num::traits::real::Real;
     use ntest::{assert_about_eq, assert_false};
+    use num::traits::real::Real;
     use pretty_assertions::{assert_eq, assert_ne};
     use rgb::RGB8;
 
@@ -2496,12 +2512,41 @@ mod tests {
     }
     #[test]
     fn test_exponential_approach_with_min_speed() {
-        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, 1.0, 0.0), [5.0, 0.0]);
-        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, f32::INFINITY, 5.0), [5.0, 0.0]);
+        assert_about_eq!(
+            exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, 1.0, 0.0),
+            [5.0, 0.0]
+        );
+        assert_about_eq!(
+            exponential_approach_with_min_speed([0.0, 0.0], [10.0, 0.0], 1.0, f32::INFINITY, 5.0),
+            [5.0, 0.0]
+        );
 
-        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 0.01, 5.0), [0.0, 100.0]);
-        assert_about_eq!(exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 5.0, 999.0), [0.0, 100.0]);
-        
-
+        assert_about_eq!(
+            exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 0.01, 5.0),
+            [0.0, 100.0]
+        );
+        assert_about_eq!(
+            exponential_approach_with_min_speed([0.0, 0.0], [0.0, 100.0], 1.0, 5.0, 999.0),
+            [0.0, 100.0]
+        );
+    }
+    #[test]
+    fn test_rect_border() {
+        assert_eq!(
+            rect_border([4, 5], [3, 2]).collect_vec(),
+            vec![[4, 5], [5, 5], [6, 5], [6, 6], [5, 6], [4, 6],]
+        );
+    }
+    #[test]
+    fn test_rect_fill() {
+        let got = HashSet::from_iter(rect_squares([4, 5], [3, 3]));
+        let correct = HashSet::from( [
+            [4, 5], [5, 5], [6, 5],
+            [4, 6], [5, 6], [6, 6],
+            [4, 7], [5, 7], [6, 7],
+        ]);
+        assert_eq!(
+            got, correct
+        );
     }
 }

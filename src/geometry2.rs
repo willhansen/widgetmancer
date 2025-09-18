@@ -65,6 +65,9 @@ pub trait IPointExt: Sized + PointExt<i32> {
     fn to_float(&self) -> FPoint {
         FPoint::new(self.x() as f32, self.y() as f32)
     }
+    fn grid_square_center(&self) -> FPoint {
+        self.to_float().add([0.5;2])
+    }
     fn to_string(&self) -> String {
         format!("[{}, {}]", self.x(), self.y())
     }
@@ -124,6 +127,9 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
     }
     fn rounded(&self) -> IPoint {
         [self.x().round() as i32, self.y().round() as i32]
+    }
+    fn floor(&self) -> IPoint {
+        [self.x().floor() as i32, self.y().floor() as i32]
     }
     fn length(&self) -> f32 {
         (self.x().powi(2) + self.y().powi(2)).sqrt()
