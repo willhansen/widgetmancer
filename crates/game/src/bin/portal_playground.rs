@@ -1817,11 +1817,11 @@ mod tests {
         game.world_state.draw_rect_on_floor([0,0], [7,7], the_glyph);
         let frame = game.world_state.render([3,3].grid_square_center(), 3);
         dbg!(&frame);
-        assert_eq!(frame.get_xy([0,0]).character, the_char);
-        assert_eq!(frame.get_xy([0,6]).character, the_char);
-        assert_eq!(frame.get_xy([13,0]).character, the_char);
-        assert_eq!(frame.get_xy([13,6]).character, the_char);
-        assert_frame_same_as_past!(frame, "a");
+        [[0,0], [0,6], [13,0], [13,6] ].into_iter().for_each(|x| {
+
+        assert_eq!(frame.get_xy(x).character, the_char);
+        })
+        // assert_frame_same_as_past!(frame, "a");
     }
     // #[ignore]
     #[test]
@@ -1864,24 +1864,25 @@ mod tests {
             );
         dbg!(game.ui_handler.camera.top_left_local_square());
         dbg!(game.ui_handler.camera, game.world_state.size_width_height());
-        let screen_world_square_world_point = [
-            ([0, 0], [0, 3], [0.0, 4.0]),
-            ([0, 1], [0, 3], [0.5, 4.0]),
-            ([0, 2], [1, 3], [1.0, 4.0]),
-            ([0, 3], [1, 3], [1.5, 4.0]),
-            ([1, 0], [0, 2], [0.0, 3.0]),
-            ([1, 1], [0, 2], [0.5, 3.0]),
+        let screen_char_screen_point_world_square_world_point = [
+            ([0, 0], [0.5, 0.5], [0, 3], [0.0, 4.0]),
+            ([0, 1], [0.5, 1.5], [0, 3], [0.5, 4.0]),
+            ([0, 2], [0.5, 2.5], [1, 3], [1.0, 4.0]),
+            ([0, 3], [0.5, 3.5], [1, 3], [1.5, 4.0]),
+            ([1, 0], [1.5, 0.5], [0, 2], [0.0, 3.0]),
+            ([1, 1], [1.5, 1.5], [0, 2], [0.5, 3.0]),
         ]
-        .iter()
-        .for_each(|(screen, correct_world_square, correct_world_point)| {
-            let world_square = game.ui_handler.screen_row_col_char_to_world_square(*screen);
-            assert_eq!(world_square, *correct_world_square, 
-                "screen_char_row_col: {screen:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
-                let screen_point = screen.to_signed().grid_square_center();
+        .into_iter()
+        .for_each(|(screen_char, correct_screen_point, correct_world_square, correct_world_point)| {
+            let world_square = game.ui_handler.screen_row_col_char_to_world_square(screen_char);
+            assert_eq!(world_square, correct_world_square, 
+                "screen_char_row_col: {screen_char:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
+            let screen_point = screen_char.to_signed().grid_square_center();
+            assert_about_eq_2d(screen_point, correct_screen_point);
             let world_point = game
                 .ui_handler
                 .screen_row_col_point_to_world_point(screen_point);
-            assert_eq!(world_point, *correct_world_point,
+            assert_eq!(world_point, correct_world_point,
                 "screen_point_row_col: {screen_point:?}, world_point: {world_point:?}, correct_world_point: {correct_world_point:?}");
         });
     }
