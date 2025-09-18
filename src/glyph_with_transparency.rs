@@ -40,6 +40,9 @@ impl GlyphWithTransparency {
     pub fn from_char(c: char) -> Self {
         Self::from_drawable_with_default_as_white_on_transparent(DrawableGlyph::from_char(c))
     }
+    pub fn from_bg_char(c: char) -> Self {
+        Self::from_drawable_with_default_as_white_on_transparent(DrawableGlyph::from_char(c)).with_swapped_primary_secondary()
+    }
     pub fn with_primary_only(&self) -> Self {
         self.with_transparent_secondary()
     }
@@ -47,6 +50,14 @@ impl GlyphWithTransparency {
         let mut x = self.clone();
         x.secondary_color = x.secondary_color.with_alpha(0);
         x
+    }
+    pub fn with_swapped_primary_secondary(&self) -> Self {
+        Self {
+            character: self.character,
+            primary_color: self.secondary_color,
+            secondary_color: self.primary_color,
+            fg_is_primary: !self.fg_is_primary
+        }
     }
     pub fn with_primary_rgb(&self, color: RGB8) -> Self {
         let mut x = self.clone();
@@ -95,6 +106,10 @@ impl GlyphWithTransparency {
         } else {
             &mut self.primary_color
         }
+    }
+    // primary and secondary by index
+    pub fn colors_mut(&mut self) -> [&mut RGBA8;2] {
+        [&mut self.primary_color, &mut self.secondary_color]
     }
     pub fn with_rgbs(&self, primary_rgb: RGB8, secondary_rgb: RGB8) -> Self {
         self.with_primary_rgb(primary_rgb)
