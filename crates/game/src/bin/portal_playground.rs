@@ -971,7 +971,6 @@ impl WorldState {
             &Default::default(),
             &portal_geometry,
         );
-        dbg!(fov_center);
 
         let shadow_glyph = GlyphWithTransparency::from_char(SHADOW_CHAR);
         let out_of_range_glyph = GlyphWithTransparency::from_char(OUT_OF_FOV_RANGE_CHAR).with_primary_rgb(GREEN);
@@ -990,7 +989,7 @@ impl WorldState {
 
         // let fov_lower_left_square = fov_center.floor().sub([radius;2].to_signed());
         
-        let visibilities_in_fov: Vec<Vec<Vec<PositionedSquareVisibilityInFov>>> = 
+        let visibilities_and_glyphs_in_fov: Vec<Vec<Vec<(PositionedSquareVisibilityInFov, DoubleGlyphWithTransparency)>>> = 
 
         (0..fov_diameter)
             .map(|row_in_fov| {
@@ -1003,7 +1002,7 @@ impl WorldState {
                         let xy_in_fov_frame: WorldStep = [x_in_fov, y_in_fov].into();
                         let xy_relative_to_fov_center =
                             xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
-                        match self.portal_rendering {
+                        let viz = match self.portal_rendering {
                             PortalRenderingOption::LineOfSight => {
                                 FieldOfViewResult::sorted_by_draw_order(
                                     fov.visibilities_of_relative_square(
@@ -1019,9 +1018,46 @@ impl WorldState {
                                 )]
                             }
                             PortalRenderingOption::Absolute => todo!(),
-                        }
+                        };
+                        viz.into_iter().map(|v| (v, self.render_one_view_of_a_square(&v) )).collect_vec()
+
                     }).collect_vec()
             }).collect_vec();
+
+        if is_debug {
+            
+            visibilities_and_glyphs_in_fov.iter().enumerate().for_each(|(row_in_fov, row)| row.iter().enumerate().for_each(|(col_in_fov, layers_at_square)| {
+                layers_at_square.iter().for_each(|(square_viz, double_glyph)|{
+
+                    let debug_frames_key: (u32, IPoint, i32) = (
+                        square_viz.portal_depth(),
+                        square_viz.absolute_fov_center_square().into(),
+                        square_viz
+                            .portal_rotation_from_relative_to_absolute()
+                            .quarter_turns()
+                            .rem_euclid(4),
+                    );
+                    if !debug_portal_visualizer_frames
+                        .contains_key(&debug_frames_key)
+                    {
+                        debug_portal_visualizer_frames.insert(
+                            debug_frames_key,
+                            Frame::blank(self.width * 2, self.height),
+                        );
+                    }
+                    let mut debug_frame = debug_portal_visualizer_frames
+                        .get_mut(&debug_frames_key)
+                        .unwrap();
+                    debug_frame.set_by_double_wide_grid(
+                        row_in_fov,
+                        col_in_fov,
+                        double_glyph
+                            .map(|g| g.to_drawable_with_transparent_as_default()),
+                    );
+                });
+            }));
+
+        }
 
         let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
 
@@ -1037,46 +1073,9 @@ impl WorldState {
                         let xy_relative_to_fov_center =
                             xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
                         let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
-                        let visible_portions_at_relative_square = &visibilities_in_fov[row_in_fov][col_in_fov];
 
-                        let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> =
-                            visible_portions_at_relative_square
-                                .clone()
-                                .into_iter()
-                                .map(|square_viz| self.render_one_view_of_a_square(&square_viz))
-                                .collect_vec();
-                        if is_debug {
-                            visible_portions_at_relative_square
-                                .iter()
-                                .zip(glyph_layers_to_combine.iter())
-                                .for_each(|(square_viz, double_glyph)| {
-                                    let debug_frames_key: (u32, IPoint, i32) = (
-                                        square_viz.portal_depth(),
-                                        square_viz.absolute_fov_center_square().into(),
-                                        square_viz
-                                            .portal_rotation_from_relative_to_absolute()
-                                            .quarter_turns()
-                                            .rem_euclid(4),
-                                    );
-                                    if !debug_portal_visualizer_frames
-                                        .contains_key(&debug_frames_key)
-                                    {
-                                        debug_portal_visualizer_frames.insert(
-                                            debug_frames_key,
-                                            Frame::blank(self.width * 2, self.height),
-                                        );
-                                    }
-                                    let mut debug_frame = debug_portal_visualizer_frames
-                                        .get_mut(&debug_frames_key)
-                                        .unwrap();
-                                    debug_frame.set_by_double_wide_grid(
-                                        row_in_fov,
-                                        col_in_fov,
-                                        double_glyph
-                                            .map(|g| g.to_drawable_with_transparent_as_default()),
-                                    );
-                                });
-                        }
+                        let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> = visibilities_and_glyphs_in_fov[row_in_fov][col_in_fov].iter().map(|(viz, glyphs)| *glyphs).collect_vec();
+
 
                         let default = if current_radius <= radius {shadow_glyph} else {out_of_range_glyph};
                         glyph_layers_to_combine
