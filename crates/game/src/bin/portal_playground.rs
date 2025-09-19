@@ -558,7 +558,7 @@ impl UiHandler {
             self.smoothed_mouse_screen_row_col = None;
             return;
         };
-        let target_pos = mouse_screen_square.map(|x| x as f32);
+        let target_pos = mouse_screen_square.to_signed().grid_square_center();
         let Some(prev_pos) = self.smoothed_mouse_screen_row_col else {
             self.smoothed_mouse_screen_row_col = Some(target_pos);
             return;
@@ -1335,7 +1335,7 @@ mod tests {
         assert_eq!(frame.height(), 11);
     }
 
-    fn press_left_row_col_screen_pos(screen_pos_row_col: [u16; 2]) -> termion::event::Event {
+    fn press_left_row_col_screen_pos_1_indexed(screen_pos_row_col: [u16; 2]) -> termion::event::Event {
         press_left_1_indexed(screen_pos_row_col[1], screen_pos_row_col[0])
     }
     fn press_left_1_indexed(col: u16, row: u16) -> termion::event::Event {
@@ -1597,10 +1597,10 @@ mod tests {
         // .....
         // .....
 
-        let row_col_point_upper_left = [1.0, 1.0];
+        let row_col_point_upper_left = [0.0, 0.0];
         let xy_point_upper_left = [0.0, 5.0];
 
-        let row_col_point_lower_left = [6.0, 1.0];
+        let row_col_point_lower_left = [5.0, 1.0];
         let xy_point_lower_left = [0.0, 0.0];
 
         assert_eq!(
@@ -1657,14 +1657,14 @@ mod tests {
             .ui_handler
             .smoothed_mouse_position_screen_row_col()
             .unwrap();
-        assert!(pos[1] > 1.0);
-        assert!(pos[1] < 1.1);
+        assert!(pos[1] > 0.5);
+        assert!(pos[1] < 0.6);
         game.ui_handler.advance_time_to(5.0);
         let pos = game
             .ui_handler
             .smoothed_mouse_position_screen_row_col()
             .unwrap();
-        assert!(pos[0] - 2.0 < 0.0001);
+        assert!(pos[0] - 2.5 < 0.0001);
         // assert_frame_same_as_past!(frame, "a", true);
     }
 
@@ -1773,7 +1773,7 @@ mod tests {
         let steps_and_times = steps.map(|n| {
             let mut game = Game::new_headless_square(40);
             game.ui_handler
-                .give_event(press_left_row_col_screen_pos([10, 3]));
+                .give_event(press_left_row_col_screen_pos_1_indexed([10, 3]));
             let end_time = 1.0;
             game.advance_time_n_steps(end_time / n as f32, n);
             (
@@ -1791,11 +1791,15 @@ mod tests {
     fn test_smoothed_mouse_is_fast() {
         let mut game = Game::new_headless_square(40);
         game.ui_handler
-            .give_event(press_left_row_col_screen_pos([10, 3]));
+            .give_event(press_left_row_col_screen_pos_1_indexed([10, 3]));
         game.advance_time_by(0.5);
         assert_eq!(
+            game.ui_handler.last_mouse_screen_row_col,
+            Some([9, 2])
+        );
+        assert_eq!(
             game.ui_handler.smoothed_mouse_screen_row_col,
-            Some([10.0, 3.0])
+            Some([9.5, 2.5])
         );
         game.ui_handler
             .give_event(drag_mouse_to_screen_pos([10, 30]));
@@ -1803,7 +1807,7 @@ mod tests {
         game.advance_time_by(0.5);
         assert_eq!(
             game.ui_handler.smoothed_mouse_screen_row_col,
-            Some([10.0, 30.0])
+            Some([9.5, 29.5])
         );
     }
     #[test]
@@ -1865,12 +1869,12 @@ mod tests {
         dbg!(game.ui_handler.camera.top_left_local_square());
         dbg!(game.ui_handler.camera, game.world_state.size_width_height());
         let screen_char_screen_point_world_square_world_point = [
-            ([0, 0], [0.5, 0.5], [0, 3], [0.0, 4.0]),
-            ([0, 1], [0.5, 1.5], [0, 3], [0.5, 4.0]),
-            ([0, 2], [0.5, 2.5], [1, 3], [1.0, 4.0]),
-            ([0, 3], [0.5, 3.5], [1, 3], [1.5, 4.0]),
-            ([1, 0], [1.5, 0.5], [0, 2], [0.0, 3.0]),
-            ([1, 1], [1.5, 1.5], [0, 2], [0.5, 3.0]),
+            ([0, 0], [0.5, 0.5], [0, 3], [0.25, 3.5]),
+            ([0, 1], [0.5, 1.5], [0, 3], [0.75, 3.5]),
+            ([0, 2], [0.5, 2.5], [1, 3], [1.25, 3.5]),
+            ([0, 3], [0.5, 3.5], [1, 3], [1.75, 3.5]),
+            ([1, 0], [1.5, 0.5], [0, 2], [0.25, 2.5]),
+            ([1, 1], [1.5, 1.5], [0, 2], [0.75, 2.5]),
         ]
         .into_iter()
         .for_each(|(screen_char, correct_screen_point, correct_world_square, correct_world_point)| {
