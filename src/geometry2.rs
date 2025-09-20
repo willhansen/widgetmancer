@@ -1,5 +1,7 @@
 use itertools::all;
 
+use crate::BoolIterExt;
+
 pub type IPoint = [i32; 2];
 pub type UPoint = [u32; 2];
 pub type FPoint = [f32; 2];
@@ -8,8 +10,8 @@ pub type SquareEdge = (IPoint, OrthoDir);
 // 1-indexed
 pub type ScreenRowColCharPos = [u16; 2];
 
-// minimum square and size
-pub type IRect = [[i32;2];2];
+// minimum square and maximum square
+pub type IRect = [[i32; 2]; 2];
 
 pub const DIR_RIGHT: i32 = 0;
 pub const DIR_UP: i32 = 1;
@@ -23,14 +25,11 @@ pub const STEP_LEFT: IPoint = [-1, 0];
 pub const STEP_DOWN: IPoint = [0, -1];
 
 pub trait PointExt<T> {
-
     fn x(&self) -> T;
     fn y(&self) -> T;
     fn new(x: T, y: T) -> Self;
-
 }
-impl<T: Copy> PointExt<T> for [T;2] {
-
+impl<T: Copy> PointExt<T> for [T; 2] {
     fn x(&self) -> T {
         self[0]
     }
@@ -39,6 +38,15 @@ impl<T: Copy> PointExt<T> for [T;2] {
     }
     fn new(x: T, y: T) -> Self {
         [x, y]
+    }
+}
+
+pub trait SignedPointExt<T> {
+    fn negative(&self) -> Self;
+}
+impl<T: std::ops::Neg> SignedPointExt<T> for IPoint {
+    fn negative(&self) -> Self {
+        self.map(|x| -x)
     }
 }
 
@@ -71,7 +79,7 @@ pub trait IPointExt: Sized + PointExt<i32> {
         FPoint::new(self.x() as f32, self.y() as f32)
     }
     fn grid_square_center(&self) -> FPoint {
-        self.to_float().add([0.5;2])
+        self.to_float().add([0.5; 2])
     }
     fn to_string(&self) -> String {
         format!("[{}, {}]", self.x(), self.y())
@@ -83,11 +91,18 @@ pub trait IPointExt: Sized + PointExt<i32> {
     fn absmax(&self) -> u32 {
         *self.abs().iter().max().unwrap()
     }
+    fn to_unsigned(&self) -> UPoint;
 }
 
 impl IPointExt for IPoint {
     fn abs(&self) -> UPoint {
         self.map(|x| x.abs() as u32)
+    }
+    fn to_unsigned(&self) -> UPoint {
+        self.map(|x| {
+            assert!(x >= 0);
+            x as u32
+        })
     }
 }
 pub trait UPointExt {
@@ -102,7 +117,7 @@ impl UPointExt for UPoint {
         self.map(|x| x as f32)
     }
 }
-impl UPointExt for [u16;2] {
+impl UPointExt for [u16; 2] {
     fn to_signed(&self) -> IPoint {
         self.map(|x| x as i32)
     }
@@ -110,7 +125,7 @@ impl UPointExt for [u16;2] {
         self.map(|x| x as f32)
     }
 }
-impl UPointExt for [usize;2] {
+impl UPointExt for [usize; 2] {
     fn to_signed(&self) -> IPoint {
         self.map(|x| x as i32)
     }
@@ -144,6 +159,9 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
     fn floor(&self) -> IPoint {
         [self.x().floor() as i32, self.y().floor() as i32]
     }
+    fn snap_to_grid(&self) -> IPoint {
+        self.floor()
+    }
     fn length(&self) -> f32 {
         (self.x().powi(2) + self.y().powi(2)).sqrt()
     }
@@ -164,8 +182,7 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
         self.div(self.length())
     }
 }
-impl FPointExt for FPoint {
-}
+impl FPointExt for FPoint {}
 
 pub type USizePoint = [usize; 2];
 pub trait USizePointExt {
@@ -243,52 +260,66 @@ pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
 pub trait IRectExt {
     fn min_square(&self) -> IPoint;
     fn max_square(&self) -> IPoint;
-    fn size(&self) -> IPoint;
-    fn from_min_and_size(min: IPoint, size: IPoint) -> Self;
+    fn size(&self) -> UPoint;
+    fn from_min_and_size(min: IPoint, size: UPoint) -> Self;
     fn from_min_and_max(min: IPoint, max: IPoint) -> Self;
     fn contains_square(&self, square: IPoint) -> bool {
         let min = self.min_square();
         let max = self.max_square();
-        let a = [0,1].map(|i| {
-            square[i] >= min[i] && square[i] <= max[i]
-        });
+        let a = [0, 1].map(|i| square[i] >= min[i] && square[i] <= max[i]);
         all(a, |x| x)
     }
     fn contains_rect(&self, other: IRect) -> bool {
         self.contains_square(other.min_square()) && self.contains_square(other.max_square())
     }
+    fn valid(&self) -> bool;
 }
 impl IRectExt for IRect {
-
     fn min_square(&self) -> IPoint {
         self[0]
     }
-    fn max_square(&self) -> IPoint{
-        self[0].add(self[1].sub([1,1]))
-    }
-    fn size(&self) -> IPoint {
+    fn max_square(&self) -> IPoint {
         self[1]
     }
-    fn from_min_and_size(min: IPoint, size: IPoint) -> Self {
-        [min, size]
+    fn size(&self) -> UPoint {
+        self[1].sub(self[0]).add([1; 2]).to_unsigned()
+    }
+    fn from_min_and_size(min: IPoint, size: UPoint) -> Self {
+        let max = min.add(size.to_signed().sub([1; 2]));
+        Self::from_min_and_max(min, max)
     }
     fn from_min_and_max(min: IPoint, max: IPoint) -> Self {
-        let size = max.sub(min).add([1,1]);
-        Self::from_min_and_size(min, size)
+        [min, max]
+    }
+    fn valid(&self) -> bool {
+        [0, 1].map(|i| self[0][i] <= self[1][i]).all_true()
     }
 }
-
 
 #[cfg(test)]
 mod ui_handler_tests {
     use super::*;
     #[test]
     fn test_rect_inside() {
-        let rect = IRect::from_min_and_size([0,0],[3,4]);
+        let rect = IRect::from_min_and_size([0, 0], [3, 4]);
 
-        assert!(rect.contains_square([1,1]));
-        assert!(rect.contains_square([0,1]));
-        assert!(!rect.contains_square([-1,1]));
+        assert!(rect.contains_square([1, 1]));
+        assert!(rect.contains_square([0, 1]));
+        assert!(!rect.contains_square([-1, 1]));
+    }
+    #[test]
+    fn test_rect_creation() {
+        let rect = IRect::from_min_and_max([0, 0], [3, 4]);
+        assert_eq!(rect.min_square(), [0, 0]);
+        assert_eq!(rect.max_square(), [3, 4]);
+        assert_eq!(rect.size(), [4, 5]);
+        assert!(rect.contains_square([3, 4]));
+        assert!(rect.contains_square([3, 3]));
+        assert!(rect.contains_square([2, 4]));
+        assert!(!rect.contains_square([4, 4]));
+        assert!(!rect.contains_square([3, 5]));
 
+        let rect = IRect::from_min_and_size([0, 0], [3, 4]);
+        assert_eq!(rect.max_square(), [2, 3]);
     }
 }
