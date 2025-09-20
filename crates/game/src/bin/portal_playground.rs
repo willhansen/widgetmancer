@@ -800,7 +800,7 @@ impl UiHandler {
         );
         dbg!(world_frame.size_rows_cols());
         dbg!(self.camera);
-        screen_buffer.blit(&world_frame, [0, 0]);
+        screen_buffer.safe_blit(&world_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         screen_buffer
     }

@@ -1,3 +1,5 @@
+use itertools::all;
+
 pub type IPoint = [i32; 2];
 pub type UPoint = [u32; 2];
 pub type FPoint = [f32; 2];
@@ -5,6 +7,9 @@ pub type OrthoDir = i32;
 pub type SquareEdge = (IPoint, OrthoDir);
 // 1-indexed
 pub type ScreenRowColCharPos = [u16; 2];
+
+// minimum square and size
+pub type IRect = [[i32;2];2];
 
 pub const DIR_RIGHT: i32 = 0;
 pub const DIR_UP: i32 = 1;
@@ -98,6 +103,14 @@ impl UPointExt for UPoint {
     }
 }
 impl UPointExt for [u16;2] {
+    fn to_signed(&self) -> IPoint {
+        self.map(|x| x as i32)
+    }
+    fn to_float(&self) -> FPoint {
+        self.map(|x| x as f32)
+    }
+}
+impl UPointExt for [usize;2] {
     fn to_signed(&self) -> IPoint {
         self.map(|x| x as i32)
     }
@@ -225,4 +238,57 @@ pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
     let step = step_in_direction(edge.1);
     let reverse_dir = (edge.1 + 2).rem_euclid(4);
     ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
+}
+
+pub trait IRectExt {
+    fn min_square(&self) -> IPoint;
+    fn max_square(&self) -> IPoint;
+    fn size(&self) -> IPoint;
+    fn from_min_and_size(min: IPoint, size: IPoint) -> Self;
+    fn from_min_and_max(min: IPoint, max: IPoint) -> Self;
+    fn contains_square(&self, square: IPoint) -> bool {
+        let min = self.min_square();
+        let max = self.max_square();
+        let a = [0,1].map(|i| {
+            square[i] >= min[i] && square[i] <= max[i]
+        });
+        all(a, |x| x)
+    }
+    fn contains_rect(&self, other: IRect) -> bool {
+        self.contains_square(other.min_square()) && self.contains_square(other.max_square())
+    }
+}
+impl IRectExt for IRect {
+
+    fn min_square(&self) -> IPoint {
+        self[0]
+    }
+    fn max_square(&self) -> IPoint{
+        self[0].add(self[1].sub([1,1]))
+    }
+    fn size(&self) -> IPoint {
+        self[1]
+    }
+    fn from_min_and_size(min: IPoint, size: IPoint) -> Self {
+        [min, size]
+    }
+    fn from_min_and_max(min: IPoint, max: IPoint) -> Self {
+        let size = max.sub(min).add([1,1]);
+        Self::from_min_and_size(min, size)
+    }
+}
+
+
+#[cfg(test)]
+mod ui_handler_tests {
+    use super::*;
+    #[test]
+    fn test_rect_inside() {
+        let rect = IRect::from_min_and_size([0,0],[3,4]);
+
+        assert!(rect.contains_square([1,1]));
+        assert!(rect.contains_square([0,1]));
+        assert!(!rect.contains_square([-1,1]));
+
+    }
 }

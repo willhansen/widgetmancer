@@ -1768,10 +1768,10 @@ pub fn exponential_approach_with_min_speed(
 }
 
 pub fn rect_corner_by_quadrant<T: num::Zero + Copy>(
-    rect_width_height: [T; 2],
+    max_corner: [T; 2],
     nth_quadrant: i32,
 ) -> [T; 2] {
-    let [w, h] = rect_width_height;
+    let [w, h] = max_corner;
     match nth_quadrant.rem_euclid(4) {
         0 => [w, h],
         1 => [T::zero(), h],
