@@ -410,8 +410,8 @@ impl Camera {
         // Can get that from the top-left square of the fov in the camera's local world frame
         let mut camera_frame = self.blank_frame();
 
-        let fov_center_absolute_square = fov_center.rounded();
-        dbg!(fov_center_absolute_square);
+        let fov_center_absolute_square = fov_center.snap_to_grid();
+        dbg!(fov_center_absolute_square, fov_range, fov_center);
         let fov_top_left_absolute_square =
             fov_center_absolute_square.add([-(fov_range as i32), fov_range as i32]);
         dbg!(fov_top_left_absolute_square);
@@ -419,7 +419,7 @@ impl Camera {
             self.absolute_world_square_to_left_char_frame_row_col(fov_top_left_absolute_square);
         dbg!(fov_top_left_char_row_col);
 
-        camera_frame.blit(&fov_frame, fov_top_left_char_row_col.map(|x| x as usize));
+        camera_frame.safe_blit(&fov_frame, fov_top_left_char_row_col);
 
         camera_frame
     }
@@ -676,12 +676,12 @@ impl UiHandler {
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
             let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
-            let [row_1i, col_1i] = smoothed_mouse_pos_row_col.rounded();
-            assert!(row_1i > 0, "{row_1i}");
-            assert!(row_1i <= self.screen_height() as i32, "{row_1i}");
-            assert!(col_1i > 0, "{col_1i}");
-            assert!(col_1i <= self.screen_width() as i32, "{col_1i}");
-            let [row, col] = [row_1i as usize - 1, col_1i as usize - 1];
+            let [row_1i, col_1i] = smoothed_mouse_pos_row_col.snap_to_grid();
+            assert!(row_1i >= 0, "{row_1i}");
+            assert!(row_1i < self.screen_height() as i32, "{row_1i}");
+            assert!(col_1i >= 0, "{col_1i}");
+            assert!(col_1i < self.screen_width() as i32, "{col_1i}");
+            let [row, col] = [row_1i as usize, col_1i as usize];
             screen_buffer.grid[row][col].character = the_char;
             screen_buffer.grid[row][col].fg_color = BLACK.into();
         }
@@ -1556,13 +1556,13 @@ mod tests {
     }
     fn path_to_square_entry_events(path: &[(f32, FPoint)]) -> Vec<(f32, IPoint)> {
         let moves = path.iter().tuple_windows().filter_map(|(a, b)| {
-            if a.1.rounded() != b.1.rounded() {
-                Some((b.0, b.1.rounded()))
+            if a.1.snap_to_grid() != b.1.snap_to_grid() {
+                Some((b.0, b.1.snap_to_grid()))
             } else {
                 None
             }
         });
-        once((path[0].0, path[0].1.rounded()))
+        once((path[0].0, path[0].1.snap_to_grid()))
             .chain(moves)
             .collect_vec()
     }

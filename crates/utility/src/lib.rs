@@ -1785,7 +1785,7 @@ pub fn rect_border(
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
     let [w, h] = width_height;
-    let [x1,y1] = width_height.sub([1,1]);
+    let [x1, y1] = width_height.sub([1, 1]);
     (0..x1)
         .map(move |dx| [dx, 0])
         .chain((0..y1).map(move |dy| [x1, dy]))
@@ -1799,7 +1799,23 @@ pub fn rect_squares(
 ) -> impl Iterator<Item = geometry2::IPoint> {
     let [w, h] = width_height;
     let [x0, y0] = bottom_left;
-    (0..w).map(move |x| (0..h).map(move |y| [x0 + x, y0 + y])).flatten()
+    (0..w)
+        .map(move |x| (0..h).map(move |y| [x0 + x, y0 + y]))
+        .flatten()
+}
+
+pub trait BoolIterExt {
+    fn all_true(self) -> bool;
+    fn any_true(self) -> bool;
+}
+impl<T> BoolIterExt for T where T: IntoIterator<Item=bool>
+{
+    fn all_true(self) -> bool {
+        self.into_iter().all(|x| x)
+    }
+    fn any_true(self) -> bool {
+        self.into_iter().any(|x| x)
+    }
 }
 
 #[cfg(test)]
@@ -2541,13 +2557,31 @@ mod tests {
     #[test]
     fn test_rect_fill() {
         let got = HashSet::from_iter(rect_squares([4, 5], [3, 3]));
-        let correct = HashSet::from( [
-            [4, 5], [5, 5], [6, 5],
-            [4, 6], [5, 6], [6, 6],
-            [4, 7], [5, 7], [6, 7],
+        let correct = HashSet::from([
+            [4, 5],
+            [5, 5],
+            [6, 5],
+            [4, 6],
+            [5, 6],
+            [6, 6],
+            [4, 7],
+            [5, 7],
+            [6, 7],
         ]);
-        assert_eq!(
-            got, correct
-        );
+        assert_eq!(got, correct);
+    }
+    #[test]
+    fn test_all_true() {
+        assert!(vec![true, true, true].all_true());
+        assert!([true, true, true].all_true());
+        assert_false!([true, false, true].all_true());
+        assert_false!(vec![true, true, false].all_true());
+    }
+    #[test]
+    fn test_any_true() {
+        assert!(vec![true, true, true].any_true());
+        assert!([false, true, false].any_true());
+        assert_false!([false, false, false].any_true());
+        assert_false!(vec![false, false, false].any_true());
     }
 }

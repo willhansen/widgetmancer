@@ -102,17 +102,25 @@ impl Frame {
     pub fn safe_blit(&mut self, other: &Self, rowcol: IPoint) {
         let self_rect = [[0; 2], self.size_rows_cols().to_signed().sub([1; 2])];
         let other_rect = [rowcol, rowcol.add(other.size_rows_cols().to_signed().sub([1; 2]))];
-        assert!(self_rect.contains_rect(other_rect));
+        assert!(self_rect.contains_rect(other_rect), "self rect: {:?}\nsmall rect: {:?}", self_rect, other_rect);
         self.blit(other, rowcol.into())
     }
+    // blit, but both frames are exactly the same size.  May as well not even blit
+    pub fn full_blit(&mut self, other: &Self, rowcol: IPoint) {
+        let self_rect = [[0; 2], self.size_rows_cols().to_signed().sub([1; 2])];
+        let other_rect = [rowcol, rowcol.add(other.size_rows_cols().to_signed().sub([1; 2]))];
+        assert_eq!(self_rect, other_rect);
+        self.blit(other, rowcol.into())
+    }
+
     pub fn blit(&mut self, other: &Self, rowcol: IPoint) {
         for other_row in 0..other.height() {
-            let row = rowcol[0] + other_row;
+            let row = rowcol[0] as usize + other_row;
             if row >= self.height() {
                 break;
             }
             for other_col in 0..other.width() {
-                let col = rowcol[1] + other_col;
+                let col = rowcol[1] as usize + other_col;
                 if col >= self.width() {
                     break;
                 }
