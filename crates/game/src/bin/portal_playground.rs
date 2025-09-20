@@ -411,9 +411,10 @@ impl Camera {
         let mut camera_frame = self.blank_frame();
 
         let fov_center_absolute_square = fov_center.snap_to_grid();
-        dbg!(fov_center_absolute_square, fov_range, fov_center);
-        let fov_top_left_absolute_square =
-            fov_center_absolute_square.add([-(fov_range as i32), fov_range as i32]);
+        let fov_rect = IRect::from_center_and_radius(fov_center_absolute_square, fov_range);
+
+        dbg!(fov_rect, fov_rect.center(), fov_center_absolute_square, fov_range, fov_center);
+        let fov_top_left_absolute_square =fov_rect.top_left_corner();
         dbg!(fov_top_left_absolute_square);
         let fov_top_left_char_row_col =
             self.absolute_world_square_to_left_char_frame_row_col(fov_top_left_absolute_square);
@@ -785,7 +786,7 @@ impl UiHandler {
                 .mouse_world_point()
                 .unwrap_or_else(|| world_state.player_square.grid_square_center()),
         };
-        let fov_range = self.default_fov_range;
+        let fov_range = self.default_fov_range.min(self.screen_height() as u32/2);
 
         let world_frame = self
             .camera
