@@ -257,11 +257,20 @@ pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
     ([edge.0[0] + step[0], edge.0[1] + step[1]], reverse_dir)
 }
 
-pub trait IRectExt {
+pub trait IRectExt: Sized {
     fn min_square(&self) -> IPoint;
     fn max_square(&self) -> IPoint;
     fn size(&self) -> UPoint;
-    fn from_min_and_size(min: IPoint, size: UPoint) -> Self;
+    fn width(&self) -> u32 {
+        self.size()[0]
+    }
+    fn height(&self) -> u32 {
+        self.size()[1]
+    }
+    fn from_min_and_size(min: IPoint, size: UPoint) -> Self {
+        let max = min.add(size.to_signed().sub([1; 2]));
+        Self::from_min_and_max(min, max)
+    }
     fn from_min_and_max(min: IPoint, max: IPoint) -> Self;
     fn contains_square(&self, square: IPoint) -> bool {
         let min = self.min_square();
@@ -273,6 +282,45 @@ pub trait IRectExt {
         self.contains_square(other.min_square()) && self.contains_square(other.max_square())
     }
     fn valid(&self) -> bool;
+    fn from_center_and_radius(center: IPoint, radius: u32) -> Self {
+        let min = center.sub([radius; 2].to_signed());
+        let max = center.add([radius; 2].to_signed());
+        Self::from_min_and_max(min, max)
+    }
+    // quadrants start top-right and go counter-clockwise
+    fn corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
+        let [x0, y0] = self.min_square();
+        let [x1, y1] = self.max_square();
+        match nth_quadrant.rem_euclid(4) {
+            0 => [x1, y1],
+            1 => [x0, y1],
+            2 => [x0, y0],
+            3 => [x1, y0],
+            _ => unreachable!("rem_euclid fail"),
+        }
+    }
+    fn top_right_corner(&self) -> IPoint {
+        self.corner_by_quadrant(0)
+    }
+    fn top_left_corner(&self) -> IPoint {
+        self.corner_by_quadrant(1)
+    }
+    fn bottom_left_corner(&self) -> IPoint {
+        self.corner_by_quadrant(2)
+    }
+    fn bottom_right_corner(&self) -> IPoint {
+        self.corner_by_quadrant(3)
+    }
+    // Only provides a center if the rectangle has odd width and height
+    fn center(&self) -> Option<IPoint> {
+        if self.size().map(|x| x %2 == 0).any_true() {
+            return None
+        }
+        let half_diag = self.size().to_signed().div(2);
+        Some(self.min_square().add(half_diag))
+
+    }
+
 }
 impl IRectExt for IRect {
     fn min_square(&self) -> IPoint {
@@ -283,10 +331,6 @@ impl IRectExt for IRect {
     }
     fn size(&self) -> UPoint {
         self[1].sub(self[0]).add([1; 2]).to_unsigned()
-    }
-    fn from_min_and_size(min: IPoint, size: UPoint) -> Self {
-        let max = min.add(size.to_signed().sub([1; 2]));
-        Self::from_min_and_max(min, max)
     }
     fn from_min_and_max(min: IPoint, max: IPoint) -> Self {
         [min, max]
@@ -321,5 +365,12 @@ mod ui_handler_tests {
 
         let rect = IRect::from_min_and_size([0, 0], [3, 4]);
         assert_eq!(rect.max_square(), [2, 3]);
+    }
+    #[test]
+    fn test_rect_center() {
+        assert_eq!(IRect::from_min_and_size([0,0], [3,3]).center(), Some([1,1]));
+        assert_eq!(IRect::from_min_and_size([0,1], [3,5]).center(), Some([1,3]));
+        assert_eq!(IRect::from_min_and_size([0,-2], [3,3]).center(), Some([1,-1]));
+        assert_eq!(IRect::from_min_and_size([0,0], [4,5]).center(), None);
     }
 }
