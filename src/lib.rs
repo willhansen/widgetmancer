@@ -559,7 +559,7 @@ pub mod test_utils {
         if !good {
 
             let f = if verbose {
-                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nHuman readable:\n{}\n", 
+                |frame: &Frame| format!("Frame:\n{}\n\nRaw:\n{}\n\nMore readable:\n{}\n", 
                     format!("{}", &frame.string_for_regular_display().framed()).indent(), 
                     frame.escaped_regular_display_string().indent(), frame.readable_string().indent())
             } else {

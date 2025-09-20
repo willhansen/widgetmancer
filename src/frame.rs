@@ -7,12 +7,16 @@ use itertools::*;
 
 use itertools::Itertools;
 use rgb::RGB8;
-use utility::geometry2::USizePoint;
+use utility::geometry2::IPoint;
+use utility::geometry2::IPointExt;
+use utility::geometry2::IRectExt;
+use utility::geometry2::UPointExt;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Write;
 use std::iter::once;
 use std::path::PathBuf;
+use utility::geometry2::USizePoint;
 use utility::ToDebug;
 
 #[derive(PartialEq, Clone)]
@@ -94,7 +98,14 @@ impl Frame {
         Some(self.grid[row][col])
     }
 
-    pub fn blit(&mut self, other: &Self, rowcol: [usize; 2]) {
+    // blit, but requires that the other frame is fully within this one.  No discard.
+    pub fn safe_blit(&mut self, other: &Self, rowcol: IPoint) {
+        let self_rect = [[0; 2], self.size_rows_cols().to_signed().sub([1; 2])];
+        let other_rect = [rowcol, rowcol.add(other.size_rows_cols().to_signed().sub([1; 2]))];
+        assert!(self_rect.contains_rect(other_rect));
+        self.blit(other, rowcol.into())
+    }
+    pub fn blit(&mut self, other: &Self, rowcol: IPoint) {
         for other_row in 0..other.height() {
             let row = rowcol[0] + other_row;
             if row >= self.height() {
@@ -741,8 +752,8 @@ ghi";
 
     #[test]
     fn test_frame_is_zero_indexed() {
-        let frame = Frame::new_from_repeated_glyph(1,1, 'a'.into());
-        frame.get_xy([0,0]);
-        frame.try_get_row_col([0,0]).expect("get row col");
+        let frame = Frame::new_from_repeated_glyph(1, 1, 'a'.into());
+        frame.get_xy([0, 0]);
+        frame.try_get_row_col([0, 0]).expect("get row col");
     }
 }
