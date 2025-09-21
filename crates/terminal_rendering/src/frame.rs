@@ -7,15 +7,16 @@ use itertools::*;
 
 use itertools::Itertools;
 use rgb::RGB8;
-use utility::geometry2::IPoint;
-use utility::geometry2::IPointExt;
-use utility::geometry2::IRectExt;
-use utility::geometry2::UPointExt;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Write;
 use std::iter::once;
 use std::path::PathBuf;
+use utility::geometry2::IRect;
+use utility::geometry2::IPoint;
+use utility::geometry2::IPointExt;
+use utility::geometry2::IRectExt;
+use utility::geometry2::UPointExt;
 use utility::geometry2::USizePoint;
 use utility::ToDebug;
 
@@ -97,36 +98,52 @@ impl Frame {
         }
         Some(self.grid[row][col])
     }
+    pub fn rect(&self) -> IRect {
+        IRect::from_min_and_size([0;2], self.size_rows_cols())
+
+    }
 
     // blit, but requires that the other frame is fully within this one.  No discard.
     pub fn safe_blit(&mut self, other: &Self, rowcol: IPoint) {
-        let self_rect = [[0; 2], self.size_rows_cols().to_signed().sub([1; 2])];
-        let other_rect = [rowcol, rowcol.add(other.size_rows_cols().to_signed().sub([1; 2]))];
-        assert!(self_rect.contains_rect(other_rect), "self rect: {:?}\nsmall rect: {:?}", self_rect, other_rect);
+        let self_rect = self.rect();
+        let other_rect = other.rect().add(rowcol);
+        assert!(
+            self_rect.contains_rect(other_rect),
+            "self rect: {:?}\nsmall rect: {:?}",
+            self_rect,
+            other_rect
+        );
         self.blit(other, rowcol.into())
     }
-    // blit, but both frames are exactly the same size.  May as well not even blit
+    // blit, but both frames are exactly the same size.  May as well not eve/n blit
     pub fn full_blit(&mut self, other: &Self, rowcol: IPoint) {
         let self_rect = [[0; 2], self.size_rows_cols().to_signed().sub([1; 2])];
-        let other_rect = [rowcol, rowcol.add(other.size_rows_cols().to_signed().sub([1; 2]))];
+        let other_rect = [
+            rowcol,
+            rowcol.add(other.size_rows_cols().to_signed().sub([1; 2])),
+        ];
         assert_eq!(self_rect, other_rect);
         self.blit(other, rowcol.into())
     }
 
+    pub fn blitted(&self, other: &Self, patch_topleft_rowcol: IPoint) -> Self {
+        let mut frame = self.clone();
+        frame.blit(other, patch_topleft_rowcol);
+        frame
+    }
     pub fn blit(&mut self, other: &Self, rowcol: IPoint) {
-        for other_row in 0..other.height() {
-            let row = rowcol[0] as usize + other_row;
-            if row >= self.height() {
-                break;
+        let other_relative_rect = other.rect();
+        let other_absolute_rect = other_relative_rect.add(rowcol);
+        let self_rect = self.rect();
+        other_relative_rect.covered_squares().into_iter().for_each(|other_rel| {
+            let other_abs = other_rel.add(rowcol);
+
+            if !self_rect.contains_square(other_abs) {
+                return;
             }
-            for other_col in 0..other.width() {
-                let col = rowcol[1] as usize + other_col;
-                if col >= self.width() {
-                    break;
-                }
-                self.grid[row][col] = other.grid[other_row][other_col];
-            }
-        }
+            self.grid[other_abs[0] as usize][other_abs[1] as usize] = other.grid[other_rel[0] as usize][other_rel[1] as usize];
+
+        })
     }
     pub fn resized_by_delta(&self, d_left: i32, d_right: i32, d_bottom: i32, d_top: i32) -> Self {
         todo!();
@@ -491,7 +508,7 @@ fn regular_display_string_to_raw_display_string(regular_display_string: String) 
 
 impl Display for Frame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.framed())
+        f.write_str(&self.string_for_regular_display())
     }
 }
 impl std::fmt::Debug for Frame {
@@ -534,6 +551,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
     use rgb::RGBA8;
+    use utility::indoc;
 
     const code_for_set_fg: &str = "\u{1b}[38";
     const code_for_set_bg: &str = "\u{1b}[48";
@@ -763,5 +781,56 @@ ghi";
         let frame = Frame::new_from_repeated_glyph(1, 1, 'a'.into());
         frame.get_xy([0, 0]);
         frame.try_get_row_col([0, 0]).expect("get row col");
+    }
+    #[test]
+    fn test_blit_cutoff() {
+        let base = Frame::new_from_repeated_glyph(5, 5, DrawableGlyph::from_char('a'));
+        let patch = Frame::new_from_repeated_glyph(3, 3, DrawableGlyph::from_char('b'));
+
+        assert_eq!(
+            base.blitted(&patch, [1, 1]).characters_only().to_string(),
+            indoc! {"
+                aaaaa
+                abbba
+                abbba
+                abbba
+                aaaaa"}
+        );
+        assert_eq!(
+            base.blitted(&patch, [-1, -1]).characters_only().to_string(),
+            indoc! {"
+                bbaaa
+                bbaaa
+                aaaaa
+                aaaaa
+                aaaaa"}
+        );
+        assert_eq!(
+            base.blitted(&patch, [-1, 3]).characters_only().to_string(),
+            indoc! {"
+                aaabb
+                aaabb
+                aaaaa
+                aaaaa
+                aaaaa"}
+        );
+        assert_eq!(
+            base.blitted(&patch, [3, 3]).characters_only().to_string(),
+            indoc! {"
+                aaaaa
+                aaaaa
+                aaaaa
+                aaabb
+                aaabb"}
+        );
+        assert_eq!(
+            base.blitted(&patch, [3, -1]).characters_only().to_string(),
+            indoc! {"
+                aaaaa
+                aaaaa
+                aaaaa
+                bbaaa
+                bbaaa"}
+        );
     }
 }

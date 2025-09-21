@@ -9,6 +9,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg, Sub};
+pub use indoc::indoc;
 
 use derive_more::{AddAssign, Constructor, Neg};
 use euclid::approxeq::ApproxEq;
@@ -1784,13 +1785,13 @@ pub fn rect_border(
     bottom_left: geometry2::IPoint,
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
-    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_unsigned()).border_squares()
+    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_usize()).border_squares()
 }
 pub fn rect_squares(
     bottom_left: geometry2::IPoint,
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
-    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_unsigned()).covered_squares()
+    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_usize()).covered_squares()
 }
 
 pub trait BoolIterExt {

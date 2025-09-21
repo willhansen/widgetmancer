@@ -413,14 +413,12 @@ impl Camera {
         let fov_center_absolute_square = fov_center.snap_to_grid();
         let fov_rect = IRect::from_center_and_radius(fov_center_absolute_square, fov_range);
 
-        dbg!(fov_rect, fov_rect.center(), fov_center_absolute_square, fov_range, fov_center);
         let fov_top_left_absolute_square =fov_rect.top_left_corner();
-        dbg!(fov_top_left_absolute_square);
         let fov_top_left_char_row_col =
             self.absolute_world_square_to_left_char_frame_row_col(fov_top_left_absolute_square);
-        dbg!(fov_top_left_char_row_col);
 
-        camera_frame.safe_blit(&fov_frame, fov_top_left_char_row_col);
+        // If fov is near edge of camera, it's fine if part is cut off
+        camera_frame.blit(&fov_frame, fov_top_left_char_row_col);
 
         camera_frame
     }
@@ -788,20 +786,17 @@ impl UiHandler {
         };
         let fov_range = self.default_fov_range.min(self.screen_height() as u32/2);
 
-        let world_frame = self
+        let camera_frame = self
             .camera
             .render_world_with_radius(world_state, fov_center, fov_range);
 
-        dbg!(&world_frame);
 
         let mut screen_buffer = Frame::solid_color(
             self.screen_width(),
             self.screen_height(),
             UI_BACKGROUND_RGB.into(),
         );
-        dbg!(world_frame.size_rows_cols());
-        dbg!(self.camera);
-        screen_buffer.safe_blit(&world_frame, [0, 0]);
+        screen_buffer.safe_blit(&camera_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         screen_buffer
     }
@@ -878,10 +873,10 @@ impl WorldState {
         }
     }
     fn draw_simple_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint, glyphs: DoubleGlyphWithTransparency) {
-        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_unsigned()), false, |_,_|glyphs)
+        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_usize()), false, |_,_|glyphs)
     }
     fn draw_labelled_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint) {
-        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_unsigned()), false, |abs_square,_|{
+        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_usize()), false, |abs_square,_|{
             [0,1].map(|i|GlyphWithTransparency::new_colored_char((abs_square[i]%10).to_string().chars().next().unwrap(), RED.into()))
 
         })
@@ -1122,7 +1117,6 @@ impl WorldState {
             })
             .collect_vec()
             .into();
-        dbg!(&frame);
 
         (
             frame,
@@ -1863,7 +1857,6 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         let frame = game.render();
-        dbg!(&frame);
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
