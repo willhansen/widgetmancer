@@ -877,8 +877,31 @@ impl WorldState {
             None
         }
     }
-    fn draw_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint, glyphs: DoubleGlyphWithTransparency) {
-        rect_border(bottom_left_square, width_height).for_each(|square| {self.floor_markings.insert(square, glyphs);})
+    fn draw_simple_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint, glyphs: DoubleGlyphWithTransparency) {
+        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_unsigned()), false, |_,_|glyphs)
+    }
+    fn draw_labelled_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint) {
+        self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_unsigned()), false, |abs_square,_|{
+            [0,1].map(|i|GlyphWithTransparency::new_colored_char((abs_square[i]%10).to_string().chars().next().unwrap(), RED.into()))
+
+        })
+    }
+    // glyph function takes arguments of abs_square and rel_square in that order
+    fn draw_rect_on_floor(&mut self, rect: IRect, fill: bool, glyph_func: impl Fn(IPoint, IPoint) -> DoubleGlyphWithTransparency) {
+        let absolute_squares = if fill {
+            rect.covered_squares().collect_vec()
+        } else {
+            rect.border_squares().collect_vec()
+        };
+
+        absolute_squares.into_iter().for_each(|abs_square|{
+
+            let rel_square =  abs_square.sub(rect.min_square());
+            let glyphs = glyph_func(abs_square, rel_square);
+            self.floor_markings.insert(abs_square, glyphs);
+        });
+
+
     }
     fn default_portal_tint(color: RGB8, depth: u32) -> RGB8 {
         let tint = RED;
@@ -1819,7 +1842,7 @@ mod tests {
         // 🭮🭬
         let the_char = 'a';
         let the_glyph: DoubleGlyphWithTransparency = [the_char;2].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
-        game.world_state.draw_rect_on_floor([0,0], [7,7], the_glyph);
+        game.world_state.draw_simple_rect_on_floor([0,0], [7,7], the_glyph);
         let frame = game.world_state.render([3,3].grid_square_center(), 3);
         dbg!(&frame);
         [[0,0], [0,6], [13,0], [13,6] ].into_iter().for_each(|x| {
@@ -1836,7 +1859,7 @@ mod tests {
         // 🯩🯫
         // 🭮🭬
         let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
-        game.world_state.draw_rect_on_floor([0,0], [7,7], the_glyph);
+        game.world_state.draw_labelled_rect_on_floor([0,0], [7,7]);
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         let frame = game.render();

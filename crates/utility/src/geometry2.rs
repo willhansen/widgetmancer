@@ -313,14 +313,28 @@ pub trait IRectExt: Sized {
     }
     // Only provides a center if the rectangle has odd width and height
     fn center(&self) -> Option<IPoint> {
-        if self.size().map(|x| x %2 == 0).any_true() {
-            return None
+        if self.size().map(|x| x % 2 == 0).any_true() {
+            return None;
         }
         let half_diag = self.size().to_signed().div(2);
         Some(self.min_square().add(half_diag))
-
     }
-
+    fn border_squares(self) -> impl Iterator<Item = IPoint> {
+        let [x1, y1] = self.max_square();
+        (0..x1)
+            .map(move |dx| [dx, 0])
+            .chain((0..y1).map(move |dy| [x1, dy]))
+            .chain((0..x1).map(move |dx| [x1 - dx, y1]))
+            .chain((0..y1).map(move |dy| [0, y1 - dy]))
+            .map(move |x| self.min_square().add(x))
+    }
+    fn covered_squares(self) -> impl Iterator<Item = IPoint> {
+        let [w, h] = self.size().to_signed();
+        let [x0, y0] = self.min_square();
+        (0..w)
+            .map(move |x| (0..h).map(move |y| [x0 + x, y0 + y]))
+            .flatten()
+    }
 }
 impl IRectExt for IRect {
     fn min_square(&self) -> IPoint {
@@ -329,6 +343,7 @@ impl IRectExt for IRect {
     fn max_square(&self) -> IPoint {
         self[1]
     }
+    // width, height
     fn size(&self) -> UPoint {
         self[1].sub(self[0]).add([1; 2]).to_unsigned()
     }
@@ -368,9 +383,18 @@ mod ui_handler_tests {
     }
     #[test]
     fn test_rect_center() {
-        assert_eq!(IRect::from_min_and_size([0,0], [3,3]).center(), Some([1,1]));
-        assert_eq!(IRect::from_min_and_size([0,1], [3,5]).center(), Some([1,3]));
-        assert_eq!(IRect::from_min_and_size([0,-2], [3,3]).center(), Some([1,-1]));
-        assert_eq!(IRect::from_min_and_size([0,0], [4,5]).center(), None);
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [3, 3]).center(),
+            Some([1, 1])
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 1], [3, 5]).center(),
+            Some([1, 3])
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, -2], [3, 3]).center(),
+            Some([1, -1])
+        );
+        assert_eq!(IRect::from_min_and_size([0, 0], [4, 5]).center(), None);
     }
 }

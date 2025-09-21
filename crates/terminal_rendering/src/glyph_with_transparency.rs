@@ -33,7 +33,7 @@ impl GlyphWithTransparency {
             fg_is_primary: false,
         }
     }
-    pub fn fg_only(c: char, fg: RGBA8) -> Self {
+    pub fn new_colored_char(c: char, fg: RGBA8) -> Self {
         Self::new(c, fg, BLACK.with_alpha(0))
     }
 
