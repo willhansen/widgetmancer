@@ -296,8 +296,11 @@ pub trait IRectExt: Sized {
     }
     // quadrants start top-right and go counter-clockwise
     fn corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
-        let [x0, y0] = self.min_square();
-        let [x1, y1] = self.max_square();
+        self.relative_corner_by_quadrant(nth_quadrant).add(self.min_square())
+    }
+    fn relative_corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
+        let [x0, y0] = [0,0];
+        let [x1, y1] = self.size().to_signed().sub([1,1]);
         match nth_quadrant.rem_euclid(4) {
             0 => [x1, y1],
             1 => [x0, y1],
@@ -308,6 +311,10 @@ pub trait IRectExt: Sized {
     }
     fn top_right_corner(&self) -> IPoint {
         self.corner_by_quadrant(0)
+    }
+    // local frame has min_square as [0,0]
+    fn top_right_corner_in_local_frame(&self) -> IPoint {
+        self.relative_corner_by_quadrant(0)
     }
     fn top_left_corner(&self) -> IPoint {
         self.corner_by_quadrant(1)
@@ -327,7 +334,7 @@ pub trait IRectExt: Sized {
         Some(self.min_square().add(half_diag))
     }
     fn border_squares(self) -> impl Iterator<Item = IPoint> {
-        let [x1, y1] = self.max_square();
+        let [x1, y1] = self.top_right_corner_in_local_frame();
         (0..x1)
             .map(move |dx| [dx, 0])
             .chain((0..y1).map(move |dy| [x1, dy]))

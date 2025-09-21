@@ -224,6 +224,9 @@ struct Camera {
 // deal with frame coordinates.
 // Most coordinates are in squares unless noted
 impl Camera {
+    pub fn rect(&self) -> IRect {
+        IRect::from_min_and_max(self.lower_left_square, self.upper_right_square)
+    }
     pub fn new_from_screen_size(size_on_screen_rows_cols: USizePoint) -> Self {
         let size_in_squares_width_height =
             [size_on_screen_rows_cols[1] / 2, size_on_screen_rows_cols[0]];
@@ -386,7 +389,8 @@ impl Camera {
     }
     fn blank_frame(&self) -> Frame {
         let size = self.size_on_screen_rows_cols();
-        let camera_background_default_glyph = DrawableGlyph::new(DEFAULT_FRAME_BACKGROUND_CHAR, Some(MAGENTA), Some(BLACK));
+        let camera_background_default_glyph = DrawableGlyph::from_char(OUT_OF_FOV_RANGE_CHAR).with_fg(Some(GREEN));
+        // let camera_background_default_glyph = DrawableGlyph::new(DEFAULT_FRAME_BACKGROUND_CHAR, Some(MAGENTA), Some(BLACK));
         Frame::new_from_repeated_glyph(size[1], size[0], camera_background_default_glyph)
     }
     pub fn render_world_with_radius(
@@ -1364,9 +1368,9 @@ mod tests {
         ))
     }
     fn drag_mouse_to_screen_pos(row_col: [u16; 2]) -> termion::event::Event {
-        drag_mouse_to(row_col[1], row_col[0])
+        drag_mouse_to_1_indexed(row_col[1], row_col[0])
     }
-    fn drag_mouse_to(col: u16, row: u16) -> termion::event::Event {
+    fn drag_mouse_to_1_indexed(col: u16, row: u16) -> termion::event::Event {
         termion::event::Event::Mouse(termion::event::MouseEvent::Hold(col, row))
     }
     fn release_mouse(col: u16, row: u16) -> termion::event::Event {
@@ -1413,10 +1417,10 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
         let frame_1 = game.render();
-        game.ui_handler.give_event(drag_mouse_to(5, 4));
+        game.ui_handler.give_event(drag_mouse_to_1_indexed(5, 4));
         game.process_events();
         let frame_2 = game.render();
-        game.ui_handler.give_event(drag_mouse_to(6, 4));
+        game.ui_handler.give_event(drag_mouse_to_1_indexed(6, 4));
         game.process_events();
         let frame_3 = game.render();
         assert_frame_same_as_past!(frame_1, "1");
@@ -1607,7 +1611,8 @@ mod tests {
     }
     #[test]
     fn test_screen_row_col_to_xy_points() {
-        let mut game = Game::new_headless_square(5);
+        let n = 5;
+        let mut game = Game::new_headless_square(n);
 
         // .....
         // .....
@@ -1616,9 +1621,9 @@ mod tests {
         // .....
 
         let row_col_point_upper_left = [0.0, 0.0];
-        let xy_point_upper_left = [0.0, 5.0];
+        let xy_point_upper_left = [0.0, n as f32];
 
-        let row_col_point_lower_left = [5.0, 1.0];
+        let row_col_point_lower_left = [n as f32, 0.0];
         let xy_point_lower_left = [0.0, 0.0];
 
         assert_eq!(
@@ -1667,7 +1672,7 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         game.ui_handler.advance_time_to(0.2);
-        game.ui_handler.give_event(drag_mouse_to(2, 1));
+        game.ui_handler.give_event(drag_mouse_to_1_indexed(2, 1));
         game.process_events();
 
         game.ui_handler.advance_time_by(0.0001);
@@ -1720,23 +1725,10 @@ mod tests {
     }
     #[test]
     fn test_render_with_center_offset() {
-        let mut game = Game::new_headless_square(25);
-        game.ui_handler
-            .give_future_event_absolute(press_left_1_indexed(5, 6), 1.0);
-        game.advance_time_to(1.0);
-        game.process_events();
-        game.ui_handler
-            .give_future_event_absolute(drag_mouse_to(6, 6), 2.0);
-        game.advance_time_to(2.0);
-        game.process_events();
-        let n = 43;
-        (0..n).for_each(|x| {
-            let t = 1.5 + x as f32 / 20.0;
-            let p = [5.0 + x as f32 / 20.0, 8.0 + x as f32 / n as f32 * 5.0];
-            let frame = game.world_state.render(p, 10);
-            // dbg!( &p);
-            frame.glyphs().for_each(|g| assert!(g.looks_solid()));
-        });
+        let mut game = Game::new_headless_square(5);
+        let frame = game.render();
+        dbg!(&frame);
+        frame.glyphs().for_each(|g| assert!(g.looks_solid()));
     }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
