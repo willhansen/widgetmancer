@@ -28,7 +28,7 @@ pub use angle_interval::*;
 pub mod coordinate_frame_conversions;
 pub use coordinate_frame_conversions::*;
 
-use crate::geometry2::{FPointExt, IPointExt};
+use crate::geometry2::{FPointExt, IPointExt, IRectExt};
 
 pub mod geometry2;
 
@@ -1784,24 +1784,13 @@ pub fn rect_border(
     bottom_left: geometry2::IPoint,
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
-    let [w, h] = width_height;
-    let [x1, y1] = width_height.sub([1, 1]);
-    (0..x1)
-        .map(move |dx| [dx, 0])
-        .chain((0..y1).map(move |dy| [x1, dy]))
-        .chain((0..x1).map(move |dx| [x1 - dx, y1]))
-        .chain((0..y1).map(move |dy| [0, y1 - dy]))
-        .map(move |x| bottom_left.add(x))
+    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_unsigned()).border_squares()
 }
 pub fn rect_squares(
     bottom_left: geometry2::IPoint,
     width_height: geometry2::IPoint,
 ) -> impl Iterator<Item = geometry2::IPoint> {
-    let [w, h] = width_height;
-    let [x0, y0] = bottom_left;
-    (0..w)
-        .map(move |x| (0..h).map(move |y| [x0 + x, y0 + y]))
-        .flatten()
+    geometry2::IRect::from_min_and_size(bottom_left, width_height.to_unsigned()).covered_squares()
 }
 
 pub trait BoolIterExt {
