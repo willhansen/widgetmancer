@@ -92,6 +92,7 @@ pub trait IPointExt: Sized + PointExt<i32> {
         *self.abs().iter().max().unwrap()
     }
     fn to_unsigned(&self) -> UPoint;
+    fn to_usize(&self) -> USizePoint;
 }
 
 impl IPointExt for IPoint {
@@ -102,6 +103,12 @@ impl IPointExt for IPoint {
         self.map(|x| {
             assert!(x >= 0);
             x as u32
+        })
+    }
+    fn to_usize(&self) -> USizePoint {
+        self.map(|x| {
+            assert!(x >= 0);
+            x as usize
         })
     }
 }
@@ -260,14 +267,14 @@ pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
 pub trait IRectExt: Sized {
     fn min_square(&self) -> IPoint;
     fn max_square(&self) -> IPoint;
-    fn size(&self) -> UPoint;
-    fn width(&self) -> u32 {
+    fn size(&self) -> USizePoint;
+    fn width(&self) -> usize {
         self.size()[0]
     }
-    fn height(&self) -> u32 {
+    fn height(&self) -> usize {
         self.size()[1]
     }
-    fn from_min_and_size(min: IPoint, size: UPoint) -> Self {
+    fn from_min_and_size(min: IPoint, size: USizePoint) -> Self {
         let max = min.add(size.to_signed().sub([1; 2]));
         Self::from_min_and_max(min, max)
     }
@@ -335,6 +342,10 @@ pub trait IRectExt: Sized {
             .map(move |x| (0..h).map(move |y| [x0 + x, y0 + y]))
             .flatten()
     }
+    fn to_string(&self) -> String;
+    fn add(&self, rhs: IPoint) -> Self {
+        Self::from_min_and_size(self.min_square().add(rhs), self.size())
+    }
 }
 impl IRectExt for IRect {
     fn min_square(&self) -> IPoint {
@@ -344,14 +355,17 @@ impl IRectExt for IRect {
         self[1]
     }
     // width, height
-    fn size(&self) -> UPoint {
-        self[1].sub(self[0]).add([1; 2]).to_unsigned()
+    fn size(&self) -> USizePoint {
+        self[1].sub(self[0]).add([1; 2]).to_usize()
     }
     fn from_min_and_max(min: IPoint, max: IPoint) -> Self {
         [min, max]
     }
     fn valid(&self) -> bool {
         [0, 1].map(|i| self[0][i] <= self[1][i]).all_true()
+    }
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
     }
 }
 
