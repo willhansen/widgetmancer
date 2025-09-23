@@ -210,14 +210,17 @@ impl Game {
         self.ui_handler.now_as_s_from_start()
     }
     pub fn render(&mut self) -> Frame {
-        self.ui_handler.render(&self.world_state)
+        self.ui_handler.update_camera_position_and_render(&self.world_state)
+    }
+    pub fn render_at(&mut self, fov_center: FPoint) -> Frame {
+        self.ui_handler.render_at(&self.world_state, fov_center)
     }
 }
 
-#[derive(Clone, Debug, Copy, Eq, PartialEq)]
+#[derive(Clone, Debug, Copy)]
 struct Camera {
-    lower_left_square: [i32; 2],
-    upper_right_square: [i32; 2],
+    rect: IRect,
+    center_offset: FPoint
 }
 
 // TODO: frame coordinates should be distinct from screen coordinates, and the camera should only
@@ -225,45 +228,27 @@ struct Camera {
 // Most coordinates are in squares unless noted
 impl Camera {
     pub fn rect(&self) -> IRect {
-        IRect::from_min_and_max(self.lower_left_square, self.upper_right_square)
+        self.rect
     }
-    pub fn new_from_screen_size(size_on_screen_rows_cols: USizePoint) -> Self {
-        let size_in_squares_width_height =
-            [size_on_screen_rows_cols[1] / 2, size_on_screen_rows_cols[0]];
-        Self::new_from_world_size(size_in_squares_width_height)
-    }
-    pub fn new_from_world_size(size_in_squares_width_height: USizePoint) -> Self {
-        let names = ["width", "height"];
-        size_in_squares_width_height
-            .iter()
-            .zip(names.iter())
-            .for_each(|(size, name)| {
-                assert!(
-                    size % 2 == 1,
-                    "{name} must be odd to have integer center.  {name}: {size}"
-                );
-            });
-        Self::new_pos_and_squares_width_height([0, 0], size_in_squares_width_height)
-    }
-    pub fn new_square(s: usize) -> Self {
-        Self::new_pos_and_squares_width_height([0, 0], [s; 2])
-    }
-    pub fn new_pos_and_squares_width_height(lower_left: IPoint, width_height: USizePoint) -> Self {
+    pub fn new(s: usize) -> Self {
+        assert_eq!(s%2,1, "size given is {s}.  Must be odd.");
         Camera {
-            lower_left_square: lower_left,
-            upper_right_square: lower_left.add(width_height.to_int().sub([1, 1])),
+            rect: IRect::from_min_and_size([0,0], [s;2]),
+            center_offset: [0.0;2]
         }
     }
     pub fn translate_to_set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
-        let new = self.with_bottom_left_square(bottom_left_square);
-        self.lower_left_square = new.lower_left_square;
-        self.upper_right_square = new.upper_right_square;
+        self.rect = self.rect.with_lower_left_at(bottom_left_square)
     }
     pub fn top_right_local_square(&self) -> IPoint {
-        self.upper_right_square.sub(self.lower_left_square)
+        self.rect.relative_corner_by_quadrant(0)
     }
     pub fn top_left_local_square(&self) -> IPoint {
-        rect_corner_by_quadrant(self.top_right_local_square(), 1)
+        self.rect.relative_corner_by_quadrant(1)
+    }
+    pub fn set_center(&mut self, new_center: FPoint) {
+        self.rect = self.rect.with_center_at(new_center.snap_to_grid());
+        self.center_offset = new_center.fraction_part()
     }
     pub fn translate_local_square_to_absolute_square(
         &mut self,
@@ -274,30 +259,25 @@ impl Camera {
         self.translate_to_set_bottom_left_square(new_absolute_bottom_left);
     }
     pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
-        Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world())
+        Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world().to_usize())
     }
     pub fn from_bottom_left_and_size(
         bottom_left_square: IPoint,
-        width_height_in_squares: [u32; 2],
+        width_height_in_squares: USizePoint,
     ) -> Self {
         Self {
-            lower_left_square: bottom_left_square,
-            upper_right_square: bottom_left_square
-                .add(width_height_in_squares.to_signed())
-                .sub([1, 1]),
+            rect: IRect::from_min_and_size(bottom_left_square, width_height_in_squares),
+            center_offset: [0.0;2]
         }
     }
     pub fn bottom_left_square(&self) -> IPoint {
-        self.lower_left_square
+        self.rect.min_square()
     }
     pub fn translate(&mut self, movement: IPoint) {
         self.translate_to_set_bottom_left_square(self.bottom_left_square().add(movement))
     }
     pub fn size_in_world(&self) -> [u32; 2] {
-        [
-            (self.upper_right_square[0] - self.lower_left_square[0]) as u32 + 1,
-            (self.upper_right_square[1] - self.lower_left_square[1]) as u32 + 1,
-        ]
+        self.rect.size().to_signed().to_unsigned()
     }
     pub fn width_in_world(&self) -> u32 {
         self.size_in_world()[0]
@@ -313,23 +293,29 @@ impl Camera {
     }
     pub fn local_to_absolute_world_point(&self, local_v: FPoint) -> FPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.lower_left_square.to_float()) // Note use of square corner rather than square
+            .add(self.rect.bottom_left_corner().to_float()) // Note use of square corner rather than square
         // center
+    }
+    fn lower_left_square(&self) -> IPoint {
+        self.rect.bottom_left_corner()
+    }
+    fn upper_right_square(&self) -> IPoint {
+        self.rect.top_right_corner()
     }
     pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
         rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.lower_left_square)
+            .add(self.lower_left_square())
     }
     pub fn absolute_to_local_world_square(&self, absolute_world_square: IPoint) -> IPoint {
         // TODO: rotation
-        absolute_world_square.sub(self.lower_left_square)
+        absolute_world_square.sub(self.lower_left_square())
     }
     pub fn local_to_world_ortho_dir(&self, dir: OrthoDir) -> OrthoDir {
         (dir + self.quarter_turns_ccw_from_world()).rem_euclid(4)
     }
     pub fn quarter_turns_ccw_from_world(&self) -> OrthoDir {
-        let [x1, y1] = self.lower_left_square;
-        let [x2, y2] = self.upper_right_square;
+        let [x1, y1] = self.lower_left_square();
+        let [x2, y2] = self.upper_right_square();
 
         match (x1 < x2, y1 < y2) {
             (true, true) => 0,
@@ -379,52 +365,26 @@ impl Camera {
         todo!();
     }
 
-    pub fn render_world(&self, world_state: &WorldState, fov_center: FPoint) -> Frame {
-        let radius = self.width_in_world() / 2;
-        let frame = self.render_world_with_radius(&world_state, fov_center, radius);
-        assert_eq!(frame.size_rows_cols()[0], radius as usize * 2 + 1);
-        assert_eq!(frame.size_rows_cols()[1], (radius as usize * 2 + 1) * 2);
-        assert_eq!(self.size_on_screen_rows_cols(), frame.size_rows_cols());
-        frame
-    }
     fn blank_frame(&self) -> Frame {
         let size = self.size_on_screen_rows_cols();
         let camera_background_default_glyph = DrawableGlyph::from_char(OUT_OF_FOV_RANGE_CHAR).with_fg(Some(GREEN));
         // let camera_background_default_glyph = DrawableGlyph::new(DEFAULT_FRAME_BACKGROUND_CHAR, Some(MAGENTA), Some(BLACK));
         Frame::new_from_repeated_glyph(size[1], size[0], camera_background_default_glyph)
     }
-    pub fn render_world_with_radius(
+    fn fov_center(&self) -> FPoint {
+        self.rect.center().unwrap().to_float().add(self.center_offset)
+    }
+    fn fov_radius(&self) -> u32 {
+        self.rect.width() as u32 / 2
+    }
+
+    pub fn render(
         &self,
         world_state: &WorldState,
-        fov_center: FPoint,
-        fov_range: u32,
     ) -> Frame {
         let (fov_frame, debug_layers) =
-            world_state.render_with_options(false, fov_center, fov_range);
-        assert_eq!(fov_frame.size_rows_cols()[0], fov_range as usize * 2 + 1);
-        assert_eq!(
-            fov_frame.size_rows_cols()[1],
-            (fov_range as usize * 2 + 1) * 2
-        );
-        // assert_eq!(self.size_on_screen_rows_cols(), result.0.size_rows_cols());
-
-        // Have rendered world fov frame, but now where to put it in the camera frame?
-        // Camera corners in world are known.  fov center and radius in world are known.
-        // to blit, we need the top-left character pos of the fov
-        // Can get that from the top-left square of the fov in the camera's local world frame
-        let mut camera_frame = self.blank_frame();
-
-        let fov_center_absolute_square = fov_center.snap_to_grid();
-        let fov_rect = IRect::from_center_and_radius(fov_center_absolute_square, fov_range);
-
-        let fov_top_left_absolute_square =fov_rect.top_left_corner();
-        let fov_top_left_char_row_col =
-            self.absolute_world_square_to_left_char_frame_row_col(fov_top_left_absolute_square);
-
-        // If fov is near edge of camera, it's fine if part is cut off
-        camera_frame.blit(&fov_frame, fov_top_left_char_row_col);
-
-        camera_frame
+            world_state.render_with_options(false, self.fov_center(), self.fov_radius());
+        fov_frame
     }
 }
 
@@ -433,8 +393,8 @@ mod camera_tests {
     use super::*;
     #[test]
     fn test_frame_to_world_integers() {
-        let s: i32 = 32;
-        let camera = Camera::new_square(s as usize);
+        let s: i32 = 31;
+        let camera = Camera::new(s as usize);
 
         let f = |x| camera.frame_row_col_char_to_absolute_world_square(x);
         assert_eq!(f([0, 0]), [0, s - 1]);
@@ -456,7 +416,7 @@ mod camera_tests {
     }
     #[test]
     fn test_frame_to_world_floating_point() {
-        let camera = Camera::new_square(10);
+        let camera = Camera::new(9);
 
         assert_eq!(
             camera.frame_row_col_point_to_local_world_point([0.0, 0.0]),
@@ -465,13 +425,13 @@ mod camera_tests {
     }
     #[test]
     fn test_size() {
-        let camera = Camera::new_square(25);
+        let camera = Camera::new(25);
         assert_eq!(camera.size_in_world(), [25, 25]);
         assert_eq!(camera.size_on_screen_rows_cols(), [25, 50]);
     }
     #[test]
     fn test_local_to_absolute_world_squares_simple() {
-        let camera = Camera::new_square(10);
+        let camera = Camera::new(9);
         let p = [3, 5];
         assert_eq!(
             p,
@@ -484,15 +444,18 @@ mod camera_tests {
     }
     #[test]
     fn test_get_set_bottom_left_invariant() {
-        let mut camera = Camera::new_square(10);
+        let camera = Camera::new(9);
+        let after_move = 
+            camera.with_bottom_left_square(camera.bottom_left_square());
         assert_eq!(
-            camera,
-            camera.with_bottom_left_square(camera.bottom_left_square())
+            camera.rect(),
+            after_move.rect()
         );
+        assert_about_eq_2d(camera.center_offset, after_move.center_offset);
     }
     #[test]
     fn test_local_to_absolute_world_squares_after_translation() {
-        let mut camera = Camera::new_square(10);
+        let mut camera = Camera::new(9);
         let p = [3, 5];
         dbg!(&camera);
         camera.translate([-2, 0]);
@@ -509,10 +472,10 @@ mod camera_tests {
     }
     #[test]
     fn test_absolute_square_to_char_row_col() {
-        let camera = Camera::new_square(10);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([0,0]), [9,0]);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([1,0]), [9,2]);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([2,0]), [9,4]);
+        let camera = Camera::new(9);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([0,0]), [8,0]);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([1,0]), [8,2]);
+        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([2,0]), [8,4]);
     }
 }
 
@@ -645,7 +608,7 @@ impl UiHandler {
         let (event_sender, event_receiver) = channel();
         let screen_size_rows_cols = [screen_height as usize, screen_width as usize];
         // want to be square (for now)
-        let camera_side_length = (screen_height as usize).min((screen_width as usize) / 2);
+        let camera_side_length = cut_to_odd(((screen_height as usize).min((screen_width as usize) / 2)) as i32) as usize;
         // Needs to be odd size (because radius-based)
         // let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
         UiHandler {
@@ -661,7 +624,7 @@ impl UiHandler {
             event_log: Default::default(),
             prev_drawn: None,
             enable_mouse_smoothing: false,
-            camera: Camera::new_square(camera_side_length),
+            camera: Camera::new(camera_side_length),
             default_fov_range: camera_side_length as u32 / 2,
             mouse_behavior: MouseBehavior::DrawMouse,
         }
@@ -780,19 +743,15 @@ impl UiHandler {
         p
     }
 
-    pub fn render(&mut self, world_state: &WorldState) -> Frame {
-        let fov_center = 
-        match self.mouse_behavior {
-            MouseBehavior::DrawMouse => world_state.player_square.grid_square_center(),
-            MouseBehavior::CenterOnMouse => self
-                .mouse_world_point()
-                .unwrap_or_else(|| world_state.player_square.grid_square_center()),
-        };
-        let fov_range = self.default_fov_range.min(self.screen_height() as u32/2);
+    pub fn render_at(&mut self, world_state: &WorldState, fov_center: FPoint) -> Frame {
+        self.camera.set_center(fov_center);
+        self.render(world_state)
 
+    }
+    pub fn render(&mut self, world_state: &WorldState) -> Frame {
         let camera_frame = self
             .camera
-            .render_world_with_radius(world_state, fov_center, fov_range);
+            .render(world_state);
 
 
         let mut screen_buffer = Frame::solid_color(
@@ -803,6 +762,20 @@ impl UiHandler {
         screen_buffer.safe_blit(&camera_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         screen_buffer
+    }
+
+    pub fn update_camera_position_and_render(&mut self, world_state: &WorldState) -> Frame {
+        let fov_center = 
+        match self.mouse_behavior {
+            MouseBehavior::DrawMouse => world_state.player_square.grid_square_center(),
+            MouseBehavior::CenterOnMouse => self
+                .mouse_world_point()
+                .unwrap_or_else(|| world_state.player_square.grid_square_center()),
+        };
+        let fov_range = self.default_fov_range.min(self.screen_height() as u32/2);
+
+        self.camera.set_center(fov_center);
+        self.render(world_state)
     }
 }
 fn press_char(c: char) -> Event {
@@ -1098,7 +1071,6 @@ impl WorldState {
                         let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
 
                         let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> = visibilities_and_glyphs_in_fov[row_in_fov][col_in_fov].iter().map(|(viz, glyphs)| *glyphs).collect_vec();
-
 
                         let default = if current_radius <= radius {shadow_glyph} else {out_of_range_glyph};
                         glyph_layers_to_combine
@@ -1726,7 +1698,7 @@ mod tests {
     #[test]
     fn test_render_with_center_offset() {
         let mut game = Game::new_headless_square(5);
-        let frame = game.render();
+        let frame = game.render_at([2.3,2.3]);
         dbg!(&frame);
         frame.glyphs().for_each(|g| assert!(g.looks_solid()));
     }

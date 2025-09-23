@@ -3,13 +3,13 @@
 
 extern crate num;
 
+pub use indoc::indoc;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{LN_2, PI, TAU};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::mem;
 use std::ops::{Add, Neg, Sub};
-pub use indoc::indoc;
 
 use derive_more::{AddAssign, Constructor, Neg};
 use euclid::approxeq::ApproxEq;
@@ -1798,13 +1798,26 @@ pub trait BoolIterExt {
     fn all_true(self) -> bool;
     fn any_true(self) -> bool;
 }
-impl<T> BoolIterExt for T where T: IntoIterator<Item=bool>
+impl<T> BoolIterExt for T
+where
+    T: IntoIterator<Item = bool>,
 {
     fn all_true(self) -> bool {
         self.into_iter().all(|x| x)
     }
     fn any_true(self) -> bool {
         self.into_iter().any(|x| x)
+    }
+}
+
+pub fn cut_to_odd(x: i32) -> i32 {
+    if x == 0 {
+        panic!();
+    }
+    if x % 2 == 1 {
+        x
+    } else {
+        x - 1
     }
 }
 
@@ -2573,5 +2586,20 @@ mod tests {
         assert!([false, true, false].any_true());
         assert_false!([false, false, false].any_true());
         assert_false!(vec![false, false, false].any_true());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cut_to_odd_fail_at_zero() {
+        cut_to_odd(0);
+    }
+    #[test]
+    fn test_cut_to_odd() {
+        assert_eq!(cut_to_odd(1), 1);
+        assert_eq!(cut_to_odd(2), 1);
+        assert_eq!(cut_to_odd(3), 3);
+        assert_eq!(cut_to_odd(4), 3);
+        assert_eq!(cut_to_odd(10), 9);
+        assert_eq!(cut_to_odd(40), 39);
     }
 }

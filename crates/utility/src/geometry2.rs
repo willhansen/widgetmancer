@@ -115,6 +115,7 @@ impl IPointExt for IPoint {
 pub trait UPointExt {
     fn to_signed(&self) -> IPoint;
     fn to_float(&self) -> FPoint;
+    fn to_usize(&self) -> USizePoint;
 }
 impl UPointExt for UPoint {
     fn to_signed(&self) -> IPoint {
@@ -122,6 +123,9 @@ impl UPointExt for UPoint {
     }
     fn to_float(&self) -> FPoint {
         self.map(|x| x as f32)
+    }
+    fn to_usize(&self) -> USizePoint {
+        self.map(|x| x as usize)
     }
 }
 impl UPointExt for [u16; 2] {
@@ -131,6 +135,9 @@ impl UPointExt for [u16; 2] {
     fn to_float(&self) -> FPoint {
         self.map(|x| x as f32)
     }
+    fn to_usize(&self) -> USizePoint {
+        self.map(|x| x as usize)
+    }
 }
 impl UPointExt for [usize; 2] {
     fn to_signed(&self) -> IPoint {
@@ -138,6 +145,9 @@ impl UPointExt for [usize; 2] {
     }
     fn to_float(&self) -> FPoint {
         self.map(|x| x as f32)
+    }
+    fn to_usize(&self) -> USizePoint {
+        self.map(|x| x as usize)
     }
 }
 
@@ -188,8 +198,16 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
     fn normalized(&self) -> Self {
         self.div(self.length())
     }
+    fn fraction_part(&self) -> Self ;
 }
-impl FPointExt for FPoint {}
+impl FPointExt for FPoint {
+
+
+    fn fraction_part(&self) -> Self {
+        self.sub(self.snap_to_grid().to_float())
+    }
+
+}
 
 pub type USizePoint = [usize; 2];
 pub trait USizePointExt {
@@ -285,6 +303,14 @@ pub trait IRectExt: Sized {
         let a = [0, 1].map(|i| square[i] >= min[i] && square[i] <= max[i]);
         all(a, |x| x)
     }
+    fn translate_local_square_to_absolute_square(&self, local_square: IPoint, absolute_square: IPoint) -> Self {
+        let abs_start = local_square.add(self.min_square());
+        let diff = absolute_square.sub(abs_start);
+        self.translated(diff)
+    }
+    fn with_lower_left_at(&self, dest: IPoint) -> Self {
+        self.translate_local_square_to_absolute_square([0,0], dest)
+    }
     fn contains_rect(&self, other: IRect) -> bool {
         self.contains_square(other.min_square()) && self.contains_square(other.max_square())
     }
@@ -327,11 +353,24 @@ pub trait IRectExt: Sized {
     }
     // Only provides a center if the rectangle has odd width and height
     fn center(&self) -> Option<IPoint> {
-        if self.size().map(|x| x % 2 == 0).any_true() {
+        if !self.is_odd(){
             return None;
         }
-        let half_diag = self.size().to_signed().div(2);
+        let half_diag = self.relative_center().unwrap();
         Some(self.min_square().add(half_diag))
+    }
+    fn is_odd(&self) -> bool {
+        self.size().map(|x| x % 2 == 1).all_true()
+    }
+    fn relative_center(&self) -> Option<IPoint> {
+        if !self.is_odd() {
+            return None;
+        }
+        Some(self.size().to_signed().div(2))
+    }
+    fn with_center_at(&self, dest: IPoint) -> Self {
+        self.translate_local_square_to_absolute_square(self.relative_center().unwrap(), dest)
+
     }
     fn border_squares(self) -> impl Iterator<Item = IPoint> {
         let [x1, y1] = self.top_right_corner_in_local_frame();
@@ -352,6 +391,9 @@ pub trait IRectExt: Sized {
     fn to_string(&self) -> String;
     fn add(&self, rhs: IPoint) -> Self {
         Self::from_min_and_size(self.min_square().add(rhs), self.size())
+    }
+    fn translated(&self, dx: IPoint) -> Self {
+        self.add(dx)
     }
 }
 impl IRectExt for IRect {

@@ -19,13 +19,13 @@ use crate::graphics::drawable::{
 };
 use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
+use geometry2::FPointExt;
 use terminal_rendering::glyph::glyph_constants::*;
 use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
 use terminal_rendering::*;
 use utility::angle_interval::AngleInterval;
 use utility::coordinate_frame_conversions::*;
 use utility::*;
-use geometry2::FPointExt;
 
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
@@ -1070,7 +1070,7 @@ pub fn portal_aware_field_of_view_from_point(
     // Split into square and offset to avoid rounding issues with all the rotations the center
     // point is going to go through.  Don't want incosistencies if a rotation causes just enough
     // rounding error to cause it to round to a different center square.
-    let center_square: WorldSquare  = center_point.to_array().floor().into();
+    let center_square: WorldSquare = center_point.to_array().floor().into();
     let center_offset = center_point - center_square.to_f32();
     (0..8)
         .fold(
