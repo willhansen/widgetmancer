@@ -199,6 +199,10 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
         self.div(self.length())
     }
     fn fraction_part(&self) -> Self ;
+    fn from_angle_and_radius(angle_rad: f32, radius: f32) -> FPoint {
+        [angle_rad.cos(), angle_rad.sin()].mul(radius)
+
+    }
 }
 impl FPointExt for FPoint {
 
