@@ -962,7 +962,8 @@ impl WorldState {
         // panic!();
 
         let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
-            fov_center.into(),
+            // (fov_center).into(),
+            (fov_center.sub([0.5;2])).into(),
             radius,
             &Default::default(),
             &portal_geometry,
@@ -1510,8 +1511,6 @@ mod tests {
     #[test]
     fn test_portal_with_rotation() {
         let mut game = Game::new_headless_square(13);
-        game.world_state.player_square = [5, 5];
-        game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
         game.world_state.board_color_function = |world_state, square| {
             let n = 10;
             let frac = square.y().rem_euclid(n) as f32 / n as f32;
@@ -1519,18 +1518,17 @@ mod tests {
             Some(grey(val))
         };
 
-        WorldState::radial_sin_board_colors;
         game.world_state
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
-        game.world_state.portal_tint_function = WorldState::rainbow_tint;
+        // game.world_state.portal_tint_function = WorldState::rainbow_tint;
         let (frame, layers) = game.world_state.render_with_debug_layers(
-            game.world_state.smoothed_player_pos,
+            [5.5, 5.5],
             game.ui_handler.default_fov_range,
         );
-        layers.into_iter().for_each(|frame| {
-            dbg!(frame);
-        });
+        // layers.into_iter().for_each(|frame| {
+        //     dbg!(frame);
+        // });
 
         assert_frame_same_as_past!(frame, "a");
     }
@@ -1698,9 +1696,20 @@ mod tests {
     #[test]
     fn test_render_with_center_offset() {
         let mut game = Game::new_headless_square(5);
-        let frame = game.render_at([2.3,2.3]);
-        dbg!(&frame);
-        frame.glyphs().for_each(|g| assert!(g.looks_solid()));
+        let default_center = [2.5;2];
+        let offset_radius = 0.3;
+        let n = 10;
+        let offsets = 
+        (0..n).map(|i| {
+            let angle_rad = i as f32/n as f32 * TAU;
+             FPoint::from_angle_and_radius(angle_rad, offset_radius)
+        }).chain([[0.5,0.5], [-0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]].into_iter()).collect_vec();
+        offsets.into_iter().for_each(|offset| {
+            let center = default_center.add(offset);
+            let frame = game.render_at(center);
+            dbg!(&frame);
+            frame.glyphs().for_each(|g| assert!(g.looks_solid(), "Offset: {offset:?}\nCenter: {center:?}\nFrame:\n{frame:?}",));
+        })
     }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
