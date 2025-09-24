@@ -213,6 +213,9 @@ impl Game {
         self.ui_handler.now_as_s_from_start()
     }
     pub fn render(&mut self) -> Frame {
+        self.ui_handler.render(&self.world_state)
+    }
+    pub fn update_camera_pos_and_render(&mut self) -> Frame {
         self.ui_handler.update_camera_position_and_render(&self.world_state)
     }
     pub fn render_at(&mut self, fov_center: FPoint) -> Frame {
@@ -1301,7 +1304,7 @@ fn main() {
         game.ui_handler.advance_time_to(s_from_start);
         game.process_events();
 
-        let mut frame = game.render();
+        let mut frame = game.update_camera_pos_and_render();
         frame.draw_text(
             format!(
                 "{:<30}",
@@ -1368,7 +1371,7 @@ mod tests {
 
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         assert_frame_same_as_past!(frame, "a");
@@ -1380,7 +1383,7 @@ mod tests {
         game.process_events();
         let center_of_top_row_left_char = [0.25, 2.5];
         assert_about_eq_2d(game.ui_handler.mouse_world_point().unwrap(), center_of_top_row_left_char);
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         // dbg!(&frame);
         // dbg!(&frame.grid);
         assert_frame_same_as_past!(frame, "a", true);
@@ -1390,7 +1393,7 @@ mod tests {
         let mut game = Game::new_headless_square(13);
         game.ui_handler.give_event(press_left_1_indexed(4, 11));
         game.process_events();
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED.into());
         assert_eq!(frame.get_xy([3, 2]).bg_color, RED.into());
@@ -1401,13 +1404,13 @@ mod tests {
         let mut game = Game::new_headless(11, 22, 12, 12, 5);
         game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
-        let frame_1 = game.render();
+        let frame_1 = game.update_camera_pos_and_render();
         game.ui_handler.give_event(drag_mouse_to_1_indexed(5, 4));
         game.process_events();
-        let frame_2 = game.render();
+        let frame_2 = game.update_camera_pos_and_render();
         game.ui_handler.give_event(drag_mouse_to_1_indexed(6, 4));
         game.process_events();
-        let frame_3 = game.render();
+        let frame_3 = game.update_camera_pos_and_render();
         assert_frame_same_as_past!(frame_1, "1");
         assert_frame_same_as_past!(frame_2, "2");
         assert_frame_same_as_past!(frame_3, "3");
@@ -1442,7 +1445,7 @@ mod tests {
         game.world_state
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1511,7 +1514,7 @@ mod tests {
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         let (_, debug_layers) = game
             .world_state
             .render_with_debug_layers(game.world_state.smoothed_player_pos, 5);
@@ -1639,7 +1642,7 @@ mod tests {
         game.process_events();
         assert_eq!(game.ui_handler.event_log.len(), 1);
         assert!(game.ui_handler.smoothed_mouse_screen_row_col.is_some());
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         println!("{}", &frame.escaped_regular_display_string());
         assert!(
             char_is_braille(frame.grid[0][0].character),
@@ -1695,7 +1698,7 @@ mod tests {
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
         game.try_move_player_at_time(STEP_RIGHT, 1.0);
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         dbg!(&frame);
         let player_pos_in_frame = game
             .ui_handler
@@ -1831,6 +1834,22 @@ mod tests {
     }
     // #[ignore]
     #[test]
+    fn test_big_screen_small_world_simple() {
+        // screen height is 10, world height is 4, camera height is 7
+        let mut game = Game::new_headless(10, 30, 4, 4, 3);
+        game.world_state.draw_labelled_rect_on_floor([0,0], [4;2]);
+        // 🯩🯫
+        // 🭮🭬
+        // let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
+        // game.world_state.draw_labelled_rect_on_floor([0,0], [7,7]);
+        // game.ui_handler.give_event(press_left_1_indexed(5, 6));
+        // game.process_events();
+        game.print_debug_data();
+        let frame = game.render();
+
+        assert_frame_same_as_past!(frame, "a");
+    }
+    #[test]
     fn test_big_screen_small_world_click() {
         let mut game = Game::new_headless(10, 30, 4, 4, 3);
         // 🯩🯫
@@ -1840,7 +1859,7 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         game.print_debug_data();
-        let frame = game.render();
+        let frame = game.update_camera_pos_and_render();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
