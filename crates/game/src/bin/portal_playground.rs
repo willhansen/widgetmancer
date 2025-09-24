@@ -75,6 +75,7 @@ const DEFAULT_FRAME_BACKGROUND_CHAR: char = '🮖';
 const ETERNAL_VOID_CHAR: char = '.';
 const OUT_OF_FOV_RANGE_CHAR: char = '╲';
 const SHADOW_CHAR: char = '╳';
+const DEFAULT_FOV_RANGE: u32 = 3;
 
 struct Game {
     pub world_state: WorldState,
@@ -93,6 +94,7 @@ impl Game {
             side_length_in_squares as u16 * 2,
             side_length_in_squares,
             side_length_in_squares,
+            (side_length_in_squares as u32-1)/2
         )
     }
     pub fn new_headless(
@@ -100,10 +102,11 @@ impl Game {
         screen_width: u16,
         world_width: usize,
         world_height: usize,
+        camera_radius: u32,
     ) -> Self {
         Game {
             world_state: WorldState::new(world_width, world_height),
-            ui_handler: UiHandler::new_headless(screen_height, screen_width),
+            ui_handler: UiHandler::new_headless(screen_height, screen_width, camera_radius),
         }
     }
     pub fn process_event(&mut self, event: Event) {
@@ -215,6 +218,12 @@ impl Game {
     pub fn render_at(&mut self, fov_center: FPoint) -> Frame {
         self.ui_handler.render_at(&self.world_state, fov_center)
     }
+    pub fn print_debug_data(&self) {
+        println!("\nScreen width: {:?}, \theight: {:?}", self.ui_handler.screen_width(), self.ui_handler.screen_height());
+        println!("Camera rect: {:?}, \tsize: {:?}, \toffset: {:?}, \tcenter: {:?}", self.ui_handler.camera.rect(), self.ui_handler.camera.rect().size(), self.ui_handler.camera.center_offset, self.ui_handler.camera.fov_center());
+        println!("Player square: {:?}, \tsmoothed: {:?}\nMouse char: {:?}, \tsmoothed: {:?}", self.world_state.player_square, self.world_state.smoothed_player_pos, self.ui_handler.last_mouse_screen_row_col, self.ui_handler.smoothed_mouse_screen_row_col);
+        println!("");
+    }
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -230,10 +239,10 @@ impl Camera {
     pub fn rect(&self) -> IRect {
         self.rect
     }
-    pub fn new(s: usize) -> Self {
+    pub fn new(s: u32) -> Self {
         assert_eq!(s%2,1, "size given is {s}.  Must be odd.");
         Camera {
-            rect: IRect::from_min_and_size([0,0], [s;2]),
+            rect: IRect::from_min_and_size([0,0], [s;2].to_usize()),
             center_offset: [0.0;2]
         }
     }
@@ -394,7 +403,7 @@ mod camera_tests {
     #[test]
     fn test_frame_to_world_integers() {
         let s: i32 = 31;
-        let camera = Camera::new(s as usize);
+        let camera = Camera::new(s as u32);
 
         let f = |x| camera.frame_row_col_char_to_absolute_world_square(x);
         assert_eq!(f([0, 0]), [0, s - 1]);
@@ -511,7 +520,6 @@ struct UiHandler {
     pub prev_drawn: Option<Frame>,
     pub enable_mouse_smoothing: bool,
     pub camera: Camera,
-    pub default_fov_range: u32,
     pub mouse_behavior: MouseBehavior,
 }
 impl UiHandler {
@@ -560,7 +568,7 @@ impl UiHandler {
             .into_alternate_screen()
             .unwrap(),
         );
-        let ui_handler = Self::new_maybe_headless(term_height, term_width, Some(output_writable));
+        let ui_handler = Self::new_maybe_headless(term_height, term_width, Some(output_writable), DEFAULT_FOV_RANGE);
         set_up_input_thread_given_sender(ui_handler.copy_of_event_sender.clone());
         ui_handler
     }
@@ -597,18 +605,20 @@ impl UiHandler {
         let screen_mouse_point = self.smoothed_mouse_position_screen_row_col();
         screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
     }
-    pub fn new_headless(screen_height: u16, screen_width: u16) -> UiHandler {
-        Self::new_maybe_headless(screen_height, screen_width, None)
+    pub fn new_headless(screen_height: u16, screen_width: u16, camera_radius: u32) -> UiHandler {
+        Self::new_maybe_headless(screen_height, screen_width, None, camera_radius)
     }
     pub fn new_maybe_headless(
         screen_height: u16,
         screen_width: u16,
         output_writable: Option<Box<dyn Write>>,
+        camera_radius: u32,
     ) -> UiHandler {
         let (event_sender, event_receiver) = channel();
         let screen_size_rows_cols = [screen_height as usize, screen_width as usize];
         // want to be square (for now)
-        let camera_side_length = cut_to_odd(((screen_height as usize).min((screen_width as usize) / 2)) as i32) as usize;
+        // let camera_side_length = cut_to_odd(((screen_height as usize).min((screen_width as usize) / 2)) as i32) as usize;
+        let camera_side_length = camera_radius * 2 + 1;
         // Needs to be odd size (because radius-based)
         // let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
         UiHandler {
@@ -625,9 +635,12 @@ impl UiHandler {
             prev_drawn: None,
             enable_mouse_smoothing: false,
             camera: Camera::new(camera_side_length),
-            default_fov_range: camera_side_length as u32 / 2,
             mouse_behavior: MouseBehavior::DrawMouse,
         }
+    }
+    pub fn fit_camera_to_screen(&mut self) {
+        let n = ((self.screen_width()/2).min(self.screen_height())-1)/2;
+        self.camera = Camera::new(n as u32);
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
         if self.enable_mouse_smoothing {
@@ -772,7 +785,6 @@ impl UiHandler {
                 .mouse_world_point()
                 .unwrap_or_else(|| world_state.player_square.grid_square_center()),
         };
-        let fov_range = self.default_fov_range.min(self.screen_height() as u32/2);
 
         self.camera.set_center(fov_center);
         self.render(world_state)
@@ -1386,7 +1398,7 @@ mod tests {
     }
     #[test]
     fn test_drag_mouse() {
-        let mut game = Game::new_headless(11, 22, 12, 12);
+        let mut game = Game::new_headless(11, 22, 12, 12, 5);
         game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
         let frame_1 = game.render();
@@ -1524,7 +1536,7 @@ mod tests {
         // game.world_state.portal_tint_function = WorldState::rainbow_tint;
         let (frame, layers) = game.world_state.render_with_debug_layers(
             [5.5, 5.5],
-            game.ui_handler.default_fov_range,
+            6,
         );
         // layers.into_iter().for_each(|frame| {
         //     dbg!(frame);
@@ -1755,8 +1767,8 @@ mod tests {
     fn test_odd_screen_sizes() {
         Game::new_headless_square(9); // odd square
         Game::new_headless_square(8); // even square
-        Game::new_headless(8, 16, 3, 4);
-        Game::new_headless(10, 20, 30, 30);
+        Game::new_headless(8, 16, 3, 4, DEFAULT_FOV_RANGE);
+        Game::new_headless(10, 20, 30, 30, DEFAULT_FOV_RANGE);
     }
     #[test]
     fn test_smoothed_mouse_time_step_length_independence() {
@@ -1803,8 +1815,7 @@ mod tests {
     }
     #[test]
     fn test_fov_rendering_alignment() {
-        let mut game = Game::new_headless(10, 30, 4, 4);
-        game.ui_handler.default_fov_range = 3;
+        let mut game = Game::new_headless(10, 30, 4, 4, 3);
         // 🯩🯫
         // 🭮🭬
         let the_char = 'a';
@@ -1821,20 +1832,20 @@ mod tests {
     // #[ignore]
     #[test]
     fn test_big_screen_small_world_click() {
-        let mut game = Game::new_headless(10, 30, 4, 4);
-        game.ui_handler.default_fov_range = 3;
+        let mut game = Game::new_headless(10, 30, 4, 4, 3);
         // 🯩🯫
         // 🭮🭬
         let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
         game.world_state.draw_labelled_rect_on_floor([0,0], [7,7]);
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
+        game.print_debug_data();
         let frame = game.render();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
     fn test_camera_local_world_squares_invariant_to_camera_motion() {
-        let mut game = Game::new_headless(10, 30, 4, 4);
+        let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
         let before = game.ui_handler.camera.top_left_local_square();
         game.ui_handler
             .camera
@@ -1847,7 +1858,7 @@ mod tests {
     }
     #[test]
     fn test_screen_to_world() {
-        let mut game = Game::new_headless(10, 30, 4, 4);
+        let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
         // let frame = game.render();
         // game.ui_handler.draw_screen(frame);
         game.ui_handler
