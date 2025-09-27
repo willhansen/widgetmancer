@@ -1031,6 +1031,8 @@ pub fn single_octant_field_of_view(
     sight_blockers: &HashSet<WorldSquare>,
     portal_geometry: &PortalGeometry,
 ) -> FieldOfViewResult {
+    assert!(center_offset.x.abs() <= 0.5);
+    assert!(center_offset.y.abs() <= 0.5);
     //arc.next_relative_square_in_octant_sequence(first_relative_square_in_sequence);
     //let octant: i32 = arc.octant().expect("arc not confined to octant");
     let mut fov_result = field_of_view_within_arc_in_single_octant(
@@ -1070,7 +1072,8 @@ pub fn portal_aware_field_of_view_from_point(
     // Split into square and offset to avoid rounding issues with all the rotations the center
     // point is going to go through.  Don't want incosistencies if a rotation causes just enough
     // rounding error to cause it to round to a different center square.
-    let center_square: WorldSquare = center_point.to_array().floor().into();
+    let center_square: WorldSquare = center_point.to_array().snap_to_grid().into();
+    dbg!(center_square);
     let center_offset = center_point - center_square.to_f32();
     (0..8)
         .fold(

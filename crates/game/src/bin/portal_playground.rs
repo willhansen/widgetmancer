@@ -212,284 +212,39 @@ impl Game {
     pub fn now_as_s_from_start(&self) -> f32 {
         self.ui_handler.now_as_s_from_start()
     }
-    pub fn render(&mut self) -> Frame {
-        self.ui_handler.render(&self.world_state)
+    pub fn fov_center(&self) -> FPoint {
+        // TODO: move mouse behaviour to config scope
+        match self.ui_handler.mouse_behavior {
+            MouseBehavior::DrawMouse => self.world_state.player_square.grid_square_center(),
+            MouseBehavior::CenterOnMouse => self.ui_handler
+                .mouse_world_point()
+                .unwrap_or_else(|| self.world_state.player_square.grid_square_center()),
+        }
+
     }
-    pub fn update_camera_pos_and_render(&mut self) -> Frame {
-        self.ui_handler.update_camera_position_and_render(&self.world_state)
+    pub fn camera_rect(&self) -> IRect {
+        IRect::from_center_and_radius(self.fov_center().snap_to_grid(), self.ui_handler.camera_side_length/2)
+
+    }
+    pub fn render(&mut self) -> Frame {
+        self.ui_handler.render_camera(&self.world_state, self.camera_rect(), self.fov_center(), self.config.fov_radius)
     }
     pub fn render_at(&mut self, fov_center: FPoint) -> Frame {
-        self.ui_handler.render_at(&self.world_state, fov_center)
+        self.ui_handler.render_camera(&self.world_state,self.camera_rect(), fov_center, self.config.fov_radius)
     }
     pub fn print_debug_data(&self) {
         println!("\nScreen width: {:?}, \theight: {:?}", self.ui_handler.screen_width(), self.ui_handler.screen_height());
-        println!("Camera rect: {:?}, \tsize: {:?}, \toffset: {:?}, \tcenter: {:?}", self.ui_handler.camera.rect(), self.ui_handler.camera.rect().size(), self.ui_handler.camera.center_offset, self.ui_handler.camera.fov_center());
-        println!("Player square: {:?}, \tsmoothed: {:?}\nMouse char: {:?}, \tsmoothed: {:?}", self.world_state.player_square, self.world_state.smoothed_player_pos, self.ui_handler.last_mouse_screen_row_col, self.ui_handler.smoothed_mouse_screen_row_col);
+        println!("Camera rect: {:?}, \tsize: {:?}, \tcenter_square: {:?}, \toffset: {:?}, \tcenter_point: {:?}", self.ui_handler.camera.rect(), self.ui_handler.camera.rect().size(), self.ui_handler.camera.fov_center_square(), self.ui_handler.camera.center_offset, self.ui_handler.camera.fov_center_point());
+        println!("Player square: {:?}, \tsmoothed: {:?}", self.world_state.player_square, self.world_state.smoothed_player_pos);
+        println!("Mouse char rowcol: {:?}, \tsmoothed: {:?}", self.ui_handler.last_mouse_screen_row_col, self.ui_handler.smoothed_mouse_screen_row_col);
+        print!("Mouse world square: {:?}", self.ui_handler.mouse_world_square());
+        print!(" \tsmoothed: {:?}", self.ui_handler.mouse_world_point());
+        println!("");
         println!("");
     }
 }
 
-#[derive(Clone, Debug, Copy)]
-struct Camera {
-    rect: IRect,
-    center_offset: FPoint
-}
 
-// TODO: frame coordinates should be distinct from screen coordinates, and the camera should only
-// deal with frame coordinates.
-// Most coordinates are in squares unless noted
-impl Camera {
-    pub fn rect(&self) -> IRect {
-        self.rect
-    }
-    pub fn new(s: u32) -> Self {
-        assert_eq!(s%2,1, "size given is {s}.  Must be odd.");
-        Camera {
-            rect: IRect::from_min_and_size([0,0], [s;2].to_usize()),
-            center_offset: [0.0;2]
-        }
-    }
-    pub fn translate_to_set_bottom_left_square(&mut self, bottom_left_square: IPoint) {
-        self.rect = self.rect.with_lower_left_at(bottom_left_square)
-    }
-    pub fn top_right_local_square(&self) -> IPoint {
-        self.rect.relative_corner_by_quadrant(0)
-    }
-    pub fn top_left_local_square(&self) -> IPoint {
-        self.rect.relative_corner_by_quadrant(1)
-    }
-    pub fn set_center(&mut self, new_center: FPoint) {
-        self.rect = self.rect.with_center_at(new_center.snap_to_grid());
-        self.center_offset = new_center.fraction_part()
-    }
-    pub fn translate_local_square_to_absolute_square(
-        &mut self,
-        local_square: IPoint,
-        absolute_square: IPoint,
-    ) {
-        let new_absolute_bottom_left = absolute_square.sub(local_square);
-        self.translate_to_set_bottom_left_square(new_absolute_bottom_left);
-    }
-    pub fn with_bottom_left_square(&self, bottom_left_square: IPoint) -> Self {
-        Self::from_bottom_left_and_size(bottom_left_square, self.size_in_world().to_usize())
-    }
-    pub fn from_bottom_left_and_size(
-        bottom_left_square: IPoint,
-        width_height_in_squares: USizePoint,
-    ) -> Self {
-        Self {
-            rect: IRect::from_min_and_size(bottom_left_square, width_height_in_squares),
-            center_offset: [0.0;2]
-        }
-    }
-    pub fn bottom_left_square(&self) -> IPoint {
-        self.rect.min_square()
-    }
-    pub fn translate(&mut self, movement: IPoint) {
-        self.translate_to_set_bottom_left_square(self.bottom_left_square().add(movement))
-    }
-    pub fn size_in_world(&self) -> [u32; 2] {
-        self.rect.size().to_signed().to_unsigned()
-    }
-    pub fn width_in_world(&self) -> u32 {
-        self.size_in_world()[0]
-    }
-    pub fn height_in_world(&self) -> u32 {
-        self.size_in_world()[1]
-    }
-    pub fn size_on_screen_rows_cols(&self) -> [usize; 2] {
-        [
-            self.height_in_world() as usize,
-            self.width_in_world() as usize * 2,
-        ]
-    }
-    pub fn local_to_absolute_world_point(&self, local_v: FPoint) -> FPoint {
-        rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.rect.bottom_left_corner().to_float()) // Note use of square corner rather than square
-        // center
-    }
-    fn lower_left_square(&self) -> IPoint {
-        self.rect.bottom_left_corner()
-    }
-    fn upper_right_square(&self) -> IPoint {
-        self.rect.top_right_corner()
-    }
-    pub fn local_to_absolute_world_square(&self, local_v: IPoint) -> IPoint {
-        rotate_quarter_turns(local_v, self.quarter_turns_ccw_from_world())
-            .add(self.lower_left_square())
-    }
-    pub fn absolute_to_local_world_square(&self, absolute_world_square: IPoint) -> IPoint {
-        // TODO: rotation
-        absolute_world_square.sub(self.lower_left_square())
-    }
-    pub fn local_to_world_ortho_dir(&self, dir: OrthoDir) -> OrthoDir {
-        (dir + self.quarter_turns_ccw_from_world()).rem_euclid(4)
-    }
-    pub fn quarter_turns_ccw_from_world(&self) -> OrthoDir {
-        let [x1, y1] = self.lower_left_square();
-        let [x2, y2] = self.upper_right_square();
-
-        match (x1 < x2, y1 < y2) {
-            (true, true) => 0,
-            (true, false) => 3,
-            (false, true) => 1,
-            (false, false) => 2,
-        }
-    }
-    // zero indexed
-    pub fn frame_row_col_point_to_local_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        let [row_pos, col_pos] = screen_row_col_point;
-        [col_pos / 2.0, self.height_in_world() as f32 - row_pos]
-    }
-    // Not one-to-one.  each square has two characters that map to it
-    // zero indexed
-    pub fn frame_row_col_char_to_local_world_square(
-        &self,
-        camera_local_row_col_char: [u16; 2],
-    ) -> IPoint {
-        let [row, col] = camera_local_row_col_char.map(|x| x as i32);
-        [col / 2, self.height_in_world() as i32 - row - 1]
-    }
-    // zero indexed
-    pub fn frame_row_col_char_to_absolute_world_square(
-        &self,
-        frame_row_col_char: [u16; 2],
-    ) -> IPoint {
-        self.local_to_absolute_world_square(
-            self.frame_row_col_char_to_local_world_square(frame_row_col_char),
-        )
-    }
-    pub fn absolute_world_square_to_left_char_frame_row_col(
-        &self,
-        absolute_world_square: IPoint,
-    ) -> IPoint {
-        self.local_world_square_to_left_frame_row_col(
-            self.absolute_to_local_world_square(absolute_world_square),
-        )
-    }
-    pub fn local_world_square_to_left_frame_row_col(&self, local_world_square: IPoint) -> IPoint {
-        [self.height_in_world() as i32 - local_world_square[1] -1, local_world_square[0] * 2]
-    }
-    pub fn local_world_square_in_frame(&self, local_world_square: IPoint) -> bool {
-        todo!();
-    }
-    pub fn char_row_col_in_frame(&self, char_row_col: IPoint) -> bool {
-        todo!();
-    }
-
-    fn blank_frame(&self) -> Frame {
-        let size = self.size_on_screen_rows_cols();
-        let camera_background_default_glyph = DrawableGlyph::from_char(OUT_OF_FOV_RANGE_CHAR).with_fg(Some(GREEN));
-        // let camera_background_default_glyph = DrawableGlyph::new(DEFAULT_FRAME_BACKGROUND_CHAR, Some(MAGENTA), Some(BLACK));
-        Frame::new_from_repeated_glyph(size[1], size[0], camera_background_default_glyph)
-    }
-    fn fov_center(&self) -> FPoint {
-        self.rect.center().unwrap().to_float().add(self.center_offset)
-    }
-    fn fov_radius(&self) -> u32 {
-        self.rect.width() as u32 / 2
-    }
-
-    pub fn render(
-        &self,
-        world_state: &WorldState,
-    ) -> Frame {
-        let (fov_frame, debug_layers) =
-            world_state.render_with_options(false, self.fov_center(), self.fov_radius());
-        fov_frame
-    }
-}
-
-#[cfg(test)]
-mod camera_tests {
-    use super::*;
-    #[test]
-    fn test_frame_to_world_integers() {
-        let s: i32 = 31;
-        let camera = Camera::new(s as u32);
-
-        let f = |x| camera.frame_row_col_char_to_absolute_world_square(x);
-        assert_eq!(f([0, 0]), [0, s - 1]);
-
-        assert_eq!(f([0, 0]), [0, s - 1]);
-        assert_eq!(f([0, 1]), [0, s - 1]);
-
-        assert_eq!(f([1, 0]), [0, s - 2]);
-        assert_eq!(f([1, 1]), [0, s - 2]);
-
-        assert_eq!(f([0, 2]), [1, s - 1]);
-        assert_eq!(f([0, 3]), [1, s - 1]);
-
-        assert_eq!(
-            camera.local_to_absolute_world_square([0, s - 1]),
-            [0, s - 1]
-        );
-        assert_eq!(camera.local_to_absolute_world_square([0, 0]), [0, 0]);
-    }
-    #[test]
-    fn test_frame_to_world_floating_point() {
-        let camera = Camera::new(9);
-
-        assert_eq!(
-            camera.frame_row_col_point_to_local_world_point([0.0, 0.0]),
-            [0.0, camera.height_in_world() as f32]
-        );
-    }
-    #[test]
-    fn test_size() {
-        let camera = Camera::new(25);
-        assert_eq!(camera.size_in_world(), [25, 25]);
-        assert_eq!(camera.size_on_screen_rows_cols(), [25, 50]);
-    }
-    #[test]
-    fn test_local_to_absolute_world_squares_simple() {
-        let camera = Camera::new(9);
-        let p = [3, 5];
-        assert_eq!(
-            p,
-            camera.local_to_absolute_world_square(camera.absolute_to_local_world_square(p))
-        );
-        assert_eq!(
-            p,
-            camera.absolute_to_local_world_square(camera.local_to_absolute_world_square(p))
-        );
-    }
-    #[test]
-    fn test_get_set_bottom_left_invariant() {
-        let camera = Camera::new(9);
-        let after_move = 
-            camera.with_bottom_left_square(camera.bottom_left_square());
-        assert_eq!(
-            camera.rect(),
-            after_move.rect()
-        );
-        assert_about_eq_2d(camera.center_offset, after_move.center_offset);
-    }
-    #[test]
-    fn test_local_to_absolute_world_squares_after_translation() {
-        let mut camera = Camera::new(9);
-        let p = [3, 5];
-        dbg!(&camera);
-        camera.translate([-2, 0]);
-        dbg!(camera);
-        assert_eq!(camera.local_to_absolute_world_square(p), [1, 5]);
-        assert_eq!(
-            p,
-            camera.local_to_absolute_world_square(camera.absolute_to_local_world_square(p))
-        );
-        assert_eq!(
-            p,
-            camera.absolute_to_local_world_square(camera.local_to_absolute_world_square(p))
-        );
-    }
-    #[test]
-    fn test_absolute_square_to_char_row_col() {
-        let camera = Camera::new(9);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([0,0]), [8,0]);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([1,0]), [8,2]);
-        assert_eq!(camera.absolute_world_square_to_left_char_frame_row_col([2,0]), [8,4]);
-    }
-}
 
 // struct PortalUnderConstruction {
 //     start_square: IPoint,
@@ -502,6 +257,13 @@ enum MouseBehavior {
     DrawMouse,
     CenterOnMouse,
 }
+struct Config {
+    pub mouse_behavior: MouseBehavior,
+    pub fov_radius: u32,
+
+}
+
+
 struct UiHandler {
     // This instant is the link between the real world and "seconds from start".  The game world
     // has no use for real-time reference points that are instants
@@ -522,11 +284,11 @@ struct UiHandler {
     pub event_log: VecDeque<(f32, Event)>,
     pub prev_drawn: Option<Frame>,
     pub enable_mouse_smoothing: bool,
-    pub camera: Camera,
+    pub camera_side_length: u32,
     pub mouse_behavior: MouseBehavior,
 }
 impl UiHandler {
-    fn smoothed_mouse_position_screen_row_col(&mut self) -> Option<FPoint> {
+    fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
         self.smoothed_mouse_screen_row_col
     }
 
@@ -604,7 +366,7 @@ impl UiHandler {
         self.last_mouse_screen_row_col
             .map(|row_col| self.screen_row_col_char_to_world_square(row_col))
     }
-    fn mouse_world_point(&mut self) -> Option<FPoint> {
+    fn mouse_world_point(&self) -> Option<FPoint> {
         let screen_mouse_point = self.smoothed_mouse_position_screen_row_col();
         screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
     }
@@ -637,7 +399,7 @@ impl UiHandler {
             event_log: Default::default(),
             prev_drawn: None,
             enable_mouse_smoothing: false,
-            camera: Camera::new(camera_side_length),
+            camera_side_length,
             mouse_behavior: MouseBehavior::DrawMouse,
         }
     }
@@ -759,15 +521,10 @@ impl UiHandler {
         p
     }
 
-    pub fn render_at(&mut self, world_state: &WorldState, fov_center: FPoint) -> Frame {
-        self.camera.set_center(fov_center);
-        self.render(world_state)
 
-    }
-    pub fn render(&mut self, world_state: &WorldState) -> Frame {
-        let camera_frame = self
-            .camera
-            .render(world_state);
+    pub fn render_camera(&mut self, world_state: &WorldState, camera_rect: IRect, fov_center: FPoint, fov_radius: u32) -> Frame {
+        let camera_frame = 
+            world_state.render_with_options(false, fov_center, fov_radius).0;
 
 
         let mut screen_buffer = Frame::solid_color(
@@ -778,19 +535,6 @@ impl UiHandler {
         screen_buffer.safe_blit(&camera_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
         screen_buffer
-    }
-
-    pub fn update_camera_position_and_render(&mut self, world_state: &WorldState) -> Frame {
-        let fov_center = 
-        match self.mouse_behavior {
-            MouseBehavior::DrawMouse => world_state.player_square.grid_square_center(),
-            MouseBehavior::CenterOnMouse => self
-                .mouse_world_point()
-                .unwrap_or_else(|| world_state.player_square.grid_square_center()),
-        };
-
-        self.camera.set_center(fov_center);
-        self.render(world_state)
     }
 }
 fn press_char(c: char) -> Event {
@@ -974,11 +718,10 @@ impl WorldState {
                                       // .map(|(&entrance, &reverse_exit)| (entrance, reverse_exit.rotate(2)))
                                       // .collect(),
             );
-        // panic!();
 
+        dbg!(fov_center);
         let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
-            // (fov_center).into(),
-            (fov_center.sub([0.5;2])).into(),
+            (fov_center).into(),
             radius,
             &Default::default(),
             &portal_geometry,
@@ -1002,7 +745,6 @@ impl WorldState {
         // let fov_lower_left_square = fov_center.floor().sub([radius;2].to_signed());
         
         let visibilities_and_glyphs_in_fov: Vec<Vec<Vec<(PositionedSquareVisibilityInFov, DoubleGlyphWithTransparency)>>> = 
-
         (0..fov_diameter)
             .map(|row_in_fov| {
                 let y_in_fov = fov_diameter as i32 - row_in_fov as i32 - 1;
@@ -1304,7 +1046,7 @@ fn main() {
         game.ui_handler.advance_time_to(s_from_start);
         game.process_events();
 
-        let mut frame = game.update_camera_pos_and_render();
+        let mut frame = game.render();
         frame.draw_text(
             format!(
                 "{:<30}",
@@ -1371,7 +1113,7 @@ mod tests {
 
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         // let no_color = frame.uncolored_regular_string();
         dbg!(&frame);
         assert_frame_same_as_past!(frame, "a");
@@ -1383,7 +1125,7 @@ mod tests {
         game.process_events();
         let center_of_top_row_left_char = [0.25, 2.5];
         assert_about_eq_2d(game.ui_handler.mouse_world_point().unwrap(), center_of_top_row_left_char);
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         // dbg!(&frame);
         // dbg!(&frame.grid);
         assert_frame_same_as_past!(frame, "a", true);
@@ -1393,7 +1135,7 @@ mod tests {
         let mut game = Game::new_headless_square(13);
         game.ui_handler.give_event(press_left_1_indexed(4, 11));
         game.process_events();
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         eprintln!("{}", frame.string_for_regular_display());
         assert_ne!(frame.get_xy([2, 2]).bg_color, RED.into());
         assert_eq!(frame.get_xy([3, 2]).bg_color, RED.into());
@@ -1404,13 +1146,13 @@ mod tests {
         let mut game = Game::new_headless(11, 22, 12, 12, 5);
         game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
-        let frame_1 = game.update_camera_pos_and_render();
+        let frame_1 = game.render();
         game.ui_handler.give_event(drag_mouse_to_1_indexed(5, 4));
         game.process_events();
-        let frame_2 = game.update_camera_pos_and_render();
+        let frame_2 = game.render();
         game.ui_handler.give_event(drag_mouse_to_1_indexed(6, 4));
         game.process_events();
-        let frame_3 = game.update_camera_pos_and_render();
+        let frame_3 = game.render();
         assert_frame_same_as_past!(frame_1, "1");
         assert_frame_same_as_past!(frame_2, "2");
         assert_frame_same_as_past!(frame_3, "3");
@@ -1445,7 +1187,8 @@ mod tests {
         game.world_state
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
         game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
-        let frame = game.update_camera_pos_and_render();
+        game.print_debug_data();
+        let frame = game.render();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1514,7 +1257,7 @@ mod tests {
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         let (_, debug_layers) = game
             .world_state
             .render_with_debug_layers(game.world_state.smoothed_player_pos, 5);
@@ -1642,7 +1385,7 @@ mod tests {
         game.process_events();
         assert_eq!(game.ui_handler.event_log.len(), 1);
         assert!(game.ui_handler.smoothed_mouse_screen_row_col.is_some());
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         println!("{}", &frame.escaped_regular_display_string());
         assert!(
             char_is_braille(frame.grid[0][0].character),
@@ -1698,7 +1441,7 @@ mod tests {
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
         game.try_move_player_at_time(STEP_RIGHT, 1.0);
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
         dbg!(&frame);
         let player_pos_in_frame = game
             .ui_handler
@@ -1859,7 +1602,8 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
         game.print_debug_data();
-        let frame = game.update_camera_pos_and_render();
+        let frame = game.render();
+        game.print_debug_data();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
