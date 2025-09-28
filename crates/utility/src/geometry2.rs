@@ -28,6 +28,12 @@ pub trait PointExt<T> {
     fn x(&self) -> T;
     fn y(&self) -> T;
     fn new(x: T, y: T) -> Self;
+    fn transposed(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self::new(self.y(), self.x())
+    }
 }
 impl<T: Copy> PointExt<T> for [T; 2] {
     fn x(&self) -> T {
@@ -93,6 +99,12 @@ pub trait IPointExt: Sized + PointExt<i32> {
     }
     fn to_unsigned(&self) -> UPoint;
     fn to_usize(&self) -> USizePoint;
+    fn char_to_square(&self) -> Self {
+        Self::new(self.x() / 2, self.y())
+    }
+    fn square_to_char(&self) -> Self {
+        Self::new(self.x() * 2, self.y())
+    }
 }
 
 impl IPointExt for IPoint {
@@ -198,19 +210,15 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
     fn normalized(&self) -> Self {
         self.div(self.length())
     }
-    fn fraction_part(&self) -> Self ;
+    fn fraction_part(&self) -> Self;
     fn from_angle_and_radius(angle_rad: f32, radius: f32) -> FPoint {
         [angle_rad.cos(), angle_rad.sin()].mul(radius)
-
     }
 }
 impl FPointExt for FPoint {
-
-
     fn fraction_part(&self) -> Self {
         self.sub(self.snap_to_grid().to_float())
     }
-
 }
 
 pub type USizePoint = [usize; 2];
@@ -289,6 +297,12 @@ pub fn other_side_of_edge(edge: SquareEdge) -> SquareEdge {
 pub trait IRectExt: Sized {
     fn min_square(&self) -> IPoint;
     fn max_square(&self) -> IPoint;
+    fn min_point(&self) -> FPoint {
+        self.min_square().to_float()
+    }
+    fn max_point(&self) -> FPoint {
+        self.max_square().add([1; 2]).to_float()
+    }
     fn size(&self) -> USizePoint;
     fn width(&self) -> usize {
         self.size()[0]
@@ -307,13 +321,17 @@ pub trait IRectExt: Sized {
         let a = [0, 1].map(|i| square[i] >= min[i] && square[i] <= max[i]);
         all(a, |x| x)
     }
-    fn translate_local_square_to_absolute_square(&self, local_square: IPoint, absolute_square: IPoint) -> Self {
+    fn translated_to_put_local_square_at_absolute_square(
+        &self,
+        local_square: IPoint,
+        absolute_square: IPoint,
+    ) -> Self {
         let abs_start = local_square.add(self.min_square());
         let diff = absolute_square.sub(abs_start);
         self.translated(diff)
     }
     fn with_lower_left_at(&self, dest: IPoint) -> Self {
-        self.translate_local_square_to_absolute_square([0,0], dest)
+        self.translated_to_put_local_square_at_absolute_square([0, 0], dest)
     }
     fn contains_rect(&self, other: IRect) -> bool {
         self.contains_square(other.min_square()) && self.contains_square(other.max_square())
@@ -326,11 +344,12 @@ pub trait IRectExt: Sized {
     }
     // quadrants start top-right and go counter-clockwise
     fn corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
-        self.relative_corner_by_quadrant(nth_quadrant).add(self.min_square())
+        self.relative_corner_by_quadrant(nth_quadrant)
+            .add(self.min_square())
     }
     fn relative_corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
-        let [x0, y0] = [0,0];
-        let [x1, y1] = self.size().to_signed().sub([1,1]);
+        let [x0, y0] = [0, 0];
+        let [x1, y1] = self.size().to_signed().sub([1, 1]);
         match nth_quadrant.rem_euclid(4) {
             0 => [x1, y1],
             1 => [x0, y1],
@@ -355,9 +374,13 @@ pub trait IRectExt: Sized {
     fn bottom_right_corner(&self) -> IPoint {
         self.corner_by_quadrant(3)
     }
+    fn relative_top_left_corner(&self) -> IPoint {
+
+        self.relative_corner_by_quadrant(1)
+    }
     // Only provides a center if the rectangle has odd width and height
     fn center(&self) -> Option<IPoint> {
-        if !self.is_odd(){
+        if !self.is_odd() {
             return None;
         }
         let half_diag = self.relative_center().unwrap();
@@ -373,8 +396,7 @@ pub trait IRectExt: Sized {
         Some(self.size().to_signed().div(2))
     }
     fn with_center_at(&self, dest: IPoint) -> Self {
-        self.translate_local_square_to_absolute_square(self.relative_center().unwrap(), dest)
-
+        self.translated_to_put_local_square_at_absolute_square(self.relative_center().unwrap(), dest)
     }
     fn border_squares(self) -> impl Iterator<Item = IPoint> {
         let [x1, y1] = self.top_right_corner_in_local_frame();
@@ -398,6 +420,38 @@ pub trait IRectExt: Sized {
     }
     fn translated(&self, dx: IPoint) -> Self {
         self.add(dx)
+    }
+    fn local_to_absolute_square(&self, local_square: IPoint) -> IPoint {
+        self.min_square().add(local_square)
+    }
+    fn absolute_to_local_square(&self, absolute_square: IPoint) -> IPoint {
+        absolute_square.sub(self.min_square())
+    }
+    fn local_to_absolute_point(&self, local_point: FPoint) -> FPoint {
+        self.min_point().add(local_point)
+    }
+    fn absolute_to_local_point(&self, absolute_point: FPoint) -> FPoint {
+        absolute_point.sub(self.min_point())
+    }
+    // applies to local coordinates
+    fn flip_y_square(&self, local_square: IPoint) -> IPoint {
+        [local_square[0], self.height() as i32 - 1 - local_square[1]]
+    }
+    // applies to local coordinates
+    fn flip_y_point(&self, local_point: FPoint) -> FPoint {
+        [local_point[0], self.height() as f32 - local_point[1]]
+    }
+    fn char_rowcol_to_local_square(&self, char_rowcol: IPoint) -> IPoint {
+        let char_colrow = char_rowcol.transposed();
+        let char_xy = self.flip_y_square(char_colrow);
+        let square_xy = char_xy.char_to_square();
+        square_xy
+    }
+    fn local_square_to_char_rowcol(&self, local_square: IPoint) -> IPoint {
+        let char_xy = local_square.square_to_char();
+        let char_colrow = self.flip_y_square(char_xy);
+        let char_rowcol = char_colrow.transposed();
+        char_rowcol
     }
 }
 impl IRectExt for IRect {
@@ -423,7 +477,7 @@ impl IRectExt for IRect {
 }
 
 #[cfg(test)]
-mod ui_handler_tests {
+mod tests {
     use super::*;
     #[test]
     fn test_rect_inside() {
@@ -463,5 +517,115 @@ mod ui_handler_tests {
             Some([1, -1])
         );
         assert_eq!(IRect::from_min_and_size([0, 0], [4, 5]).center(), None);
+    }
+    #[test]
+    fn test_rect_flip_y_square() {
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_square([0, 0]),
+            [0, 4]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_square([0, 1]),
+            [0, 3]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_square([0, 3]),
+            [0, 1]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_square([0, 4]),
+            [0, 0]
+        );
+
+        assert_eq!(
+            IRect::from_min_and_size([1, 0], [5, 5]).flip_y_square([0, 0]),
+            [0, 4]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 3], [5, 5]).flip_y_square([0, 1]),
+            [0, 3]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([8, 3], [5, 5]).flip_y_square([0, 3]),
+            [0, 1]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([9, 8], [5, 5]).flip_y_square([0, 4]),
+            [0, 0]
+        );
+    }
+
+    #[test]
+    fn test_rect_flip_y_point() {
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_point([0.0, 0.0]),
+            [0.0, 5.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_point([0.0, 1.0]),
+            [0.0, 4.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_point([0.0, 3.0]),
+            [0.0, 2.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 0], [5, 5]).flip_y_point([0.0, 4.0]),
+            [0.0, 1.0]
+        );
+
+        assert_eq!(
+            IRect::from_min_and_size([1, 0], [5, 5]).flip_y_point([0.0, 0.0]),
+            [0.0, 5.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([0, 3], [5, 5]).flip_y_point([0.0, 1.0]),
+            [0.0, 4.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([8, 3], [5, 5]).flip_y_point([0.0, 3.0]),
+            [0.0, 2.0]
+        );
+        assert_eq!(
+            IRect::from_min_and_size([9, 8], [5, 5]).flip_y_point([0.0, 4.0]),
+            [0.0, 1.0]
+        );
+    }
+    #[test]
+    fn test_rect_square_to_char_conversions() {
+        let rect_sizes_char_rowcols_and_local_squares = [
+            ([5,5], [0,0], [0,4]),
+            ([5,5], [1,0], [0,3]),
+            ([5,5], [4,0], [0,0]),
+            ([5,5], [0,1], [0,4]),
+            ([5,5], [0,2], [1,4]),
+            ([5,5], [0,3], [1,4]),
+
+            ([5,6], [0,0], [0,5]),
+            ([5,6], [5,0], [0,0]),
+        ];
+        for (rect_size, char_rowcol, local_square) in rect_sizes_char_rowcols_and_local_squares.into_iter() {
+            let rect = IRect::from_min_and_size([0, 0], rect_size);
+            assert_eq!(
+                rect.char_rowcol_to_local_square(char_rowcol),
+                local_square,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
+            );
+            assert_eq!(
+                rect.local_square_to_char_rowcol(local_square),
+                char_rowcol,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
+            );
+            assert_eq!(
+                rect.char_rowcol_to_local_square(rect.local_square_to_char_rowcol(local_square)),
+                local_square,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
+            );
+            assert_eq!(
+                rect.local_square_to_char_rowcol(rect.char_rowcol_to_local_square(char_rowcol)),
+                char_rowcol,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
+            );
+        }
     }
 }

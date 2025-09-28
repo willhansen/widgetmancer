@@ -34,7 +34,7 @@ use utility::*;
 type PortalSide = SquareEdge;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum PortalRenderingOption {
+enum PortalRenderingBehavior {
     LineOnFloor,
     Absolute,
     LineOfSight,
@@ -80,12 +80,22 @@ const DEFAULT_FOV_RANGE: u32 = 3;
 struct Game {
     pub world_state: WorldState,
     pub ui_handler: UiHandler,
+    pub config: Config,
 }
 impl Game {
+    fn mouse_world_square(&self) -> Option<IPoint> {
+        self.ui_handler.last_mouse_screen_row_col
+            .map(|row_col| self.screen_row_col_char_to_world_square(row_col.map(|x| x as i32)))
+    }
+    fn mouse_world_point(&self) -> Option<FPoint> {
+        let screen_mouse_point = self.ui_handler.smoothed_mouse_position_screen_row_col();
+        screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
+    }
     pub fn new(width: usize, height: usize) -> Self {
         Game {
             world_state: WorldState::new(width, height),
             ui_handler: UiHandler::new(),
+            config: Default::default()
         }
     }
     pub fn new_headless_square(side_length_in_squares: usize) -> Self {
@@ -107,6 +117,7 @@ impl Game {
         Game {
             world_state: WorldState::new(world_width, world_height),
             ui_handler: UiHandler::new_headless(screen_height, screen_width, camera_radius),
+            config: Default::default()
         }
     }
     pub fn process_event(&mut self, event: Event) {
@@ -115,9 +126,9 @@ impl Game {
                 Key::Char('q') => self.world_state.running = false,
                 Key::Char('t') => {
                     self.world_state.portal_rendering = match self.world_state.portal_rendering {
-                        PortalRenderingOption::LineOnFloor => PortalRenderingOption::Absolute,
-                        PortalRenderingOption::Absolute => PortalRenderingOption::LineOfSight,
-                        PortalRenderingOption::LineOfSight => PortalRenderingOption::LineOnFloor,
+                        PortalRenderingBehavior::LineOnFloor => PortalRenderingBehavior::Absolute,
+                        PortalRenderingBehavior::Absolute => PortalRenderingBehavior::LineOfSight,
+                        PortalRenderingBehavior::LineOfSight => PortalRenderingBehavior::LineOnFloor,
                     }
                 }
                 Key::Char('w') => self.try_move_player([0, 1]),
@@ -215,11 +226,9 @@ impl Game {
     pub fn fov_center(&self) -> FPoint {
         // TODO: move mouse behaviour to config scope
         match self.ui_handler.mouse_behavior {
-            MouseBehavior::DrawMouse => self.world_state.player_square.grid_square_center(),
-            MouseBehavior::CenterOnMouse => self.ui_handler
-                .mouse_world_point()
-                .unwrap_or_else(|| self.world_state.player_square.grid_square_center()),
-        }
+            MouseBehavior::DrawMouse => None,
+            MouseBehavior::CenterOnMouse => self.mouse_world_point()
+        }.unwrap_or_else(|| self.world_state.player_square.grid_square_center())
 
     }
     pub fn camera_rect(&self) -> IRect {
@@ -234,13 +243,35 @@ impl Game {
     }
     pub fn print_debug_data(&self) {
         println!("\nScreen width: {:?}, \theight: {:?}", self.ui_handler.screen_width(), self.ui_handler.screen_height());
-        println!("Camera rect: {:?}, \tsize: {:?}, \tcenter_square: {:?}, \toffset: {:?}, \tcenter_point: {:?}", self.ui_handler.camera.rect(), self.ui_handler.camera.rect().size(), self.ui_handler.camera.fov_center_square(), self.ui_handler.camera.center_offset, self.ui_handler.camera.fov_center_point());
+        println!("Camera rect: {:?}, \tcenter_point: {:?}", self.camera_rect(),  self.fov_center());
         println!("Player square: {:?}, \tsmoothed: {:?}", self.world_state.player_square, self.world_state.smoothed_player_pos);
         println!("Mouse char rowcol: {:?}, \tsmoothed: {:?}", self.ui_handler.last_mouse_screen_row_col, self.ui_handler.smoothed_mouse_screen_row_col);
-        print!("Mouse world square: {:?}", self.ui_handler.mouse_world_square());
-        print!(" \tsmoothed: {:?}", self.ui_handler.mouse_world_point());
+        print!("Mouse world square: {:?}", self.mouse_world_square());
+        print!(" \tsmoothed: {:?}", self.mouse_world_point());
         println!("");
         println!("");
+    }
+    pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
+        let camera_rect = self.camera_rect();
+        let p = self.ui_handler.screen_to_camera_point_rowcol(screen_row_col_point);
+        let p = [p[1]/2.0, camera_rect.height() as f32 - p[0]];
+        let p = self.camera_rect().local_to_absolute_point(p);
+        p
+    }
+    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: IPoint) -> IPoint {
+        let camera_char_rowcol = self.ui_handler.screen_to_camera_char_rowcol(screen_row_col_char);
+        let camera_rect = self.camera_rect();
+        let p = camera_rect.char_rowcol_to_local_square(camera_char_rowcol.map(|x| x as i32));
+        let p = camera_rect.local_to_absolute_square(p);
+        p
+    }
+    // one square maps to two characters.  This returns the left one.
+    pub fn world_square_to_left_screen_row_col_char(&self, world_square: IPoint) -> IPoint {
+        let camera_rect = self.camera_rect();
+        let camera_square = camera_rect.absolute_to_local_square(world_square);
+        let camera_left_char_rowcol = camera_rect.local_square_to_char_rowcol(camera_square);
+        let screen_char_rowcol = self.ui_handler.camera_to_screen_char_rowcol(camera_left_char_rowcol);
+        screen_char_rowcol
     }
 }
 
@@ -259,8 +290,19 @@ enum MouseBehavior {
 }
 struct Config {
     pub mouse_behavior: MouseBehavior,
+    pub portal_rendering_behavior: PortalRenderingBehavior,
     pub fov_radius: u32,
-
+    pub camera_diameter: u32,
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self { 
+            mouse_behavior: MouseBehavior::DrawMouse,
+            portal_rendering_behavior: PortalRenderingBehavior::LineOfSight,
+            fov_radius: 5,
+            camera_diameter: 9 
+        }
+    }
 }
 
 
@@ -362,14 +404,6 @@ impl UiHandler {
             xy_point[0], // back to 1-indexed
         ]
     }
-    fn mouse_world_square(&self) -> Option<IPoint> {
-        self.last_mouse_screen_row_col
-            .map(|row_col| self.screen_row_col_char_to_world_square(row_col))
-    }
-    fn mouse_world_point(&self) -> Option<FPoint> {
-        let screen_mouse_point = self.smoothed_mouse_position_screen_row_col();
-        screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
-    }
     pub fn new_headless(screen_height: u16, screen_width: u16, camera_radius: u32) -> UiHandler {
         Self::new_maybe_headless(screen_height, screen_width, None, camera_radius)
     }
@@ -405,7 +439,7 @@ impl UiHandler {
     }
     pub fn fit_camera_to_screen(&mut self) {
         let n = ((self.screen_width()/2).min(self.screen_height())-1)/2;
-        self.camera = Camera::new(n as u32);
+        self.camera_side_length = 2*n as u32 + 1;
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
         if self.enable_mouse_smoothing {
@@ -494,32 +528,33 @@ impl UiHandler {
     pub fn s_from_start_to_instant(&self, s_after_start: f32) -> Instant {
         self.start_time + Duration::from_secs_f32(s_after_start)
     }
-    pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        let p = self.screen_row_col_point_to_camera_frame_row_col_point(screen_row_col_point);
-        let p = self.camera.frame_row_col_point_to_local_world_point(p);
-        let p = self.camera.local_to_absolute_world_point(p);
-        p
-    }
 
-    pub fn screen_row_col_char_to_camera_frame_row_col_char(
+    // Camera is currently locked in top left of terminal
+    pub fn screen_to_camera_char_rowcol<T>(
         &self,
-        screen_row_col_char: [u16; 2],
-    ) -> [u16; 2] {
+        screen_row_col_char: [T; 2],
+    ) -> [T; 2] {
         screen_row_col_char
     }
-    pub fn screen_row_col_point_to_camera_frame_row_col_point(
+    pub fn screen_to_camera_point_rowcol(
         &self,
         screen_row_col_point: [f32; 2],
     ) -> [f32; 2] {
         screen_row_col_point
     }
-
-    pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: [u16; 2]) -> IPoint {
-        let p = self.screen_row_col_char_to_camera_frame_row_col_char(screen_row_col_char);
-        let p = self.camera.frame_row_col_char_to_local_world_square(p);
-        let p = self.camera.local_to_absolute_world_square(p);
-        p
+    pub fn camera_to_screen_char_rowcol<T>(
+        &self,
+        x: [T; 2],
+    ) -> [T; 2] {
+        x
     }
+    pub fn camera_to_screen_point_rowcol(
+        &self,
+        x: [f32; 2],
+    ) -> [f32; 2] {
+        x
+    }
+
 
 
     pub fn render_camera(&mut self, world_state: &WorldState, camera_rect: IRect, fov_center: FPoint, fov_radius: u32) -> Frame {
@@ -561,7 +596,7 @@ struct WorldState {
 
     portals: HashMap<PortalSide, PortalSide>,
 
-    pub portal_rendering: PortalRenderingOption,
+    pub portal_rendering: PortalRenderingBehavior,
     board_color_function: fn(&WorldState, IPoint) -> Option<RGB8>,
     portal_tint_function: fn(RGB8, u32) -> RGB8,
     // Effectively drawing on the floor.  on top of board color
@@ -580,7 +615,7 @@ impl WorldState {
             player_step_history: Default::default(),
             player_is_alive: false,
             portals: Default::default(),
-            portal_rendering: PortalRenderingOption::LineOfSight,
+            portal_rendering: PortalRenderingBehavior::LineOfSight,
             board_color_function: Self::default_board_color,
             portal_tint_function: Self::default_portal_tint,
             floor_markings: Default::default(),
@@ -757,21 +792,21 @@ impl WorldState {
                         let xy_relative_to_fov_center =
                             xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
                         let viz = match self.portal_rendering {
-                            PortalRenderingOption::LineOfSight => {
+                            PortalRenderingBehavior::LineOfSight => {
                                 FieldOfViewResult::sorted_by_draw_order(
                                     fov.visibilities_of_relative_square(
                                         xy_relative_to_fov_center,
                                     ),
                                 )
                             }
-                            PortalRenderingOption::LineOnFloor => {
+                            PortalRenderingBehavior::LineOnFloor => {
                                 vec![PositionedSquareVisibilityInFov::new_in_top_view(
                                     SquareVisibility::new_fully_visible(),
                                      fov.root_square() + xy_relative_to_fov_center,
                                     xy_relative_to_fov_center,
                                 )]
                             }
-                            PortalRenderingOption::Absolute => todo!(),
+                            PortalRenderingBehavior::Absolute => todo!(),
                         };
                         viz.into_iter().map(|v| (v, self.render_one_view_of_a_square(&v) )).collect_vec()
 
@@ -866,7 +901,7 @@ impl WorldState {
                 .contains_key(&(mapped_square.absolute_square.into(), dir))
         });
         let internal_faces_with_visible_portal_entrances = match self.portal_rendering {
-            PortalRenderingOption::LineOfSight => {
+            PortalRenderingBehavior::LineOfSight => {
                 let visible_relative_internal_faces = ALL_ORTHODIRS.map(|dir| {
                     !mapped_square
                         .relative_square
@@ -1033,7 +1068,7 @@ fn main() {
     let n = 5;
     let mut game = Game::new(n, n);
     game.world_state.player_is_alive = true;
-    game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
+    game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
     // game.world_state
     //     .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
     game.ui_handler.enable_mouse_smoothing = true;
@@ -1124,7 +1159,7 @@ mod tests {
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         let center_of_top_row_left_char = [0.25, 2.5];
-        assert_about_eq_2d(game.ui_handler.mouse_world_point().unwrap(), center_of_top_row_left_char);
+        assert_about_eq_2d(game.mouse_world_point().unwrap(), center_of_top_row_left_char);
         let frame = game.render();
         // dbg!(&frame);
         // dbg!(&frame.grid);
@@ -1186,7 +1221,7 @@ mod tests {
             .place_portal(([9, 1], DIR_RIGHT), ([9, 3], DIR_RIGHT));
         game.world_state
             .place_portal(([9, 1], DIR_LEFT), ([9, 3], DIR_LEFT));
-        game.world_state.portal_rendering = PortalRenderingOption::LineOnFloor;
+        game.world_state.portal_rendering = PortalRenderingBehavior::LineOnFloor;
         game.print_debug_data();
         let frame = game.render();
         assert_frame_same_as_past!(frame, "a");
@@ -1251,7 +1286,7 @@ mod tests {
     fn test_render_one_line_of_sight_portal() {
         let mut game = Game::new_headless_square(13);
         game.world_state.player_square = [5, 5];
-        game.world_state.portal_rendering = PortalRenderingOption::LineOfSight;
+        game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
         game.world_state.board_color_function = WorldState::radial_sin_board_colors;
         game.world_state
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
@@ -1444,9 +1479,7 @@ mod tests {
         let frame = game.render();
         dbg!(&frame);
         let player_pos_in_frame = game
-            .ui_handler
-            .camera
-            .absolute_world_square_to_left_char_frame_row_col(game.world_state.player_square);
+            .world_square_to_left_screen_row_col_char(game.world_state.player_square);
         let [row, left_col] = player_pos_in_frame.map(|x| x as usize);
         let right_player_glyph: DrawableGlyph = frame.grid[row][left_col + 1];
         assert!(char_is_braille(right_player_glyph.character));
@@ -1609,14 +1642,15 @@ mod tests {
     #[test]
     fn test_camera_local_world_squares_invariant_to_camera_motion() {
         let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
-        let before = game.ui_handler.camera.top_left_local_square();
-        game.ui_handler
-            .camera
-            .translate_local_square_to_absolute_square(
-                game.ui_handler.camera.top_left_local_square(),
+        let camera_rect = game.camera_rect();
+        let before = camera_rect.relative_top_left_corner();
+        camera_rect
+            .translated_to_put_local_square_at_absolute_square(
+
+                camera_rect.relative_top_left_corner(),
                 [0, 3],
             );
-        let after = game.ui_handler.camera.top_left_local_square();
+        let after = camera_rect.relative_top_left_corner();
         assert_eq!(before, after);
     }
     #[test]
@@ -1624,14 +1658,14 @@ mod tests {
         let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
         // let frame = game.render();
         // game.ui_handler.draw_screen(frame);
-        game.ui_handler
-            .camera
-            .translate_local_square_to_absolute_square(
-                game.ui_handler.camera.top_left_local_square(),
-                [0, 3],
-            );
-        dbg!(game.ui_handler.camera.top_left_local_square());
-        dbg!(game.ui_handler.camera, game.world_state.size_width_height());
+        // game.ui_handler
+        //     .camera
+        //     .translate_local_square_to_absolute_square(
+        //         game.ui_handler.camera.top_left_local_square(),
+        //         [0, 3],
+        //     );
+        dbg!(game.camera_rect().relative_top_left_corner());
+        dbg!(game.camera_rect(), game.world_state.size_width_height());
         let screen_char_screen_point_world_square_world_point = [
             ([0, 0], [0.5, 0.5], [0, 3], [0.25, 3.5]),
             ([0, 1], [0.5, 1.5], [0, 3], [0.75, 3.5]),
@@ -1642,13 +1676,12 @@ mod tests {
         ]
         .into_iter()
         .for_each(|(screen_char, correct_screen_point, correct_world_square, correct_world_point)| {
-            let world_square = game.ui_handler.screen_row_col_char_to_world_square(screen_char);
+            let world_square = game.screen_row_col_char_to_world_square(screen_char);
             assert_eq!(world_square, correct_world_square, 
                 "screen_char_row_col: {screen_char:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
-            let screen_point = screen_char.to_signed().grid_square_center();
+            let screen_point = screen_char.grid_square_center();
             assert_about_eq_2d(screen_point, correct_screen_point);
             let world_point = game
-                .ui_handler
                 .screen_row_col_point_to_world_point(screen_point);
             assert_eq!(world_point, correct_world_point,
                 "screen_point_row_col: {screen_point:?}, world_point: {world_point:?}, correct_world_point: {correct_world_point:?}");
