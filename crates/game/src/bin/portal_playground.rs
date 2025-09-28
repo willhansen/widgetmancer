@@ -33,12 +33,6 @@ use utility::*;
 
 type PortalSide = SquareEdge;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum PortalRenderingBehavior {
-    LineOnFloor,
-    Absolute,
-    LineOfSight,
-}
 
 // TODO
 // enum OrthoDir {
@@ -77,12 +71,12 @@ const OUT_OF_FOV_RANGE_CHAR: char = '╲';
 const SHADOW_CHAR: char = '╳';
 const DEFAULT_FOV_RANGE: u32 = 3;
 
-struct Game {
-    pub world_state: WorldState,
-    pub ui_handler: UiHandler,
-    pub config: Config,
+struct Game<'a> {
+    pub config: &'a Config,
+    pub world_state: WorldState<'a>,
+    pub ui_handler: UiHandler<'a>,
 }
-impl Game {
+impl<'a> Game<'a> {
     fn mouse_world_square(&self) -> Option<IPoint> {
         self.ui_handler.last_mouse_screen_row_col
             .map(|row_col| self.screen_row_col_char_to_world_square(row_col.map(|x| x as i32)))
@@ -91,15 +85,16 @@ impl Game {
         let screen_mouse_point = self.ui_handler.smoothed_mouse_position_screen_row_col();
         screen_mouse_point.map(|p| self.screen_row_col_point_to_world_point(p))
     }
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(config: &'a Config, width: usize, height: usize) -> Self {
         Game {
-            world_state: WorldState::new(width, height),
-            ui_handler: UiHandler::new(),
-            config: Default::default()
+            config,
+            world_state: WorldState::new(config, width, height),
+            ui_handler: UiHandler::new(config),
         }
     }
-    pub fn new_headless_square(side_length_in_squares: usize) -> Self {
+    pub fn new_headless_square(config: &'a Config, side_length_in_squares: usize) -> Self {
         Self::new_headless(
+            config,
             side_length_in_squares as u16,
             side_length_in_squares as u16 * 2,
             side_length_in_squares,
@@ -108,6 +103,7 @@ impl Game {
         )
     }
     pub fn new_headless(
+        config: &'a Config,
         screen_height: u16,
         screen_width: u16,
         world_width: usize,
@@ -115,9 +111,9 @@ impl Game {
         camera_radius: u32,
     ) -> Self {
         Game {
-            world_state: WorldState::new(world_width, world_height),
-            ui_handler: UiHandler::new_headless(screen_height, screen_width, camera_radius),
-            config: Default::default()
+            config,
+            world_state: WorldState::new(config, world_width, world_height),
+            ui_handler: UiHandler::new_headless(config, screen_height, screen_width, camera_radius),
         }
     }
     pub fn process_event(&mut self, event: Event) {
@@ -284,29 +280,42 @@ impl Game {
 //     extension_length: Option<u32>
 // }
 
+#[derive(Clone, Debug, PartialEq)]
 enum MouseBehavior {
     DrawMouse,
     CenterOnMouse,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum PortalRenderingBehavior {
+    LineOnFloor,
+    Absolute,
+    LineOfSight,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct Config {
     pub mouse_behavior: MouseBehavior,
     pub portal_rendering_behavior: PortalRenderingBehavior,
     pub fov_radius: u32,
     pub camera_diameter: u32,
+    pub world_size: UPoint,
 }
 impl Default for Config {
     fn default() -> Self {
         Self { 
             mouse_behavior: MouseBehavior::DrawMouse,
             portal_rendering_behavior: PortalRenderingBehavior::LineOfSight,
-            fov_radius: 5,
-            camera_diameter: 9 
+            fov_radius: 3,
+            camera_diameter: 9,
+            world_size: [15,15],
         }
     }
 }
 
 
-struct UiHandler {
+struct UiHandler<'a> {
+    pub config: &'a Config,
     // This instant is the link between the real world and "seconds from start".  The game world
     // has no use for real-time reference points that are instants
     pub start_time: Instant,
@@ -329,7 +338,7 @@ struct UiHandler {
     pub camera_side_length: u32,
     pub mouse_behavior: MouseBehavior,
 }
-impl UiHandler {
+impl UiHandler<'_> {
     fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
         self.smoothed_mouse_screen_row_col
     }
@@ -366,7 +375,7 @@ impl UiHandler {
     pub fn screen_width(&self) -> usize {
         self.screen_size_rows_cols[1]
     }
-    pub fn new() -> UiHandler {
+    pub fn new(config: &Config) -> UiHandler {
         let (term_width, term_height) = termion::terminal_size().unwrap();
         let output_writable = Box::new(
             termion::cursor::HideCursor::from(MouseTerminal::from(
@@ -375,7 +384,7 @@ impl UiHandler {
             .into_alternate_screen()
             .unwrap(),
         );
-        let ui_handler = Self::new_maybe_headless(term_height, term_width, Some(output_writable), DEFAULT_FOV_RANGE);
+        let ui_handler = Self::new_maybe_headless(config, term_height, term_width, Some(output_writable), DEFAULT_FOV_RANGE);
         set_up_input_thread_given_sender(ui_handler.copy_of_event_sender.clone());
         ui_handler
     }
@@ -404,10 +413,11 @@ impl UiHandler {
             xy_point[0], // back to 1-indexed
         ]
     }
-    pub fn new_headless(screen_height: u16, screen_width: u16, camera_radius: u32) -> UiHandler {
-        Self::new_maybe_headless(screen_height, screen_width, None, camera_radius)
+    pub fn new_headless(config: &Config, screen_height: u16, screen_width: u16, camera_radius: u32) -> UiHandler {
+        Self::new_maybe_headless(config, screen_height, screen_width, None, camera_radius)
     }
     pub fn new_maybe_headless(
+        config: &Config,
         screen_height: u16,
         screen_width: u16,
         output_writable: Option<Box<dyn Write>>,
@@ -421,6 +431,7 @@ impl UiHandler {
         // Needs to be odd size (because radius-based)
         // let camera_side_length = camera_side_length - (camera_side_length + 1) % 2;
         UiHandler {
+            config,
             start_time: Instant::now(),
             s_from_start: 0.0,
             screen_size_rows_cols,
@@ -529,7 +540,7 @@ impl UiHandler {
         self.start_time + Duration::from_secs_f32(s_after_start)
     }
 
-    // Camera is currently locked in top left of terminal
+    // Camera is currently locked in top left of screen
     pub fn screen_to_camera_char_rowcol<T>(
         &self,
         screen_row_col_char: [T; 2],
@@ -583,7 +594,8 @@ mod ui_handler_tests {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct WorldState {
+struct WorldState<'a> {
+    pub config: &'a Config,
     running: bool,
     s_from_start: f32,
     width: usize,
@@ -602,10 +614,33 @@ struct WorldState {
     // Effectively drawing on the floor.  on top of board color
     floor_markings: HashMap<IPoint, DoubleGlyphWithTransparency>,
 }
-impl WorldState {
-    pub fn new(width: usize, height: usize) -> Self {
+fn default_board_color(world_state: &WorldState, square: IPoint) -> Option<RGB8> {
+    let is_white = ((square[0] / 3).rem_euclid(2) == 0) == ((square[1] / 3).rem_euclid(2) == 0);
+    Some(if is_white { grey(191) } else { grey(127) })
+}
+fn radial_sin_board_colors(world_state: &WorldState, square: IPoint) -> Option<RGB8> {
+    let [cx, cy] = world_state.player_square;
+    let dx = square[0] - cx;
+    let dy = square[1] - cy;
+    let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+    let wave_length = 7.0;
+    let mid = 120.0;
+    let ampl = 50.0;
+
+    let val = mid + ampl * (d / wave_length * std::f32::consts::TAU).cos();
+
+    if world_state.on_board(square) {
+        Some(grey(val.round() as u8))
+    } else {
+        None
+    }
+}
+
+impl<'a> WorldState<'a> {
+    pub fn new(config: &'a Config, width: usize, height: usize) -> Self {
         let player_square = [width, height].to_int().div(2);
         let mut state = WorldState {
+            config,
             running: true,
             s_from_start: 0.0,
             width,
@@ -616,32 +651,11 @@ impl WorldState {
             player_is_alive: false,
             portals: Default::default(),
             portal_rendering: PortalRenderingBehavior::LineOfSight,
-            board_color_function: Self::default_board_color,
+            board_color_function: default_board_color,
             portal_tint_function: Self::default_portal_tint,
             floor_markings: Default::default(),
         };
         state
-    }
-    fn default_board_color(&self, square: IPoint) -> Option<RGB8> {
-        let is_white = ((square[0] / 3).rem_euclid(2) == 0) == ((square[1] / 3).rem_euclid(2) == 0);
-        Some(if is_white { grey(191) } else { grey(127) })
-    }
-    fn radial_sin_board_colors(&self, square: IPoint) -> Option<RGB8> {
-        let [cx, cy] = self.player_square;
-        let dx = square[0] - cx;
-        let dy = square[1] - cy;
-        let d = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
-        let wave_length = 7.0;
-        let mid = 120.0;
-        let ampl = 50.0;
-
-        let val = mid + ampl * (d / wave_length * std::f32::consts::TAU).cos();
-
-        if self.on_board(square) {
-            Some(grey(val.round() as u8))
-        } else {
-            None
-        }
     }
     fn draw_simple_rect_on_floor(&mut self, bottom_left_square: IPoint, width_height: IPoint, glyphs: DoubleGlyphWithTransparency) {
         self.draw_rect_on_floor(IRect::from_min_and_size(bottom_left_square, width_height.to_usize()), false, |_,_|glyphs)
@@ -1066,7 +1080,8 @@ fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Op
 
 fn main() {
     let n = 5;
-    let mut game = Game::new(n, n);
+    let config = Default::default();
+    let mut game = Game::new(&config, n, n);
     game.world_state.player_is_alive = true;
     game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
     // game.world_state
@@ -1116,7 +1131,8 @@ mod tests {
 
     #[test]
     fn test_simple_output() {
-        let state = WorldState::new(10, 10);
+        let config = Default::default();
+        let state = WorldState::new(&config, 10, 10);
         let frame = state.render([5.0, 5.0], 5);
         assert_eq!(frame.width(), 22);
         assert_eq!(frame.height(), 11);
@@ -1144,7 +1160,8 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut game = Game::new_headless_square(9);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 9);
 
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
@@ -1155,7 +1172,8 @@ mod tests {
     }
     #[test]
     fn test_click_a_small() {
-        let mut game = Game::new_headless_square(3);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 3);
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         let center_of_top_row_left_char = [0.25, 2.5];
@@ -1167,7 +1185,8 @@ mod tests {
     }
     #[test]
     fn test_click_b() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.ui_handler.give_event(press_left_1_indexed(4, 11));
         game.process_events();
         let frame = game.render();
@@ -1178,7 +1197,8 @@ mod tests {
     }
     #[test]
     fn test_drag_mouse() {
-        let mut game = Game::new_headless(11, 22, 12, 12, 5);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config, 11, 22, 12, 12, 5);
         game.ui_handler.give_event(press_left_1_indexed(4, 4));
         game.process_events();
         let frame_1 = game.render();
@@ -1194,7 +1214,8 @@ mod tests {
     }
     #[test]
     fn test_render_portal_edges() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.world_state
             .place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
         game.world_state
@@ -1228,7 +1249,8 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let visible_portion = PositionedSquareVisibilityInFov {
@@ -1255,7 +1277,8 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
         let mut frame = Frame::blank(20, 3);
@@ -1284,10 +1307,11 @@ mod tests {
     }
     #[test]
     fn test_render_one_line_of_sight_portal() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
-        game.world_state.board_color_function = WorldState::radial_sin_board_colors;
+        game.world_state.board_color_function = radial_sin_board_colors;
         game.world_state
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
         // game.portal_tint_function = GameState::rainbow_solid;
@@ -1303,7 +1327,8 @@ mod tests {
     }
     #[test]
     fn test_portal_with_rotation() {
-        let mut game = Game::new_headless_square(13);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 13);
         game.world_state.board_color_function = |world_state, square| {
             let n = 10;
             let frac = square.y().rem_euclid(n) as f32 / n as f32;
@@ -1375,7 +1400,8 @@ mod tests {
     #[test]
     fn test_screen_row_col_to_xy_points() {
         let n = 5;
-        let mut game = Game::new_headless_square(n);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, n);
 
         // .....
         // .....
@@ -1414,7 +1440,8 @@ mod tests {
 
     #[test]
     fn test_render_smoothed_mouse_stationary() {
-        let mut game = Game::new_headless_square(3);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 3);
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
@@ -1430,7 +1457,8 @@ mod tests {
     }
     #[test]
     fn test_smoothed_mouse_linear_move() {
-        let mut game = Game::new_headless_square(3);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 3);
         game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
@@ -1456,7 +1484,8 @@ mod tests {
 
     #[test]
     fn test_player_step_through_portal() {
-        let mut game = Game::new_headless_square(5);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 5);
         game.world_state
             .place_portal(([1, 2], DIR_RIGHT), ([3, 2], DIR_LEFT));
         game.world_state.player_square = [1, 2];
@@ -1466,13 +1495,15 @@ mod tests {
     }
     #[test]
     fn test_player_step_history_starts_empty() {
-        let mut game = Game::new_headless_square(5);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 5);
         assert!(game.world_state.player_step_history.is_empty());
     }
     #[ignore]
     #[test]
     fn test_draw_smoothed_player_position() {
-        let mut game = Game::new_headless_square(5);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 5);
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
         game.try_move_player_at_time(STEP_RIGHT, 1.0);
@@ -1486,7 +1517,8 @@ mod tests {
     }
     #[test]
     fn test_render_with_center_offset() {
-        let mut game = Game::new_headless_square(5);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 5);
         let default_center = [2.5;2];
         let offset_radius = 0.3;
         let n = 10;
@@ -1504,7 +1536,8 @@ mod tests {
     }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
-        let mut game = Game::new_headless_square(9);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 9);
         game.process_events();
         game.ui_handler.give_event(press_char('a'));
         game.ui_handler.receive_events();
@@ -1517,7 +1550,8 @@ mod tests {
     }
     #[test]
     fn test_give_events_and_advance_time() {
-        let mut game = Game::new_headless_square(9);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 9);
         game.advance_time_by(1.0);
         game.ui_handler.give_event(press_char('a'));
         game.ui_handler.receive_events();
@@ -1544,16 +1578,18 @@ mod tests {
     }
     #[test]
     fn test_odd_screen_sizes() {
-        Game::new_headless_square(9); // odd square
-        Game::new_headless_square(8); // even square
-        Game::new_headless(8, 16, 3, 4, DEFAULT_FOV_RANGE);
-        Game::new_headless(10, 20, 30, 30, DEFAULT_FOV_RANGE);
+        let config = Default::default();
+        Game::new_headless_square(&config, 9); // odd square
+        Game::new_headless_square(&config, 8); // even square
+        Game::new_headless(&config,8, 16, 3, 4, DEFAULT_FOV_RANGE);
+        Game::new_headless(&config,10, 20, 30, 30, DEFAULT_FOV_RANGE);
     }
     #[test]
     fn test_smoothed_mouse_time_step_length_independence() {
         let steps = [10, 2];
+        let config = Default::default();
         let steps_and_times = steps.map(|n| {
-            let mut game = Game::new_headless_square(40);
+            let mut game = Game::new_headless_square(&config, 40);
             game.ui_handler
                 .give_event(press_left_row_col_screen_pos_1_indexed([10, 3]));
             let end_time = 1.0;
@@ -1571,7 +1607,8 @@ mod tests {
     }
     #[test]
     fn test_smoothed_mouse_is_fast() {
-        let mut game = Game::new_headless_square(40);
+        let config = Default::default();
+        let mut game = Game::new_headless_square(&config, 40);
         game.ui_handler
             .give_event(press_left_row_col_screen_pos_1_indexed([10, 3]));
         game.advance_time_by(0.5);
@@ -1594,7 +1631,8 @@ mod tests {
     }
     #[test]
     fn test_fov_rendering_alignment() {
-        let mut game = Game::new_headless(10, 30, 4, 4, 3);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config,10, 30, 4, 4, 3);
         // 🯩🯫
         // 🭮🭬
         let the_char = 'a';
@@ -1612,7 +1650,8 @@ mod tests {
     #[test]
     fn test_big_screen_small_world_simple() {
         // screen height is 10, world height is 4, camera height is 7
-        let mut game = Game::new_headless(10, 30, 4, 4, 3);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config,10, 30, 4, 4, 3);
         game.world_state.draw_labelled_rect_on_floor([0,0], [4;2]);
         // 🯩🯫
         // 🭮🭬
@@ -1627,7 +1666,8 @@ mod tests {
     }
     #[test]
     fn test_big_screen_small_world_click() {
-        let mut game = Game::new_headless(10, 30, 4, 4, 3);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config,10, 30, 4, 4, 3);
         // 🯩🯫
         // 🭮🭬
         let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
@@ -1641,7 +1681,8 @@ mod tests {
     }
     #[test]
     fn test_camera_local_world_squares_invariant_to_camera_motion() {
-        let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config,10, 30, 4, 4, DEFAULT_FOV_RANGE);
         let camera_rect = game.camera_rect();
         let before = camera_rect.relative_top_left_corner();
         camera_rect
@@ -1655,7 +1696,8 @@ mod tests {
     }
     #[test]
     fn test_screen_to_world() {
-        let mut game = Game::new_headless(10, 30, 4, 4, DEFAULT_FOV_RANGE);
+        let config = Default::default();
+        let mut game = Game::new_headless(&config,10, 30, 4, 4, DEFAULT_FOV_RANGE);
         // let frame = game.render();
         // game.ui_handler.draw_screen(frame);
         // game.ui_handler

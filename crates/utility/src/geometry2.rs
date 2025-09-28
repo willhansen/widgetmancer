@@ -375,7 +375,6 @@ pub trait IRectExt: Sized {
         self.corner_by_quadrant(3)
     }
     fn relative_top_left_corner(&self) -> IPoint {
-
         self.relative_corner_by_quadrant(1)
     }
     // Only provides a center if the rectangle has odd width and height
