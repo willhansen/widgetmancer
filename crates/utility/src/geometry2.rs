@@ -446,7 +446,7 @@ pub trait IRectExt: Sized {
         let square_xy = char_xy.char_to_square();
         square_xy
     }
-    fn local_square_to_char_rowcol(&self, local_square: IPoint) -> IPoint {
+    fn local_square_to_left_char_rowcol(&self, local_square: IPoint) -> IPoint {
         let char_xy = local_square.square_to_char();
         let char_colrow = self.flip_y_square(char_xy);
         let char_rowcol = char_colrow.transposed();
@@ -592,18 +592,18 @@ mod tests {
     }
     #[test]
     fn test_rect_square_to_char_conversions() {
-        let rect_sizes_char_rowcols_and_local_squares = [
-            ([5,5], [0,0], [0,4]),
-            ([5,5], [1,0], [0,3]),
-            ([5,5], [4,0], [0,0]),
-            ([5,5], [0,1], [0,4]),
-            ([5,5], [0,2], [1,4]),
-            ([5,5], [0,3], [1,4]),
+        let rect_sizes_char_rowcols_left_char_rowcols_and_local_squares = [
+            ([5,5], [0,0], [0,0], [0,4]),
+            ([5,5], [1,0], [1,0], [0,3]),
+            ([5,5], [4,0], [4,0], [0,0]),
+            ([5,5], [0,1], [0,0], [0,4]),
+            ([5,5], [0,2], [0,2], [1,4]),
+            ([5,5], [0,3], [0,2], [1,4]),
 
-            ([5,6], [0,0], [0,5]),
-            ([5,6], [5,0], [0,0]),
+            ([5,6], [0,0], [0,0], [0,5]),
+            ([5,6], [5,0], [5,0], [0,0]),
         ];
-        for (rect_size, char_rowcol, local_square) in rect_sizes_char_rowcols_and_local_squares.into_iter() {
+        for (rect_size, char_rowcol, left_char_rowcol, local_square) in rect_sizes_char_rowcols_left_char_rowcols_and_local_squares.into_iter() {
             let rect = IRect::from_min_and_size([0, 0], rect_size);
             assert_eq!(
                 rect.char_rowcol_to_local_square(char_rowcol),
@@ -611,18 +611,23 @@ mod tests {
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
             );
             assert_eq!(
-                rect.local_square_to_char_rowcol(local_square),
-                char_rowcol,
-                "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
+                rect.char_rowcol_to_local_square(left_char_rowcol),
+                local_square,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {left_char_rowcol:?}"
             );
             assert_eq!(
-                rect.char_rowcol_to_local_square(rect.local_square_to_char_rowcol(local_square)),
+                rect.local_square_to_left_char_rowcol(local_square),
+                left_char_rowcol,
+                "rect: {rect:?}, square: {local_square:?}, char rowcol: {left_char_rowcol:?}"
+            );
+            assert_eq!(
+                rect.char_rowcol_to_local_square(rect.local_square_to_left_char_rowcol(local_square)),
                 local_square,
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
             );
             assert_eq!(
-                rect.local_square_to_char_rowcol(rect.char_rowcol_to_local_square(char_rowcol)),
-                char_rowcol,
+                rect.local_square_to_left_char_rowcol(rect.char_rowcol_to_local_square(char_rowcol)),
+                left_char_rowcol,
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
             );
         }

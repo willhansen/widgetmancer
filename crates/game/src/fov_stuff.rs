@@ -1073,7 +1073,6 @@ pub fn portal_aware_field_of_view_from_point(
     // point is going to go through.  Don't want incosistencies if a rotation causes just enough
     // rounding error to cause it to round to a different center square.
     let center_square: WorldSquare = center_point.to_array().snap_to_grid().into();
-    dbg!(center_square);
     let center_offset = center_point - center_square.to_f32();
     (0..8)
         .fold(

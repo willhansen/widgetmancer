@@ -220,26 +220,30 @@ impl<'a> Game<'a> {
         self.ui_handler.now_as_s_from_start()
     }
     pub fn fov_center(&self) -> FPoint {
-        // TODO: move mouse behaviour to config scope
-        match self.ui_handler.mouse_behavior {
-            MouseBehavior::DrawMouse => None,
-            MouseBehavior::CenterOnMouse => self.mouse_world_point()
-        }.unwrap_or_else(|| self.world_state.player_square.grid_square_center())
+         match self.config.fov_center_behavior {
+            FovCenterBehavior::CameraCenter => self.camera_rect_in_world().center().unwrap().grid_square_center(),
+            FovCenterBehavior::Mouse => self.mouse_world_point().unwrap_or_else(|| self.camera_rect_in_world().center().unwrap().grid_square_center()),
+            FovCenterBehavior::Player => self.world_state.player_square.grid_square_center(),
+            FovCenterBehavior::Custom(point) => point,
+        }
+    }
+    pub fn camera_rect_in_world(&self) -> IRect {
+        let s = self.config.camera_side_length.unwrap_or_else(|| self.ui_handler.biggest_camera_size_that_fits_in_screen());
+        IRect::from_min_and_size([0;2], [s as usize;2])
 
     }
-    pub fn camera_rect(&self) -> IRect {
-        IRect::from_center_and_radius(self.fov_center().snap_to_grid(), self.ui_handler.camera_side_length/2)
-
+    fn fov_radius(&self) -> u32 {
+        self.config.fov_radius.unwrap_or_else(|| self.ui_handler.camera_side_length / 2)
     }
     pub fn render(&mut self) -> Frame {
-        self.ui_handler.render_camera(&self.world_state, self.camera_rect(), self.fov_center(), self.config.fov_radius)
+        self.ui_handler.render_camera(&self.world_state, self.camera_rect_in_world(), self.fov_center(), self.fov_radius())
     }
     pub fn render_at(&mut self, fov_center: FPoint) -> Frame {
-        self.ui_handler.render_camera(&self.world_state,self.camera_rect(), fov_center, self.config.fov_radius)
+        self.ui_handler.render_camera(&self.world_state,self.camera_rect_in_world(), fov_center, self.fov_radius())
     }
     pub fn print_debug_data(&self) {
         println!("\nScreen width: {:?}, \theight: {:?}", self.ui_handler.screen_width(), self.ui_handler.screen_height());
-        println!("Camera rect: {:?}, \tcenter_point: {:?}", self.camera_rect(),  self.fov_center());
+        println!("Camera rect: {:?}, \tcenter_point: {:?}", self.camera_rect_in_world(),  self.fov_center());
         println!("Player square: {:?}, \tsmoothed: {:?}", self.world_state.player_square, self.world_state.smoothed_player_pos);
         println!("Mouse char rowcol: {:?}, \tsmoothed: {:?}", self.ui_handler.last_mouse_screen_row_col, self.ui_handler.smoothed_mouse_screen_row_col);
         print!("Mouse world square: {:?}", self.mouse_world_square());
@@ -248,24 +252,24 @@ impl<'a> Game<'a> {
         println!("");
     }
     pub fn screen_row_col_point_to_world_point(&self, screen_row_col_point: FPoint) -> FPoint {
-        let camera_rect = self.camera_rect();
+        let camera_rect = self.camera_rect_in_world();
         let p = self.ui_handler.screen_to_camera_point_rowcol(screen_row_col_point);
         let p = [p[1]/2.0, camera_rect.height() as f32 - p[0]];
-        let p = self.camera_rect().local_to_absolute_point(p);
+        let p = self.camera_rect_in_world().local_to_absolute_point(p);
         p
     }
     pub fn screen_row_col_char_to_world_square(&self, screen_row_col_char: IPoint) -> IPoint {
         let camera_char_rowcol = self.ui_handler.screen_to_camera_char_rowcol(screen_row_col_char);
-        let camera_rect = self.camera_rect();
+        let camera_rect = self.camera_rect_in_world();
         let p = camera_rect.char_rowcol_to_local_square(camera_char_rowcol.map(|x| x as i32));
         let p = camera_rect.local_to_absolute_square(p);
         p
     }
     // one square maps to two characters.  This returns the left one.
     pub fn world_square_to_left_screen_row_col_char(&self, world_square: IPoint) -> IPoint {
-        let camera_rect = self.camera_rect();
+        let camera_rect = self.camera_rect_in_world();
         let camera_square = camera_rect.absolute_to_local_square(world_square);
-        let camera_left_char_rowcol = camera_rect.local_square_to_char_rowcol(camera_square);
+        let camera_left_char_rowcol = camera_rect.local_square_to_left_char_rowcol(camera_square);
         let screen_char_rowcol = self.ui_handler.camera_to_screen_char_rowcol(camera_left_char_rowcol);
         screen_char_rowcol
     }
@@ -281,9 +285,11 @@ impl<'a> Game<'a> {
 // }
 
 #[derive(Clone, Debug, PartialEq)]
-enum MouseBehavior {
-    DrawMouse,
-    CenterOnMouse,
+enum FovCenterBehavior {
+    CameraCenter,
+    Mouse,
+    Player,
+    Custom(FPoint)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -295,20 +301,22 @@ enum PortalRenderingBehavior {
 
 #[derive(Clone, Debug, PartialEq)]
 struct Config {
-    pub mouse_behavior: MouseBehavior,
+    pub fov_center_behavior: FovCenterBehavior,
     pub portal_rendering_behavior: PortalRenderingBehavior,
-    pub fov_radius: u32,
-    pub camera_diameter: u32,
+    // Fits to camera if not set
+    pub fov_radius: Option<u32>,
+    // Fits to screen if not set
+    pub camera_side_length: Option<u32>,
     pub world_size: UPoint,
 }
 impl Default for Config {
     fn default() -> Self {
         Self { 
-            mouse_behavior: MouseBehavior::DrawMouse,
+            fov_center_behavior: FovCenterBehavior::CameraCenter,
             portal_rendering_behavior: PortalRenderingBehavior::LineOfSight,
-            fov_radius: 3,
-            camera_diameter: 9,
-            world_size: [15,15],
+            fov_radius: None,
+            camera_side_length: None,
+            world_size: [9;2],
         }
     }
 }
@@ -336,7 +344,6 @@ struct UiHandler<'a> {
     pub prev_drawn: Option<Frame>,
     pub enable_mouse_smoothing: bool,
     pub camera_side_length: u32,
-    pub mouse_behavior: MouseBehavior,
 }
 impl UiHandler<'_> {
     fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
@@ -445,12 +452,11 @@ impl UiHandler<'_> {
             prev_drawn: None,
             enable_mouse_smoothing: false,
             camera_side_length,
-            mouse_behavior: MouseBehavior::DrawMouse,
         }
     }
-    pub fn fit_camera_to_screen(&mut self) {
-        let n = ((self.screen_width()/2).min(self.screen_height())-1)/2;
-        self.camera_side_length = 2*n as u32 + 1;
+    fn biggest_camera_size_that_fits_in_screen(&self) -> u32 {
+        let smallest_screen_dim_in_squares = (self.screen_width()/2).min(self.screen_height());
+        cut_to_odd(smallest_screen_dim_in_squares as i32) as u32
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
         if self.enable_mouse_smoothing {
@@ -768,7 +774,6 @@ impl<'a> WorldState<'a> {
                                       // .collect(),
             );
 
-        dbg!(fov_center);
         let fov = game::fov_stuff::portal_aware_field_of_view_from_point(
             (fov_center).into(),
             radius,
@@ -1683,7 +1688,7 @@ mod tests {
     fn test_camera_local_world_squares_invariant_to_camera_motion() {
         let config = Default::default();
         let mut game = Game::new_headless(&config,10, 30, 4, 4, DEFAULT_FOV_RANGE);
-        let camera_rect = game.camera_rect();
+        let camera_rect = game.camera_rect_in_world();
         let before = camera_rect.relative_top_left_corner();
         camera_rect
             .translated_to_put_local_square_at_absolute_square(
@@ -1697,31 +1702,27 @@ mod tests {
     #[test]
     fn test_screen_to_world() {
         let config = Default::default();
-        let mut game = Game::new_headless(&config,10, 30, 4, 4, DEFAULT_FOV_RANGE);
+        dbg!(&config);
+        let mut game = Game::new_headless(&config,9, 30, 4, 4, DEFAULT_FOV_RANGE);
         // let frame = game.render();
         // game.ui_handler.draw_screen(frame);
-        // game.ui_handler
-        //     .camera
-        //     .translate_local_square_to_absolute_square(
-        //         game.ui_handler.camera.top_left_local_square(),
-        //         [0, 3],
-        //     );
-        dbg!(game.camera_rect().relative_top_left_corner());
-        dbg!(game.camera_rect(), game.world_state.size_width_height());
-        let screen_char_screen_point_world_square_world_point = [
-            ([0, 0], [0.5, 0.5], [0, 3], [0.25, 3.5]),
-            ([0, 1], [0.5, 1.5], [0, 3], [0.75, 3.5]),
-            ([0, 2], [0.5, 2.5], [1, 3], [1.25, 3.5]),
-            ([0, 3], [0.5, 3.5], [1, 3], [1.75, 3.5]),
-            ([1, 0], [1.5, 0.5], [0, 2], [0.25, 2.5]),
-            ([1, 1], [1.5, 1.5], [0, 2], [0.75, 2.5]),
+        game.print_debug_data();
+        // dbg!(game.camera_rect_in_world().relative_top_left_corner());
+        // dbg!(game.camera_rect_in_world(), game.world_state.size_width_height());
+        let screen_char_rowcol_screen_point_rowcol_world_square_world_point = [
+            ([0, 0], [0.5, 0.5], [0, 8], [0.25, 8.5]),
+            ([0, 1], [0.5, 1.5], [0, 8], [0.75, 8.5]),
+            ([0, 2], [0.5, 2.5], [1, 8], [1.25, 8.5]),
+            ([0, 3], [0.5, 3.5], [1, 8], [1.75, 8.5]),
+            ([1, 0], [1.5, 0.5], [0, 7], [0.25, 7.5]),
+            ([1, 1], [1.5, 1.5], [0, 7], [0.75, 7.5]),
         ]
         .into_iter()
-        .for_each(|(screen_char, correct_screen_point, correct_world_square, correct_world_point)| {
-            let world_square = game.screen_row_col_char_to_world_square(screen_char);
+        .for_each(|(screen_char_rowcol, correct_screen_point, correct_world_square, correct_world_point)| {
+            let world_square = game.screen_row_col_char_to_world_square(screen_char_rowcol);
             assert_eq!(world_square, correct_world_square, 
-                "screen_char_row_col: {screen_char:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
-            let screen_point = screen_char.grid_square_center();
+                "screen_char_row_col: {screen_char_rowcol:?}, world_square: {world_square:?}, correct_world_square: {correct_world_square:?}");
+            let screen_point = screen_char_rowcol.grid_square_center();
             assert_about_eq_2d(screen_point, correct_screen_point);
             let world_point = game
                 .screen_row_col_point_to_world_point(screen_point);
