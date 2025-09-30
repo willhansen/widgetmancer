@@ -343,11 +343,11 @@ pub trait IRectExt: Sized {
         Self::from_min_and_max(min, max)
     }
     // quadrants start top-right and go counter-clockwise
-    fn corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
-        self.relative_corner_by_quadrant(nth_quadrant)
+    fn square_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
+        self.relative_square_by_quadrant(nth_quadrant)
             .add(self.min_square())
     }
-    fn relative_corner_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
+    fn relative_square_by_quadrant(&self, nth_quadrant: i32) -> IPoint {
         let [x0, y0] = [0, 0];
         let [x1, y1] = self.size().to_signed().sub([1, 1]);
         match nth_quadrant.rem_euclid(4) {
@@ -358,24 +358,24 @@ pub trait IRectExt: Sized {
             _ => unreachable!("rem_euclid fail"),
         }
     }
-    fn top_right_corner(&self) -> IPoint {
-        self.corner_by_quadrant(0)
+    fn top_right_square(&self) -> IPoint {
+        self.square_by_quadrant(0)
     }
     // local frame has min_square as [0,0]
-    fn top_right_corner_in_local_frame(&self) -> IPoint {
-        self.relative_corner_by_quadrant(0)
+    fn top_right_square_in_local_frame(&self) -> IPoint {
+        self.relative_square_by_quadrant(0)
     }
-    fn top_left_corner(&self) -> IPoint {
-        self.corner_by_quadrant(1)
+    fn top_left_square(&self) -> IPoint {
+        self.square_by_quadrant(1)
     }
-    fn bottom_left_corner(&self) -> IPoint {
-        self.corner_by_quadrant(2)
+    fn bottom_left_square(&self) -> IPoint {
+        self.square_by_quadrant(2)
     }
-    fn bottom_right_corner(&self) -> IPoint {
-        self.corner_by_quadrant(3)
+    fn bottom_right_square(&self) -> IPoint {
+        self.square_by_quadrant(3)
     }
-    fn relative_top_left_corner(&self) -> IPoint {
-        self.relative_corner_by_quadrant(1)
+    fn relative_top_left_square(&self) -> IPoint {
+        self.relative_square_by_quadrant(1)
     }
     // Only provides a center if the rectangle has odd width and height
     fn center(&self) -> Option<IPoint> {
@@ -398,7 +398,7 @@ pub trait IRectExt: Sized {
         self.translated_to_put_local_square_at_absolute_square(self.relative_center().unwrap(), dest)
     }
     fn border_squares(self) -> impl Iterator<Item = IPoint> {
-        let [x1, y1] = self.top_right_corner_in_local_frame();
+        let [x1, y1] = self.top_right_square_in_local_frame();
         (0..x1)
             .map(move |dx| [dx, 0])
             .chain((0..y1).map(move |dy| [x1, dy]))
@@ -425,6 +425,9 @@ pub trait IRectExt: Sized {
     }
     fn absolute_to_local_square(&self, absolute_square: IPoint) -> IPoint {
         absolute_square.sub(self.min_square())
+    }
+    fn absolute_to_local_rect(&self, absolute_rect: IRect) -> IRect {
+        absolute_rect.map(|x| self.absolute_to_local_square(x))
     }
     fn local_to_absolute_point(&self, local_point: FPoint) -> FPoint {
         self.min_point().add(local_point)
