@@ -582,19 +582,20 @@ impl UiHandler<'_> {
 
 
         let off_camera_glyph = GlyphWithTransparency::from_char(DEFAULT_FRAME_BACKGROUND_CHAR).with_primary_rgb(MAGENTA);
-        let mut camera_frame = Frame::new_from_repeated_glyph(camera_rect.width(), camera_rect.height(), off_camera_glyph.over_solid_bg(BLACK));
+        let mut camera_frame = Frame::new_from_repeated_glyph(camera_rect.width()*2, camera_rect.height(), off_camera_glyph.over_solid_bg(BLACK));
+
+
         camera_frame.blit(&world_frame, fov_rect_upper_left_char_rowcol_in_camera);
 
 
-        dbg!(camera_rect, fov_center, fov_radius);
         let mut screen_buffer = Frame::solid_color(
             self.screen_width(),
             self.screen_height(),
             UI_BACKGROUND_RGB.into(),
         );
-        dbg!(&world_frame);
-        screen_buffer.safe_blit(&world_frame, [0, 0]);
+        screen_buffer.safe_blit(&camera_frame, [0, 0]);
         self.draw_mouse(&mut screen_buffer);
+        // dbg!(&world_frame, &camera_frame, &screen_buffer);
         screen_buffer
     }
 }
@@ -1668,7 +1669,7 @@ mod tests {
     fn test_big_screen_small_world_simple() {
         // screen height is 10, world height is 4, camera height is 7
         let mut config = Config::default();
-        // config.fov_radius = Some(3);
+        config.camera_side_length = Some(7);
         let mut game = Game::new_headless(&config,10, 30, 4, 4);
         game.world_state.draw_labelled_rect_on_floor([0,0], [4;2]);
         // 🯩🯫
@@ -1685,7 +1686,7 @@ mod tests {
     #[test]
     fn test_big_screen_small_world_click() {
         let mut config = Config::default();
-        config.fov_radius = Some(3);
+        config.camera_side_length = Some(7);
         let mut game = Game::new_headless(&config,10, 30, 4, 4);
         // 🯩🯫
         // 🭮🭬
@@ -1695,7 +1696,6 @@ mod tests {
         game.process_events();
         game.print_debug_data();
         let frame = game.render();
-        game.print_debug_data();
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
