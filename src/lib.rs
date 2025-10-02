@@ -1821,6 +1821,28 @@ pub fn cut_to_odd(x: i32) -> i32 {
     }
 }
 
+// Map a value in a range to to an index depending on its relative value [min, low, mid, high, max]
+pub fn map_to_5_segments(min: i32, max: i32, x: i32) -> usize {
+    assert!(x >= min && x <= max, "min: {min}, max: {max}, x: {x}");
+
+    let width = max - min + 1;
+    let mid: Option<i32> = if width %2 == 0 {
+        None
+    } else {
+        Some((max + min) / 2)
+    };
+    let fmid = (max as f32 + min as f32) / 2.0;
+    if x == min {
+        0
+    } else if x == max {
+        4
+    } else if mid.is_some_and(|mid| x==mid) {
+        2
+    } else if (x as f32) < fmid {
+        1
+    } else {3}
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32;
@@ -2601,5 +2623,19 @@ mod tests {
         assert_eq!(cut_to_odd(4), 3);
         assert_eq!(cut_to_odd(10), 9);
         assert_eq!(cut_to_odd(40), 39);
+    }
+    #[test]
+    fn test_map_to_5_segments() {
+        assert_eq!(map_to_5_segments(0,4,0),0);
+        assert_eq!(map_to_5_segments(0,4,1),1);
+        assert_eq!(map_to_5_segments(0,4,2),2);
+        assert_eq!(map_to_5_segments(0,4,3),3);
+        assert_eq!(map_to_5_segments(0,4,4),4);
+
+        assert_eq!(map_to_5_segments(0,8,0),0);
+        assert_eq!(map_to_5_segments(0,8,1),1);
+        assert_eq!(map_to_5_segments(0,8,2),1);
+        assert_eq!(map_to_5_segments(0,8,3),1);
+        assert_eq!(map_to_5_segments(0,8,4),2);
     }
 }
