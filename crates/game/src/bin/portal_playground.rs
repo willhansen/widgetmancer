@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(deprecated)]
+#![feature(iter_array_chunks)]
 
 use color_hex::color_from_hex;
 use euclid::point2;
@@ -682,6 +683,53 @@ impl<'a> WorldState<'a> {
 
         })
     }
+    fn draw_rect_crosshair_on_floor(&mut self, rect: IRect) {
+        // let template = "
+// ┌───┬┬───┐
+// │  ╲││╱  │
+// ├───┼┼───┤
+// │  ╱││╲  │
+// └───┴┴───┘
+// ".trim();
+        // Not yet rendered by font :(
+        //🯐 	🯑 	🯒 	🯓
+        let template_string: &str =  "
+🭽▔▔▔🭾🭽▔▔▔🭾 
+▏ 🮡🮢▕▏🮣🮠 ▕
+▏───🮥🮤───▕
+▏ 🮣🮠▕▏🮡🮢 ▕
+🭼▁▁▁🭿🭼▁▁▁🭿
+";
+
+
+let template:  [[[char;2];5];5] = 
+            template_string.trim().lines().map(|line| {
+                let row: [[char;2];5] = line.chars().array_chunks::<2>().collect::<Vec<[char;2]>>().try_into().unwrap();
+                row
+            }
+            ).collect_vec().try_into().unwrap();
+
+        let [xmin, ymin] = rect.min_square();
+        let [xmax, ymax] = rect.max_square();
+        let center = rect.center().expect("rect center");
+        rect.covered_squares().for_each(|square| {
+            let xi = map_to_5_segments(xmin, xmax, square.x());
+            let yi = map_to_5_segments(ymin, ymax, square.y());
+            let rel_square = square.sub(center);
+            let x = rel_square.x();
+            let y = rel_square.y();
+
+            if xi %2 == 1 && yi%2 == 1 && x.abs() != y.abs() {
+                return;
+            }
+
+            let chars = template[4-yi][xi];
+            // let chars = [xi,yi].map(|x| x.to_string().chars().next().unwrap());
+            
+            self.floor_markings.insert(square, chars.map(|c| GlyphWithTransparency::from_char(c).with_primary_rgb(RED)));
+        })
+
+    }
     // glyph function takes arguments of abs_square and rel_square in that order
     fn draw_rect_on_floor(&mut self, rect: IRect, fill: bool, glyph_func: impl Fn(IPoint, IPoint) -> DoubleGlyphWithTransparency) {
         let absolute_squares = if fill {
@@ -696,8 +744,6 @@ impl<'a> WorldState<'a> {
             let glyphs = glyph_func(abs_square, rel_square);
             self.floor_markings.insert(abs_square, glyphs);
         });
-
-
     }
     fn default_portal_tint(color: RGB8, depth: u32) -> RGB8 {
         let tint = RED;
@@ -1357,6 +1403,7 @@ mod tests {
             .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
         // game.world_state.portal_tint_function = WorldState::rainbow_tint;
+        game.world_state.draw_rect_crosshair_on_floor(IRect::from_center_and_radius([5,5], 6));
         let (frame, layers) = game.world_state.render_with_debug_layers(
             [5.5, 5.5],
             6,
