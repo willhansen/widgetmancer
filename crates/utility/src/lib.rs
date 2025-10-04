@@ -1843,6 +1843,23 @@ pub fn map_to_5_segments(min: i32, max: i32, x: i32) -> usize {
     } else {3}
 }
 
+
+// TODO: print line the function is called from
+pub trait PostfixDebug {
+    fn dbg(self) -> Self;
+    fn rdbg(&self) -> &Self;
+}
+
+impl<T> PostfixDebug for T where T: Debug {
+    fn dbg(self) -> Self {
+        dbg!(self)
+    }
+    fn rdbg(&self) -> &Self {
+        dbg!(&self)
+    }
+
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32;

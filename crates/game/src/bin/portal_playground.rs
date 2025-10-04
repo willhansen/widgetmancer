@@ -309,6 +309,7 @@ struct Config {
     // Fits to screen if not set
     pub camera_side_length: Option<u32>,
     pub world_size: Option<UPoint>,
+    pub render_smoothed_mouse: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -318,6 +319,7 @@ impl Default for Config {
             fov_radius: None,
             camera_side_length: None,
             world_size: Some([9;2]),
+            render_smoothed_mouse: false,
         }
     }
 }
@@ -356,7 +358,6 @@ struct UiHandler<'a> {
     // newest events are added via `push_back`
     pub event_log: VecDeque<(f32, Event)>,
     pub prev_drawn: Option<Frame>,
-    pub enable_mouse_smoothing: bool,
 }
 impl UiHandler<'_> {
     fn smoothed_mouse_position_screen_row_col(&self) -> Option<FPoint> {
@@ -461,7 +462,6 @@ impl UiHandler<'_> {
             event_queue: Default::default(),
             event_log: Default::default(),
             prev_drawn: None,
-            enable_mouse_smoothing: false,
         }
     }
     fn biggest_camera_size_that_fits_in_screen(&self) -> u32 {
@@ -469,7 +469,7 @@ impl UiHandler<'_> {
         cut_to_odd(smallest_screen_dim_in_squares as i32) as u32
     }
     pub fn draw_mouse(&mut self, mut screen_buffer: &mut Frame) {
-        if self.enable_mouse_smoothing {
+        if self.config.render_smoothed_mouse {
             self.draw_smoothed_mouse(&mut screen_buffer);
         } else {
             self.draw_mouse_square(&mut screen_buffer);
@@ -477,10 +477,13 @@ impl UiHandler<'_> {
     }
     pub fn draw_smoothed_mouse(&mut self, screen_buffer: &mut Frame) {
         if let Some(smoothed_mouse_pos_row_col) = self.smoothed_mouse_position_screen_row_col() {
-            let smoothed_mouse_pos_xy =
+            let smoothed_mouse_screen_xy =
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
-            let the_char: char = character_grid_point_xy_to_braille_char(smoothed_mouse_pos_xy);
+
+            dbg!(smoothed_mouse_screen_xy);
+            let the_char: char = braille_char_by_pos_in_char(smoothed_mouse_screen_xy.fraction_part());
+
             let [row_1i, col_1i] = smoothed_mouse_pos_row_col.snap_to_grid();
             assert!(row_1i >= 0, "{row_1i}");
             assert!(row_1i < self.screen_height() as i32, "{row_1i}");
@@ -920,7 +923,7 @@ let template:  [[[char;2];5];5] =
                     {
                         debug_portal_visualizer_frames.insert(
                             debug_frames_key,
-                            Frame::blank(self.width * 2, self.height),
+                            Frame::blank(fov_diameter * 2, fov_diameter),
                         );
                     }
                     let mut debug_frame = debug_portal_visualizer_frames
@@ -1157,13 +1160,13 @@ fn main() {
     let n = 5;
     let mut config: Config = Default::default();
     config.world_size = Some([n;2]);
+    config.render_smoothed_mouse = true;
 
     let mut game = Game::new(&config);
     game.world_state.player_is_alive = true;
     game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
     // game.world_state
     //     .place_portal(([10, 5], DIR_UP), ([15, 15], DIR_RIGHT));
-    game.ui_handler.enable_mouse_smoothing = true;
 
     set_up_panic_hook();
 
@@ -1264,6 +1267,7 @@ mod tests {
     #[test]
     fn test_click_b() {
         let mut config = Config::default();
+        config.world_size = Some([13;2]);
         let mut game = Game::new_headless_square(&config, 13);
         game.ui_handler.give_event(press_left_1_indexed(4, 11));
         game.process_events();
@@ -1296,6 +1300,7 @@ mod tests {
     #[test]
     fn test_render_portal_edges() {
         let mut config = Config::default();
+        config.world_size=Some([13;2]);
         let mut game = Game::new_headless_square(&config, 13);
         game.world_state
             .place_portal(([1, 1], DIR_UP), ([1, 3], DIR_UP));
@@ -1389,21 +1394,19 @@ mod tests {
     #[test]
     fn test_render_one_line_of_sight_portal() {
         let mut config = Config::default();
+        config.world_size = Some([12;2]);
+        config.fov_radius = Some(7);
+        config.fov_center_behavior = FovCenterBehavior::Player;
         let mut game = Game::new_headless_square(&config, 13);
         game.world_state.player_square = [5, 5];
         game.world_state.portal_rendering = PortalRenderingBehavior::LineOfSight;
         game.world_state.board_color_function = radial_sin_board_colors;
         game.world_state
-            .place_portal(([5, 7], DIR_UP), ([7, 10], DIR_UP));
+            .place_portal(([5, 7], DIR_UP), ([8, 4], DIR_RIGHT));
         // game.portal_tint_function = GameState::rainbow_solid;
         game.world_state.portal_tint_function = WorldState::rainbow_tint;
+        game.print_debug_data();
         let frame = game.render();
-        let (_, debug_layers) = game
-            .world_state
-            .render_with_debug_layers(game.world_state.smoothed_player_pos, 5);
-        debug_layers.into_iter().for_each(|frame| {
-            dbg!(frame);
-        });
         assert_frame_same_as_past!(frame, "a");
     }
     #[test]
@@ -1528,8 +1531,8 @@ mod tests {
     #[test]
     fn test_render_smoothed_mouse_stationary() {
         let mut config = Config::default();
+        config.render_smoothed_mouse = true;
         let mut game = Game::new_headless_square(&config, 3);
-        game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         assert_eq!(game.ui_handler.event_log.len(), 1);
@@ -1545,8 +1548,8 @@ mod tests {
     #[test]
     fn test_smoothed_mouse_linear_move() {
         let mut config = Config::default();
+        config.render_smoothed_mouse = true;
         let mut game = Game::new_headless_square(&config, 3);
-        game.ui_handler.enable_mouse_smoothing = true;
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
         game.ui_handler.advance_time_to(0.2);

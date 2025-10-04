@@ -188,6 +188,7 @@ pub trait FPointExt: PointExt<f32> + Sized + Clone {
     fn floor(&self) -> IPoint {
         [self.x().floor() as i32, self.y().floor() as i32]
     }
+    // TODO: should round to negative infinity
     fn snap_to_grid(&self) -> IPoint {
         self.floor()
     }
@@ -395,7 +396,10 @@ pub trait IRectExt: Sized {
         Some(self.size().to_signed().div(2))
     }
     fn with_center_at(&self, dest: IPoint) -> Self {
-        self.translated_to_put_local_square_at_absolute_square(self.relative_center().unwrap(), dest)
+        self.translated_to_put_local_square_at_absolute_square(
+            self.relative_center().unwrap(),
+            dest,
+        )
     }
     fn border_squares(self) -> impl Iterator<Item = IPoint> {
         let [x1, y1] = self.top_right_square_in_local_frame();
@@ -596,17 +600,18 @@ mod tests {
     #[test]
     fn test_rect_square_to_char_conversions() {
         let rect_sizes_char_rowcols_left_char_rowcols_and_local_squares = [
-            ([5,5], [0,0], [0,0], [0,4]),
-            ([5,5], [1,0], [1,0], [0,3]),
-            ([5,5], [4,0], [4,0], [0,0]),
-            ([5,5], [0,1], [0,0], [0,4]),
-            ([5,5], [0,2], [0,2], [1,4]),
-            ([5,5], [0,3], [0,2], [1,4]),
-
-            ([5,6], [0,0], [0,0], [0,5]),
-            ([5,6], [5,0], [5,0], [0,0]),
+            ([5, 5], [0, 0], [0, 0], [0, 4]),
+            ([5, 5], [1, 0], [1, 0], [0, 3]),
+            ([5, 5], [4, 0], [4, 0], [0, 0]),
+            ([5, 5], [0, 1], [0, 0], [0, 4]),
+            ([5, 5], [0, 2], [0, 2], [1, 4]),
+            ([5, 5], [0, 3], [0, 2], [1, 4]),
+            ([5, 6], [0, 0], [0, 0], [0, 5]),
+            ([5, 6], [5, 0], [5, 0], [0, 0]),
         ];
-        for (rect_size, char_rowcol, left_char_rowcol, local_square) in rect_sizes_char_rowcols_left_char_rowcols_and_local_squares.into_iter() {
+        for (rect_size, char_rowcol, left_char_rowcol, local_square) in
+            rect_sizes_char_rowcols_left_char_rowcols_and_local_squares.into_iter()
+        {
             let rect = IRect::from_min_and_size([0, 0], rect_size);
             assert_eq!(
                 rect.char_rowcol_to_local_square(char_rowcol),
@@ -624,15 +629,29 @@ mod tests {
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {left_char_rowcol:?}"
             );
             assert_eq!(
-                rect.char_rowcol_to_local_square(rect.local_square_to_left_char_rowcol(local_square)),
+                rect.char_rowcol_to_local_square(
+                    rect.local_square_to_left_char_rowcol(local_square)
+                ),
                 local_square,
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
             );
             assert_eq!(
-                rect.local_square_to_left_char_rowcol(rect.char_rowcol_to_local_square(char_rowcol)),
+                rect.local_square_to_left_char_rowcol(
+                    rect.char_rowcol_to_local_square(char_rowcol)
+                ),
                 left_char_rowcol,
                 "rect: {rect:?}, square: {local_square:?}, char rowcol: {char_rowcol:?}"
             );
+        }
+    }
+    #[test]
+    fn test_snap_to_grid() {
+        assert_eq!([0.0, 0.0].snap_to_grid(), [0, 0]);
+        let ps: [IPoint;_] = [[3, 3], [-3, 3], [-3, -3], [3, -3]];
+        for p in ps {
+            for n in 0..10 {
+                assert_eq!([n as f32 / 10.0; 2].add(p.to_float()).snap_to_grid(), p);
+            }
         }
     }
 }
