@@ -7,7 +7,6 @@ edition.workspace = true
 # external
 approx = "0.5.1"
 derive_more = "0.99.17"
-device_query = "1.1.1"
 dyn-clone = "1.0.9"
 enum-as-inner = "0.5.1"
 euclid = "0.22.7"
