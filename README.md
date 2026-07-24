@@ -2,11 +2,9 @@
 
 A roguelike in rust featuring portals.
 
-Just a test map for now.
-
-Still quite rough, but the portals look neat.
-
 Run with `cargo run --release`
+
+run tests with `cargo nextest run`
 
 ## Gameplay
 
