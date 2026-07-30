@@ -79,12 +79,6 @@ impl Game {
             .min_by_key(|&square| (square - self.player_square()).square_length())
             .unwrap()
     }
-    pub(crate) fn kill_player(&mut self) {
-        // TODO: less abrupt game-over
-        self.player_optional = None;
-        self.quit();
-    }
-
     pub(crate) fn move_piece(&mut self, start: WorldSquare, end: WorldSquare) {
         // capture player
         if !self.is_non_player_piece_at(start) {
