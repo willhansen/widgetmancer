@@ -19,7 +19,8 @@ with each item so the context doesn't have to be re-discovered later.
      `docs/checkpoints/roadmap-1.1-extract-blocks.md`
   2. `game/floating_entities.rs` — `DeathCube`, `FloatingHunterDrone`, `FloatingEntityTrait` **[DONE]** — see
      `docs/checkpoints/roadmap-1.2-extract-floating-entities.md`
-  3. `game/ai.rs` — enemy pathfinding/decision logic
+  3. `game/ai.rs` — enemy pathfinding/decision logic **[DONE]** — see
+     `docs/checkpoints/roadmap-1.3-extract-ai.md`
   4. `game/spawning.rs` — pawn/drone spawn logic
   5. `game/turns.rs` — turn advancement and game-over handling
   6. Move inline `#[cfg(test)]` tests into `crates/game/tests/` or `game/tests.rs`
