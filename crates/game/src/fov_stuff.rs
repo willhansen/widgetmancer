@@ -812,15 +812,18 @@ impl OctantFOVSquareSequenceIter {
     }
 
     fn next_out_and_across_steps(next_step_number: u32) -> (u32, u32) {
-        // area = y + (x-1)/2 * x
-        // dx = x-1, dy = y-1, i = area-2
-
-        let area: i32 = next_step_number as i32 + 1;
-        let x: i32 = (0.5 + (0.25 + 2.0 * area as f32).sqrt()).ceil() as i32 - 1;
-        let y: i32 = area - ((x - 1) as f32 / 2.0 * x as f32).round() as i32;
-        let dx: u32 = x as u32 - 1;
-        let dy: u32 = y as u32 - 1;
-        (dx, dy)
+        // Each outward ring `dx` yields `dy` in 0..=dx+1 (one square past the octant's
+        // diagonal), so that squares whose *angular* extent straddles the octant
+        // boundary when viewed from a fractional center offset are still visited by
+        // both neighboring octants.  Squares that don't actually overlap the octant's
+        // view arc are filtered out later by the arc-overlap check.
+        let mut dx: u32 = 0;
+        let mut remaining: u32 = next_step_number;
+        while remaining > dx + 1 {
+            remaining -= dx + 2;
+            dx += 1;
+        }
+        (dx, remaining)
     }
 }
 
@@ -1072,7 +1075,10 @@ pub fn portal_aware_field_of_view_from_point(
     // Split into square and offset to avoid rounding issues with all the rotations the center
     // point is going to go through.  Don't want incosistencies if a rotation causes just enough
     // rounding error to cause it to round to a different center square.
-    let center_square: WorldSquare = center_point.to_array().snap_to_grid().into();
+    // Note: rounding (not flooring) to the nearest square keeps center_offset within [-0.5, 0.5],
+    // which single_octant_field_of_view asserts.  Ties (view point exactly on a square boundary)
+    // go to the even square so that the choice is consistent and unbiased.
+    let center_square: WorldSquare = center_point.map(|x| x.round_ties_even() as i32);
     let center_offset = center_point - center_square.to_f32();
     (0..8)
         .fold(
@@ -1460,14 +1466,17 @@ mod tests {
         let mut sequence = OctantFOVSquareSequenceIter::new(Octant::new(1), 0);
         let correct_sequence = vec![
             vec2(0, 0),
+            vec2(1, 0),
             vec2(0, 1),
             vec2(1, 1),
+            vec2(2, 1),
             vec2(0, 2),
             vec2(1, 2),
             vec2(2, 2),
+            vec2(3, 2),
             vec2(0, 3),
         ];
-        assert_eq!(sequence.take(7).collect_vec(), correct_sequence);
+        assert_eq!(sequence.take(10).collect_vec(), correct_sequence);
     }
 
     #[test]
@@ -1982,17 +1991,17 @@ mod tests {
     fn test_octant_step_sequence() {
         let i_x_y = vec![
             (0, 0, 0),
-            (1, 1, 0),
-            (2, 1, 1),
-            (3, 2, 0),
-            (4, 2, 1),
-            (5, 2, 2),
-            (6, 3, 0),
-            (7, 3, 1),
-            (8, 3, 2),
-            (9, 3, 3),
-            (10, 4, 0),
-            (11, 4, 1),
+            (1, 0, 1),
+            (2, 1, 0),
+            (3, 1, 1),
+            (4, 1, 2),
+            (5, 2, 0),
+            (6, 2, 1),
+            (7, 2, 2),
+            (8, 2, 3),
+            (9, 3, 0),
+            (10, 3, 1),
+            (11, 3, 2),
         ];
         i_x_y.into_iter().for_each(|(i, x, y)| {
             assert_eq!(

@@ -41,6 +41,21 @@ with each item so the context doesn't have to be re-discovered later.
 - **Plan:** for each ignored test: either fix the underlying behavior, fix the
   test's assumptions, or delete it with a comment explaining why it's not
   testable. Priority order: portal FOV > pathfinding determinism > the rest.
+- **Progress:**
+  - FIXED: `portal_playground::test_render_with_center_offset` — root cause was
+    in `fov_stuff.rs`: `OctantFOVSquareSequenceIter` partitioned squares by the
+    static integer octant wedge, so with a fractional `center_offset`, squares
+    whose angular extent straddles an octant boundary were only enumerated in one
+    octant; the other octant's visible sliver was silently dropped, producing
+    spurious partial visibility on an empty board. Fix: each octant ring now also
+    yields the one-square band just past its diagonal (straddlers are filtered by
+    the existing arc-overlap check; complementary partials then combine into full
+    visibility). Also fixed two center-convention inconsistencies unmasked along
+    the way: `portal_aware_field_of_view_from_point` now picks the center square
+    with `round_ties_even` (keeping `center_offset` within the asserted
+    [-0.5, 0.5]; ties break consistently when the view point is exactly on a
+    square boundary), and `portal_playground::render_camera` positions the fov
+    rect using the same convention instead of flooring the unadjusted center.
 - **Done when:** `cargo nextest run` runs the full suite with zero ignored
   tests (or only ignored tests with documented justification).
 

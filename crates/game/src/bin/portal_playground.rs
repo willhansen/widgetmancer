@@ -592,7 +592,11 @@ impl UiHandler<'_> {
         let world_frame = 
             world_state.render_with_options(false, fov_center, fov_radius).0;
 
-        let fov_rect = IRect::from_center_and_radius(fov_center.snap_to_grid(), fov_radius);
+        // Must match the center-square convention in render_with_options /
+        // portal_aware_field_of_view_from_point: the world frame is built around the
+        // ties-even-rounded square of the center-offset-adjusted fov center.
+        let fov_root_square = fov_center.sub([0.5;2]).map(|x| x.round_ties_even() as i32);
+        let fov_rect = IRect::from_center_and_radius(fov_root_square, fov_radius);
 
         let fov_rect_upper_left_square_in_camera: IPoint = camera_rect.absolute_to_local_rect(fov_rect).top_left_square();
         let fov_rect_upper_left_char_rowcol_in_camera: IPoint = camera_rect.local_square_to_left_char_rowcol(fov_rect_upper_left_square_in_camera);
@@ -1825,3 +1829,5 @@ mod tests {
         });
     }
 }
+
+
