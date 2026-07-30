@@ -7,6 +7,9 @@ techniques (braille, half/quarter/hextant blocks) for smooth graphics.
 
 Run with `cargo run --release`; test with `cargo nextest run`.
 
+Known architectural issues and the plan to fix them are tracked in
+[ROADMAP.md](ROADMAP.md).
+
 ## Workspace Layout
 
 The project is a Cargo workspace (`resolver = "3"`) with three crates under `crates/`,
