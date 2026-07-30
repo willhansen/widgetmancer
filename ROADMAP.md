@@ -25,7 +25,8 @@ with each item so the context doesn't have to be re-discovered later.
      `docs/checkpoints/roadmap-1.4-extract-spawning.md`
   5. `game/turns.rs` — turn advancement and game-over handling **[DONE]** — see
      `docs/checkpoints/roadmap-1.5-extract-turns.md`
-  6. Move inline `#[cfg(test)]` tests into `crates/game/tests/` or `game/tests.rs`
+  6. Move inline `#[cfg(test)]` tests into `crates/game/tests/` or `game/tests.rs` **[DONE]** — see
+     `docs/checkpoints/roadmap-1.6-extract-tests.md`
 - **Done when:** no module in `game/` exceeds ~1.5k LOC; `game.rs` is primarily
   the `Game` struct and its core accessors.
 
