@@ -4,7 +4,6 @@ members = ["crates/*"]
 resolver = "3"
 
 [workspace.package]
-name = "rust_roguelike"
 version = "0.1.0"
 edition = "2021"
 

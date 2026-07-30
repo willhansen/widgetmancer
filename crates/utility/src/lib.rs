@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(deprecated)]
 
 extern crate num;
 
@@ -724,7 +722,7 @@ pub fn get_by_point<T, U>(grid: &Vec<Vec<T>>, p: Point2D<i32, U>) -> &T {
     &grid[p.x as usize][p.y as usize]
 }
 
-pub fn int_to_T<T: Signed>(x: i32) -> T {
+pub fn int_to_t<T: Signed>(x: i32) -> T {
     match x {
         1 => T::one(),
         0 => T::zero(),
@@ -738,8 +736,8 @@ pub fn rotated_n_quarter_turns_counter_clockwise<T: Signed + Copy, U>(
     quarter_turns: i32,
 ) -> Vector2D<T, U> {
     vec2(
-        v.x * int_to_T(int_cos(quarter_turns)) - v.y * int_to_T(int_sin(quarter_turns)),
-        v.x * int_to_T(int_sin(quarter_turns)) + v.y * int_to_T(int_cos(quarter_turns)),
+        v.x * int_to_t(int_cos(quarter_turns)) - v.y * int_to_t(int_sin(quarter_turns)),
+        v.x * int_to_t(int_sin(quarter_turns)) + v.y * int_to_t(int_cos(quarter_turns)),
     )
 }
 
@@ -1744,7 +1742,8 @@ pub fn exponential_approach_with_min_speed(
 
     let time_constant = dist_halflife / LN_2;
 
-    let speed_at_start = start_dist / time_constant * (-dt / time_constant).exp();
+    // TODO: `_speed_at_start` is unused — leftover from the approach-speed derivation; delete or use
+    let _speed_at_start = start_dist / time_constant * (-dt / time_constant).exp();
 
     let time_until_transition = time_constant * (start_dist / (min_speed * time_constant)).ln();
 
@@ -1867,7 +1866,7 @@ mod tests {
     use ntest::{assert_about_eq, assert_false};
     use num::traits::real::Real;
     use pretty_assertions::{assert_eq, assert_ne};
-    use rgb::RGB8;
+    
 
     use super::*;
 

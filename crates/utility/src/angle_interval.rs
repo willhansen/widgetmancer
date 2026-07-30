@@ -407,7 +407,6 @@ impl DirectionalAngularEdge {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-#[deprecated]
 pub struct AngleIntervalSet {
     intervals: Vec<AngleInterval>,
 }
@@ -448,6 +447,7 @@ impl AngleIntervalSet {
         self.intervals = new_intervals;
     }
 
+    #[cfg(test)]
     fn is_valid(&self) -> bool {
         let sorted = self.intervals.is_sorted_by_key(|i| i.clockwise_end);
         if !sorted {
@@ -529,10 +529,10 @@ impl Display for AngleIntervalSet {
 mod tests {
     use crate::ORTHOGONAL_STEPS;
     use ntest::{assert_about_eq, assert_false};
-    use num::zero;
-    use pretty_assertions::{assert_eq, assert_ne};
+    
+    use pretty_assertions::assert_eq;
 
-    use crate::{STEP_DOWN, STEP_RIGHT, STEP_UP};
+    use crate::STEP_RIGHT;
 
     use super::*;
 
@@ -956,7 +956,7 @@ mod tests {
 
     #[test]
     fn test_split_interval_around_interval() {
-        let new_arcs = assert_eq!(
+        let _new_arcs = assert_eq!(
             AngleInterval::from_degrees(0.0, 30.0)
                 .subtract(AngleInterval::from_degrees(10.0, 20.0)),
             vec![
@@ -968,7 +968,7 @@ mod tests {
 
     #[test]
     fn test_interval_subtraction_touching_from_inside() {
-        let new_arcs = assert_eq!(
+        let _new_arcs = assert_eq!(
             AngleInterval::from_degrees(0.0, 30.0)
                 .subtract(AngleInterval::from_degrees(-10.0, 30.0)),
             vec![]
@@ -1093,12 +1093,12 @@ mod tests {
         let d = Angle::degrees(1.0);
 
         let arc = AngleInterval::new(cw, ccw);
-        let arc_extend_cw = AngleInterval::new(cw - d, ccw);
-        let arc_retract_cw = AngleInterval::new(cw + d, ccw);
+        let _arc_extend_cw = AngleInterval::new(cw - d, ccw);
+        let _arc_retract_cw = AngleInterval::new(cw + d, ccw);
         let arc_extend_ccw = AngleInterval::new(cw, ccw + d);
         let arc_retract_ccw = AngleInterval::new(cw, ccw - d);
-        let arc_extend_both = AngleInterval::new(cw - d, ccw + d);
-        let arc_retract_both = AngleInterval::new(cw + d, ccw - d);
+        let _arc_extend_both = AngleInterval::new(cw - d, ccw + d);
+        let _arc_retract_both = AngleInterval::new(cw + d, ccw - d);
 
         assert!(arc.exactly_touches_arc(arc_extend_ccw.complement()));
         assert_false!(arc.exactly_touches_arc(arc_retract_ccw.complement()));
