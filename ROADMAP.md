@@ -15,7 +15,8 @@ with each item so the context doesn't have to be re-discovered later.
   It contains board state, turn handling, combat, enemy AI, spawning, block types,
   floating entities, and inline tests.
 - **Plan:** extract submodules incrementally, keeping each step compiling:
-  1. `game/blocks.rs` — block/wall/conveyor/upgrade block types
+  1. `game/blocks.rs` — block/wall/conveyor/upgrade block types **[DONE]** — see
+     `docs/checkpoints/roadmap-1.1-extract-blocks.md`
   2. `game/floating_entities.rs` — `DeathCube`, `FloatingHunterDrone`, `FloatingEntityTrait`
   3. `game/ai.rs` — enemy pathfinding/decision logic
   4. `game/spawning.rs` — pawn/drone spawn logic

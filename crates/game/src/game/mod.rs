@@ -36,6 +36,9 @@ use utility::*;
 use glyph_constants::named_colors::*;
 use crate::graphics::game_colors::*;
 
+mod blocks;
+pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
+
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
 
@@ -109,20 +112,11 @@ impl FloatingHunterDrone {
     }
 }
 
-pub const CONVEYOR_BELT_MOVEMENT_PERIOD: Duration = Duration::new(2, 0);
-pub const CONVEYOR_BELT_VISUAL_PERIOD: Duration = CONVEYOR_BELT_MOVEMENT_PERIOD.saturating_mul(2);
-
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum GridEntity {
     Player,
     Widget(Widget),
     Block,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Copy)]
-enum FloorFeature {
-    PushArrow(OrthogonalWorldStep),
-    ConveyorBelt(OrthogonalWorldStep),
 }
 
 pub struct Player {
@@ -176,11 +170,9 @@ pub struct Game {
     player_optional: Option<Player>,
     graphics: Graphics,
     pieces: HashMap<WorldSquare, Piece>,
-    upgrades: HashMap<WorldSquare, Upgrade>,
-    blocks: HashSet<WorldSquare>,
+    blocks: Blocks,
     widgets: HashMap<WorldSquare, Widget>,
     floor_push_arrows: HashMap<WorldSquare, OrthogonalWorldStep>,
-    conveyor_belts: HashMap<WorldSquare, OrthogonalWorldStep>,
     turn_count: u32,
     selectors: Vec<SelectorAnimation>,
     selected_square: Option<WorldSquare>,
@@ -205,11 +197,9 @@ impl Game {
             player_optional: None,
             graphics: Graphics::new(terminal_width, terminal_height, start_time),
             pieces: HashMap::new(),
-            upgrades: HashMap::new(),
-            blocks: HashSet::new(),
+            blocks: Blocks::new(),
             widgets: HashMap::new(),
             floor_push_arrows: HashMap::new(),
-            conveyor_belts: HashMap::new(),
             turn_count: 0,
             selectors: vec![],
             selected_square: None,
@@ -341,7 +331,7 @@ impl Game {
     fn get_grid_entity_at_square(&self, square: WorldSquare) -> Option<GridEntity> {
         if self.try_get_player_square() == Some(square) {
             Some(GridEntity::Player)
-        } else if self.blocks.contains(&square) {
+        } else if self.blocks.is_block_at(square) {
             Some(GridEntity::Block)
         } else if let Some(&widget) = self.widgets.get(&square) {
             Some(GridEntity::Widget(widget))
@@ -513,9 +503,9 @@ impl Game {
             return Err(());
         }
 
-        if let Some(&upgrade) = self.upgrades.get(&square) {
+        if let Some(&upgrade) = self.blocks.upgrades.get(&square) {
             self.apply_upgrade(upgrade);
-            self.upgrades.remove(&square);
+            self.blocks.upgrades.remove(&square);
         }
 
         self.raw_set_player_position(square);
@@ -609,7 +599,7 @@ impl Game {
         let global_phase_offset: f32 =
             self.world_time_since_start().as_secs_f32() / CONVEYOR_BELT_VISUAL_PERIOD.as_secs_f32();
         self.graphics
-            .draw_conveyor_belts(&self.conveyor_belts, global_phase_offset);
+            .draw_conveyor_belts(&self.blocks.conveyor_belts, global_phase_offset);
 
         self.graphics.draw_move_marker_squares(
             self.move_squares_for_all_pieces(false),
@@ -618,7 +608,7 @@ impl Game {
             self.squares_threatened_by_any_piece(true),
         );
 
-        self.graphics.draw_blocks(&self.blocks);
+        self.graphics.draw_blocks(&self.blocks.blocks);
         for (&square, &piece) in &self.pieces {
             if piece.piece_type == Arrow {
                 self.graphics.draw_arrow(square, piece.faced_direction());
@@ -632,7 +622,8 @@ impl Game {
             self.graphics
                 .draw_piece_with_color(square, piece.piece_type, color)
         }
-        self.upgrades
+        self.blocks
+            .upgrades
             .iter()
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
         self.death_cubes
@@ -948,16 +939,11 @@ impl Game {
     }
 
     fn tick_conveyor_belts(&mut self, delta: Duration) {
-        let prev_conveyor_periods_since_start = self.world_time_since_start().as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32();
-        let new_conveyor_periods_since_start = delta.as_secs_f32()
-            / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
-            + prev_conveyor_periods_since_start;
-
         let just_finished_full_movement_period =
-            new_conveyor_periods_since_start.floor() > prev_conveyor_periods_since_start.floor();
+            conveyor_period_just_elapsed(self.world_time_since_start(), delta);
 
         let push_directions: HashMap<WorldSquare, KingWorldStep> = self
+            .blocks
             .conveyor_belts
             .iter()
             .map(|(&start_square, &push_direction)| (start_square, push_direction.into()))
@@ -1111,7 +1097,7 @@ impl Game {
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {
         assert!(self.square_is_empty(square));
-        self.upgrades.insert(square, upgrade_type);
+        self.blocks.place_upgrade(upgrade_type, square);
     }
 
     pub fn tick_pawn_incubation(&mut self) {
@@ -1208,7 +1194,7 @@ impl Game {
     }
 
     pub fn is_upgrade_at(&self, square: WorldSquare) -> bool {
-        self.upgrades.contains_key(&square)
+        self.blocks.is_upgrade_at(square)
     }
     pub fn is_arrow_at(&self, square: WorldSquare) -> bool {
         self.pieces
@@ -2037,17 +2023,17 @@ impl Game {
         self.floor_push_arrows.insert(square, dir.into());
     }
     pub fn place_conveyor_belt(&mut self, square: WorldSquare, dir: WorldStep) {
-        self.conveyor_belts.insert(square, dir.into());
+        self.blocks.place_conveyor_belt(square, dir);
     }
     pub fn conveyor_belt_speed() -> f32 {
-        1.0 / CONVEYOR_BELT_MOVEMENT_PERIOD.as_secs_f32()
+        conveyor_belt_speed()
     }
 
     pub fn place_block(&mut self, square: WorldSquare) {
-        self.blocks.insert(square);
+        self.blocks.place_block(square);
     }
     pub fn is_block_at(&self, square: WorldSquare) -> bool {
-        self.blocks.contains(&square)
+        self.blocks.is_block_at(square)
     }
     pub fn set_up_vs_arrows(&mut self) {
         (0..10).for_each(|i| {
@@ -2408,7 +2394,7 @@ impl Game {
         portal_aware_field_of_view_from_square(
             start_square,
             PLAYER_SIGHT_RADIUS,
-            &self.blocks,
+            &self.blocks.blocks,
             &self.portal_geometry,
         )
     }
@@ -2942,9 +2928,9 @@ mod tests {
         let mut game = set_up_10x10_game();
         let square = point2(5, 5);
         game.place_piece(Piece::new(King, game.default_enemy_faction), square);
-        assert!(game.upgrades.is_empty());
+        assert!(game.blocks.upgrades.is_empty());
         game.capture_piece_at(square);
-        assert_eq!(game.upgrades.get(&square).unwrap(), &BlinkRange);
+        assert_eq!(game.blocks.upgrades.get(&square).unwrap(), &BlinkRange);
     }
 
     #[test]
