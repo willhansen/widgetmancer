@@ -82,6 +82,45 @@ with each item so the context doesn't have to be re-discovered later.
 - **Done when:** every remaining `unwrap()`/`expect()` in `fov_stuff.rs` and
   `terminal_rendering` has a stated invariant or is gone.
 
+### 6. Record user input + timing for deterministic crash reproduction
+- **Evidence:** input already arrives as `(Instant, Event)` pairs via
+  `set_up_input_thread` in `crates/game/src/lib.rs` (~line 51), and
+  `Game::new` takes a start `Instant` — so the full input stream is
+  capturable at one seam. But there is currently no logging/replay:
+  a crash report can't be reproduced from what the user actually did.
+- **Plan:**
+  1. Log the input stream (event + timestamp offset from game start, plus
+     the initial seed/start `Instant` and terminal size) to a rolling file
+     (e.g. `~/.local/share/<game>/replays/last_session.input`).
+  2. Verify determinism first: audit `Game`/`inputmap.rs` for wall-clock
+     reads (`Instant::now()` outside the input seam) and RNG without a
+     seeded source; route both through injectable clock/RNG.
+  3. Add a headless replay mode (e.g. `--replay <file>` or a test harness
+     in `crates/game/tests/`) that feeds recorded events at recorded times
+     (or turn indices) and asserts identical final state.
+  4. On panic, leave the replay file intact and print its path in the
+     crash message.
+- **Done when:** crashing a live session, then replaying the recorded
+  input file, reproduces the same panic/final state; a regression test
+  replays a canned recording.
+
+### 7. Fix error display truncation on crashes
+- **Evidence:** the panic hook in `crates/game/src/lib.rs` (~line 44, and
+  a copy in `crates/game/src/bin/portal_playground.rs` ~line 47) writes
+  `{:?}` of `PanicInfo` straight to stdout after switching to the main
+  screen. With no scrollback handling/wrapping, long panic messages and
+  backtraces run past the terminal height and the top of the message
+  (often the actual error) is lost.
+- **Plan:** in the hook, format the message + location + optional
+  backtrace, wrap to terminal width, and either print the tail (most
+  relevant lines last) or page it; dedupe the hook into one shared
+  function used by both `lib.rs` and `portal_playground.rs`. Also write
+  the full crash text to a log file and print its path so nothing is
+  ever lost to truncation.
+- **Done when:** panicking with a multi-screen message leaves the error
+  message and location readable on screen (or in a pager), and the full
+  text is on disk; covered by a test that panics in a small terminal.
+
 ---
 
 ## Done
