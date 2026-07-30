@@ -481,7 +481,6 @@ impl UiHandler<'_> {
                 self.screen_row_col_point_to_screen_xy_point(smoothed_mouse_pos_row_col);
 
 
-            dbg!(smoothed_mouse_screen_xy);
             let the_char: char = braille_char_by_pos_in_char(smoothed_mouse_screen_xy.fraction_part());
 
             let [row_1i, col_1i] = smoothed_mouse_pos_row_col.snap_to_grid();
@@ -1624,7 +1623,6 @@ mod tests {
         offsets.into_iter().for_each(|offset| {
             let center = default_center.add(offset);
             let frame = game.render_at(center);
-            dbg!(&frame);
             frame.glyphs().for_each(|g| assert!(g.looks_solid(), "Offset: {offset:?}\nCenter: {center:?}\nFrame:\n{frame:?}",));
         })
     }
