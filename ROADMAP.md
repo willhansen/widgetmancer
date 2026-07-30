@@ -21,7 +21,8 @@ with each item so the context doesn't have to be re-discovered later.
      `docs/checkpoints/roadmap-1.2-extract-floating-entities.md`
   3. `game/ai.rs` — enemy pathfinding/decision logic **[DONE]** — see
      `docs/checkpoints/roadmap-1.3-extract-ai.md`
-  4. `game/spawning.rs` — pawn/drone spawn logic
+  4. `game/spawning.rs` — pawn/drone spawn logic **[DONE]** — see
+     `docs/checkpoints/roadmap-1.4-extract-spawning.md`
   5. `game/turns.rs` — turn advancement and game-over handling
   6. Move inline `#[cfg(test)]` tests into `crates/game/tests/` or `game/tests.rs`
 - **Done when:** no module in `game/` exceeds ~1.5k LOC; `game.rs` is primarily
