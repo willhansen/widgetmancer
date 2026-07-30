@@ -10,26 +10,6 @@ with each item so the context doesn't have to be re-discovered later.
 
 ## Open
 
-### 1. Split the `game.rs` god module
-- **Evidence:** `crates/game/src/game.rs` is ~4,900 LOC with 121 `pub fn`s and ~59 `unwrap()`s.
-  It contains board state, turn handling, combat, enemy AI, spawning, block types,
-  floating entities, and inline tests.
-- **Plan:** extract submodules incrementally, keeping each step compiling:
-  1. `game/blocks.rs` — block/wall/conveyor/upgrade block types **[DONE]** — see
-     `docs/checkpoints/roadmap-1.1-extract-blocks.md`
-  2. `game/floating_entities.rs` — `DeathCube`, `FloatingHunterDrone`, `FloatingEntityTrait` **[DONE]** — see
-     `docs/checkpoints/roadmap-1.2-extract-floating-entities.md`
-  3. `game/ai.rs` — enemy pathfinding/decision logic **[DONE]** — see
-     `docs/checkpoints/roadmap-1.3-extract-ai.md`
-  4. `game/spawning.rs` — pawn/drone spawn logic **[DONE]** — see
-     `docs/checkpoints/roadmap-1.4-extract-spawning.md`
-  5. `game/turns.rs` — turn advancement and game-over handling **[DONE]** — see
-     `docs/checkpoints/roadmap-1.5-extract-turns.md`
-  6. Move inline `#[cfg(test)]` tests into `crates/game/tests/` or `game/tests.rs` **[DONE]** — see
-     `docs/checkpoints/roadmap-1.6-extract-tests.md`
-- **Done when:** no module in `game/` exceeds ~1.5k LOC; `game.rs` is primarily
-  the `Game` struct and its core accessors.
-
 ### 2. Remove globally suppressed warnings
 - **Evidence:** `#![allow(warnings)]` in `crates/game/src/lib.rs`;
   `#![allow(dead_code)]` + `#![allow(deprecated)]` in `crates/utility/src/lib.rs`.
@@ -129,4 +109,13 @@ with each item so the context doesn't have to be re-discovered later.
 
 ## Done
 
-_(nothing yet — move completed items here with a date)_
+### 1. Split the `game.rs` god module — 2026-07-30
+- **Evidence:** `crates/game/src/game.rs` was ~4,900 LOC with 121 `pub fn`s and ~59 `unwrap()`s.
+- **Landed:** extracted `game/blocks.rs`, `game/floating_entities.rs`, `game/ai.rs`,
+  `game/spawning.rs`, `game/turns.rs`, `game/tests.rs`, `game/combat.rs`, and
+  `game/realtime.rs` in seven compiling steps (checkpoints:
+  `docs/checkpoints/roadmap-1.1-extract-blocks.md` through
+  `roadmap-1.7-extract-combat-realtime.md`). `mod.rs` is now 1,219 lines —
+  primarily the `Game` struct, core accessors, map construction, and rendering
+  glue; no non-test module exceeds ~1.5k LOC. Test suite held at 470 passed /
+  11 skipped throughout; public `Game` API unchanged.
