@@ -5,7 +5,6 @@ use std::ops::Mul;
 use std::time::{Duration, Instant};
 
 use ::num::clamp;
-use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
 use derive_more::{Constructor, From};
 use euclid::*;
 use getset::{CopyGetters, Setters};
@@ -37,80 +36,14 @@ use glyph_constants::named_colors::*;
 use crate::graphics::game_colors::*;
 
 mod blocks;
+mod floating_entities;
+pub use floating_entities::{DeathCube, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
 
 const TURNS_TO_SPAWN_PAWN: u32 = 10;
 const PLAYER_SIGHT_RADIUS: u32 = 16;
 
-#[delegatable_trait]
-pub trait FloatingEntityTrait {
-    fn position(&self) -> WorldPoint;
-    fn set_position(&mut self, position: WorldPoint);
-    fn velocity(&self) -> WorldMove;
-    fn set_velocity(&mut self, velocity: WorldMove);
-}
-
-#[derive(Clone, PartialEq, Debug, Copy, From, Delegate)]
-#[delegate(FloatingEntityTrait)]
-enum FloatingEntityEnum {
-    DeathCube(DeathCube),
-    FloatingHunterDrone(FloatingHunterDrone),
-}
-
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub struct DeathCube {
-    position: WorldPoint,
-    velocity: WorldMove,
-}
-impl FloatingEntityTrait for DeathCube {
-    fn position(&self) -> WorldPoint {
-        self.position
-    }
-    fn set_position(&mut self, position: WorldPoint) {
-        self.position = position;
-    }
-    fn velocity(&self) -> WorldMove {
-        self.velocity
-    }
-    fn set_velocity(&mut self, velocity: WorldMove) {
-        self.velocity = velocity;
-    }
-}
-
-pub const HUNTER_DRONE_SIGHT_RANGE: f32 = 5.0;
-
-#[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters)]
-pub struct FloatingHunterDrone {
-    position: WorldPoint,
-    velocity: WorldMove,
-    #[getset(get_copy = "pub", set = "pub")]
-    sight_direction: Angle<f32>,
-}
-
-impl FloatingEntityTrait for FloatingHunterDrone {
-    fn position(&self) -> WorldPoint {
-        self.position
-    }
-    fn set_position(&mut self, position: WorldPoint) {
-        self.position = position;
-    }
-    fn velocity(&self) -> WorldMove {
-        self.velocity
-    }
-    fn set_velocity(&mut self, velocity: WorldMove) {
-        self.velocity = velocity;
-    }
-}
-
-impl FloatingHunterDrone {
-    pub fn new(position: WorldPoint, velocity: WorldMove, sight_direction: Angle<f32>) -> Self {
-        FloatingHunterDrone {
-            position,
-            velocity,
-            sight_direction,
-        }
-    }
-}
+use floating_entities::FloatingEntityEnum;
 
 #[derive(Clone, Eq, PartialEq, Debug, Copy)]
 enum GridEntity {
@@ -713,7 +646,7 @@ impl Game {
     }
 
     pub fn place_linear_death_cube(&mut self, position: WorldPoint, velocity: WorldMove) {
-        self.death_cubes.push(DeathCube { position, velocity });
+        self.death_cubes.push(DeathCube::new(position, velocity));
     }
 
     pub fn tick_realtime_effects(&mut self, delta: Duration) {

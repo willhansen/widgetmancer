@@ -17,7 +17,8 @@ with each item so the context doesn't have to be re-discovered later.
 - **Plan:** extract submodules incrementally, keeping each step compiling:
   1. `game/blocks.rs` — block/wall/conveyor/upgrade block types **[DONE]** — see
      `docs/checkpoints/roadmap-1.1-extract-blocks.md`
-  2. `game/floating_entities.rs` — `DeathCube`, `FloatingHunterDrone`, `FloatingEntityTrait`
+  2. `game/floating_entities.rs` — `DeathCube`, `FloatingHunterDrone`, `FloatingEntityTrait` **[DONE]** — see
+     `docs/checkpoints/roadmap-1.2-extract-floating-entities.md`
   3. `game/ai.rs` — enemy pathfinding/decision logic
   4. `game/spawning.rs` — pawn/drone spawn logic
   5. `game/turns.rs` — turn advancement and game-over handling
