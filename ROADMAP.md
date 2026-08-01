@@ -97,11 +97,33 @@ with each item so the context doesn't have to be re-discovered later.
       screen.rs:563-566); conversions → `world_point_to_local_character_point`
       et al.; maps → `ScreenBufferGlyphMap` / `DrawableGlyphMap`.
     - DECISION (map migration): option 2 — NO intermediate
-      `LocalCharacterSquareGlyphMap` alias. Refactor `glyph.rs` producers
-      (`glyph_map_to_string`, `pair_up_character_square_map`, lines
-      ~438/445/671/683) to emit `ScreenBufferGlyphMap` directly, folding
-      the buffer-offset logic into the same commit. Fewer total touches
-      than a frame-only alias swap; slightly larger diff per commit.
+      `LocalCharacterSquareGlyphMap` alias. REVISED AFTER IMPLEMENTATION
+      START: producers CANNOT emit `ScreenBufferGlyphMap` directly —
+      braille/line producers take `WorldPoint` inputs and the world→buffer
+      transform (camera origin + `rotation`) lives in `Screen`
+      (screen.rs:43-44, `world_square_to_both_screen_buffer_character_squares`).
+      Correct end state: world-side producers emit per-`WorldSquare`
+      `[Glyph; 2]`/`DoubleChar` (pairing is already the terminal step —
+      `Screen::draw_glyphs` immediately squashes char maps via
+      `pair_up_character_square_map`, graphics.rs:146-150), and sub-square
+      producers (braille) bin dots by world square directly instead of
+      going through the world character grid.
+    - STEP 2a PARTIAL LANDED: `pair_up_character_square_map` and
+      `glyph_map_to_string` made generic over the euclid unit
+      (`HashMap<Point2D<i32, U>, _>`); pairing math reimplemented without
+      deprecated fns (`world_x = char_x.div_euclid(2)`,
+      `index = char_x.rem_euclid(2)` — matches the `char_x = 2*world_x+0.5`
+      convention and `round()` behavior of the old path); deprecated
+      `#[deprecated]` attr + dead imports removed from glyph.rs.
+      Warnings 67 → 59; terminal_rendering tests 139 pass.
+    - RISK REALIZED: the remaining glyph.rs/braille.rs producers
+      (`get_glyphs_for_colored_braille_line`, `points_to_braille_glyphs`,
+      `character_world_pos_to_colored_braille_glyph`, glyph.rs:435-447;
+      braille.rs `points_to_braille_chars` binning) are gated on the
+      animation-API migration — `glyphs_at_time` returns
+      `WorldCharacterSquareGlyphMap` across ~12 files in
+      `game/src/graphics/animations/*`. Splitting that out as item 8
+      rather than letting item 2 balloon.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
@@ -190,6 +212,27 @@ with each item so the context doesn't have to be re-discovered later.
 - **Done when:** panicking with a multi-screen message leaves the error
   message and location readable on screen (or in a pager), and the full
   text is on disk; covered by a test that panics in a small terminal.
+
+
+### 8. Migrate animation/graphics API off the world character grid
+- **Evidence:** `Animation::glyphs_at_time` returns
+  `WorldCharacterSquareGlyphMap` (`crates/game/src/graphics/animations.rs:41`)
+  and is implemented in ~12 files under `game/src/graphics/animations/*`;
+  `Screen::draw_glyphs` (graphics.rs:146) immediately squashes these to
+  per-`WorldSquare` `DoubleGlyph` via `pair_up_character_square_map`.
+  Spawned from item 2 Phase 2 (see RISK note there).
+- **Plan:**
+  1. Change the `Animation` trait to emit `HashMap<WorldSquare, DoubleGlyph>`
+     (what `draw_glyphs_at_squares` already consumes); update
+     `double_glyphs_at_time/duration` defaults and the ~12 impls.
+  2. Migrate sub-square producers (braille/hextant) to bin by world square
+     directly (`get_braille_arrays_for_braille_line` already proves the
+     pattern — it pairs then converts; skip the pairing).
+  3. Once no caller remains, delete the deprecated aliases/fns from
+     `screen.rs` (completes item 2 Phase 2) — includes resolving the 25
+     definition-site warnings in screen.rs itself.
+- **Done when:** no `WorldCharacterSquare*` types in `game/src`; the
+  deprecated items in `screen.rs` are deleted; suite still green.
 
 ---
 
