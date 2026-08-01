@@ -3,34 +3,28 @@
 #![feature(iter_array_chunks)]
 
 use color_hex::color_from_hex;
-use euclid::point2;
 use game::fov_stuff::{
     FieldOfViewResult, MappedSquare, PositionedSquareVisibilityInFov, SquareVisibility,
 };
 use game::set_up_input_thread_given_sender;
-use game::{graphics::Graphics, set_up_input_thread};
 use itertools::Itertools;
-use rgb::{RGB8, RGBA8};
+use rgb::RGB8;
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Display;
-use std::fs::File;
-use std::io::Read;
-use std::io::{stdin, stdout, Write};
-use std::option_env;
+use std::io::{stdout, Write};
+#[cfg(test)]
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread::{self, sleep_ms};
+use std::thread::{self};
 use std::time::{Duration, Instant};
 use terminal_rendering::drawable_glyph::*;
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::*;
-use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
+use termion::screen::IntoAlternateScreen;
 use termion::{
     event::{Event, Key},
-    input::{MouseTerminal, TermRead},
+    input::MouseTerminal,
     raw::IntoRawMode,
 };
-use utility::*;
 
 type PortalSide = SquareEdge;
 
@@ -147,11 +141,11 @@ impl<'a> Game<'a> {
             },
             // Switch from 1-indexing to 0-indexing here
             Event::Mouse(mouse_event) => match mouse_event {
-                termion::event::MouseEvent::Press(mouse_button, col_one_indexed, row_one_indexed) => {
+                termion::event::MouseEvent::Press(_mouse_button, col_one_indexed, row_one_indexed) => {
                     self.ui_handler.last_mouse_screen_row_col = Some([row_one_indexed - 1 , col_one_indexed - 1]);
                     self.ui_handler.smoothed_mouse_screen_row_col = self.ui_handler.last_mouse_screen_row_col.map(|x| x.to_signed().grid_square_center());
                 }
-                termion::event::MouseEvent::Release(col_one_indexed, row_one_indexed) => {
+                termion::event::MouseEvent::Release(_col_one_indexed, _row_one_indexed) => {
                     self.ui_handler.last_mouse_screen_row_col = None;
                     self.ui_handler.smoothed_mouse_screen_row_col = None;
                 }
@@ -159,7 +153,7 @@ impl<'a> Game<'a> {
                     self.ui_handler.last_mouse_screen_row_col = Some([row_one_indexed - 1, col_one_indexed - 1])
                 }
             },
-            Event::Unsupported(items) => todo!(),
+            Event::Unsupported(_items) => todo!(),
         };
     }
     pub fn advance_time_by(&mut self, dt_s: f32) {
@@ -195,7 +189,7 @@ impl<'a> Game<'a> {
     pub fn try_move_player_at_time(&mut self, step: IPoint, s_from_start: f32) {
         assert!(step.squared_length() == 1);
         let dir = closest_ortho_dir(step).unwrap();
-        let (new_pos, end_dir) = self
+        let (new_pos, _end_dir) = self
             .world_state
             .portal_step(self.world_state.player_square, dir);
         if self.world_state.on_board(new_pos) {
@@ -396,7 +390,7 @@ impl UiHandler<'_> {
     pub fn screen_width(&self) -> usize {
         self.screen_size_rows_cols[1]
     }
-    pub fn new(config: &Config) -> UiHandler {
+    pub fn new(config: &Config) -> UiHandler<'_> {
         let (term_width, term_height) = termion::terminal_size().unwrap();
         let output_writable = Box::new(
             termion::cursor::HideCursor::from(MouseTerminal::from(
@@ -434,7 +428,7 @@ impl UiHandler<'_> {
             xy_point[0], // back to 1-indexed
         ]
     }
-    pub fn new_headless(config: &Config, screen_height: u16, screen_width: u16) -> UiHandler {
+    pub fn new_headless(config: &Config, screen_height: u16, screen_width: u16) -> UiHandler<'_> {
         Self::new_maybe_headless(config, screen_height, screen_width, None)
     }
     pub fn new_maybe_headless(
@@ -442,7 +436,7 @@ impl UiHandler<'_> {
         screen_height: u16,
         screen_width: u16,
         output_writable: Option<Box<dyn Write>>,
-    ) -> UiHandler {
+    ) -> UiHandler<'_> {
         let (event_sender, event_receiver) = channel();
         let screen_size_rows_cols = [screen_height as usize, screen_width as usize];
         // want to be square (for now)
@@ -625,11 +619,11 @@ fn press_char(c: char) -> Event {
 
 #[cfg(test)]
 mod ui_handler_tests {
-    use super::*;
-    use termion::event::*;
+    
+    
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 struct WorldState<'a> {
     pub config: &'a Config,
     running: bool,
@@ -650,7 +644,7 @@ struct WorldState<'a> {
     // Effectively drawing on the floor.  on top of board color
     floor_markings: HashMap<IPoint, DoubleGlyphWithTransparency>,
 }
-fn default_board_color(world_state: &WorldState, square: IPoint) -> Option<RGB8> {
+fn default_board_color(_world_state: &WorldState, square: IPoint) -> Option<RGB8> {
     let is_white = ((square[0] / 3).rem_euclid(2) == 0) == ((square[1] / 3).rem_euclid(2) == 0);
     Some(if is_white { grey(191) } else { grey(127) })
 }
@@ -675,7 +669,7 @@ fn radial_sin_board_colors(world_state: &WorldState, square: IPoint) -> Option<R
 impl<'a> WorldState<'a> {
     pub fn new(config: &'a Config) -> Self {
         let player_square = config.world_size().to_signed().div(2);
-        let mut state = WorldState {
+        let state = WorldState {
             config,
             running: true,
             s_from_start: 0.0,
@@ -815,6 +809,7 @@ let template:  [[[char;2];5];5] =
         rotation: i32,
     ) -> DoubleGlyphWithTransparency {
         assert!(rotation >= 0 && rotation < 4);
+        let _ = square;
         todo!();
     }
     // Simple top-down, no rotation, no portals (except for entrance/exit)
@@ -929,7 +924,7 @@ let template:  [[[char;2];5];5] =
                             Frame::blank(fov_diameter * 2, fov_diameter),
                         );
                     }
-                    let mut debug_frame = debug_portal_visualizer_frames
+                    let debug_frame = debug_portal_visualizer_frames
                         .get_mut(&debug_frames_key)
                         .unwrap();
                     debug_frame.set_by_double_wide_grid(
@@ -943,7 +938,7 @@ let template:  [[[char;2];5];5] =
 
         }
 
-        let mut transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
+        let transparency_frame: Vec<Vec<DoubleGlyphWithTransparency>> = 
 
         (0..fov_diameter)
             .map(|row_in_fov| {
@@ -958,7 +953,7 @@ let template:  [[[char;2];5];5] =
                             xy_in_fov_frame - WorldStep::from(fov_center_xy_in_fov_frame);
                         let current_radius = xy_relative_to_fov_center.to_array().iter().map(|x|x.abs() as u32).max().unwrap();
 
-                        let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> = visibilities_and_glyphs_in_fov[row_in_fov][col_in_fov].iter().map(|(viz, glyphs)| *glyphs).collect_vec();
+                        let glyph_layers_to_combine: Vec<DoubleGlyphWithTransparency> = visibilities_and_glyphs_in_fov[row_in_fov][col_in_fov].iter().map(|(_viz, glyphs)| *glyphs).collect_vec();
 
                         let default = if current_radius <= radius {shadow_glyph} else {out_of_range_glyph};
                         glyph_layers_to_combine
@@ -1151,12 +1146,14 @@ let template:  [[[char;2];5];5] =
 }
 
 fn draw_frame(writable: &mut impl Write, new_frame: &Frame, maybe_old_frame: &Option<Frame>) {
-    writable.write(
-        &new_frame
-            .string_for_raw_display_over(maybe_old_frame)
-            .into_bytes(),
-    );
-    writable.flush();
+    writable
+        .write(
+            &new_frame
+                .string_for_raw_display_over(maybe_old_frame)
+                .into_bytes(),
+        )
+        .unwrap();
+    writable.flush().unwrap();
 }
 
 fn main() {
@@ -1202,14 +1199,14 @@ fn main() {
 mod tests {
     use super::*;
     use game::fov_stuff::LocalSquareHalfPlane;
-    use ordered_float::OrderedFloat;
-    use pretty_assertions::assert_str_eq;
-    use std::str::FromStr;
-    use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once, ops::Sub};
-    use terminal_rendering::assert_array_not_more_than_past;
+    
+    
+    
+    use std::{assert_eq, assert_ne, f32::consts::TAU, iter::once};
+    
     use terminal_rendering::test_utils::*;
-    use terminal_rendering::*;
-    use termion::event::MouseEvent;
+    
+    
     use utility::geometry2::STEP_RIGHT;
 
     #[test]
@@ -1244,7 +1241,7 @@ mod tests {
 
     #[test]
     fn test_click_a() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 9);
 
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
@@ -1256,7 +1253,7 @@ mod tests {
     }
     #[test]
     fn test_click_a_small() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 3);
         game.ui_handler.give_event(press_left_1_indexed(1, 1));
         game.process_events();
@@ -1338,7 +1335,7 @@ mod tests {
     }
     #[test]
     fn test_render_part_of_square() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
@@ -1358,15 +1355,15 @@ mod tests {
         println!("{}{}", glyphs[0].to_string(), glyphs[1].to_string());
         assert_eq!(glyphs[0].character, '🭞');
         assert_eq!(glyphs[0].fg_color(), GREEN.into());
-        assert_eq!(glyphs[0].bg_color(), Glyph::default_bg_color.with_alpha(0));
+        assert_eq!(glyphs[0].bg_color(), Glyph::DEFAULT_BG_COLOR.with_alpha(0));
         assert_eq!(glyphs[1].character, '🭜');
         assert_eq!(glyphs[1].fg_color(), GREEN.into());
-        assert_eq!(glyphs[1].bg_color(), Glyph::default_bg_color.with_alpha(0));
+        assert_eq!(glyphs[1].bg_color(), Glyph::DEFAULT_BG_COLOR.with_alpha(0));
         // println!("{}",glyphs.to_clean_string());
     }
     #[test]
     fn test_render_part_of_square_with_rotation() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 13);
         game.world_state.board_color_function = |_state, _square| Some(GREEN);
 
@@ -1419,7 +1416,7 @@ mod tests {
         config.fov_center_behavior = FovCenterBehavior::Custom([5.5, 5.5]);
         config.fov_radius = 8.into();
         let mut game = Game::new_headless_square(&config, 13);
-        game.world_state.board_color_function = |world_state, square| {
+        game.world_state.board_color_function = |_world_state, square| {
             let n = 10;
             let frac = square.y().rem_euclid(n) as f32 / n as f32;
             let val = 100 + (100.0 * frac) as u8;
@@ -1493,8 +1490,8 @@ mod tests {
     #[test]
     fn test_screen_row_col_to_xy_points() {
         let n = 5;
-        let mut config = Config::default();
-        let mut game = Game::new_headless_square(&config, n);
+        let config = Config::default();
+        let game = Game::new_headless_square(&config, n);
 
         // .....
         // .....
@@ -1577,7 +1574,7 @@ mod tests {
 
     #[test]
     fn test_player_step_through_portal() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 5);
         game.world_state
             .place_portal(([1, 2], DIR_RIGHT), ([3, 2], DIR_LEFT));
@@ -1588,14 +1585,14 @@ mod tests {
     }
     #[test]
     fn test_player_step_history_starts_empty() {
-        let mut config = Config::default();
-        let mut game = Game::new_headless_square(&config, 5);
+        let config = Config::default();
+        let game = Game::new_headless_square(&config, 5);
         assert!(game.world_state.player_step_history.is_empty());
     }
     #[ignore]
     #[test]
     fn test_draw_smoothed_player_position() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 5);
         game.world_state.player_square = [0, 2];
         game.try_move_player_at_time(STEP_RIGHT, 0.5);
@@ -1610,7 +1607,7 @@ mod tests {
     }
     #[test]
     fn test_render_with_center_offset() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 5);
         let default_center = [2.5;2];
         let offset_radius = 0.3;
@@ -1628,7 +1625,7 @@ mod tests {
     }
     #[test]
     fn test_give_and_process_event_with_no_time_advancement() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 9);
         game.process_events();
         game.ui_handler.give_event(press_char('a'));
@@ -1642,7 +1639,7 @@ mod tests {
     }
     #[test]
     fn test_give_events_and_advance_time() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 9);
         game.advance_time_by(1.0);
         game.ui_handler.give_event(press_char('a'));
@@ -1681,7 +1678,7 @@ mod tests {
     #[test]
     fn test_smoothed_mouse_time_step_length_independence() {
         let steps = [10, 2];
-        let mut config = Config::default();
+        let config = Config::default();
         let steps_and_times = steps.map(|n| {
             let mut game = Game::new_headless_square(&config, 40);
             game.ui_handler
@@ -1701,7 +1698,7 @@ mod tests {
     }
     #[test]
     fn test_smoothed_mouse_is_fast() {
-        let mut config = Config::default();
+        let config = Config::default();
         let mut game = Game::new_headless_square(&config, 40);
         game.ui_handler
             .give_event(press_left_row_col_screen_pos_1_indexed([10, 3]));
@@ -1753,7 +1750,7 @@ mod tests {
         game.world_state.draw_labelled_rect_on_floor(IRect::from_min_and_size([0,0], [4;2]));
         // 🯩🯫
         // 🭮🭬
-        // let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
+        // let _the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
         // game.world_state.draw_labelled_rect_on_floor([0,0], [7,7]);
         // game.ui_handler.give_event(press_left_1_indexed(5, 6));
         // game.process_events();
@@ -1770,7 +1767,7 @@ mod tests {
         let mut game = Game::new_headless(&config,10, 30);
         // 🯩🯫
         // 🭮🭬
-        let the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
+        let _the_glyph: DoubleGlyphWithTransparency = ['🭮', '🭬'].map(|c| GlyphWithTransparency::new(c, RED.into(), BLACK.with_alpha(0)));
         game.world_state.draw_labelled_rect_on_floor(IRect::from_min_and_size([0,0], [7,7]));
         game.ui_handler.give_event(press_left_1_indexed(5, 6));
         game.process_events();
@@ -1782,7 +1779,7 @@ mod tests {
     fn test_camera_local_world_squares_invariant_to_camera_motion() {
         let mut config = Config::default();
         config.world_size = Some([4;2]);
-        let mut game = Game::new_headless(&config,10, 30);
+        let game = Game::new_headless(&config,10, 30);
         let camera_rect = game.camera_rect_in_world();
         let before = camera_rect.relative_top_left_square();
         camera_rect
@@ -1799,13 +1796,13 @@ mod tests {
         let mut config = Config::default();
         dbg!(&config);
         config.world_size = Some([4;2]);
-        let mut game = Game::new_headless(&config,9, 30);
+        let game = Game::new_headless(&config,9, 30);
         // let frame = game.render();
         // game.ui_handler.draw_screen(frame);
         game.print_debug_data();
         // dbg!(game.camera_rect_in_world().relative_top_left_corner());
         // dbg!(game.camera_rect_in_world(), game.world_state.size_width_height());
-        let screen_char_rowcol_screen_point_rowcol_world_square_world_point = [
+        let _screen_char_rowcol_screen_point_rowcol_world_square_world_point = [
             ([0, 0], [0.5, 0.5], [0, 8], [0.25, 8.5]),
             ([0, 1], [0.5, 1.5], [0, 8], [0.75, 8.5]),
             ([0, 2], [0.5, 2.5], [1, 8], [1.25, 8.5]),

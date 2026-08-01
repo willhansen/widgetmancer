@@ -40,6 +40,23 @@ with each item so the context doesn't have to be re-discovered later.
   - RISK: `CharacterGridInWorldFrame` migration (13 struct uses, not just the
     alias) may become a real refactor — if so, split it into its own roadmap
     item rather than letting item 2 balloon.
+  - PHASE 1 COMPLETE (mechanical cleanup): `cargo fix --workspace` (also with
+    `--tests`), then hand-fixes. All non-deprecation warnings eliminated
+    except 2 intentional `private item shadows public glob re-export` at
+    `crates/terminal_rendering/src/lib.rs:12,14` — `geometry2::FPoint`/`IPoint`
+    are `[f32;2]`/`[i32;2]` arrays deliberately shadowing the euclid-based
+    aliases in `pub use utility::*`; untangling is item 4 (NOTE comment left
+    in code). Landed changes: removed 5 duplicate item definitions from
+    `drawable_glyph.rs` (already in `glyph.rs`: `KNOWN_FG_ONLY_CHARS`,
+    `KNOWN_BG_ONLY_CHARS`, `map_of_stringables_to_string`,
+    `glyph_map_to_string`, `chars_for_square_walls`), renamed
+    `Glyph::default_fg_color/default_bg_color` → `DEFAULT_FG_COLOR`/
+    `DEFAULT_BG_COLOR`, dropped `PartialEq` derive on
+    portal_playground `WorldState` (fn-pointer fields), `#[cfg(test)]`-gated
+    test-only fns/imports, underscore-prefixed intentionally-unused bindings.
+    Remaining: 67 deprecation warnings (Phase 2). Test suite: 470 passed /
+    11 skipped, unchanged.
+  - NEXT: Phase 2 (deprecation migration) in the order sketched above.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
