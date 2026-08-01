@@ -8,19 +8,27 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let 
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
 
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-      in {
+      in
+      {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # rustup
-            # (rust-bin.stable.latest.default.override { 
-            (rust-bin.nightly.latest.default.override { 
-              extensions = [ 
+            # (rust-bin.stable.latest.default.override {
+            (rust-bin.nightly.latest.default.override {
+              extensions = [
                 "llvm-tools-preview" # for code coverage
               ];
             })
@@ -41,8 +49,8 @@
             # luarocks
             uftrace
           ];
-          shellHook = "zsh";
+          shellHook = "";
         };
-      });
+      }
+    );
 }
-
