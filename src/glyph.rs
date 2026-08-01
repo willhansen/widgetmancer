@@ -305,11 +305,6 @@ impl Glyph {
         }
     }
 
-    #[deprecated(note = "Use has_fg instead")]
-    pub fn has_no_fg(&self) -> bool {
-        Glyph::char_is_empty(self.character)
-    }
-
     pub fn has_fg(&self) -> bool {
         !Glyph::char_is_empty(self.character)
     }
@@ -318,10 +313,10 @@ impl Glyph {
         KNOWN_BG_ONLY_CHARS.contains(&c)
     }
     pub fn is_fully_transparent(&self) -> bool {
-        self.has_no_fg() && self.bg_transparent
+        !self.has_fg() && self.bg_transparent
     }
     pub fn is_bg_only(&self) -> bool {
-        self.has_no_fg() && !self.bg_transparent
+        !self.has_fg() && !self.bg_transparent
     }
 
     pub fn is_fullwidth(&self) -> bool {
