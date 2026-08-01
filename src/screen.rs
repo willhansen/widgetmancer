@@ -79,6 +79,7 @@ impl Screen {
         self.terminal_height as i32
     }
 
+    #[cfg(test)]
     fn set_screen_origin_by_world_square(&mut self, world_square: WorldSquare) {
         self.screen_origin = world_square;
     }
@@ -87,6 +88,7 @@ impl Screen {
         self.screen_origin = world_square - self.world_step_from_origin_to_center();
     }
 
+    #[cfg(test)]
     fn screen_max_as_world_square(&self) -> WorldSquare {
         self.screen_origin_as_world_square() + self.world_step_from_origin_to_max()
     }
@@ -360,13 +362,6 @@ impl Screen {
             .map(|s| *self.get_screen_buffered_glyph(s))
     }
 
-    fn set_buffered_glyph(
-        &mut self,
-        pos: Point2D<i32, CharacterGridInScreenBufferFrame>,
-        new_glyph: Glyph,
-    ) {
-        self.screen_buffer[pos.x as usize][pos.y as usize] = new_glyph;
-    }
     pub fn print_screen_buffer(&self) {
         Self::print_buffer_of_glyphs(&self.screen_buffer);
     }
@@ -597,6 +592,7 @@ mod tests {
         Screen::new(terminal_width, terminal_height)
     }
 
+    #[allow(dead_code)]
     fn set_up_nxn_character_screen(n: u16) -> Screen {
         Screen::new(n, n)
     }

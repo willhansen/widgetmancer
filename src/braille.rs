@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::BitXor;
 use utility::coordinate_frame_conversions::*;
 use utility::geometry2::PointExt;
-use utility::geometry2::{FPointExt, IPointExt};
+use utility::geometry2::FPointExt;
 use utility::*;
 
 pub struct BrailleGridInWorldFrame;

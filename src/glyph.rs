@@ -9,10 +9,7 @@ use rgb::*;
 use termion::color;
 
 use glyph_constants::*;
-use utility::geometry2::IPointExt;
 use utility::geometry2::PointExt;
-
-use crate::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::{
     is_world_character_square_left_square_of_world_square, world_character_square_to_world_square,
     CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap,
@@ -69,8 +66,8 @@ pub struct Glyph {
 }
 
 impl Glyph {
-    pub const default_fg_color: RGB8 = named_colors::WHITE;
-    pub const default_bg_color: RGB8 = named_colors::BLACK;
+    pub const DEFAULT_FG_COLOR: RGB8 = named_colors::WHITE;
+    pub const DEFAULT_BG_COLOR: RGB8 = named_colors::BLACK;
     pub fn new(character: char, fg_color: RGB8, bg_color: RGB8) -> Glyph {
         Glyph {
             character,
@@ -80,14 +77,14 @@ impl Glyph {
         }
     }
     pub fn default_transparent() -> Glyph {
-        Glyph::fg_only(' ', Glyph::default_fg_color)
+        Glyph::fg_only(' ', Glyph::DEFAULT_FG_COLOR)
     }
 
     pub fn fg_only(character: char, fg_color: RGB8) -> Glyph {
         Glyph {
             character,
             fg_color,
-            bg_color: Glyph::default_bg_color,
+            bg_color: Glyph::DEFAULT_BG_COLOR,
             bg_transparent: true,
         }
     }
@@ -148,7 +145,7 @@ impl Glyph {
     }
 
     pub fn from_char(character: char) -> Glyph {
-        Glyph::new(character, Glyph::default_fg_color, Glyph::default_bg_color)
+        Glyph::new(character, Glyph::DEFAULT_FG_COLOR, Glyph::DEFAULT_BG_COLOR)
     }
 
     pub fn with_char(&self, new_char: char) -> Glyph {
@@ -198,7 +195,7 @@ impl Glyph {
             )
             .map(|character_offset| {
                 Glyph::new(
-                    character_for_half_square_with_1d_offset(true, character_offset),
+                    crate::floating_square::character_for_half_square_with_1d_offset(true, character_offset),
                     square_color,
                     background_color,
                 )
@@ -209,7 +206,7 @@ impl Glyph {
             );
             character_offsets.map(|character_offset| {
                 Glyph::new(
-                    character_for_half_square_with_1d_offset(false, character_offset),
+                    crate::floating_square::character_for_half_square_with_1d_offset(false, character_offset),
                     square_color,
                     background_color,
                 )
@@ -284,7 +281,7 @@ impl Glyph {
     pub fn solid_bg(color: RGB8) -> Glyph {
         Glyph {
             character: SPACE,
-            fg_color: Glyph::default_fg_color,
+            fg_color: Glyph::DEFAULT_FG_COLOR,
             bg_color: color,
             bg_transparent: false,
         }
@@ -382,10 +379,10 @@ impl Glyph {
     }
 
     pub fn transparent_glyph() -> Glyph {
-        Glyph::fg_only(' ', Glyph::default_bg_color)
+        Glyph::fg_only(' ', Glyph::DEFAULT_BG_COLOR)
     }
     pub fn transparent_square_glyphs() -> DoubleGlyph {
-        [Glyph::fg_only(' ', Glyph::default_bg_color); 2]
+        [Glyph::fg_only(' ', Glyph::DEFAULT_BG_COLOR); 2]
     }
     pub fn out_of_sight_glyphs() -> DoubleGlyph {
         [Glyph::new(FULL_BLOCK, OUT_OF_SIGHT_COLOR, OUT_OF_SIGHT_COLOR); 2]
@@ -456,7 +453,7 @@ impl Glyph {
         Glyph::new(
             character_world_pos_to_braille_char(world_pos),
             color,
-            Glyph::default_bg_color,
+            Glyph::DEFAULT_BG_COLOR,
         )
     }
 
@@ -542,7 +539,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
         let top_left = self[0];
         let top_right = self[1];
         let bottom_left = background_glyphs[0];
-        let bottom_right = background_glyphs[1];
+        let _bottom_right = background_glyphs[1];
 
         let halfwidth_only_output = [0, 1].map(|i| {
             let top = self[i];
@@ -605,7 +602,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     }
 
     fn solid_color(color: RGB8) -> DoubleGlyph {
-        [Glyph::new(SPACE, Glyph::default_fg_color, color); 2]
+        [Glyph::new(SPACE, Glyph::DEFAULT_FG_COLOR, color); 2]
     }
 
     fn tinted(&self, color: RGB8, strength: f32) -> DoubleGlyph {

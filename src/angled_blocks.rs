@@ -179,21 +179,21 @@ fn points_to_angled_block_mapping() -> HashMap<(SnapGridPoint, SnapGridPoint), c
 }
 
 fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame>) -> char {
-    let pointA = line.p1;
-    let pointB = line.p2;
+    let point_a = line.p1;
+    let point_b = line.p2;
 
     let block_map = points_to_angled_block_mapping();
 
-    if let Some(&character) = block_map.get(&(pointA, pointB)) {
+    if let Some(&character) = block_map.get(&(point_a, point_b)) {
         character
     } else {
-        let same_x = pointA.x == pointB.x;
-        let same_y = pointA.y == pointB.y;
+        let same_x = point_a.x == point_b.x;
+        let same_y = point_a.y == point_b.y;
         let both_on_same_edge =
-            (same_x && [0, 2].contains(&pointA.x)) || (same_y && [0, 3].contains(&pointA.y));
+            (same_x && [0, 2].contains(&point_a.x)) || (same_y && [0, 3].contains(&point_a.y));
         let center_is_clockwise = is_clockwise(
-            local_snap_grid_to_local_character_frame(pointA),
-            local_snap_grid_to_local_character_frame(pointB),
+            local_snap_grid_to_local_character_frame(point_a),
+            local_snap_grid_to_local_character_frame(point_b),
             point2(0.0, 0.0),
         );
         if both_on_same_edge {
@@ -203,27 +203,27 @@ fn get_character_from_snap_points(line: Line<i32, AngleBlockSnapGridInLocalFrame
                 SPACE
             }
         } else {
-            if pointA == pointB {
+            if point_a == point_b {
                 panic!(
                     "Can't be same points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    point_to_string(point_a),
+                    point_to_string(point_b)
                 );
             }
 
             let valid_points = valid_snap_points_on_angle_block();
-            if !valid_points.contains(&pointA) || !valid_points.contains(&pointB) {
+            if !valid_points.contains(&point_a) || !valid_points.contains(&point_b) {
                 panic!(
                     "gave non-valid points: A: {}, B: {}",
-                    point_to_string(pointA),
-                    point_to_string(pointB)
+                    point_to_string(point_a),
+                    point_to_string(point_b)
                 );
             }
 
             panic!(
                 "Missed case for points: A: {}, B: {}",
-                point_to_string(pointA),
-                point_to_string(pointB)
+                point_to_string(point_a),
+                point_to_string(point_b)
             );
         }
     }
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_line_and_inside_point_to_angled_block_character_left_edge_full_block() {
-        let line_point_A: LocalCharacterPoint = point2(-0.5, -0.5);
+        let _line_point_a: LocalCharacterPoint = point2(-0.5, -0.5);
         assert_eq!(
             half_plane_to_angled_block_character(
                 HalfPlane::from_line_and_point_on_half_plane(

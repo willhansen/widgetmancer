@@ -1,6 +1,4 @@
 use crate::drawable_glyph::*;
-use crate::glyph_constants::named_colors::*;
-use crate::glyph_with_transparency::*;
 use crate::horiz_concat_strings;
 use crate::MultilineStringExt;
 use itertools::*;
@@ -18,7 +16,6 @@ use utility::geometry2::IPointExt;
 use utility::geometry2::IRectExt;
 use utility::geometry2::UPointExt;
 use utility::geometry2::USizePoint;
-use utility::ToDebug;
 
 #[derive(PartialEq, Clone)]
 pub struct Frame {
@@ -43,7 +40,8 @@ impl Frame {
     pub fn save_to_file(&self, path: PathBuf) {
         File::create(path)
             .unwrap()
-            .write_all(&self.string_for_regular_display().as_bytes());
+            .write_all(&self.string_for_regular_display().as_bytes())
+            .unwrap();
     }
     pub fn from_string(s: &str) -> Self {
         let lines = s.lines().collect_vec();
@@ -93,7 +91,7 @@ impl Frame {
     }
     pub fn try_get_row_col(&self, row_col: USizePoint) -> Option<DrawableGlyph> {
         let [row, col] = row_col;
-        if row < 0 || row >= self.height() || col < 0 || col >= self.width() {
+        if row >= self.height() || col >= self.width() {
             return None;
         }
         Some(self.grid[row][col])
@@ -133,7 +131,6 @@ impl Frame {
     }
     pub fn blit(&mut self, other: &Self, rowcol: IPoint) {
         let other_relative_rect = other.rect();
-        let other_absolute_rect = other_relative_rect.add(rowcol);
         let self_rect = self.rect();
         other_relative_rect.covered_squares().into_iter().for_each(|other_rel| {
             let other_abs = other_rel.add(rowcol);
@@ -145,7 +142,7 @@ impl Frame {
 
         })
     }
-    pub fn resized_by_delta(&self, d_left: i32, d_right: i32, d_bottom: i32, d_top: i32) -> Self {
+    pub fn resized_by_delta(&self, _d_left: i32, _d_right: i32, _d_bottom: i32, _d_top: i32) -> Self {
         todo!();
     }
     pub fn widened(&self, n: usize) -> Self {
@@ -273,10 +270,10 @@ impl Frame {
     pub fn parse_regular_display_string(input_string: String) -> Self {
         let three_bytes_regex = regex::Regex::new(r";2;([0-9]+);([0-9]+);([0-9]+)").unwrap();
         let escape_regex = regex::Regex::new("\u{1b}\\[(.*?)m").unwrap();
-        const fg_set: &str = "38";
-        const bg_set: &str = "48";
-        const fg_reset: &str = "39";
-        const bg_reset: &str = "49";
+        const FG_SET: &str = "38";
+        const BG_SET: &str = "48";
+        const FG_RESET: &str = "39";
+        const BG_RESET: &str = "49";
         let parse_3_byte_color_string = |param_string: &str| {
             let rgb_array: [u8; 3] = three_bytes_regex
                 .captures(param_string)
@@ -293,7 +290,7 @@ impl Frame {
         let grid = input_string
             .lines()
             .map(|line| {
-                let mut glyphs_out: Vec<DrawableGlyph> = Vec::new();
+                let _glyphs_out: Vec<DrawableGlyph> = Vec::new();
 
                 // spans of text do not overlap with commands
 
@@ -318,10 +315,10 @@ impl Frame {
                         let cmd_code = &color_command[..2];
                         let rest_of_cmd = &color_command[2..];
                         match cmd_code {
-                            fg_set => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                            bg_set => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
-                            fg_reset => fg = None,
-                            bg_reset => bg = None,
+                            FG_SET => fg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                            BG_SET => bg = Some(parse_3_byte_color_string(rest_of_cmd)),
+                            FG_RESET => fg = None,
+                            BG_RESET => bg = None,
                             x => panic!("Invalid escape code: {x:?}"),
                         }
                         (fg, bg)
@@ -372,7 +369,7 @@ impl Frame {
         let mut prev_written_row_col: Option<[usize; 2]> = None;
         let mut fg: ORGB8 = None;
         let mut bg: ORGB8 = None;
-        let mut neutralize_colors = |fg: &mut ORGB8, bg: &mut ORGB8, output: &mut String| {
+        let neutralize_colors = |fg: &mut ORGB8, bg: &mut ORGB8, output: &mut String| {
             if fg.is_some() {
                 *output += &DrawableGlyph::fg_color_reset_string();
                 *fg = None;
@@ -502,6 +499,7 @@ fn raw_display_string_to_regular_display_string(naive_raw_display_string: String
         .unwrap()
         .replace("\r", "")
 }
+#[cfg(test)]
 fn regular_display_string_to_raw_display_string(regular_display_string: String) -> String {
     string_for_goto_top_left() + &regular_display_string.replace("\n", "\n\r")
 }
@@ -549,14 +547,16 @@ impl From<Vec<Vec<DrawableGlyph>>> for Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::glyph_constants::named_colors::*;
     use pretty_assertions::assert_eq;
-    use rgb::RGBA8;
+    
     use utility::indoc;
 
-    const code_for_set_fg: &str = "\u{1b}[38";
-    const code_for_set_bg: &str = "\u{1b}[48";
-    const code_for_clear_fg: &str = "\u{1b}[39m";
-    const code_for_clear_bg: &str = "\u{1b}[49m";
+    const CODE_FOR_SET_FG: &str = "\u{1b}[38";
+    const CODE_FOR_SET_BG: &str = "\u{1b}[48";
+    const CODE_FOR_CLEAR_FG: &str = "\u{1b}[39m";
+    #[allow(dead_code)]
+    const CODE_FOR_CLEAR_BG: &str = "\u{1b}[49m";
 
     fn small_color_frame() -> Frame {
         vec![
@@ -673,7 +673,7 @@ ghi",
         frame.grid[0][1].bg_color = None;
 
         let b = Frame::parse_regular_display_string(frame.string_for_regular_display());
-        &frame.glyphs().for_each(|x| {
+        frame.glyphs().for_each(|x| {
             dbg!(x);
         });
         assert_eq!(
@@ -761,9 +761,9 @@ ghi",
         let s = frame.string_for_regular_display();
         dbg!(&frame);
         dbg!(&s);
-        assert!(s.contains(code_for_set_fg));
-        assert!(s.contains(code_for_clear_fg));
-        assert!(!s.contains(code_for_set_bg));
+        assert!(s.contains(CODE_FOR_SET_FG));
+        assert!(s.contains(CODE_FOR_CLEAR_FG));
+        assert!(!s.contains(CODE_FOR_SET_BG));
         // assert!(!s.contains(code_for_clear_bg));
     }
     #[test]

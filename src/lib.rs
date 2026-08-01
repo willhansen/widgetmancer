@@ -5,8 +5,10 @@ use std::iter::once;
 use std::iter::repeat_n;
 use std::ops::Add;
 use std::ops::Mul;
-use std::ops::Sub;
 
+// NOTE: geometry2::FPoint/IPoint are [f32;2]/[i32;2] arrays, deliberately
+// shadowing the euclid-based aliases re-exported by `pub use utility::*`.
+// Untangling this is roadmap item 4.
 use geometry2::FPoint;
 use geometry2::FPointExt;
 use geometry2::IPoint;
@@ -18,8 +20,6 @@ pub use glyph_with_transparency::*;
 
 pub mod screen;
 use itertools::Itertools;
-use ordered_float::OrderedFloat;
-use rgb::RGBA8;
 pub use screen::*;
 
 pub mod frame;
@@ -30,7 +30,6 @@ pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
 
 pub mod glyph_constants;
 
-use utility::geometry2::IPointExt;
 pub use utility::*;
 
 use crate::glyph::glyph_constants::named_colors::*;
@@ -124,12 +123,7 @@ pub trait MultilineStringExt: ToString {
     fn framed(&self) -> String {
         //╭╮╯╰─│
         format!(
-            "\
-
-╭{horiz}╮
-{contents}
-╰{horiz}╯\
-",
+            "╭{horiz}╮\n{contents}\n╰{horiz}╯",
             horiz = "─".repeat(self.width()),
             contents = self
                 .lines_including_trailing_newline()
@@ -173,10 +167,9 @@ pub fn horiz_concat_equal_height_strings(strings: &[String], spaces: usize) -> S
     let col_heights = strings.iter().map(|col| col.height()).collect_vec();
     assert!(col_heights.iter().all_equal(), "{col_heights:?}");
     assert!(strings.iter().map(|col| col.is_rectangular()).all(|x| x));
-    let mut out = String::new();
     let num_cols = strings.len();
     let height = strings[0].height();
-    let mut columns = strings
+    let columns = strings
         .into_iter()
         .map(|s| s.lines().collect_vec())
         .collect_vec();
@@ -204,12 +197,12 @@ pub fn draw_points_in_character_grid(points: &[FPoint]) -> String {
         // println!("{}, {}", p.0.to_string(), p.1.to_string());
         // })
         .sorted()
-        .group_by(|(char_pos, local_braille_pos)| *char_pos)
+        .group_by(|(char_pos, _local_braille_pos)| *char_pos)
         .into_iter()
         .map(|(char_pos, pos_pair)| {
             let local_squares = pos_pair
                 .into_iter()
-                .map(|(char_pos, local_pos)| local_pos)
+                .map(|(_char_pos, local_pos)| local_pos)
                 .collect_vec();
             (
                 char_pos,
@@ -348,7 +341,7 @@ pub fn signed_bargraph_frame(data: &[f32], height: usize, min: Option<f32>, max:
         let background_glyph = DrawableGlyph::default();
         let pos_glyphs;
         let neg_glyphs;
-        let col_glyphs = if val >= 0.0 {
+        let _col_glyphs = if val >= 0.0 {
             pos_glyphs = val_to_column(val, positive_height, max);
             assert_eq!(pos_glyphs.len(), positive_height);
             neg_glyphs = repeat_n(background_glyph, negative_height).collect_vec();
@@ -593,7 +586,7 @@ pub mod test_utils {
 mod tests {
     use std::f32::consts::TAU;
 
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
     use stdext::function_name;
     use std::path::PathBuf;
     use test_utils::*;

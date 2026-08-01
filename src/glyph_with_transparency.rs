@@ -233,7 +233,7 @@ pub fn color_combine(above: RGBA8, below: RGBA8) -> RGBA8 {
 }
 #[cfg(test)]
 mod tests {
-    use ntest::assert_false;
+    
 
     use crate::glyph_constants::named_chars::*;
     use crate::glyph_constants::named_colors::*;
@@ -259,10 +259,10 @@ mod tests {
     }
     #[test]
     fn test_partially_occluded_letter() {
-        let mut a = GlyphWithTransparency::from_char(LOWER_HALF_BLOCK)
+        let a = GlyphWithTransparency::from_char(LOWER_HALF_BLOCK)
             .with_primary_only()
             .with_rgbs(GREEN, PURPLE);
-        let mut b = GlyphWithTransparency::from_char('b').with_rgbs(RED, BLUE);
+        let b = GlyphWithTransparency::from_char('b').with_rgbs(RED, BLUE);
 
         let c = GlyphWithTransparency {
             character: LOWER_HALF_BLOCK,
@@ -280,7 +280,7 @@ mod tests {
         let mut b = GlyphWithTransparency::from_char(RIGHT_HALF_BLOCK);
         b.secondary_color.a = 0;
         *b.primary_color.rgb_mut() = BLUE;
-        let mut c = GlyphWithTransparency::from_char('c').with_colors(PURPLE.into(), GREEN.into());
+        let c = GlyphWithTransparency::from_char('c').with_colors(PURPLE.into(), GREEN.into());
         assert_eq!(
             a.over(b.over(c)),
             GlyphWithTransparency::from_char(LOWER_HALF_BLOCK).with_colors(RED.into(), BLUE.into())

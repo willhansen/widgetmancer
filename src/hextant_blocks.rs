@@ -57,10 +57,10 @@ const HEX_FULL: u8 = const { hextant_character_to_binary(FULL_BLOCK) };
 
 pub fn hextant_array_to_char(hextant_array: HextantArray) -> char {
     let as_binary = hextant_array_to_binary(hextant_array);
-    let before_half_left = '🬓';
-    let after_half_left = '🬔';
-    let before_half_right = '🬧';
-    let after_half_right = '🬨';
+    let _before_half_left = '🬓';
+    let _after_half_left = '🬔';
+    let _before_half_right = '🬧';
+    let _after_half_right = '🬨';
 
     match as_binary {
         HEX_SPACE => SPACE,

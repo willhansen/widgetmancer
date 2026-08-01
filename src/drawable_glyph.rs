@@ -1,7 +1,6 @@
 use crate::DoubleChar;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
 
 use euclid::*;
 use itertools::Itertools;
@@ -9,27 +8,20 @@ use rgb::*;
 use termion::color;
 
 use glyph_constants::*;
-use utility::geometry2::PointExt;
-use utility::geometry2::{FPoint, FPointExt};
-use utility::geometry2::{IPoint, IPointExt};
+use utility::geometry2::FPoint;
+use utility::geometry2::IPoint;
 
 use crate::floating_square::character_for_half_square_with_1d_offset;
 use crate::screen::CharacterGridInWorldFrame;
 use utility::coordinate_frame_conversions::*;
 use utility::*;
 
-pub use crate::angled_blocks::*;
-pub use crate::braille::*;
-pub use crate::floating_square::*;
-pub use crate::glyph::*;
+use crate::glyph::*;
 pub use crate::glyph_constants;
-pub use crate::hextant_blocks::*;
 
 // x, y
 pub type DoubleDrawableGlyph = [DrawableGlyph; 2];
 
-pub const KNOWN_FG_ONLY_CHARS: &[char] = &[FULL_BLOCK];
-pub const KNOWN_BG_ONLY_CHARS: &[char] = &[SPACE, EMPTY_BRAILLE];
 
 // Fun unicode for later
 // ↈ ▴ ⚠ 🞁 🢑  🛆  𝅉  ⏹  ᙮ ⸼  ▪
@@ -536,88 +528,8 @@ impl DoubleDrawableGlyphExt for DoubleDrawableGlyph {
     }
 }
 
-fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
-    if DrawableGlyph::char_is_empty(top_char) {
-        Some(bottom_char)
-    } else if char_is_braille(top_char) && char_is_braille(bottom_char) {
-        Some(combine_braille_characters(top_char, bottom_char))
-    } else if char_is_hextant(top_char) && char_is_hextant(bottom_char) {
-        Some(combine_hextant_characters(top_char, bottom_char))
-    } else {
-        None
-    }
-}
 
-pub fn map_of_stringables_to_string<S>(stringable_map: &HashMap<[i32; 2], S>) -> String
-where
-    S: ToString,
-{
-    let top_row = stringable_map
-        .keys()
-        .map(|square| square.y())
-        .max()
-        .unwrap();
-    let bottom_row = stringable_map
-        .keys()
-        .map(|square| square.y())
-        .min()
-        .unwrap();
-    let left_column = stringable_map
-        .keys()
-        .map(|square| square.x())
-        .min()
-        .unwrap();
-    let right_column = stringable_map
-        .keys()
-        .map(|square| square.x())
-        .max()
-        .unwrap();
-    (bottom_row..=top_row)
-        .map(|bottom_to_top_y| {
-            let y = top_row + bottom_row - bottom_to_top_y;
-            (left_column..=right_column)
-                .map(|x| {
-                    let square = [x, y];
-                    let new_part = if let Some(glyph) = stringable_map.get(&square) {
-                        glyph.to_string()
-                    } else {
-                        " ".to_string()
-                    };
 
-                    new_part
-                })
-                .join("")
-        })
-        .join("\n")
-}
-pub fn glyph_map_to_string(glyph_map: &DrawableGlyphMap) -> String {
-    map_of_stringables_to_string(glyph_map)
-}
-
-// Order is anticlockwise [right, up, left, down]
-pub fn chars_for_square_walls(walls: [bool; 4]) -> DoubleChar {
-    let left = match walls {
-        [_, true, true, true] => '𜷂',
-        [_, true, true, false] => '🭽', //𜵊
-        [_, true, false, true] => '𜶮',
-        [_, true, false, false] => '▔',
-        [_, false, true, true] => '🭼', //𜷀
-        [_, false, true, false] => '▏',
-        [_, false, false, true] => '▁',
-        [_, false, false, false] => ' ',
-    };
-    let right = match walls {
-        [true, true, _, true] => '𜷖',
-        [true, true, _, false] => '🭾', //'𜶘'
-        [true, false, _, true] => '🭿', //𜷕
-        [true, false, _, false] => '▕',
-        [false, true, _, true] => '𜶮',
-        [false, true, _, false] => '▔',
-        [false, false, _, true] => '▁',
-        [false, false, _, false] => ' ',
-    };
-    [left, right]
-}
 
 #[cfg(test)]
 mod tests {

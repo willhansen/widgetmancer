@@ -7,9 +7,7 @@ use crate::screen::{
 use utility::coordinate_frame_conversions::{WorldMove,};
 use utility::*;
 use euclid::{point2, vec2};
-use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rgb::*;
 use std::collections::HashMap;
 
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
