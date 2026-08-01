@@ -16,6 +16,30 @@ with each item so the context doesn't have to be re-discovered later.
 - **Plan:** remove the blanket allows one crate at a time (`utility` first —
   it has the fewest deps), fixing lints per-category rather than re-adding
   narrower allows. Add `cargo clippy` to the workflow once clean.
+- **Progress:**
+  - STALE EVIDENCE CORRECTED: `utility`'s crate-root allows are already gone;
+    only `#![allow(warnings)]` at `crates/game/src/lib.rs:2` remains.
+    Workspace build currently surfaces 164 warnings: ~60 are deprecated
+    `screen::WorldCharacterSquare*` / `CharacterGridInWorldFrame` usage
+    ("obsolete since screen rotation" migration); the rest are mechanical
+    (7 `unused mut`, 5 ambiguous glob re-exports, unused imports/Results,
+    elided-lifetime hiding, function-pointer comparisons, useless comparisons).
+  - SKETCHED ATTACK PLAN:
+    1. Phase 1 (mechanical, allow still in place): `cargo fix --workspace`
+       for auto-fixable lints, then hand-fix the ~15 remaining non-deprecation
+       warnings.
+    2. Phase 2 (deprecation migration, ~60% of warnings): migrate call sites
+       off the `screen::` deprecated aliases one alias at a time, in
+       dependency order: `WorldCharacterPoint` → `WorldCharacterSquare` →
+       `*ToCharMap`/`*GlyphMap` → `CharacterGridInWorldFrame`. When touching
+       files with ambiguous glob re-exports, make imports explicit in the
+       same commit (overlap with item 4).
+    3. Phase 3: remove `#![allow(warnings)]` from `crates/game/src/lib.rs`,
+       fix stragglers the allow was hiding from the build output, then add
+       `cargo clippy --workspace -- -D warnings` to CI/bacon.
+  - RISK: `CharacterGridInWorldFrame` migration (13 struct uses, not just the
+    alias) may become a real refactor — if so, split it into its own roadmap
+    item rather than letting item 2 balloon.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
