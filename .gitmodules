@@ -1,3 +1,0 @@
-[submodule "crates/terminal_rendering"]
-	path = crates/terminal_rendering
-	url = git@github.com:willhansen/terminal_rendering.git
