@@ -57,6 +57,51 @@ with each item so the context doesn't have to be re-discovered later.
     Remaining: 67 deprecation warnings (Phase 2). Test suite: 470 passed /
     11 skipped, unchanged.
   - NEXT: Phase 2 (deprecation migration) in the order sketched above.
+  - PHASE 2 SCOPED (next step, evidence gathered):
+    - 67 deprecation warnings total, ALL visible ones are inside
+      `terminal_rendering` itself: `screen.rs` 25, `glyph.rs` 13,
+      `braille.rs` 12, `hextant_blocks.rs` 7, `floating_square.rs` 7,
+      `drawable_glyph.rs` 3. By symbol: `WorldCharacterSquare` 20,
+      `CharacterGridInWorldFrame` 15, `WorldCharacterSquareToCharMap` 6,
+      `WorldCharacterSquareGlyphMap` 6, `WorldCharacterPoint` 6, the 4
+      deprecated conversion fns 9, `WorldSquareGlyphMap` 1,
+      `glyph::pair_up_character_square_map` 2.
+    - `game` crate usage is HIDDEN by `#![allow(warnings)]`: 1
+      `WorldCharacterSquare`, 22 other alias uses (Point/Step/Move/maps,
+      mostly in `graphics/animations/*`), 9 deprecated fn calls, 0 direct
+      `CharacterGridInWorldFrame` uses. Must be migrated before the aliases
+      can be deleted, but yields no warnings until Phase 3.
+    - REVISED ORDER (cheapest blast radius first):
+      1. Step 2a — internal-only symbols: migrate `screen.rs`'s own 25
+         uses + the 6 cross-file uses of `WorldSquareGlyphMap` /
+         `pair_up_character_square_map` in terminal_rendering. No API
+         change, game untouched.
+      2. Step 2b — `game` crate call sites (32 uses): migrate the 9
+         deprecated fn calls + 23 alias uses to their replacements
+         (WorldPoint/WorldSquare-based or local-frame equivalents per
+         call site); verify with a temporary `#![deny(deprecated)]`
+         patch on `game/src/lib.rs` since the allow suppresses progress
+         signal.
+      3. Step 2c — `CharacterGridInWorldFrame` (15 uses, incl. 13 struct
+         uses in `screen.rs` tests/fns): attempt migration; if it turns
+         into a redesign of the screen-rotation frame stack, split into
+         roadmap item 8 per the RISK note above.
+    - EXIT CHECK for each step: warning count drops by the expected
+      amount (`cargo build --workspace 2>&1 | grep -c "use of deprecated"`),
+      test suite stays at 470 passed / 11 skipped.
+    - REPLACEMENT MAPPING RESOLVED: the three deprecation notes
+      ("Obselete/Invalidated since screen rotation", "World does not know
+      about glyphs/characters") are one root cause — post-rotation there is
+      no meaningful world-frame character grid. Replacements already exist:
+      types → local character frame (`LocalCharacterSquare`/`Point`,
+      screen.rs:563-566); conversions → `world_point_to_local_character_point`
+      et al.; maps → `ScreenBufferGlyphMap` / `DrawableGlyphMap`.
+    - DECISION (map migration): option 2 — NO intermediate
+      `LocalCharacterSquareGlyphMap` alias. Refactor `glyph.rs` producers
+      (`glyph_map_to_string`, `pair_up_character_square_map`, lines
+      ~438/445/671/683) to emit `ScreenBufferGlyphMap` directly, folding
+      the buffer-offset logic into the same commit. Fewer total touches
+      than a frame-only alias swap; slightly larger diff per commit.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
