@@ -10,10 +10,7 @@ use termion::color;
 
 use glyph_constants::*;
 use utility::geometry2::PointExt;
-use crate::screen::{
-    is_world_character_square_left_square_of_world_square, world_character_square_to_world_square,
-    CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap,
-};
+use crate::screen::{CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap};
 use utility::coordinate_frame_conversions::*;
 use utility::*;
 
@@ -668,7 +665,7 @@ where
         })
         .join("\n")
 }
-pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
+pub fn glyph_map_to_string<U>(glyph_map: &HashMap<Point2D<i32, U>, Glyph>) -> String {
     map_of_stringables_to_string(
         &glyph_map
             .into_iter()
@@ -679,19 +676,21 @@ pub fn glyph_map_to_string(glyph_map: &WorldCharacterSquareGlyphMap) -> String {
 pub fn char_map_to_string(char_map: HashMap<geometry2::IPoint, char>) -> String {
     map_of_stringables_to_string(&char_map)
 }
-#[deprecated(note = "worldcharactersquareglyphmap is bad")]
-pub fn pair_up_character_square_map<T: Clone>(
-    character_glyph_map: HashMap<WorldCharacterSquare, T>,
+/// Pairs values keyed by half-resolution horizontal squares (2 per world
+/// square, x = 2*world_x + {0,1} per the convention in
+/// `screen::world_point_to_world_character_point`) into one `[T; 2]` per
+/// world square. Generic over the euclid unit so callers can migrate off
+/// the deprecated world character frame independently.
+pub fn pair_up_character_square_map<T: Clone, U>(
+    character_glyph_map: HashMap<Point2D<i32, U>, T>,
     default_filler: T,
 ) -> HashMap<WorldSquare, [T; 2]> {
     let mut output_map = HashMap::<WorldSquare, [T; 2]>::new();
     character_glyph_map
         .into_iter()
         .for_each(|(character_square, value)| {
-            let world_square = world_character_square_to_world_square(character_square);
-            let is_left_value =
-                is_world_character_square_left_square_of_world_square(character_square);
-            let position_index = if is_left_value { 0 } else { 1 };
+            let world_square = point2(character_square.x.div_euclid(2), character_square.y);
+            let position_index = character_square.x.rem_euclid(2) as usize;
 
             if output_map.contains_key(&world_square) {
                 let existing_double_value = output_map.get_mut(&world_square).unwrap();
