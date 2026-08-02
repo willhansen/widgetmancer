@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.3: Extract `game/ai.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 plan step 3: move enemy pathfinding/decision logic out of the god module.
 
 **Status:** DONE — `cargo build` green, `cargo nextest run`: 470 passed,

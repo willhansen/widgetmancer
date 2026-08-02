@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.7: Extract `game/combat.rs` and `game/realtime.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 added step 7: get `mod.rs` to "primarily the `Game` struct and its core
 accessors" by extracting combat and real-time effects.
 

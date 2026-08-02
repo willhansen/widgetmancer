@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 2: Remove globally suppressed warnings (IN PROGRESS)
 
-Working state for [ROADMAP.md](../../ROADMAP.md) item 2, in case of
+Working state for [ROADMAP.md](../ROADMAP.md) item 2, in case of
 interruption. **Not yet committed to ROADMAP.md** — update it when the item
 completes.
 

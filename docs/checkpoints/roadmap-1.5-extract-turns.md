@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.5: Extract `game/turns.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 plan step 5: move turn advancement and game-over handling out of the god module.
 
 **Status:** DONE — `cargo build` green, `cargo nextest run`: 470 passed,

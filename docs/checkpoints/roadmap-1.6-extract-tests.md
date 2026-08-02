@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.6: Extract inline tests to `game/tests.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 plan step 6: move the inline `#[cfg(test)]` tests out of the god module.
 
 **Status:** DONE — `cargo build --tests` green, `cargo nextest run`: 470 passed,

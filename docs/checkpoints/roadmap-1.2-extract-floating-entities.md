@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.2: Extract `game/floating_entities.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 plan step 2: move `DeathCube`, `FloatingHunterDrone`, and the ambassador-based
 `FloatingEntityTrait` machinery out of the god module.
 

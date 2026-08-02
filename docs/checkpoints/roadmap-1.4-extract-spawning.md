@@ -1,6 +1,6 @@
 # Checkpoint — Roadmap 1.4: Extract `game/spawning.rs`
 
-Sub-step of [ROADMAP.md](../../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
+Sub-step of [ROADMAP.md](../ROADMAP.md) item 1 ("Split the `game.rs` god module"),
 plan step 4: move pawn/drone spawn logic out of the god module.
 
 **Status:** DONE — `cargo build` green, `cargo nextest run`: 470 passed,
