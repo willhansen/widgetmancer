@@ -581,8 +581,8 @@ impl Graphics {
     }
 
     fn draw_animation(&mut self, animation: &AnimationEnum, time: Instant) {
-        let glyph_map = animation.glyphs_at_time(time);
-        self.draw_glyphs(glyph_map);
+        let glyph_map = animation.double_glyphs_at_time(time);
+        self.draw_glyphs_at_squares(glyph_map);
     }
 
     fn draw_animations(&mut self, animations: AnimationList, time: Instant) {
@@ -598,14 +598,14 @@ impl Graphics {
     pub fn draw_non_board_animations(&mut self, time: Instant) {
         let mut glyphs_to_draw = vec![];
         for animation in &self.active_animations {
-            glyphs_to_draw.push(animation.glyphs_at_time(time));
+            glyphs_to_draw.push(animation.double_glyphs_at_time(time));
         }
         for selector in &self.selectors {
-            glyphs_to_draw.push(selector.glyphs_at_time(time))
+            glyphs_to_draw.push(selector.double_glyphs_at_time(time))
         }
 
         for glyph_map in glyphs_to_draw {
-            self.draw_glyphs(glyph_map);
+            self.draw_glyphs_at_squares(glyph_map);
         }
     }
 

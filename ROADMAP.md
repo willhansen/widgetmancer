@@ -231,6 +231,17 @@ with each item so the context doesn't have to be re-discovered later.
   3. Once no caller remains, delete the deprecated aliases/fns from
      `screen.rs` (completes item 2 Phase 2) — includes resolving the 25
      definition-site warnings in screen.rs itself.
+- **Progress:**
+  - SEAM LANDED (2026-08-02): rendering now consumes
+    `Animation::double_glyphs_at_time()` and draws it directly via
+    `draw_glyphs_at_squares()`, instead of consuming character-grid glyphs and
+    pairing them at the render boundary. The double-glyph trait methods now
+    expose `HashMap<WorldSquare, DoubleGlyph>` explicitly rather than the
+    deprecated `WorldSquareGlyphMap` alias. `StaticBoard` is the first
+    implementation migrated to emit double glyphs directly; its legacy
+    character-grid method remains as a compatibility adapter until the trait
+    is flipped. Added direct output coverage for `StaticBoard`.
+    Suite: 471 passed / 11 skipped; workspace deprecation warnings remain 59.
 - **Done when:** no `WorldCharacterSquare*` types in `game/src`; the
   deprecated items in `screen.rs` are deleted; suite still green.
 

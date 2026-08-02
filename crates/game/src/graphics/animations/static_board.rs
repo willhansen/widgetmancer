@@ -1,10 +1,9 @@
 use crate::graphics::*;
+use rgb::RGB8;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use terminal_rendering::*;
 use utility::*;
-use euclid::vec2;
-use rgb::RGB8;
-use std::time;
-use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct StaticBoard {
@@ -30,17 +29,17 @@ impl Animation for StaticBoard {
         Duration::from_secs_f32(0.0)
     }
 
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
-        let mut glyphs = WorldCharacterSquareGlyphMap::new();
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+        world_square_glyph_map_to_world_character_glyph_map(self.double_glyphs_at_time(time))
+    }
+
+    fn double_glyphs_at_time(&self, _time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+        let mut glyphs = HashMap::new();
         for x in 0..self.board_size.width {
             for y in 0..self.board_size.height {
                 let world_square = WorldSquare::new(x as i32, y as i32);
                 let glyph = Glyph::new(' ', BLACK, self.floor_color_enum.color_at(world_square));
-                let left_character_square =
-                    world_square_to_left_world_character_square(world_square);
-                let right_character_square = left_character_square + vec2(1, 0);
-                glyphs.insert(left_character_square, glyph);
-                glyphs.insert(right_character_square, glyph);
+                glyphs.insert(world_square, [glyph, glyph]);
             }
         }
         glyphs
@@ -48,5 +47,28 @@ impl Animation for StaticBoard {
 
     fn finished_at_time(&self, _time: Instant) -> bool {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn static_board_emits_double_glyphs_by_world_square() {
+        let floor_color = RGB8::new(1, 2, 3);
+        let animation = StaticBoard::new(BoardSize::new(3, 2), FloorColorEnum::Solid(floor_color));
+        let glyphs = animation.double_glyphs_at_time(Instant::now());
+        let expected_glyph = Glyph::new(' ', BLACK, floor_color);
+
+        assert_eq!(glyphs.len(), 6);
+        for x in 0..3 {
+            for y in 0..2 {
+                assert_eq!(
+                    glyphs.get(&WorldSquare::new(x, y)),
+                    Some(&[expected_glyph, expected_glyph])
+                );
+            }
+        }
     }
 }

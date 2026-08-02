@@ -40,7 +40,7 @@ pub trait Animation: Clone {
     fn duration(&self) -> Duration;
     fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
 
-    fn double_glyphs_at_time(&self, time: Instant) -> WorldSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         pair_up_character_square_map(self.glyphs_at_time(time), Glyph::transparent_glyph())
     }
 
@@ -48,11 +48,11 @@ pub trait Animation: Clone {
         self.glyphs_at_time(self.start_time() + duration)
     }
 
-    fn double_glyphs_at_duration(&self, duration: Duration) -> WorldSquareGlyphMap {
-        pair_up_character_square_map(
-            self.glyphs_at_duration(duration),
-            Glyph::transparent_glyph(),
-        )
+    fn double_glyphs_at_duration(
+        &self,
+        duration: Duration,
+    ) -> HashMap<WorldSquare, DoubleGlyph> {
+        self.double_glyphs_at_time(self.start_time() + duration)
     }
 
     fn finished_at_time(&self, time: Instant) -> bool {
