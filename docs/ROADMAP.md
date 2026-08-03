@@ -242,6 +242,13 @@ with each item so the context doesn't have to be re-discovered later.
     character-grid method remains as a compatibility adapter until the trait
     is flipped. Added direct output coverage for `StaticBoard`.
     Suite: 471 passed / 11 skipped; workspace deprecation warnings remain 59.
+  - NEXT STEP SKETCHED (2026-08-02): flip the trait (make
+    `double_glyphs_at_time` required), migrate the 11 remaining impls in two
+    groups (3 already world-square producers → rename-only; 8 braille/char-map
+    producers → new world-square-binned APIs in braille.rs/hextant_blocks.rs
+    with a binning-equivalence property test), delete `draw_string_to_draw_buffer`/
+    `draw_glyphs` (no live callers), then delete the deprecated char-grid API
+    (closes item 2 Phase 2c). Detailed step plan: `docs/checkpoints/roadmap-8-flip-animation-trait.md`.
 - **Done when:** no `WorldCharacterSquare*` types in `game/src`; the
   deprecated items in `screen.rs` are deleted; suite still green.
 
