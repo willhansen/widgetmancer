@@ -8,7 +8,9 @@ techniques (braille, half/quarter/hextant blocks) for smooth graphics.
 Run with `cargo run --release`; test with `cargo nextest run`.
 
 Known architectural issues and the plan to fix them are tracked in
-[ROADMAP.md](ROADMAP.md).
+[ROADMAP.md](ROADMAP.md). The frame-by-frame draw path is documented in
+[RENDERING.md](RENDERING.md), and the euclid-typed coordinate/reference
+frames in [COORDINATE_FRAMES.md](COORDINATE_FRAMES.md).
 
 ## Workspace Layout
 
