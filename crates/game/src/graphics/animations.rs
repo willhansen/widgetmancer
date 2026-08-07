@@ -38,7 +38,14 @@ pub type AnimationList = Vec<AnimationEnum>;
 pub trait Animation: Clone {
     fn start_time(&self) -> Instant;
     fn duration(&self) -> Duration;
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap;
+    // Transition bridge (roadmap item 8): each of glyphs_at_time /
+    // double_glyphs_at_time defaults in terms of the other, so impls can
+    // migrate one at a time. Every impl must override at least one (else
+    // infinite mutual recursion). Both defaults are deleted once all impls
+    // emit double glyphs and glyphs_at_time leaves the trait.
+    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+        world_square_glyph_map_to_world_character_glyph_map(self.double_glyphs_at_time(time))
+    }
 
     fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         pair_up_character_square_map(self.glyphs_at_time(time), Glyph::transparent_glyph())

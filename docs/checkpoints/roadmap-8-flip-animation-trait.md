@@ -25,7 +25,61 @@ update it when the item completes.
   `*WorldCharacterSquare*` / `CharacterGridInWorldFrame` / the
   `world_*character*` conversion fns is the deprecated dead-end.
 
-## Next step: flip the trait, migrate the 11 impls, then delete the char-grid API
+## Progress log
+
+- GROUP A LANDED (2026-08-02): `radial_shockwave`, `recoiling_board`,
+  `smite_from_above` now implement `double_glyphs_at_time` directly — the
+  dead round-trip through `world_square_glyph_map_to_world_character_glyph_map`
+  is gone from all three. **Sequencing deviation from the plan below**: 8a
+  (trait flip) moved to LAST, because flipping first leaves the 8 unmigrated
+  impls not implementing the required method → tree doesn't compile between
+  steps. Instead, the trait now has a transition bridge: `glyphs_at_time`
+  gained a default (un-pair via
+  `world_square_glyph_map_to_world_character_glyph_map`) mirroring the
+  existing `double_glyphs_at_time` default — each defaults in terms of the
+  other, every impl overrides ≥1 (NOTE comment on the bridge in
+  animations.rs). Flip becomes a ~10-line deletion once all 12 impls emit
+  double glyphs. Suite: 471 passed / 11 skipped; deprecation warnings 59
+  (bridge's deprecated-fn call is hidden by game's `#![allow(warnings)]`).
+- 8c LANDED (2026-08-02): world-square-binned producers + property tests.
+  - CHECKPOINT CORRECTION: `WorldSquareGlyphMap` (screen.rs:451) IS
+    deprecated ("World does not know about glyphs") — the note below claiming
+    otherwise is wrong. The 5 Group-A uses were replaced with explicit
+    `HashMap<WorldSquare, DoubleGlyph>`.
+  - braille.rs: `world_point_to_world_braille_point` rewired to skip the
+    deprecated char-grid hop (`(4x+1.5, 4y+1.5)`, algebraically identical);
+    new `points_to_braille_double_arrays(Vec<impl Into<WorldPoint>>) ->
+    HashMap<WorldSquare, DoubleBrailleArray>` bins dots directly
+    (`local = braille_square - 4*world_square`).
+  - glyph.rs: new `Glyph::double_glyphs_for_colored_braille_line` (wraps
+    `get_braille_arrays_for_braille_line`) and `Glyph::points_to_braille_double_glyphs`;
+    both emit `HashMap<WorldSquare, DoubleGlyph>`, empty half ->
+    `transparent_glyph()` to match old `pair_up(.., transparent_glyph())`.
+  - hextant_blocks.rs: new `points_to_hextant_double_glyphs(points, color) ->
+    HashMap<WorldSquare, DoubleGlyph>` (only consumer: blink_animation).
+  - TWO REAL BUGS CAUGHT by the property tests (the safety net paid off):
+    1. euclid's `Point2D::round` for floats is `(x+0.5).floor()` (half-UP),
+       NOT `f32::round` (half away from zero) — they disagree at negative
+       half-integers, flipping left/right char index. New hextant code uses
+       `(v+0.5).floor()` to match the old path exactly.
+    2. PRE-EXISTING BUG FIXED in `braille_square_to_dot_in_character`:
+       `(pos.y % 4).abs()` vertically MIRRORED braille dots inside characters
+       at negative y (e.g. by=-13 -> 1 instead of 3). Now `rem_euclid`.
+       Changes behavior of the old (still live until 8d) line/point braille
+       paths for negative coordinates — for the better. No golden test
+       encoded the buggy output (suite untouched).
+  - Property tests: `test_direct_braille_binning_matches_paired_char_grid`,
+    `test_direct_hextant_binning_matches_paired_char_grid` — 0.125-step grid
+    over [-4,4]^2 (f32-exact) + .5 ties + negatives + multi-point sets,
+    `#[allow(deprecated)]` (dies with old path in 8f).
+  - Suite: 473 passed / 11 skipped (471 + 2 new). Deprecation warnings: 59,
+    all pre-existing old-path definitions; new code adds zero.
+- NEXT: 8d (migrate 8 Group-B impls to the new producers + 4 test call
+  sites in animations.rs; simple_laser/circle_attack are 1-liners, six
+  Vec<WorldPoint> braille producers + blink's hextant), then flip + deletions
+  per 8e–8g below.
+
+## Original plan (superseded in order, not in content): flip the trait, migrate the 11 impls, then delete the char-grid API
 
 ### 8a. Flip the trait (animations.rs)
 

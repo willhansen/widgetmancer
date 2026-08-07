@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
@@ -94,13 +95,13 @@ impl Animation for RecoilingBoardAnimation {
         RecoilingBoardAnimation::RECOIL_DURATION
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let age = time.duration_since(self.start_time);
 
         let mut offset_distance_in_squares: f32 =
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(age.as_secs_f32());
 
-        let mut glyph_map = WorldSquareGlyphMap::new();
+        let mut glyph_map = HashMap::new();
 
         let offset_vector: WorldMove =
             self.orthogonal_shot_direction.step().to_f32() * offset_distance_in_squares;
@@ -121,6 +122,6 @@ impl Animation for RecoilingBoardAnimation {
                 glyph_map.insert(world_square, glyphs);
             }
         }
-        world_square_glyph_map_to_world_character_glyph_map(glyph_map)
+        glyph_map
     }
 }

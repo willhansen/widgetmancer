@@ -1,6 +1,8 @@
 use super::glyph_constants::*;
+use crate::glyph::{DoubleGlyph, Glyph};
+use rgb::RGB8;
 use utility::coordinate_frame_conversions::{
-    
+    WorldSquare,
     WorldPoint,
 };
 use crate::screen::{world_point_to_local_character_point, world_point_to_world_character_point,
@@ -197,6 +199,51 @@ fn local_hextant_squares_to_char(local_hextant_squares: HashSet<LocalHextantSqua
     hextant_array_to_char(final_hex_array)
 }
 
+/// Bins points into left/right 2x3 hextant grids per world square, skipping
+/// the deprecated world character grid. The world-square key and character
+/// index reuse the old path's exact arithmetic (div/rem_euclid on the
+/// rounded character x) so binning is identical by construction —
+/// round-half-away-from-zero makes naive sign/fraction rules disagree at
+/// negative exact-integer x. Character-level equivalence enforced by
+/// `test_direct_hextant_binning_matches_paired_char_grid`.
+pub fn points_to_hextant_double_glyphs(
+    points: Vec<WorldPoint>,
+    color: RGB8,
+) -> HashMap<WorldSquare, DoubleGlyph> {
+    let mut dots: HashMap<WorldSquare, [HashSet<LocalHextantSquare>; 2]> = HashMap::new();
+    for point in points {
+        let char_point_x = point.x * 2.0 + 0.5;
+        // euclid's Point2D::round (used by the old path) is (x+0.5).floor(),
+        // NOT f32::round — they disagree at negative half-integers, which
+        // flips the left/right character index
+        let char_x = (char_point_x + 0.5).floor() as i32;
+        // same rounding rule as char_x (euclid half-up), on both axes
+        let world_square: WorldSquare = point2(char_x.div_euclid(2), (point.y + 0.5).floor() as i32);
+        let char_index = char_x.rem_euclid(2) as usize;
+        // local point within the character, matching
+        // world_point_to_local_character_point's arithmetic
+        let local_char_point =
+            LocalCharacterPoint::new(char_point_x - char_x as f32, point.y - world_square.y as f32);
+        let dot = local_character_point_to_local_hextant_point(local_char_point)
+            .round()
+            .to_i32();
+        dots.entry(world_square).or_default()[char_index].insert(dot);
+    }
+    dots.into_iter()
+        .map(|(square, halves)| {
+            // empty half -> transparent glyph, matching the old
+            // pair_up_character_square_map(.., Glyph::transparent_glyph())
+            (square, halves.map(|set| {
+                if set.is_empty() {
+                    Glyph::transparent_glyph()
+                } else {
+                    Glyph::fg_only(local_hextant_squares_to_char(set), color)
+                }
+            }))
+        })
+        .collect()
+}
+
 pub fn points_to_hextant_chars(points: Vec<WorldPoint>) -> WorldCharacterSquareToCharMap {
     let mut local_hextant_squares_grouped_by_character_square =
         HashMap::<WorldCharacterSquare, HashSet<LocalHextantSquare>>::new();
@@ -333,6 +380,37 @@ mod tests {
                 array,
                 binary_to_hextant_array(hextant_array_to_binary(array))
             );
+        }
+    }
+
+    // Compares the new direct-binning producer against the deprecated
+    // char-grid path it replaces, at the character level (transparent_glyph
+    // is fg_only(SPACE), so characters line up). #[allow(deprecated)] dies
+    // with that path (roadmap item 8f).
+    #[allow(deprecated)]
+    #[test]
+    fn test_direct_hextant_binning_matches_paired_char_grid() {
+        use crate::glyph::pair_up_character_square_map;
+        // 0.125 steps: exactly representable in f32, so no reassociation
+        // drift between the two conversion chains. Includes .5 ties and
+        // negatives (round ties away from zero — the tricky case).
+        let offsets: Vec<f32> = (-32..=32).map(|i| i as f32 * 0.125).collect();
+        let mut point_sets: Vec<Vec<WorldPoint>> = offsets
+            .iter()
+            .flat_map(|&x| offsets.iter().map(move |&y| vec![point2(x, y)]))
+            .collect();
+        point_sets.push(vec![point2(-0.1, 0.0), point2(-0.3, 0.0), point2(1.1, 0.0)]);
+        point_sets.push(offsets.iter().map(|&x| point2(x, -x * 0.25)).collect());
+
+        for points in point_sets {
+            let old: HashMap<WorldSquare, [char; 2]> =
+                pair_up_character_square_map(points_to_hextant_chars(points.clone()), SPACE);
+            let new: HashMap<WorldSquare, [char; 2]> =
+                points_to_hextant_double_glyphs(points, RGB8::new(1, 2, 3))
+                    .into_iter()
+                    .map(|(square, glyphs)| (square, glyphs.map(|g| g.character)))
+                    .collect();
+            assert_eq!(old, new);
         }
     }
 }

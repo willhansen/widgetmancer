@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
@@ -62,13 +63,13 @@ impl Animation for RadialShockwave {
         Duration::from_secs_f32(30.0 / RadialShockwave::SHOCKWAVE_SPEED)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let shockwave_speed = RadialShockwave::SHOCKWAVE_SPEED;
         let wavelength = RadialShockwave::WAVELENGTH;
         let shockwave_radius = self.age_at_time(time).as_secs_f32() * shockwave_speed;
         let rounded_outer_edge_radius = shockwave_radius.ceil() as i32;
 
-        let mut glyph_map = WorldSquareGlyphMap::new();
+        let mut glyph_map = HashMap::new();
 
         for dx in -rounded_outer_edge_radius..=rounded_outer_edge_radius {
             for dy in -rounded_outer_edge_radius..=rounded_outer_edge_radius {
@@ -106,7 +107,7 @@ impl Animation for RadialShockwave {
                 glyph_map.insert(square, glyphs);
             }
         }
-        world_square_glyph_map_to_world_character_glyph_map(glyph_map)
+        glyph_map
     }
 }
 

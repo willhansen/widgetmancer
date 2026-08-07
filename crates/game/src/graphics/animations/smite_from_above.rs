@@ -4,6 +4,7 @@ use utility::*;
 use euclid::Angle;
 use rand::{Rng, SeedableRng};
 use std::f32::consts::{E, PI, TAU};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -29,7 +30,7 @@ impl Animation for SmiteAnimation {
         Duration::from_millis(500)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let start_width_fraction = 0.4;
         let beam_width_fraction = 1.0
             - (self.fraction_done_at_time(time) * (1.0 + start_width_fraction)
@@ -48,10 +49,8 @@ impl Animation for SmiteAnimation {
         // pretty arbitrary
         //let hash = ((self.target.x * 5 + self.target.y) * 1000) .to_u64() .unwrap();
 
-        world_square_glyph_map_to_world_character_glyph_map(
-            (0..30)
-                .map(|i| (self.target + STEP_UP * i, one_horizontal_slice))
-                .collect(),
-        )
+        (0..30)
+            .map(|i| (self.target + STEP_UP * i, one_horizontal_slice))
+            .collect()
     }
 }

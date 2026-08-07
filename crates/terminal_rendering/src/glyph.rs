@@ -443,6 +443,43 @@ impl Glyph {
         Glyph::char_map_to_fg_only_glyph_map(points_to_braille_chars(points), color)
     }
 
+    /// World-square-keyed replacement for `get_glyphs_for_colored_braille_line`.
+    pub fn double_glyphs_for_colored_braille_line(
+        start_pos: WorldPoint,
+        end_pos: WorldPoint,
+        color: RGB8,
+    ) -> HashMap<WorldSquare, DoubleGlyph> {
+        get_braille_arrays_for_braille_line(start_pos, end_pos)
+            .into_iter()
+            .map(|(square, dots)| (square, Glyph::dots_to_double_glyph(dots, color)))
+            .collect()
+    }
+
+    /// World-square-keyed replacement for `points_to_braille_glyphs`.
+    pub fn points_to_braille_double_glyphs(
+        points: Vec<WorldPoint>,
+        color: RGB8,
+    ) -> HashMap<WorldSquare, DoubleGlyph> {
+        points_to_braille_double_arrays(points)
+            .into_iter()
+            .map(|(square, dots)| (square, Glyph::dots_to_double_glyph(dots, color)))
+            .collect()
+    }
+
+    // An empty half maps to a transparent glyph (not fg_only(SPACE)) to match
+    // the old pair_up_character_square_map(.., Glyph::transparent_glyph())
+    // semantics exactly.
+    fn dots_to_double_glyph(dots: DoubleBrailleArray, color: RGB8) -> DoubleGlyph {
+        dots.to_two_braille_arrays().map(|half| {
+            let character = half.char();
+            if character == SPACE {
+                Glyph::transparent_glyph()
+            } else {
+                Glyph::fg_only(character, color)
+            }
+        })
+    }
+
     pub fn character_world_pos_to_colored_braille_glyph(
         world_pos: Point2D<f32, CharacterGridInWorldFrame>,
         color: RGB8,

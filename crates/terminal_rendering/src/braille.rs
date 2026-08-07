@@ -166,7 +166,10 @@ pub fn braille_pos_to_character_world_pos(
 }
 
 pub fn world_point_to_world_braille_point(pos: WorldPoint) -> WorldBraillePoint {
-    world_character_point_to_braille_point(world_point_to_world_character_point(pos))
+    // Inlined deprecated char-grid hop:
+    // world_character_point_to_braille_point(world_point_to_world_character_point(pos))
+    // == ((2x+0.5)*2+0.5, 4y+1.5)
+    point2(pos.x * 4.0 + 1.5, pos.y * 4.0 + 1.5)
 }
 pub fn world_braille_point_to_world_point(pos: WorldBraillePoint) -> WorldPoint {
     world_character_point_to_world_point(world_braille_point_to_world_character_point(pos))
@@ -175,7 +178,11 @@ pub fn world_braille_point_to_world_point(pos: WorldBraillePoint) -> WorldPoint 
 pub fn braille_square_to_dot_in_character(
     pos: Point2D<i32, BrailleGridInWorldFrame>,
 ) -> Point2D<i32, BrailleGridInWorldFrame> {
-    point2((pos.x % 2).abs(), (pos.y % 4).abs())
+    // rem_euclid, not (x % n).abs(): for negative braille squares the latter
+    // mirrors the dot order within the character (e.g. y=-13: -13%4=-1 ->
+    // abs 1, but geometrically that's the top row, 3). Bug was invisible on
+    // non-negative boards; exposed by the world-square-binning property test.
+    point2(pos.x.rem_euclid(2), pos.y.rem_euclid(4))
 }
 
 pub fn world_braille_point_to_world_character_point(
@@ -319,6 +326,33 @@ pub fn get_braille_arrays_for_braille_line(
         })
         .collect()
 }
+/// Bins points into a 4x4 braille-dot grid per world square, skipping the
+/// deprecated world character grid. Binning-equivalent to
+/// `points_to_braille_chars` + `pair_up_character_square_map` — enforced by
+/// `test_direct_braille_binning_matches_paired_char_grid`.
+pub fn points_to_braille_double_arrays(
+    points: Vec<impl Into<WorldPoint>>,
+) -> HashMap<WorldSquare, DoubleBrailleArray> {
+    let mut dots_by_square = HashMap::<WorldSquare, DoubleBrailleArray>::new();
+    for point in points {
+        let point: WorldPoint = point.into();
+        let world_square: WorldSquare = point.round().to_i32();
+        let braille_square = world_point_to_world_braille_point(point).round().to_i32();
+        // euclid won't subtract across units; the braille grid is exactly
+        // 4x finer than the world-square grid in both axes
+        let local_dot: LocalBrailleSquare = point2(
+            braille_square.x - world_square.x * 4,
+            braille_square.y - world_square.y * 4,
+        );
+        debug_assert!((0..4).contains(&local_dot.x) && (0..4).contains(&local_dot.y));
+        dots_by_square
+            .entry(world_square)
+            .or_insert_with(DoubleBrailleArray::empty)
+            .set_xy(local_dot.x as usize, local_dot.y as usize, true);
+    }
+    dots_by_square
+}
+
 pub fn points_to_braille_chars(
     points: Vec<impl Into<WorldPoint>>,
 ) -> WorldCharacterSquareToCharMap {
@@ -659,4 +693,35 @@ mod tests {
     fn test_braille_array_parse_space() {
         assert_eq!(BrailleArray::from_char(SPACE).char(), SPACE);
     }
+
+    // Compares the new direct-binning producer against the deprecated
+    // char-grid path it replaces. #[allow(deprecated)] dies with that path
+    // (roadmap item 8f).
+    #[allow(deprecated)]
+    #[test]
+    fn test_direct_braille_binning_matches_paired_char_grid() {
+        // 0.125 steps: exactly representable in f32, so no reassociation
+        // drift between the two conversion chains. Includes .5 ties and
+        // negatives.
+        let offsets: Vec<f32> = (-32..=32).map(|i| i as f32 * 0.125).collect();
+        let mut point_sets: Vec<Vec<WorldPoint>> = offsets
+            .iter()
+            .flat_map(|&x| offsets.iter().map(move |&y| vec![point2(x, y)]))
+            .collect();
+        // multi-point sets to exercise dot accumulation within a square
+        point_sets.push(vec![point2(0.0, 0.0), point2(0.1, 0.1), point2(-0.4, 0.4)]);
+        point_sets.push(offsets.iter().map(|&x| point2(x, x * 0.5)).collect());
+
+        for points in point_sets {
+            let old: HashMap<WorldSquare, DoubleChar> =
+                pair_up_character_square_map(points_to_braille_chars(points.clone()), SPACE);
+            let new: HashMap<WorldSquare, DoubleChar> =
+                points_to_braille_double_arrays(points.clone())
+                    .into_iter()
+                    .map(|(square, dots)| (square, dots.chars()))
+                    .collect();
+            assert_eq!(old, new, "points: {:?}", points);
+        }
+    }
 }
+
