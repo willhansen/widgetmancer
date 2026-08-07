@@ -144,7 +144,7 @@ impl Graphics {
 
     fn draw_glyphs_at_squares(&mut self, glyph_map: HashMap<WorldSquare, DoubleGlyph>) {
         for (world_square, glyph) in glyph_map {
-            self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
+            self.draw_drawable_to_draw_buffer(world_square, &TextDrawable::from_glyphs(glyph));
         }
     }
     fn draw_drawables_at_squares<T: Drawable>(&mut self, drawable_map: HashMap<WorldSquare, T>) {
@@ -169,8 +169,8 @@ impl Graphics {
         self.board_animation = None
     }
 
-    #[deprecated(note = "use more descriptive")]
-    pub fn square_is_white(square: WorldSquare) -> bool {
+    /// Locally even `x+y` — the light squares of a checkerboard.
+    pub fn square_is_light(square: WorldSquare) -> bool {
         (square.x + square.y) % 2 == 0
     }
     pub fn big_chess_pattern(square: WorldSquare) -> RGB8 {
@@ -181,21 +181,6 @@ impl Graphics {
             BOARD_BLACK
         } else {
             BOARD_WHITE
-        }
-    }
-    fn checkerboard_square_function(square: WorldSquare) -> RGB8 {
-        if Graphics::square_is_white(square) {
-            BOARD_WHITE
-        } else {
-            BOARD_BLACK
-        }
-    }
-    #[deprecated(note = "use more descriptive")]
-    pub fn off_board_color_at_square(square: WorldSquare) -> RGB8 {
-        if !Graphics::square_is_white(square) {
-            BOARD_WHITE
-        } else {
-            BOARD_BLACK
         }
     }
     pub fn get_drawable_for_square_from_draw_buffer(
@@ -320,16 +305,6 @@ impl Graphics {
         };
         self.draw_buffer.insert(world_square, to_draw.to_enum());
     }
-    #[deprecated(
-        note = "Graphics should not know about glyphs, use draw_drawable_to_draw_buffer instead"
-    )]
-    pub fn draw_glyphs_for_square_to_draw_buffer(
-        &mut self,
-        world_square: WorldSquare,
-        glyphs: DoubleGlyph,
-    ) {
-        self.draw_above_square(&TextDrawable::from_glyphs(glyphs), world_square);
-    }
 
     pub fn draw_drawable_to_draw_buffer<T: Drawable + Debug>(
         &mut self,
@@ -350,23 +325,23 @@ impl Graphics {
             .iter_mut()
             .for_each(|g: &mut Glyph| g.fg_color = color);
 
-        self.draw_glyphs_for_square_to_draw_buffer(square, piece_glyphs);
+        self.draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(piece_glyphs));
     }
 
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
-        self.draw_glyphs_for_square_to_draw_buffer(square, Self::glyphs_for_upgrade(upgrade));
+        self.draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(Self::glyphs_for_upgrade(upgrade)));
     }
     fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
         [Glyph::fg_only('*', CYAN), Glyph::transparent_glyph()]
     }
     pub fn draw_arrow(&mut self, square: WorldSquare, dir: KingWorldStep) {
-        self.draw_glyphs_for_square_to_draw_buffer(square, Glyph::glyphs_for_flying_arrow(dir))
+        self.draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(Glyph::glyphs_for_flying_arrow(dir)))
     }
 
     pub fn draw_same_glyphs_at_squares(&mut self, glyphs: DoubleGlyph, square_set: &SquareSet) {
         square_set
             .into_iter()
-            .for_each(|&square| self.draw_glyphs_for_square_to_draw_buffer(square, glyphs));
+            .for_each(|&square| self.draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(glyphs)));
     }
     pub fn draw_move_marker_squares(
         &mut self,
@@ -775,8 +750,8 @@ mod tests {
         let mut g = set_up_graphics_with_nxn_world_squares(5);
         let world_square = WorldSquare::new(1, 2);
         let color = CYAN;
-        g.draw_glyphs_for_square_to_draw_buffer(world_square, DoubleGlyph::fg_only("# ", color));
-        g.draw_glyphs_for_square_to_draw_buffer(point2(0, 0), DoubleGlyph::fg_only("# ", GREEN));
+        g.draw_drawable_to_draw_buffer(world_square, &TextDrawable::from_glyphs(DoubleGlyph::fg_only("# ", color)));
+        g.draw_drawable_to_draw_buffer(point2(0, 0), &TextDrawable::from_glyphs(DoubleGlyph::fg_only("# ", GREEN)));
         let fov = portal_aware_field_of_view_from_square(
             point2(0, 0),
             5,

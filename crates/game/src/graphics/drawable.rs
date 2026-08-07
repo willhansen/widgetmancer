@@ -94,17 +94,6 @@ pub struct PartialVisibilityDrawable {
 }
 
 impl PartialVisibilityDrawable {
-    #[deprecated(
-        note = "use from_partially_visible_drawable instead.  Shadows should be conceptualized as lack of visibility"
-    )]
-    pub fn from_square_visibility(square_viz: SquareVisibility) -> Self {
-        assert!(!square_viz.is_fully_visible());
-        PartialVisibilityDrawable {
-            visibility: square_viz,
-            fg_color: GREEN,              // TODO: no default color
-            bg_color: OUT_OF_SIGHT_COLOR, // TODO: no default color
-        }
-    }
     pub fn from_partially_visible_drawable<T: Drawable>(
         original_drawable: &T,
         square_viz: SquareVisibility,
@@ -523,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_shadow_over_text() {
-        let shadow = PartialVisibilityDrawable::from_square_visibility(
+        let shadow = PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
             SquareVisibility::bottom_half_visible(),
         );
         let text = TextDrawable::new("a ", RED, GREEN, false);

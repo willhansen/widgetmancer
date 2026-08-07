@@ -135,6 +135,37 @@ with each item so the context doesn't have to be re-discovered later.
     un-deprecate-or-rename decision), `Graphics::square_is_white` x5,
     `Glyph::get_glyphs_for_player` x1. Then remove
     `#![allow(warnings)]` and add clippy to CI.
+  - PHASE 3 STEP 1 COMPLETE (2026-08-07, trivial group; full log
+    `docs/checkpoints/roadmap-2-phase3-step1.md`): deleted dead
+    `Graphics::off_board_color_at_square` and `checkerboard_square_function`
+    (0 callers each); renamed `square_is_white` → `square_is_light` (only
+    live caller `radial_shockwave.rs`, which needs the chessboard-light parity
+    test); deleted deprecated `Glyph::get_glyphs_for_player` from
+    `terminal_rendering` (single caller in `game/tests.rs:1681` now uses
+    `ArrowDrawable::new(STEP_UP.into(), THICK_ARROWS, PLAYER_COLOR)`).
+    Re-probe with `#![deny(deprecated)]` confirms only the two intended
+    items remain in the game crate: `from_square_visibility` x16 and
+    `draw_glyphs_for_square_to_draw_buffer` x8. Suite: 459 passed / 11
+    ignored, unchanged.
+  - PHASE 3 STEP 2 COMPLETE (2026-08-07; log
+    `docs/checkpoints/roadmap-2-phase3-step2.md`): resolved the
+    un-deprecate-or-rename decision for `draw_glyphs_for_square_to_draw_buffer`
+    — deleted it (not renamed) and migrated its 8 callers (all internal to
+    `graphics.rs` incl. 2 in `#[cfg(test)]`) to
+    `draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(glyphs))`,
+    which is byte-for-byte what the deprecated body did. Re-probe now shows a
+    single remaining deprecation: `from_square_visibility` x16. Suite:
+    459 passed / 11 ignored.
+  - PHASE 3 STEP 3 COMPLETE (2026-08-07; log
+    `docs/checkpoints/roadmap-2-phase3-step3.md`): migrated all 17
+    `from_square_visibility` uses (all `#[cfg(test)]` — 15 in fov_stuff tests,
+    1 in drawable.rs test, + the def) to
+    `from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), viz)`,
+    preserving the old hard-coded `GREEN` fg. Deprecated fn deleted.
+    `#![deny(deprecated)]` probe: 0 remaining. ALL deprecated symbols in the
+    game crate are now resolved — next: remove `#![allow(warnings)]` from
+    `game/src/lib.rs`, fix stragglers, add clippy to CI.
+    Suite: 459 passed / 11 ignored.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 

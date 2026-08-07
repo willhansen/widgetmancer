@@ -12,13 +12,13 @@
     use terminal_rendering::glyph_constants::named_chars;
 
     use crate::game;
-    use crate::graphics::drawable::{Drawable, DrawableEnum};
+    use crate::graphics::drawable::{ArrowDrawable, Drawable, DrawableEnum};
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
     use crate::utils_for_tests::*;
     use terminal_rendering::glyph::glyph_constants::{
-        BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, RED,
-        RIGHT_HALF_BLOCK,
+        BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, PLAYER_COLOR,
+        RED, RIGHT_HALF_BLOCK, THICK_ARROWS,
     };
 
     use super::*;
@@ -1678,7 +1678,9 @@
         );
         assert_eq!(
             before_glyphs.to_clean_string(),
-            Glyph::get_glyphs_for_player(STEP_UP.into()).to_clean_string()
+            ArrowDrawable::new(STEP_UP.into(), THICK_ARROWS, PLAYER_COLOR)
+                .to_glyphs()
+                .to_clean_string()
         );
     }
 

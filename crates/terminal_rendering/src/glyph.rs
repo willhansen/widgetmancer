@@ -243,23 +243,6 @@ impl Glyph {
         char_is_braille(self.character)
     }
 
-    #[deprecated(note = "Use ArrowDrawable instead")]
-    pub fn get_glyphs_for_player(faced_direction: KingWorldStep) -> DoubleGlyph {
-        // ⭠⭢⭡⭣ ⭦⭧⭨⭩
-
-        let mut glyphs = [
-            Glyph::from_char(Glyph::extract_arrow_from_arrow_string(
-                faced_direction.into(),
-                THICK_ARROWS,
-            ))
-            .with_transparent_bg(true),
-            Glyph::transparent_glyph(),
-        ];
-        glyphs[0].fg_color = PLAYER_COLOR;
-
-        glyphs
-    }
-
     pub fn looks_solid_color(&self, color: RGB8) -> bool {
         if let Some(solid_color) = self.get_solid_color() {
             color == solid_color

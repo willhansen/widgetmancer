@@ -88,8 +88,8 @@ impl Animation for RadialShockwave {
                     height /= square_radius;
                 }
 
-                if (Graphics::square_is_white(square) && height > 0.0)
-                    || (!Graphics::square_is_white(square) && height < 0.0)
+                if (Graphics::square_is_light(square) && height > 0.0)
+                    || (!Graphics::square_is_light(square) && height < 0.0)
                 {
                     continue;
                 }

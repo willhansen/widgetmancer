@@ -1396,7 +1396,7 @@ mod tests {
                 .visible_relative_squares_in_main_view_only
                 .get(&step)
                 .unwrap();
-            let string = PartialVisibilityDrawable::from_square_visibility(*square_visibility)
+            let string = PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), *square_visibility)
                 .to_glyphs()
                 .to_clean_string();
             assert_eq!(&string, "🭞🭚");
@@ -1408,7 +1408,7 @@ mod tests {
         let interval = AngleInterval::from_degrees(0.0, 45.0).complement();
         let square_relative_to_center = vec2(1, 1);
         let visibility = square_visibility_from_one_view_arc(interval, square_relative_to_center);
-        let string = PartialVisibilityDrawable::from_square_visibility(visibility.unwrap())
+        let string = PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), visibility.unwrap())
             .to_glyphs()
             .to_clean_string();
         assert_eq!(&string, "🭞🭚");
@@ -1432,7 +1432,7 @@ mod tests {
             .unwrap()
             .clone();
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 visibility_of_test_square.square_visibility_in_absolute_frame()
             )
             .to_glyphs()
@@ -1486,7 +1486,7 @@ mod tests {
         let partial = square_visibility_from_one_view_arc(arc, square);
         assert!(!partial.unwrap().is_fully_visible());
         assert_eq!(
-            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), partial.unwrap())
                 .to_glyphs()
                 .to_clean_string(),
             [FULL_BLOCK, SPACE].into_iter().collect::<String>()
@@ -1516,7 +1516,7 @@ mod tests {
                 center_offset,
             );
             assert!(!partial.unwrap().is_fully_visible());
-            PartialVisibilityDrawable::from_square_visibility(partial.unwrap())
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), partial.unwrap())
                 .to_glyphs()
                 .chars()
         });
@@ -1594,7 +1594,7 @@ mod tests {
             .map(|(step, square_vis): (&WorldStep, &SquareVisibility)| {
                 (
                     step,
-                    PartialVisibilityDrawable::from_square_visibility(*square_vis)
+                    PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), *square_vis)
                         .to_glyphs()
                         .to_clean_string(),
                 )
@@ -1634,7 +1634,7 @@ mod tests {
     #[test]
     fn test_partial_visibility_of_one_square_observed_discontinuity_1() {
         assert_shadow_is_horizontally_continuous(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-1, -3)).unwrap(),
             )
             .to_glyphs(),
@@ -1644,7 +1644,7 @@ mod tests {
     #[test]
     fn test_partial_visibility_of_one_square_observed_discontinuity_2() {
         assert_shadow_is_horizontally_continuous(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 square_visibility_from_block_and_square(STEP_DOWN_RIGHT, vec2(9, -3)).unwrap(),
             )
             .to_glyphs(),
@@ -1654,7 +1654,7 @@ mod tests {
     #[test]
     fn test_partial_visibility_of_one_square_observed_discontinuity_3() {
         assert_shadow_is_horizontally_continuous(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 square_visibility_from_block_and_square(STEP_UP_LEFT, vec2(-14, 5)).unwrap(),
             )
             .to_glyphs(),
@@ -1664,13 +1664,13 @@ mod tests {
     #[test]
     fn test_partial_visibility_of_one_square_observed_discontinuity_4() {
         assert_shadow_is_horizontally_continuous(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, 3)).unwrap(),
             )
             .to_glyphs(),
         );
         assert_shadow_is_horizontally_continuous(
-            PartialVisibilityDrawable::from_square_visibility(
+            PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                 square_visibility_from_block_and_square(STEP_RIGHT * 2, vec2(9, -3)).unwrap(),
             )
             .to_glyphs(),
@@ -1682,7 +1682,7 @@ mod tests {
         // highest i observed before failure: 9
         for i in 0..30 {
             assert_shadow_is_horizontally_continuous(
-                PartialVisibilityDrawable::from_square_visibility(
+                PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                     square_visibility_from_block_and_square(STEP_DOWN_LEFT, vec2(-14, -5)).unwrap(),
                 )
                 .to_glyphs(),
@@ -1693,11 +1693,11 @@ mod tests {
     #[test]
     fn test_vertical_shadow_symmetry() {
         let block_square = STEP_RIGHT * 3;
-        let above_glyphs = PartialVisibilityDrawable::from_square_visibility(
+        let above_glyphs = PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
             square_visibility_from_block_and_square(block_square, block_square + STEP_UP).unwrap(),
         )
         .to_glyphs();
-        let below_glyphs = PartialVisibilityDrawable::from_square_visibility(
+        let below_glyphs = PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
             square_visibility_from_block_and_square(block_square, block_square + STEP_DOWN)
                 .unwrap(),
         )
@@ -1744,7 +1744,7 @@ mod tests {
                     .map(angle_block_char_complement)
                     .collect();
                 assert_eq!(
-                    PartialVisibilityDrawable::from_square_visibility(
+                    PartialVisibilityDrawable::from_partially_visible_drawable(&SolidColorDrawable::new(GREEN), 
                         square_visibility_from_block_and_square(block_square, shadow_square)
                             .unwrap()
                     )
