@@ -2,17 +2,14 @@ use crate::DoubleChar;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
-use euclid::*;
 use itertools::Itertools;
 use rgb::*;
 use termion::color;
 
 use glyph_constants::*;
-use utility::geometry2::FPoint;
 use utility::geometry2::IPoint;
 
 use crate::floating_square::character_for_half_square_with_1d_offset;
-use crate::screen::CharacterGridInWorldFrame;
 use utility::coordinate_frame_conversions::*;
 use utility::*;
 
@@ -363,40 +360,6 @@ impl DrawableGlyph {
             .collect()
     }
 
-    pub fn get_glyphs_for_colored_braille_line(
-        start_pos: WorldPoint,
-        end_pos: WorldPoint,
-        color: RGB8,
-    ) -> DrawableGlyphMap {
-        DrawableGlyph::char_map_to_fg_only_glyph_map(
-            get_chars_for_braille_line(start_pos, end_pos)
-                .into_iter()
-                .map(|(p, c)| (p.into(), c))
-                .collect(),
-            color,
-        )
-    }
-
-    pub fn points_to_braille_glyphs(points: Vec<FPoint>, color: RGB8) -> DrawableGlyphMap {
-        DrawableGlyph::char_map_to_fg_only_glyph_map(
-            points_to_braille_chars(points)
-                .into_iter()
-                .map(|(a, b)| (a.into(), b.into()))
-                .collect(),
-            color,
-        )
-    }
-
-    pub fn character_world_pos_to_colored_braille_glyph(
-        world_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        color: RGB8,
-    ) -> DrawableGlyph {
-        DrawableGlyph::new(
-            character_world_pos_to_braille_char(world_pos),
-            Some(color),
-            None,
-        )
-    }
 
     pub fn swap_fg_bg(&mut self) {
         let tmp = self.fg_color;
@@ -533,6 +496,7 @@ impl DoubleDrawableGlyphExt for DoubleDrawableGlyph {
 
 #[cfg(test)]
 mod tests {
+    use euclid::vec2;
     use ntest::assert_false;
 
     use super::*;
@@ -757,16 +721,6 @@ mod tests {
     fn test_can_not_get_solid_color_if_there_is_not_one() {
         let glyph = DrawableGlyph::new_colored('a', BLUE, RED);
         assert_eq!(glyph.get_solid_color(), None);
-    }
-
-    #[test]
-    fn test_braille_line_has_default_background() {
-        let glyph_map = DrawableGlyph::get_glyphs_for_colored_braille_line(
-            point2(1.0, 1.0),
-            point2(3.0, 30.0),
-            RED,
-        );
-        assert!(glyph_map.values().all(|glyph| glyph.bg_color.is_none()))
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
@@ -58,7 +59,7 @@ impl Animation for SpearAttackAnimation {
         Duration::from_millis(500)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
         let sweep_degrees = 10.0;
@@ -79,7 +80,7 @@ impl Animation for SpearAttackAnimation {
             .map(|p| self.start_square.to_f32() + p + rel_spear_tip)
             .collect();
         points_to_draw.append(&mut spearhead_points);
-        Glyph::points_to_braille_glyphs(points_to_draw, SPEAR_COLOR)
+        Glyph::points_to_braille_double_glyphs(points_to_draw, SPEAR_COLOR)
     }
 }
 

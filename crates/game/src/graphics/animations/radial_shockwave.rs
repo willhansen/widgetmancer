@@ -164,8 +164,10 @@ mod tests {
     #[test]
     fn test_has_some_glyphs() {
         let anim = RadialShockwave::new(point2(5, 5), FloorColorEnum::Solid(RED));
-        assert!(anim.glyphs_at_duration(Duration::from_secs_f32(0.0)).len() < 5);
-        assert!(anim.glyphs_at_duration(Duration::from_secs_f32(2.0)).len() > 5);
+        // map is keyed by world square (was: half-width character square);
+        // both thresholds hold either way
+        assert!(anim.double_glyphs_at_duration(Duration::from_secs_f32(0.0)).len() < 5);
+        assert!(anim.double_glyphs_at_duration(Duration::from_secs_f32(2.0)).len() > 5);
     }
 
     #[test]

@@ -10,7 +10,7 @@ use termion::color;
 
 use glyph_constants::*;
 use utility::geometry2::PointExt;
-use crate::screen::{CharacterGridInWorldFrame, WorldCharacterSquare, WorldCharacterSquareGlyphMap};
+
 use utility::coordinate_frame_conversions::*;
 use utility::*;
 
@@ -428,21 +428,6 @@ impl Glyph {
             .collect()
     }
 
-    pub fn get_glyphs_for_colored_braille_line(
-        start_pos: WorldPoint,
-        end_pos: WorldPoint,
-        color: RGB8,
-    ) -> WorldCharacterSquareGlyphMap {
-        Glyph::char_map_to_fg_only_glyph_map(get_chars_for_braille_line(start_pos, end_pos), color)
-    }
-
-    pub fn points_to_braille_glyphs(
-        points: Vec<WorldPoint>,
-        color: RGB8,
-    ) -> WorldCharacterSquareGlyphMap {
-        Glyph::char_map_to_fg_only_glyph_map(points_to_braille_chars(points), color)
-    }
-
     /// World-square-keyed replacement for `get_glyphs_for_colored_braille_line`.
     pub fn double_glyphs_for_colored_braille_line(
         start_pos: WorldPoint,
@@ -478,17 +463,6 @@ impl Glyph {
                 Glyph::fg_only(character, color)
             }
         })
-    }
-
-    pub fn character_world_pos_to_colored_braille_glyph(
-        world_pos: Point2D<f32, CharacterGridInWorldFrame>,
-        color: RGB8,
-    ) -> Glyph {
-        Glyph::new(
-            character_world_pos_to_braille_char(world_pos),
-            color,
-            Glyph::DEFAULT_BG_COLOR,
-        )
     }
 
     pub fn swap_fg_bg(&mut self) {
@@ -713,34 +687,6 @@ pub fn glyph_map_to_string<U>(glyph_map: &HashMap<Point2D<i32, U>, Glyph>) -> St
 pub fn char_map_to_string(char_map: HashMap<geometry2::IPoint, char>) -> String {
     map_of_stringables_to_string(&char_map)
 }
-/// Pairs values keyed by half-resolution horizontal squares (2 per world
-/// square, x = 2*world_x + {0,1} per the convention in
-/// `screen::world_point_to_world_character_point`) into one `[T; 2]` per
-/// world square. Generic over the euclid unit so callers can migrate off
-/// the deprecated world character frame independently.
-pub fn pair_up_character_square_map<T: Clone, U>(
-    character_glyph_map: HashMap<Point2D<i32, U>, T>,
-    default_filler: T,
-) -> HashMap<WorldSquare, [T; 2]> {
-    let mut output_map = HashMap::<WorldSquare, [T; 2]>::new();
-    character_glyph_map
-        .into_iter()
-        .for_each(|(character_square, value)| {
-            let world_square = point2(character_square.x.div_euclid(2), character_square.y);
-            let position_index = character_square.x.rem_euclid(2) as usize;
-
-            if output_map.contains_key(&world_square) {
-                let existing_double_value = output_map.get_mut(&world_square).unwrap();
-                existing_double_value[position_index] = value;
-            } else {
-                let mut new_double_value = [default_filler.clone(), default_filler.clone()];
-                new_double_value[position_index] = value;
-                output_map.insert(world_square, new_double_value);
-            }
-        });
-    output_map
-}
-
 // Order is anticlockwise [right, up, left, down]
 pub fn chars_for_square_walls(walls: [bool; 4]) -> DoubleChar {
     let left = match walls {
@@ -981,9 +927,12 @@ mod tests {
 
     #[test]
     fn test_braille_line_has_transparent_background() {
-        let glyph_map =
-            Glyph::get_glyphs_for_colored_braille_line(point2(1.0, 1.0), point2(3.0, 30.0), RED);
-        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true))
+        let glyph_map = Glyph::double_glyphs_for_colored_braille_line(
+            point2(1.0, 1.0),
+            point2(3.0, 30.0),
+            RED,
+        );
+        assert!(glyph_map.values().flatten().all(|glyph| glyph.bg_transparent))
     }
 
     #[test]
@@ -1127,47 +1076,5 @@ mod tests {
     fn test_character_width_detection() {
         assert!(Glyph::char_is_fullwidth('🢂'));
         assert_false!(Glyph::char_is_fullwidth('>'));
-    }
-    #[test]
-    fn test_pair_up_glyph_map_positions() {
-        let character_squares: Vec<WorldCharacterSquare> = vec![
-            point2(0, 0),
-            point2(1, 0),
-            point2(1, 1),
-            point2(2, 0),
-            point2(2, 1),
-        ];
-
-        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
-        for square in character_squares {
-            character_glyph_map.insert(square, Glyph::default_transparent());
-        }
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
-        let correct_squares = vec![point2(0, 0), point2(1, 0), point2(0, 1), point2(1, 1)];
-        assert_eq!(square_glyph_map.len(), correct_squares.len());
-        for square in correct_squares {
-            assert!(square_glyph_map.contains_key(&square));
-        }
-    }
-
-    #[test]
-    fn test_pair_up_glyph_map_glyphs() {
-        let mut character_glyph_map = WorldCharacterSquareGlyphMap::new();
-        let test_glyph = Glyph {
-            character: ' ',
-            fg_color: RGB8::new(0, 0, 0),
-            bg_color: RGB8::new(100, 100, 150),
-            bg_transparent: false,
-        };
-        character_glyph_map.insert(point2(0, 0), test_glyph);
-        character_glyph_map.insert(point2(1, 0), test_glyph);
-        let square_glyph_map =
-            pair_up_character_square_map(character_glyph_map, Glyph::transparent_glyph());
-        assert_eq!(square_glyph_map.len(), 1);
-        assert_eq!(
-            *square_glyph_map.get(&point2(0, 0)).unwrap(),
-            [test_glyph; 2]
-        );
     }
 }

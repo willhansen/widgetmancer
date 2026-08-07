@@ -3,6 +3,7 @@ use terminal_rendering::*;
 use utility::*;
 use euclid::Angle;
 use ::num::Float;
+use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::time::{Duration, Instant};
 
@@ -29,7 +30,7 @@ impl Animation for SelectorAnimation {
         Duration::from_secs_f32(1.0)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let num_dots = DOTS_IN_SELECTOR;
         let radius_in_squares = 1.0; //f32::sqrt(2.0) / 2.0;
 
@@ -46,7 +47,7 @@ impl Animation for SelectorAnimation {
             );
             points.push(self.square.to_f32() + relative_point);
         }
-        Glyph::points_to_braille_glyphs(points, SELECTOR_COLOR)
+        Glyph::points_to_braille_double_glyphs(points, SELECTOR_COLOR)
     }
     fn finished_at_time(&self, _time: Instant) -> bool {
         false

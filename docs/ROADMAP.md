@@ -124,6 +124,17 @@ with each item so the context doesn't have to be re-discovered later.
       `WorldCharacterSquareGlyphMap` across ~12 files in
       `game/src/graphics/animations/*`. Splitting that out as item 8
       rather than letting item 2 balloon.
+  - PHASE 2c COMPLETE via item 8 (2026-08-02): the entire world character
+    grid API is deleted; zero `WorldCharacterSquare*` references remain
+    anywhere; terminal_rendering builds with zero deprecation warnings
+    (lib + tests). Remaining for Phase 3 (game crate, hidden by
+    `#![allow(warnings)]`, triaged via `deny(deprecated)` probe):
+    `PartialVisibilityDrawable::from_square_visibility` x16 (mostly
+    fov_stuff.rs tests), `Graphics::draw_glyphs_for_square_to_draw_buffer`
+    x7 (itself `#[deprecated]` with live callers — needs
+    un-deprecate-or-rename decision), `Graphics::square_is_white` x5,
+    `Glyph::get_glyphs_for_player` x1. Then remove
+    `#![allow(warnings)]` and add clippy to CI.
 - **Done when:** workspace builds warning-free on stable, no crate-root
   `#![allow(warnings)]` remains.
 
@@ -214,47 +225,37 @@ with each item so the context doesn't have to be re-discovered later.
   text is on disk; covered by a test that panics in a small terminal.
 
 
-### 8. Migrate animation/graphics API off the world character grid
-- **Evidence:** `Animation::glyphs_at_time` returns
-  `WorldCharacterSquareGlyphMap` (`crates/game/src/graphics/animations.rs:41`)
-  and is implemented in ~12 files under `game/src/graphics/animations/*`;
-  `Screen::draw_glyphs` (graphics.rs:146) immediately squashes these to
-  per-`WorldSquare` `DoubleGlyph` via `pair_up_character_square_map`.
-  Spawned from item 2 Phase 2 (see RISK note there).
-- **Plan:**
-  1. Change the `Animation` trait to emit `HashMap<WorldSquare, DoubleGlyph>`
-     (what `draw_glyphs_at_squares` already consumes); update
-     `double_glyphs_at_time/duration` defaults and the ~12 impls.
-  2. Migrate sub-square producers (braille/hextant) to bin by world square
-     directly (`get_braille_arrays_for_braille_line` already proves the
-     pattern — it pairs then converts; skip the pairing).
-  3. Once no caller remains, delete the deprecated aliases/fns from
-     `screen.rs` (completes item 2 Phase 2) — includes resolving the 25
-     definition-site warnings in screen.rs itself.
-- **Progress:**
-  - SEAM LANDED (2026-08-02): rendering now consumes
-    `Animation::double_glyphs_at_time()` and draws it directly via
-    `draw_glyphs_at_squares()`, instead of consuming character-grid glyphs and
-    pairing them at the render boundary. The double-glyph trait methods now
-    expose `HashMap<WorldSquare, DoubleGlyph>` explicitly rather than the
-    deprecated `WorldSquareGlyphMap` alias. `StaticBoard` is the first
-    implementation migrated to emit double glyphs directly; its legacy
-    character-grid method remains as a compatibility adapter until the trait
-    is flipped. Added direct output coverage for `StaticBoard`.
-    Suite: 471 passed / 11 skipped; workspace deprecation warnings remain 59.
-  - NEXT STEP SKETCHED (2026-08-02): flip the trait (make
-    `double_glyphs_at_time` required), migrate the 11 remaining impls in two
-    groups (3 already world-square producers → rename-only; 8 braille/char-map
-    producers → new world-square-binned APIs in braille.rs/hextant_blocks.rs
-    with a binning-equivalence property test), delete `draw_string_to_draw_buffer`/
-    `draw_glyphs` (no live callers), then delete the deprecated char-grid API
-    (closes item 2 Phase 2c). Detailed step plan: `docs/checkpoints/roadmap-8-flip-animation-trait.md`.
-- **Done when:** no `WorldCharacterSquare*` types in `game/src`; the
-  deprecated items in `screen.rs` are deleted; suite still green.
-
 ---
 
 ## Done
+
+### 8. Migrate animation/graphics API off the world character grid — 2026-08-02
+- **Evidence:** `Animation::glyphs_at_time` returned `WorldCharacterSquareGlyphMap`
+  across 12 impls in `game/src/graphics/animations/*`, immediately squashed to
+  per-`WorldSquare` `DoubleGlyph` at the render boundary. Spawned from item 2
+  Phase 2c.
+- **Landed:** the `Animation` trait now has a single required glyph method,
+  `double_glyphs_at_time -> HashMap<WorldSquare, DoubleGlyph>`; all 12 impls
+  migrated (3 rename-only; 9 via new world-square-binned producers:
+  `points_to_braille_double_arrays`, `Glyph::points_to_braille_double_glyphs`,
+  `Glyph::double_glyphs_for_colored_braille_line`,
+  `points_to_hextant_double_glyphs`). The entire world character grid API is
+  deleted from `terminal_rendering` (`WorldCharacterSquare/Point/Step/Move`,
+  `CharacterGridInWorldFrame`, the map aliases, 7 conversion fns,
+  `pair_up_character_square_map`, `get_chars_for_braille_line`,
+  `points_to_braille_chars`, `points_to_hextant_chars`,
+  `character_map_for_full_square_at_point`, and the DrawableGlyph char-grid
+  variants); dead `Graphics::draw_glyphs`/`draw_string_to_draw_buffer`
+  deleted. Binning-equivalence property tests guarded the migration and
+  caught two real bugs: euclid's `Point2D::round` is `(x+0.5).floor()` (not
+  `f32::round`), and a pre-existing vertical mirroring of braille dots at
+  negative y (`(pos.y % 4).abs()` → `rem_euclid` in
+  `braille_square_to_dot_in_character`, behavior fix on old path until its
+  deletion). Property tests retired with the old path; converted golden
+  tests retain coverage. Workspace deprecation warnings: 59 → 0 (only 2
+  intentional glob-shadowing warnings remain, item 4). Suite: 459 passed /
+  11 skipped (14 tests of deleted APIs removed/converted).
+  Full log: `docs/checkpoints/roadmap-8-flip-animation-trait.md`.
 
 ### 1. Split the `game.rs` god module — 2026-07-30
 - **Evidence:** `crates/game/src/game.rs` was ~4,900 LOC with 121 `pub fn`s and ~59 `unwrap()`s.

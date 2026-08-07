@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
@@ -34,7 +35,7 @@ impl Animation for BlinkAnimation {
         Duration::from_secs_f32(1.0)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         // pretty arbitrary
         let hash = ((self.start_square.x as f32 * PI + self.start_square.y as f32) * 1000.0
             + self.end_square.x as f32 * 4.23746287
@@ -100,10 +101,7 @@ impl Animation for BlinkAnimation {
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))
             .collect();
 
-        points_to_hextant_chars(visible_points)
-            .into_iter()
-            .map(|(square, c)| (square, Glyph::fg_only(c, BLINK_EFFECT_COLOR)))
-            .collect()
+        points_to_hextant_double_glyphs(visible_points, BLINK_EFFECT_COLOR)
 
         //line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
         //.map(|(x, y)| point2(x, y))

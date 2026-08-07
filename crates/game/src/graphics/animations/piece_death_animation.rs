@@ -3,6 +3,7 @@ use terminal_rendering::*;
 use utility::*;
 use euclid::vec2;
 use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
@@ -29,7 +30,7 @@ impl Animation for PieceDeathAnimation {
         Duration::from_secs_f32(5.0)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         assert!(!self.finished_at_time(time));
 
         // rather arbitrary
@@ -54,6 +55,6 @@ impl Animation for PieceDeathAnimation {
                 self.square.to_f32() + vec2(x_pos, y_pos)
             })
             .collect();
-        Glyph::points_to_braille_glyphs(points_to_draw, EXPLOSION_COLOR)
+        Glyph::points_to_braille_double_glyphs(points_to_draw, EXPLOSION_COLOR)
     }
 }

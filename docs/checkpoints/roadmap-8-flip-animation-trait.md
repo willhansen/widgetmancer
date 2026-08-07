@@ -74,10 +74,67 @@ update it when the item completes.
     `#[allow(deprecated)]` (dies with old path in 8f).
   - Suite: 473 passed / 11 skipped (471 + 2 new). Deprecation warnings: 59,
     all pre-existing old-path definitions; new code adds zero.
-- NEXT: 8d (migrate 8 Group-B impls to the new producers + 4 test call
-  sites in animations.rs; simple_laser/circle_attack are 1-liners, six
-  Vec<WorldPoint> braille producers + blink's hextant), then flip + deletions
-  per 8e–8g below.
+- 8d + TRAIT FLIP LANDED (2026-08-02): all 8 Group-B impls migrated
+  (6 braille `points_to_braille_double_glyphs`, simple_laser
+  `double_glyphs_for_colored_braille_line`, blink
+  `points_to_hextant_double_glyphs`); 4 test call sites in animations.rs +
+  2 `glyphs_at_duration` callers in radial_shockwave tests migrated;
+  `glyph_map_to_string` replaced by test-local `double_glyph_map_to_string`
+  (2 chars per world square). **Trait flipped**: `double_glyphs_at_time` is
+  now the ONLY glyph method (required, no default); `glyphs_at_time`,
+  `glyphs_at_duration`, and the transition bridge are deleted, along with
+  StaticBoard's adapter. Suite: 473 passed / 11 skipped.
+- TRIAGE via temporary `#![deny(deprecated)]` on game (then removed) —
+  game's remaining deprecated surface:
+  - ITEM-8 SCOPE (3 uses, all graphics.rs, all 8e): `draw_glyphs` (:146,
+    dead), `draw_glyphs_at_squares` (:152, LIVE — just retype its param off
+    the deprecated `WorldSquareGlyphMap` alias), `draw_string_to_draw_buffer`
+    internals (:318-319, dead). Everything else char-grid is inside
+    terminal_rendering itself (8f deletions).
+  - NOT ITEM-8 (separate deprecations, item 2 Phase 2 / new items):
+    `PartialVisibilityDrawable::from_square_visibility` x16 (mostly
+    fov_stuff.rs tests, "Shadows should be conceptualized as lack of
+    visibility"), `Graphics::draw_glyphs_for_square_to_draw_buffer` x7
+    (itself `#[deprecated]` but with many LIVE callers — needs an
+    un-deprecate-or-rename decision), `Graphics::square_is_white` x4,
+    `Glyph::get_glyphs_for_player` x1. ~28 uses; the roadmap-2 estimate of
+    game's hidden surface (32) was right in total but wrong in composition.
+- 8e + 8f LANDED (2026-08-02) — ITEM 8 COMPLETE.
+  - 8e: deleted dead `Graphics::draw_glyphs` + `draw_string_to_draw_buffer`
+    (+ stale commented-out callers in game/tests.rs), retyped live
+    `draw_glyphs_at_squares` to `HashMap<WorldSquare, DoubleGlyph>`.
+    `deny(deprecated)` probe: zero char-grid uses left in game.
+  - 8f-1: `get_braille_arrays_for_braille_line` rewritten to direct binning
+    (Bresenham over braille squares, `local = braille_square - 4*world_square`);
+    3 golden line tests converted (expected chars carried over exactly).
+  - 8f-2: `world_braille_point_to_world_point` rewired to
+    `((x-1.5)/4, (y-1.5)/4)`.
+  - 8f-3: `local_square_point_to_local_character_point` (LIVE via
+    fov_stuff.rs:179 shadow splitting) reimplemented without deprecated
+    hops — ref square is hardcoded (0,0), so the chain collapses to
+    `x' = 2x+0.5-index, y' = y`. screen.rs:838-842 assertions pin values.
+  - 8f-4 deletions: all char-grid types/aliases/conversions from screen.rs;
+    braille.rs old producers + conversion fns (incl. the one with stray
+    `dbg!`s); glyph.rs old producers + `pair_up_character_square_map`;
+    hextant `points_to_hextant_chars`; drawable_glyph.rs char-grid variants;
+    floating_square `character_map_for_full_square_at_point` (DECISION (a):
+    deleted, not migrated — supersedes the roadmap-2 un-deprecate note;
+    successors exist: `drawables_for_floating_square_at_point` live at
+    graphics.rs:448, `characters_for_full_square_with_2d_offset`).
+    The two 8c property tests retired with the old path they compared
+    against; goldens converted to the new APIs retain coverage.
+  - Suite: 459 passed / 11 skipped (14 tests of deleted APIs
+    removed/converted). Workspace deprecation warnings: 59 -> 0. Only 2
+    warnings remain anywhere: the intentional `geometry2::FPoint`/`IPoint`
+    glob-shadowing (item 4).
+  - GOTCHA for future deletions: `cargo fix --allow-no-vcs` removed
+    `use euclid::*` from drawable_glyph.rs (unused in lib) which tests
+    relied on via `use super::*` — had to re-add `use euclid::vec2` in the
+    test module. Sandbox has no VCS, so cargo fix needs --allow-no-vcs.
+  - ITEM 8 done-when satisfied: zero `WorldCharacterSquare*` anywhere,
+    screen.rs deprecated items deleted, suite green. Moved to Done in
+    ROADMAP.md. Remaining tail work is item 2 Phase 3 (game-crate
+    deprecations triaged above + remove `#![allow(warnings)]` + clippy CI).
 
 ## Original plan (superseded in order, not in content): flip the trait, migrate the 11 impls, then delete the char-grid API
 

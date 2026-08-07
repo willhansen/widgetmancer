@@ -793,15 +793,7 @@
         game.draw_headless_now();
         let visible_enemy_square = player_square + STEP_RIGHT * 3;
 
-        // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
-        // game.graphics
-        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
-        // game.update_screen_from_draw_buffer_headless();
 
-        // game.graphics.print_draw_buffer(
-        //     world_square_to_left_world_character_square(player_square),
-        //     5,
-        // );
         // game.graphics.print_screen_buffer();
 
         let fov = game.player_field_of_view();
@@ -899,15 +891,7 @@
         game.draw_headless_now();
         let correct_apparent_enemy_square = player_square + STEP_RIGHT;
 
-        // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
-        // game.graphics
-        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
-        // game.update_screen_from_draw_buffer_headless();
 
-        // game.graphics.print_draw_buffer(
-        //     world_square_to_left_world_character_square(player_square),
-        //     5,
-        // );
         // game.graphics.print_screen_buffer();
 
         let fov = game.player_field_of_view();
@@ -944,15 +928,7 @@
         game.draw_headless_now();
         let square_that_should_be_visible = entrance.square() + STEP_DOWN_LEFT;
 
-        // game.graphics.draw_string_to_draw_buffer(enemy_square + STEP_UP, "123456789");
-        // game.graphics
-        //     .draw_string_to_draw_buffer(player_square + STEP_RIGHT, "123456789");
-        // game.update_screen_from_draw_buffer_headless();
 
-        // game.graphics.print_draw_buffer(
-        //     world_square_to_left_world_character_square(player_square),
-        //     5,
-        // );
         // game.graphics.screen.print_screen_buffer();
 
         let fov = game.player_field_of_view();

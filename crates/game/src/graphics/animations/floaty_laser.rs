@@ -3,6 +3,7 @@ use terminal_rendering::*;
 use utility::*;
 use euclid::Angle;
 use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
 use std::f32::consts::{E, PI, TAU};
 use std::time::{Duration, Instant};
 
@@ -31,7 +32,7 @@ impl Animation for FloatyLaserAnimation {
         Duration::from_millis(500)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut line_points: Vec<WorldPoint> = world_points_for_braille_line(self.start, self.end);
         // pretty arbitrary
         let hash = ((self.start.x * PI + self.start.y)
@@ -55,7 +56,7 @@ impl Animation for FloatyLaserAnimation {
             );
             *point += vertical_displacement + random_displacement;
         }
-        Glyph::points_to_braille_glyphs(line_points, RED)
+        Glyph::points_to_braille_double_glyphs(line_points, RED)
         //Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 }

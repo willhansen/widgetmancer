@@ -38,22 +38,7 @@ pub type AnimationList = Vec<AnimationEnum>;
 pub trait Animation: Clone {
     fn start_time(&self) -> Instant;
     fn duration(&self) -> Duration;
-    // Transition bridge (roadmap item 8): each of glyphs_at_time /
-    // double_glyphs_at_time defaults in terms of the other, so impls can
-    // migrate one at a time. Every impl must override at least one (else
-    // infinite mutual recursion). Both defaults are deleted once all impls
-    // emit double glyphs and glyphs_at_time leaves the trait.
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
-        world_square_glyph_map_to_world_character_glyph_map(self.double_glyphs_at_time(time))
-    }
-
-    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
-        pair_up_character_square_map(self.glyphs_at_time(time), Glyph::transparent_glyph())
-    }
-
-    fn glyphs_at_duration(&self, duration: Duration) -> WorldCharacterSquareGlyphMap {
-        self.glyphs_at_time(self.start_time() + duration)
-    }
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph>;
 
     fn double_glyphs_at_duration(
         &self,
@@ -106,9 +91,25 @@ mod tests {
 
 
     use crate::graphics::FloorColorEnum;
-    use crate::{derivative, glyph_map_to_string, DOWN_I, LEFT_I};
+    use crate::{derivative, DOWN_I, LEFT_I};
 
     use super::*;
+
+    // Each world square prints as its two half-width characters, matching the
+    // old glyph_map_to_string(char-grid) output layout.
+    fn double_glyph_map_to_string(glyph_map: &HashMap<WorldSquare, DoubleGlyph>) -> String {
+        map_of_stringables_to_string(
+            &glyph_map
+                .iter()
+                .flat_map(|(&square, glyphs)| {
+                    [
+                        ([square.x * 2, square.y], glyphs[0].character),
+                        ([square.x * 2 + 1, square.y], glyphs[1].character),
+                    ]
+                })
+                .collect(),
+        )
+    }
 
     #[test]
     fn test_recoil_distance_function_increasing_for_first_half() {
@@ -147,10 +148,9 @@ mod tests {
             let fraction_of_second = i as f32 / steps as f32;
             let age = Duration::from_secs_f32(fraction_of_second);
             let animation_time = start_time + age;
-            let glyph_map = animation.glyphs_at_time(animation_time);
-            let right_half_of_top_left_square =
-                WorldCharacterSquare::new(1, board_length as i32 - 1);
-            let test_glyph = glyph_map.get(&right_half_of_top_left_square).unwrap();
+            let glyph_map = animation.double_glyphs_at_time(animation_time);
+            let top_left_square = WorldSquare::new(0, board_length as i32 - 1);
+            let test_glyph = &glyph_map.get(&top_left_square).unwrap()[1]; // right half
             let target_char = '▉'; // one left of solid
             let bad_char = '▊'; // two left of solid
             if test_glyph.character == target_char {
@@ -180,11 +180,11 @@ mod tests {
             let seconds = 0.11 * i as f32;
             let age = Duration::from_secs_f32(seconds);
             let animation_time = start_time + age;
-            let glyph_map = animation.glyphs_at_time(animation_time);
+            let glyph_map = animation.double_glyphs_at_time(animation_time);
             println!(
                 "v-- seconds: {}\n{}",
                 age.as_secs_f32(),
-                glyph_map_to_string(&glyph_map)
+                double_glyph_map_to_string(&glyph_map)
             );
         }
         assert!(false);
@@ -194,16 +194,16 @@ mod tests {
     fn test_simple_laser_transparent_background() {
         let animation =
             SimpleLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
-        let glyph_map = animation.glyphs_at_time(animation.start_time() + Duration::from_millis(1));
-        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
+        let glyph_map = animation.double_glyphs_at_time(animation.start_time() + Duration::from_millis(1));
+        assert!(glyph_map.values().flatten().all(|glyph| glyph.bg_transparent));
     }
 
     #[test]
     fn test_floaty_laser_transparent_background() {
         let animation =
             FloatyLaserAnimation::new(WorldPoint::new(0.0, 0.0), WorldPoint::new(10.0, 0.0));
-        let glyph_map = animation.glyphs_at_time(animation.start_time() + Duration::from_millis(1));
-        assert!(glyph_map.values().all(|glyph| glyph.bg_transparent == true));
+        let glyph_map = animation.double_glyphs_at_time(animation.start_time() + Duration::from_millis(1));
+        assert!(glyph_map.values().flatten().all(|glyph| glyph.bg_transparent));
     }
 
     #[test]

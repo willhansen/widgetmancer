@@ -29,10 +29,6 @@ impl Animation for StaticBoard {
         Duration::from_secs_f32(0.0)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
-        world_square_glyph_map_to_world_character_glyph_map(self.double_glyphs_at_time(time))
-    }
-
     fn double_glyphs_at_time(&self, _time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut glyphs = HashMap::new();
         for x in 0..self.board_size.width {

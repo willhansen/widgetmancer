@@ -1,6 +1,7 @@
 use crate::graphics::*;
 use terminal_rendering::*;
 use utility::*;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -28,7 +29,7 @@ impl Animation for SimpleLaserAnimation {
         Duration::from_millis(500)
     }
 
-    fn glyphs_at_time(&self, _time: Instant) -> WorldCharacterSquareGlyphMap {
-        Glyph::get_glyphs_for_colored_braille_line(self.start, self.end, RED)
+    fn double_glyphs_at_time(&self, _time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
+        Glyph::double_glyphs_for_colored_braille_line(self.start, self.end, RED)
     }
 }

@@ -36,8 +36,7 @@ use crate::graphics::screen::{
 pub use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::{
-    get_by_point, pair_up_character_square_map, point_to_string, DoubleGlyphFunctions, Game,
-    IPoint, PieceType, RIGHT_I,
+    get_by_point, point_to_string, DoubleGlyphFunctions, Game, IPoint, PieceType, RIGHT_I,
 };
 use terminal_rendering::*;
 use utility::*;
@@ -143,13 +142,7 @@ impl Graphics {
         self.draw_naive_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs(&mut self, glyph_map: WorldCharacterSquareGlyphMap) {
-        let world_square_glyph_map =
-            pair_up_character_square_map(glyph_map, Glyph::transparent_glyph());
-        self.draw_glyphs_at_squares(world_square_glyph_map);
-    }
-
-    fn draw_glyphs_at_squares(&mut self, glyph_map: WorldSquareGlyphMap) {
+    fn draw_glyphs_at_squares(&mut self, glyph_map: HashMap<WorldSquare, DoubleGlyph>) {
         for (world_square, glyph) in glyph_map {
             self.draw_glyphs_for_square_to_draw_buffer(world_square, glyph);
         }
@@ -308,23 +301,6 @@ impl Graphics {
         }
 
         // if associated world square is in draw buffer, put it on screen
-    }
-
-    pub fn draw_string_to_draw_buffer(&mut self, world_pos: WorldSquare, the_string: &str) {
-        let glyphs = the_string
-            .chars()
-            .map(|c: char| Glyph::fg_only(c, RED))
-            .collect_vec();
-        let start_char_square = world_square_to_left_world_character_square(world_pos);
-        let glyphs_to_draw: WorldCharacterSquareGlyphMap = glyphs
-            .into_iter()
-            .enumerate()
-            .map(|(i, glyph): (usize, Glyph)| {
-                (start_char_square + STEP_RIGHT.cast_unit() * i as i32, glyph)
-            })
-            .collect();
-
-        self.draw_glyphs(glyphs_to_draw);
     }
 
     pub fn draw_player(&mut self, world_pos: WorldSquare, faced_direction: KingWorldStep) {

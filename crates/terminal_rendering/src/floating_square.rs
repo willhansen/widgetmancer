@@ -1,14 +1,10 @@
 use crate::glyph_constants::*;
 use crate::hextant_blocks::hextant_block_by_offset;
 use crate::DoubleChar;
-use crate::screen::{
-    world_character_point_to_world_character_square, WorldCharacterPoint, WorldCharacterSquare,
-};
 use utility::coordinate_frame_conversions::{WorldMove,};
 use utility::*;
 use euclid::{point2, vec2};
 use ordered_float::OrderedFloat;
-use std::collections::HashMap;
 
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
     match half_steps.to_tuple() {
@@ -232,34 +228,6 @@ pub fn character_for_half_square_with_2d_offset(offset: FVector) -> char {
         .min_by_key(|(snap_point, _character)| OrderedFloat((*snap_point - offset).length()))
         .map(|(_snap_point, character)| character)
         .unwrap()
-}
-
-#[deprecated(note = "use drawables_for_floating_square_at_point instead")]
-pub fn character_map_for_full_square_at_point(
-    point: WorldCharacterPoint,
-) -> HashMap<WorldCharacterSquare, char> {
-    let mut output_characters = HashMap::<WorldCharacterSquare, char>::new();
-    let center_square = world_character_point_to_world_character_square(point);
-    (-2..=2).for_each(|dx| {
-        (-1..=1).for_each(|dy| {
-            let step = vec2(dx, dy);
-            let square = center_square + step;
-            let center_of_square = square.to_f32();
-            let mut offset_from_square_center = point - center_of_square;
-
-            //Tweak offset for effectively double width
-            let inward_shifted_x_offset = (offset_from_square_center.x.abs() - 0.5).max(0.0)
-                * sign(offset_from_square_center.x);
-            offset_from_square_center.x = inward_shifted_x_offset;
-
-            let character_for_square =
-                character_for_half_square_with_2d_offset(offset_from_square_center.cast_unit());
-            if character_for_square != SPACE {
-                output_characters.insert(square, character_for_square);
-            }
-        })
-    });
-    output_characters
 }
 
 pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
@@ -564,21 +532,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_chars_for_floating_square_at_origin() {
-        let chars = character_map_for_full_square_at_point(point2(0.0, 0.0));
-        assert_eq!(chars.len(), 3);
-        assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
-        assert_eq!(chars.get(&point2(-1, 0)), Some(&RIGHT_HALF_BLOCK));
-        assert_eq!(chars.get(&point2(1, 0)), Some(&LEFT_HALF_BLOCK));
-    }
-    #[test]
-    fn test_chars_for_floating_square_at_square_center() {
-        let chars = character_map_for_full_square_at_point(point2(0.5, 0.0));
-        assert_eq!(chars.len(), 2);
-        assert_eq!(chars.get(&point2(0, 0)), Some(&FULL_BLOCK));
-        assert_eq!(chars.get(&point2(1, 0)), Some(&FULL_BLOCK));
-    }
     #[test]
     fn test_offset_full_square() {
         let f = characters_for_full_square_with_1d_offset;

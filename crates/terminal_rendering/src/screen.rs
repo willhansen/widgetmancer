@@ -3,14 +3,14 @@ use std::io::Write;
 
 use euclid::{point2, vec2, Point2D, Vector2D};
 use rgb::RGB8;
-use utility::coordinate_frame_conversions::{local_square_point_to_world_point, world_point_to_world_square, LocalSquarePoint, SquareGridInLocalSquareFrame, SquareGridInWorldFrame};
+use utility::coordinate_frame_conversions::{local_square_point_to_world_point, LocalSquarePoint, SquareGridInLocalSquareFrame};
 use utility::HalfPlane;
 
 use crate::glyph::glyph_constants::WHITE;
 use crate::glyph::{DoubleGlyph, Glyph};
 use utility::{coordinate_frame_conversions::{
     
-     WorldPoint, WorldSquare, WorldStep,
+     WorldSquare, WorldStep,
 }, flip_y, point_to_string, QuarterTurnsAnticlockwise, RIGHT_I, STEP_RIGHT, STEP_UP};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -438,111 +438,19 @@ impl Screen {
     }
 }
 
-#[deprecated(note = "Obselete since screen rotation")]
-pub type WorldCharacterSquare = Point2D<i32, CharacterGridInWorldFrame>;
-#[deprecated(note = "Obselete since screen rotation")]
-pub type WorldCharacterPoint = Point2D<f32, CharacterGridInWorldFrame>;
-#[deprecated(note = "Obselete since screen rotation")]
-pub type WorldCharacterStep = Vector2D<i32, CharacterGridInWorldFrame>;
-#[deprecated(note = "Obselete since screen rotation")]
-pub type WorldCharacterMove = Vector2D<f32, CharacterGridInWorldFrame>;
-
-#[deprecated(note = "World does not know about glyphs")]
-pub type WorldSquareGlyphMap = HashMap<WorldSquare, DoubleGlyph>;
-#[deprecated(note = "World does not know about characters")]
-pub type WorldCharacterSquareGlyphMap = HashMap<WorldCharacterSquare, Glyph>;
-
-#[deprecated(note = "World does not know about characters")]
-pub type WorldCharacterSquareToCharMap = HashMap<WorldCharacterSquare, char>;
-
-pub fn world_square_glyph_map_to_world_character_glyph_map(
-    world_square_glyph_map: WorldSquareGlyphMap,
-) -> WorldCharacterSquareGlyphMap {
-    let mut world_character_glyph_map = WorldCharacterSquareGlyphMap::new();
-    world_square_glyph_map
-        .into_iter()
-        .for_each(|(world_square, two_glyphs)| {
-            let left_char_square = world_square_to_left_world_character_square(world_square);
-            let right_char_square = left_char_square + RIGHT_I.cast_unit();
-            world_character_glyph_map.insert(left_char_square, two_glyphs[0]);
-            world_character_glyph_map.insert(right_char_square, two_glyphs[1]);
-        });
-    world_character_glyph_map
-}
-
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn world_square_to_left_world_character_square(
-    world_square: WorldSquare,
-) -> WorldCharacterSquare {
-    (world_point_to_world_character_point(world_square.to_f32()) + vec2(-0.5, 0.0))
-        .round()
-        .to_i32()
-}
-
-pub fn world_square_to_both_world_character_squares(
-    world_square: WorldSquare,
-) -> [WorldCharacterSquare; 2] {
-    let left_char_square = world_square_to_left_world_character_square(world_square);
-    [left_char_square, left_char_square + STEP_RIGHT.cast_unit()]
-}
-
-pub fn world_square_to_world_character_square(
-    world_square: WorldSquare,
-    index: usize,
-) -> WorldCharacterSquare {
-    world_square_to_both_world_character_squares(world_square)[index]
-}
-
-pub fn world_point_to_local_character_point(
-    world_point: WorldPoint,
-    origin_character_square: WorldCharacterSquare,
-) -> LocalCharacterPoint {
-    (world_point_to_world_character_point(world_point) - origin_character_square.to_f32())
-        .to_point()
-        .cast_unit()
-}
-pub fn world_half_plane_to_local_character_half_plane(
-    world_half_plane: HalfPlane<f32, SquareGridInWorldFrame>,
-    ref_char_square: WorldCharacterSquare,
-) -> HalfPlane<f32, CharacterGridInLocalCharacterFrame> {
-    world_half_plane
-        .with_transformed_points(|p| world_point_to_local_character_point(p, ref_char_square))
-}
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn world_character_square_to_world_square(pos: WorldCharacterSquare) -> WorldSquare {
-    world_point_to_world_square(world_character_point_to_world_point(pos.to_f32()))
-}
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn world_character_point_to_world_character_square(
-    point: WorldCharacterPoint,
-) -> WorldCharacterSquare {
-    point.round().to_i32()
-}
-pub fn world_point_to_world_character_point(
-    pos: Point2D<f32, SquareGridInWorldFrame>,
-) -> Point2D<f32, CharacterGridInWorldFrame> {
-    point2(pos.x * 2.0 + 0.5, pos.y)
-}
-
-pub fn world_character_point_to_world_point(
-    pos: Point2D<f32, CharacterGridInWorldFrame>,
-) -> Point2D<f32, SquareGridInWorldFrame> {
-    point2((pos.x - 0.5) / 2.0, pos.y)
-}
 pub fn local_square_point_to_local_character_point(
     local_square_point: LocalSquarePoint,
     character_index_in_square: usize,
 ) -> LocalCharacterPoint {
     assert!([0, 1].contains(&character_index_in_square));
-    let ref_square = point2(0, 0);
-    let world_point = local_square_point_to_world_point(local_square_point, ref_square);
-    let ref_character_square = world_square_to_left_world_character_square(ref_square)
-        + if character_index_in_square == 0 {
-            vec2(0, 0)
-        } else {
-            STEP_RIGHT.cast_unit()
-        };
-    world_point_to_local_character_point(world_point, ref_character_square)
+    let world_point = local_square_point_to_world_point(local_square_point, point2(0, 0));
+    // The reference square is hardcoded to world (0,0), whose left character
+    // square is character (0,0), so the deprecated char-grid chain collapses
+    // to the char frame's affine transform: x' = 2x+0.5, y' = y.
+    LocalCharacterPoint::new(
+        world_point.x * 2.0 + 0.5 - character_index_in_square as f32,
+        world_point.y,
+    )
 }
 pub fn local_square_half_plane_to_local_character_half_plane(
     square_half_plane: HalfPlane<f32, SquareGridInLocalSquareFrame>,
@@ -555,26 +463,12 @@ pub fn local_square_half_plane_to_local_character_half_plane(
 
 
 
-#[deprecated(note = "Obselete since screen rotation")]
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub struct CharacterGridInWorldFrame;
-
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct CharacterGridInLocalCharacterFrame;
 
 pub type LocalCharacterSquare = Point2D<i32, CharacterGridInLocalCharacterFrame>;
 pub type LocalCharacterPoint = Point2D<f32, CharacterGridInLocalCharacterFrame>;
 
-
-
-#[deprecated(note = "Invalidated by screen rotation")]
-pub fn is_world_character_square_left_square_of_world_square(
-    character_square: WorldCharacterSquare,
-) -> bool {
-    world_square_to_left_world_character_square(world_character_square_to_world_square(
-        character_square,
-    )) == character_square
-}
 
 
 #[cfg(test)]
@@ -814,23 +708,6 @@ mod tests {
             assert_eq!(s.screen_center_as_world_square(), center);
             assert_ne!(s.screen_origin_as_world_square(), start_origin);
         });
-    }
-    #[test]
-    fn test_world_pos_to_character_world_pos() {
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(0.5, 0.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                0.0, 0.0,
-            )),
-            "zero is actually between two characters"
-        );
-        assert_eq!(
-            Point2D::<f32, CharacterGridInWorldFrame>::new(2.5, 1.0),
-            world_point_to_world_character_point(Point2D::<f32, SquareGridInWorldFrame>::new(
-                1.0, 1.0,
-            )),
-            "diagonal a bit"
-        );
     }
     #[test]
     fn test_local_square_point_to_local_character_point() {

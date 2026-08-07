@@ -3,6 +3,7 @@ use terminal_rendering::*;
 use utility::*;
 use euclid::Angle;
 use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
 use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
@@ -31,7 +32,7 @@ impl Animation for CircleAttackAnimation {
         Duration::from_millis(500)
     }
 
-    fn glyphs_at_time(&self, time: Instant) -> WorldCharacterSquareGlyphMap {
+    fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         // rather arbitrary
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
@@ -43,6 +44,6 @@ impl Animation for CircleAttackAnimation {
             let particle_pos = self.position + relative_position;
             points_to_draw.push(particle_pos);
         }
-        Glyph::points_to_braille_glyphs(points_to_draw, CYAN)
+        Glyph::points_to_braille_double_glyphs(points_to_draw, CYAN)
     }
 }
