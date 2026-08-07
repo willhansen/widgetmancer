@@ -1,13 +1,9 @@
 use std::collections::HashMap;
-use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
-use euclid::{point2, vec2, Angle};
-use rand::{Rng, SeedableRng};
+use euclid::vec2;
 
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct SpearAttackAnimation {
@@ -62,7 +58,7 @@ impl Animation for SpearAttackAnimation {
     fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let mut points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 50;
-        let sweep_degrees = 10.0;
+        let _sweep_degrees = 10.0;
         let angle = better_angle_from_x_axis(self.direction.step().to_f32());
         let spear_length = self.range as f32 * self.fraction_remaining_at_time(time);
         for i in 0..num_particles {

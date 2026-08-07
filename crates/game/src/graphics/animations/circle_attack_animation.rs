@@ -1,10 +1,6 @@
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 use euclid::Angle;
-use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
-use std::f32::consts::{PI, TAU};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, PartialEq, Debug, Copy)]

@@ -10,8 +10,6 @@ use itertools::Itertools;
 use crate::piece::PieceType::*;
 use crate::piece::*;
 use crate::*;
-use terminal_rendering::*;
-use utility::*;
 
 use super::Game;
 
@@ -61,7 +59,7 @@ impl Game {
                         start_square,
                         push_direction.into(),
                     ));
-                    if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
+                    if let Ok((end_square, _)) = push_end_pose.map(|x| x.tuple()) {
                         self.try_push_grid_entity(start_square, push_direction.into())
                             .ok();
                         push_end_squares.insert(end_square);
@@ -85,7 +83,7 @@ impl Game {
                         start_square,
                         push_direction.into(),
                     ));
-                    if let Ok((end_square, end_dir)) = push_end_pose.map(|x| x.tuple()) {
+                    if let Ok((end_square, _)) = push_end_pose.map(|x| x.tuple()) {
                         self.push_floating_entities_that_are_in_square_in_king_direction(
                             start_square,
                             push_direction.into(),

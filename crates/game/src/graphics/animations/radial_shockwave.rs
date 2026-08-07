@@ -2,12 +2,9 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
-use euclid::{vec2, Length};
-use rgb::RGB8;
+use euclid::vec2;
 
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 
 #[derive(Clone)]
 pub struct RadialShockwave {

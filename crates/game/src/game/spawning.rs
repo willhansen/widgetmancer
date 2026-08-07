@@ -16,8 +16,6 @@ use super::{DeathCube, FloatingHunterDrone};
 use crate::piece::PieceType::*;
 use crate::piece::*;
 use crate::*;
-use terminal_rendering::*;
-use utility::*;
 
 use super::Game;
 

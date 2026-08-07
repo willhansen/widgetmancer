@@ -1,31 +1,18 @@
-use std::backtrace::Backtrace;
 use std::collections::{HashMap, HashSet};
-use std::f32::consts::PI;
 use std::fmt::{Debug, Formatter};
 
 use derive_more::Constructor;
 use euclid::{point2, vec2, Angle};
-use getset::CopyGetters;
 use itertools::*;
-use ntest::assert_false;
-use num::abs;
-use ordered_float::OrderedFloat;
-use utility::geometry2::IPointExt;
 
-use crate::graphics;
-use crate::graphics::drawable::DrawableEnum::SolidColor;
 use crate::graphics::drawable::{
     Drawable, DrawableEnum, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
 };
-use crate::piece::MAX_PIECE_RANGE;
 use crate::portal_geometry::{Portal, PortalGeometry, RigidTransform};
-use geometry2::FPointExt;
 use terminal_rendering::glyph::glyph_constants::*;
-use terminal_rendering::glyph::{DoubleGlyph, DoubleGlyphFunctions, Glyph};
+use terminal_rendering::glyph::DoubleGlyphFunctions;
 use terminal_rendering::*;
 use utility::angle_interval::AngleInterval;
-use utility::coordinate_frame_conversions::*;
-use utility::*;
 
 type StepVisibilityMap = HashMap<WorldStep, SquareVisibility>;
 
@@ -347,8 +334,8 @@ impl FieldOfViewResult {
     pub fn fully_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         self.visible_relative_squares_in_main_view_only
             .iter()
-            .filter(|(square, vis): &(&WorldStep, &SquareVisibility)| vis.is_fully_visible())
-            .map(|(&square, vis): (&WorldStep, &SquareVisibility)| square)
+            .filter(|(_, vis): &(&WorldStep, &SquareVisibility)| vis.is_fully_visible())
+            .map(|(&square, _): (&WorldStep, &SquareVisibility)| square)
             .collect()
     }
     pub fn fully_visible_relative_squares_including_subviews(&self) -> StepSet {
@@ -415,8 +402,8 @@ impl FieldOfViewResult {
     pub fn only_partially_visible_relative_squares_in_main_view_only(&self) -> StepSet {
         self.visible_relative_squares_in_main_view_only
             .iter()
-            .filter(|(square, vis)| !vis.is_fully_visible())
-            .map(|(&square, vis)| square)
+            .filter(|(_, vis)| !vis.is_fully_visible())
+            .map(|(&square, _)| square)
             .collect()
     }
     pub fn visibilities_of_partially_visible_squares_in_main_view_only(
@@ -424,7 +411,7 @@ impl FieldOfViewResult {
     ) -> HashMap<WorldStep, SquareVisibility> {
         self.visible_relative_squares_in_main_view_only
             .iter()
-            .filter(|(square, vis)| !vis.is_fully_visible())
+            .filter(|(_, vis)| !vis.is_fully_visible())
             .map(|(square, vis)| (square.clone(), vis.clone()))
             .collect()
     }
@@ -447,14 +434,14 @@ impl FieldOfViewResult {
             .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
-            .filter(|(square, partial)| squares_visible_in_only_one_view.contains(square))
+            .filter(|(square, _)| squares_visible_in_only_one_view.contains(square))
             .collect();
 
         let visibility_of_squares_only_visible_in_other: StepVisibilityMap = other
             .visible_relative_squares_in_main_view_only
             .clone()
             .into_iter()
-            .filter(|(square, partial)| squares_visible_in_only_one_view.contains(square))
+            .filter(|(square, _)| squares_visible_in_only_one_view.contains(square))
             .collect();
 
         let all_visible_squares: StepSet = self
@@ -515,7 +502,7 @@ impl FieldOfViewResult {
         let combined_by_root: Vec<FieldOfViewResult> = grouped_by_root
             .into_iter()
             .map(
-                |(root, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfViewResult>)| {
+                |(_, fov_list): (SquareWithOrthogonalDir, Vec<FieldOfViewResult>)| {
                     fov_list
                         .into_iter()
                         .reduce(|acc: FieldOfViewResult, next_fov: FieldOfViewResult| {
@@ -1242,6 +1229,7 @@ mod tests {
     use terminal_rendering::glyph::glyph_constants::{FULL_BLOCK, GREEN};
     use terminal_rendering::glyph::DoubleGlyphFunctions;
     use terminal_rendering::glyph_constants::UPPER_HALF_BLOCK;
+    use std::f32::consts::PI;
     use utility::{
         better_angle_from_x_axis, QuarterTurnsAnticlockwise, SquareWithKingDir,
         SquareWithOrthogonalDir, STEP_DOWN, STEP_LEFT, STEP_UP,

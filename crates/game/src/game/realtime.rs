@@ -10,10 +10,7 @@ use euclid::Angle;
 use num::clamp;
 
 use crate::piece::PieceType::*;
-use crate::piece::*;
 use crate::*;
-use terminal_rendering::*;
-use utility::*;
 
 use super::{conveyor_period_just_elapsed, FloatingEntityTrait, Game, GridEntity, DeathCube, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 

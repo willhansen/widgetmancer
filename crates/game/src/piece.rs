@@ -1,20 +1,13 @@
 use std::collections::HashSet;
-use std::f32::consts::PI;
 
-use derive_more::Constructor;
-use euclid::*;
-use getset::CopyGetters;
-use rgb::RGB8;
-use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
 use terminal_rendering::glyph::DoubleGlyph;
-use terminal_rendering::glyph_constants::*;
 use crate::piece::PieceType::*;
 use utility::*;
 use crate::{
-    get_4_rotations_of, get_8_octants_of, rotated_n_quarter_turns_counter_clockwise, Glyph,
+    rotated_n_quarter_turns_counter_clockwise, Glyph,
 };
 use crate::graphics::game_colors::*;
 

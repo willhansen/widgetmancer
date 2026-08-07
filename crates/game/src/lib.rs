@@ -1,5 +1,4 @@
 //#![allow(non_snake_case)]
-#![allow(warnings)]
 #![allow(non_snake_case)]
 
 extern crate approx;
@@ -15,22 +14,19 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use enum_as_inner::EnumAsInner;
-use euclid::default::Point2D;
 use euclid::point2;
 use rand::SeedableRng;
-use termion::event::{Event, Key, MouseButton, MouseEvent};
+use termion::event::Event;
 use termion::input::{MouseTerminal, TermRead};
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::screen::{IntoAlternateScreen, ToAlternateScreen};
+use termion::raw::IntoRawMode;
+use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::glyph::*;
 use utility::*;
 
 use crate::game::Game;
-use crate::graphics::Graphics;
 use crate::inputmap::InputMap;
-use crate::piece::{Piece, PieceType};
+use crate::piece::PieceType;
 
 pub mod fov_stuff;
 pub mod game;
@@ -71,7 +67,7 @@ pub fn do_everything() {
     let mut input_map = InputMap::new(width, height);
     //let mut game = init_platformer_test_world(width, height);
 
-    let mut writable =
+    let writable =
         termion::cursor::HideCursor::from(MouseTerminal::from(stdout().into_raw_mode().unwrap()))
             .into_alternate_screen()
             .unwrap();
@@ -85,7 +81,7 @@ pub fn do_everything() {
 
     //let pawn_pos = game.player_position() + LEFT_I.cast_unit() * 3; game.place_piece(Piece::pawn(), pawn_pos) .expect("Failed to place pawn");
 
-    let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+    let _rng = rand::rngs::StdRng::seed_from_u64(5);
     //game.set_up_test_map();
     //game.set_up_labyrinth_hunt();
     //game.set_up_labyrinth_kings();
@@ -115,7 +111,7 @@ pub fn do_everything() {
         //let prev_tick_duration_ms = start_time.duration_since(prev_start_time).as_millis();
         //let prev_tick_duration_s: f32 = prev_tick_duration_ms as f32 / 1000.0;
 
-        while let Ok((event_time, event)) = event_receiver.try_recv() {
+        while let Ok((_, event)) = event_receiver.try_recv() {
             input_map.handle_event(&mut game, event);
 
             game.tick_game_logic();

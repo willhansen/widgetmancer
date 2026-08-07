@@ -1,6 +1,4 @@
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 use euclid::vec2;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
@@ -40,7 +38,7 @@ impl Animation for PieceDeathAnimation {
             .to_u64()
             .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        let mut points_to_draw: Vec<WorldPoint> = vec![];
+        let _points_to_draw: Vec<WorldPoint> = vec![];
         let num_particles = 20;
         let age = time.duration_since(self.start_time);
         let remaining_seconds = self.duration().as_secs_f32() - age.as_secs_f32();

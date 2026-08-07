@@ -3,10 +3,7 @@ use std::f32::consts::PI;
 use std::time::{Duration, Instant};
 
 use euclid::Length;
-use rgb::RGB8;
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 
 #[derive(Clone)]
 pub struct RecoilingBoardAnimation {
@@ -63,13 +60,13 @@ impl RecoilingBoardAnimation {
         }
 
         let duration = end_time - start_time;
-        normalized_cos_ease_in_and_out(((age - start_time) / duration)) * start_height
+        normalized_cos_ease_in_and_out((age - start_time) / duration) * start_height
     }
 
     pub(crate) fn recoil_distance_in_squares_at_age(age: f32) -> f32 {
         // shot in positive direction, so recoil position should start negative at a fixed velocity
         // linear negative triangle
-        let fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32();
+        let _fraction_done = age / RecoilingBoardAnimation::RECOIL_DURATION.as_secs_f32();
         if age < RecoilingBoardAnimation::TIME_TO_PEAK.as_secs_f32() {
             RecoilingBoardAnimation::recoil_start(
                 age,
@@ -98,7 +95,7 @@ impl Animation for RecoilingBoardAnimation {
     fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph> {
         let age = time.duration_since(self.start_time);
 
-        let mut offset_distance_in_squares: f32 =
+        let offset_distance_in_squares: f32 =
             RecoilingBoardAnimation::recoil_distance_in_squares_at_age(age.as_secs_f32());
 
         let mut glyph_map = HashMap::new();

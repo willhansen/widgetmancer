@@ -6,8 +6,6 @@ use ::num::ToPrimitive;
 use rand::SeedableRng;
 
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct BlinkAnimation {
@@ -61,7 +59,7 @@ impl Animation for BlinkAnimation {
 
         let start_speed = motion_distance / ostensible_blink_duration;
 
-        let start_vel = motion_direction * start_speed;
+        let _start_vel = motion_direction * start_speed;
 
         let end_point = self.end_square.to_f32();
         let start_point = self.start_square.to_f32();
@@ -73,8 +71,8 @@ impl Animation for BlinkAnimation {
         let total_seconds = self.duration().as_secs_f32();
         let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
-        let lifetime_fraction_remaining = remaining_seconds / total_seconds;
-        let lifetime_fraction_spent = spent_seconds / total_seconds;
+        let _lifetime_fraction_remaining = remaining_seconds / total_seconds;
+        let _lifetime_fraction_spent = spent_seconds / total_seconds;
 
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
@@ -85,7 +83,7 @@ impl Animation for BlinkAnimation {
         let num_points = (points_per_square_blinked * distance_blinked) as u32;
         let base_points: Vec<WorldPoint> = (0..num_points * 2)
             .into_iter()
-            .map(|i| {
+            .map(|_| {
                 float_line_centered_on_start
                     .seeded_random_point_near_line(&mut rng, point_spread_radius)
             })

@@ -1,23 +1,18 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Add;
 
 use derive_more::Constructor;
-use derive_more::Neg;
 use euclid::{point2, Angle};
 use getset::CopyGetters;
-use itertools::Itertools;
 use ntest::assert_false;
 
 use utility::{
     angle_interval::AngleInterval,
-    coordinate_frame_conversions::{StepSet, WorldMove, WorldPoint, WorldSquare, WorldStep},
+    coordinate_frame_conversions::{StepSet, WorldPoint, WorldSquare, WorldStep},
 };
 use utility::{
-    better_angle_from_x_axis, first_inside_square_face_hit_by_ray, is_orthogonal,
-    ith_projection_of_step, naive_ray_endpoint, revolve_square,
+    better_angle_from_x_axis, first_inside_square_face_hit_by_ray, naive_ray_endpoint, revolve_square,
     rotated_n_quarter_turns_counter_clockwise, unit_vector_from_angle, Octant,
-    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir,
-    StepWithQuarterRotations, WorldLine, STEP_RIGHT, STEP_ZERO,
+    QuarterTurnsAnticlockwise, SquareWithKingDir, SquareWithOrthogonalDir, WorldLine, STEP_RIGHT,
 };
 
 #[derive(Hash, Clone, Copy, Debug)]
@@ -338,14 +333,14 @@ impl PortalGeometry {
     pub fn square_has_portal_entrance(&self, square: WorldSquare) -> bool {
         self.portal_exits_by_entrance
             .iter()
-            .any(|(entrance, exit)| entrance.square() == square)
+            .any(|(entrance, _)| entrance.square() == square)
     }
 
     pub fn portals_entering_from_square(&self, square: WorldSquare) -> Vec<Portal> {
         self.portal_exits_by_entrance
             .iter()
             .filter(
-                |(&entrance, &exit): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
+                |(&entrance, _): &(&SquareWithOrthogonalDir, &SquareWithOrthogonalDir)| {
                     entrance.square() == square
                 },
             )
@@ -406,6 +401,7 @@ impl PortalGeometry {
 #[cfg(test)]
 mod tests {
     use ntest::assert_about_eq;
+    use itertools::Itertools;
     use utility::{assert_about_eq_2d, STEP_DOWN, STEP_LEFT, STEP_RIGHT, STEP_UP, STEP_UP_RIGHT};
 
     use super::*;

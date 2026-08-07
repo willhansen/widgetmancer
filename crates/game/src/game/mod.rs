@@ -1,29 +1,19 @@
-use std::cmp::{max, min, Ordering};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Write;
-use std::ops::Mul;
 use std::time::{Duration, Instant};
 
-use ::num::clamp;
-use derive_more::{Constructor, From};
 use euclid::*;
-use getset::{CopyGetters, Setters};
+use getset::CopyGetters;
 use itertools::Itertools;
-use line_drawing::Point;
-use ntest::assert_false;
 use ordered_float::OrderedFloat;
-use priority_queue::DoublePriorityQueue;
 use rand::rngs::StdRng;
-use rand::seq::{IteratorRandom, SliceRandom};
-use rand::{thread_rng, Rng, SeedableRng};
 use rgb::RGB8;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 use crate::fov_stuff::{
-    portal_aware_field_of_view_from_square, FieldOfViewResult, SquareVisibility,
+    portal_aware_field_of_view_from_square, FieldOfViewResult,
 };
-use crate::graphics::drawable::{DrawableEnum, TextDrawable};
+use crate::graphics::drawable::TextDrawable;
 use crate::graphics::*;
 use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
@@ -31,7 +21,6 @@ use crate::piece::*;
 use crate::portal_geometry::PortalGeometry;
 use crate::*;
 use terminal_rendering::*;
-use utility::*;
 use glyph_constants::named_colors::*;
 use crate::graphics::game_colors::*;
 
@@ -43,7 +32,6 @@ mod realtime;
 mod spawning;
 mod turns;
 pub use spawning::IncubatingPawn;
-pub(crate) use spawning::TURNS_TO_SPAWN_PAWN;
 pub use floating_entities::{DeathCube, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
 
@@ -310,7 +298,7 @@ impl Game {
     ) {
         let floating_entities_at_start: Vec<FloatingEntityEnum> =
             self.take_floating_entities_from_square(start_square);
-        let mut moved_drones = floating_entities_at_start
+        let moved_drones = floating_entities_at_start
             .iter()
             .map(|e| {
                 self.slide_floating_entity_with_portal_awareness(
@@ -411,7 +399,7 @@ impl Game {
     pub fn arrows(&self) -> HashMap<WorldSquare, KingWorldStep> {
         self.pieces
             .iter()
-            .filter(|(&square, &piece)| piece.piece_type == Arrow)
+            .filter(|(_, &piece)| piece.piece_type == Arrow)
             .map(|(&square, &piece)| (square, piece.faced_direction()))
             .collect()
     }
@@ -489,8 +477,8 @@ impl Game {
     fn find_pieces(&self, target_piece: Piece) -> SquareSet {
         self.pieces
             .iter()
-            .filter(|(&square, &piece)| piece == target_piece)
-            .map(|(&square, &piece)| square)
+            .filter(|(_, &piece)| piece == target_piece)
+            .map(|(&square, _)| square)
             .collect()
     }
 
@@ -941,7 +929,7 @@ impl Game {
     }
     pub fn set_up_simple_test_map(&mut self) {
         let width = 2;
-        let spacing = width * 2 + 1;
+        let _spacing = width * 2 + 1;
         let left_entrance = SquareWithOrthogonalDir::from_square_and_worldstep(
             self.player_square() + STEP_RIGHT * 5,
             STEP_RIGHT.into(),
@@ -1101,7 +1089,7 @@ impl Game {
         );
 
         (0..4).for_each(|_| {
-            (0..side_length).for_each(|i| {
+            (0..side_length).for_each(|_| {
                 self.place_single_sided_one_way_portal(entrance_step, exit_step);
                 entrance_step = entrance_step.strafed_right();
                 exit_step = exit_step.strafed_right();

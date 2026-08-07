@@ -1,9 +1,6 @@
 use crate::graphics::*;
-use rgb::RGB8;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use terminal_rendering::*;
-use utility::*;
 
 #[derive(Clone)]
 pub struct StaticBoard {

@@ -1,45 +1,30 @@
-use std::any::Any;
-use std::borrow::Borrow;
-use std::cmp::min;
 use std::collections::{HashMap, HashSet};
-use std::f32::consts::{PI, TAU};
 use std::fmt::Debug;
 use std::io::Write;
-use std::mem::swap;
-use std::ptr::hash;
 use std::time::{Duration, Instant};
 
 use euclid::*;
-use itertools::Itertools;
-use line_drawing::Point;
-use rand::{Rng, SeedableRng};
 use rgb::RGB8;
-use termion::color::Black;
-use termion::input::MouseTerminal;
-use termion::raw::RawTerminal;
-use termion::terminal_size;
 
 use glyph::glyph_constants::*;
 
-use crate::fov_stuff::{FieldOfViewResult, PositionedSquareVisibilityInFov, SquareVisibility};
+use crate::fov_stuff::FieldOfViewResult;
 use crate::game::{
-    DeathCube, FloatingEntityTrait, FloatingHunterDrone, CONVEYOR_BELT_VISUAL_PERIOD,
-    HUNTER_DRONE_SIGHT_RANGE,
+    DeathCube, FloatingEntityTrait, FloatingHunterDrone,
 };
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
-    OffsetSquareDrawable, PartialVisibilityDrawable, SolidColorDrawable, TextDrawable,
+    OffsetSquareDrawable, SolidColorDrawable, TextDrawable,
 };
 use crate::graphics::screen::{
-    CharacterGridInScreenBufferFrame, Screen, ScreenBufferCharacterSquare, ScreenBufferStep,
+    CharacterGridInScreenBufferFrame, Screen,
 };
 pub use crate::num::ToPrimitive;
 use crate::piece::{Piece, Upgrade};
 use crate::{
-    get_by_point, point_to_string, DoubleGlyphFunctions, Game, IPoint, PieceType, RIGHT_I,
+    DoubleGlyphFunctions, PieceType, RIGHT_I,
 };
 use terminal_rendering::*;
-use utility::*;
 
 pub(crate) mod drawable;
 
@@ -201,7 +186,7 @@ impl Graphics {
                     if let Some(drawable) = self.draw_buffer.get(&point2(x, y)) {
                         drawable.to_glyphs().to_string()
                     } else {
-                        Box::new(TextDrawable::new("**", RED, BLACK, false))
+                        TextDrawable::new("**", RED, BLACK, false)
                             .to_glyphs()
                             .to_clean_string()
                     }
@@ -331,7 +316,7 @@ impl Graphics {
     pub fn draw_upgrade(&mut self, square: WorldSquare, upgrade: Upgrade) {
         self.draw_drawable_to_draw_buffer(square, &TextDrawable::from_glyphs(Self::glyphs_for_upgrade(upgrade)));
     }
-    fn glyphs_for_upgrade(upgrade: Upgrade) -> DoubleGlyph {
+    fn glyphs_for_upgrade(_upgrade: Upgrade) -> DoubleGlyph {
         [Glyph::fg_only('*', CYAN), Glyph::transparent_glyph()]
     }
     pub fn draw_arrow(&mut self, square: WorldSquare, dir: KingWorldStep) {
@@ -566,9 +551,9 @@ impl Graphics {
                 self.board_animation = None;
             }
         }
-        self.active_animations
+        let _ = self.active_animations
             .extract_if(.., |x| x.finished_at_time(time));
-        self.selectors.extract_if(.., |x| x.finished_at_time(time));
+        let _ = self.selectors.extract_if(.., |x| x.finished_at_time(time));
     }
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {

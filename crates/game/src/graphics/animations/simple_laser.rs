@@ -1,6 +1,4 @@
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 

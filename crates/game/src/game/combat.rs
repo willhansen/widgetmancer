@@ -8,8 +8,6 @@ use crate::piece::PieceType::*;
 use crate::piece::Upgrade::BlinkRange;
 use crate::piece::*;
 use crate::*;
-use terminal_rendering::*;
-use utility::*;
 
 use super::Game;
 
@@ -103,7 +101,7 @@ impl Game {
     }
 
     pub fn do_player_shoot_sniper(&mut self) {
-        let mut graphical_laser_end: WorldSquare;
+        let graphical_laser_end: WorldSquare;
         if let Some(square) = self.selected_square {
             if self.pieces.contains_key(&square) {
                 self.capture_piece_at(square);

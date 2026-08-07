@@ -1,8 +1,5 @@
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
 use euclid::Angle;
-use ::num::Float;
 use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::time::{Duration, Instant};

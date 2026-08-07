@@ -1,18 +1,9 @@
 use ambassador::{delegatable_trait, Delegate};
 use std::collections::HashMap;
-use std::f32::consts::{E, PI, TAU};
-use std::time;
 use std::time::{Duration, Instant};
 
-use dyn_clone::DynClone;
-use euclid::{point2, vec2, Angle, Length};
-use num::{clamp, ToPrimitive};
-use rand::{Rng, SeedableRng};
-use termion::color::Black;
-use termion::style::Blink;
+use num::clamp;
 
-use crate::{is_orthogonal_king_step, lerp, round_to_king_step, Glyph, Graphics, RIGHT_I, UP_I};
-use terminal_rendering::glyph_constants::*;
 use utility::*;
 use terminal_rendering::*;
 
@@ -90,7 +81,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
 
-    use crate::graphics::FloorColorEnum;
+    use crate::graphics::{FloorColorEnum, Graphics};
     use crate::{derivative, DOWN_I, LEFT_I};
 
     use super::*;

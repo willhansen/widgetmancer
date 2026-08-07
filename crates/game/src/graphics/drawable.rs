@@ -1,19 +1,16 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use ambassador::{delegatable_trait, delegate_to_methods, Delegate};
-use derive_more::Constructor;
+use ambassador::{delegatable_trait, Delegate};
 use derive_more::From;
-use dyn_clone::DynClone;
-use euclid::{vec2, Angle};
+use euclid::vec2;
 use getset::CopyGetters;
 use itertools::Itertools;
 use rgb::RGB8;
 
-use crate::fov_stuff::{LocalSquareHalfPlane, SquareVisibility};
+use crate::fov_stuff::SquareVisibility;
 use glyph_constants::named_colors::*;
 use terminal_rendering::*;
-use utility::*;
 
 #[delegatable_trait]
 pub trait Drawable: Clone + Debug {
@@ -80,7 +77,7 @@ impl Drawable for TextDrawable {
         self.clone().into()
     }
 
-    fn tinted(&self, color: RGB8, mut strength: f32) -> DrawableEnum {
+    fn tinted(&self, color: RGB8, strength: f32) -> DrawableEnum {
         Self::from_glyphs(self.glyphs.tinted(color, strength)).into()
     }
 }
@@ -390,7 +387,7 @@ impl Drawable for ConveyorBeltDrawable {
         chars.map(|c| Glyph::new(c, self.colors[0], self.colors[1]))
     }
 
-    fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
+    fn drawn_over<T: Drawable>(&self, _other: &T) -> DrawableEnum {
         self.to_enum()
     }
 
@@ -509,6 +506,8 @@ mod tests {
     use utility::{Line, STEP_DOWN, STEP_RIGHT, STEP_UP};
 
     use super::*;
+
+    use crate::fov_stuff::LocalSquareHalfPlane;
 
     #[test]
     fn test_shadow_over_text() {

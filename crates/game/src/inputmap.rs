@@ -1,4 +1,3 @@
-use euclid::default::Point2D;
 use euclid::*;
 use termion::event::{Event, Key, MouseButton, MouseEvent};
 
@@ -8,8 +7,6 @@ use terminal_rendering::screen::{
     SCREEN_STEP_LEFT, SCREEN_STEP_RIGHT, SCREEN_STEP_UP, SCREEN_STEP_UP_LEFT, SCREEN_STEP_UP_RIGHT,
 };
 use utility::coordinate_frame_conversions::*;
-use utility::{FVector, IVector};
-use crate::{DOWN_I, LEFT_I, RIGHT_I, UP_I};
 
 pub struct InputMap {
     prev_mouse_square: WorldSquare,

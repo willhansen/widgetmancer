@@ -1,9 +1,4 @@
 use crate::graphics::*;
-use terminal_rendering::*;
-use utility::*;
-use euclid::Angle;
-use rand::{Rng, SeedableRng};
-use std::f32::consts::{E, PI, TAU};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 

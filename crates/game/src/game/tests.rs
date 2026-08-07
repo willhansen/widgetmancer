@@ -15,6 +15,7 @@
     use crate::graphics::drawable::{ArrowDrawable, Drawable, DrawableEnum};
     use crate::piece::PieceType::Rook;
     use crate::piece::Upgrade;
+    use crate::game::spawning::TURNS_TO_SPAWN_PAWN;
     use crate::utils_for_tests::*;
     use terminal_rendering::glyph::glyph_constants::{
         BLACK, BLOCK_FG, BLUE, FULL_BLOCK, GREY, LEFT_HALF_BLOCK, OUT_OF_SIGHT_COLOR, PLAYER_COLOR,
