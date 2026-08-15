@@ -428,7 +428,9 @@
 
         let blink_step = end_pos - start_pos;
 
-        for i in 0..20 {
+        // only check before the blink trail's fade-out starts (0.75s in);
+        // past that the color is a fade intermediate, not BLINK_EFFECT_COLOR
+        for i in 0..8 {
             // TODO: why is the duration necessary? (might be just randomness)
             let delta = Duration::from_secs_f32(i as f32 * 0.1);
             game.draw_headless_at_duration_from_start(delta);
@@ -448,6 +450,19 @@
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_blink_animation_is_removed_after_its_duration() {
+        let mut game = set_up_game_with_player();
+        game.player_blink(STEP_RIGHT);
+        assert_eq!(game.graphics.num_active_animations(), 1);
+
+        // BlinkAnimation::duration() is 1.0s; draw well past it.
+        // Guards the extract_if-must-be-consumed fix in remove_finished_animations.
+        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(2.0));
+
+        assert_eq!(game.graphics.num_active_animations(), 0);
     }
 
     #[test]

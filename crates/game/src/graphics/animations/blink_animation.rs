@@ -71,8 +71,6 @@ impl Animation for BlinkAnimation {
         let total_seconds = self.duration().as_secs_f32();
         let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
-        let _lifetime_fraction_remaining = remaining_seconds / total_seconds;
-        let _lifetime_fraction_spent = spent_seconds / total_seconds;
 
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
 
@@ -99,7 +97,14 @@ impl Animation for BlinkAnimation {
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))
             .collect();
 
-        points_to_hextant_double_glyphs(visible_points, BLINK_EFFECT_COLOR)
+        // fade toward the background over the tail of the animation so the
+        // trail doesn't pop when the animation is removed at t = duration.
+        // remaining_seconds goes negative if removal lags a frame; the clamp
+        // makes those dots black-on-black instead of wrapping
+        let fade_out_seconds = 0.25;
+        let fade_fraction = (remaining_seconds / fade_out_seconds).clamp(0.0, 1.0);
+        let color = lerp_rgb8(BLACK, BLINK_EFFECT_COLOR, fade_fraction);
+        points_to_hextant_double_glyphs(visible_points, color)
 
         //line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
         //.map(|(x, y)| point2(x, y))

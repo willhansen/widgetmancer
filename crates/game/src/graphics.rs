@@ -551,9 +551,18 @@ impl Graphics {
                 self.board_animation = None;
             }
         }
-        let _ = self.active_animations
-            .extract_if(.., |x| x.finished_at_time(time));
-        let _ = self.selectors.extract_if(.., |x| x.finished_at_time(time));
+        // extract_if is lazy: elements are only removed as the iterator is
+        // consumed, so dropping it would remove nothing
+        self.active_animations
+            .extract_if(.., |x| x.finished_at_time(time))
+            .for_each(drop);
+        self.selectors
+            .extract_if(.., |x| x.finished_at_time(time))
+            .for_each(drop);
+    }
+
+    pub fn num_active_animations(&self) -> usize {
+        self.active_animations.len()
     }
 
     pub fn count_buffered_braille_dots_in_rect(&self, rect: WorldSquareRect) -> u32 {

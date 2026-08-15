@@ -54,6 +54,12 @@ pub fn grey(x: u8) -> RGB8 {
     RGB8::new(x, x, x)
 }
 
+/// Linear interpolation between two colors; `t` is clamped by callers.
+pub fn lerp_rgb8(a: RGB8, b: RGB8, t: f32) -> RGB8 {
+    let l = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
+    RGB8::new(l(a.r, b.r), l(a.g, b.g), l(a.b, b.b))
+}
+
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Glyph {
     pub character: char,
