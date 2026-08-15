@@ -192,7 +192,7 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant) {
     draw_floating_square(&mut frame, 4, origin, pos);
     write!(
         out,
-        "{frame}{}pos=({:6.3}, {:6.3})  branch={:<26}  t={:.1}s\r",
+        "{frame}{}pos=({:6.3}, {:6.3})  branch={:<26}  t={:.1}s",
         Glyph::reset_colors(),
         pos.x,
         pos.y,
@@ -200,8 +200,10 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant) {
         start.elapsed().as_secs_f32(),
     )
     .unwrap();
-    // erase leftovers when the status text shrinks between frames
-    write!(out, "{}", termion::clear::CurrentLine).unwrap();
+    // erase leftovers when the status text shrinks between frames.
+    // UntilNewline clears from the cursor to end of line; CurrentLine would
+    // wipe the whole line, including the status just written.
+    write!(out, "{}", termion::clear::UntilNewline).unwrap();
     out.flush().unwrap();
 }
 
