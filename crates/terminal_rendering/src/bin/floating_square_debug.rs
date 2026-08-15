@@ -20,7 +20,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use rgb::RGB8;
-use termion::event::{Event, Key};
+use termion::event::{Event, Key, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
 use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
@@ -183,6 +183,22 @@ fn show_sweep() {
 }
 
 const ORBIT_RADIUS: f32 = 2.5;
+/// Half-width of the animation grid in squares; fixed so mouse cells can be
+/// mapped back to world geometry.
+const ANIMATE_GRID_RADIUS: i32 = 4;
+
+/// Angle from the grid origin to the (1-based) terminal cell under the mouse.
+/// atan2 on the pixel offset makes angular resolution grow with distance, so
+/// dragging out past the grid edge allows very slight adjustments.
+fn mouse_cell_angle(col: u16, row: u16) -> f32 {
+    let r = ANIMATE_GRID_RADIUS as f32;
+    // The origin square spans cols 2r+1..=2r+2 (center 2r+1.5), row r+1.
+    let dx_cells = col as f32 - (2.0 * r + 1.5);
+    let dy_cells = row as f32 - (r + 1.0);
+    // Convert to world units: 2 columns per square vs 1 row per square,
+    // and world +y is up while terminal rows increase downward.
+    (-dy_cells).atan2(dx_cells * 0.5)
+}
 
 /// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
 /// disables ONLCR, so bare '\n' would stair-step the frame.
@@ -190,8 +206,8 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant, raw_
     let pos: WorldPoint =
         euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS);
     let origin = euclid::point2(0, 0);
-    let mut frame = grid_frame(4, origin);
-    draw_floating_square(&mut frame, 4, origin, pos);
+    let mut frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
+    draw_floating_square(&mut frame, ANIMATE_GRID_RADIUS, origin, pos);
     let frame_text = if raw_mode {
         frame.string_for_regular_display().replace('\n', "\r\n")
     } else {
@@ -251,14 +267,24 @@ fn run_animation(frame_count: Option<u32>) {
             if let Event::Key(Key::Char('q')) | Event::Key(Key::Esc) = event {
                 return;
             }
-            if let Event::Key(Key::Char(' ')) = event {
-                paused = !paused;
+            match event {
+                Event::Key(Key::Char(' ')) => paused = !paused,
+                // Click both snaps the angle and pauses so the adjustment
+                // sticks instead of the orbit moving on.
+                Event::Mouse(MouseEvent::Press(_, x, y)) => {
+                    theta = mouse_cell_angle(x, y);
+                    paused = true;
+                }
+                Event::Mouse(MouseEvent::Hold(x, y)) => {
+                    theta = mouse_cell_angle(x, y);
+                }
+                _ => {}
             }
         }
 
         write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
         render_animation_frame(&mut screen, theta, start, true);
-        write!(screen, "q=quit space=pause").unwrap();
+        write!(screen, "q=quit space=pause click/drag=angle").unwrap();
         screen.flush().unwrap();
 
         frames += 1;
@@ -278,7 +304,9 @@ fn usage() {
          modes:\n  \
            pos X Y   single square at world point (X, Y)\n  \
            sweep     offset table for x in 0..=0.5, y in {{0, 0.25, 0.5}}\n  \
-           animate   orbiting square; q quits, space pauses. Optional
+           animate   orbiting square; q quits, space pauses, click snaps
+                     and pauses, drag scrubs the angle (finer far away).
+                     Optional
                      frame count runs a fixed number of frames, which is
                      also the mode used when stdout is not a terminal.\n\
          default: pos 0.3 0.7"
