@@ -184,15 +184,22 @@ fn show_sweep() {
 
 const ORBIT_RADIUS: f32 = 2.5;
 
-fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant) {
+/// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
+/// disables ONLCR, so bare '\n' would stair-step the frame.
+fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant, raw_mode: bool) {
     let pos: WorldPoint =
         euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS);
     let origin = euclid::point2(0, 0);
     let mut frame = grid_frame(4, origin);
     draw_floating_square(&mut frame, 4, origin, pos);
+    let frame_text = if raw_mode {
+        frame.string_for_regular_display().replace('\n', "\r\n")
+    } else {
+        frame.to_string()
+    };
     write!(
         out,
-        "{frame}{}pos=({:6.3}, {:6.3})  branch={:<26}  t={:.1}s",
+        "{frame_text}{}pos=({:6.3}, {:6.3})  branch={:<26}  t={:.1}s",
         Glyph::reset_colors(),
         pos.x,
         pos.y,
@@ -217,7 +224,7 @@ fn run_animation(frame_count: Option<u32>) {
     if !interactive {
         // Piped output (e.g. `animate 5 | less -R`): no raw mode available.
         for _ in 0..frame_count.unwrap_or(8) {
-            render_animation_frame(&mut stdout(), theta, start);
+            render_animation_frame(&mut stdout(), theta, start, false);
             println!("\n");
             theta = (theta + 0.02).rem_euclid(std::f32::consts::TAU);
         }
@@ -250,7 +257,7 @@ fn run_animation(frame_count: Option<u32>) {
         }
 
         write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        render_animation_frame(&mut screen, theta, start);
+        render_animation_frame(&mut screen, theta, start, true);
         write!(screen, "q=quit space=pause").unwrap();
         screen.flush().unwrap();
 
