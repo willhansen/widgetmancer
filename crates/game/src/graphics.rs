@@ -127,9 +127,24 @@ impl Graphics {
         self.draw_naive_braille_line(pos, pos, color);
     }
 
-    fn draw_glyphs_at_squares(&mut self, glyph_map: HashMap<WorldSquare, DoubleGlyph>) {
-        for (world_square, glyph) in glyph_map {
-            self.draw_drawable_to_draw_buffer(world_square, &TextDrawable::from_glyphs(glyph));
+    /// Animations draw after the board and pieces, so what's beneath them in
+    /// the draw buffer is final; alpha can be resolved immediately per square.
+    fn draw_transparent_glyphs_at_squares(
+        &mut self,
+        glyph_map: HashMap<WorldSquare, DoubleGlyphWithTransparency>,
+    ) {
+        for (world_square, above) in glyph_map {
+            let below = self
+                .draw_buffer
+                .get(&world_square)
+                .map(|drawable| drawable.to_glyphs())
+                .unwrap_or_else(Glyph::transparent_square_glyphs);
+            let composited: DoubleGlyph = [
+                above[0].over_solid_glyph(below[0]),
+                above[1].over_solid_glyph(below[1]),
+            ];
+            self.draw_buffer
+                .insert(world_square, TextDrawable::from_glyphs(composited).to_enum());
         }
     }
     fn draw_drawables_at_squares<T: Drawable>(&mut self, drawable_map: HashMap<WorldSquare, T>) {
@@ -517,8 +532,8 @@ impl Graphics {
     }
 
     fn draw_animation(&mut self, animation: &AnimationEnum, time: Instant) {
-        let glyph_map = animation.double_glyphs_at_time(time);
-        self.draw_glyphs_at_squares(glyph_map);
+        let glyph_map = animation.double_glyphs_with_transparency_at_time(time);
+        self.draw_transparent_glyphs_at_squares(glyph_map);
     }
 
     fn draw_animations(&mut self, animations: AnimationList, time: Instant) {
@@ -534,14 +549,14 @@ impl Graphics {
     pub fn draw_non_board_animations(&mut self, time: Instant) {
         let mut glyphs_to_draw = vec![];
         for animation in &self.active_animations {
-            glyphs_to_draw.push(animation.double_glyphs_at_time(time));
+            glyphs_to_draw.push(animation.double_glyphs_with_transparency_at_time(time));
         }
         for selector in &self.selectors {
-            glyphs_to_draw.push(selector.double_glyphs_at_time(time))
+            glyphs_to_draw.push(selector.double_glyphs_with_transparency_at_time(time))
         }
 
         for glyph_map in glyphs_to_draw {
-            self.draw_glyphs_at_squares(glyph_map);
+            self.draw_transparent_glyphs_at_squares(glyph_map);
         }
     }
 

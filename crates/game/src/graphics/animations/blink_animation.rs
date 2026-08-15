@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use ::num::ToPrimitive;
 use rand::SeedableRng;
+use terminal_rendering::{DoubleGlyphWithTransparency, GlyphWithTransparency};
 
 use crate::graphics::*;
 
@@ -68,8 +69,6 @@ impl Animation for BlinkAnimation {
             Line::new(end_point_mirrored_over_start_point, end_point);
 
         let age = time.duration_since(self.start_time);
-        let total_seconds = self.duration().as_secs_f32();
-        let remaining_seconds = total_seconds - age.as_secs_f32();
         let spent_seconds = age.as_secs_f32();
 
         //let vel = start_vel * (-lifetime_fraction_spent * time_constant).exp();
@@ -97,19 +96,40 @@ impl Animation for BlinkAnimation {
             .filter(|&point| blink_line.point_is_on_or_normal_to_line_segment(point))
             .collect();
 
-        // fade toward the background over the tail of the animation so the
-        // trail doesn't pop when the animation is removed at t = duration.
-        // remaining_seconds goes negative if removal lags a frame; the clamp
-        // makes those dots black-on-black instead of wrapping
-        let fade_out_seconds = 0.25;
-        let fade_fraction = (remaining_seconds / fade_out_seconds).clamp(0.0, 1.0);
-        let color = lerp_rgb8(BLACK, BLINK_EFFECT_COLOR, fade_fraction);
-        points_to_hextant_double_glyphs(visible_points, color)
+        points_to_hextant_double_glyphs(visible_points, BLINK_EFFECT_COLOR)
 
         //line_drawing::Bresenham::new(self.start_square.to_tuple(), self.end_square.to_tuple())
         //.map(|(x, y)| point2(x, y))
         //.flat_map(world_square_to_both_world_character_squares)
         //.map(|char_square| (char_square, Glyph::fg_only(FULL_BLOCK, BLINK_EFFECT_COLOR)))
         //.collect()
+    }
+
+    /// Fade by alpha, not color, so dots dissolve into whatever is behind
+    /// them (checkerboard, overlays, off-board void) instead of toward black.
+    fn double_glyphs_with_transparency_at_time(
+        &self,
+        time: Instant,
+    ) -> HashMap<WorldSquare, DoubleGlyphWithTransparency> {
+        const FADE_OUT_SECONDS: f32 = 0.25;
+        let age = time.duration_since(self.start_time);
+        let remaining_seconds = self.duration().as_secs_f32() - age.as_secs_f32();
+        let fade_fraction = (remaining_seconds / FADE_OUT_SECONDS).clamp(0.0, 1.0);
+        let alpha = (fade_fraction * 255.0).round() as u8;
+        self.double_glyphs_at_time(time)
+            .into_iter()
+            .map(|(square, glyphs)| {
+                (square, glyphs.map(|g| {
+                    if g.is_fully_transparent() {
+                        GlyphWithTransparency::transparent()
+                    } else {
+                        GlyphWithTransparency::new_colored_char(
+                            g.character,
+                            BLINK_EFFECT_COLOR.with_alpha(alpha),
+                        )
+                    }
+                }))
+            })
+            .collect()
     }
 }

@@ -466,6 +466,49 @@
     }
 
     #[test]
+    fn test_blink_trail_fades_toward_background_not_black() {
+        let mut game = set_up_game_with_player();
+        let start_pos = game.player_square();
+        game.player_blink(STEP_RIGHT);
+        let end_pos = game.player_square();
+
+        // halfway through the fade (age ≈ 0.875s of 1.0s)
+        game.draw_headless_at_duration_from_start(Duration::from_secs_f32(0.875));
+
+        let mut squares_checked = 0;
+        for x in start_pos.x + 1..end_pos.x {
+            let square = point2(x, start_pos.y);
+            let glyphs = game
+                .graphics
+                .screen
+                .get_screen_glyphs_at_world_square(square);
+            let Some(dot) = glyphs.iter().find(|g| g.has_fg()) else {
+                continue;
+            };
+            squares_checked += 1;
+            let f = game.graphics.floor_color_at_square(square);
+            let d = dot.fg_color;
+            let c = BLINK_EFFECT_COLOR;
+            // mid-fade: strictly between floor and cobalt on every channel
+            // where they differ — near neither endpoint, and never near black
+            for ((d, f), c) in [d.r, d.g, d.b]
+                .into_iter()
+                .zip([f.r, f.g, f.b])
+                .zip([c.r, c.g, c.b])
+            {
+                if f != c {
+                    let (lo, hi) = (f.min(c), f.max(c));
+                    assert!(
+                        d > lo + 8 && d < hi - 8,
+                        "dot channel {d} not strictly between floor {f} and cobalt {c}"
+                    );
+                }
+            }
+        }
+        assert!(squares_checked > 0);
+    }
+
+    #[test]
     fn test_try_to_blink_but_blocked() {
         let mut game = set_up_10x10_game();
         game.place_player(point2(0, 0));

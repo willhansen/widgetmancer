@@ -611,7 +611,7 @@ impl DoubleGlyphFunctions for DoubleGlyph {
     }
 }
 
-fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
+pub(crate) fn combine_characters(top_char: char, bottom_char: char) -> Option<char> {
     if Glyph::char_is_empty(top_char) {
         Some(bottom_char)
     } else if char_is_braille(top_char) && char_is_braille(bottom_char) {

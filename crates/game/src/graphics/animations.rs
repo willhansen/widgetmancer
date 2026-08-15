@@ -31,6 +31,17 @@ pub trait Animation: Clone {
     fn duration(&self) -> Duration;
     fn double_glyphs_at_time(&self, time: Instant) -> HashMap<WorldSquare, DoubleGlyph>;
 
+    /// Default: the solid output as fully opaque. Override to emit real alpha.
+    fn double_glyphs_with_transparency_at_time(
+        &self,
+        time: Instant,
+    ) -> HashMap<WorldSquare, DoubleGlyphWithTransparency> {
+        self.double_glyphs_at_time(time)
+            .into_iter()
+            .map(|(square, glyphs)| (square, glyphs.map(GlyphWithTransparency::from_solid_glyph)))
+            .collect()
+    }
+
     fn double_glyphs_at_duration(
         &self,
         duration: Duration,

@@ -3,6 +3,7 @@ use std::iter::once;
 use rgb::{RGB8, RGBA8};
 use utility::array_zip;
 
+use crate::glyph::{combine_characters, lerp_rgb8, Glyph};
 use crate::glyph_constants::{named_colors::*, SPACE};
 use crate::DrawableGlyph;
 
@@ -165,6 +166,46 @@ impl GlyphWithTransparency {
             if bg.a == 0 { None } else { Some(bg.rgb()) },
         )
     }
+    /// Opaque conversion preserving Glyph's transparency model:
+    /// empty characters carry no fg ink; bg_transparent means no bg.
+    pub fn from_solid_glyph(glyph: Glyph) -> Self {
+        Self {
+            character: glyph.character,
+            primary_color: glyph
+                .fg_color
+                .with_alpha(if glyph.has_fg() { 255 } else { 0 }),
+            secondary_color: glyph
+                .bg_color
+                .with_alpha(if glyph.bg_transparent { 0 } else { 255 }),
+            fg_is_primary: true,
+        }
+    }
+
+    pub fn is_fully_transparent(&self) -> bool {
+        self.primary_color.a == 0 && self.secondary_color.a == 0
+    }
+
+    /// Composite over an opaque glyph, resolving to solid. Mirrors
+    /// Glyph::drawn_over: characters combine only when the top has no bg,
+    /// and the below "visible" color is its fg if it has ink, else its bg.
+    pub fn over_solid_glyph(&self, below: Glyph) -> Glyph {
+        if self.is_fully_transparent() {
+            return below;
+        }
+        let below_visible = if below.has_fg() {
+            below.fg_color
+        } else {
+            below.bg_color
+        };
+        let blend = |c: RGBA8| lerp_rgb8(below_visible, c.rgb(), c.a as f32 / 255.0);
+        let character = if self.bg_color().a == 0 {
+            combine_characters(self.character, below.character).unwrap_or(self.character)
+        } else {
+            self.character
+        };
+        Glyph::new(character, blend(self.fg_color()), blend(self.bg_color()))
+    }
+
     pub fn from_drawable_with_default_as_transparent(drawable: DrawableGlyph) -> Self {
         Self::from_drawable_with_default_as(drawable, BLACK.with_alpha(0), BLACK.with_alpha(0))
     }
@@ -239,6 +280,35 @@ mod tests {
     use crate::glyph_constants::named_colors::*;
 
     use super::*;
+
+    #[test]
+    fn test_over_solid_glyph_opaque_matches_drawn_over() {
+        let below = Glyph::new(SPACE, WHITE, GREY);
+        let solid_above = Glyph::fg_only(FULL_BLOCK, RED);
+        assert_eq!(
+            GlyphWithTransparency::from_solid_glyph(solid_above).over_solid_glyph(below),
+            solid_above.drawn_over(below)
+        );
+    }
+
+    #[test]
+    fn test_over_solid_glyph_half_alpha_blends_toward_below() {
+        let below = Glyph::new(SPACE, WHITE, GREY);
+        let above = GlyphWithTransparency::new_colored_char(FULL_BLOCK, RED.with_alpha(128));
+        assert_eq!(
+            above.over_solid_glyph(below),
+            Glyph::new(FULL_BLOCK, lerp_rgb8(GREY, RED, 128.0 / 255.0), GREY)
+        );
+    }
+
+    #[test]
+    fn test_over_solid_glyph_fully_transparent_is_identity() {
+        let below = Glyph::new('x', GREEN, BLUE);
+        assert_eq!(
+            GlyphWithTransparency::transparent().over_solid_glyph(below),
+            below
+        );
+    }
 
     #[test]
     fn test_alpha_composite() {
