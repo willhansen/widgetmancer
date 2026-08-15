@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Run the full test suite via nextest (see README).
+# Extra args are forwarded to `cargo nextest run`, e.g.:
+#   ./run-tests -p game
+#   ./run-tests portal_geometry
+set -euo pipefail
+
+# Re-exec inside the nix dev shell when cargo isn't on PATH (e.g. invoked
+# from a bare shell). The guard var prevents an infinite loop if the dev
+# shell itself fails to provide cargo.
+if ! command -v cargo >/dev/null 2>&1 && [[ -z "${_DEV_SHELL_GUARD:-}" ]]; then
+  export _DEV_SHELL_GUARD=1
+  exec nix develop --command "$(readlink -f "${BASH_SOURCE[0]}")" "$@"
+fi
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec cargo nextest run "$@"
