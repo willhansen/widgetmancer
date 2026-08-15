@@ -17,7 +17,7 @@
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::sync::mpsc::channel;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use rgb::RGB8;
 use termion::event::{Event, Key, MouseEvent};
@@ -202,7 +202,9 @@ fn mouse_cell_angle(col: u16, row: u16) -> f32 {
 
 /// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
 /// disables ONLCR, so bare '\n' would stair-step the frame.
-fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant, raw_mode: bool) {
+const FRAME_DT: Duration = Duration::from_millis(33);
+
+fn render_animation_frame(out: &mut impl Write, theta: f32, time: Duration, raw_mode: bool) {
     let pos: WorldPoint =
         euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS);
     let origin = euclid::point2(0, 0);
@@ -220,7 +222,7 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant, raw_
         pos.x,
         pos.y,
         smoothing_branch(pos),
-        start.elapsed().as_secs_f32(),
+        time.as_secs_f32(),
     )
     .unwrap();
     // erase leftovers when the status text shrinks between frames.
@@ -234,15 +236,17 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, start: Instant, raw_
 /// (piped output). In interactive mode the square orbits until q/Esc.
 fn run_animation(frame_count: Option<u32>) {
     let mut theta = 0.0f32;
-    let start = Instant::now();
     let interactive = stdout().is_terminal();
 
     if !interactive {
         // Piped output (e.g. `animate 5 | less -R`): no raw mode available.
+        // These frames render instantly, so simulate the animation clock.
+        let mut t = Duration::ZERO;
         for _ in 0..frame_count.unwrap_or(8) {
-            render_animation_frame(&mut stdout(), theta, start, false);
+            render_animation_frame(&mut stdout(), theta, t, false);
             println!("\n");
             theta = (theta + 0.02).rem_euclid(std::f32::consts::TAU);
+            t += FRAME_DT;
         }
         return;
     }
@@ -262,39 +266,53 @@ fn run_animation(frame_count: Option<u32>) {
 
     let mut paused = false;
     let mut frames = 0u32;
+    let mut dirty = true;
+    // Animation clock (freezes while paused), so a paused frame is fully
+    // static and needs no redraws.
+    let mut anim_time = Duration::ZERO;
     loop {
         while let Ok(event) = rx.try_recv() {
-            if let Event::Key(Key::Char('q')) | Event::Key(Key::Esc) = event {
-                return;
-            }
             match event {
-                Event::Key(Key::Char(' ')) => paused = !paused,
+                Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
+                Event::Key(Key::Char(' ')) => {
+                    paused = !paused;
+                    dirty = true;
+                }
                 // Click both snaps the angle and pauses so the adjustment
                 // sticks instead of the orbit moving on.
                 Event::Mouse(MouseEvent::Press(_, x, y)) => {
                     theta = mouse_cell_angle(x, y);
                     paused = true;
+                    dirty = true;
                 }
                 Event::Mouse(MouseEvent::Hold(x, y)) => {
                     theta = mouse_cell_angle(x, y);
+                    dirty = true;
                 }
                 _ => {}
             }
         }
 
-        write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        render_animation_frame(&mut screen, theta, start, true);
-        write!(screen, "q=quit space=pause click/drag=angle").unwrap();
-        screen.flush().unwrap();
-
-        frames += 1;
-        if frame_count.is_some_and(|n| frames >= n) {
-            return;
-        }
         if !paused {
             theta = (theta + 0.02).rem_euclid(std::f32::consts::TAU);
+            anim_time += FRAME_DT;
+            dirty = true;
         }
-        thread::sleep(Duration::from_millis(33));
+
+        // Redraw only on state change: repainting the full screen every
+        // 33ms would wipe any in-progress text selection.
+        if dirty {
+            write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
+            render_animation_frame(&mut screen, theta, anim_time, true);
+            write!(screen, "q=quit space=pause click/drag=angle").unwrap();
+            screen.flush().unwrap();
+            dirty = false;
+            frames += 1;
+            if frame_count.is_some_and(|n| frames >= n) {
+                return;
+            }
+        }
+        thread::sleep(FRAME_DT);
     }
 }
 
