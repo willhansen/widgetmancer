@@ -146,6 +146,9 @@ fn binary_to_hextant_array(mut binary: u8) -> HextantArray {
     out
 }
 
+/// Public for the floating-square coherence tests' coverage model; not
+/// intended as general API.
+#[doc(hidden)]
 pub const fn hextant_character_to_binary(hextant_character: char) -> u8 {
     assert!(char_is_hextant(hextant_character));
     let before_half_left = '🬓';

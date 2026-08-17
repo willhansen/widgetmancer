@@ -14,14 +14,19 @@
 //! this, so a failure means the renderer mixed families within one square.
 //!
 //! Report layout: first a horizontal strip of the small (character-grid)
-//! views of the square at every position, without colors; below it the
-//! same strip with each half-cell glyph in its own color; below that the
-//! correct rendering (the true square glyphized coherently via hextants)
+//! views of the square at every position, monochrome (uniform grey on the
+//! checkerboard); below it the same strip with each half-cell glyph in its
+//! own color; below that a coherent reference rendering (the true square
+//! glyphized via hextants — one valid coherent family, not the only one)
 //! at the same zoom, colored per piece. Columns (positions) with errors
 //! are marked with `^^^`, and each failed position gets a zoomed-in row
 //! (sampled bitmaps of actual vs ideal coverage) at the bottom. A
 //! dark-grey background checkerboard marks the character cells.
 //! Set NO_COLOR=1 for plain output.
+//!
+//! Sampling note: metric sample points sit at half-sample offsets
+//! ((j+0.5)/16, (i+0.5)/24), which can never coincide with the
+//! half/third/eighth glyph boundaries, so coverage metrics never alias.
 //!
 //! Run with output visible:
 //!   cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture
@@ -85,8 +90,11 @@ struct Style {
 
 impl Style {
     fn from_env() -> Self {
+        let disabled = std::env::var_os("NO_COLOR").is_some()
+            || std::env::var_os("CLICOLOR").is_some_and(|v| v == "0")
+            || std::env::var_os("TERM").is_some_and(|v| v == "dumb");
         Style {
-            enabled: std::env::var_os("NO_COLOR").is_none(),
+            enabled: !disabled,
         }
     }
     fn fg(&self, (r, g, b): (u8, u8, u8)) -> String {
@@ -207,6 +215,10 @@ fn assign_colors(grid: &[[DoubleChar; 3]; 3]) -> [[[Option<usize>; 2]; 3]; 3] {
 }
 
 /// (filled, color index) of the rendered output at a world point.
+///
+/// Square lookup uses the same half-up rounding as
+/// `world_point_to_world_square` so samples land in the same square the
+/// renderer would draw into.
 fn actual_sample(
     grid: &[[DoubleChar; 3]; 3],
     owners: &[[[Option<usize>; 2]; 3]; 3],
@@ -402,6 +414,15 @@ impl Metrics {
 
     fn failures(&self) -> Vec<String> {
         let mut out = Vec::new();
+        // without this the spread checks below pass vacuously on an empty
+        // or degenerate render (no filled columns -> no spread)
+        if self.area == 0.0 {
+            out.push("no fill at all".to_string());
+        } else if (self.area - 1.0).abs() > 0.3 {
+            // 0.3 exceeds the worst-case quantization error of any single
+            // glyph family (~0.23: x edges to 1/16, y edges to 1/6)
+            out.push(format!("area {:.3} too far from 1.0", self.area));
+        }
         for (name, spread) in [
             ("top", self.top_spread),
             ("bottom", self.bottom_spread),
@@ -455,36 +476,12 @@ fn analyze(pos: WorldPoint) -> PositionAnalysis {
     }
 }
 
-/// Small view, monochrome: the 3x3 world squares as 6 half-cell chars,
-/// the square in uniform grey over the cell checkerboard.
-fn plain_view_lines(grid: &[[DoubleChar; 3]; 3], style: &Style) -> Vec<String> {
-    [1i32, 0, -1]
-        .iter()
-        .map(|&dy| {
-            let mut line = String::new();
-            for dx in -1..=1i32 {
-                for half in 0..2 {
-                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
-                    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
-                    if c == SPACE {
-                        line.push_str(&format!("{}·", style.fg(DOT_COLOR)));
-                    } else {
-                        line.push_str(&format!("{}{c}", style.fg(IDEAL_COLOR)));
-                    }
-                }
-            }
-            line.push_str(style.reset());
-            line
-        })
-        .collect()
-}
-
-/// Small view, colored: each glyph in its assigned color over the cell
-/// checkerboard.
-fn colored_view_lines(
-    grid: &[[DoubleChar; 3]; 3],
-    owners: &[[[Option<usize>; 2]; 3]; 3],
+/// Small view builder: the 3x3 world squares as 6 half-cell chars per row
+/// over the cell checkerboard. `cell` resolves each half-cell to the char
+/// to show and its fg color.
+fn small_view_lines(
     style: &Style,
+    cell: impl Fn(i32, i32, usize) -> (char, (u8, u8, u8)),
 ) -> Vec<String> {
     [1i32, 0, -1]
         .iter()
@@ -492,12 +489,11 @@ fn colored_view_lines(
             let mut line = String::new();
             for dx in -1..=1i32 {
                 for half in 0..2 {
-                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
-                    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
-                    match owners[(dx + 1) as usize][(dy + 1) as usize][half] {
-                        Some(idx) => line.push_str(&format!("{}{c}", style.fg(PALETTE[idx]))),
-                        None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
-                    }
+                    line.push_str(
+                        &style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)),
+                    );
+                    let (c, color) = cell(dx, dy, half);
+                    line.push_str(&format!("{}{c}", style.fg(color)));
                 }
             }
             line.push_str(style.reset());
@@ -506,8 +502,38 @@ fn colored_view_lines(
         .collect()
 }
 
-/// The correct rendering of one half-cell: the true unit square's coverage
-/// of the cell, glyphized coherently as a hextant (2x3 sub-cell majority).
+/// Small view, monochrome: the square in uniform grey.
+fn plain_view_lines(grid: &[[DoubleChar; 3]; 3], style: &Style) -> Vec<String> {
+    small_view_lines(style, |dx, dy, half| {
+        let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+        if c == SPACE {
+            ('·', DOT_COLOR)
+        } else {
+            (c, IDEAL_COLOR)
+        }
+    })
+}
+
+/// Small view, colored: each glyph in its assigned color.
+fn colored_view_lines(
+    grid: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+    style: &Style,
+) -> Vec<String> {
+    small_view_lines(style, |dx, dy, half| {
+        let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+        match owners[(dx + 1) as usize][(dy + 1) as usize][half] {
+            Some(idx) => (c, PALETTE[idx]),
+            None => ('·', DOT_COLOR),
+        }
+    })
+}
+
+/// The reference rendering of one half-cell: the true unit square's
+/// coverage of the cell, glyphized coherently as a hextant. Each 2x3
+/// sub-cell is filled iff at least half (>= 8 of 16) of its samples are
+/// covered; the 4x4 sub-samples can alias exactly onto the square's edge,
+/// which is what makes the exact-half rule load-bearing.
 fn correct_view_char(pos: WorldPoint, square: WorldSquare, half: usize) -> Option<char> {
     let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
     let cell_bottom = square.y as f32 - 0.5;
@@ -534,33 +560,22 @@ fn correct_view_char(pos: WorldPoint, square: WorldSquare, half: usize) -> Optio
     any.then(|| hextant_array_to_char(array))
 }
 
-/// Small view of the correct rendering, colored per piece. Pieces keep the
-/// color of the same cell in the actual view; pieces the actual render is
-/// missing entirely are gray.
+/// Small view of the reference rendering, colored per piece. Pieces keep
+/// the color of the same cell in the actual view; pieces the actual render
+/// is missing entirely are gray.
 fn correct_view_lines(a: &PositionAnalysis, style: &Style) -> Vec<String> {
-    [1i32, 0, -1]
-        .iter()
-        .map(|&dy| {
-            let mut line = String::new();
-            for dx in -1..=1i32 {
-                for half in 0..2 {
-                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
-                    let square = a.center + vec2(dx, dy);
-                    match correct_view_char(a.pos, square, half) {
-                        Some(c) => {
-                            let color = a.owners[(dx + 1) as usize][(dy + 1) as usize][half]
-                                .map(|idx| PALETTE[idx])
-                                .unwrap_or(IDEAL_COLOR);
-                            line.push_str(&format!("{}{c}", style.fg(color)));
-                        }
-                        None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
-                    }
-                }
+    small_view_lines(style, |dx, dy, half| {
+        let square = a.center + vec2(dx, dy);
+        match correct_view_char(a.pos, square, half) {
+            Some(c) => {
+                let color = a.owners[(dx + 1) as usize][(dy + 1) as usize][half]
+                    .map(|idx| PALETTE[idx])
+                    .unwrap_or(IDEAL_COLOR);
+                (c, color)
             }
-            line.push_str(style.reset());
-            line
-        })
-        .collect()
+            None => ('·', DOT_COLOR),
+        }
+    })
 }
 
 /// Pad a possibly ANSI-styled line to a visible width.
@@ -634,8 +649,8 @@ fn zoomed_report(idx: usize, count: usize, a: &PositionAnalysis, style: &Style) 
 
 /// Renders the square along a line through the reported tearing position
 /// (2.363, -0.816) and asserts the silhouette stays rectangular: straight
-/// edges, no holes. Currently FAILS at several positions — that is the
-/// demonstration of the bug, and this test should pass once the renderer
+/// edges, no holes, area ~1. FAILS at several positions — that is the
+/// demonstration of the bug, deliberately left red until the renderer
 /// picks one glyph family per square instead of per half-cell.
 #[test]
 fn test_square_silhouette_stays_rectangular_along_motion_line() {
@@ -738,7 +753,11 @@ fn test_square_silhouette_stays_rectangular_along_motion_line() {
         }
     }
 
-    println!("{report}");
+    // the report rides the panic payload on failure; printing it too
+    // would show it twice under --nocapture
+    if failed.is_empty() {
+        println!("{report}");
+    }
     assert!(
         failed.is_empty(),
         "square silhouette is not rectangular at {}/{} sampled positions:\n{}\n\nfull report:\n{}",
@@ -758,6 +777,45 @@ fn test_square_silhouette_stays_rectangular_along_motion_line() {
             .join("\n"),
         report
     );
+}
+
+/// Pin the coverage oracle: every metric above flows through
+/// `glyph_filled`, so a flipped axis or bit order here would silently
+/// invalidate the other tests.
+#[test]
+fn test_glyph_filled_coverage_model() {
+    let f = glyph_filled;
+    // trivial cases
+    assert!(!f(SPACE, 0.5, 0.5));
+    assert!(f(FULL_BLOCK, 0.01, 0.99));
+    // half and quadrant blocks: right/left and up/down not swapped
+    assert!(f('▐', 0.75, 0.5) && !f('▐', 0.25, 0.5));
+    assert!(f('▌', 0.25, 0.5) && !f('▌', 0.75, 0.5));
+    assert!(f('▀', 0.5, 0.75) && !f('▀', 0.5, 0.25));
+    assert!(f('▄', 0.5, 0.25) && !f('▄', 0.5, 0.75));
+    assert!(f('▖', 0.25, 0.25) && !f('▖', 0.75, 0.25) && !f('▖', 0.25, 0.75));
+    assert!(f('▝', 0.75, 0.75) && !f('▝', 0.25, 0.75) && !f('▝', 0.75, 0.25));
+    // eighth blocks: fill measured from the named edge, boundary excluded
+    assert!(f(EIGHTH_BLOCKS_FROM_RIGHT[2], 0.9, 0.5));
+    assert!(!f(EIGHTH_BLOCKS_FROM_RIGHT[2], 0.5, 0.5));
+    assert!(!f(EIGHTH_BLOCKS_FROM_RIGHT[2], 0.75, 0.5));
+    assert!(f(EIGHTH_BLOCKS_FROM_LEFT[4], 0.4, 0.5) && !f(EIGHTH_BLOCKS_FROM_LEFT[4], 0.6, 0.5));
+    assert!(f(EIGHTH_BLOCKS_FROM_BOTTOM[1], 0.5, 0.1) && !f(EIGHTH_BLOCKS_FROM_BOTTOM[1], 0.5, 0.5));
+    assert!(f(EIGHTH_BLOCKS_FROM_TOP[7], 0.5, 0.9) && !f(EIGHTH_BLOCKS_FROM_TOP[7], 0.5, 0.1));
+    // third blocks
+    assert!(f(UPPER_TWO_THIRD_BLOCK, 0.5, 0.9) && f(UPPER_TWO_THIRD_BLOCK, 0.5, 0.5));
+    assert!(!f(UPPER_TWO_THIRD_BLOCK, 0.5, 0.1));
+    assert!(f(LOWER_ONE_THIRD_BLOCK, 0.5, 0.1) && !f(LOWER_ONE_THIRD_BLOCK, 0.5, 0.5));
+    // sextants: '🬀' (U+1FB00) is the top-left sub-cell only
+    assert!(f('🬀', 0.25, 0.9));
+    assert!(!f('🬀', 0.75, 0.9) && !f('🬀', 0.25, 0.5) && !f('🬀', 0.25, 0.1));
+    // cross-check the sextant arm against the crate's array->char direction
+    // (independent logic path through the same bit convention)
+    let only_bottom_right = hextant_array_to_char([[false, false], [false, false], [false, true]]);
+    assert!(f(only_bottom_right, 0.75, 0.1));
+    assert!(!f(only_bottom_right, 0.25, 0.1) && !f(only_bottom_right, 0.75, 0.9));
+    let full_sextant = hextant_array_to_char([[true; 2]; 3]);
+    assert!(f(full_sextant, 0.25, 0.9) && f(full_sextant, 0.75, 0.1));
 }
 
 /// The 1D path (`characters_for_full_square_with_looping_1d_offset`, used by

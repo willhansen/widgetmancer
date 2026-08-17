@@ -31,12 +31,16 @@ rendered picture always comes from the 2d-offset path.
 `crates/terminal_rendering/tests/floating_square_coherence.rs`:
 
 - `test_square_silhouette_stays_rectangular_along_motion_line` — **FAILS**
-  (intentionally, demonstrating the bug). Renders the square at 9 evenly
-  spaced positions along a line through (2.363, -0.816) (it is [5]).
-  Asserts edge coherence (top/bottom/left/right edge spread == 0, no
-  holes) — a bar any single glyph family applied per-square clears.
-  Currently 5/9 positions fail; at [5] the top-edge spread is 0.333 and
-  the bottom-edge spread is 1.000.
+  at 5/9 positions (demonstrating the bug), deliberately left red until
+  the fix lands (user decision over `should_panic`/`#[ignore]`). The full
+  visual report rides the panic payload; nothing is printed on pass.
+  Renders the square at 9 evenly spaced positions along a line through
+  (2.363, -0.816) (it is [5]). Asserts edge coherence
+  (top/bottom/left/right edge spread == 0, no holes, non-empty fill with
+  area within 0.3 of 1.0 — the area check closes the vacuous-pass hole
+  for empty/degenerate renders) — a bar any single glyph family applied
+  per-square clears. At [5] the top-edge spread is 0.333 and the
+  bottom-edge spread is 1.000.
   Report layout: (1) a horizontal strip of the small 6x3 glyph views at
   all positions, monochrome (uniform grey square on the cell checkerboard);
   (2) the same strip with each half-cell glyph
@@ -50,17 +54,21 @@ rendered picture always comes from the 2d-offset path.
   straddling two glyphs shows upper=fg, lower=bg. NO_COLOR=1 disables
   colors (empty cells fall back to dots).
   Run: `cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture`
+- `test_glyph_filled_coverage_model` — pins the coverage oracle
+  (`glyph_filled`) that all metrics flow through: half/quadrant/eighth/
+  third blocks plus sextant bit order, cross-checked against
+  `hextant_array_to_char`.
 - `test_1d_offset_rendering_moves_monotonically` — passes; regression net
   for the live 1D path (`characters_for_full_square_with_looping_1d_offset`,
   used by shockwave animations at `crates/game/src/graphics/drawable.rs:383`).
 
 Supporting change: `hextant_character_to_binary` in
-`crates/terminal_rendering/src/hextant_blocks.rs` is now `pub` (the test's
-coverage model needs sextant bit patterns).
+`crates/terminal_rendering/src/hextant_blocks.rs` is now
+`#[doc(hidden)] pub` (the test's coverage model needs sextant bit
+patterns).
 
-The test suite is otherwise green (130 passed in `terminal_rendering`).
-The coherence test is left failing on purpose; it should go green with the
-fix. **Note: `cargo test` is red until the fix lands.**
+The rest of the workspace suite is green (467 passed). **Note: `cargo test`
+is red until the fix lands** — the coherence test is the only failure.
 
 ## Proposed fixes (reviewed, NOT yet implemented — awaiting approval)
 
