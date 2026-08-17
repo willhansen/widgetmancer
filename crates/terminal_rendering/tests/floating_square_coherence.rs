@@ -318,9 +318,9 @@ impl FillGrid {
                 }
                 (Some(ou), None) => format!("{}{}▀", bg, style.fg(color_of(ou))),
                 (None, Some(ol)) => format!("{}{}▄", bg, style.fg(color_of(ol))),
-                // without colors there is no checkerboard, so keep the dots
-                (None, None) if style.enabled => format!("{} ", bg),
-                (None, None) => format!("{}·", style.fg(DOT_COLOR)),
+                // a shaded space would be invisible whenever the bg colors
+                // don't survive (no truecolor, pipes, copy-paste)
+                (None, None) => format!("{}{}·", bg, style.fg(DOT_COLOR)),
             }
         };
         (0..TEXT_ROWS)
@@ -455,17 +455,26 @@ fn analyze(pos: WorldPoint) -> PositionAnalysis {
     }
 }
 
-/// Small view, uncolored: the 3x3 world squares as 6 half-cell chars.
-fn plain_view_lines(grid: &[[DoubleChar; 3]; 3]) -> Vec<String> {
+/// Small view, monochrome: the 3x3 world squares as 6 half-cell chars,
+/// the square in uniform grey over the cell checkerboard.
+fn plain_view_lines(grid: &[[DoubleChar; 3]; 3], style: &Style) -> Vec<String> {
     [1i32, 0, -1]
         .iter()
         .map(|&dy| {
-            (-1..=1i32)
-                .flat_map(|dx| {
-                    grid[(dx + 1) as usize][(dy + 1) as usize]
-                        .map(|c| if c == SPACE { '·' } else { c })
-                })
-                .collect()
+            let mut line = String::new();
+            for dx in -1..=1i32 {
+                for half in 0..2 {
+                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
+                    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+                    if c == SPACE {
+                        line.push_str(&format!("{}·", style.fg(DOT_COLOR)));
+                    } else {
+                        line.push_str(&format!("{}{c}", style.fg(IDEAL_COLOR)));
+                    }
+                }
+            }
+            line.push_str(style.reset());
+            line
         })
         .collect()
 }
@@ -487,7 +496,6 @@ fn colored_view_lines(
                     let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
                     match owners[(dx + 1) as usize][(dy + 1) as usize][half] {
                         Some(idx) => line.push_str(&format!("{}{c}", style.fg(PALETTE[idx]))),
-                        None if style.enabled => line.push(' '),
                         None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
                     }
                 }
@@ -545,7 +553,6 @@ fn correct_view_lines(a: &PositionAnalysis, style: &Style) -> Vec<String> {
                                 .unwrap_or(IDEAL_COLOR);
                             line.push_str(&format!("{}{c}", style.fg(color)));
                         }
-                        None if style.enabled => line.push(' '),
                         None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
                     }
                 }
@@ -655,7 +662,10 @@ fn test_square_silhouette_stays_rectangular_along_motion_line() {
     let strips: Vec<(&str, Vec<Vec<String>>)> = vec![
         (
             "plain",
-            analyses.iter().map(|a| plain_view_lines(&a.grid)).collect(),
+            analyses
+                .iter()
+                .map(|a| plain_view_lines(&a.grid, &style))
+                .collect(),
         ),
         (
             "colored",

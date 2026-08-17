@@ -38,7 +38,8 @@ rendered picture always comes from the 2d-offset path.
   Currently 5/9 positions fail; at [5] the top-edge spread is 0.333 and
   the bottom-edge spread is 1.000.
   Report layout: (1) a horizontal strip of the small 6x3 glyph views at
-  all positions, uncolored; (2) the same strip with each half-cell glyph
+  all positions, monochrome (uniform grey square on the cell checkerboard);
+  (2) the same strip with each half-cell glyph
   in its own ANSI truecolor; (3) the correct rendering at the same zoom
   (true square glyphized coherently via hextants, 2x3 sub-cell majority),
   colored per piece — pieces the actual render lacks are gray; (4) `^^^`
