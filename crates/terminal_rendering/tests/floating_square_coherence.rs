@@ -682,7 +682,7 @@ fn test_square_silhouette_stays_rectangular_along_motion_line() {
     for (label, views) in &strips {
         for row in 0..3 {
             let label = if row == 1 { *label } else { "" };
-            report.push_str(&format!("  {:6}  ", label));
+            report.push_str(&format!("  {:7} ", label));
             report.push_str(
                 &views
                     .iter()
