@@ -258,6 +258,24 @@ with each item so the context doesn't have to be re-discovered later.
 
 ---
 
+### 9. Fix floating-square silhouette tearing
+- **Evidence:** at pos=(2.363, -0.816) the floating square renders as a
+  ragged blob. `character_for_half_square_with_2d_offset`
+  (`crates/terminal_rendering/src/floating_square.rs:168`) snaps each
+  half-cell independently across four glyph families (h-eighths, v-eighths,
+  hextants, quadrants); sibling cells of one square drop different axes, so
+  the edges land at different positions per column. Failing visual test:
+  `crates/terminal_rendering/tests/floating_square_coherence.rs` (5/9
+  sampled positions along a motion line fail edge coherence). Details:
+  [checkpoints/floating-square-rendering-quality.md](checkpoints/floating-square-rendering-quality.md).
+- **Plan:** pick the glyph family once per square (score families against
+  the center offset, y weighted ~2x for cell aspect), then snap all
+  half-cells within that family. Also fix the debug tool's misleading
+  `branch=` label (it describes the unused `get_chars_for_floating_square`
+  path, not the render path).
+- **Done when:** `test_square_silhouette_stays_rectangular_along_motion_line`
+  passes and the debug tool no longer attributes renders to dead code.
+
 ## Done
 
 ### 8. Migrate animation/graphics API off the world character grid — 2026-08-02
