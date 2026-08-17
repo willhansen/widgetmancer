@@ -39,6 +39,11 @@ rendered picture always comes from the 2d-offset path.
   holes) — a bar any single glyph family applied per-square clears.
   Currently 5/9 positions fail; at [5/9] the top-edge spread is 0.333 and
   the bottom-edge spread is 1.000, with `^` markers under deviating columns.
+  Each half-cell glyph of the square is drawn in its own ANSI truecolor,
+  kept consistent between the glyph view and the zoomed coverage view (a
+  text cell straddling two glyphs shows upper=fg, lower=bg); the character
+  cells are marked by a dark-grey background checkerboard (one shade per
+  half-cell). NO_COLOR=1 disables colors (empty cells fall back to dots).
   Run: `cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture`
 - `test_1d_offset_rendering_moves_monotonically` — passes; regression net
   for the live 1D path (`characters_for_full_square_with_looping_1d_offset`,
