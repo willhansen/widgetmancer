@@ -7,18 +7,21 @@
 //! tearing the silhouette (seen at e.g. pos=(2.363, -0.816)).
 //!
 //! These tests render the square at evenly spaced positions along a line
-//! (the reported position is the middle sample), print the glyph rendering
-//! next to a sampled bitmap of those glyphs and a bitmap of the true
-//! square, and assert edge coherence: a square's top/bottom/left/right
-//! edges must be straight (same position in every column/row) and its fill
-//! must be hole-free. Any single glyph family (eighths, hextants,
-//! quadrants) applied consistently satisfies this, so a failure means the
-//! renderer mixed families within one square.
+//! (the reported position is the middle sample) and assert edge coherence:
+//! a square's top/bottom/left/right edges must be straight (same position
+//! in every column/row) and its fill must be hole-free. Any single glyph
+//! family (eighths, hextants, quadrants) applied consistently satisfies
+//! this, so a failure means the renderer mixed families within one square.
 //!
-//! Each half-cell glyph of the square gets its own color, kept consistent
-//! between the glyph view and the zoomed coverage view; a dark-grey
-//! background checkerboard marks the character cells. Set NO_COLOR=1 for
-//! plain output.
+//! Report layout: first a horizontal strip of the small (character-grid)
+//! views of the square at every position, without colors; below it the
+//! same strip with each half-cell glyph in its own color; below that the
+//! correct rendering (the true square glyphized coherently via hextants)
+//! at the same zoom, colored per piece. Columns (positions) with errors
+//! are marked with `^^^`, and each failed position gets a zoomed-in row
+//! (sampled bitmaps of actual vs ideal coverage) at the bottom. A
+//! dark-grey background checkerboard marks the character cells.
+//! Set NO_COLOR=1 for plain output.
 //!
 //! Run with output visible:
 //!   cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture
@@ -26,7 +29,7 @@
 use euclid::vec2;
 use terminal_rendering::glyph_constants::*;
 use terminal_rendering::hextant_blocks::{
-    hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
+    hextant_array_to_char, hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
 };
 use terminal_rendering::*;
 use utility::coordinate_frame_conversions::{WorldMove, WorldPoint, WorldSquare};
@@ -41,12 +44,13 @@ const SY: usize = 24;
 const NX: usize = 3 * SX;
 const NY: usize = 3 * SY;
 
-// Display geometry: 2x3 samples per pixel, 2 pixels per text row.
+// Display geometry of the zoomed views: 2x3 samples per pixel, 2 pixels
+// per text row.
 const PX_W: usize = NX / 2; // 24 pixels wide (4 per half-cell)
 const PX_H: usize = NY / 3; // 24 pixels tall (8 per world square)
 const TEXT_ROWS: usize = PX_H / 2; // 12 content rows
 const BITMAP_W: usize = PX_W;
-const GLYPH_W: usize = 6;
+const GLYPH_W: usize = 6; // small views: 3 world squares = 6 half-cell chars
 
 /// One color per half-cell glyph of the square (max 4 columns x 2 rows).
 const PALETTE: [(u8, u8, u8); 8] = [
@@ -415,9 +419,60 @@ impl Metrics {
     }
 }
 
-/// The 3x3 world squares as 6 half-cell chars per row, each glyph in its
-/// assigned color over the same cell checkerboard as the zoomed views.
-fn glyph_pane_lines(
+struct PositionAnalysis {
+    pos: WorldPoint,
+    grid: [[DoubleChar; 3]; 3],
+    owners: [[[Option<usize>; 2]; 3]; 3],
+    center: WorldSquare,
+    actual: FillGrid,
+    ideal: FillGrid,
+    metrics: Metrics,
+    failures: Vec<String>,
+}
+
+fn analyze(pos: WorldPoint) -> PositionAnalysis {
+    let (grid, center) = rendered_neighborhood(pos);
+    let owners = assign_colors(&grid);
+    let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
+    let ideal = FillGrid::sample(origin, |wx, wy| {
+        (
+            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
+            Some(0),
+        )
+    });
+    let metrics = Metrics::measure(&actual, pos);
+    let failures = metrics.failures();
+    PositionAnalysis {
+        pos,
+        grid,
+        owners,
+        center,
+        actual,
+        ideal,
+        metrics,
+        failures,
+    }
+}
+
+/// Small view, uncolored: the 3x3 world squares as 6 half-cell chars.
+fn plain_view_lines(grid: &[[DoubleChar; 3]; 3]) -> Vec<String> {
+    [1i32, 0, -1]
+        .iter()
+        .map(|&dy| {
+            (-1..=1i32)
+                .flat_map(|dx| {
+                    grid[(dx + 1) as usize][(dy + 1) as usize]
+                        .map(|c| if c == SPACE { '·' } else { c })
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Small view, colored: each glyph in its assigned color over the cell
+/// checkerboard.
+fn colored_view_lines(
     grid: &[[DoubleChar; 3]; 3],
     owners: &[[[Option<usize>; 2]; 3]; 3],
     style: &Style,
@@ -428,12 +483,68 @@ fn glyph_pane_lines(
             let mut line = String::new();
             for dx in -1..=1i32 {
                 for half in 0..2 {
-                    let cell_col = (dx + 1) as usize * 2 + half;
-                    let cell_row = (1 - dy) as usize;
+                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
                     let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
-                    line.push_str(&style.bg(cell_bg(cell_col, cell_row)));
                     match owners[(dx + 1) as usize][(dy + 1) as usize][half] {
                         Some(idx) => line.push_str(&format!("{}{c}", style.fg(PALETTE[idx]))),
+                        None if style.enabled => line.push(' '),
+                        None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
+                    }
+                }
+            }
+            line.push_str(style.reset());
+            line
+        })
+        .collect()
+}
+
+/// The correct rendering of one half-cell: the true unit square's coverage
+/// of the cell, glyphized coherently as a hextant (2x3 sub-cell majority).
+fn correct_view_char(pos: WorldPoint, square: WorldSquare, half: usize) -> Option<char> {
+    let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
+    let cell_bottom = square.y as f32 - 0.5;
+    let mut array = [[false; 2]; 3];
+    let mut any = false;
+    for row in 0..3 {
+        for col in 0..2 {
+            let mut count = 0;
+            for sy in 0..4 {
+                for sx in 0..4 {
+                    let fx = (col as f32 + (sx as f32 + 0.5) / 4.0) / 2.0;
+                    let fy = ((2 - row) as f32 + (sy as f32 + 0.5) / 4.0) / 3.0;
+                    let wx = cell_left + fx * 0.5;
+                    let wy = cell_bottom + fy;
+                    if (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5 {
+                        count += 1;
+                    }
+                }
+            }
+            array[row][col] = count >= 8;
+            any |= array[row][col];
+        }
+    }
+    any.then(|| hextant_array_to_char(array))
+}
+
+/// Small view of the correct rendering, colored per piece. Pieces keep the
+/// color of the same cell in the actual view; pieces the actual render is
+/// missing entirely are gray.
+fn correct_view_lines(a: &PositionAnalysis, style: &Style) -> Vec<String> {
+    [1i32, 0, -1]
+        .iter()
+        .map(|&dy| {
+            let mut line = String::new();
+            for dx in -1..=1i32 {
+                for half in 0..2 {
+                    line.push_str(&style.bg(cell_bg((dx + 1) as usize * 2 + half, (1 - dy) as usize)));
+                    let square = a.center + vec2(dx, dy);
+                    match correct_view_char(a.pos, square, half) {
+                        Some(c) => {
+                            let color = a.owners[(dx + 1) as usize][(dy + 1) as usize][half]
+                                .map(|idx| PALETTE[idx])
+                                .unwrap_or(IDEAL_COLOR);
+                            line.push_str(&format!("{}{c}", style.fg(color)));
+                        }
                         None if style.enabled => line.push(' '),
                         None => line.push_str(&format!("{}·", style.fg(DOT_COLOR))),
                     }
@@ -450,55 +561,45 @@ fn pad(line: &str, visible_len: usize, width: usize) -> String {
     format!("{}{}", line, " ".repeat(width.saturating_sub(visible_len)))
 }
 
-fn position_report(idx: usize, count: usize, pos: WorldPoint, style: &Style) -> (String, Vec<String>) {
-    let (grid, center) = rendered_neighborhood(pos);
-    let owners = assign_colors(&grid);
-    let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
-    let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
-    let ideal = FillGrid::sample(origin, |wx, wy| {
-        (
-            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
-            Some(0),
-        )
-    });
-    let metrics = Metrics::measure(&actual, pos);
-    let failures = metrics.failures();
-
-    let frac = fraction_part(pos);
-    let status = if failures.is_empty() { "pass" } else { "FAIL" };
+/// Zoomed-in row for one position: glyph view, sampled actual coverage,
+/// sampled ideal coverage, deviation markers, metrics.
+fn zoomed_report(idx: usize, count: usize, a: &PositionAnalysis, style: &Style) -> String {
+    let frac = fraction_part(a.pos);
+    let status = if a.failures.is_empty() { "pass" } else { "FAIL" };
     let mut out = format!(
         "── [{idx}/{count}] pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  ── {status} ──\n",
-        pos.x, pos.y, frac.x, frac.y
+        a.pos.x, a.pos.y, frac.x, frac.y
     );
     out.push_str(&format!(
         "  char grid: world squares x={}..={}, y={}..={}   (background checkerboard = character cells)\n",
-        center.x - 1,
-        center.x + 1,
-        center.y - 1,
-        center.y + 1
+        a.center.x - 1,
+        a.center.x + 1,
+        a.center.y - 1,
+        a.center.y + 1
     ));
     out.push_str(&format!(
         "  {:GLYPH_W$}  {:BITMAP_W$}  {}\n",
         "glyphs", "actual coverage", "ideal (true square)"
     ));
 
-    let glyphs = glyph_pane_lines(&grid, &owners, style);
-    let actual_lines = actual.bitmap_pane(&PALETTE, style);
-    let ideal_lines = ideal.bitmap_pane(&[IDEAL_COLOR], style);
+    let glyphs = colored_view_lines(&a.grid, &a.owners, style);
+    let actual_lines = a.actual.bitmap_pane(&PALETTE, style);
+    let ideal_lines = a.ideal.bitmap_pane(&[IDEAL_COLOR], style);
     let height = actual_lines.len().max(glyphs.len());
     for row in 0..height {
         let g = glyphs.get(row).map(String::as_str).unwrap_or("");
-        let a = actual_lines.get(row).map(String::as_str).unwrap_or("");
-        let i = ideal_lines.get(row).map(String::as_str).unwrap_or("");
+        let ac = actual_lines.get(row).map(String::as_str).unwrap_or("");
+        let id = ideal_lines.get(row).map(String::as_str).unwrap_or("");
         out.push_str(&format!(
             "  {}  {}  {}\n",
             pad(g, if row < glyphs.len() { GLYPH_W } else { 0 }, GLYPH_W),
-            pad(a, if row < actual_lines.len() { BITMAP_W } else { 0 }, BITMAP_W),
-            i
+            pad(ac, if row < actual_lines.len() { BITMAP_W } else { 0 }, BITMAP_W),
+            id
         ));
     }
 
-    let markers: String = metrics
+    let markers: String = a
+        .metrics
         .ragged_columns
         .iter()
         .map(|&ragged| if ragged { '^' } else { ' ' })
@@ -513,15 +614,15 @@ fn position_report(idx: usize, count: usize, pos: WorldPoint, style: &Style) -> 
     }
     out.push_str(&format!(
         "  edge spreads: top {:.3}  bottom {:.3}  left {:.3}  right {:.3}   holes: {}   area {:.3} (err {:+.3})\n",
-        metrics.top_spread,
-        metrics.bottom_spread,
-        metrics.left_spread,
-        metrics.right_spread,
-        metrics.holes,
-        metrics.area,
-        metrics.area - 1.0,
+        a.metrics.top_spread,
+        a.metrics.bottom_spread,
+        a.metrics.left_spread,
+        a.metrics.right_spread,
+        a.metrics.holes,
+        a.metrics.area,
+        a.metrics.area - 1.0,
     ));
-    (out, failures)
+    out
 }
 
 /// Renders the square along a line through the reported tearing position
@@ -536,37 +637,115 @@ fn test_square_silhouette_stays_rectangular_along_motion_line() {
     let positions: Vec<WorldPoint> = (-4..=4)
         .map(|i| base + step * i as f32)
         .collect();
-
+    let analyses: Vec<PositionAnalysis> = positions.iter().map(|&p| analyze(p)).collect();
     let style = Style::from_env();
+
     let mut report = String::from(
-        "\nfloating square along a line; the reported case is [5/9].\n\
-         A square must have a straight top/bottom/left/right edge and no holes.\n\
-         Each glyph of the square has its own color, kept across both views.\n\n",
+        "\nfloating square along a line; the reported case is [5].\n\
+         A square must have a straight top/bottom/left/right edge and no holes.\n\n",
     );
-    let mut failed_positions = Vec::new();
-    for (k, &pos) in positions.iter().enumerate() {
-        let (text, failures) = position_report(k + 1, positions.len(), pos, &style);
-        report.push_str(&text);
+
+    // strips of small views, one 6-wide view per position
+    let n = analyses.len();
+    report.push_str("          ");
+    for k in 0..n {
+        report.push_str(&format!("{:^7}", format!("[{}]", k + 1)));
+    }
+    report.push('\n');
+    let strips: Vec<(&str, Vec<Vec<String>>)> = vec![
+        (
+            "plain",
+            analyses.iter().map(|a| plain_view_lines(&a.grid)).collect(),
+        ),
+        (
+            "colored",
+            analyses
+                .iter()
+                .map(|a| colored_view_lines(&a.grid, &a.owners, &style))
+                .collect(),
+        ),
+        (
+            "correct",
+            analyses.iter().map(|a| correct_view_lines(a, &style)).collect(),
+        ),
+    ];
+    for (label, views) in &strips {
+        for row in 0..3 {
+            let label = if row == 1 { *label } else { "" };
+            report.push_str(&format!("  {:6}  ", label));
+            report.push_str(
+                &views
+                    .iter()
+                    .map(|v| v[row].as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+            report.push('\n');
+        }
         report.push('\n');
-        if !failures.is_empty() {
-            failed_positions.push(format!(
-                "  [{}/{}] pos=({:.3}, {:.3}): {}",
-                k + 1,
-                positions.len(),
-                pos.x,
-                pos.y,
-                failures.join(", ")
-            ));
+    }
+
+    // mark the columns (positions) with errors
+    report.push_str("          ");
+    for a in &analyses {
+        if a.failures.is_empty() {
+            report.push_str("       ");
+        } else {
+            report.push_str(&format!("{} ^^^^  {}", style.fg(MARKER_COLOR), style.reset()));
+        }
+    }
+    report.push_str("\n\n");
+
+    // legend
+    for (k, a) in analyses.iter().enumerate() {
+        let frac = fraction_part(a.pos);
+        let status = if a.failures.is_empty() {
+            "pass".to_string()
+        } else {
+            format!("FAIL: {}", a.failures.join(", "))
+        };
+        report.push_str(&format!(
+            "  [{}] pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  {status}\n",
+            k + 1,
+            a.pos.x,
+            a.pos.y,
+            frac.x,
+            frac.y
+        ));
+    }
+
+    // zoomed-in rows for the failed positions only
+    let failed: Vec<(usize, &PositionAnalysis)> = analyses
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| !a.failures.is_empty())
+        .collect();
+    if !failed.is_empty() {
+        report.push_str("\nzoomed views of failed positions:\n\n");
+        for (k, a) in &failed {
+            report.push_str(&zoomed_report(k + 1, n, a, &style));
+            report.push('\n');
         }
     }
 
     println!("{report}");
     assert!(
-        failed_positions.is_empty(),
+        failed.is_empty(),
         "square silhouette is not rectangular at {}/{} sampled positions:\n{}\n\nfull report:\n{}",
-        failed_positions.len(),
-        positions.len(),
-        failed_positions.join("\n"),
+        failed.len(),
+        n,
+        failed
+            .iter()
+            .map(|(k, a)| format!(
+                "  [{}/{}] pos=({:.3}, {:.3}): {}",
+                k + 1,
+                n,
+                a.pos.x,
+                a.pos.y,
+                a.failures.join(", ")
+            ))
+            .collect::<Vec<_>>()
+            .join("\n"),
         report
     );
 }
