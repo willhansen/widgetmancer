@@ -9,7 +9,10 @@ use euclid::vec2;
 
 use crate::glyph_constants::*;
 use crate::hextant_blocks::{hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT};
-use crate::{characters_for_full_square_with_2d_offset, DoubleChar};
+use crate::{
+    characters_for_full_square_with_2d_offset, characters_for_full_square_with_2d_offset_forced,
+    DoubleChar,
+};
 use utility::coordinate_frame_conversions::{
     world_point_to_world_square, WorldMove, WorldPoint, WorldSquare,
 };
@@ -171,6 +174,51 @@ pub fn rendered_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSqu
     (grid, center)
 }
 
+/// Same as `rendered_neighborhood` but with the snap family forced, for
+/// scoring "what would family X have done" (family-map baking, debug tool).
+#[doc(hidden)]
+pub fn rendered_neighborhood_forced(
+    pos: WorldPoint,
+    family_index: usize,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    let center = world_point_to_world_square(pos);
+    let mut grid = [[[' '; 2]; 3]; 3];
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = center + vec2(dx, dy);
+            let offset: WorldMove = pos - square.to_f32();
+            grid[(dx + 1) as usize][(dy + 1) as usize] =
+                characters_for_full_square_with_2d_offset_forced(offset, family_index);
+        }
+    }
+    (grid, center)
+}
+
+/// Symmetric-difference area (in world square units) between the rendered
+/// glyph grid and the true 1x1 square at `pos`, on the sampling lattice.
+/// This is the objective the family map is baked against.
+#[doc(hidden)]
+pub fn coverage_error(
+    grid: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+    center: WorldSquare,
+    pos: WorldPoint,
+) -> f32 {
+    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let mut mismatches = 0usize;
+    for j in 0..NX {
+        for i in 0..NY {
+            let wx = origin.x + (j as f32 + 0.5) / SX as f32;
+            let wy = origin.y + (i as f32 + 0.5) / SY as f32;
+            let ideal = (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5;
+            if actual_sample(grid, owners, center, wx, wy).0 != ideal {
+                mismatches += 1;
+            }
+        }
+    }
+    mismatches as f32 / (SX * SY) as f32
+}
+
 /// Assign each non-space half-cell glyph a PALETTE index, scanning
 /// top-to-bottom, left-to-right so colors are stable within one report.
 /// Indexed [dx+1][dy+1][half].
@@ -217,6 +265,119 @@ pub fn actual_sample(
         glyph_filled(c, fx, fy),
         owners[(dx + 1) as usize][(dy + 1) as usize][half],
     )
+}
+
+/// Silhouette metrics over a sampled actual-coverage grid, shared by the
+/// coherence test (which asserts on them) and the floating_square_debug
+/// tool (which prints them). Not game-facing API.
+#[doc(hidden)]
+#[derive(Default)]
+pub struct Metrics {
+    pub top_spread: f32,
+    pub bottom_spread: f32,
+    pub left_spread: f32,
+    pub right_spread: f32,
+    pub holes: usize,
+    pub area: f32,
+    /// per display-column flag: top or bottom edge deviates >1/8 from ideal
+    pub ragged_columns: Vec<bool>,
+}
+
+impl Metrics {
+    pub fn measure(actual: &FillGrid, pos: WorldPoint) -> Self {
+        let mut m = Metrics::default();
+        let mut tops = Vec::new();
+        let mut bottoms = Vec::new();
+        let mut column_info = Vec::new(); // (top, bottom) per sample column
+        for j in 0..NX {
+            let filled_rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
+            if filled_rows.is_empty() {
+                column_info.push(None);
+                continue;
+            }
+            let (lo, hi) = (*filled_rows.first().unwrap(), *filled_rows.last().unwrap());
+            m.holes += (hi - lo + 1) - filled_rows.len();
+            let (top, bottom) = (actual.wy(hi), actual.wy(lo));
+            tops.push(top);
+            bottoms.push(bottom);
+            column_info.push(Some((top, bottom)));
+        }
+        let spread = |v: &Vec<f32>| {
+            v.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+                - v.iter().cloned().fold(f32::INFINITY, f32::min)
+        };
+        m.top_spread = spread(&tops);
+        m.bottom_spread = spread(&bottoms);
+
+        let mut lefts = Vec::new();
+        let mut rights = Vec::new();
+        for i in 0..NY {
+            let filled_cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
+            if filled_cols.is_empty() {
+                continue;
+            }
+            lefts.push(actual.wx(*filled_cols.first().unwrap()));
+            rights.push(actual.wx(*filled_cols.last().unwrap()));
+        }
+        m.left_spread = spread(&lefts);
+        m.right_spread = spread(&rights);
+
+        let filled_count: usize = actual.cells.iter().flatten().filter(|&&b| b).count();
+        m.area = filled_count as f32 / (SX * SY) as f32;
+
+        let (ideal_top, ideal_bottom) = (pos.y + 0.5, pos.y - 0.5);
+        m.ragged_columns = (0..PX_W)
+            .map(|px| {
+                [2 * px, 2 * px + 1].iter().any(|&j| {
+                    column_info[j].is_some_and(|(top, bottom)| {
+                        (top - ideal_top).abs() > 0.125 || (bottom - ideal_bottom).abs() > 0.125
+                    })
+                })
+            })
+            .collect();
+        m
+    }
+
+    pub fn failures(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        // without this the spread checks below pass vacuously on an empty
+        // or degenerate render (no filled columns -> no spread)
+        if self.area == 0.0 {
+            out.push("no fill at all".to_string());
+        } else if (self.area - 1.0).abs() > 0.3 {
+            // 0.3 exceeds the worst-case quantization error of any single
+            // glyph family (~0.23: x edges to 1/16, y edges to 1/6)
+            out.push(format!("area {:.3} too far from 1.0", self.area));
+        }
+        for (name, spread) in [
+            ("top", self.top_spread),
+            ("bottom", self.bottom_spread),
+            ("left", self.left_spread),
+            ("right", self.right_spread),
+        ] {
+            if spread > 1e-6 {
+                out.push(format!("{name}-edge spread {spread:.3}"));
+            }
+        }
+        if self.holes > 0 {
+            out.push(format!("{} hole(s) in the fill", self.holes));
+        }
+        out
+    }
+
+    /// One-line summary, as printed by the debug tool and test reports.
+    pub fn summary_line(&self) -> String {
+        format!(
+            "edge spreads: top {:.3}  bottom {:.3}  left {:.3}  right {:.3}   holes: {}   area {:.3} (err {:+.3})",
+            self.top_spread,
+            self.bottom_spread,
+            self.left_spread,
+            self.right_spread,
+            self.holes,
+            self.area,
+            self.area - 1.0,
+        )
+    }
 }
 
 /// Sample grid over the render window. Indexed [x][y], y from the bottom.

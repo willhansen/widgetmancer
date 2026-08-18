@@ -30,25 +30,35 @@ pub type HextantArray = [[bool; 2]; 3]; // row, column
 // 2^6 = 64 = 4* 16
 // missing hextant blocks: empty, left half, right half, full
 
+/// Glyph for the part of a 1x1 square, offset by `hextant_grid_steps`
+/// (x: half-cell halves, y: thirds), that overlaps one half-cell. The
+/// overlap is always a full rectangle of mini-blocks, so the entry is
+/// generated (column mask x row mask) rather than tabulated — a
+/// hand-written table previously shipped one entry (`(-1,-1)`) that
+/// disagreed with the geometry and notched the silhouette.
 pub fn hextant_block_by_offset(hextant_grid_steps: IVector) -> char {
-    match hextant_grid_steps.to_tuple() {
-        (1, -2) => '🬞',
-        (1, -1) => '🬦',
-        (1, 0) => RIGHT_HALF_BLOCK,
-        (1, 1) => '🬉',
-        (1, 2) => '🬁',
-        (0, -2) => LOWER_ONE_THIRD_BLOCK,
-        (0, -1) => LOWER_TWO_THIRD_BLOCK,
-        (0, 0) => FULL_BLOCK,
-        (0, 1) => UPPER_TWO_THIRD_BLOCK,
-        (0, 2) => UPPER_ONE_THIRD_BLOCK,
-        (-1, -2) => '🬏',
-        (-1, -1) => '🬓',
-        (-1, 0) => LEFT_HALF_BLOCK,
-        (-1, 1) => '🬄',
-        (-1, 2) => '🬀',
-        _ => SPACE,
+    let cols: [bool; 2] = match hextant_grid_steps.x {
+        -1 => [true, false],
+        0 => [true, true],
+        1 => [false, true],
+        _ => return SPACE,
+    };
+    // row 0 = top (world +y is up)
+    let rows: [bool; 3] = match hextant_grid_steps.y {
+        -2 => [false, false, true],
+        -1 => [false, true, true],
+        0 => [true, true, true],
+        1 => [true, true, false],
+        2 => [true, false, false],
+        _ => return SPACE,
+    };
+    let mut array = [[false; 2]; 3];
+    for r in 0..3 {
+        for c in 0..2 {
+            array[r][c] = rows[r] && cols[c];
+        }
     }
+    hextant_array_to_char(array)
 }
 
 const HEX_SPACE: u8 = const { hextant_character_to_binary(SPACE) };
@@ -361,4 +371,51 @@ mod tests {
         }
     }
 
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    use crate::coverage::glyph_filled;
+    use euclid::vec2;
+
+    /// Every table entry must agree with the analytic square-overlap
+    /// rectangle: the half-cell glyph for offset steps (x, y) shows exactly
+    /// the part of a 1x1 square, centered that far off the cell, that falls
+    /// in this half-cell. Probe at mini-block centers so no probe lands on
+    /// a glyph boundary.
+    #[test]
+    fn test_hextant_table_matches_square_overlap_geometry() {
+        for x_steps in -1..=1 {
+            for y_steps in -2..=2 {
+                let c = hextant_block_by_offset(vec2(x_steps, y_steps));
+                // overlap in half-cell-local fractions (fx, fy from bottom)
+                let (fx0, fx1) = match x_steps {
+                    -1 => (0.0, 0.5),
+                    0 => (0.0, 1.0),
+                    _ => (0.5, 1.0),
+                };
+                let (fy0, fy1) = match y_steps {
+                    -2 => (0.0, 1.0 / 3.0),
+                    -1 => (0.0, 2.0 / 3.0),
+                    0 => (0.0, 1.0),
+                    1 => (1.0 / 3.0, 1.0),
+                    _ => (2.0 / 3.0, 1.0),
+                };
+                for col in 0..2 {
+                    for row in 0..3 {
+                        let fx = 0.25 + 0.5 * col as f32;
+                        let fy = (row as f32 + 0.5) / 3.0;
+                        let expected =
+                            (fx0..fx1).contains(&fx) && (fy0..fy1).contains(&fy);
+                        assert_eq!(
+                            glyph_filled(c, fx, fy),
+                            expected,
+                            "steps ({x_steps}, {y_steps}) -> {c:?} at ({fx:.2}, {fy:.2})"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

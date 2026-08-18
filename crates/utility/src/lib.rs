@@ -1448,8 +1448,16 @@ pub fn ith_projection_of_step(step: WorldStep, i: u32) -> WorldStep {
     }
 }
 
+/// Snaps to the nearest multiple of 1/denominator. Ties round toward
+/// +infinity (half-up: `(x*n + 0.5).floor()`, matching euclid's
+/// `Point2D::round` and `world_point_to_world_square`) because that rule
+/// is exactly translation-invariant: snap(x - k) == snap(x) - k for
+/// integer k, for every x. The floating-square snap families rely on that
+/// to keep every cell of a square on the same relative grid point.
+/// f32::round (half away from zero) breaks it at exact ties:
+/// round(0.5) = 1 but round(-3.5) = -4 != round(0.5) - 4.
 pub fn snap_to_nths(x: f32, denominator: u32) -> f32 {
-    (x * denominator as f32).round() / denominator as f32
+    (x * denominator as f32 + 0.5).floor() / denominator as f32
 }
 pub fn looping_clamp(a: f32, b: f32, x: f32) -> f32 {
     assert!(a < b);

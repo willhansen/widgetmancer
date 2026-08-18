@@ -33,6 +33,10 @@ pub_mod_and_use!(angled_blocks, braille, floating_square, hextant_blocks);
 // generic names (Style, FillGrid, SX...) stay out of the crate root.
 #[doc(hidden)]
 pub mod coverage;
+#[doc(hidden)]
+pub mod family_map;
+#[doc(hidden)]
+pub mod family_map_table;
 
 pub mod glyph_constants;
 

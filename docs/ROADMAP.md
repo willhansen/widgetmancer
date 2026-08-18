@@ -276,6 +276,23 @@ with each item so the context doesn't have to be re-discovered later.
 - **Done when:** `test_square_silhouette_stays_rectangular_along_motion_line`
   passes and the debug tool no longer attributes renders to dead code.
 
+### 10. Improve floating-square rendering quality
+- **Evidence:** post-item-9 evaluation found (a) a 0.25×1/6 silhouette notch
+  from one wrong hand-written entry in `hextant_block_by_offset`
+  (`(-1,-1) => '▖'` should be `🬓`; fixed locally, uncommitted), (b) family
+  selection optimizes a center-offset proxy rather than measured coverage
+  error, (c) the motion-line test's trajectory misses whole offset regions,
+  (d) family switches cause visible pops during motion.
+- **Plan:** (1) generate the glyph tables from square-overlap geometry +
+  table≡geometry test; (2) bake the family-selection map offline from
+  coverage error (blessed-file pattern); (3) dense-sweep silhouette test +
+  surface `Metrics` in the debug tool; (5) family-switch hysteresis
+  (`FAMILY_SWITCH_PENALTY`, per-entity `Cell<Option<usize>>`). Details and
+  progress: [checkpoints/floating-square-rendering-improvements.md](checkpoints/floating-square-rendering-improvements.md).
+- **Done when:** dense-sweep test passes at 1/24 density, selection uses the
+  baked map, debug `pos` prints metrics, and hysteresis measurably reduces
+  family switches on the line trajectory without metric regressions.
+
 ## Done
 
 ### 8. Migrate animation/graphics API off the world character grid — 2026-08-02

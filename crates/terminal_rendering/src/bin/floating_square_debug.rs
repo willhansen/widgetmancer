@@ -35,7 +35,8 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
-    self, actual_sample, assign_colors, rendered_neighborhood, FillGrid, BITMAP_W,
+    self, actual_sample, assign_colors, coverage_error, rendered_neighborhood,
+    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -193,6 +194,7 @@ fn coverage_zoom_pane(pos: WorldPoint) -> String {
     for row in 0..actual_lines.len() {
         out.push_str(&format!("  {}  {}\n", actual_lines[row], ideal_lines[row]));
     }
+    out.push_str(&format!("  {}\n", Metrics::measure(&actual, pos).summary_line()));
     out
 }
 
@@ -213,9 +215,14 @@ fn print_family_diagnostics(pos: WorldPoint) {
         info.snapped_offset.x - offset.x,
         info.snapped_offset.y - offset.y,
     );
-    for (name, err) in info.candidates {
-        let mark = if name == info.family { '>' } else { ' ' };
-        println!("  {mark} {name:<38} err {err:.4}");
+    // candidates ranked by measured coverage error (the family map's
+    // objective), not the center-snap proxy it used to report
+    for (i, name) in snap_family_names().iter().enumerate() {
+        let (grid, center) = rendered_neighborhood_forced(pos, i);
+        let owners = assign_colors(&grid);
+        let err = coverage_error(&grid, &owners, center, pos);
+        let mark = if *name == info.family { '>' } else { ' ' };
+        println!("  {mark} {name:<38} coverage err {err:.4}");
     }
 }
 

@@ -33,8 +33,8 @@
 
 use euclid::vec2;
 use terminal_rendering::coverage::{
-    actual_sample, assign_colors, cell_bg, glyph_filled, rendered_neighborhood, FillGrid, Rgb,
-    Style, BITMAP_W, DOT_COLOR, IDEAL_COLOR, NX, NY, PALETTE, PX_W, SX, SY,
+    actual_sample, assign_colors, cell_bg, glyph_filled, rendered_neighborhood, FillGrid, Metrics,
+    Rgb, Style, BITMAP_W, DOT_COLOR, IDEAL_COLOR, PALETTE, SX, SY,
 };
 use terminal_rendering::glyph_constants::*;
 use terminal_rendering::hextant_blocks::hextant_array_to_char;
@@ -44,101 +44,6 @@ use utility::coordinate_frame_conversions::{WorldPoint, WorldSquare};
 const GLYPH_W: usize = 6; // small views: 3 world squares = 6 half-cell chars
 
 const MARKER_COLOR: Rgb = Rgb(255, 220, 80);
-
-#[derive(Default)]
-struct Metrics {
-    top_spread: f32,
-    bottom_spread: f32,
-    left_spread: f32,
-    right_spread: f32,
-    holes: usize,
-    area: f32,
-    /// per display-column flag: top or bottom edge deviates >1/8 from ideal
-    ragged_columns: Vec<bool>,
-}
-
-impl Metrics {
-    fn measure(actual: &FillGrid, pos: WorldPoint) -> Self {
-        let mut m = Metrics::default();
-        let mut tops = Vec::new();
-        let mut bottoms = Vec::new();
-        let mut column_info = Vec::new(); // (top, bottom) per sample column
-        for j in 0..NX {
-            let filled_rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
-            if filled_rows.is_empty() {
-                column_info.push(None);
-                continue;
-            }
-            let (lo, hi) = (*filled_rows.first().unwrap(), *filled_rows.last().unwrap());
-            m.holes += (hi - lo + 1) - filled_rows.len();
-            let (top, bottom) = (actual.wy(hi), actual.wy(lo));
-            tops.push(top);
-            bottoms.push(bottom);
-            column_info.push(Some((top, bottom)));
-        }
-        let spread = |v: &Vec<f32>| {
-            v.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
-                - v.iter().cloned().fold(f32::INFINITY, f32::min)
-        };
-        m.top_spread = spread(&tops);
-        m.bottom_spread = spread(&bottoms);
-
-        let mut lefts = Vec::new();
-        let mut rights = Vec::new();
-        for i in 0..NY {
-            let filled_cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
-            if filled_cols.is_empty() {
-                continue;
-            }
-            lefts.push(actual.wx(*filled_cols.first().unwrap()));
-            rights.push(actual.wx(*filled_cols.last().unwrap()));
-        }
-        m.left_spread = spread(&lefts);
-        m.right_spread = spread(&rights);
-
-        let filled_count: usize = actual.cells.iter().flatten().filter(|&&b| b).count();
-        m.area = filled_count as f32 / (SX * SY) as f32;
-
-        let (ideal_top, ideal_bottom) = (pos.y + 0.5, pos.y - 0.5);
-        m.ragged_columns = (0..PX_W)
-            .map(|px| {
-                [2 * px, 2 * px + 1].iter().any(|&j| {
-                    column_info[j].is_some_and(|(top, bottom)| {
-                        (top - ideal_top).abs() > 0.125 || (bottom - ideal_bottom).abs() > 0.125
-                    })
-                })
-            })
-            .collect();
-        m
-    }
-
-    fn failures(&self) -> Vec<String> {
-        let mut out = Vec::new();
-        // without this the spread checks below pass vacuously on an empty
-        // or degenerate render (no filled columns -> no spread)
-        if self.area == 0.0 {
-            out.push("no fill at all".to_string());
-        } else if (self.area - 1.0).abs() > 0.3 {
-            // 0.3 exceeds the worst-case quantization error of any single
-            // glyph family (~0.23: x edges to 1/16, y edges to 1/6)
-            out.push(format!("area {:.3} too far from 1.0", self.area));
-        }
-        for (name, spread) in [
-            ("top", self.top_spread),
-            ("bottom", self.bottom_spread),
-            ("left", self.left_spread),
-            ("right", self.right_spread),
-        ] {
-            if spread > 1e-6 {
-                out.push(format!("{name}-edge spread {spread:.3}"));
-            }
-        }
-        if self.holes > 0 {
-            out.push(format!("{} hole(s) in the fill", self.holes));
-        }
-        out
-    }
-}
 
 struct PositionAnalysis {
     pos: WorldPoint,
@@ -334,24 +239,15 @@ fn zoomed_report(idx: usize, count: usize, a: &PositionAnalysis, style: &Style) 
             style.reset()
         ));
     }
-    out.push_str(&format!(
-        "  edge spreads: top {:.3}  bottom {:.3}  left {:.3}  right {:.3}   holes: {}   area {:.3} (err {:+.3})\n",
-        a.metrics.top_spread,
-        a.metrics.bottom_spread,
-        a.metrics.left_spread,
-        a.metrics.right_spread,
-        a.metrics.holes,
-        a.metrics.area,
-        a.metrics.area - 1.0,
-    ));
+    out.push_str(&format!("  {}\n", a.metrics.summary_line()));
     out
 }
 
 /// Renders the square along a line through the reported tearing position
 /// (2.363, -0.816) and asserts the silhouette stays rectangular: straight
-/// edges, no holes, area ~1. FAILS at several positions — that is the
-/// demonstration of the bug, deliberately left red until the renderer
-/// picks one glyph family per square instead of per half-cell.
+/// edges, no holes, area ~1. Failed at 5/9 positions before the renderer
+/// picked one glyph family per square; kept as a cheap smoke test — the
+/// dense sweep below is the thorough one.
 #[test]
 fn test_square_silhouette_stays_rectangular_along_motion_line() {
     let base = euclid::point2(2.363f32, -0.816f32);
@@ -569,3 +465,110 @@ fn test_1d_offset_rendering_moves_monotonically() {
     }
 }
 
+
+/// Sweeps the whole offset plane [-0.5, 0.5)^2 at 1/24 steps — finer than
+/// the finest snap grid (1/16 in x), so every family region and every
+/// inter-grid boundary case is exercised. A motion line can thread between
+/// bad offsets; the plane sweep cannot. Density overridable via
+/// SWEEP_DENSITY (positions per axis over the half-open unit interval).
+#[test]
+fn test_silhouette_coherent_over_offset_plane() {
+    let density: usize = std::env::var("SWEEP_DENSITY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(24);
+    let style = Style::from_env();
+    let mut failures: Vec<(WorldPoint, Vec<String>)> = Vec::new();
+    let mut reports: Vec<PositionAnalysis> = Vec::new();
+    for xi in 0..density {
+        for yi in 0..density {
+            let pos = euclid::point2(
+                -0.5 + xi as f32 / density as f32,
+                -0.5 + yi as f32 / density as f32,
+            );
+            let a = analyze(pos);
+            if !a.failures.is_empty() {
+                if reports.len() < 3 {
+                    reports.push(analyze(pos));
+                }
+                failures.push((pos, a.failures));
+            }
+        }
+    }
+    let mut msg = format!(
+        "\n{}/{} offset-plane positions broke silhouette coherence:\n",
+        failures.len(),
+        density * density
+    );
+    for (pos, fs) in &failures {
+        msg.push_str(&format!("  ({:.4}, {:.4}): {}\n", pos.x, pos.y, fs.join("; ")));
+    }
+    for (i, a) in reports.iter().enumerate() {
+        msg.push_str(&zoomed_report(i, reports.len(), a, &style));
+    }
+    assert!(failures.is_empty(), "{msg}");
+}
+
+
+
+/// Bakes/validates the family-selection map (src/family_map.rs). For each
+/// cell of the [0, 0.5)^2 fundamental domain, score every snap family by
+/// measured coverage error (symmetric difference vs the true square) and
+/// store the argmin; ties resolve to the lowest family index, matching the
+/// debug tool's candidate order. FAMILY_MAP_BLESS=1 rewrites
+/// src/family_map_table.rs; otherwise a sparse subset is re-checked against
+/// the baked table so it can't silently rot.
+#[test]
+fn test_family_map_matches_coverage_error_objective() {
+    use terminal_rendering::coverage::{coverage_error, rendered_neighborhood_forced};
+    use terminal_rendering::family_map::{FAMILY_MAP_CELLS_PER_UNIT, FAMILY_MAP_RES};
+    use terminal_rendering::family_map_table::FAMILY_BY_OFFSET;
+
+    let cell_offset = |xi: usize, yi: usize| {
+        euclid::point2(
+            (xi as f32 + 0.5) / FAMILY_MAP_CELLS_PER_UNIT,
+            (yi as f32 + 0.5) / FAMILY_MAP_CELLS_PER_UNIT,
+        )
+    };
+    let best_family = |pos: WorldPoint| {
+        (0..4)
+            .min_by_key(|&i| {
+                let (grid, center) = rendered_neighborhood_forced(pos, i);
+                let owners = assign_colors(&grid);
+                ordered_float::OrderedFloat(coverage_error(&grid, &owners, center, pos))
+            })
+            .unwrap() as u8
+    };
+
+    if std::env::var_os("FAMILY_MAP_BLESS").is_some() {
+        let mut body = String::new();
+        for xi in 0..FAMILY_MAP_RES {
+            let row: Vec<String> = (0..FAMILY_MAP_RES)
+                .map(|yi| best_family(cell_offset(xi, yi)).to_string())
+                .collect();
+            body.push_str(&format!("    [{}],\n", row.join(", ")));
+        }
+        let contents = format!(
+            "//! GENERATED FILE - do not edit. Regenerate with:\n\
+             //!   FAMILY_MAP_BLESS=1 cargo test -p terminal_rendering --test floating_square_coherence family_map\n\
+             //! Contents: [x_cell][y_cell] over [0, 0.5)^2 at 1/48 world units per cell,\n\
+             //! value = index into snap_family_names() picked by measured coverage error.\n\n\
+             pub static FAMILY_BY_OFFSET: [[u8; {0}]; {0}] = [\n{1}];\n",
+            FAMILY_MAP_RES, body
+        );
+        std::fs::write("src/family_map_table.rs", contents).unwrap();
+        return;
+    }
+
+    // sparse re-validation: every 6th cell in each axis (16 cells)
+    for xi in (0..FAMILY_MAP_RES).step_by(6) {
+        for yi in (0..FAMILY_MAP_RES).step_by(6) {
+            let baked = FAMILY_BY_OFFSET[xi][yi];
+            let live = best_family(cell_offset(xi, yi));
+            assert_eq!(
+                baked, live,
+                "family map stale at cell ({xi}, {yi}); regenerate with FAMILY_MAP_BLESS=1"
+            );
+        }
+    }
+}

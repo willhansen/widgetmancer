@@ -6,18 +6,33 @@ use utility::*;
 use euclid::vec2;
 use ordered_float::OrderedFloat;
 
+/// Glyph for the part of a 1x1 square, offset by `half_steps` (x and y in
+/// half-cell halves), that overlaps one half-cell. Generated like
+/// `hextant_block_by_offset`: the overlap is a rectangle of quadrants.
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
-    match half_steps.to_tuple() {
-        (1, -1) => '▗',
-        (1, 0) => '▐',
-        (1, 1) => '▝',
-        (0, -1) => '▄',
-        (0, 0) => '█',
-        (0, 1) => '▀',
-        (-1, -1) => '▖',
-        (-1, 0) => '▌',
-        (-1, 1) => '▘',
-        _ => ' ',
+    let cols: [bool; 2] = match half_steps.x {
+        -1 => [true, false],
+        0 => [true, true],
+        1 => [false, true],
+        _ => return SPACE,
+    };
+    let rows: [bool; 2] = match half_steps.y {
+        -1 => [false, true],
+        0 => [true, true],
+        1 => [true, false],
+        _ => return SPACE,
+    };
+    match (cols, rows) {
+        ([true, true], [true, true]) => FULL_BLOCK,
+        ([true, false], [true, true]) => LEFT_HALF_BLOCK,
+        ([false, true], [true, true]) => RIGHT_HALF_BLOCK,
+        ([true, true], [true, false]) => UPPER_HALF_BLOCK,
+        ([true, true], [false, true]) => LOWER_HALF_BLOCK,
+        ([true, false], [true, false]) => '▘',
+        ([false, true], [true, false]) => '▝',
+        ([true, false], [false, true]) => '▖',
+        ([false, true], [false, true]) => '▗',
+        _ => SPACE,
     }
 }
 
@@ -125,15 +140,42 @@ impl SnapFamily {
         }
     }
 
+    /// Snap errors closer than this are treated as tied. The error is
+    /// mathematically identical for every cell of a square (translation-
+    /// invariant snapping), but float subtraction noise (~1e-7) breaks
+    /// exact ties differently per cell: at decision boundaries like
+    /// (x=1/8, y=7/24), where hextant and v-eighths are exactly
+    /// equidistant, cells picked different families and tore the
+    /// silhouette. With the tolerance, all cells find the same tied set
+    /// and the fixed `SnapFamily::ALL` priority order resolves it
+    /// identically. Positions whose family gap lands within float noise
+    /// (~2e-6) of exactly EPSILON could still disagree — a ~1e-6-wide
+    /// shell, watched by the dense offset-plane sweep test.
+    const SNAP_ERROR_TIE_EPSILON: f32 = 1e-3;
+
     /// Every snap grid is integer-aligned, so all cells of a square agree
-    /// on the family no matter which cell's offset is passed. Errors are
-    /// compared in world units, which are already visually isotropic
-    /// (1 unit = 2 columns horizontally, 1 row ~ 2 column-widths
-    /// vertically).
+    /// on the family no matter which cell's offset is passed. The decision
+    /// comes from the baked map (see family_map.rs): offline-scored by
+    /// measured coverage error, folded by absolute value — bit-identical
+    /// for every cell of a square by construction.
     fn for_offset(o: FVector) -> SnapFamily {
+        SnapFamily::ALL[crate::family_map::family_index_for_offset(o)]
+    }
+
+    /// Live selection by snap-error proxy, with epsilon tie-breaking. Not
+    /// the render path (that's the baked map); kept for the hysteresis
+    /// margin (needs per-family error values at runtime) and for tests
+    /// cross-checking the map. Errors are compared in world units, which
+    /// are already visually isotropic (1 unit = 2 columns horizontally,
+    /// 1 row ~ 2 column-widths vertically).
+    fn for_offset_by_snap_error(o: FVector) -> SnapFamily {
+        let min = SnapFamily::ALL
+            .iter()
+            .map(|f| f.snap_error(o))
+            .fold(f32::INFINITY, f32::min);
         SnapFamily::ALL
             .into_iter()
-            .min_by_key(|f| OrderedFloat(f.snap_error(o)))
+            .find(|f| f.snap_error(o) <= min + Self::SNAP_ERROR_TIE_EPSILON)
             .unwrap()
     }
 
@@ -206,6 +248,50 @@ fn characters_in_family(offset: WorldMove, family: SnapFamily) -> DoubleChar {
 
 pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
     characters_in_family(offset, SnapFamily::for_offset(vec2(offset.x, offset.y)))
+}
+
+/// Live proxy-based family selection, as an index into
+/// `snap_family_names()`. Not the render path (that uses the baked map);
+/// exposed for the map cross-check test and the hysteresis margin.
+#[doc(hidden)]
+pub fn family_index_by_snap_error(o: FVector) -> usize {
+    let f = SnapFamily::for_offset_by_snap_error(o);
+    SnapFamily::ALL.iter().position(|&x| x == f).unwrap()
+}
+
+/// Hysteresis margin, in world units: an incumbent snap family is kept
+/// until the baked map's winner beats it by more than this. ~1/50 is
+/// visually sub-perceptual; below it family switches (the animation pops)
+/// get suppressed. Snap errors are identical for every cell of a square,
+/// so biased selection stays coherent by construction.
+pub const FAMILY_SWITCH_PENALTY: f32 = 0.02;
+
+/// `characters_for_full_square_with_2d_offset` with hysteresis: returns
+/// the rendered chars plus the picked family index (into
+/// `snap_family_names()`), keeping `incumbent_family` unless the map
+/// winner beats it by more than `FAMILY_SWITCH_PENALTY` in snap-error.
+/// Feed the returned index back as the next call's incumbent.
+///
+/// Note this picks the family for a *single* offset; callers rendering a
+/// whole square (the game-side `drawables_for_floating_square_at_point`)
+/// must take the returned index and force it for every cell, e.g. via
+/// `characters_for_full_square_with_2d_offset_forced`.
+pub fn characters_for_full_square_with_2d_offset_biased(
+    offset: WorldMove,
+    incumbent_family: Option<usize>,
+) -> (DoubleChar, usize) {
+    let o = vec2(offset.x, offset.y);
+    let winner = SnapFamily::for_offset(o);
+    let picked = match incumbent_family {
+        Some(inc) if SnapFamily::ALL[inc].snap_error(o)
+            <= winner.snap_error(o) + FAMILY_SWITCH_PENALTY =>
+        {
+            SnapFamily::ALL[inc]
+        }
+        _ => winner,
+    };
+    let index = SnapFamily::ALL.iter().position(|&f| f == picked).unwrap();
+    (characters_in_family(o, picked), index)
 }
 
 /// Per-position snapshot of the snap decision, for the floating_square_debug
@@ -423,7 +509,10 @@ mod tests {
 
     #[test]
     fn test_snap_family_selection() {
-        let f = SnapFamily::for_offset;
+        // proxy-based picks; the render path uses the baked map, which
+        // agrees with the proxy everywhere except boundary ties (resolved
+        // there by priority order)
+        let f = SnapFamily::for_offset_by_snap_error;
         // the reported tearing case: v-eighths (0.5, 1/8) is closer than
         // hextant (1/4, 1/3) once y error is counted honestly
         assert_eq!(f(vec2(0.363, 0.184)), SnapFamily::VerticalEighths);
@@ -433,10 +522,9 @@ mod tests {
         assert_eq!(f(vec2(0.1, 0.01)), SnapFamily::HorizontalEighths);
         assert_eq!(f(vec2(0.0, 0.2)), SnapFamily::VerticalEighths);
         assert_eq!(f(vec2(0.0, 0.0)), SnapFamily::HorizontalEighths);
-        // family agreement: every neighborhood cell of one square must
-        // pick the same family (grids are integer-aligned). Sweep
-        // near-axis and mixed offsets; near-axis positions are where a
-        // snap that loses the integer row/col offset would disagree.
+        // neighbor agreement on the render path (baked map): the fold
+        // must return the same map cell for every cell of a square
+        let fm = SnapFamily::for_offset;
         for pos in [
             vec2(0.363, 0.184),
             vec2(0.123, 0.064),
@@ -447,8 +535,8 @@ mod tests {
             for dx in -1..=1 {
                 for dy in -1..=1 {
                     assert_eq!(
-                        f(pos - vec2(dx, dy).to_f32()),
-                        f(pos),
+                        fm(pos - vec2(dx, dy).to_f32()),
+                        fm(pos),
                         "neighbor ({dx}, {dy}) of {pos:?} disagreed"
                     );
                 }
@@ -589,5 +677,43 @@ mod tests {
             f(vec2(1.0 / 16.0, 0.0)),
             [RIGHT_SEVEN_EIGHTHS_BLOCK, FULL_BLOCK]
         );
+    }
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    use crate::coverage::glyph_filled;
+
+    /// Quadrant table vs analytic square-overlap rectangle; probes at
+    /// quadrant centers. See the hextant equivalent in hextant_blocks.rs.
+    #[test]
+    fn test_quadrant_table_matches_square_overlap_geometry() {
+        for x_steps in -1..=1 {
+            for y_steps in -1..=1 {
+                let c = quadrant_block_by_offset(vec2(x_steps, y_steps));
+                let (fx0, fx1) = match x_steps {
+                    -1 => (0.0, 0.5),
+                    0 => (0.0, 1.0),
+                    _ => (0.5, 1.0),
+                };
+                let (fy0, fy1) = match y_steps {
+                    -1 => (0.0, 0.5),
+                    0 => (0.0, 1.0),
+                    _ => (0.5, 1.0),
+                };
+                for &fx in &[0.25, 0.75] {
+                    for &fy in &[0.25, 0.75] {
+                        let expected =
+                            (fx0..fx1).contains(&fx) && (fy0..fy1).contains(&fy);
+                        assert_eq!(
+                            glyph_filled(c, fx, fy),
+                            expected,
+                            "steps ({x_steps}, {y_steps}) -> {c:?} at ({fx}, {fy})"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
