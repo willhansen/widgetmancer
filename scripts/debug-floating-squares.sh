@@ -4,7 +4,8 @@
 # Assumes cargo is on PATH (i.e. you're already in the nix dev shell).
 #   ./scripts/debug-floating-squares.sh            single square at default pos
 #   ./scripts/debug-floating-squares.sh pos 1.3 0.7
-#   ./scripts/debug-floating-squares.sh sweep      table of x/y offsets
+#   ./scripts/debug-floating-squares.sh families 1.3 0.7   all snap families side by side
+#   ./scripts/debug-floating-squares.sh sweep      offset table + family boundary map
 #   ./scripts/debug-floating-squares.sh animate    orbiting square (q quits)
 set -euo pipefail
 

@@ -3,7 +3,7 @@ use crate::hextant_blocks::hextant_block_by_offset;
 use crate::DoubleChar;
 use utility::coordinate_frame_conversions::{WorldMove,};
 use utility::*;
-use euclid::{point2, vec2};
+use euclid::vec2;
 use ordered_float::OrderedFloat;
 
 pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
@@ -19,84 +19,6 @@ pub fn quadrant_block_by_offset(half_steps: IVector) -> char {
         (-1, 1) => '▘',
         _ => ' ',
     }
-}
-
-pub fn get_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
-    let grid_offset = fraction_part(pos);
-    let x_offset = grid_offset.x;
-    let y_offset = grid_offset.y;
-    if y_offset.abs() < x_offset.abs() && y_offset.abs() < 0.25 {
-        get_smooth_horizontal_chars_for_floating_square(pos)
-    } else if x_offset.abs() < 0.25 {
-        get_smooth_vertical_chars_for_floating_square(pos)
-    } else {
-        get_half_grid_chars_for_floating_square(pos)
-    }
-}
-
-pub fn get_smooth_horizontal_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
-    let width = 3;
-    let mut output = vec![vec![None; width]; width];
-
-    let c = width / 2 as usize;
-
-    let grid_offset = fraction_part(pos);
-    let x_offset = grid_offset.x;
-    let offset_dir: IPoint = sign2d(grid_offset).to_i32();
-
-    for i in 0..3 {
-        let x = i as i32 - 1;
-        if offset_dir.x == x || x == 0 {
-            output[i][c] = Some(character_for_half_square_with_1d_offset(
-                false,
-                x_offset - x as f32,
-            ));
-        }
-    }
-
-    return output;
-}
-pub fn get_smooth_vertical_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
-    let width = 3;
-    let mut output = vec![vec![None; width]; width];
-
-    let c = width / 2 as usize;
-
-    let grid_offset = fraction_part(pos);
-    let y_offset = grid_offset.y;
-    let offset_dir: IPoint = sign2d(grid_offset).to_i32();
-    for j in 0..3 {
-        let y = j as i32 - 1;
-        if offset_dir.y == y || y == 0 {
-            output[c][j] = Some(character_for_half_square_with_1d_offset(
-                true,
-                y_offset - y as f32,
-            ));
-        }
-    }
-    return output;
-}
-
-pub fn get_half_grid_chars_for_floating_square(pos: FPoint) -> Vec<Vec<Option<char>>> {
-    let width = 3;
-    let mut output = vec![vec![None; width]; width];
-    let grid_offset = fraction_part(pos);
-    let offset_dir = sign2d(grid_offset).to_i32();
-
-    for i in 0..3 {
-        for j in 0..3 {
-            let x = i as i32 - 1;
-            let y = j as i32 - 1;
-            let square = point2(x, y);
-            if (offset_dir.x == x || x == 0) && (offset_dir.y == y || y == 0) {
-                let character = square_with_half_step_offset(grid_offset - square.to_f32());
-                if character != ' ' {
-                    output[i][j] = Some(character);
-                }
-            }
-        }
-    }
-    return output;
 }
 
 pub fn square_with_half_step_offset(offset: FVector) -> char {
@@ -165,83 +87,167 @@ pub fn character_for_half_square_with_1d_offset(
     }
 }
 
-pub fn character_for_half_square_with_2d_offset(offset: FVector) -> char {
-    // start with basic centered square
-    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), FULL_BLOCK)];
-
-    // the eighth steps along the axes
-    let mut horizontal_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
-        .map(|i| {
-            (
-                vec2(i as f32 / 8.0, 0.0),
-                character_for_half_square_with_1d_eighths_offset(false, i),
-            )
-        })
-        .collect();
-    snap_points_with_characters.append(&mut horizontal_snap_points_at_eighths);
-
-    let mut vertical_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
-        .map(|i| {
-            (
-                vec2(0.0, i as f32 / 8.0),
-                character_for_half_square_with_1d_eighths_offset(true, i),
-            )
-        })
-        .collect();
-    snap_points_with_characters.append(&mut vertical_snap_points_at_eighths);
-
-    // the one third steps vertically, with horizontal half-square offsets
-    let mut hextant_snap_points: Vec<(FVector, char)> = (-2..=2)
-        .flat_map(|x| {
-            (-3..=3).map(move |y| {
-                (
-                    vec2(x as f32 / 2.0, y as f32 / 3.0),
-                    hextant_block_by_offset(vec2(x, y)),
-                )
-            })
-        })
-        .collect();
-    snap_points_with_characters.append(&mut hextant_snap_points);
-
-    // the half square grid offsets
-    let mut quadrant_snap_points: Vec<(FVector, char)> = (-2..=2)
-        .flat_map(|x| {
-            (-2..=2).map(move |y| {
-                (
-                    vec2(x as f32 / 2.0, y as f32 / 2.0),
-                    quadrant_block_by_offset(vec2(x, y)),
-                )
-            })
-        })
-        .collect();
-    snap_points_with_characters.append(&mut quadrant_snap_points);
-
-    // remove duplicate snap points
-    // TODO
-    //snap_points_with_characters = snap_points_with_characters
-    //.into_iter()
-    //.unique_by(|(point, char)| (OrderedFloat(point.x), OrderedFloat(point.y), char))
-    //.collect();
-
-    *snap_points_with_characters
-        .iter()
-        .min_by_key(|(snap_point, _character)| OrderedFloat((*snap_point - offset).length()))
-        .map(|(_snap_point, character)| character)
-        .unwrap()
+/// Glyph families that can render a square coherently. No glyph combines
+/// fine x AND fine y in one cell, so each family commits to a resolution
+/// per axis; snapping each half-cell independently let sibling cells pick
+/// different families, which tore the silhouette (see
+/// tests/floating_square_coherence.rs).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum SnapFamily {
+    /// x to 1/16 world (eighth of a half-cell), y to the row
+    HorizontalEighths,
+    /// x to the half-cell, y to 1/8 world
+    VerticalEighths,
+    /// x to 1/4 world (half-cell), y to thirds
+    Hextant,
+    /// x to 1/4 world (half-cell), y to halves
+    Quadrant,
 }
 
-pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
+impl SnapFamily {
+    const ALL: [SnapFamily; 4] = [
+        SnapFamily::HorizontalEighths,
+        SnapFamily::VerticalEighths,
+        SnapFamily::Hextant,
+        SnapFamily::Quadrant,
+    ];
+
+    /// Nearest position on this family's grid, in world units. All grids
+    /// are integer-aligned, so snapping preserves the cell's integer
+    /// offset from the square's center; that is what makes every
+    /// neighborhood cell agree on the family.
+    fn snapped_offset(&self, o: FVector) -> FVector {
+        match self {
+            SnapFamily::HorizontalEighths => vec2(snap_to_nths(o.x, 16), snap_to_nths(o.y, 1)),
+            SnapFamily::VerticalEighths => vec2(snap_to_nths(o.x, 2), snap_to_nths(o.y, 8)),
+            SnapFamily::Hextant => vec2(snap_to_nths(o.x, 4), snap_to_nths(o.y, 3)),
+            SnapFamily::Quadrant => vec2(snap_to_nths(o.x, 4), snap_to_nths(o.y, 2)),
+        }
+    }
+
+    /// Every snap grid is integer-aligned, so all cells of a square agree
+    /// on the family no matter which cell's offset is passed. Errors are
+    /// compared in world units, which are already visually isotropic
+    /// (1 unit = 2 columns horizontally, 1 row ~ 2 column-widths
+    /// vertically).
+    fn for_offset(o: FVector) -> SnapFamily {
+        SnapFamily::ALL
+            .into_iter()
+            .min_by_key(|f| OrderedFloat(f.snap_error(o)))
+            .unwrap()
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            SnapFamily::HorizontalEighths => "horizontal eighths (x: 1/16, y: row)",
+            SnapFamily::VerticalEighths => "vertical eighths (x: half-cell, y: 1/8)",
+            SnapFamily::Hextant => "hextant (x: 1/4, y: 1/3)",
+            SnapFamily::Quadrant => "quadrant (x: 1/4, y: 1/2)",
+        }
+    }
+
+    fn snap_error(&self, o: FVector) -> f32 {
+        (self.snapped_offset(o) - o).length()
+    }
+
+    /// Glyph for one half-cell whose offset from the square's center is
+    /// `r` (half-cell units in x, row units in y). The snapped offset plus
+    /// the integer x-compensation guarantees `r` lands on this family's
+    /// grid.
+    fn character_for_half_square(&self, r: FVector) -> char {
+        match self {
+            // pure eighths, not character_for_half_square_with_1d_offset:
+            // its thirds-vs-eighths mixing would break family purity.
+            // The 1d glyph fills the whole row/column, so cells the
+            // snapped square doesn't overlap (|r| = 1 on the forced axis)
+            // must be empty.
+            SnapFamily::HorizontalEighths => {
+                if r.y.abs() >= 0.5 {
+                    SPACE
+                } else {
+                    character_for_half_square_with_1d_eighths_offset(
+                        false,
+                        (r.x * 8.0).round() as i32,
+                    )
+                }
+            }
+            SnapFamily::VerticalEighths => {
+                if r.x.abs() >= 0.5 {
+                    SPACE
+                } else {
+                    character_for_half_square_with_1d_eighths_offset(
+                        true,
+                        (r.y * 8.0).round() as i32,
+                    )
+                }
+            }
+            SnapFamily::Hextant => {
+                hextant_block_by_offset(vec2(r.x * 2.0, r.y * 3.0).round().to_i32())
+            }
+            SnapFamily::Quadrant => square_with_half_step_offset(r),
+        }
+    }
+}
+
+fn characters_in_family(offset: WorldMove, family: SnapFamily) -> DoubleChar {
+    let snapped = family.snapped_offset(vec2(offset.x, offset.y));
     let char_offsets = [-1.0, 1.0].map(|i| {
-        let scaled_x_offset = offset.x * 2.0;
+        let scaled_x_offset = snapped.x * 2.0;
         let shifted_toward_this_side = sign(scaled_x_offset) == i;
         let compensated_x_offset = if shifted_toward_this_side {
             (scaled_x_offset.abs() - 1.0).max(0.0) * sign(scaled_x_offset)
         } else {
             scaled_x_offset
         };
-        vec2(compensated_x_offset, offset.y)
+        vec2(compensated_x_offset, snapped.y)
     });
-    char_offsets.map(|char_offset| character_for_half_square_with_2d_offset(char_offset))
+    char_offsets.map(|char_offset| family.character_for_half_square(char_offset))
+}
+
+pub fn characters_for_full_square_with_2d_offset(offset: WorldMove) -> DoubleChar {
+    characters_in_family(offset, SnapFamily::for_offset(vec2(offset.x, offset.y)))
+}
+
+/// Per-position snapshot of the snap decision, for the floating_square_debug
+/// tool. Not game-facing API.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug)]
+pub struct SnapDebugInfo {
+    pub family: &'static str,
+    pub snapped_offset: FVector,
+    /// (family name, snap error) for every candidate, best first.
+    pub candidates: [(&'static str, f32); 4],
+}
+
+#[doc(hidden)]
+pub fn snap_debug_info(offset: WorldMove) -> SnapDebugInfo {
+    let o = vec2(offset.x, offset.y);
+    let mut candidates = SnapFamily::ALL.map(|f| (f.name(), f.snap_error(o)));
+    candidates.sort_by_key(|&(_, e)| OrderedFloat(e));
+    let family = SnapFamily::for_offset(o);
+    SnapDebugInfo {
+        family: family.name(),
+        snapped_offset: family.snapped_offset(o),
+        candidates,
+    }
+}
+
+/// Display names of the snap families, in `SnapFamily::ALL` order
+/// (h-eighths, v-eighths, hextant, quadrant).
+#[doc(hidden)]
+pub fn snap_family_names() -> [&'static str; 4] {
+    SnapFamily::ALL.map(|f| f.name())
+}
+
+/// `characters_for_full_square_with_2d_offset` with the family forced, for
+/// side-by-side "what would family X have done" views. `family_index`
+/// indexes `SnapFamily::ALL` / `snap_family_names()`.
+#[doc(hidden)]
+pub fn characters_for_full_square_with_2d_offset_forced(
+    offset: WorldMove,
+    family_index: usize,
+) -> DoubleChar {
+    characters_in_family(offset, SnapFamily::ALL[family_index])
 }
 
 pub fn characters_for_full_square_with_1d_offset(
@@ -344,97 +350,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_half_grid_glyph_when_rounding_to_zero_for_both_axes() {
-        let test_pos = point2(-0.24, 0.01);
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1], None);
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(0, 0)));
-        assert_eq!(chars[1][2], None);
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1], None);
-        assert_eq!(chars[2][2], None);
-    }
-
-    #[test]
-    fn test_half_grid_chars_when_rounding_to_zero_for_x_and_half_step_up_for_y() {
-        let test_pos = point2(0.24, 0.26);
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1], None);
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(0, 1)));
-        assert_eq!(chars[1][2].unwrap(), quadrant_block_by_offset(vec2(0, -1)));
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1], None);
-        assert_eq!(chars[2][2], None);
-    }
-
-    #[test]
-    fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_up_for_y() {
-        let test_pos = point2(0.24, 0.25);
-
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1], None);
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(0, 1)));
-        assert_eq!(chars[1][2].unwrap(), quadrant_block_by_offset(vec2(0, -1)));
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1], None);
-        assert_eq!(chars[2][2], None);
-    }
-
-    #[test]
-    fn test_half_grid_chars_when_rounding_to_zero_for_x_and_exactly_half_step_down_for_y() {
-        let test_pos = point2(-0.2, -0.25);
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1], None);
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(0, 0)));
-        assert_eq!(chars[1][2], None);
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1], None);
-        assert_eq!(chars[2][2], None);
-    }
-
-    #[test]
-    fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_right_for_x() {
-        let test_pos = point2(0.3, 0.1);
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1], None);
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(1, 0)));
-        assert_eq!(chars[1][2], None);
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1].unwrap(), quadrant_block_by_offset(vec2(-1, 0)));
-        assert_eq!(chars[2][2], None);
-    }
-
-    #[test]
-    fn test_half_grid_chars_when_rounding_to_zero_for_y_and_half_step_left_for_x() {
-        let test_pos = point2(-0.3, 0.2);
-        let chars = get_half_grid_chars_for_floating_square(test_pos);
-        assert_eq!(chars[0][0], None);
-        assert_eq!(chars[0][1].unwrap(), quadrant_block_by_offset(vec2(1, 0)));
-        assert_eq!(chars[0][2], None);
-        assert_eq!(chars[1][0], None);
-        assert_eq!(chars[1][1].unwrap(), quadrant_block_by_offset(vec2(-1, 0)));
-        assert_eq!(chars[1][2], None);
-        assert_eq!(chars[2][0], None);
-        assert_eq!(chars[2][1], None);
-        assert_eq!(chars[2][2], None);
-    }
-
     //                      |<--halfway
     // ' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'
     #[test]
@@ -507,28 +422,58 @@ mod tests {
     }
 
     #[test]
-    fn test_2d_square_offset() {
-        assert_eq!(
-            character_for_half_square_with_2d_offset(vec2(0.0, 0.0)),
-            FULL_BLOCK
-        );
-        assert_eq!(
-            character_for_half_square_with_2d_offset(vec2(0.001, 0.0)),
-            FULL_BLOCK
-        );
-        assert_eq!(
-            character_for_half_square_with_2d_offset(vec2(0.0, -0.01)),
-            FULL_BLOCK
-        );
+    fn test_snap_family_selection() {
+        let f = SnapFamily::for_offset;
+        // the reported tearing case: v-eighths (0.5, 1/8) is closer than
+        // hextant (1/4, 1/3) once y error is counted honestly
+        assert_eq!(f(vec2(0.363, 0.184)), SnapFamily::VerticalEighths);
+        // y residual near a third, x near a quarter -> hextant
+        assert_eq!(f(vec2(0.25, 0.3)), SnapFamily::Hextant);
+        // near-axis offsets pick the fine family of the other axis
+        assert_eq!(f(vec2(0.1, 0.01)), SnapFamily::HorizontalEighths);
+        assert_eq!(f(vec2(0.0, 0.2)), SnapFamily::VerticalEighths);
+        assert_eq!(f(vec2(0.0, 0.0)), SnapFamily::HorizontalEighths);
+        // family agreement: every neighborhood cell of one square must
+        // pick the same family (grids are integer-aligned). Sweep
+        // near-axis and mixed offsets; near-axis positions are where a
+        // snap that loses the integer row/col offset would disagree.
+        for pos in [
+            vec2(0.363, 0.184),
+            vec2(0.123, 0.064),
+            vec2(0.05, 0.3),
+            vec2(0.25, 0.05),
+            vec2(-0.4, -0.2),
+        ] {
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    assert_eq!(
+                        f(pos - vec2(dx, dy).to_f32()),
+                        f(pos),
+                        "neighbor ({dx}, {dy}) of {pos:?} disagreed"
+                    );
+                }
+            }
+        }
+    }
 
+    #[test]
+    fn test_2d_offset_uses_one_family_for_both_chars() {
+        // the reported tearing case, pos frac (0.363, 0.184): v-eighths
+        // family, center snapped to (0.5, 1/8) - the square sits entirely
+        // in the right half-cell
         assert_eq!(
-            character_for_half_square_with_2d_offset(vec2(0.25, -0.01)),
-            EIGHTH_BLOCKS_FROM_RIGHT[6]
+            characters_for_full_square_with_2d_offset(vec2(0.363, 0.184)),
+            [' ', '🮆']
         );
-
+        // row above: same family, y snapped to -7/8
         assert_eq!(
-            character_for_half_square_with_2d_offset(vec2(1.25, -0.5)),
-            SPACE
+            characters_for_full_square_with_2d_offset(vec2(0.363, -0.816)),
+            [' ', '▁']
+        );
+        // hextant family keeps both chars non-empty and third-consistent
+        assert_eq!(
+            characters_for_full_square_with_2d_offset(vec2(0.25, 0.3)),
+            ['🬉', '🬎']
         );
     }
 

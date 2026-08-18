@@ -3,13 +3,22 @@
 //! Renders the same character picks the game uses
 //! (`characters_for_full_square_with_2d_offset`, one world square = 2 terminal
 //! columns) onto a checkerboard background with a dot marking each square
-//! center, so sub-square offsets are easy to eyeball.
+//! center, so sub-square offsets are easy to eyeball. All diagnostics
+//! (snap family, snap error, coverage) describe the real render path via the
+//! `#[doc(hidden)]` debug accessors in floating_square.rs and coverage.rs, so
+//! the tool cannot drift from what the game draws and the coherence test
+//! asserts.
 //!
 //! Modes:
-//!   pos X Y   draw one square at world point (X, Y), plus a text dump of the
-//!             3x3 half-grid char table from `get_chars_for_floating_square`
-//!   sweep     grid of mini views for x offsets 0..=0.5 x y offsets 0..=0.5
-//!   animate   square orbiting the origin on the alternate screen (q quits)
+//!   pos X Y       one square at world point (X, Y): frame with true-center
+//!                 marker, snap-family diagnostics, and a sampled
+//!                 actual-vs-ideal coverage view (the coherence test's oracle)
+//!   families X Y  the same position rendered with each snap family forced,
+//!                 side by side
+//!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
+//!                 with the family that offset picks (a decision-boundary map)
+//!   animate       square on the alternate screen (q quits); orbit,
+//!                 arrow-key nudge, and line trajectories
 //!
 //! Run via scripts/debug-floating-squares.sh or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
@@ -25,6 +34,9 @@ use termion::input::{MouseTerminal, TermRead};
 use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
+use terminal_rendering::coverage::{
+    self, actual_sample, assign_colors, rendered_neighborhood, FillGrid, BITMAP_W,
+};
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
 use terminal_rendering::*;
@@ -34,6 +46,26 @@ const CENTER_DOT_COLOR: RGB8 = RGB8::new(90, 90, 110);
 const BG_DARK: RGB8 = RGB8::new(16, 16, 24);
 const BG_LIGHT: RGB8 = RGB8::new(30, 30, 44);
 const ORIGIN_COLOR: RGB8 = RGB8::new(0, 180, 180);
+const TRUE_CENTER_COLOR: RGB8 = RGB8::new(120, 255, 255);
+
+/// One display color per snap family, in SnapFamily::ALL / snap_family_names()
+/// order (h-eighths, v-eighths, hextant, quadrant).
+const FAMILY_COLORS: [RGB8; 4] = [
+    RGB8::new(230, 230, 80),  // horizontal eighths: yellow
+    RGB8::new(80, 210, 210),  // vertical eighths: cyan
+    RGB8::new(100, 220, 100), // hextant: green
+    RGB8::new(220, 120, 255), // quadrant: magenta
+];
+const FAMILY_LETTERS: [char; 4] = ['H', 'V', 'X', 'Q'];
+
+fn family_index_of(name: &str) -> usize {
+    snap_family_names().iter().position(|&n| n == name).unwrap()
+}
+
+/// "horizontal eighths (x: 1/16, y: row)" -> "horizontal eighths"
+fn short_family_name(name: &str) -> &str {
+    name.split(" (").next().unwrap()
+}
 
 /// Same checkerboard parity rule as Graphics::square_is_light.
 fn bg_color_for(square: WorldSquare) -> RGB8 {
@@ -82,7 +114,15 @@ fn frame_row_col(radius: i32, origin_square: WorldSquare, square: WorldSquare) -
 
 /// Mirrors OffsetSquareDrawable::drawables_for_floating_square_at_point:
 /// only the 3x3 neighborhood of the rounded center square can be non-empty.
-fn draw_floating_square(frame: &mut Frame, radius: i32, origin_square: WorldSquare, pos: WorldPoint) {
+/// `forced_family` (index into snap_family_names()) overrides the automatic
+/// family pick, for the `families` mode.
+fn draw_floating_square(
+    frame: &mut Frame,
+    radius: i32,
+    origin_square: WorldSquare,
+    pos: WorldPoint,
+    forced_family: Option<usize>,
+) {
     let center = world_point_to_world_square(pos);
     for dx in -1..=1i32 {
         for dy in -1..=1i32 {
@@ -92,7 +132,10 @@ fn draw_floating_square(frame: &mut Frame, radius: i32, origin_square: WorldSqua
                 continue;
             }
             let offset: WorldMove = pos - square.to_f32();
-            let chars = characters_for_full_square_with_2d_offset(offset);
+            let chars = match forced_family {
+                Some(i) => characters_for_full_square_with_2d_offset_forced(offset, i),
+                None => characters_for_full_square_with_2d_offset(offset),
+            };
             if chars != [SPACE; 2] {
                 let bg = bg_color_for(square);
                 frame.set_by_double_wide_grid(
@@ -105,124 +148,333 @@ fn draw_floating_square(frame: &mut Frame, radius: i32, origin_square: WorldSqua
     }
 }
 
-/// Which branch of get_chars_for_floating_square a position takes.
-fn smoothing_branch(pos: WorldPoint) -> &'static str {
-    let offset = fraction_part(pos);
-    let (x, y) = (offset.x.abs(), offset.y.abs());
-    if y < x && y < 0.25 {
-        "smooth horizontal"
-    } else if x < 0.25 {
-        "smooth vertical"
-    } else {
-        "half grid (quadrant blocks)"
+/// Marks the exact square center on the half-cell grid so the snapped-vs-true
+/// offset (reported numerically in the text output) is also visible. Honest
+/// to half a half-cell (1/4 world unit) of quantization; overwrites whatever
+/// glyph the square put in that half-cell.
+fn overlay_true_center(
+    frame: &mut Frame,
+    radius: i32,
+    origin_square: WorldSquare,
+    pos: WorldPoint,
+) {
+    // frame col 0 is the left half-cell edge of the leftmost square, i.e.
+    // world x = origin.x - radius - 0.5; row 0 is the top edge of the
+    // topmost square, world y = origin.y + radius + 0.5
+    let col = ((pos.x - origin_square.x as f32 + radius as f32 + 0.5) * 2.0).floor() as i32;
+    let row = (origin_square.y as f32 + radius as f32 + 0.5 - pos.y).floor() as i32;
+    if row < 0 || col < 0 || row as usize >= frame.height() || col as usize >= frame.width() {
+        return;
     }
+    let bg = frame.grid[row as usize][col as usize].bg_color;
+    frame.grid[row as usize][col as usize] = DrawableGlyph::new('+', Some(TRUE_CENTER_COLOR), bg);
 }
 
-fn dump_char_grid(pos: WorldPoint) {
-    // get_chars_for_floating_square takes the unitless FPoint alias.
-    let grid = get_chars_for_floating_square(euclid::point2(pos.x, pos.y));
-    println!("get_chars_for_floating_square 3x3 (i = x+1, j = y+1):");
-    for j in (0..3).rev() {
-        let row: String = (0..3)
-            .map(|i| grid[i][j].unwrap_or('·'))
-            .collect();
-        println!("  {row}");
+/// Sampled actual-vs-ideal coverage, using the same oracle the coherence
+/// test asserts on (tests/floating_square_coherence.rs).
+fn coverage_zoom_pane(pos: WorldPoint) -> String {
+    let (grid, center) = rendered_neighborhood(pos);
+    let owners = assign_colors(&grid);
+    let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
+    let ideal = FillGrid::sample(origin, |wx, wy| {
+        (
+            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
+            Some(0),
+        )
+    });
+    let style = coverage::Style::from_env();
+    let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
+    let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
+    let mut out = format!(
+        "sampled coverage (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
+        "actual", "ideal (true square)"
+    );
+    for row in 0..actual_lines.len() {
+        out.push_str(&format!("  {}  {}\n", actual_lines[row], ideal_lines[row]));
+    }
+    out
+}
+
+/// The offset the renderer's family decision actually sees: pos relative to
+/// the rounded center square.
+fn center_offset(pos: WorldPoint) -> WorldMove {
+    pos - world_point_to_world_square(pos).to_f32()
+}
+
+fn print_family_diagnostics(pos: WorldPoint) {
+    let offset = center_offset(pos);
+    let info = snap_debug_info(offset);
+    println!(
+        "family: {}   snapped offset ({:+.4}, {:+.4})   snap err ({:+.4}, {:+.4})",
+        info.family,
+        info.snapped_offset.x,
+        info.snapped_offset.y,
+        info.snapped_offset.x - offset.x,
+        info.snapped_offset.y - offset.y,
+    );
+    for (name, err) in info.candidates {
+        let mark = if name == info.family { '>' } else { ' ' };
+        println!("  {mark} {name:<38} err {err:.4}");
     }
 }
 
 fn show_position(pos: WorldPoint) {
     let frac = fraction_part(pos);
     println!(
-        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  branch={}",
-        pos.x,
-        pos.y,
-        frac.x,
-        frac.y,
-        smoothing_branch(pos)
+        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})",
+        pos.x, pos.y, frac.x, frac.y,
     );
-    let mut frame = grid_frame(3, world_point_to_world_square(pos));
-    draw_floating_square(&mut frame, 3, world_point_to_world_square(pos), pos);
+    print_family_diagnostics(pos);
+    let center = world_point_to_world_square(pos);
+    let mut frame = grid_frame(3, center);
+    draw_floating_square(&mut frame, 3, center, pos, None);
+    overlay_true_center(&mut frame, 3, center, pos);
     println!("{frame}{}", Glyph::reset_colors());
-    dump_char_grid(pos);
+    print!("{}", coverage_zoom_pane(pos));
 }
 
+/// The same position rendered with each snap family forced, side by side.
+/// Explains the automatic pick: the winner is the family whose snapped
+/// silhouette sits closest to the true square.
+fn show_families(pos: WorldPoint) {
+    let frac = fraction_part(pos);
+    let info = snap_debug_info(center_offset(pos));
+    println!(
+        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  auto-picked family: {}",
+        pos.x, pos.y, frac.x, frac.y, info.family,
+    );
+    let center = world_point_to_world_square(pos);
+    let names = snap_family_names();
+    let err_of = |name: &str| {
+        info.candidates
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, e)| *e)
+            .unwrap()
+    };
+    let radius = 2i32;
+    let pane_w = ((2 * radius + 1) * 2) as usize; // 5 squares = 10 cols
+    let header: Vec<String> = names
+        .iter()
+        .map(|n| {
+            let mark = if *n == info.family { '>' } else { ' ' };
+            format!("{mark}{:^w$}", short_family_name(n), w = pane_w - 1)
+        })
+        .collect();
+    println!("{}", header.join("  "));
+    let err_line: Vec<String> = names
+        .iter()
+        .map(|n| format!("{:^w$.4}", err_of(n), w = pane_w))
+        .collect();
+    println!("{}", err_line.join("  "));
+    let pane_lines: Vec<Vec<String>> = (0..4)
+        .map(|i| {
+            let mut f = grid_frame(radius, center);
+            draw_floating_square(&mut f, radius, center, pos, Some(i));
+            overlay_true_center(&mut f, radius, center, pos);
+            f.string_for_regular_display()
+                .lines()
+                .map(String::from)
+                .collect()
+        })
+        .collect();
+    for row in 0..pane_lines[0].len() {
+        let line: Vec<&str> = pane_lines.iter().map(|l| l[row].as_str()).collect();
+        println!("{}", line.join("  "));
+    }
+    println!("{}", Glyph::reset_colors());
+}
+
+/// Offset table over 0..=0.5 in 1/16 steps (the finest snap grid), each cell
+/// labeled with the family that offset picks — a map of the family decision
+/// boundaries. Only the positive quadrant is shown: every snap grid is
+/// sign-symmetric, so the other quadrants are mirror images.
 fn show_sweep() {
-    // One 3x3-square cell (6 columns x 3 rows) per offset, +1 col/row gap.
-    let x_offsets = [0.0f32, 0.1, 0.2, 0.3, 0.4, 0.5];
-    let y_offsets = [0.0f32, 0.25, 0.5];
-    // cell = 3 squares wide (6 char columns) x 3 rows, plus a 2-column gap
-    let (cell_w, cell_h, gap) = (8usize, 3usize, 2usize);
-    let mut big = Frame::blank(x_offsets.len() * cell_w, y_offsets.len() * (cell_h + gap));
-    for (yi, &y_off) in y_offsets.iter().enumerate() {
-        for (xi, &x_off) in x_offsets.iter().enumerate() {
+    let offsets: Vec<f32> = (0..=8).map(|i| i as f32 / 16.0).collect();
+    let n = offsets.len();
+    // cell = 3x3 squares (6 cols x 3 rows) + 1-col gap + 1 family-letter row
+    let (cell_h, step_x, step_y) = (3usize, 7usize, 4usize);
+    // width drops the trailing gap column; height keeps the last cell's letter row
+    let mut big = Frame::blank(n * step_x - 1, n * step_y);
+    for (yi, &y_off) in offsets.iter().enumerate() {
+        for (xi, &x_off) in offsets.iter().enumerate() {
             let pos: WorldPoint = euclid::point2(x_off, y_off);
             let mut cell = grid_frame(1, euclid::point2(0, 0));
-            draw_floating_square(&mut cell, 1, euclid::point2(0, 0), pos);
-            let row = yi * (cell_h + gap);
-            let col = xi * cell_w;
-            big.blit(&cell, [row as i32, col as i32]);
+            draw_floating_square(&mut cell, 1, euclid::point2(0, 0), pos, None);
+            let row0 = yi * step_y;
+            let col0 = xi * step_x;
+            big.blit(&cell, [row0 as i32, col0 as i32]);
+            let idx = family_index_of(snap_debug_info(center_offset(pos)).family);
+            big.grid[row0 + cell_h][col0 + 2] =
+                DrawableGlyph::new(FAMILY_LETTERS[idx], Some(FAMILY_COLORS[idx]), None);
         }
     }
-    let header: String = x_offsets
+    let header: String = offsets
         .iter()
-        .map(|x| format!("x={x:<+.2} "))
+        .map(|x| format!("x={x:.2} "))
         .collect();
-    println!("         {header}");
-    let display_string = big.string_for_regular_display();
-    for (yi, &y_off) in y_offsets.iter().enumerate() {
-        let lines: Vec<&str> = display_string
-            .lines()
-            .skip(yi * (cell_h + gap))
-            .take(cell_h)
-            .collect();
-        for line in lines {
-            println!("y={y_off:<+.2}  {line}");
+    println!("        {header}");
+    for (row, line) in big.string_for_regular_display().lines().enumerate() {
+        // both prefixes are exactly 8 chars so labeled and unlabeled rows align
+        if row % step_y == 1 {
+            println!("y={:<5.3} {line}", offsets[row / step_y]);
+        } else {
+            println!("        {line}");
         }
-        println!();
+    }
+    print!("{}", Glyph::reset_colors());
+    println!("\nfamilies (auto-picked per offset):");
+    for (i, name) in snap_family_names().iter().enumerate() {
+        println!(
+            "  {}{} = {}{}",
+            termion::color::Fg(termion::color::Rgb(
+                FAMILY_COLORS[i].r,
+                FAMILY_COLORS[i].g,
+                FAMILY_COLORS[i].b
+            )),
+            FAMILY_LETTERS[i],
+            name,
+            termion::style::Reset
+        );
     }
 }
 
 const ORBIT_RADIUS: f32 = 2.5;
+/// Radians per second. Matches the old 0.02 rad per 33ms frame.
+const ORBIT_SPEED: f32 = 0.6;
+/// Nudge step for the arrow keys: the finest snap grid (h-eighths x step),
+/// so every nudge can cross at most one snap boundary.
+const NUDGE: f32 = 1.0 / 16.0;
+/// Per-second velocity of the line trajectory: 10x the coherence test's
+/// (0.06, 0.03) per-sample step so motion is visible in real time.
+const LINE_DIR: WorldMove = WorldMove::new(0.6, 0.3);
 /// Half-width of the animation grid in squares; fixed so mouse cells can be
 /// mapped back to world geometry.
 const ANIMATE_GRID_RADIUS: i32 = 4;
 
-/// Angle from the grid origin to the (1-based) terminal cell under the mouse.
-/// atan2 on the pixel offset makes angular resolution grow with distance, so
-/// dragging out past the grid edge allows very slight adjustments.
-fn mouse_cell_angle(col: u16, row: u16) -> f32 {
+enum Motion {
+    Orbit { theta: f32 },
+    /// Parked at a spot (arrow-key nudge or mouse placement).
+    Free { pos: WorldPoint },
+    /// Straight line through `base`, t in [-2, 2], wrapping.
+    Line { base: WorldPoint, dir: WorldMove, t: f32 },
+}
+
+impl Motion {
+    fn pos(&self) -> WorldPoint {
+        match *self {
+            Motion::Orbit { theta } => {
+                euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS)
+            }
+            Motion::Free { pos } => pos,
+            Motion::Line { base, dir, t } => base + dir * t,
+        }
+    }
+    fn advance(&mut self, dt: f32, speed: f32) {
+        match self {
+            Motion::Orbit { theta } => {
+                *theta = (*theta + ORBIT_SPEED * speed * dt).rem_euclid(std::f32::consts::TAU)
+            }
+            Motion::Free { .. } => {}
+            Motion::Line { t, .. } => *t = (*t + speed * dt + 2.0).rem_euclid(4.0) - 2.0,
+        }
+    }
+    fn name(&self) -> &'static str {
+        match self {
+            Motion::Orbit { .. } => "orbit",
+            Motion::Free { .. } => "free",
+            Motion::Line { .. } => "line",
+        }
+    }
+}
+
+struct AnimState {
+    motion: Motion,
+    paused: bool,
+    speed: f32,
+    anim_time: Duration,
+    /// Family changes since start; each one is a potential visible pop.
+    switches: u32,
+    prev_family: Option<&'static str>,
+}
+
+impl AnimState {
+    fn new() -> Self {
+        AnimState {
+            motion: Motion::Orbit { theta: 0.0 },
+            paused: false,
+            speed: 1.0,
+            anim_time: Duration::ZERO,
+            switches: 0,
+            prev_family: None,
+        }
+    }
+}
+
+/// World point under the (1-based) terminal cell, using the same grid
+/// geometry as the frame: 2 columns per square, rows increase downward.
+fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
     let r = ANIMATE_GRID_RADIUS as f32;
     // The origin square spans cols 2r+1..=2r+2 (center 2r+1.5), row r+1.
     let dx_cells = col as f32 - (2.0 * r + 1.5);
     let dy_cells = row as f32 - (r + 1.0);
-    // Convert to world units: 2 columns per square vs 1 row per square,
-    // and world +y is up while terminal rows increase downward.
-    (-dy_cells).atan2(dx_cells * 0.5)
+    euclid::point2(dx_cells * 0.5, -dy_cells)
 }
 
 /// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
 /// disables ONLCR, so bare '\n' would stair-step the frame.
 const FRAME_DT: Duration = Duration::from_millis(33);
 
-fn render_animation_frame(out: &mut impl Write, theta: f32, time: Duration, raw_mode: bool) {
-    let pos: WorldPoint =
-        euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS);
+fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode: bool) {
+    let pos = state.motion.pos();
+    let offset = center_offset(pos);
+    let info = snap_debug_info(offset);
+    let family_changed = state.prev_family.is_some_and(|p| p != info.family);
+    if state.prev_family != Some(info.family) {
+        if state.prev_family.is_some() {
+            state.switches += 1;
+        }
+        state.prev_family = Some(info.family);
+    }
+
     let origin = euclid::point2(0, 0);
     let mut frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
-    draw_floating_square(&mut frame, ANIMATE_GRID_RADIUS, origin, pos);
+    draw_floating_square(&mut frame, ANIMATE_GRID_RADIUS, origin, pos, None);
+    overlay_true_center(&mut frame, ANIMATE_GRID_RADIUS, origin, pos);
     let frame_text = if raw_mode {
         frame.string_for_regular_display().replace('\n', "\r\n")
     } else {
         frame.to_string()
     };
+    // invert the family on the frame it changed: family switches are where
+    // the visible pops happen
+    let family_display = if family_changed {
+        format!(
+            "{}{}{}",
+            termion::style::Invert,
+            short_family_name(info.family),
+            termion::style::NoInvert
+        )
+    } else {
+        short_family_name(info.family).to_string()
+    };
     write!(
         out,
-        "{frame_text}{}pos=({:6.3}, {:6.3})  branch={:<26}  t={:.1}s",
+        "{frame_text}{}pos=({:6.3}, {:6.3})  family={}  snap=({:+.3}, {:+.3})  err=({:+.3}, {:+.3})  {} speed={:.2}x  switches={}  t={:.1}s{}",
         Glyph::reset_colors(),
         pos.x,
         pos.y,
-        smoothing_branch(pos),
-        time.as_secs_f32(),
+        family_display,
+        info.snapped_offset.x,
+        info.snapped_offset.y,
+        info.snapped_offset.x - offset.x,
+        info.snapped_offset.y - offset.y,
+        state.motion.name(),
+        state.speed,
+        state.switches,
+        state.anim_time.as_secs_f32(),
+        if state.paused { "  [paused]" } else { "" },
     )
     .unwrap();
     // erase leftovers when the status text shrinks between frames.
@@ -233,20 +485,19 @@ fn render_animation_frame(out: &mut impl Write, theta: f32, time: Duration, raw_
 }
 
 /// `frame_count`: None = run until quit (interactive) or a short default
-/// (piped output). In interactive mode the square orbits until q/Esc.
+/// (piped output).
 fn run_animation(frame_count: Option<u32>) {
-    let mut theta = 0.0f32;
     let interactive = stdout().is_terminal();
 
     if !interactive {
         // Piped output (e.g. `animate 5 | less -R`): no raw mode available.
         // These frames render instantly, so simulate the animation clock.
-        let mut t = Duration::ZERO;
+        let mut state = AnimState::new();
         for _ in 0..frame_count.unwrap_or(8) {
-            render_animation_frame(&mut stdout(), theta, t, false);
+            render_animation_frame(&mut stdout(), &mut state, false);
             println!("\n");
-            theta = (theta + 0.02).rem_euclid(std::f32::consts::TAU);
-            t += FRAME_DT;
+            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
+            state.anim_time += FRAME_DT;
         }
         return;
     }
@@ -264,38 +515,79 @@ fn run_animation(frame_count: Option<u32>) {
         .into_alternate_screen()
         .unwrap();
 
-    let mut paused = false;
+    let mut state = AnimState::new();
     let mut frames = 0u32;
     let mut dirty = true;
-    // Animation clock (freezes while paused), so a paused frame is fully
-    // static and needs no redraws.
-    let mut anim_time = Duration::ZERO;
     loop {
         while let Ok(event) = rx.try_recv() {
             match event {
                 Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
                 Event::Key(Key::Char(' ')) => {
-                    paused = !paused;
+                    state.paused = !state.paused;
                     dirty = true;
                 }
-                // Click both snaps the angle and pauses so the adjustment
-                // sticks instead of the orbit moving on.
-                Event::Mouse(MouseEvent::Press(_, x, y)) => {
-                    theta = mouse_cell_angle(x, y);
-                    paused = true;
+                // Arrow keys park the square and step it across snap
+                // boundaries deterministically — an orbit sweeps past the
+                // interesting crossings before you can see them.
+                Event::Key(Key::Left) | Event::Key(Key::Right) | Event::Key(Key::Up)
+                | Event::Key(Key::Down) => {
+                    let step = match event {
+                        Event::Key(Key::Left) => euclid::vec2(-NUDGE, 0.0),
+                        Event::Key(Key::Right) => euclid::vec2(NUDGE, 0.0),
+                        Event::Key(Key::Up) => euclid::vec2(0.0, NUDGE),
+                        _ => euclid::vec2(0.0, -NUDGE),
+                    };
+                    state.motion = Motion::Free {
+                        pos: state.motion.pos() + step,
+                    };
                     dirty = true;
                 }
-                Event::Mouse(MouseEvent::Hold(x, y)) => {
-                    theta = mouse_cell_angle(x, y);
+                Event::Key(Key::Char('o')) => {
+                    let p = state.motion.pos();
+                    state.motion = Motion::Orbit {
+                        theta: p.y.atan2(p.x),
+                    };
+                    state.paused = false;
+                    dirty = true;
+                }
+                Event::Key(Key::Char('l')) => {
+                    state.motion = Motion::Line {
+                        base: state.motion.pos(),
+                        dir: LINE_DIR,
+                        t: 0.0,
+                    };
+                    state.paused = false;
+                    dirty = true;
+                }
+                Event::Key(Key::Char('+') | Key::Char('=')) => {
+                    state.speed = (state.speed * 2.0).min(8.0);
+                    dirty = true;
+                }
+                Event::Key(Key::Char('-')) => {
+                    state.speed = (state.speed / 2.0).max(0.125);
+                    dirty = true;
+                }
+                // Click places the square and pauses so the placement sticks;
+                // drag moves it. Clamped to the visible grid.
+                Event::Mouse(MouseEvent::Press(_, x, y))
+                | Event::Mouse(MouseEvent::Hold(x, y)) => {
+                    let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
+                    let p = mouse_cell_point(x, y);
+                    state.motion = Motion::Free {
+                        pos: euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit)),
+                    };
+                    if matches!(event, Event::Mouse(MouseEvent::Press(_, _, _))) {
+                        state.paused = true;
+                    }
                     dirty = true;
                 }
                 _ => {}
             }
         }
 
-        if !paused {
-            theta = (theta + 0.02).rem_euclid(std::f32::consts::TAU);
-            anim_time += FRAME_DT;
+        if !state.paused {
+            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
+            state.anim_time += FRAME_DT;
             dirty = true;
         }
 
@@ -303,8 +595,12 @@ fn run_animation(frame_count: Option<u32>) {
         // 33ms would wipe any in-progress text selection.
         if dirty {
             write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
-            render_animation_frame(&mut screen, theta, anim_time, true);
-            write!(screen, "q=quit space=pause click/drag=angle").unwrap();
+            render_animation_frame(&mut screen, &mut state, true);
+            write!(
+                screen,
+                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed click/drag=place"
+            )
+            .unwrap();
             screen.flush().unwrap();
             dirty = false;
             frames += 1;
@@ -320,37 +616,57 @@ fn usage() {
     eprintln!(
         "usage: floating_square_debug <mode>\n\
          modes:\n  \
-           pos X Y   single square at world point (X, Y)\n  \
-           sweep     offset table for x in 0..=0.5, y in {{0, 0.25, 0.5}}\n  \
-           animate   orbiting square; q quits, space pauses, click snaps
-                     and pauses, drag scrubs the angle (finer far away).
-                     Optional
-                     frame count runs a fixed number of frames, which is
-                     also the mode used when stdout is not a terminal.\n\
+           pos X Y       single square at world point (X, Y), with snap-family\n  \
+          \x20      diagnostics and a sampled coverage view\n  \
+           families X Y  the same position with each snap family forced\n  \
+           sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
+          \x20      the family each offset picks (decision-boundary map)\n  \
+           animate [N]   orbiting square; q quits, space pauses, arrows nudge,\n  \
+          \x20      o resumes the orbit, l starts a line trajectory, +/- change\n  \
+          \x20      speed, click/drag places the square. Optional frame count N\n  \
+          \x20      runs a fixed number of frames, which is also the mode used\n  \
+          \x20      when stdout is not a terminal.\n\
          default: pos 0.3 0.7"
     );
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let parse_xy = |i: usize| -> Option<(f32, f32)> {
+        match (
+            args.get(i).and_then(|s| s.parse().ok()),
+            args.get(i + 1).and_then(|s| s.parse().ok()),
+        ) {
+            (Some(x), Some(y)) => Some((x, y)),
+            _ => None,
+        }
+    };
     match args.first().map(String::as_str) {
         None => show_position(euclid::point2(0.3, 0.7)),
-        Some("pos") => {
-            let x = args.get(1).and_then(|s| s.parse().ok());
-            let y = args.get(2).and_then(|s| s.parse().ok());
-            match (x, y) {
-                (Some(x), Some(y)) => show_position(euclid::point2(x, y)),
-                _ => {
-                    usage();
-                    std::process::exit(2);
-                }
+        Some("pos") => match parse_xy(1) {
+            Some((x, y)) => show_position(euclid::point2(x, y)),
+            _ => {
+                usage();
+                std::process::exit(2);
             }
-        }
+        },
+        Some("families") => match parse_xy(1) {
+            Some((x, y)) => show_families(euclid::point2(x, y)),
+            _ => {
+                usage();
+                std::process::exit(2);
+            }
+        },
         Some("sweep") => show_sweep(),
-        Some("animate") => {
-            let frames = args.get(1).and_then(|s| s.parse().ok());
-            run_animation(frames)
-        }
+        Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
+            None => run_animation(None),
+            Some(Ok(n)) => run_animation(Some(n)),
+            Some(Err(_)) => {
+                eprintln!("animate: frame count must be a non-negative integer");
+                usage();
+                std::process::exit(2);
+            }
+        },
         Some("--help" | "-h") => usage(),
         Some(other) => {
             eprintln!("unknown mode: {other}");

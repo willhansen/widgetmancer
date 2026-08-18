@@ -1,98 +1,75 @@
 # Checkpoint — Floating square silhouette tearing
 
-Working state for the floating-square rendering-quality issue (ROADMAP.md
-item 9), in case of interruption.
+Resolved. Kept as a record of the issue and the fix (ROADMAP.md item 9).
 
-## The issue
+## The issue (fixed)
 
 Reported via `floating_square_debug`: at pos=(2.363, -0.816) the floating
-square renders as a ragged blob (`🬞▁🬏` over `🮇🮆▊`), not a square.
+square rendered as a ragged blob (`🬞▁🬏` over `🮇🮆▊`), not a square.
 
-**Root cause:** the game renders a floating square per terminal half-cell via
-`characters_for_full_square_with_2d_offset` →
-`character_for_half_square_with_2d_offset`
-(`crates/terminal_rendering/src/floating_square.rs:168`). That function snaps
-each half-cell **independently** to the nearest of ~60 candidate offsets from
-four glyph families: horizontal eighths `(i/8, 0)`, vertical eighths
-`(0, i/8)`, hextants `(halves, thirds)`, quadrants `(halves, halves)`. No
-candidate has fine x *and* fine y (no such glyphs exist), so any cell with
-both an x and y residual must drop one axis — and because the x-compensation
-differs per half-cell, sibling cells drop *different* axes. At the reported
-position the six half-cells pick three different families; the top edge lands
-at five different heights across four columns.
+**Root cause:** the game rendered a floating square per terminal half-cell,
+snapping each half-cell **independently** to the nearest of ~60 candidate
+offsets from four glyph families. Sibling half-cells could pick different
+families, tearing the silhouette.
 
-**Red herring in the debug tool:** its `branch=` label and 3x3 dump describe
-`get_chars_for_floating_square` (`floating_square.rs:24`), which the game
-never calls — dead code kept alive by the debug bin and its own tests. The
-rendered picture always comes from the 2d-offset path.
+**Fix (landed):** `SnapFamily` in
+`crates/terminal_rendering/src/floating_square.rs` picks one glyph family
+per *square* (`SnapFamily::for_offset`, min snap error over horizontal
+eighths / vertical eighths / hextant / quadrant), then snaps all half-cells
+within that family. The snap grids are integer-aligned, so every cell of a
+square agrees on the family by construction. Worst case is now a uniformly
+slightly-misplaced square instead of a torn blob.
 
-## Evidence (automated, visual)
+## Tests (all green)
 
 `crates/terminal_rendering/tests/floating_square_coherence.rs`:
 
-- `test_square_silhouette_stays_rectangular_along_motion_line` — **FAILS**
-  at 5/9 positions (demonstrating the bug), deliberately left red until
-  the fix lands (user decision over `should_panic`/`#[ignore]`). The full
-  visual report rides the panic payload; nothing is printed on pass.
-  Renders the square at 9 evenly spaced positions along a line through
-  (2.363, -0.816) (it is [5]). Asserts edge coherence
-  (top/bottom/left/right edge spread == 0, no holes, non-empty fill with
-  area within 0.3 of 1.0 — the area check closes the vacuous-pass hole
-  for empty/degenerate renders) — a bar any single glyph family applied
-  per-square clears. At [5] the top-edge spread is 0.333 and the
-  bottom-edge spread is 1.000.
-  Report layout: (1) a horizontal strip of the small 6x3 glyph views at
-  all positions, monochrome (uniform grey square on the cell checkerboard);
-  (2) the same strip with each half-cell glyph
-  in its own ANSI truecolor; (3) the correct rendering at the same zoom
-  (true square glyphized coherently via hextants, 2x3 sub-cell majority),
-  colored per piece — pieces the actual render lacks are gray; (4) `^^^`
-  markers under the failed columns; (5) a legend with per-position
-  pos/frac/status; (6) one zoomed-in row per failed position (sampled
-  bitmaps of actual vs ideal coverage over a dark-grey cell checkerboard,
-  `^` markers under deviating columns, edge-spread metrics). A text cell
-  straddling two glyphs shows upper=fg, lower=bg. NO_COLOR=1 disables
-  colors (empty cells fall back to dots).
-  Run: `cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture`
+- `test_square_silhouette_stays_rectangular_along_motion_line` — renders the
+  square at 9 evenly spaced positions along a line through the reported
+  position (2.363, -0.816) and asserts edge coherence (edge spread == 0, no
+  holes, area within 0.3 of 1.0). Failed at 5/9 positions before the fix;
+  passes since. The full visual report rides the panic payload on failure.
 - `test_glyph_filled_coverage_model` — pins the coverage oracle
-  (`glyph_filled`) that all metrics flow through: half/quadrant/eighth/
-  third blocks plus sextant bit order, cross-checked against
-  `hextant_array_to_char`.
-- `test_1d_offset_rendering_moves_monotonically` — passes; regression net
-  for the live 1D path (`characters_for_full_square_with_looping_1d_offset`,
-  used by shockwave animations at `crates/game/src/graphics/drawable.rs:383`).
+  (`coverage::glyph_filled`) all metrics flow through.
+- `test_1d_offset_rendering_moves_monotonically` — regression net for the
+  live 1D path (`characters_for_full_square_with_looping_1d_offset`, used by
+  shockwave animations).
 
-Supporting change: `hextant_character_to_binary` in
-`crates/terminal_rendering/src/hextant_blocks.rs` is now
-`#[doc(hidden)] pub` (the test's coverage model needs sextant bit
-patterns).
+Run: `cargo test -p terminal_rendering --test floating_square_coherence -- --nocapture`
 
-The rest of the workspace suite is green (467 passed). **Note: `cargo test`
-is red until the fix lands** — the coherence test is the only failure.
+## Debug tool (rewired to the real render path)
 
-## Proposed fixes (reviewed, NOT yet implemented — awaiting approval)
+`floating_square_debug` previously displayed diagnostics for
+`get_chars_for_floating_square`, a dead code path the game never called (its
+`branch=` label and 3x3 dump described nothing the renderer did). That
+subtree is deleted; the tool now reports the real path via `#[doc(hidden)]`
+accessors (`snap_debug_info`, `snap_family_names`,
+`characters_for_full_square_with_2d_offset_forced` in floating_square.rs):
 
-1. **Pick the glyph family once per square, not per half-cell**: in
-   `characters_for_full_square_with_2d_offset`, score the four families
-   against the center offset (weight y ~2x for terminal cell aspect — the
-   current Euclidean metric in (half-cell, row) units under-penalizes
-   vertical error ~2x, biasing toward h-eighth candidates that discard y),
-   then snap all half-cells within the winning family. Edges become
-   consistent by construction; worst case is a uniformly slightly-misplaced
-   square instead of a torn blob. This is what makes the coherence test pass.
-2. Fix the debug tool: label the actual render path; delete or clearly
-   quarantine the unused `get_chars_for_floating_square` subtree (smooth
-   horizontal/vertical + half-grid 3x3 + `square_with_half_step_offset`).
-3. Optional: static snap-point table (the TODO'd duplicate removal at
-   `floating_square.rs:211`); the function rebuilds a ~60-entry Vec per
-   half-cell per frame. The vertical thirds-vs-eighths per-call choice in
-   `character_for_half_square_with_1d_offset` causes glyph-family flicker on
-   the live 1D path — make it hysteretic or family-fixed per call site.
+- `pos X Y` — frame with a bright `+` marking the true square center, the
+  winning snap family with snapped offset and error, all four candidates
+  ranked by error, and a sampled actual-vs-ideal coverage pane.
+- `families X Y` — the position rendered with each family forced, side by
+  side, with per-family snap errors.
+- `sweep` — offsets 0..=0.5 in 1/16 steps, each cell labeled with the family
+  it picks (a decision-boundary map; sign-symmetric, so one quadrant
+  suffices).
+- `animate [N]` — orbit / arrow-key nudge (1/16 steps) / line trajectory,
+  with the live family in the status line (inverted on the frame it changes;
+  `switches=N` counts family changes — the visible pops), speed controls,
+  and click/drag placement.
 
-## Status
+The coverage oracle (`glyph_filled`, `FillGrid`, `bitmap_pane`, …) lives in
+`crates/terminal_rendering/src/coverage.rs` (`#[doc(hidden)] pub`), shared
+by the test and the tool so the two can never drift apart. `Style`/`Rgb` and
+the palette constants moved there too.
 
-- [x] Root cause identified and reviewed
-- [x] Visual automated tests demonstrating the issue (failing as intended)
-- [ ] Fix approved
-- [ ] Fix implemented; coherence test green
-- [ ] Debug tool label fixed / dead smooth path resolved
+## Remaining loose ends (not blocking)
+
+- The y-error weighting idea from the original proposal (weight y ~2x for
+  terminal cell aspect when scoring families) was not needed for coherence;
+  revisit only if squares look vertically off.
+- The vertical thirds-vs-eighths per-call choice in
+  `character_for_half_square_with_1d_offset` can still cause glyph-family
+  flicker on the live 1D path (shockwaves). Consider hysteresis if it ever
+  shows.
