@@ -568,3 +568,4 @@ fn test_1d_offset_rendering_moves_monotonically() {
         prev_edges = Some(edges);
     }
 }
+

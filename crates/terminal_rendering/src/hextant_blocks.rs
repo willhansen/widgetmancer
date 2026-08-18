@@ -43,7 +43,7 @@ pub fn hextant_block_by_offset(hextant_grid_steps: IVector) -> char {
         (0, 1) => UPPER_TWO_THIRD_BLOCK,
         (0, 2) => UPPER_ONE_THIRD_BLOCK,
         (-1, -2) => '🬏',
-        (-1, -1) => '▖',
+        (-1, -1) => '🬓',
         (-1, 0) => LEFT_HALF_BLOCK,
         (-1, 1) => '🬄',
         (-1, 2) => '🬀',
