@@ -416,6 +416,10 @@ impl Drawable for ConveyorBeltDrawable {
 pub struct OffsetSquareDrawable {
     offset: WorldMove,
     colors: [RGB8; 2],
+    /// Snap family forced for this whole square (index into
+    /// `snap_family_names()`), set when hysteresis picked one family per
+    /// floating entity. `None` = per-cell baked-map lookup.
+    forced_family: Option<usize>,
 }
 
 impl OffsetSquareDrawable {
@@ -432,6 +436,35 @@ impl OffsetSquareDrawable {
         point: WorldPoint,
         color: RGB8,
     ) -> HashMap<WorldSquare, OffsetSquareDrawable> {
+        Self::drawables_for_floating_square_at_point_with_family(point, color, None)
+    }
+
+    /// `drawables_for_floating_square_at_point` with family-switch
+    /// hysteresis: picks one snap family for the whole square via
+    /// `characters_for_full_square_with_2d_offset_biased` (keeping
+    /// `incumbent_family` unless the map winner beats it by more than the
+    /// penalty) and forces it on every cell so the silhouette stays
+    /// coherent. Returns the picked family index alongside the drawables
+    /// so the caller can store it as the next frame's incumbent.
+    pub fn drawables_for_floating_square_at_point_biased(
+        point: WorldPoint,
+        color: RGB8,
+        incumbent_family: Option<usize>,
+    ) -> (HashMap<WorldSquare, OffsetSquareDrawable>, usize) {
+        let center_offset = point - world_point_to_world_square(point).to_f32();
+        let (_, family) =
+            characters_for_full_square_with_2d_offset_biased(center_offset, incumbent_family);
+        (
+            Self::drawables_for_floating_square_at_point_with_family(point, color, Some(family)),
+            family,
+        )
+    }
+
+    fn drawables_for_floating_square_at_point_with_family(
+        point: WorldPoint,
+        color: RGB8,
+        forced_family: Option<usize>,
+    ) -> HashMap<WorldSquare, OffsetSquareDrawable> {
         let mut output = HashMap::<WorldSquare, OffsetSquareDrawable>::new();
         let center_square = world_point_to_world_square(point);
 
@@ -444,6 +477,7 @@ impl OffsetSquareDrawable {
                 let drawable = OffsetSquareDrawable {
                     offset: floating_square_offset_from_square_center,
                     colors: [color, BLACK],
+                    forced_family,
                 };
                 let glyphs_round_to_empty_square =
                     drawable.to_glyphs().chars() == [glyph_constants::SPACE; 2];
@@ -463,14 +497,23 @@ impl Drawable for OffsetSquareDrawable {
                 self.offset,
                 quarter_rotations_anticlockwise,
             ),
+            // Portal rotations drop the forced family: the snap families
+            // are not rotation-invariant (horizontal eighths rotate into
+            // vertical eighths), so a family forced in unrotated space is
+            // meaningless here. The rotated view re-derives it from the
+            // baked map; the entity's own memory is untouched.
+            forced_family: None,
             ..self.clone()
         }
         .into()
     }
 
     fn to_glyphs(&self) -> DoubleGlyph {
-        characters_for_full_square_with_2d_offset(self.offset)
-            .map(|c| Glyph::new(c, self.fg_color(), self.bg_color()))
+        let chars = match self.forced_family {
+            Some(family) => characters_for_full_square_with_2d_offset_forced(self.offset, family),
+            None => characters_for_full_square_with_2d_offset(self.offset),
+        };
+        chars.map(|c| Glyph::new(c, self.fg_color(), self.bg_color()))
     }
 
     fn drawn_over<T: Drawable>(&self, other: &T) -> DrawableEnum {
@@ -577,6 +620,7 @@ mod tests {
         let top = OffsetSquareDrawable {
             offset: vec2(0.5, 0.0),
             colors: [RED, BLUE],
+            forced_family: None,
         };
         let bottom = SolidColorDrawable::new(GREEN);
         let combo = top.drawn_over(&bottom);

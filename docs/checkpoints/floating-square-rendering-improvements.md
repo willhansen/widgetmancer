@@ -1,6 +1,6 @@
 # Checkpoint — Floating square rendering improvements (items 1, 2, 3, 5)
 
-In progress. Follow-up to
+Complete (all steps 0–4 landed). Follow-up to
 [floating-square-rendering-quality.md](floating-square-rendering-quality.md)
 (silhouette tearing fix). Plan approved 2026-08; see ROADMAP.md item 10.
 
@@ -101,4 +101,50 @@ generating the table.
      `SNAP_ERROR_TIE_EPSILON = 1e-3` + fixed priority order in
      `SnapFamily::for_offset`. Residual risk: a ~2e-6-wide shell around
      gap==EPSILON contours; accepted, watched by the sweep test.
-- Next: Step 3 (baked family map), Step 4 (hysteresis).
+- Step 3 DONE: `family_map.rs` (folded lookup over the [0, 0.5)^2
+  fundamental domain, 1/48 cells) + generated `family_map_table.rs`;
+  `SnapFamily::for_offset` is now a map lookup; the baker/validator test
+  `test_family_map_matches_coverage_error_objective` regenerates with
+  FAMILY_MAP_BLESS=1 and sparsely re-validates otherwise; the debug tool's
+  candidate ranking switched to measured coverage error.
+- Step 4, library half DONE: `FAMILY_SWITCH_PENALTY` +
+  `characters_for_full_square_with_2d_offset_biased` (returns picked family
+  index). NOTE: this was committed broken (passed `FVector` where
+  `WorldMove` was expected — compile error); fixed in a follow-up. Nothing
+  called it, so no test caught it.
+- Step 4 DONE (2026-08, follow-up session):
+  - Tests first (tests/floating_square_coherence.rs):
+    `test_hysteresis_reduces_family_switches`,
+    `test_biased_pick_stays_within_penalty_of_best`,
+    `test_silhouette_coherent_with_hysteresis_along_motion_line`
+    (with `analyze` refactored to share `analyze_grid` with a new
+    `analyze_forced`). Two design findings from writing them:
+    1. The penalty bound must be relative to the *baked-map winner's*
+       snap error, not the snap-error proxy's best — the map optimizes
+       measured coverage error, which legitimately differs from the proxy
+       by more than 0.02 at some offsets.
+    2. On a one-way drift trajectory hysteresis only *delays* switches
+       (count unchanged); the win is flicker suppression. The
+       switch-count test therefore oscillates across a real map boundary
+       (found by scanning the baked table, robust to re-blessing):
+       unbiased flickers every step (39 switches), biased holds (0).
+  - Game side, after a design review (entities are pure model — a square
+    at a position; family history is a rendering concern, so the renderer
+    owns it): floating entities carry a stable `FloatingEntityId`
+    assigned by `Game` at spawn (`alloc_floating_entity_id`), and
+    `Graphics` keeps `floating_entity_family_memory:
+    HashMap<FloatingEntityId, usize>`, swept at the `display()` frame
+    boundary to ids drawn that frame (despawned entities can't leak).
+    `OffsetSquareDrawable` gained `forced_family: Option<usize>` +
+    `drawables_for_floating_square_at_point_biased` (one biased pick per
+    entity per frame, forced on all 9 cells, returns the pick for the
+    cache); `Graphics::draw_death_cube` takes `&DeathCube`. `rotated()`
+    drops the forced family — the snap families are not
+    rotation-invariant (h-eighths rotate into v-eighths), so portal views
+    re-derive from the baked map. Lifecycle covered by
+    `test_floating_entity_family_memory_lifecycle`.
+    (An intermediate version stored `Cell<Option<usize>>` on the entities
+    themselves; rejected as model/renderer coupling.)
+  - Workspace suite green: 469 passed / 0 failed.
+- All of item 10's done-when criteria are now met; moving it to Done in
+  ROADMAP.md.

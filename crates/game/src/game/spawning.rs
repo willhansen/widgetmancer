@@ -11,7 +11,7 @@ use itertools::Itertools;
 use rand::rngs::StdRng;
 use rand::Rng;
 
-use super::{DeathCube, FloatingHunterDrone};
+use super::{DeathCube, FloatingEntityId, FloatingHunterDrone};
 
 use crate::piece::PieceType::*;
 use crate::piece::*;
@@ -60,8 +60,15 @@ impl Game {
         }
     }
 
+    fn alloc_floating_entity_id(&mut self) -> FloatingEntityId {
+        let id = FloatingEntityId(self.next_floating_entity_id);
+        self.next_floating_entity_id += 1;
+        id
+    }
+
     pub fn place_linear_death_cube(&mut self, position: WorldPoint, velocity: WorldMove) {
-        self.death_cubes.push(DeathCube::new(position, velocity));
+        let id = self.alloc_floating_entity_id();
+        self.death_cubes.push(DeathCube::new(id, position, velocity));
     }
 
     pub fn place_piece(&mut self, piece: Piece, square: WorldSquare) {
@@ -94,8 +101,9 @@ impl Game {
         velocity: WorldMove,
         sight_angle: Angle<f32>,
     ) {
+        let id = self.alloc_floating_entity_id();
         self.floating_hunter_drones
-            .push(FloatingHunterDrone::new(point, velocity, sight_angle));
+            .push(FloatingHunterDrone::new(id, point, velocity, sight_angle));
     }
 
     pub fn place_upgrade(&mut self, upgrade_type: Upgrade, square: WorldSquare) {

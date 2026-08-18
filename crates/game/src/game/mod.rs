@@ -32,7 +32,7 @@ mod realtime;
 mod spawning;
 mod turns;
 pub use spawning::IncubatingPawn;
-pub use floating_entities::{DeathCube, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
+pub use floating_entities::{DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone, HUNTER_DRONE_SIGHT_RANGE};
 pub use blocks::{conveyor_belt_speed, conveyor_period_just_elapsed, Blocks, FloorFeature, CONVEYOR_BELT_MOVEMENT_PERIOD, CONVEYOR_BELT_VISUAL_PERIOD};
 
 const PLAYER_SIGHT_RADIUS: u32 = 16;
@@ -105,6 +105,7 @@ pub struct Game {
     death_cube_faction: Faction,
     portal_geometry: PortalGeometry,
     floating_hunter_drones: Vec<FloatingHunterDrone>,
+    next_floating_entity_id: u64,
     world_start_time: Instant,
     world_time: Instant,
 }
@@ -132,6 +133,7 @@ impl Game {
             death_cube_faction: Faction::DeathCube,
             portal_geometry: PortalGeometry::default(),
             floating_hunter_drones: vec![],
+            next_floating_entity_id: 0,
             world_start_time: Instant::now(),
             world_time: Instant::now(),
         };
@@ -542,7 +544,7 @@ impl Game {
             .for_each(|(&square, &upgrade)| self.graphics.draw_upgrade(square, upgrade));
         self.death_cubes
             .iter()
-            .for_each(|death_cube| self.graphics.draw_death_cube(*death_cube));
+            .for_each(|death_cube| self.graphics.draw_death_cube(death_cube));
         self.floating_hunter_drones.iter().for_each(|drone| {
             let sight_line_segments = self.portal_geometry.ray_to_naive_line_segments(
                 drone.position,

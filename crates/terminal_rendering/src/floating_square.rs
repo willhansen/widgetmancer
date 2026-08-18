@@ -291,7 +291,7 @@ pub fn characters_for_full_square_with_2d_offset_biased(
         _ => winner,
     };
     let index = SnapFamily::ALL.iter().position(|&f| f == picked).unwrap();
-    (characters_in_family(o, picked), index)
+    (characters_in_family(offset, picked), index)
 }
 
 /// Per-position snapshot of the snap decision, for the floating_square_debug

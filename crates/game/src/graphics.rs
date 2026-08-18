@@ -10,7 +10,7 @@ use glyph::glyph_constants::*;
 
 use crate::fov_stuff::FieldOfViewResult;
 use crate::game::{
-    DeathCube, FloatingEntityTrait, FloatingHunterDrone,
+    DeathCube, FloatingEntityId, FloatingEntityTrait, FloatingHunterDrone,
 };
 use crate::graphics::drawable::{
     ArrowDrawable, BrailleDrawable, ConveyorBeltDrawable, Drawable, DrawableEnum,
@@ -74,6 +74,13 @@ pub struct Graphics {
     floor_color_enum: FloorColorEnum,
     pub tint_portals: bool,
     render_portals_with_line_of_sight: bool,
+    /// Snap-family hysteresis memory for floating squares, keyed by entity
+    /// id. Owned here (not on the entities) because family history is a
+    /// rendering concern — as far as an entity knows, it is just a square
+    /// at a position. Entries for entities not drawn since the last
+    /// `display()` are swept, so despawned entities cannot leak.
+    floating_entity_family_memory: HashMap<FloatingEntityId, usize>,
+    floating_entities_drawn_this_frame: HashSet<FloatingEntityId>,
 }
 
 impl Graphics {
@@ -88,6 +95,8 @@ impl Graphics {
             floor_color_enum: FloorColorEnum::Function(Graphics::big_chess_pattern),
             tint_portals: true,
             render_portals_with_line_of_sight: true,
+            floating_entity_family_memory: HashMap::new(),
+            floating_entities_drawn_this_frame: HashSet::new(),
         };
         g.screen.fill_screen_buffer(BLACK);
         g
@@ -220,6 +229,10 @@ impl Graphics {
             self.screen.update_screen(optional_writer.as_mut().unwrap());
         }
         self.screen.current_screen_state = self.screen.screen_buffer.clone();
+        // frame boundary: drop family memory of entities no longer drawn
+        let drawn = std::mem::take(&mut self.floating_entities_drawn_this_frame);
+        self.floating_entity_family_memory
+            .retain(|id, _| drawn.contains(id));
     }
 
     pub fn maybe_drawable_for_rel_square_of_fov(
@@ -380,9 +393,9 @@ impl Graphics {
         self.draw_same_glyphs_at_squares(capture_only_square_glyphs(), &capture_only_squares);
     }
 
-    pub fn draw_death_cube(&mut self, death_cube: DeathCube) {
+    pub fn draw_death_cube(&mut self, death_cube: &DeathCube) {
         let color = self.technicolor_at_time(Instant::now());
-        self.draw_floating_square(death_cube.position(), color);
+        self.draw_floating_square(death_cube.id, death_cube.position(), color);
     }
     pub fn draw_floating_hunter_drone(
         &mut self,
@@ -392,11 +405,18 @@ impl Graphics {
         for line in sight_line_segments {
             self.draw_naive_braille_line(line.p1, line.p2, SIGHT_LINE_SEEKING_COLOR);
         }
-        self.draw_floating_square(drone.position(), HUNTER_DRONE_COLOR);
+        self.draw_floating_square(drone.id, drone.position(), HUNTER_DRONE_COLOR);
     }
 
-    fn draw_floating_square(&mut self, pos: WorldPoint, color: RGB8) {
-        let drawables = OffsetSquareDrawable::drawables_for_floating_square_at_point(pos, color);
+    fn draw_floating_square(&mut self, id: FloatingEntityId, pos: WorldPoint, color: RGB8) {
+        let (drawables, picked_family) =
+            OffsetSquareDrawable::drawables_for_floating_square_at_point_biased(
+                pos,
+                color,
+                self.floating_entity_family_memory.get(&id).copied(),
+            );
+        self.floating_entity_family_memory.insert(id, picked_family);
+        self.floating_entities_drawn_this_frame.insert(id);
         drawables
             .iter()
             .for_each(|(&square, drawable)| self.draw_drawable_to_draw_buffer(square, drawable));
@@ -642,6 +662,22 @@ mod tests {
 
     fn set_up_graphics_with_nxn_world_squares(board_length: u16) -> Graphics {
         Graphics::new(board_length * 2, board_length, Instant::now())
+    }
+
+    #[test]
+    fn test_floating_entity_family_memory_lifecycle() {
+        let mut g = set_up_graphics();
+        let cube = DeathCube::new(FloatingEntityId(0), WorldPoint::new(5.3, 4.7), WorldMove::zero());
+
+        // drawn -> remembered, and the memory feeds the next frame's pick
+        g.draw_death_cube(&cube);
+        assert!(g.floating_entity_family_memory.contains_key(&cube.id));
+        g.display_headless();
+        assert!(g.floating_entity_family_memory.contains_key(&cube.id));
+
+        // a frame without the entity -> swept at the frame boundary
+        g.display_headless();
+        assert!(g.floating_entity_family_memory.is_empty());
     }
 
     #[test]

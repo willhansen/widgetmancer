@@ -276,24 +276,31 @@ with each item so the context doesn't have to be re-discovered later.
 - **Done when:** `test_square_silhouette_stays_rectangular_along_motion_line`
   passes and the debug tool no longer attributes renders to dead code.
 
-### 10. Improve floating-square rendering quality
+## Done
+
+### 10. Improve floating-square rendering quality — 2026-08
 - **Evidence:** post-item-9 evaluation found (a) a 0.25×1/6 silhouette notch
   from one wrong hand-written entry in `hextant_block_by_offset`
-  (`(-1,-1) => '▖'` should be `🬓`; fixed locally, uncommitted), (b) family
-  selection optimizes a center-offset proxy rather than measured coverage
-  error, (c) the motion-line test's trajectory misses whole offset regions,
-  (d) family switches cause visible pops during motion.
-- **Plan:** (1) generate the glyph tables from square-overlap geometry +
-  table≡geometry test; (2) bake the family-selection map offline from
-  coverage error (blessed-file pattern); (3) dense-sweep silhouette test +
-  surface `Metrics` in the debug tool; (5) family-switch hysteresis
-  (`FAMILY_SWITCH_PENALTY`, per-entity `Cell<Option<usize>>`). Details and
-  progress: [checkpoints/floating-square-rendering-improvements.md](checkpoints/floating-square-rendering-improvements.md).
-- **Done when:** dense-sweep test passes at 1/24 density, selection uses the
-  baked map, debug `pos` prints metrics, and hysteresis measurably reduces
-  family switches on the line trajectory without metric regressions.
-
-## Done
+  (`(-1,-1) => '▖'` should be `🬓`), (b) family selection optimized a
+  center-offset proxy rather than measured coverage error, (c) the
+  motion-line test's trajectory missed whole offset regions, (d) family
+  switches caused visible pops during motion.
+- **Landed:** (1) hextant/quadrant glyph tables generated from
+  square-overlap geometry, with table≡geometry probe tests; (2) family
+  selection is a baked 24×24 map over the [0, 0.5)² fundamental domain
+  scored by measured coverage error (`family_map.rs` + generated
+  `family_map_table.rs`, FAMILY_MAP_BLESS regeneration + sparse live
+  re-validation); (3) dense-sweep silhouette test over the offset plane at
+  1/24 density (caught two real bugs: non-translation-invariant
+  `f32::round` snapping, and float-ULP tie-break tearing at family
+  decision boundaries) + `Metrics` surfaced in the debug tool; (5)
+  family-switch hysteresis: `characters_for_full_square_with_2d_offset_biased`
+  with `FAMILY_SWITCH_PENALTY`, renderer-owned memory keyed by
+  `FloatingEntityId` (entities are pure model; `Graphics` caches and
+  sweeps per frame), one biased pick per frame forced on all 9 cells
+  (portal rotations re-derive — families aren't rotation-invariant). Hysteresis takes boundary flicker from 39 switches
+  to 0 with silhouette metrics green. Suite: 469 passed / 0 failed.
+  Full log: [checkpoints/floating-square-rendering-improvements.md](checkpoints/floating-square-rendering-improvements.md).
 
 ### 8. Migrate animation/graphics API off the world character grid — 2026-08-02
 - **Evidence:** `Animation::glyphs_at_time` returned `WorldCharacterSquareGlyphMap`

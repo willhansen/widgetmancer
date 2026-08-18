@@ -5,6 +5,13 @@ use getset::{CopyGetters, Setters};
 
 use utility::*;
 
+/// Stable identity of a floating entity, assigned by `Game` at spawn.
+/// Exists so subsystems outside the model (the renderer's per-entity
+/// caches) can track an entity across frames without the entity itself
+/// knowing what is cached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FloatingEntityId(pub u64);
+
 #[delegatable_trait]
 pub trait FloatingEntityTrait {
     fn position(&self) -> WorldPoint;
@@ -22,12 +29,17 @@ pub(crate) enum FloatingEntityEnum {
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct DeathCube {
+    pub(crate) id: FloatingEntityId,
     pub(crate) position: WorldPoint,
     pub(crate) velocity: WorldMove,
 }
 impl DeathCube {
-    pub fn new(position: WorldPoint, velocity: WorldMove) -> Self {
-        DeathCube { position, velocity }
+    pub fn new(id: FloatingEntityId, position: WorldPoint, velocity: WorldMove) -> Self {
+        DeathCube {
+            id,
+            position,
+            velocity,
+        }
     }
 }
 
@@ -50,6 +62,7 @@ pub const HUNTER_DRONE_SIGHT_RANGE: f32 = 5.0;
 
 #[derive(PartialEq, Debug, Copy, Clone, Setters, CopyGetters)]
 pub struct FloatingHunterDrone {
+    pub(crate) id: FloatingEntityId,
     pub(crate) position: WorldPoint,
     pub(crate) velocity: WorldMove,
     #[getset(get_copy = "pub", set = "pub")]
@@ -72,8 +85,14 @@ impl FloatingEntityTrait for FloatingHunterDrone {
 }
 
 impl FloatingHunterDrone {
-    pub fn new(position: WorldPoint, velocity: WorldMove, sight_direction: Angle<f32>) -> Self {
+    pub fn new(
+        id: FloatingEntityId,
+        position: WorldPoint,
+        velocity: WorldMove,
+        sight_direction: Angle<f32>,
+    ) -> Self {
         FloatingHunterDrone {
+            id,
             position,
             velocity,
             sight_direction,

@@ -33,13 +33,17 @@
 
 use euclid::vec2;
 use terminal_rendering::coverage::{
-    actual_sample, assign_colors, cell_bg, glyph_filled, rendered_neighborhood, FillGrid, Metrics,
-    Rgb, Style, BITMAP_W, DOT_COLOR, IDEAL_COLOR, PALETTE, SX, SY,
+    actual_sample, assign_colors, cell_bg, glyph_filled, rendered_neighborhood,
+    rendered_neighborhood_forced, FillGrid, Metrics, Rgb, Style, BITMAP_W, DOT_COLOR, IDEAL_COLOR,
+    PALETTE, SX, SY,
 };
+use terminal_rendering::family_map::family_index_for_offset;
 use terminal_rendering::glyph_constants::*;
 use terminal_rendering::hextant_blocks::hextant_array_to_char;
 use terminal_rendering::*;
-use utility::coordinate_frame_conversions::{WorldPoint, WorldSquare};
+use utility::coordinate_frame_conversions::{
+    world_point_to_world_square, WorldPoint, WorldSquare,
+};
 
 const GLYPH_W: usize = 6; // small views: 3 world squares = 6 half-cell chars
 
@@ -58,6 +62,21 @@ struct PositionAnalysis {
 
 fn analyze(pos: WorldPoint) -> PositionAnalysis {
     let (grid, center) = rendered_neighborhood(pos);
+    analyze_grid(pos, grid, center)
+}
+
+/// `analyze` with the snap family forced for every cell, as the game does
+/// when hysteresis picks one family per square.
+fn analyze_forced(pos: WorldPoint, family_index: usize) -> PositionAnalysis {
+    let (grid, center) = rendered_neighborhood_forced(pos, family_index);
+    analyze_grid(pos, grid, center)
+}
+
+fn analyze_grid(
+    pos: WorldPoint,
+    grid: [[DoubleChar; 3]; 3],
+    center: WorldSquare,
+) -> PositionAnalysis {
     let owners = assign_colors(&grid);
     let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
@@ -571,4 +590,167 @@ fn test_family_map_matches_coverage_error_objective() {
             );
         }
     }
+}
+
+/// Center offset of the square (what the game feeds the biased picker —
+/// the family is chosen once per square, then forced on every cell).
+fn center_offset(pos: WorldPoint) -> WorldMove {
+    pos - world_point_to_world_square(pos).to_f32()
+}
+
+/// Fine trajectory along the reported tearing line: 101 positions at
+/// 0.02 world-unit steps, dense enough that the unbiased picker switches
+/// families several times.
+fn motion_line_positions() -> Vec<WorldPoint> {
+    let base = euclid::point2(2.363f32, -0.816f32);
+    let step = vec2(0.02f32, 0.01f32);
+    (-50..=50).map(|i| base + step * i as f32).collect()
+}
+
+/// Picks along a trajectory, with and without the hysteresis memory fed
+/// forward (as the game's per-entity family memory does).
+fn family_trajectories(positions: &[WorldPoint]) -> (Vec<usize>, Vec<usize>) {
+    let unbiased = positions
+        .iter()
+        .map(|&p| family_index_for_offset(center_offset(p).to_untyped()))
+        .collect();
+    let mut incumbent = None;
+    let biased = positions
+        .iter()
+        .map(|&p| {
+            let (_, idx) =
+                characters_for_full_square_with_2d_offset_biased(center_offset(p), incumbent);
+            incumbent = Some(idx);
+            idx
+        })
+        .collect();
+    (unbiased, biased)
+}
+
+fn count_switches(idxs: &[usize]) -> usize {
+    idxs.windows(2).filter(|w| w[0] != w[1]).count()
+}
+
+/// Hysteresis (Step 4): feeding the picked family back as the next call's
+/// incumbent must suppress the rapid A->B->A flicker the unbiased baked-map
+/// pick shows when a square hovers across a family boundary — that's the
+/// visible-pop reduction. On one-way drift it may only delay switches, so
+/// the strict drop is asserted on a boundary-oscillating line (derived from
+/// the baked map, robust to re-blessing); the plain motion line must at
+/// least not get worse.
+#[test]
+fn test_hysteresis_reduces_family_switches() {
+    use terminal_rendering::family_map::{FAMILY_MAP_CELLS_PER_UNIT, FAMILY_MAP_RES};
+    use terminal_rendering::family_map_table::FAMILY_BY_OFFSET;
+
+    // a boundary-oscillating line: find two x-adjacent map cells with
+    // different families and straddle their shared edge
+    let (xi, yi) = (0..FAMILY_MAP_RES - 1)
+        .flat_map(|xi| (0..FAMILY_MAP_RES).map(move |yi| (xi, yi)))
+        .find(|&(xi, yi)| FAMILY_BY_OFFSET[xi][yi] != FAMILY_BY_OFFSET[xi + 1][yi])
+        .expect("family map has no x-adjacent family boundary");
+    let boundary_x = (xi + 1) as f32 / FAMILY_MAP_CELLS_PER_UNIT;
+    let y = (yi as f32 + 0.5) / FAMILY_MAP_CELLS_PER_UNIT;
+    let oscillating: Vec<WorldPoint> = (0..40)
+        .map(|i| {
+            let side = if i % 2 == 0 { -1.0 } else { 1.0 };
+            euclid::point2(boundary_x + side * 0.005, y)
+        })
+        .collect();
+
+    let (unbiased, biased) = family_trajectories(&oscillating);
+    let (unbiased_switches, biased_switches) =
+        (count_switches(&unbiased), count_switches(&biased));
+    assert!(
+        unbiased_switches > 10,
+        "oscillating line should flicker without hysteresis, got {unbiased_switches} switches \
+         (boundary between cells {xi}/{}, y cell {yi} is not a snap-error near-tie; \
+         hysteresis cannot hold there)",
+        xi + 1
+    );
+    assert!(
+        biased_switches < unbiased_switches,
+        "hysteresis did not reduce flicker: unbiased {unbiased_switches}, biased {biased_switches}"
+    );
+
+    let (unbiased, biased) = family_trajectories(&motion_line_positions());
+    assert!(
+        count_switches(&biased) <= count_switches(&unbiased),
+        "hysteresis added switches on the motion line: unbiased {}, biased {}",
+        count_switches(&unbiased),
+        count_switches(&biased)
+    );
+}
+
+/// Hysteresis (Step 4): the biased pick must never render much worse than
+/// the unbiased path would have — its snap error stays within
+/// FAMILY_SWITCH_PENALTY of the baked-map winner's, for every offset and
+/// every possible incumbent. (The bound is relative to the map winner, not
+/// the snap-error proxy's best: the map optimizes measured coverage error,
+/// which can legitimately differ from the proxy by more than the penalty.)
+#[test]
+fn test_biased_pick_stays_within_penalty_of_best() {
+    let density = 24; // matches the silhouette sweep
+    let names = snap_family_names();
+    for xi in 0..density {
+        for yi in 0..density {
+            let o = vec2(
+                -0.5 + xi as f32 / density as f32,
+                -0.5 + yi as f32 / density as f32,
+            );
+            let info = snap_debug_info(o);
+            let winner_err = info
+                .candidates
+                .iter()
+                .find(|(name, _)| *name == names[family_index_for_offset(o.to_untyped())])
+                .unwrap()
+                .1;
+            for incumbent in [None, Some(0), Some(1), Some(2), Some(3)] {
+                let (_, picked) = characters_for_full_square_with_2d_offset_biased(o, incumbent);
+                let picked_err = info
+                    .candidates
+                    .iter()
+                    .find(|(name, _)| *name == names[picked])
+                    .unwrap()
+                    .1;
+                assert!(
+                    picked_err <= winner_err + FAMILY_SWITCH_PENALTY + 1e-6,
+                    "offset ({:.4}, {:.4}), incumbent {incumbent:?}: picked {} (err {picked_err:.4}) \
+                     is worse than the map winner ({}, err {winner_err:.4}) by more than \
+                     {FAMILY_SWITCH_PENALTY}",
+                    o.x, o.y, names[picked], names[family_index_for_offset(o.to_untyped())],
+                );
+            }
+        }
+    }
+}
+
+/// Hysteresis (Step 4): the biased sequence must stay silhouette-coherent.
+/// Walk the motion line feeding the family memory forward and render each
+/// position with that family forced on all 9 cells (the game draw path);
+/// the silhouette metrics must pass at every position.
+#[test]
+fn test_silhouette_coherent_with_hysteresis_along_motion_line() {
+    let mut incumbent = None;
+    let mut failures: Vec<(WorldPoint, Vec<String>)> = Vec::new();
+    for pos in motion_line_positions() {
+        let (_, idx) =
+            characters_for_full_square_with_2d_offset_biased(center_offset(pos), incumbent);
+        incumbent = Some(idx);
+        let a = analyze_forced(pos, idx);
+        if !a.failures.is_empty() {
+            failures.push((pos, a.failures));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "\n{}/{} hysteretic positions broke silhouette coherence:\n{}",
+        failures.len(),
+        101,
+        failures
+            .iter()
+            .map(|(pos, fs)| format!("  ({:.4}, {:.4}): {}", pos.x, pos.y, fs.join("; ")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
