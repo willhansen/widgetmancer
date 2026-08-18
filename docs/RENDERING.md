@@ -123,7 +123,11 @@ character*, all in `crates/terminal_rendering/`:
 | `braille.rs`        | 2×4 dot matrix per character                       | lasers, sight lines, smooth curves |
 | `angled_blocks.rs`  | half-cell triangles at arbitrary angles            | FOV shadow edges                |
 | `hextant_blocks.rs` | 2×3 block sextants                                 | filled sub-cell shapes          |
-| `floating_square.rs`| offset half/full block combos                      | sub-square-positioned entities  |
+| `floating_square.rs`| snap-family block combos                           | sub-square-positioned entities  |
+
+The floating-square path (snap families, the coherence invariant, the
+coverage oracle, and its debug tooling) has its own document:
+[FLOATING_BLOCKS.md](FLOATING_BLOCKS.md).
 
 A `BrailleDrawable::line(start, end, color)` rasterizes a world-space line
 into a `HashMap<WorldSquare, BrailleDrawable>`, so smooth lines compose with

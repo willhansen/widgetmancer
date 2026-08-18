@@ -9,8 +9,10 @@ Run with `cargo run --release`; test with `cargo nextest run`.
 
 Known architectural issues and the plan to fix them are tracked in
 [ROADMAP.md](ROADMAP.md). The frame-by-frame draw path is documented in
-[RENDERING.md](RENDERING.md), and the euclid-typed coordinate/reference
-frames in [COORDINATE_FRAMES.md](COORDINATE_FRAMES.md).
+[RENDERING.md](RENDERING.md), the euclid-typed coordinate/reference
+frames in [COORDINATE_FRAMES.md](COORDINATE_FRAMES.md), and the
+sub-square floating-entity renderer in
+[FLOATING_BLOCKS.md](FLOATING_BLOCKS.md).
 
 ## Workspace Layout
 
