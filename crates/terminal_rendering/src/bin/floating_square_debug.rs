@@ -18,7 +18,12 @@
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
 //!   animate       square on the alternate screen (q quits); orbit,
-//!                 arrow-key nudge, and line trajectories
+//!                 arrow-key nudge, and line trajectories. Shows a zoomed
+//!                 sampled-coverage view (actual vs ideal, one color per
+//!                 glyph) and one line per error metric. Click/drag places
+//!                 the square; holding shift/ctrl/alt while dragging (or
+//!                 pressing f) switches to fine control, where large mouse
+//!                 movements map to sub-cell square movements.
 //!
 //! Run via scripts/debug-floating-squares.sh or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
@@ -29,14 +34,14 @@ use std::thread;
 use std::time::Duration;
 
 use rgb::RGB8;
-use termion::event::{Event, Key, MouseEvent};
-use termion::input::{MouseTerminal, TermRead};
+use termion::event::{Event, Key, MouseButton, MouseEvent};
+use termion::input::{MouseTerminal, TermReadEventsAndRaw};
 use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, coverage_error, rendered_neighborhood,
-    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W,
+    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W, NX, NY,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -93,8 +98,8 @@ fn grid_frame(radius: i32, origin_square: WorldSquare) -> Frame {
             };
             let [row, wide_col] = frame_row_col(radius, origin_square, square);
             frame.set_by_double_wide_grid(
-                row,
-                wide_col,
+                row as usize,
+                wide_col as usize,
                 [
                     DrawableGlyph::new_colored(marker.0, marker.1, bg),
                     DrawableGlyph::new_colored(SPACE, BLACK, bg),
@@ -105,12 +110,14 @@ fn grid_frame(radius: i32, origin_square: WorldSquare) -> Frame {
     frame
 }
 
-fn frame_row_col(radius: i32, origin_square: WorldSquare, square: WorldSquare) -> [usize; 2] {
-    let [row, col] = [
+/// Signed so off-grid squares (square near the animation grid's edge) can
+/// be bounds-checked before casting; casting first would wrap to huge
+/// values and overflow the width arithmetic in the check itself.
+fn frame_row_col(radius: i32, origin_square: WorldSquare, square: WorldSquare) -> [i32; 2] {
+    [
         radius - (square.y - origin_square.y),
         radius + (square.x - origin_square.x),
-    ];
-    [row as usize, col as usize]
+    ]
 }
 
 /// Mirrors OffsetSquareDrawable::drawables_for_floating_square_at_point:
@@ -129,9 +136,14 @@ fn draw_floating_square(
         for dy in -1..=1i32 {
             let square = euclid::point2(center.x + dx, center.y + dy);
             let [row, wide_col] = frame_row_col(radius, origin_square, square);
-            if row >= frame.height() || wide_col * 2 + 1 >= frame.width() {
+            if row < 0
+                || wide_col < 0
+                || row as usize >= frame.height()
+                || wide_col as usize * 2 + 1 >= frame.width()
+            {
                 continue;
             }
+            let [row, wide_col] = [row as usize, wide_col as usize];
             let offset: WorldMove = pos - square.to_f32();
             let chars = match forced_family {
                 Some(i) => characters_for_full_square_with_2d_offset_forced(offset, i),
@@ -359,6 +371,11 @@ const LINE_DIR: WorldMove = WorldMove::new(0.6, 0.3);
 /// Half-width of the animation grid in squares; fixed so mouse cells can be
 /// mapped back to world geometry.
 const ANIMATE_GRID_RADIUS: i32 = 4;
+/// Fine mouse-drag scale: world units per terminal cell of mouse travel,
+/// vs. coarse mode's direct cell-to-grid mapping (0.5 in x, 1 in y). Large
+/// mouse sweeps produce sub-cell square movements, which is what the
+/// terminal grid's resolution otherwise forbids.
+const FINE_SCALE: f32 = 1.0 / 32.0;
 
 enum Motion {
     Orbit { theta: f32 },
@@ -404,6 +421,12 @@ struct AnimState {
     /// Family changes since start; each one is a potential visible pop.
     switches: u32,
     prev_family: Option<&'static str>,
+    /// f-key fallback for terminals that don't report mouse modifiers:
+    /// treats every drag as a fine drag.
+    fine_drag: bool,
+    /// Anchor for fine drags, which accumulate cell deltas relative to the
+    /// previous event instead of mapping cells to absolute positions.
+    last_mouse_cell: Option<(u16, u16)>,
 }
 
 impl AnimState {
@@ -415,8 +438,53 @@ impl AnimState {
             anim_time: Duration::ZERO,
             switches: 0,
             prev_family: None,
+            fine_drag: false,
+            last_mouse_cell: None,
         }
     }
+}
+
+/// Decode an SGR mouse sequence (ESC [ < Cb ; Cx ; Cy M/m) from raw input
+/// bytes, recovering the modifier bits termion drops (shift=4, alt=8,
+/// ctrl=16 — modified events otherwise surface as Event::Unsupported or
+/// lose their modifier). Returns the event and whether any modifier was
+/// held.
+fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
+    let body = raw.strip_prefix(b"\x1b[<")?;
+    let (&final_byte, nums) = body.split_last()?;
+    if final_byte != b'M' && final_byte != b'm' {
+        return None;
+    }
+    let text = std::str::from_utf8(nums).ok()?;
+    let mut fields = text.split(';');
+    let cb: u16 = fields.next()?.parse().ok()?;
+    let cx: u16 = fields.next()?.parse().ok()?;
+    let cy: u16 = fields.next()?.parse().ok()?;
+    let modified = cb & (4 | 8 | 16) != 0;
+    let button = match cb & 3 {
+        0 => MouseButton::Left,
+        1 => MouseButton::Middle,
+        _ => MouseButton::Right,
+    };
+    let event = if cb & 64 != 0 {
+        // wheel events come only as presses
+        if final_byte != b'M' {
+            return None;
+        }
+        let button = if cb & 1 == 0 {
+            MouseButton::WheelUp
+        } else {
+            MouseButton::WheelDown
+        };
+        MouseEvent::Press(button, cx, cy)
+    } else if cb & 32 != 0 {
+        MouseEvent::Hold(cx, cy)
+    } else if final_byte == b'm' || cb & 3 == 3 {
+        MouseEvent::Release(cx, cy)
+    } else {
+        MouseEvent::Press(button, cx, cy)
+    };
+    Some((event, modified))
 }
 
 /// World point under the (1-based) terminal cell, using the same grid
@@ -433,6 +501,22 @@ fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
 /// disables ONLCR, so bare '\n' would stair-step the frame.
 const FRAME_DT: Duration = Duration::from_millis(33);
 
+/// Centroid of the rendered fill, for the measured center error: how far
+/// the silhouette's actual middle sits from the true square center.
+fn measured_center(actual: &FillGrid) -> Option<WorldPoint> {
+    let (mut sx, mut sy, mut n) = (0.0f32, 0.0f32, 0usize);
+    for j in 0..NX {
+        for i in 0..NY {
+            if actual.filled(j, i) {
+                sx += actual.wx(j);
+                sy += actual.wy(i);
+                n += 1;
+            }
+        }
+    }
+    (n > 0).then(|| euclid::point2(sx / n as f32, sy / n as f32))
+}
+
 fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode: bool) {
     let pos = state.motion.pos();
     let offset = center_offset(pos);
@@ -445,15 +529,88 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         state.prev_family = Some(info.family);
     }
 
+    // sampled-coverage oracle (the same one the coherence test asserts on):
+    // both the zoomed view and the error metrics derive from it
+    let (glyphs, center) = rendered_neighborhood(pos);
+    let owners = assign_colors(&glyphs);
+    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let actual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&glyphs, &owners, center, wx, wy)
+    });
+    let ideal = FillGrid::sample(sample_origin, |wx, wy| {
+        (
+            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
+            Some(0),
+        )
+    });
+    let metrics = Metrics::measure(&actual, pos);
+    let coverage_err = coverage_error(&glyphs, &owners, center, pos);
+    let style = coverage::Style::from_env();
+    let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
+    let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
+
     let origin = euclid::point2(0, 0);
     let mut frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
     draw_floating_square(&mut frame, ANIMATE_GRID_RADIUS, origin, pos, None);
     overlay_true_center(&mut frame, ANIMATE_GRID_RADIUS, origin, pos);
-    let frame_text = if raw_mode {
-        frame.string_for_regular_display().replace('\n', "\r\n")
+    let frame_lines: Vec<String> = frame
+        .string_for_regular_display()
+        .lines()
+        .map(String::from)
+        .collect();
+    let frame_w = frame.width();
+
+    // glyph legend in the same scan order assign_colors used, so legend
+    // colors match the zoomed view's pixels. A 1x1 square spans at most 8
+    // half-cells, so the legend always fits under the real-size grid.
+    let mut legend = String::new();
+    let mut legend_w = 0usize;
+    for dy in [1i32, 0, -1] {
+        for dx in -1..=1i32 {
+            for half in 0..2 {
+                if let Some(idx) = owners[(dx + 1) as usize][(dy + 1) as usize][half] {
+                    legend.push_str(&style.fg(coverage::PALETTE[idx % coverage::PALETTE.len()]));
+                    legend.push(glyphs[(dx + 1) as usize][(dy + 1) as usize][half]);
+                    legend.push(' ');
+                    legend_w += 2;
+                }
+            }
+        }
+    }
+    legend.push_str(style.reset());
+    // the real-size grid is shorter than the zoomed panes; the leftover
+    // rows under it hold the legend. (text, visible width)
+    let under_grid: Vec<(String, usize)> = if legend_w > 0 {
+        vec![("glyph colors:".to_string(), 13), (legend, legend_w)]
     } else {
-        frame.to_string()
+        Vec::new()
     };
+
+    // side-by-side: real-size grid left, zoomed actual + ideal coverage
+    // right. Frame rows always render full-width (and color-neutral at both
+    // ends), so plain concatenation keeps the panes aligned.
+    let mut text = String::new();
+    for row in 0..actual_lines.len() {
+        match frame_lines.get(row) {
+            Some(line) => {
+                text.push_str(line);
+                text.push_str("  ");
+            }
+            None => {
+                let (s, w) = under_grid
+                    .get(row - frame_lines.len())
+                    .cloned()
+                    .unwrap_or_default();
+                text.push_str(&s);
+                text.push_str(&" ".repeat(frame_w + 2 - w));
+            }
+        }
+        text.push_str(&actual_lines[row]);
+        text.push_str("  ");
+        text.push_str(&ideal_lines[row]);
+        text.push('\n');
+    }
+
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
     let family_display = if family_changed {
@@ -466,28 +623,64 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
-    write!(
-        out,
-        "{frame_text}{}pos=({:6.3}, {:6.3})  family={}  snap=({:+.3}, {:+.3})  err=({:+.3}, {:+.3})  {} speed={:.2}x  switches={}  t={:.1}s{}",
-        Glyph::reset_colors(),
-        pos.x,
-        pos.y,
-        family_display,
+    let frac = fraction_part(pos);
+    let center_err = match measured_center(&actual) {
+        Some(c) => {
+            let (dx, dy) = (c.x - pos.x, c.y - pos.y);
+            format!(
+                "center err=({:+.3}, {:+.3})  |center err|={:.3}",
+                dx,
+                dy,
+                dx.hypot(dy)
+            )
+        }
+        None => "center err=n/a (nothing rendered)".to_string(),
+    };
+    // one line per metric, so no value is crowded out when others grow
+    text.push_str(&format!(
+        "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})  family={}\n",
+        pos.x, pos.y, frac.x, frac.y, family_display,
+    ));
+    text.push_str(&format!(
+        "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})\n",
         info.snapped_offset.x,
         info.snapped_offset.y,
         info.snapped_offset.x - offset.x,
         info.snapped_offset.y - offset.y,
+    ));
+    text.push_str(&center_err);
+    text.push('\n');
+    text.push_str(&format!(
+        "area err={:+.3}  (area {:.3})\n",
+        metrics.area - 1.0,
+        metrics.area,
+    ));
+    text.push_str(&format!("coverage err={coverage_err:.4}\n"));
+    text.push_str(&format!("top spread={:.3}\n", metrics.top_spread));
+    text.push_str(&format!("bottom spread={:.3}\n", metrics.bottom_spread));
+    text.push_str(&format!("left spread={:.3}\n", metrics.left_spread));
+    text.push_str(&format!("right spread={:.3}\n", metrics.right_spread));
+    text.push_str(&format!("holes={}\n", metrics.holes));
+    text.push_str(&format!(
+        "{} speed={:.2}x  switches={}  t={:.1}s{}{}\n",
         state.motion.name(),
         state.speed,
         state.switches,
         state.anim_time.as_secs_f32(),
         if state.paused { "  [paused]" } else { "" },
-    )
-    .unwrap();
-    // erase leftovers when the status text shrinks between frames.
-    // UntilNewline clears from the cursor to end of line; CurrentLine would
-    // wipe the whole line, including the status just written.
-    write!(out, "{}", termion::clear::UntilNewline).unwrap();
+        if state.fine_drag { "  [fine-drag]" } else { "" },
+    ));
+
+    if raw_mode {
+        // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
+        // to end-of-line per line so shrinking values leave no leftovers.
+        // UntilNewline clears from the cursor to end of line; CurrentLine
+        // would wipe the line content just written.
+        let eol = format!("{}\r\n", termion::clear::UntilNewline);
+        write!(out, "{}{}", text.replace('\n', &eol), Glyph::reset_colors()).unwrap();
+    } else {
+        write!(out, "{}{}", text, Glyph::reset_colors()).unwrap();
+    }
     out.flush().unwrap();
 }
 
@@ -502,7 +695,7 @@ fn run_animation(frame_count: Option<u32>) {
         let mut state = AnimState::new();
         for _ in 0..frame_count.unwrap_or(8) {
             render_animation_frame(&mut stdout(), &mut state, false);
-            println!("\n");
+            println!();
             state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
             state.anim_time += FRAME_DT;
         }
@@ -511,7 +704,7 @@ fn run_animation(frame_count: Option<u32>) {
 
     let (tx, rx) = channel();
     thread::spawn(move || {
-        for event in stdin().events() {
+        for event in stdin().events_and_raw() {
             if tx.send(event.unwrap()).is_err() {
                 break;
             }
@@ -526,7 +719,14 @@ fn run_animation(frame_count: Option<u32>) {
     let mut frames = 0u32;
     let mut dirty = true;
     loop {
-        while let Ok(event) = rx.try_recv() {
+        while let Ok((event, raw)) = rx.try_recv() {
+            // recover the mouse modifier bits termion drops, so a held
+            // shift/ctrl/alt can select fine dragging
+            let (event, fine_mod) = match parse_sgr_mouse(&raw) {
+                Some((mouse_event, modified)) => (Event::Mouse(mouse_event), modified),
+                None => (event, false),
+            };
+            let fine = fine_mod || state.fine_drag;
             match event {
                 Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
                 Event::Key(Key::Char(' ')) => {
@@ -574,19 +774,48 @@ fn run_animation(frame_count: Option<u32>) {
                     state.speed = (state.speed / 2.0).max(0.125);
                     dirty = true;
                 }
+                // fallback fine-drag toggle for terminals that don't pass
+                // mouse modifiers through
+                Event::Key(Key::Char('f')) => {
+                    state.fine_drag = !state.fine_drag;
+                    dirty = true;
+                }
                 // Click places the square and pauses so the placement sticks;
-                // drag moves it. Clamped to the visible grid.
+                // drag moves it. Clamped to the visible grid. With a
+                // modifier held (or fine_drag toggled), movement is relative
+                // instead: cell deltas accumulate at FINE_SCALE, so large
+                // mouse movements produce sub-cell square movements.
                 Event::Mouse(MouseEvent::Press(_, x, y))
                 | Event::Mouse(MouseEvent::Hold(x, y)) => {
                     let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
-                    let p = mouse_cell_point(x, y);
-                    state.motion = Motion::Free {
-                        pos: euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit)),
+                    let clamp = |p: WorldPoint| {
+                        euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit))
                     };
+                    if fine {
+                        if let Some((lx, ly)) = state.last_mouse_cell {
+                            let d: WorldMove = euclid::vec2(
+                                (x as f32 - lx as f32) * FINE_SCALE,
+                                (ly as f32 - y as f32) * FINE_SCALE,
+                            );
+                            state.motion = Motion::Free {
+                                pos: clamp(state.motion.pos() + d),
+                            };
+                        }
+                    } else {
+                        state.motion = Motion::Free {
+                            pos: clamp(mouse_cell_point(x, y)),
+                        };
+                    }
+                    // anchored on every event, so grabbing or releasing the
+                    // modifier mid-drag never causes a jump
+                    state.last_mouse_cell = Some((x, y));
                     if matches!(event, Event::Mouse(MouseEvent::Press(_, _, _))) {
                         state.paused = true;
                     }
                     dirty = true;
+                }
+                Event::Mouse(MouseEvent::Release(_, _)) => {
+                    state.last_mouse_cell = None;
                 }
                 _ => {}
             }
@@ -605,7 +834,7 @@ fn run_animation(frame_count: Option<u32>) {
             render_animation_frame(&mut screen, &mut state, true);
             write!(
                 screen,
-                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed click/drag=place"
+                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed drag=place mod+drag=fine f=toggle-fine"
             )
             .unwrap();
             screen.flush().unwrap();
@@ -628,11 +857,15 @@ fn usage() {
            families X Y  the same position with each snap family forced\n  \
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
-           animate [N]   orbiting square; q quits, space pauses, arrows nudge,\n  \
-          \x20      o resumes the orbit, l starts a line trajectory, +/- change\n  \
-          \x20      speed, click/drag places the square. Optional frame count N\n  \
-          \x20      runs a fixed number of frames, which is also the mode used\n  \
-          \x20      when stdout is not a terminal.\n\
+           animate [N]   orbiting square with a zoomed sampled-coverage view\n  \
+          \x20      (actual vs ideal, one color per glyph) and one line per\n  \
+          \x20      error metric; q quits, space pauses, arrows nudge, o resumes\n  \
+          \x20      the orbit, l starts a line trajectory, +/- change speed,\n  \
+          \x20      click/drag places the square, holding shift/ctrl/alt while\n  \
+          \x20      dragging (or pressing f) gives fine control: large mouse\n  \
+          \x20      movements map to sub-cell square movements. Optional frame\n  \
+          \x20      count N runs a fixed number of frames, which is also the\n  \
+          \x20      mode used when stdout is not a terminal.\n\
          default: pos 0.3 0.7"
     );
 }

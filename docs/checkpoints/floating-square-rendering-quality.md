@@ -57,7 +57,24 @@ accessors (`snap_debug_info`, `snap_family_names`,
 - `animate [N]` — orbit / arrow-key nudge (1/16 steps) / line trajectory,
   with the live family in the status line (inverted on the frame it changes;
   `switches=N` counts family changes — the visible pops), speed controls,
-  and click/drag placement.
+  and click/drag placement. Extended 2026-08 with:
+  - a zoomed sampled-coverage view beside the real-size grid (actual vs
+    ideal, one palette color per rendered half-cell glyph, checkerboard
+    marking the character cells, glyph-color legend under the grid);
+  - one line per error metric: snap err, center err (measured fill centroid
+    vs true center), area err, coverage err, the four edge spreads, holes;
+  - fine mouse control: holding shift/ctrl/alt while dragging (or pressing
+    `f`, for terminals that don't pass mouse modifiers) switches from
+    absolute cell-to-grid placement to relative movement at 1/32 world unit
+    per cell, so large mouse movements produce sub-cell square movements.
+    termion drops the xterm modifier bits, so the tool decodes them itself
+    from the raw SGR mouse bytes (`events_and_raw`).
+
+  Also fixed a pre-existing crash the finer control exposed: clicking near
+  the animation grid's edge panicked with "attempt to multiply with
+  overflow" — `frame_row_col` cast possibly-negative indices to usize
+  before the bounds check, and the check's own `wide_col * 2` then
+  overflowed. It now returns signed indices checked before casting.
 
 The coverage oracle (`glyph_filled`, `FillGrid`, `bitmap_pane`, …) lives in
 `crates/terminal_rendering/src/coverage.rs` (`#[doc(hidden)] pub`), shared
