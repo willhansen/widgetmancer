@@ -18,17 +18,20 @@
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
 //!   animate       square on the alternate screen (q quits); orbit,
-//!                 arrow-key nudge, and line trajectories. Two view rows:
-//!                 the family-snapped render and, for comparison, the
-//!                 unrestricted render (per-half-cell best fit over all
-//!                 glyphs, minimizing area then center then coverage error;
-//!                 silhouette allowed to be jagged), each shown real-size
-//!                 (square drawn in its glyph colors, no center marker) and
-//!                 zoomed (sampled coverage, one color per glyph), plus one
-//!                 line per error metric. Click/drag places the square;
-//!                 holding shift/ctrl/alt while dragging (or pressing f)
-//!                 switches to fine control, where large mouse movements map
-//!                 to sub-cell square movements.
+//!                 arrow-key nudge, and line trajectories. Three bordered
+//!                 rows: one per rendering approach — family-snapped, then
+//!                 unrestricted (per-half-cell best fit over all glyphs,
+//!                 minimizing area then center then coverage error;
+//!                 silhouette allowed to be jagged) — each with the
+//!                 real-size render (square drawn in its glyph colors, no
+//!                 center marker) plus legend, the zoomed sampled-coverage
+//!                 view, and metrics (comparison metrics measured
+//!                 identically for every approach, then approach-specific
+//!                 ones); then a common row with the ideal (true square)
+//!                 zoom, global state, and controls. Click/drag places the
+//!                 square; holding shift/ctrl/alt while dragging (or
+//!                 pressing f) switches to fine control, where large mouse
+//!                 movements map to sub-cell square movements.
 //!
 //! Run via scripts/debug-floating-squares.sh or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
@@ -240,25 +243,87 @@ fn glyph_legend(
     (legend, w)
 }
 
-/// Left column of one view-row line: the real-size grid, or the
-/// label/legend rows underneath it once the grid runs out (it is shorter
-/// than the zoomed panes). Always padded to frame_w + 2 visible columns.
-fn left_pane_row(
-    frame_lines: &[String],
-    frame_w: usize,
-    under: &[(String, usize)],
-    row: usize,
-) -> String {
-    match frame_lines.get(row) {
-        Some(line) => format!("{line}  "),
-        None => {
-            let (s, w) = under
-                .get(row - frame_lines.len())
-                .cloned()
-                .unwrap_or_default();
-            format!("{s}{}", " ".repeat(frame_w + 2 - w))
+/// Strip ANSI CSI sequences (ESC [ ... final letter) to get a line's
+/// visible width. Pane lines are full of color codes; the box borders need
+/// printable widths to pad straight right edges.
+fn visible_width(s: &str) -> usize {
+    let mut w = 0;
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            for c in chars.by_ref() {
+                if c.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            w += 1;
         }
     }
+    w
+}
+
+/// One titled, bordered row of side-by-side columns. Each column is its
+/// lines plus its visible width; short columns are padded with spaces so
+/// the right border stays a straight vertical line. Relies on the pane
+/// lines being color-neutral at both ends (frame lines, bitmap panes, and
+/// legends all reset their colors), so the padding and borders pick up no
+/// dangling background.
+fn boxed_row(title: &str, columns: &[(&[String], usize)]) -> Vec<String> {
+    const GAP: usize = 2;
+    let h = columns.iter().map(|c| c.0.len()).max().unwrap_or(0);
+    let inner_w: usize =
+        columns.iter().map(|c| c.1).sum::<usize>() + GAP * (columns.len() - 1) + 2;
+    let label = format!("─ {title} ");
+    let mut lines = vec![format!(
+        "┌{label}{}┐",
+        "─".repeat(inner_w - visible_width(&label))
+    )];
+    for row in 0..h {
+        let mut line = String::from("│ ");
+        for (i, (col, w)) in columns.iter().enumerate() {
+            if i > 0 {
+                line.push_str(&" ".repeat(GAP));
+            }
+            let cell = col.get(row).map(String::as_str).unwrap_or("");
+            line.push_str(cell);
+            line.push_str(&" ".repeat(w.saturating_sub(visible_width(cell))));
+        }
+        line.push_str(" │");
+        lines.push(line);
+    }
+    lines.push(format!("└{}┘", "─".repeat(inner_w)));
+    lines
+}
+
+/// The comparison metrics, measured identically for every rendering
+/// approach: center error, area error (rendered vs 1.0), per-character
+/// coverage error (sum over half-cells of |rendered - ideal| filled area),
+/// and jaggedness (total edge step length). Rendering approaches are not
+/// fitted to these.
+fn comparison_stats(
+    grid: &[[DoubleChar; 3]; 3],
+    center: WorldSquare,
+    pos: WorldPoint,
+    actual: &FillGrid,
+    m: &Metrics,
+) -> Vec<String> {
+    let center_err = match fill_centroid(actual) {
+        Some(c) => {
+            let (dx, dy) = (c.x - pos.x, c.y - pos.y);
+            format!("({:+.3}, {:+.3})  |d|={:.3}", dx, dy, dx.hypot(dy))
+        }
+        None => "n/a (nothing rendered)".to_string(),
+    };
+    vec![
+        format!("center err={center_err}"),
+        format!("area err={:+.3}  (area {:.3})", m.area - 1.0, m.area),
+        format!(
+            "per-char coverage err={:.4}",
+            per_char_coverage_error(grid, center, pos)
+        ),
+        format!("jaggedness={:.3}", jaggedness(actual)),
+    ]
 }
 
 /// Marks the exact square center on the half-cell grid so the snapped-vs-true
@@ -587,13 +652,19 @@ fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
     Some((event, modified))
 }
 
+/// 1-based terminal cell of the animation grid's top-left corner: just
+/// inside the first boxed row's border. If the boxed layout changes (the
+/// grid is no longer the first column of the first row), this moves with it.
+const GRID_SCREEN_ORIGIN: (u16, u16) = (2, 2);
+
 /// World point under the (1-based) terminal cell, using the same grid
 /// geometry as the frame: 2 columns per square, rows increase downward.
 fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
     let r = ANIMATE_GRID_RADIUS as f32;
-    // The origin square spans cols 2r+1..=2r+2 (center 2r+1.5), row r+1.
-    let dx_cells = col as f32 - (2.0 * r + 1.5);
-    let dy_cells = row as f32 - (r + 1.0);
+    // grid cell (0,0) sits at GRID_SCREEN_ORIGIN; within the grid the
+    // origin square spans cols 2r..=2r+1 (center 2r+0.5), row r
+    let dx_cells = col as f32 - GRID_SCREEN_ORIGIN.0 as f32 - (2.0 * r + 0.5);
+    let dy_cells = row as f32 - GRID_SCREEN_ORIGIN.1 as f32 - r;
     euclid::point2(dx_cells * 0.5, -dy_cells)
 }
 
@@ -690,89 +761,96 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     };
     let umetrics = Metrics::measure(&uactual, pos);
     let frac = fraction_part(pos);
-    let center_err_of = |actual: &FillGrid| match fill_centroid(actual) {
-        Some(c) => {
-            let (dx, dy) = (c.x - pos.x, c.y - pos.y);
-            format!("({:+.3}, {:+.3})  |d|={:.3}", dx, dy, dx.hypot(dy))
-        }
-        None => "n/a (nothing rendered)".to_string(),
-    };
-    // The comparison metrics, measured identically for every approach:
-    // area error (rendered vs 1.0), per-character coverage error (sum over
-    // half-cells of |rendered - ideal| filled area), and jaggedness (total
-    // edge step length). Rendering approaches are not fitted to these.
-    let approach_stats = |name: &str,
-                          grid: &[[DoubleChar; 3]; 3],
-                          actual: &FillGrid,
-                          m: &Metrics| {
-        vec![
-            format!("approach: {name}"),
-            format!("center err={}", center_err_of(actual)),
-            format!("area err={:+.3}  (area {:.3})", m.area - 1.0, m.area),
-            format!(
-                "per-char coverage err={:.4}",
-                per_char_coverage_error(grid, center, pos)
-            ),
-            format!("jaggedness={:.3}", jaggedness(actual)),
-        ]
-    };
-    // row 1 carries the family-snapped approach, the ideal (true square)
-    // zoom, and the globally applicable stats and notes
-    let stats1 = [
-        approach_stats("family-snapped", &glyphs, &actual, &metrics),
-        vec![String::new()],
-        vec![
-            format!(
-                "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
-                pos.x, pos.y, frac.x, frac.y,
-            ),
-            format!("family={family_display}"),
-            format!(
-                "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})",
-                info.snapped_offset.x,
-                info.snapped_offset.y,
-                info.snapped_offset.x - offset.x,
-                info.snapped_offset.y - offset.y,
-            ),
-            format!(
-                "{} speed={:.2}x  switches={}  t={:.1}s{}{}",
-                state.motion.name(),
-                state.speed,
-                state.switches,
-                state.anim_time.as_secs_f32(),
-                if state.paused { "  [paused]" } else { "" },
-                if state.fine_drag { "  [fine-drag]" } else { "" },
-            ),
-            "zoom: actual | ideal (true square)".to_string(),
-            "glyph-color legend under each grid".to_string(),
-        ],
-    ]
-    .concat();
-    let stats2 = approach_stats("unrestricted (per-half-cell best coverage)", &uglyphs, &uactual, &umetrics);
 
-    // one row per rendering approach, real-size grid left and zoomed
-    // coverage right, with the approach's stats on the same row. Frame
-    // rows always render full-width and color-neutral at both ends, so
-    // plain concatenation keeps the panes aligned.
+    // one boxed row per rendering method: real-size grid with the glyph
+    // legend underneath (it is shorter than the zoomed pane), the actual
+    // zoom, comparison metrics, then method-only metrics
+    let left_col = |frame_lines: &[String], under: &[(String, usize)]| {
+        let mut col = frame_lines.to_vec();
+        col.extend(under.iter().map(|(s, _)| s.clone()));
+        col
+    };
+    let col_w = |v: &[String]| v.iter().map(|s| visible_width(s)).max().unwrap_or(0);
+
+    let mut stats1 = comparison_stats(&glyphs, center, pos, &actual, &metrics);
+    stats1.push(String::new());
+    stats1.extend([
+        format!("family={family_display}"),
+        format!(
+            "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})",
+            info.snapped_offset.x,
+            info.snapped_offset.y,
+            info.snapped_offset.x - offset.x,
+            info.snapped_offset.y - offset.y,
+        ),
+    ]);
+    let stats2 = comparison_stats(&uglyphs, center, pos, &uactual, &umetrics);
+
+    let left1 = left_col(&frame_lines, &under1);
+    let left2 = left_col(&uframe_lines, &under2);
+    let stats1_w = col_w(&stats1);
+    let stats2_w = col_w(&stats2);
+    let row1 = boxed_row(
+        "family-snapped",
+        &[
+            (left1.as_slice(), frame_w),
+            (actual_lines.as_slice(), BITMAP_W),
+            (stats1.as_slice(), stats1_w),
+        ],
+    );
+    let row2 = boxed_row(
+        "unrestricted (per-half-cell best coverage)",
+        &[
+            (left2.as_slice(), frame_w),
+            (uactual_lines.as_slice(), BITMAP_W),
+            (stats2.as_slice(), stats2_w),
+        ],
+    );
+
+    // common box: ideal zoom, global state, controls — one column each
+    let mut ideal_col = vec!["ideal (true square)".to_string()];
+    ideal_col.extend(ideal_lines.iter().cloned());
+    let global = vec![
+        format!(
+            "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
+            pos.x, pos.y, frac.x, frac.y,
+        ),
+        format!(
+            "{} speed={:.2}x  switches={}  t={:.1}s{}{}",
+            state.motion.name(),
+            state.speed,
+            state.switches,
+            state.anim_time.as_secs_f32(),
+            if state.paused { "  [paused]" } else { "" },
+            if state.fine_drag { "  [fine-drag]" } else { "" },
+        ),
+    ];
+    let controls: Vec<String> = [
+        "controls:",
+        "q/esc quit    space pause",
+        "arrows nudge 1/16",
+        "o orbit  l line",
+        "+/- speed  f fine-drag",
+        "click/drag place square",
+        "shift/ctrl/alt-drag fine",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    let global_w = col_w(&global);
+    let controls_w = col_w(&controls);
+    let row3 = boxed_row(
+        "common",
+        &[
+            (ideal_col.as_slice(), BITMAP_W),
+            (global.as_slice(), global_w),
+            (controls.as_slice(), controls_w),
+        ],
+    );
+
     let mut text = String::new();
-    for row in 0..actual_lines.len() {
-        text.push_str(&left_pane_row(&frame_lines, frame_w, &under1, row));
-        text.push_str(&actual_lines[row]);
-        text.push_str("  ");
-        text.push_str(&ideal_lines[row]);
-        text.push_str("  ");
-        if let Some(m) = stats1.get(row) {
-            text.push_str(m);
-        }
-        text.push('\n');
-    }
-    for (row, uline) in uactual_lines.iter().enumerate() {
-        text.push_str(&left_pane_row(&uframe_lines, frame_w, &under2, row));
-        text.push_str(uline);
-        text.push_str("  ");
-        if let Some(m) = stats2.get(row) {
-            text.push_str(m);
-        }
+    for line in [row1, row2, row3].concat() {
+        text.push_str(&line);
         text.push('\n');
     }
 
