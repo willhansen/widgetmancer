@@ -61,8 +61,8 @@ accessors (`snap_debug_info`, `snap_family_names`,
   - a zoomed sampled-coverage view beside the real-size grid (actual vs
     ideal, one palette color per rendered half-cell glyph, checkerboard
     marking the character cells, glyph-color legend under the grid);
-  - one line per error metric: snap err, center err (measured fill centroid
-    vs true center), area err, coverage err, the four edge spreads, holes;
+  - one line per error metric (later reworked into the per-approach
+    comparison metrics described in the next section);
   - fine mouse control: holding shift/ctrl/alt while dragging (or pressing
     `f`, for terminals that don't pass mouse modifiers) switches from
     absolute cell-to-grid placement to relative movement at 1/32 world unit
@@ -75,6 +75,83 @@ accessors (`snap_debug_info`, `snap_family_names`,
   overflow" — `frame_row_col` cast possibly-negative indices to usize
   before the bounds check, and the check's own `wide_col * 2` then
   overflowed. It now returns signed indices checked before casting.
+
+## Debug tool: approach-comparison view + glyph colors — 2026-08 (continued)
+
+More animate-mode refinements (the `pos`/`families`/`sweep` modes are
+unchanged: they keep the true-center marker and uniform square color as
+single-shot diagnostics):
+
+- The true-center `+` overlay is gone from the animate view (it hid the
+  glyphs under inspection; the center-err metric and ideal pane carry the
+  same information).
+- The real-size square is drawn in its glyph (palette) colors instead of
+  uniform orange, so a glyph means the same color in the small view, the
+  zoomed view, and the legend (`draw_neighborhood_colored`).
+- Fine mouse control and per-line metrics from the previous round are
+  unchanged.
+
+**Layout: one row per rendering approach, with its stats.** Row 1: the
+family-snapped approach — real-size grid, zoomed actual, zoomed *ideal*
+(true square), and the globally applicable stats and notes (pos/frac,
+family + snap err, motion status, pane notes). Row 2: the *unrestricted*
+approach — real-size grid, zoomed actual, and its own stats. Glyph-color
+legends sit under each real-size grid.
+
+**Comparison metrics, measured identically for every approach**
+(`coverage.rs`, `#[doc(hidden)]` so tool and test can't drift):
+
+- *area error* — rendered total area vs the (sampled) ideal's;
+- *center error* — rendered fill centroid vs the ideal's (`fill_centroid`);
+- *per-character coverage error* (`per_char_coverage_error`) — for each
+  character half-cell, |rendered filled area − ideal filled area|,
+  summed. Coarser than the bitmap symmetric-difference `coverage_error`:
+  it only asks each half-cell to contain the right *amount* of ink;
+- *jaggedness* (`jaggedness`) — the sum, along each of the four edges, of
+  the perpendicular step lengths between consecutive sample columns/rows
+  (each edge contour's total variation). A clean rectangle measures 0.
+
+**The unrestricted approach does no fitting to these metrics** (an
+explicitly fitted earlier design was rejected: minimizing the metrics
+inside the renderer is not the point — a good fitted rule would later be
+hardcoded as its own approach). It is simply: per half-cell, over every
+coverage-modelled glyph (all eighth/third/quadrant/half blocks, hextants),
+lowest sampled coverage error, ties broken by filled-area match
+(`unrestricted_neighborhood`).
+
+Measured over a 16x16 offset grid (tests/unrestricted_rendering.rs prints
+the table; mean / max):
+
+| approach | area | center | per-char cov | jaggedness |
+|---|---|---|---|---|
+| family-snapped (auto) | .021/.042 | .079/.159 | .325/.667 | 0/0 |
+| unrestricted | .058/.208 | .035/.081 | .225/.417 | 1.24/3.79 |
+| forced h-eighths | .021/.042 | .250/.500 | 1.00/2.00 | 0/0 |
+| forced v-eighths | .021/.042 | .136/.258 | .574/1.21 | 0/0 |
+| forced hextant | .021/.042 | .114/.208 | .496/.938 | 0/0 |
+| forced quadrant | .021/.042 | .151/.280 | .647/1.38 | 0/0 |
+
+Reading: the family restriction buys perfectly straight edges (jaggedness
+0 everywhere — the coherence property holds over the whole grid, and every
+single-family render is coherent by construction) at the cost of ~2x the
+center error and ~1.4x the per-character coverage error of the
+unrestricted best-fit. The test asserts only loose sanity bounds (the
+family-snapped jaggedness bound is the real guard); the printed table is
+the comparison.
+
+Gotchas encountered during this work (so nobody retries them):
+
+- `glyph_filled`'s `fx` spans the *half-cell* (one terminal column), like
+  `actual_sample`'s `* 2.0` — a first implementation of per-half-cell
+  scoring forgot this and was caught by the scan test.
+- Fitting picks to running *global* area/centroid residuals scrambles the
+  silhouette: moment cancellation pulls fill into the wrong half-cells,
+  giving perfect area/center metrics on a non-square (worst coverage err
+  1.30 vs 0.36).
+- At positions where the true square's boundary lands exactly on a sample
+  point (e.g. y frac = 1/16), the *sampled* ideal area is not 1.0
+  (inclusive boundaries count it twice), so renderer-vs-ideal comparisons
+  must use the sampled ideal, not the continuous 1.0.
 
 The coverage oracle (`glyph_filled`, `FillGrid`, `bitmap_pane`, …) lives in
 `crates/terminal_rendering/src/coverage.rs` (`#[doc(hidden)] pub`), shared

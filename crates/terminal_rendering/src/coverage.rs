@@ -5,6 +5,8 @@
 //!
 //! Not game-facing API.
 
+use std::sync::OnceLock;
+
 use euclid::vec2;
 
 use crate::glyph_constants::*;
@@ -219,6 +221,188 @@ pub fn coverage_error(
     mismatches as f32 / (SX * SY) as f32
 }
 
+/// Samples across a half-cell's width (half a world square).
+const HX: usize = SX / 2;
+
+/// One candidate glyph's coverage over a half-cell's sample lattice, plus
+/// its filled count (for per-character coverage error).
+struct GlyphFit {
+    c: char,
+    bits: [u64; HX * SY / 64],
+    count: u32,
+}
+
+/// Every glyph the coverage model knows, as a best-fit candidate table.
+fn glyph_fits() -> &'static [GlyphFit] {
+    static FITS: OnceLock<Vec<GlyphFit>> = OnceLock::new();
+    FITS.get_or_init(|| {
+        let mut candidates: Vec<char> = vec![SPACE, FULL_BLOCK];
+        for blocks in [
+            EIGHTH_BLOCKS_FROM_LEFT,
+            EIGHTH_BLOCKS_FROM_BOTTOM,
+            EIGHTH_BLOCKS_FROM_RIGHT,
+            EIGHTH_BLOCKS_FROM_TOP,
+        ] {
+            // indices 0 and 8 are SPACE and FULL_BLOCK, already listed
+            candidates.extend_from_slice(&blocks[1..8]);
+        }
+        candidates.extend([
+            UPPER_ONE_THIRD_BLOCK,
+            UPPER_TWO_THIRD_BLOCK,
+            LOWER_ONE_THIRD_BLOCK,
+            LOWER_TWO_THIRD_BLOCK,
+            // quadrant blocks and half blocks
+            '\u{2598}', '\u{259D}', '\u{2596}', '\u{2597}', '\u{258C}', '\u{2590}', '\u{2584}', '\u{2580}',
+        ]);
+        candidates.extend(FIRST_HEXTANT..=LAST_HEXTANT);
+        candidates
+            .into_iter()
+            .map(|c| {
+                let mut fit = GlyphFit {
+                    c,
+                    bits: [0; HX * SY / 64],
+                    count: 0,
+                };
+                for i in 0..SY {
+                    for j in 0..HX {
+                        // same lattice and fx/fy mapping as actual_sample
+                        if glyph_filled(c, (j as f32 + 0.5) / HX as f32, (i as f32 + 0.5) / SY as f32)
+                        {
+                            let bit = i * HX + j;
+                            fit.bits[bit / 64] |= 1 << (bit % 64);
+                            fit.count += 1;
+                        }
+                    }
+                }
+                fit
+            })
+            .collect()
+    })
+}
+
+/// Ideal coverage of the true square over one half-cell's sample lattice:
+/// (bitmap, filled count).
+fn half_cell_ideal(
+    square: WorldSquare,
+    half: usize,
+    pos: WorldPoint,
+) -> ([u64; HX * SY / 64], u32) {
+    let half_left = square.x as f32 - 0.5 + 0.5 * half as f32;
+    let bottom = square.y as f32 - 0.5;
+    let mut bits = [0u64; HX * SY / 64];
+    let mut count = 0u32;
+    for i in 0..SY {
+        for j in 0..HX {
+            let wx = half_left + 0.5 * (j as f32 + 0.5) / HX as f32;
+            let wy = bottom + (i as f32 + 0.5) / SY as f32;
+            if (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5 {
+                let bit = i * HX + j;
+                bits[bit / 64] |= 1 << (bit % 64);
+                count += 1;
+            }
+        }
+    }
+    (bits, count)
+}
+
+/// Mirror of `rendered_neighborhood` with no snap-family restriction and no
+/// silhouette-coherence constraint: each half-cell independently takes the
+/// glyph (from the whole coverage-modelled set) with the lowest sampled
+/// coverage error against the true square, ties broken by filled-area
+/// match. This is a candidate rendering *approach*, evaluated by the
+/// comparison metrics below (`per_char_coverage_error`, `jaggedness`,
+/// area error) exactly like the family-snapped approach is — it does no
+/// fitting against those metrics itself.
+#[doc(hidden)]
+pub fn unrestricted_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    let center = world_point_to_world_square(pos);
+    let mut grid = [[[' '; 2]; 3]; 3];
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = center + vec2(dx, dy);
+            for half in 0..2 {
+                let (ideal, ideal_count) = half_cell_ideal(square, half, pos);
+                let key = |fit: &GlyphFit| {
+                    let mismatches: u32 = (0..HX * SY / 64)
+                        .map(|w| (fit.bits[w] ^ ideal[w]).count_ones())
+                        .sum();
+                    (mismatches, fit.count.abs_diff(ideal_count))
+                };
+                grid[(dx + 1) as usize][(dy + 1) as usize][half] = glyph_fits()
+                    .iter()
+                    .min_by(|a, b| key(a).partial_cmp(&key(b)).unwrap())
+                    .unwrap()
+                    .c;
+            }
+        }
+    }
+    (grid, center)
+}
+
+/// Per-character coverage error: for each character half-cell, the absolute
+/// difference between the rendered glyph's filled area and the ideal
+/// square's filled area within that half-cell, summed (in world square
+/// units). Coarser than `coverage_error` (which compares sample by
+/// sample): it only asks each half-cell to contain the right *amount* of
+/// ink, regardless of where in the cell it sits.
+#[doc(hidden)]
+pub fn per_char_coverage_error(
+    grid: &[[DoubleChar; 3]; 3],
+    center: WorldSquare,
+    pos: WorldPoint,
+) -> f32 {
+    let mut total = 0u32;
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = center + vec2(dx, dy);
+            for half in 0..2 {
+                let (_, ideal_count) = half_cell_ideal(square, half, pos);
+                let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+                let rendered = glyph_fits().iter().find(|f| f.c == c).unwrap().count;
+                total += rendered.abs_diff(ideal_count);
+            }
+        }
+    }
+    total as f32 / (HX * SY) as f32
+}
+
+/// Jaggedness of a rendered silhouette: the sum, along each of the four
+/// edges, of the perpendicular step lengths between consecutive sample
+/// columns/rows — each edge contour's total variation, in world units.
+/// A clean rectangle measures 0. Columns/rows with no fill (holes) break
+/// the contour and contribute no step.
+#[doc(hidden)]
+pub fn jaggedness(actual: &FillGrid) -> f32 {
+    let mut steps = 0.0f32;
+    // top and bottom edges: extreme filled row per sample column
+    let col_edges: Vec<Option<(f32, f32)>> = (0..NX)
+        .map(|j| {
+            let rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
+            rows.first()
+                .map(|&lo| (actual.wy(lo), actual.wy(*rows.last().unwrap())))
+        })
+        .collect();
+    for pair in col_edges.windows(2) {
+        if let (Some((bot0, top0)), Some((bot1, top1))) = (pair[0], pair[1]) {
+            steps += (top1 - top0).abs() + (bot1 - bot0).abs();
+        }
+    }
+    // left and right edges: extreme filled column per sample row
+    let row_edges: Vec<Option<(f32, f32)>> = (0..NY)
+        .map(|i| {
+            let cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
+            cols.first()
+                .map(|&lo| (actual.wx(lo), actual.wx(*cols.last().unwrap())))
+        })
+        .collect();
+    for pair in row_edges.windows(2) {
+        if let (Some((left0, right0)), Some((left1, right1))) = (pair[0], pair[1]) {
+            steps += (left1 - left0).abs() + (right1 - right0).abs();
+        }
+    }
+    steps
+}
+
 /// Assign each non-space half-cell glyph a PALETTE index, scanning
 /// top-to-bottom, left-to-right so colors are stable within one report.
 /// Indexed [dx+1][dy+1][half].
@@ -265,6 +449,23 @@ pub fn actual_sample(
         glyph_filled(c, fx, fy),
         owners[(dx + 1) as usize][(dy + 1) as usize][half],
     )
+}
+
+/// Centroid of the rendered fill, for the measured center error: how far
+/// the silhouette's actual middle sits from the true square center.
+#[doc(hidden)]
+pub fn fill_centroid(actual: &FillGrid) -> Option<WorldPoint> {
+    let (mut sx, mut sy, mut n) = (0.0f32, 0.0f32, 0usize);
+    for j in 0..NX {
+        for i in 0..NY {
+            if actual.filled(j, i) {
+                sx += actual.wx(j);
+                sy += actual.wy(i);
+                n += 1;
+            }
+        }
+    }
+    (n > 0).then(|| euclid::point2(sx / n as f32, sy / n as f32))
 }
 
 /// Silhouette metrics over a sampled actual-coverage grid, shared by the

@@ -18,12 +18,17 @@
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
 //!   animate       square on the alternate screen (q quits); orbit,
-//!                 arrow-key nudge, and line trajectories. Shows a zoomed
-//!                 sampled-coverage view (actual vs ideal, one color per
-//!                 glyph) and one line per error metric. Click/drag places
-//!                 the square; holding shift/ctrl/alt while dragging (or
-//!                 pressing f) switches to fine control, where large mouse
-//!                 movements map to sub-cell square movements.
+//!                 arrow-key nudge, and line trajectories. Two view rows:
+//!                 the family-snapped render and, for comparison, the
+//!                 unrestricted render (per-half-cell best fit over all
+//!                 glyphs, minimizing area then center then coverage error;
+//!                 silhouette allowed to be jagged), each shown real-size
+//!                 (square drawn in its glyph colors, no center marker) and
+//!                 zoomed (sampled coverage, one color per glyph), plus one
+//!                 line per error metric. Click/drag places the square;
+//!                 holding shift/ctrl/alt while dragging (or pressing f)
+//!                 switches to fine control, where large mouse movements map
+//!                 to sub-cell square movements.
 //!
 //! Run via scripts/debug-floating-squares.sh or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
@@ -40,8 +45,9 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
-    self, actual_sample, assign_colors, coverage_error, rendered_neighborhood,
-    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W, NX, NY,
+    self, actual_sample, assign_colors, coverage_error, fill_centroid, jaggedness,
+    per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
+    unrestricted_neighborhood, FillGrid, Metrics, BITMAP_W,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -157,6 +163,100 @@ fn draw_floating_square(
                     chars.map(|c| DrawableGlyph::new_colored(c, SQUARE_COLOR, bg)),
                 );
             }
+        }
+    }
+}
+
+fn pal(i: usize) -> RGB8 {
+    let coverage::Rgb(r, g, b) = coverage::PALETTE[i % coverage::PALETTE.len()];
+    RGB8::new(r, g, b)
+}
+
+/// Draws a precomputed glyph neighborhood with one palette color per
+/// half-cell glyph (matching the zoomed panes and the legend), instead of
+/// the uniform square color the diagnostic modes use.
+fn draw_neighborhood_colored(
+    frame: &mut Frame,
+    radius: i32,
+    origin_square: WorldSquare,
+    center: WorldSquare,
+    grid: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+) {
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = euclid::point2(center.x + dx, center.y + dy);
+            let [row, wide_col] = frame_row_col(radius, origin_square, square);
+            if row < 0
+                || wide_col < 0
+                || row as usize >= frame.height()
+                || wide_col as usize * 2 + 1 >= frame.width()
+            {
+                continue;
+            }
+            let chars = grid[(dx + 1) as usize][(dy + 1) as usize];
+            if chars != [SPACE; 2] {
+                let bg = bg_color_for(square);
+                let glyph = |half: usize| {
+                    let color = owners[(dx + 1) as usize][(dy + 1) as usize][half]
+                        .map(pal)
+                        .unwrap_or(SQUARE_COLOR);
+                    DrawableGlyph::new_colored(chars[half], color, bg)
+                };
+                frame.set_by_double_wide_grid(
+                    row as usize,
+                    wide_col as usize,
+                    [glyph(0), glyph(1)],
+                );
+            }
+        }
+    }
+}
+
+/// (text, visible width) legend mapping each rendered half-cell glyph to
+/// its palette color, in assign_colors' scan order so legend colors match
+/// the panes. A 1x1 square spans at most 8 half-cells, so the legend always
+/// fits under the real-size grid.
+fn glyph_legend(
+    glyphs: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+    style: &coverage::Style,
+) -> (String, usize) {
+    let mut legend = String::new();
+    let mut w = 0usize;
+    for dy in [1i32, 0, -1] {
+        for dx in -1..=1i32 {
+            for half in 0..2 {
+                if let Some(idx) = owners[(dx + 1) as usize][(dy + 1) as usize][half] {
+                    legend.push_str(&style.fg(coverage::PALETTE[idx % coverage::PALETTE.len()]));
+                    legend.push(glyphs[(dx + 1) as usize][(dy + 1) as usize][half]);
+                    legend.push(' ');
+                    w += 2;
+                }
+            }
+        }
+    }
+    legend.push_str(style.reset());
+    (legend, w)
+}
+
+/// Left column of one view-row line: the real-size grid, or the
+/// label/legend rows underneath it once the grid runs out (it is shorter
+/// than the zoomed panes). Always padded to frame_w + 2 visible columns.
+fn left_pane_row(
+    frame_lines: &[String],
+    frame_w: usize,
+    under: &[(String, usize)],
+    row: usize,
+) -> String {
+    match frame_lines.get(row) {
+        Some(line) => format!("{line}  "),
+        None => {
+            let (s, w) = under
+                .get(row - frame_lines.len())
+                .cloned()
+                .unwrap_or_default();
+            format!("{s}{}", " ".repeat(frame_w + 2 - w))
         }
     }
 }
@@ -501,22 +601,6 @@ fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
 /// disables ONLCR, so bare '\n' would stair-step the frame.
 const FRAME_DT: Duration = Duration::from_millis(33);
 
-/// Centroid of the rendered fill, for the measured center error: how far
-/// the silhouette's actual middle sits from the true square center.
-fn measured_center(actual: &FillGrid) -> Option<WorldPoint> {
-    let (mut sx, mut sy, mut n) = (0.0f32, 0.0f32, 0usize);
-    for j in 0..NX {
-        for i in 0..NY {
-            if actual.filled(j, i) {
-                sx += actual.wx(j);
-                sy += actual.wy(i);
-                n += 1;
-            }
-        }
-    }
-    (n > 0).then(|| euclid::point2(sx / n as f32, sy / n as f32))
-}
-
 fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode: bool) {
     let pos = state.motion.pos();
     let offset = center_offset(pos);
@@ -530,12 +614,17 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     }
 
     // sampled-coverage oracle (the same one the coherence test asserts on):
-    // both the zoomed view and the error metrics derive from it
+    // both the zoomed views and the error metrics derive from it
     let (glyphs, center) = rendered_neighborhood(pos);
     let owners = assign_colors(&glyphs);
+    let (uglyphs, _) = unrestricted_neighborhood(pos);
+    let uowners = assign_colors(&uglyphs);
     let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(sample_origin, |wx, wy| {
         actual_sample(&glyphs, &owners, center, wx, wy)
+    });
+    let uactual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&uglyphs, &uowners, center, wx, wy)
     });
     let ideal = FillGrid::sample(sample_origin, |wx, wy| {
         (
@@ -544,72 +633,48 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         )
     });
     let metrics = Metrics::measure(&actual, pos);
-    let coverage_err = coverage_error(&glyphs, &owners, center, pos);
     let style = coverage::Style::from_env();
     let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
+    let uactual_lines = uactual.bitmap_pane(&coverage::PALETTE, &style);
     let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
 
+    // real-size views draw the square in its glyph (palette) colors, not a
+    // uniform fill, so a glyph means the same color in every pane; no
+    // center marker — it would hide the very glyphs under inspection
     let origin = euclid::point2(0, 0);
     let mut frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
-    draw_floating_square(&mut frame, ANIMATE_GRID_RADIUS, origin, pos, None);
-    overlay_true_center(&mut frame, ANIMATE_GRID_RADIUS, origin, pos);
+    draw_neighborhood_colored(&mut frame, ANIMATE_GRID_RADIUS, origin, center, &glyphs, &owners);
     let frame_lines: Vec<String> = frame
+        .string_for_regular_display()
+        .lines()
+        .map(String::from)
+        .collect();
+    let mut uframe = grid_frame(ANIMATE_GRID_RADIUS, origin);
+    draw_neighborhood_colored(
+        &mut uframe,
+        ANIMATE_GRID_RADIUS,
+        origin,
+        center,
+        &uglyphs,
+        &uowners,
+    );
+    let uframe_lines: Vec<String> = uframe
         .string_for_regular_display()
         .lines()
         .map(String::from)
         .collect();
     let frame_w = frame.width();
 
-    // glyph legend in the same scan order assign_colors used, so legend
-    // colors match the zoomed view's pixels. A 1x1 square spans at most 8
-    // half-cells, so the legend always fits under the real-size grid.
-    let mut legend = String::new();
-    let mut legend_w = 0usize;
-    for dy in [1i32, 0, -1] {
-        for dx in -1..=1i32 {
-            for half in 0..2 {
-                if let Some(idx) = owners[(dx + 1) as usize][(dy + 1) as usize][half] {
-                    legend.push_str(&style.fg(coverage::PALETTE[idx % coverage::PALETTE.len()]));
-                    legend.push(glyphs[(dx + 1) as usize][(dy + 1) as usize][half]);
-                    legend.push(' ');
-                    legend_w += 2;
-                }
-            }
+    // glyph legend in the rows under each (shorter) real-size grid
+    let under_of = |legend: (String, usize)| {
+        if legend.1 > 0 {
+            vec![("glyph colors:".to_string(), 13), legend]
+        } else {
+            Vec::new()
         }
-    }
-    legend.push_str(style.reset());
-    // the real-size grid is shorter than the zoomed panes; the leftover
-    // rows under it hold the legend. (text, visible width)
-    let under_grid: Vec<(String, usize)> = if legend_w > 0 {
-        vec![("glyph colors:".to_string(), 13), (legend, legend_w)]
-    } else {
-        Vec::new()
     };
-
-    // side-by-side: real-size grid left, zoomed actual + ideal coverage
-    // right. Frame rows always render full-width (and color-neutral at both
-    // ends), so plain concatenation keeps the panes aligned.
-    let mut text = String::new();
-    for row in 0..actual_lines.len() {
-        match frame_lines.get(row) {
-            Some(line) => {
-                text.push_str(line);
-                text.push_str("  ");
-            }
-            None => {
-                let (s, w) = under_grid
-                    .get(row - frame_lines.len())
-                    .cloned()
-                    .unwrap_or_default();
-                text.push_str(&s);
-                text.push_str(&" ".repeat(frame_w + 2 - w));
-            }
-        }
-        text.push_str(&actual_lines[row]);
-        text.push_str("  ");
-        text.push_str(&ideal_lines[row]);
-        text.push('\n');
-    }
+    let under1 = under_of(glyph_legend(&glyphs, &owners, &style));
+    let under2 = under_of(glyph_legend(&uglyphs, &uowners, &style));
 
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
@@ -623,53 +688,93 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
+    let umetrics = Metrics::measure(&uactual, pos);
     let frac = fraction_part(pos);
-    let center_err = match measured_center(&actual) {
+    let center_err_of = |actual: &FillGrid| match fill_centroid(actual) {
         Some(c) => {
             let (dx, dy) = (c.x - pos.x, c.y - pos.y);
-            format!(
-                "center err=({:+.3}, {:+.3})  |center err|={:.3}",
-                dx,
-                dy,
-                dx.hypot(dy)
-            )
+            format!("({:+.3}, {:+.3})  |d|={:.3}", dx, dy, dx.hypot(dy))
         }
-        None => "center err=n/a (nothing rendered)".to_string(),
+        None => "n/a (nothing rendered)".to_string(),
     };
-    // one line per metric, so no value is crowded out when others grow
-    text.push_str(&format!(
-        "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})  family={}\n",
-        pos.x, pos.y, frac.x, frac.y, family_display,
-    ));
-    text.push_str(&format!(
-        "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})\n",
-        info.snapped_offset.x,
-        info.snapped_offset.y,
-        info.snapped_offset.x - offset.x,
-        info.snapped_offset.y - offset.y,
-    ));
-    text.push_str(&center_err);
-    text.push('\n');
-    text.push_str(&format!(
-        "area err={:+.3}  (area {:.3})\n",
-        metrics.area - 1.0,
-        metrics.area,
-    ));
-    text.push_str(&format!("coverage err={coverage_err:.4}\n"));
-    text.push_str(&format!("top spread={:.3}\n", metrics.top_spread));
-    text.push_str(&format!("bottom spread={:.3}\n", metrics.bottom_spread));
-    text.push_str(&format!("left spread={:.3}\n", metrics.left_spread));
-    text.push_str(&format!("right spread={:.3}\n", metrics.right_spread));
-    text.push_str(&format!("holes={}\n", metrics.holes));
-    text.push_str(&format!(
-        "{} speed={:.2}x  switches={}  t={:.1}s{}{}\n",
-        state.motion.name(),
-        state.speed,
-        state.switches,
-        state.anim_time.as_secs_f32(),
-        if state.paused { "  [paused]" } else { "" },
-        if state.fine_drag { "  [fine-drag]" } else { "" },
-    ));
+    // The comparison metrics, measured identically for every approach:
+    // area error (rendered vs 1.0), per-character coverage error (sum over
+    // half-cells of |rendered - ideal| filled area), and jaggedness (total
+    // edge step length). Rendering approaches are not fitted to these.
+    let approach_stats = |name: &str,
+                          grid: &[[DoubleChar; 3]; 3],
+                          actual: &FillGrid,
+                          m: &Metrics| {
+        vec![
+            format!("approach: {name}"),
+            format!("center err={}", center_err_of(actual)),
+            format!("area err={:+.3}  (area {:.3})", m.area - 1.0, m.area),
+            format!(
+                "per-char coverage err={:.4}",
+                per_char_coverage_error(grid, center, pos)
+            ),
+            format!("jaggedness={:.3}", jaggedness(actual)),
+        ]
+    };
+    // row 1 carries the family-snapped approach, the ideal (true square)
+    // zoom, and the globally applicable stats and notes
+    let stats1 = [
+        approach_stats("family-snapped", &glyphs, &actual, &metrics),
+        vec![String::new()],
+        vec![
+            format!(
+                "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
+                pos.x, pos.y, frac.x, frac.y,
+            ),
+            format!("family={family_display}"),
+            format!(
+                "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})",
+                info.snapped_offset.x,
+                info.snapped_offset.y,
+                info.snapped_offset.x - offset.x,
+                info.snapped_offset.y - offset.y,
+            ),
+            format!(
+                "{} speed={:.2}x  switches={}  t={:.1}s{}{}",
+                state.motion.name(),
+                state.speed,
+                state.switches,
+                state.anim_time.as_secs_f32(),
+                if state.paused { "  [paused]" } else { "" },
+                if state.fine_drag { "  [fine-drag]" } else { "" },
+            ),
+            "zoom: actual | ideal (true square)".to_string(),
+            "glyph-color legend under each grid".to_string(),
+        ],
+    ]
+    .concat();
+    let stats2 = approach_stats("unrestricted (per-half-cell best coverage)", &uglyphs, &uactual, &umetrics);
+
+    // one row per rendering approach, real-size grid left and zoomed
+    // coverage right, with the approach's stats on the same row. Frame
+    // rows always render full-width and color-neutral at both ends, so
+    // plain concatenation keeps the panes aligned.
+    let mut text = String::new();
+    for row in 0..actual_lines.len() {
+        text.push_str(&left_pane_row(&frame_lines, frame_w, &under1, row));
+        text.push_str(&actual_lines[row]);
+        text.push_str("  ");
+        text.push_str(&ideal_lines[row]);
+        text.push_str("  ");
+        if let Some(m) = stats1.get(row) {
+            text.push_str(m);
+        }
+        text.push('\n');
+    }
+    for (row, uline) in uactual_lines.iter().enumerate() {
+        text.push_str(&left_pane_row(&uframe_lines, frame_w, &under2, row));
+        text.push_str(uline);
+        text.push_str("  ");
+        if let Some(m) = stats2.get(row) {
+            text.push_str(m);
+        }
+        text.push('\n');
+    }
 
     if raw_mode {
         // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
@@ -858,8 +963,10 @@ fn usage() {
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
            animate [N]   orbiting square with a zoomed sampled-coverage view\n  \
-          \x20      (actual vs ideal, one color per glyph) and one line per\n  \
-          \x20      error metric; q quits, space pauses, arrows nudge, o resumes\n  \
+          \x20      (actual vs ideal, one color per glyph), a second row with\n  \
+          \x20      the unrestricted best-fit render (no snap-family\n  \
+          \x20      restriction, jagged allowed), and one line per error\n  \
+          \x20      metric; q quits, space pauses, arrows nudge, o resumes\n  \
           \x20      the orbit, l starts a line trajectory, +/- change speed,\n  \
           \x20      click/drag places the square, holding shift/ctrl/alt while\n  \
           \x20      dragging (or pressing f) gives fine control: large mouse\n  \
