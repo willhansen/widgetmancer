@@ -20,20 +20,22 @@
 //!   animate       square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. Three bordered
 //!                 rows: one per rendering approach — family-snapped, then
-//!                 per-character best fit (each half-cell over all glyphs,
-//!                 min sampled coverage error; tie: filled-area match;
-//!                 jagged silhouettes allowed) — each with the real-size
-//!                 render (square drawn in its glyph colors, no center
-//!                 marker) plus legend, the zoomed sampled-coverage view,
-//!                 and metrics: the comparison metrics measured identically
-//!                 for every approach, then approach-specific info (for
-//!                 family-snapped its snap family and snap error; for
-//!                 per-character best fit an outline of its approach);
-//!                 then a common row with the ideal (true square)
-//!                 zoom, global state, and controls. Click/drag places the
-//!                 square; holding shift/ctrl/alt while dragging (or
-//!                 pressing f) switches to fine control, where large mouse
-//!                 movements map to sub-cell square movements.
+//!                 the legacy full-square method (pre-SnapFamily
+//!                 characters_for_full_square_with_2d_offset: per
+//!                 half-cell, nearest snap point over the union of all
+//!                 four families' grids, with per-square x-compensation)
+//!                 — each with the real-size render (square drawn in its
+//!                 glyph colors, no center marker) plus legend, the
+//!                 zoomed sampled-coverage view, and metrics: the
+//!                 comparison metrics measured identically for every
+//!                 approach, then approach-specific info (for
+//!                 family-snapped its snap family and snap error; for the
+//!                 legacy method an outline of the approach); then a
+//!                 common row with the ideal (true square) zoom, global
+//!                 state, and controls. Click/drag places the square;
+//!                 holding shift/ctrl/alt while dragging (or pressing f)
+//!                 switches to fine control, where large mouse movements
+//!                 map to sub-cell square movements.
 //!
 //! Run via scripts/debug-floating-squares.sh or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
@@ -51,8 +53,8 @@ use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, coverage_error, fill_centroid, jaggedness,
-    per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
-    per_character_best_fit_neighborhood, FillGrid, Metrics, BITMAP_W,
+    legacy_full_square_neighborhood, per_char_coverage_error, rendered_neighborhood,
+    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -690,14 +692,14 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     // both the zoomed views and the error metrics derive from it
     let (glyphs, center) = rendered_neighborhood(pos);
     let owners = assign_colors(&glyphs);
-    let (fit_glyphs, _) = per_character_best_fit_neighborhood(pos);
-    let fit_owners = assign_colors(&fit_glyphs);
+    let (full_glyphs, _) = legacy_full_square_neighborhood(pos);
+    let full_owners = assign_colors(&full_glyphs);
     let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(sample_origin, |wx, wy| {
         actual_sample(&glyphs, &owners, center, wx, wy)
     });
-    let fit_actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&fit_glyphs, &fit_owners, center, wx, wy)
+    let full_actual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&full_glyphs, &full_owners, center, wx, wy)
     });
     let ideal = FillGrid::sample(sample_origin, |wx, wy| {
         (
@@ -708,7 +710,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     let metrics = Metrics::measure(&actual, pos);
     let style = coverage::Style::from_env();
     let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
-    let fit_lines = fit_actual.bitmap_pane(&coverage::PALETTE, &style);
+    let full_lines = full_actual.bitmap_pane(&coverage::PALETTE, &style);
     let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
 
     // real-size views draw the square in its glyph (palette) colors, not a
@@ -722,16 +724,16 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         .lines()
         .map(String::from)
         .collect();
-    let mut fit_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
+    let mut full_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
     draw_neighborhood_colored(
-        &mut fit_frame,
+        &mut full_frame,
         ANIMATE_GRID_RADIUS,
         origin,
         center,
-        &fit_glyphs,
-        &fit_owners,
+        &full_glyphs,
+        &full_owners,
     );
-    let fit_frame_lines: Vec<String> = fit_frame
+    let full_frame_lines: Vec<String> = full_frame
         .string_for_regular_display()
         .lines()
         .map(String::from)
@@ -747,7 +749,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         }
     };
     let under1 = under_of(glyph_legend(&glyphs, &owners, &style));
-    let under2 = under_of(glyph_legend(&fit_glyphs, &fit_owners, &style));
+    let under2 = under_of(glyph_legend(&full_glyphs, &full_owners, &style));
 
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
@@ -761,7 +763,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
-    let fit_metrics = Metrics::measure(&fit_actual, pos);
+    let full_metrics = Metrics::measure(&full_actual, pos);
     let frac = fraction_part(pos);
 
     // one boxed row per rendering method: real-size grid with the glyph
@@ -786,18 +788,19 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
             info.snapped_offset.y - offset.y,
         ),
     ]);
-    let mut stats2 = comparison_stats(&fit_glyphs, center, pos, &fit_actual, &fit_metrics);
+    let mut stats2 = comparison_stats(&full_glyphs, center, pos, &full_actual, &full_metrics);
     stats2.push(String::new());
     stats2.extend([
-        "approach: each half-cell, over".to_string(),
-        "every coverage-modelled glyph, takes".to_string(),
-        "min sampled coverage error; tie-break:".to_string(),
-        "filled-area match. no coherence".to_string(),
-        "constraint — jagged silhouettes allowed.".to_string(),
+        "approach: pre-SnapFamily".to_string(),
+        "full-square method: per half-cell,".to_string(),
+        "nearest snap point over the union".to_string(),
+        "of all four families' grids, with".to_string(),
+        "per-square x-compensation. no".to_string(),
+        "family purity — sibling half-cells".to_string(),
+        "can mix families.".to_string(),
     ]);
-
     let left1 = left_col(&frame_lines, &under1);
-    let left2 = left_col(&fit_frame_lines, &under2);
+    let left2 = left_col(&full_frame_lines, &under2);
     let stats1_w = col_w(&stats1);
     let stats2_w = col_w(&stats2);
     let row1 = boxed_row(
@@ -809,13 +812,14 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         ],
     );
     let row2 = boxed_row(
-        "per-character best fit",
+        "legacy full-square",
         &[
             (left2.as_slice(), frame_w),
-            (fit_lines.as_slice(), BITMAP_W),
+            (full_lines.as_slice(), BITMAP_W),
             (stats2.as_slice(), stats2_w),
         ],
     );
+
 
     // common box: ideal zoom, global state, controls — one column each
     let mut ideal_col = vec!["ideal (true square)".to_string()];
@@ -1050,13 +1054,14 @@ fn usage() {
            families X Y  the same position with each snap family forced\n  \
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
-           animate [N]   orbiting square with a zoomed sampled-coverage view\n  \
-          \x20      (actual vs ideal, one color per glyph), a second row with\n  \
-          \x20      the per-character-best-fit render (no snap-family\n  \
-          \x20      restriction, jagged allowed), and one line per error\n  \
-          \x20      metric; q quits, space pauses, arrows nudge, o resumes\n  \
-          \x20      the orbit, l starts a line trajectory, +/- change speed,\n  \
-          \x20      click/drag places the square, holding shift/ctrl/alt while\n  \
+           animate [N]   orbiting square, one bordered row per rendering\n  \
+          \x20      approach (family-snapped, legacy full-square): real-\n  \
+          \x20      size render plus legend, zoomed sampled-coverage view\n  \
+          \x20      (actual vs ideal, one color per\n  \
+          \x20      glyph), and one line per error metric; q quits, space\n  \
+          \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
+          \x20      line trajectory, +/- change speed, click/drag places\n  \
+          \x20      the square, holding shift/ctrl/alt while\n  \
           \x20      dragging (or pressing f) gives fine control: large mouse\n  \
           \x20      movements map to sub-cell square movements. Optional frame\n  \
           \x20      count N runs a fixed number of frames, which is also the\n  \

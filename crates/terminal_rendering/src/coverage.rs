@@ -8,16 +8,20 @@
 use std::sync::OnceLock;
 
 use euclid::vec2;
+use ordered_float::OrderedFloat;
 
 use crate::glyph_constants::*;
-use crate::hextant_blocks::{hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT};
+use crate::hextant_blocks::{
+    hextant_block_by_offset, hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
+};
 use crate::{
-    characters_for_full_square_with_2d_offset, characters_for_full_square_with_2d_offset_forced,
-    DoubleChar,
+    character_for_half_square_with_1d_eighths_offset, characters_for_full_square_with_2d_offset,
+    characters_for_full_square_with_2d_offset_forced, quadrant_block_by_offset, DoubleChar,
 };
 use utility::coordinate_frame_conversions::{
     world_point_to_world_square, WorldMove, WorldPoint, WorldSquare,
 };
+use utility::{sign, FVector};
 
 // Samples per world unit. X needs 8 per half-cell for eighth blocks; Y must
 // divide both eighths and thirds (hextants), hence 24.
@@ -194,6 +198,112 @@ pub fn rendered_neighborhood_forced(
         }
     }
     (grid, center)
+}
+
+/// Legacy per-half-cell glyph pick from the pre-SnapFamily renderer
+/// (`character_for_half_square_with_2d_offset`, deleted from
+/// floating_square.rs in "more debug tooling"; restored verbatim for
+/// approach comparison in the debug tool — not a render-path candidate).
+/// `offset` is the half square's offset from the half-cell's center (x in
+/// half-cell units, y in row units); returns the glyph at the nearest snap
+/// point in the union of all four snap families' grids. Each half-cell
+/// picks independently, so sibling half-cells can mix families — the
+/// silhouette tearing SnapFamily was introduced to fix.
+fn legacy_character_for_half_square_with_2d_offset(offset: FVector) -> char {
+    // start with basic centered square
+    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), FULL_BLOCK)];
+
+    // the eighth steps along the axes
+    let mut horizontal_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
+        .map(|i| {
+            (
+                vec2(i as f32 / 8.0, 0.0),
+                character_for_half_square_with_1d_eighths_offset(false, i),
+            )
+        })
+        .collect();
+    snap_points_with_characters.append(&mut horizontal_snap_points_at_eighths);
+
+    let mut vertical_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
+        .map(|i| {
+            (
+                vec2(0.0, i as f32 / 8.0),
+                character_for_half_square_with_1d_eighths_offset(true, i),
+            )
+        })
+        .collect();
+    snap_points_with_characters.append(&mut vertical_snap_points_at_eighths);
+
+    // the one third steps vertically, with horizontal half-square offsets
+    let mut hextant_snap_points: Vec<(FVector, char)> = (-2..=2)
+        .flat_map(|x| {
+            (-3..=3).map(move |y| {
+                (
+                    vec2(x as f32 / 2.0, y as f32 / 3.0),
+                    hextant_block_by_offset(vec2(x, y)),
+                )
+            })
+        })
+        .collect();
+    snap_points_with_characters.append(&mut hextant_snap_points);
+
+    // the half square grid offsets
+    let mut quadrant_snap_points: Vec<(FVector, char)> = (-2..=2)
+        .flat_map(|x| {
+            (-2..=2).map(move |y| {
+                (
+                    vec2(x as f32 / 2.0, y as f32 / 2.0),
+                    quadrant_block_by_offset(vec2(x, y)),
+                )
+            })
+        })
+        .collect();
+    snap_points_with_characters.append(&mut quadrant_snap_points);
+
+    *snap_points_with_characters
+        .iter()
+        .min_by_key(|(snap_point, _character)| OrderedFloat((*snap_point - offset).length()))
+        .map(|(_snap_point, character)| character)
+        .unwrap()
+}
+
+/// `rendered_neighborhood` with the per-square character pick pluggable.
+fn neighborhood_with(
+    pos: WorldPoint,
+    chars: impl Fn(WorldMove) -> DoubleChar,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    let center = world_point_to_world_square(pos);
+    let mut grid = [[[' '; 2]; 3]; 3];
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = center + vec2(dx, dy);
+            let offset: WorldMove = pos - square.to_f32();
+            grid[(dx + 1) as usize][(dy + 1) as usize] = chars(offset);
+        }
+    }
+    (grid, center)
+}
+
+/// The pre-SnapFamily full-square approach: the legacy
+/// `characters_for_full_square_with_2d_offset` — per half-cell, nearest
+/// snap point over the union of all four families' grids, with the
+/// x-compensation that zeroes the half-cell the square moved toward. No
+/// family purity: a square's two half-cells can mix families.
+#[doc(hidden)]
+pub fn legacy_full_square_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    neighborhood_with(pos, |offset: WorldMove| {
+        let char_offsets = [-1.0, 1.0].map(|i| {
+            let scaled_x_offset = offset.x * 2.0;
+            let shifted_toward_this_side = sign(scaled_x_offset) == i;
+            let compensated_x_offset = if shifted_toward_this_side {
+                (scaled_x_offset.abs() - 1.0).max(0.0) * sign(scaled_x_offset)
+            } else {
+                scaled_x_offset
+            };
+            vec2(compensated_x_offset, offset.y)
+        });
+        char_offsets.map(legacy_character_for_half_square_with_2d_offset)
+    })
 }
 
 /// Symmetric-difference area (in world square units) between the rendered

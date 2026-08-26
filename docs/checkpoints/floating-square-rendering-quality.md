@@ -158,6 +158,27 @@ The coverage oracle (`glyph_filled`, `FillGrid`, `bitmap_pane`, …) lives in
 by the test and the tool so the two can never drift apart. `Style`/`Rgb` and
 the palette constants moved there too.
 
+## Debug tool: legacy approach row replaces per-character best fit — 2026-08
+
+The animate view's second approach row (per-character best fit) was
+replaced by the pre-SnapFamily rendering method, restored verbatim from
+"more debug tooling"~1 into coverage.rs as
+`legacy_character_for_half_square_with_2d_offset` (private) behind the
+`#[doc(hidden)]` wrapper `legacy_full_square_neighborhood` (the old
+`characters_for_full_square_with_2d_offset`: per half-cell, nearest snap
+point over the union of all four families' grids, with per-square
+x-compensation). The best-fit machinery
+(`per_character_best_fit_neighborhood`, `GlyphFit`) stays: the comparison
+test still measures it.
+
+The no-compensation half-square variant (same pick on the raw scaled
+offset) was briefly shown as a third row but removed: near x offsets of
+±0.5 the raw scaled offset lands on the ±1.0 snap points (SPACE glyph) in
+every cell at once, so the square disappears entirely (per-char coverage
+err ~2.0) — degenerate rather than merely tear-prone. The full-square
+x-compensation is exactly what keeps the square alive through those
+offsets.
+
 ## Remaining loose ends (not blocking)
 
 - The y-error weighting idea from the original proposal (weight y ~2x for
