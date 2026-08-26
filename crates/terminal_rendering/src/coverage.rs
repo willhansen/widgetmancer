@@ -305,16 +305,21 @@ fn half_cell_ideal(
     (bits, count)
 }
 
-/// Mirror of `rendered_neighborhood` with no snap-family restriction and no
-/// silhouette-coherence constraint: each half-cell independently takes the
-/// glyph (from the whole coverage-modelled set) with the lowest sampled
-/// coverage error against the true square, ties broken by filled-area
-/// match. This is a candidate rendering *approach*, evaluated by the
-/// comparison metrics below (`per_char_coverage_error`, `jaggedness`,
-/// area error) exactly like the family-snapped approach is — it does no
-/// fitting against those metrics itself.
+/// The "Per-character Best Fit" approach: a mirror of
+/// `rendered_neighborhood` with no snap-family restriction and no
+/// silhouette-coherence constraint — each half-cell independently takes
+/// the glyph (from the whole coverage-modelled set) with the lowest
+/// sampled coverage error against the true square, ties broken by
+/// filled-area match. Since half-cells are disjoint, that is the global
+/// optimum of its objective; jagged silhouettes are expected. It is a
+/// candidate rendering *approach*, evaluated by the comparison metrics
+/// below (`per_char_coverage_error`, `jaggedness`, area error) exactly
+/// like the family-snapped approach is — it does no fitting against those
+/// metrics itself.
 #[doc(hidden)]
-pub fn unrestricted_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+pub fn per_character_best_fit_neighborhood(
+    pos: WorldPoint,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
     let center = world_point_to_world_square(pos);
     let mut grid = [[[' '; 2]; 3]; 3];
     for dx in -1..=1i32 {

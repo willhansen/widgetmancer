@@ -20,14 +20,16 @@
 //!   animate       square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. Three bordered
 //!                 rows: one per rendering approach — family-snapped, then
-//!                 unrestricted (per-half-cell best fit over all glyphs,
-//!                 minimizing area then center then coverage error;
-//!                 silhouette allowed to be jagged) — each with the
-//!                 real-size render (square drawn in its glyph colors, no
-//!                 center marker) plus legend, the zoomed sampled-coverage
-//!                 view, and metrics (comparison metrics measured
-//!                 identically for every approach, then approach-specific
-//!                 ones); then a common row with the ideal (true square)
+//!                 per-character best fit (each half-cell over all glyphs,
+//!                 min sampled coverage error; tie: filled-area match;
+//!                 jagged silhouettes allowed) — each with the real-size
+//!                 render (square drawn in its glyph colors, no center
+//!                 marker) plus legend, the zoomed sampled-coverage view,
+//!                 and metrics: the comparison metrics measured identically
+//!                 for every approach, then approach-specific info (for
+//!                 family-snapped its snap family and snap error; for
+//!                 per-character best fit an outline of its approach);
+//!                 then a common row with the ideal (true square)
 //!                 zoom, global state, and controls. Click/drag places the
 //!                 square; holding shift/ctrl/alt while dragging (or
 //!                 pressing f) switches to fine control, where large mouse
@@ -50,7 +52,7 @@ use termion::screen::IntoAlternateScreen;
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, coverage_error, fill_centroid, jaggedness,
     per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
-    unrestricted_neighborhood, FillGrid, Metrics, BITMAP_W,
+    per_character_best_fit_neighborhood, FillGrid, Metrics, BITMAP_W,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -688,14 +690,14 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     // both the zoomed views and the error metrics derive from it
     let (glyphs, center) = rendered_neighborhood(pos);
     let owners = assign_colors(&glyphs);
-    let (uglyphs, _) = unrestricted_neighborhood(pos);
-    let uowners = assign_colors(&uglyphs);
+    let (fit_glyphs, _) = per_character_best_fit_neighborhood(pos);
+    let fit_owners = assign_colors(&fit_glyphs);
     let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(sample_origin, |wx, wy| {
         actual_sample(&glyphs, &owners, center, wx, wy)
     });
-    let uactual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&uglyphs, &uowners, center, wx, wy)
+    let fit_actual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&fit_glyphs, &fit_owners, center, wx, wy)
     });
     let ideal = FillGrid::sample(sample_origin, |wx, wy| {
         (
@@ -706,7 +708,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     let metrics = Metrics::measure(&actual, pos);
     let style = coverage::Style::from_env();
     let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
-    let uactual_lines = uactual.bitmap_pane(&coverage::PALETTE, &style);
+    let fit_lines = fit_actual.bitmap_pane(&coverage::PALETTE, &style);
     let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
 
     // real-size views draw the square in its glyph (palette) colors, not a
@@ -720,16 +722,16 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         .lines()
         .map(String::from)
         .collect();
-    let mut uframe = grid_frame(ANIMATE_GRID_RADIUS, origin);
+    let mut fit_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
     draw_neighborhood_colored(
-        &mut uframe,
+        &mut fit_frame,
         ANIMATE_GRID_RADIUS,
         origin,
         center,
-        &uglyphs,
-        &uowners,
+        &fit_glyphs,
+        &fit_owners,
     );
-    let uframe_lines: Vec<String> = uframe
+    let fit_frame_lines: Vec<String> = fit_frame
         .string_for_regular_display()
         .lines()
         .map(String::from)
@@ -745,7 +747,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         }
     };
     let under1 = under_of(glyph_legend(&glyphs, &owners, &style));
-    let under2 = under_of(glyph_legend(&uglyphs, &uowners, &style));
+    let under2 = under_of(glyph_legend(&fit_glyphs, &fit_owners, &style));
 
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
@@ -759,7 +761,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
-    let umetrics = Metrics::measure(&uactual, pos);
+    let fit_metrics = Metrics::measure(&fit_actual, pos);
     let frac = fraction_part(pos);
 
     // one boxed row per rendering method: real-size grid with the glyph
@@ -784,10 +786,18 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
             info.snapped_offset.y - offset.y,
         ),
     ]);
-    let stats2 = comparison_stats(&uglyphs, center, pos, &uactual, &umetrics);
+    let mut stats2 = comparison_stats(&fit_glyphs, center, pos, &fit_actual, &fit_metrics);
+    stats2.push(String::new());
+    stats2.extend([
+        "approach: each half-cell, over".to_string(),
+        "every coverage-modelled glyph, takes".to_string(),
+        "min sampled coverage error; tie-break:".to_string(),
+        "filled-area match. no coherence".to_string(),
+        "constraint — jagged silhouettes allowed.".to_string(),
+    ]);
 
     let left1 = left_col(&frame_lines, &under1);
-    let left2 = left_col(&uframe_lines, &under2);
+    let left2 = left_col(&fit_frame_lines, &under2);
     let stats1_w = col_w(&stats1);
     let stats2_w = col_w(&stats2);
     let row1 = boxed_row(
@@ -799,10 +809,10 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         ],
     );
     let row2 = boxed_row(
-        "unrestricted (per-half-cell best coverage)",
+        "per-character best fit",
         &[
             (left2.as_slice(), frame_w),
-            (uactual_lines.as_slice(), BITMAP_W),
+            (fit_lines.as_slice(), BITMAP_W),
             (stats2.as_slice(), stats2_w),
         ],
     );
@@ -1042,7 +1052,7 @@ fn usage() {
           \x20      the family each offset picks (decision-boundary map)\n  \
            animate [N]   orbiting square with a zoomed sampled-coverage view\n  \
           \x20      (actual vs ideal, one color per glyph), a second row with\n  \
-          \x20      the unrestricted best-fit render (no snap-family\n  \
+          \x20      the per-character-best-fit render (no snap-family\n  \
           \x20      restriction, jagged allowed), and one line per error\n  \
           \x20      metric; q quits, space pauses, arrows nudge, o resumes\n  \
           \x20      the orbit, l starts a line trajectory, +/- change speed,\n  \
