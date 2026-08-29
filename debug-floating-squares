@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Visually debug floating square rendering (sub-square character snapping).
+# Renders the same glyph picks the game uses for OffsetSquareDrawable.
+#   ./debug-floating-squares                 animate (default): orbiting square (q quits)
+#   ./debug-floating-squares pos 1.3 0.7     single square at (X, Y)
+#   ./debug-floating-squares families 1.3 0.7  all snap families side by side
+#   ./debug-floating-squares sweep           offset table + family boundary map
+#   ./debug-floating-squares animate         orbiting square (q quits)
+set -euo pipefail
+
+# Re-exec inside the nix dev shell when cargo isn't on PATH (e.g. invoked
+# from a bare shell). The guard var prevents an infinite loop if the dev
+# shell itself fails to provide cargo.
+if ! command -v cargo >/dev/null 2>&1 && [[ -z "${_DEV_SHELL_GUARD:-}" ]]; then
+  export _DEV_SHELL_GUARD=1
+  exec nix develop --command "$(readlink -f "${BASH_SOURCE[0]}")" "$@"
+fi
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec cargo run --quiet -p terminal_rendering --bin floating_square_debug -- "$@"

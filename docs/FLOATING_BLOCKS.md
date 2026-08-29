@@ -119,7 +119,7 @@ The same oracle drives both consumers, so they can never drift apart:
 
 ## Debug tooling
 
-`scripts/debug-floating-squares.sh` (wrapper for
+The top-level `./debug-floating-squares` wrapper (for
 `cargo run -p terminal_rendering --bin floating_square_debug`) renders the
 real glyph picks on a checkerboard of square centers:
 
@@ -134,7 +134,7 @@ real glyph picks on a checkerboard of square centers:
 - `animate` — orbiting square on the alternate screen; arrow keys nudge
   by 1/16 (the finest snap grid, so one keypress crosses at most one snap
   boundary), family switches are highlighted since that is where visible
-  pops happen.
+  pops happen. This is the default when no mode is given.
 
 ## Related but separate: the 1D-offset path
 

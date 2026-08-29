@@ -17,7 +17,8 @@
 //!                 side by side
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
-//!   animate       square on the alternate screen (q quits); orbit,
+//!   animate (default)
+//!                 square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. Three bordered
 //!                 rows: one per rendering approach — family-snapped, then
 //!                 the legacy full-square method (pre-SnapFamily
@@ -37,8 +38,8 @@
 //!                 switches to fine control, where large mouse movements
 //!                 map to sub-cell square movements.
 //!
-//! Run via scripts/debug-floating-squares.sh or:
-//!   cargo run -p terminal_rendering --bin floating_square_debug -- pos 1.3 0.7
+//! Run via the top-level ./debug-floating-squares wrapper, or:
+//!   cargo run -p terminal_rendering --bin floating_square_debug -- animate
 
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::sync::mpsc::channel;
@@ -1066,7 +1067,7 @@ fn usage() {
           \x20      movements map to sub-cell square movements. Optional frame\n  \
           \x20      count N runs a fixed number of frames, which is also the\n  \
           \x20      mode used when stdout is not a terminal.\n\
-         default: pos 0.3 0.7"
+         default: animate (runs until q; fixed frame count when piped)"
     );
 }
 
@@ -1082,7 +1083,7 @@ fn main() {
         }
     };
     match args.first().map(String::as_str) {
-        None => show_position(euclid::point2(0.3, 0.7)),
+        None => run_animation(None),
         Some("pos") => match parse_xy(1) {
             Some((x, y)) => show_position(euclid::point2(x, y)),
             _ => {
