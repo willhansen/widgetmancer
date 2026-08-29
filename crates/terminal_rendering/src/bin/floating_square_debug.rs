@@ -33,9 +33,12 @@
 //!                 family-snapped its snap family and snap error; for the
 //!                 legacy method an outline of the approach); then a
 //!                 common row with the ideal (true square) zoom, global
-//!                 state, and controls. Click/drag places the square;
-//!                 holding shift/ctrl/alt while dragging (or pressing f)
-//!                 switches to fine control, where large mouse movements
+//!                 state, and controls. Left click/drag sets the orbit's
+//!                 angular position (the angle from the top-row grid's
+//!                 center to the mouse, at the fixed orbit radius); other
+//!                 buttons place the square (drag to move it), and holding
+//!                 shift/ctrl/alt while dragging (or pressing f) switches
+//!                 placement to fine control, where large mouse movements
 //!                 map to sub-cell square movements.
 //!
 //! Run via the top-level ./debug-floating-squares wrapper, or:
@@ -583,6 +586,16 @@ impl Motion {
     }
 }
 
+/// What an in-progress mouse drag does. Hold events don't report which
+/// button is down, so the press that starts the drag picks the mode once
+/// and Holds stick with it for the whole drag.
+enum DragMode {
+    /// Left button: steer the orbit's angular position.
+    Angle,
+    /// Any other button (or left with a modifier held): place the square.
+    Place,
+}
+
 struct AnimState {
     motion: Motion,
     paused: bool,
@@ -597,6 +610,8 @@ struct AnimState {
     /// Anchor for fine drags, which accumulate cell deltas relative to the
     /// previous event instead of mapping cells to absolute positions.
     last_mouse_cell: Option<(u16, u16)>,
+    /// Mode of the drag in progress (None between drags).
+    drag: Option<DragMode>,
 }
 
 impl AnimState {
@@ -610,6 +625,7 @@ impl AnimState {
             prev_family: None,
             fine_drag: false,
             last_mouse_cell: None,
+            drag: None,
         }
     }
 }
@@ -671,6 +687,16 @@ fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
     let dx_cells = col as f32 - GRID_SCREEN_ORIGIN.0 as f32 - (2.0 * r + 0.5);
     let dy_cells = row as f32 - GRID_SCREEN_ORIGIN.1 as f32 - r;
     euclid::point2(dx_cells * 0.5, -dy_cells)
+}
+
+/// Bearing of the mouse cell from the animation grid's center (the world
+/// origin), for steering the orbit with the left button: clicking a
+/// direction from the center moves the orbiting square to that angle,
+/// keeping the orbit radius. Unlike placement this needs no clamping —
+/// every cell has a well-defined angle.
+fn mouse_cell_angle(col: u16, row: u16) -> f32 {
+    let p = mouse_cell_point(col, row);
+    p.y.atan2(p.x)
 }
 
 /// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
@@ -846,7 +872,8 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         "arrows nudge 1/16",
         "o orbit  l line",
         "+/- speed  f fine-drag",
-        "click/drag place square",
+        "left drag: orbit angle",
+        "mid/right drag: place",
         "shift/ctrl/alt-drag fine",
     ]
     .iter()
@@ -978,41 +1005,63 @@ fn run_animation(frame_count: Option<u32>) {
                     state.fine_drag = !state.fine_drag;
                     dirty = true;
                 }
-                // Click places the square and pauses so the placement sticks;
-                // drag moves it. Clamped to the visible grid. With a
-                // modifier held (or fine_drag toggled), movement is relative
+                // Left click/drag steers the orbit: the angle from the
+                // grid center to the mouse becomes the orbit's angular
+                // position (orbit radius unchanged, so the square jumps to
+                // that bearing). Other buttons place the square (drag to
+                // move it), clamped to the visible grid; with a modifier
+                // held (or fine_drag toggled) placement is relative
                 // instead: cell deltas accumulate at FINE_SCALE, so large
                 // mouse movements produce sub-cell square movements.
+                // Press pauses so the placement sticks.
                 Event::Mouse(MouseEvent::Press(_, x, y))
                 | Event::Mouse(MouseEvent::Hold(x, y)) => {
+                    if let Event::Mouse(MouseEvent::Press(button, _, _)) = &event {
+                        state.drag = Some(if *button == MouseButton::Left && !fine {
+                            DragMode::Angle
+                        } else {
+                            DragMode::Place
+                        });
+                    }
                     let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
                     let clamp = |p: WorldPoint| {
                         euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit))
                     };
-                    if fine {
-                        if let Some((lx, ly)) = state.last_mouse_cell {
-                            let d: WorldMove = euclid::vec2(
-                                (x as f32 - lx as f32) * FINE_SCALE,
-                                (ly as f32 - y as f32) * FINE_SCALE,
-                            );
-                            state.motion = Motion::Free {
-                                pos: clamp(state.motion.pos() + d),
+                    match state.drag {
+                        Some(DragMode::Angle) => {
+                            state.motion = Motion::Orbit {
+                                theta: mouse_cell_angle(x, y),
                             };
                         }
-                    } else {
-                        state.motion = Motion::Free {
-                            pos: clamp(mouse_cell_point(x, y)),
-                        };
+                        _ => {
+                            if fine {
+                                if let Some((lx, ly)) = state.last_mouse_cell {
+                                    let d: WorldMove = euclid::vec2(
+                                        (x as f32 - lx as f32) * FINE_SCALE,
+                                        (ly as f32 - y as f32) * FINE_SCALE,
+                                    );
+                                    state.motion = Motion::Free {
+                                        pos: clamp(state.motion.pos() + d),
+                                    };
+                                }
+                            } else {
+                                state.motion = Motion::Free {
+                                    pos: clamp(mouse_cell_point(x, y)),
+                                };
+                            }
+                            // anchored on every event, so grabbing or
+                            // releasing the modifier mid-drag never causes
+                            // a jump
+                            state.last_mouse_cell = Some((x, y));
+                        }
                     }
-                    // anchored on every event, so grabbing or releasing the
-                    // modifier mid-drag never causes a jump
-                    state.last_mouse_cell = Some((x, y));
                     if matches!(event, Event::Mouse(MouseEvent::Press(_, _, _))) {
                         state.paused = true;
                     }
                     dirty = true;
                 }
                 Event::Mouse(MouseEvent::Release(_, _)) => {
+                    state.drag = None;
                     state.last_mouse_cell = None;
                 }
                 _ => {}
@@ -1032,7 +1081,7 @@ fn run_animation(frame_count: Option<u32>) {
             render_animation_frame(&mut screen, &mut state, true);
             write!(
                 screen,
-                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed drag=place mod+drag=fine f=toggle-fine"
+                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine"
             )
             .unwrap();
             screen.flush().unwrap();
@@ -1061,8 +1110,10 @@ fn usage() {
           \x20      (actual vs ideal, one color per\n  \
           \x20      glyph), and one line per error metric; q quits, space\n  \
           \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
-          \x20      line trajectory, +/- change speed, click/drag places\n  \
-          \x20      the square, holding shift/ctrl/alt while\n  \
+          \x20      line trajectory, +/- change speed, left click/drag sets\n  \
+          \x20      the orbit's angular position (angle from the top-row\n  \
+          \x20      grid's center to the mouse); other buttons place the\n  \
+          \x20      square, and holding shift/ctrl/alt while\n  \
           \x20      dragging (or pressing f) gives fine control: large mouse\n  \
           \x20      movements map to sub-cell square movements. Optional frame\n  \
           \x20      count N runs a fixed number of frames, which is also the\n  \
