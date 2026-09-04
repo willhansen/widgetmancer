@@ -188,3 +188,41 @@ offsets.
   `character_for_half_square_with_1d_offset` can still cause glyph-family
   flicker on the live 1D path (shockwaves). Consider hysteresis if it ever
   shows.
+
+## Charwise approach replaces the legacy row — exact analytic best fit
+
+The animate view's second approach row is renamed "charwise" and no
+longer renders the restored pre-SnapFamily method
+(`legacy_full_square_neighborhood`, deleted together with the sampled
+`per_character_best_fit_neighborhood` that row had once shown). Charwise
+is the same per-character idea, now exact and analytic: a character is a
+half-cell (0.5 wide, 1 row tall) and the square is exactly 2 half-cells
+by 1 row, so the square's overlap with any character is always an
+anchored rectangle (full on an axis, or flush against exactly one cell
+edge — it can never float). Each glyph-geometry class's best member is
+then closed-form:
+
+- strips (eighth/third blocks): xor is monotone in strip size on either
+  side of the ideal's, so the optimum is one of the two grid neighbors;
+- quadrant blocks: fixed 1/2 x 1/2 at the anchor corner;
+- hextants: fill each sextant iff the square covers more than half of it
+  (sextants are disjoint, so this per-sextant majority rule is the exact
+  xor optimum over hextants).
+
+All candidates share the ideal's anchor corner, so the symmetric
+difference is `max(w,a)*max(h,b) - min(w,a)*min(h,b)`; the minimum (ties:
+x-strip, y-strip, quadrant, hextant) is the exact argmin over the whole
+glyph inventory — the objective the old sampled best-fit approximated
+with an 8x24 lattice and a 40-glyph scan. Measured on the same 16x16
+offset grid as the earlier table (mean/max):
+
+| approach | area | center | per-char cov | jaggedness |
+|---|---|---|---|---|
+| family-snapped (auto) | .021/.042 | .079/.159 | .325/.667 | 0/0 |
+| charwise | .066/.250 | .042/.081 | .259/.604 | 1.09/3.00 |
+
+Unit tests pin concrete picks
+(aligned, half-shift, row straddle, diagonal corner) in coverage.rs; the
+comparison test is renamed tests/charwise_rendering.rs with unchanged
+bounds. `glyph_fits` / `half_cell_ideal` stay but lose their bitmap halves
+— only `per_char_coverage_error`'s filled counts were ever read.

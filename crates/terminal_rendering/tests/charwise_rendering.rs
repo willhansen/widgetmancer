@@ -8,7 +8,7 @@
 //! regression screams, while the printed table is the real comparison.
 
 use terminal_rendering::coverage::{
-    actual_sample, assign_colors, fill_centroid, jaggedness, per_character_best_fit_neighborhood,
+    actual_sample, assign_colors, charwise_neighborhood, fill_centroid, jaggedness,
     per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced, FillGrid, SX,
     SY,
 };
@@ -92,7 +92,7 @@ fn measure(
 #[test]
 fn test_approach_comparison_metrics() {
     let auto = measure("family-snapped (auto)", rendered_neighborhood);
-    let best_fit = measure("per-character best fit", per_character_best_fit_neighborhood);
+    let charwise = measure("charwise", charwise_neighborhood);
     for f in 0..4 {
         measure(&format!("forced family {f}"), move |pos| {
             rendered_neighborhood_forced(pos, f)
@@ -102,13 +102,13 @@ fn test_approach_comparison_metrics() {
     // sanity bounds, deliberately loose: the printed table above is the
     // comparison; these only catch blowups
     let (auto_area, auto_center, _, auto_jag) = auto;
-    let (fit_area, fit_center, _, fit_jag) = best_fit;
+    let (fit_area, fit_center, _, fit_jag) = charwise;
     assert!(auto_area <= 0.35, "family-snapped area err {auto_area}");
     assert!(auto_center <= 0.25, "family-snapped center err {auto_center}");
     // the coherence property: the auto pick keeps edges straight
     assert!(auto_jag <= 0.3, "family-snapped jaggedness {auto_jag}");
-    assert!(fit_area <= 0.35, "per-character-best-fit area err {fit_area}");
-    assert!(fit_center <= 0.25, "per-character-best-fit center err {fit_center}");
+    assert!(fit_area <= 0.35, "charwise area err {fit_area}");
+    assert!(fit_center <= 0.25, "charwise center err {fit_center}");
     // jagged by design, but not chaotic
-    assert!(fit_jag <= 8.0, "per-character-best-fit jaggedness {fit_jag}");
+    assert!(fit_jag <= 8.0, "charwise jaggedness {fit_jag}");
 }

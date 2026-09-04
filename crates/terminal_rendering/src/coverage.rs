@@ -12,16 +12,15 @@ use ordered_float::OrderedFloat;
 
 use crate::glyph_constants::*;
 use crate::hextant_blocks::{
-    hextant_block_by_offset, hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
+    hextant_array_to_char, hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
 };
 use crate::{
-    character_for_half_square_with_1d_eighths_offset, characters_for_full_square_with_2d_offset,
-    characters_for_full_square_with_2d_offset_forced, quadrant_block_by_offset, DoubleChar,
+    characters_for_full_square_with_2d_offset, characters_for_full_square_with_2d_offset_forced,
+    DoubleChar,
 };
 use utility::coordinate_frame_conversions::{
     world_point_to_world_square, WorldMove, WorldPoint, WorldSquare,
 };
-use utility::{sign, FVector};
 
 // Samples per world unit. X needs 8 per half-cell for eighth blocks; Y must
 // divide both eighths and thirds (hextants), hence 24.
@@ -200,110 +199,178 @@ pub fn rendered_neighborhood_forced(
     (grid, center)
 }
 
-/// Legacy per-half-cell glyph pick from the pre-SnapFamily renderer
-/// (`character_for_half_square_with_2d_offset`, deleted from
-/// floating_square.rs in "more debug tooling"; restored verbatim for
-/// approach comparison in the debug tool — not a render-path candidate).
-/// `offset` is the half square's offset from the half-cell's center (x in
-/// half-cell units, y in row units); returns the glyph at the nearest snap
-/// point in the union of all four snap families' grids. Each half-cell
-/// picks independently, so sibling half-cells can mix families — the
-/// silhouette tearing SnapFamily was introduced to fix.
-fn legacy_character_for_half_square_with_2d_offset(offset: FVector) -> char {
-    // start with basic centered square
-    let mut snap_points_with_characters: Vec<(FVector, char)> = vec![(vec2(0.0, 0.0), FULL_BLOCK)];
-
-    // the eighth steps along the axes
-    let mut horizontal_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
-        .map(|i| {
-            (
-                vec2(i as f32 / 8.0, 0.0),
-                character_for_half_square_with_1d_eighths_offset(false, i),
-            )
-        })
-        .collect();
-    snap_points_with_characters.append(&mut horizontal_snap_points_at_eighths);
-
-    let mut vertical_snap_points_at_eighths: Vec<(FVector, char)> = (-8..=8)
-        .map(|i| {
-            (
-                vec2(0.0, i as f32 / 8.0),
-                character_for_half_square_with_1d_eighths_offset(true, i),
-            )
-        })
-        .collect();
-    snap_points_with_characters.append(&mut vertical_snap_points_at_eighths);
-
-    // the one third steps vertically, with horizontal half-square offsets
-    let mut hextant_snap_points: Vec<(FVector, char)> = (-2..=2)
-        .flat_map(|x| {
-            (-3..=3).map(move |y| {
-                (
-                    vec2(x as f32 / 2.0, y as f32 / 3.0),
-                    hextant_block_by_offset(vec2(x, y)),
-                )
-            })
-        })
-        .collect();
-    snap_points_with_characters.append(&mut hextant_snap_points);
-
-    // the half square grid offsets
-    let mut quadrant_snap_points: Vec<(FVector, char)> = (-2..=2)
-        .flat_map(|x| {
-            (-2..=2).map(move |y| {
-                (
-                    vec2(x as f32 / 2.0, y as f32 / 2.0),
-                    quadrant_block_by_offset(vec2(x, y)),
-                )
-            })
-        })
-        .collect();
-    snap_points_with_characters.append(&mut quadrant_snap_points);
-
-    *snap_points_with_characters
-        .iter()
-        .min_by_key(|(snap_point, _character)| OrderedFloat((*snap_point - offset).length()))
-        .map(|(_snap_point, character)| character)
-        .unwrap()
-}
-
-/// `rendered_neighborhood` with the per-square character pick pluggable.
-fn neighborhood_with(
-    pos: WorldPoint,
-    chars: impl Fn(WorldMove) -> DoubleChar,
-) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+/// The "charwise" approach: for each character (half-cell) the true
+/// square overlaps, independently pick the glyph whose filled region best
+/// fits the square's overlap with that cell — exact, analytic, and with no
+/// regard for sibling characters, so silhouettes are jagged by design (the
+/// family-snapped render path is the coherent one). A comparison candidate
+/// for the debug tool and tests, not a game-facing render path.
+///
+/// Geometry: a character is a half-cell (0.5 world units wide, 1 row tall)
+/// and the square is exactly 2 half-cells by 1 row, so its overlap with a
+/// character is always an *anchored* rectangle — on each axis either the
+/// full cell or flush against exactly one cell edge; it can never float in
+/// the middle. Every glyph's filled region is anchored the same way
+/// (strips flush to one edge, quadrant blocks and hextants to a corner),
+/// so ideal and candidate always share an anchor corner.
+#[doc(hidden)]
+pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
     let center = world_point_to_world_square(pos);
     let mut grid = [[[' '; 2]; 3]; 3];
     for dx in -1..=1i32 {
         for dy in -1..=1i32 {
             let square = center + vec2(dx, dy);
-            let offset: WorldMove = pos - square.to_f32();
-            grid[(dx + 1) as usize][(dy + 1) as usize] = chars(offset);
+            for half in 0..2 {
+                grid[(dx + 1) as usize][(dy + 1) as usize][half] =
+                    charwise_glyph(pos, square, half);
+            }
         }
     }
     (grid, center)
 }
 
-/// The pre-SnapFamily full-square approach: the legacy
-/// `characters_for_full_square_with_2d_offset` — per half-cell, nearest
-/// snap point over the union of all four families' grids, with the
-/// x-compensation that zeroes the half-cell the square moved toward. No
-/// family purity: a square's two half-cells can mix families.
-#[doc(hidden)]
-pub fn legacy_full_square_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
-    neighborhood_with(pos, |offset: WorldMove| {
-        let char_offsets = [-1.0, 1.0].map(|i| {
-            let scaled_x_offset = offset.x * 2.0;
-            let shifted_toward_this_side = sign(scaled_x_offset) == i;
-            let compensated_x_offset = if shifted_toward_this_side {
-                (scaled_x_offset.abs() - 1.0).max(0.0) * sign(scaled_x_offset)
+/// One character's glyph in the charwise approach (see
+/// `charwise_neighborhood`): the exact argmin of symmetric-difference
+/// area over the whole glyph inventory, computed in closed form.
+///
+/// Each geometry class contributes its provably best member: for strips
+/// the xor is monotone in the strip size on either side of the ideal's,
+/// so the optimum is one of the two grid neighbors; the xor-optimal
+/// hextant is the per-sextant majority rule (sextants are disjoint, so
+/// each decides independently). The overall winner is the minimum over
+/// the four class candidates.
+fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
+    // overlap of the true square with this half-cell in cell coordinates:
+    // x in [0, 1] across the half-cell, y in [0, 1] up the row
+    let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
+    let cell_bottom = square.y as f32 - 0.5;
+    let (x0, x1) = (
+        ((pos.x - 0.5 - cell_left) * 2.0).clamp(0.0, 1.0),
+        ((pos.x + 0.5 - cell_left) * 2.0).clamp(0.0, 1.0),
+    );
+    let (y0, y1) = (
+        (pos.y - 0.5 - cell_bottom).clamp(0.0, 1.0),
+        (pos.y + 0.5 - cell_bottom).clamp(0.0, 1.0),
+    );
+    if x1 <= x0 || y1 <= y0 {
+        return SPACE;
+    }
+    if x0 <= 0.0 && x1 >= 1.0 && y0 <= 0.0 && y1 >= 1.0 {
+        return FULL_BLOCK;
+    }
+    // w and h are the overlap extents measured from the touched edges;
+    // the ideal is then the corner-anchored rectangle [0, w] x [0, h]
+    debug_assert!(x0 <= 0.0 || x1 >= 1.0, "overlap floats in x");
+    debug_assert!(y0 <= 0.0 || y1 >= 1.0, "overlap floats in y");
+    let from_left = x0 <= 0.0;
+    let from_bottom = y0 <= 0.0;
+    let (w, h) = (
+        if from_left { x1 } else { 1.0 - x0 },
+        if from_bottom { y1 } else { 1.0 - y0 },
+    );
+
+    // symmetric-difference area between the ideal [0, w] x [0, h] and a
+    // candidate anchored rectangle [0, a] x [0, b] (strips are the a=1
+    // or b=1 cases, the quadrant block a=b=1/2)
+    let xor = |a: f32, b: f32| w.max(a) * h.max(b) - w.min(a) * h.min(b);
+
+    // vertical strip (eighth blocks): k/8 wide, full height. xor is
+    // monotone in the width on either side of w, so the optimum is one
+    // of the two eighth-grid neighbors.
+    let kf = (w * 8.0).floor();
+    let (x_k, x_err) = {
+        let floor = (kf, xor(kf / 8.0, 1.0));
+        let ceil = (kf + 1.0, xor((kf + 1.0) / 8.0, 1.0));
+        if ceil.1 < floor.1 { ceil } else { floor }
+    };
+    let x_strip = (
+        if from_left {
+            EIGHTH_BLOCKS_FROM_LEFT[x_k as usize]
+        } else {
+            EIGHTH_BLOCKS_FROM_RIGHT[x_k as usize]
+        },
+        x_err,
+    );
+
+    // horizontal strip (eighth and third blocks): full width, k/8 or k/3
+    // tall; the best over the union of the two grids is the better of
+    // each grid's own best
+    let kf_y = (h * 8.0).floor();
+    let (eighth_k, eighth_err) = {
+        let floor = (kf_y, xor(1.0, kf_y / 8.0));
+        let ceil = (kf_y + 1.0, xor(1.0, (kf_y + 1.0) / 8.0));
+        if ceil.1 < floor.1 { ceil } else { floor }
+    };
+    let (third_k, third_err) = {
+        let low = (1.0, xor(1.0, 1.0 / 3.0));
+        let high = (2.0, xor(1.0, 2.0 / 3.0));
+        if high.1 < low.1 { high } else { low }
+    };
+    let y_strip = if eighth_err <= third_err {
+        (
+            if from_bottom {
+                EIGHTH_BLOCKS_FROM_BOTTOM[eighth_k as usize]
             } else {
-                scaled_x_offset
-            };
-            vec2(compensated_x_offset, offset.y)
-        });
-        char_offsets.map(legacy_character_for_half_square_with_2d_offset)
-    })
+                EIGHTH_BLOCKS_FROM_TOP[eighth_k as usize]
+            },
+            eighth_err,
+        )
+    } else if from_bottom {
+        (
+            [LOWER_ONE_THIRD_BLOCK, LOWER_TWO_THIRD_BLOCK][third_k as usize - 1],
+            third_err,
+        )
+    } else {
+        (
+            [UPPER_ONE_THIRD_BLOCK, UPPER_TWO_THIRD_BLOCK][third_k as usize - 1],
+            third_err,
+        )
+    };
+
+    // quadrant block at the anchor corner
+    let quadrant = (
+        match (from_left, from_bottom) {
+            (true, true) => '▖',
+            (false, true) => '▗',
+            (true, false) => '▘',
+            (false, false) => '▝',
+        },
+        xor(0.5, 0.5),
+    );
+
+    // hextant: fill each sextant iff the square covers more than half of
+    // it — the exact xor optimum over hextants, since the sextants are
+    // disjoint. err is accumulated per sextant alongside the fill bits.
+    let hextant = {
+        let mut array = [[false; 2]; 3]; // row 0 = top, col 0 = left
+        let mut err = 0.0;
+        for col in 0..2 {
+            for row in 0..3 {
+                // anchor coordinates: u from the touched x edge, v from
+                // the touched y edge; the ideal is [0, w] x [0, h]
+                let u_ov = ((col + 1) as f32 / 2.0).min(w) - (col as f32 / 2.0).min(w);
+                let v_ov = ((row + 1) as f32 / 3.0).min(h) - (row as f32 / 3.0).min(h);
+                let ov = u_ov * v_ov;
+                // strict >: a half-covered sextant is xor-equal either
+                // way; leaving it unfilled keeps the pick deterministic
+                let filled = 2.0 * ov > 1.0 / 6.0;
+                if filled {
+                    array[if from_bottom { 2 - row } else { row }]
+                        [if from_left { col } else { 1 - col }] = true;
+                }
+                err += if filled { 1.0 / 6.0 - ov } else { ov };
+            }
+        }
+        (hextant_array_to_char(array), err)
+    };
+
+    // minimum error wins; on a tie the earlier candidate (strips over
+    // corner geometry) keeps the silhouette closer to a rectangle
+    [x_strip, y_strip, quadrant, hextant]
+        .into_iter()
+        .min_by_key(|&(_, err)| OrderedFloat(err))
+        .unwrap()
+        .0
 }
 
 /// Symmetric-difference area (in world square units) between the rendered
@@ -334,15 +401,14 @@ pub fn coverage_error(
 /// Samples across a half-cell's width (half a world square).
 const HX: usize = SX / 2;
 
-/// One candidate glyph's coverage over a half-cell's sample lattice, plus
-/// its filled count (for per-character coverage error).
+/// One glyph's filled count over a half-cell's sample lattice (for
+/// per-character coverage error).
 struct GlyphFit {
     c: char,
-    bits: [u64; HX * SY / 64],
     count: u32,
 }
 
-/// Every glyph the coverage model knows, as a best-fit candidate table.
+/// Every glyph the coverage model knows, with its filled sample count.
 fn glyph_fits() -> &'static [GlyphFit] {
     static FITS: OnceLock<Vec<GlyphFit>> = OnceLock::new();
     FITS.get_or_init(|| {
@@ -368,90 +434,41 @@ fn glyph_fits() -> &'static [GlyphFit] {
         candidates
             .into_iter()
             .map(|c| {
-                let mut fit = GlyphFit {
-                    c,
-                    bits: [0; HX * SY / 64],
-                    count: 0,
-                };
+                let mut count = 0u32;
                 for i in 0..SY {
                     for j in 0..HX {
                         // same lattice and fx/fy mapping as actual_sample
-                        if glyph_filled(c, (j as f32 + 0.5) / HX as f32, (i as f32 + 0.5) / SY as f32)
-                        {
-                            let bit = i * HX + j;
-                            fit.bits[bit / 64] |= 1 << (bit % 64);
-                            fit.count += 1;
+                        if glyph_filled(
+                            c,
+                            (j as f32 + 0.5) / HX as f32,
+                            (i as f32 + 0.5) / SY as f32,
+                        ) {
+                            count += 1;
                         }
                     }
                 }
-                fit
+                GlyphFit { c, count }
             })
             .collect()
     })
 }
 
-/// Ideal coverage of the true square over one half-cell's sample lattice:
-/// (bitmap, filled count).
-fn half_cell_ideal(
-    square: WorldSquare,
-    half: usize,
-    pos: WorldPoint,
-) -> ([u64; HX * SY / 64], u32) {
+/// Ideal filled count of the true square over one half-cell's sample
+/// lattice (for per-character coverage error).
+fn half_cell_ideal(square: WorldSquare, half: usize, pos: WorldPoint) -> u32 {
     let half_left = square.x as f32 - 0.5 + 0.5 * half as f32;
     let bottom = square.y as f32 - 0.5;
-    let mut bits = [0u64; HX * SY / 64];
     let mut count = 0u32;
     for i in 0..SY {
         for j in 0..HX {
             let wx = half_left + 0.5 * (j as f32 + 0.5) / HX as f32;
             let wy = bottom + (i as f32 + 0.5) / SY as f32;
             if (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5 {
-                let bit = i * HX + j;
-                bits[bit / 64] |= 1 << (bit % 64);
                 count += 1;
             }
         }
     }
-    (bits, count)
-}
-
-/// The "Per-character Best Fit" approach: a mirror of
-/// `rendered_neighborhood` with no snap-family restriction and no
-/// silhouette-coherence constraint — each half-cell independently takes
-/// the glyph (from the whole coverage-modelled set) with the lowest
-/// sampled coverage error against the true square, ties broken by
-/// filled-area match. Since half-cells are disjoint, that is the global
-/// optimum of its objective; jagged silhouettes are expected. It is a
-/// candidate rendering *approach*, evaluated by the comparison metrics
-/// below (`per_char_coverage_error`, `jaggedness`, area error) exactly
-/// like the family-snapped approach is — it does no fitting against those
-/// metrics itself.
-#[doc(hidden)]
-pub fn per_character_best_fit_neighborhood(
-    pos: WorldPoint,
-) -> ([[DoubleChar; 3]; 3], WorldSquare) {
-    let center = world_point_to_world_square(pos);
-    let mut grid = [[[' '; 2]; 3]; 3];
-    for dx in -1..=1i32 {
-        for dy in -1..=1i32 {
-            let square = center + vec2(dx, dy);
-            for half in 0..2 {
-                let (ideal, ideal_count) = half_cell_ideal(square, half, pos);
-                let key = |fit: &GlyphFit| {
-                    let mismatches: u32 = (0..HX * SY / 64)
-                        .map(|w| (fit.bits[w] ^ ideal[w]).count_ones())
-                        .sum();
-                    (mismatches, fit.count.abs_diff(ideal_count))
-                };
-                grid[(dx + 1) as usize][(dy + 1) as usize][half] = glyph_fits()
-                    .iter()
-                    .min_by(|a, b| key(a).partial_cmp(&key(b)).unwrap())
-                    .unwrap()
-                    .c;
-            }
-        }
-    }
-    (grid, center)
+    count
 }
 
 /// Per-character coverage error: for each character half-cell, the absolute
@@ -471,7 +488,7 @@ pub fn per_char_coverage_error(
         for dy in -1..=1i32 {
             let square = center + vec2(dx, dy);
             for half in 0..2 {
-                let (_, ideal_count) = half_cell_ideal(square, half, pos);
+                let ideal_count = half_cell_ideal(square, half, pos);
                 let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
                 let rendered = glyph_fits().iter().find(|f| f.c == c).unwrap().count;
                 total += rendered.abs_diff(ideal_count);
@@ -799,5 +816,62 @@ impl FillGrid {
                 line
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod charwise_tests {
+    use super::*;
+
+    fn cell(grid: &[[DoubleChar; 3]; 3], dx: i32, dy: i32) -> DoubleChar {
+        grid[(dx + 1) as usize][(dy + 1) as usize]
+    }
+
+    #[test]
+    fn test_aligned_square() {
+        let (grid, center) = charwise_neighborhood(euclid::point2(0.0, 0.0));
+        assert_eq!(center, euclid::point2(0, 0));
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                let expected = if (dx, dy) == (0, 0) {
+                    [FULL_BLOCK; 2]
+                } else {
+                    [SPACE; 2]
+                };
+                assert_eq!(cell(&grid, dx, dy), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_half_cell_x_shift() {
+        // square spans x in [-0.25, 0.75]: the center square keeps a full
+        // right half-cell, its right neighbor gets a left half-block
+        let (grid, _) = charwise_neighborhood(euclid::point2(0.25, 0.0));
+        assert_eq!(cell(&grid, 0, 0), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
+        assert_eq!(cell(&grid, 1, 0), [LEFT_HALF_BLOCK, SPACE]);
+        assert_eq!(cell(&grid, -1, 0), [SPACE; 2]);
+    }
+
+    #[test]
+    fn test_row_straddle_picks_vertical_strips() {
+        // the square at y=0.4 straddles both rows: the center row keeps a
+        // top-anchored 5/8 of the square (0.6 is nearest the eighth grid),
+        // the row above gets the bottom 3/8; thirds are farther
+        let (grid, _) = charwise_neighborhood(euclid::point2(0.0, 0.4));
+        assert_eq!(cell(&grid, 0, 0), [EIGHTH_BLOCKS_FROM_TOP[5]; 2]);
+        assert_eq!(cell(&grid, 0, 1), [EIGHTH_BLOCKS_FROM_BOTTOM[3]; 2]);
+        assert_eq!(cell(&grid, 0, -1), [SPACE; 2]);
+    }
+
+    #[test]
+    fn test_diagonal_corner_picks_hextant() {
+        // the up-right diagonal cell sees a 0.6 x 0.3 corner overlap; a
+        // single bottom-left sextant beats every strip and the quadrant
+        // (xor ~0.047 vs 0.15 for the runner-up)
+        let (grid, _) = charwise_neighborhood(euclid::point2(0.3, 0.3));
+        let bottom_left_sextant =
+            hextant_array_to_char([[false, false], [false, false], [true, false]]);
+        assert_eq!(cell(&grid, 1, 1), [bottom_left_sextant, SPACE]);
     }
 }

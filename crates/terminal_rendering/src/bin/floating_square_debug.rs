@@ -20,11 +20,11 @@
 //!   animate (default)
 //!                 square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. Three bordered
-//!                 rows: one per rendering approach — family-snapped, then
-//!                 the legacy full-square method (pre-SnapFamily
-//!                 characters_for_full_square_with_2d_offset: per
-//!                 half-cell, nearest snap point over the union of all
-//!                 four families' grids, with per-square x-compensation)
+//!                 rows: one per rendering approach — family-snapped,
+//!                 then charwise (per character the square overlaps, the
+//!                 glyph whose known geometry best fits the square's
+//!                 overlap with that character — exact and analytic, no
+//!                 regard for sibling characters)
 //!                 — each with the real-size render (square drawn in its
 //!                 glyph colors, no center marker) plus legend, the
 //!                 zoomed sampled-coverage view, and metrics: the
@@ -56,9 +56,9 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
-    self, actual_sample, assign_colors, coverage_error, fill_centroid, jaggedness,
-    legacy_full_square_neighborhood, per_char_coverage_error, rendered_neighborhood,
-    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W,
+    self, actual_sample, assign_colors, charwise_neighborhood, coverage_error, fill_centroid,
+    jaggedness, per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
+    FillGrid, Metrics, BITMAP_W,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -719,14 +719,14 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     // both the zoomed views and the error metrics derive from it
     let (glyphs, center) = rendered_neighborhood(pos);
     let owners = assign_colors(&glyphs);
-    let (full_glyphs, _) = legacy_full_square_neighborhood(pos);
-    let full_owners = assign_colors(&full_glyphs);
+    let (charwise_glyphs, _) = charwise_neighborhood(pos);
+    let charwise_owners = assign_colors(&charwise_glyphs);
     let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(sample_origin, |wx, wy| {
         actual_sample(&glyphs, &owners, center, wx, wy)
     });
-    let full_actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&full_glyphs, &full_owners, center, wx, wy)
+    let charwise_actual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&charwise_glyphs, &charwise_owners, center, wx, wy)
     });
     let ideal = FillGrid::sample(sample_origin, |wx, wy| {
         (
@@ -737,7 +737,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     let metrics = Metrics::measure(&actual, pos);
     let style = coverage::Style::from_env();
     let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
-    let full_lines = full_actual.bitmap_pane(&coverage::PALETTE, &style);
+    let charwise_lines = charwise_actual.bitmap_pane(&coverage::PALETTE, &style);
     let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
 
     // real-size views draw the square in its glyph (palette) colors, not a
@@ -751,16 +751,16 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         .lines()
         .map(String::from)
         .collect();
-    let mut full_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
+    let mut charwise_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
     draw_neighborhood_colored(
-        &mut full_frame,
+        &mut charwise_frame,
         ANIMATE_GRID_RADIUS,
         origin,
         center,
-        &full_glyphs,
-        &full_owners,
+        &charwise_glyphs,
+        &charwise_owners,
     );
-    let full_frame_lines: Vec<String> = full_frame
+    let charwise_frame_lines: Vec<String> = charwise_frame
         .string_for_regular_display()
         .lines()
         .map(String::from)
@@ -776,7 +776,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         }
     };
     let under1 = under_of(glyph_legend(&glyphs, &owners, &style));
-    let under2 = under_of(glyph_legend(&full_glyphs, &full_owners, &style));
+    let under2 = under_of(glyph_legend(&charwise_glyphs, &charwise_owners, &style));
 
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
@@ -790,7 +790,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
-    let full_metrics = Metrics::measure(&full_actual, pos);
+    let charwise_metrics = Metrics::measure(&charwise_actual, pos);
     let frac = fraction_part(pos);
 
     // one boxed row per rendering method: real-size grid with the glyph
@@ -815,19 +815,24 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
             info.snapped_offset.y - offset.y,
         ),
     ]);
-    let mut stats2 = comparison_stats(&full_glyphs, center, pos, &full_actual, &full_metrics);
+    let mut stats2 = comparison_stats(
+        &charwise_glyphs,
+        center,
+        pos,
+        &charwise_actual,
+        &charwise_metrics,
+    );
     stats2.push(String::new());
     stats2.extend([
-        "approach: pre-SnapFamily".to_string(),
-        "full-square method: per half-cell,".to_string(),
-        "nearest snap point over the union".to_string(),
-        "of all four families' grids, with".to_string(),
-        "per-square x-compensation. no".to_string(),
-        "family purity — sibling half-cells".to_string(),
-        "can mix families.".to_string(),
+        "approach: charwise — per".to_string(),
+        "character, the glyph whose known".to_string(),
+        "geometry best fits the square's".to_string(),
+        "overlap with that character".to_string(),
+        "(exact, analytic). no regard for".to_string(),
+        "siblings — jagged by design.".to_string(),
     ]);
     let left1 = left_col(&frame_lines, &under1);
-    let left2 = left_col(&full_frame_lines, &under2);
+    let left2 = left_col(&charwise_frame_lines, &under2);
     let stats1_w = col_w(&stats1);
     let stats2_w = col_w(&stats2);
     let row1 = boxed_row(
@@ -839,10 +844,10 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         ],
     );
     let row2 = boxed_row(
-        "legacy full-square",
+        "charwise",
         &[
             (left2.as_slice(), frame_w),
-            (full_lines.as_slice(), BITMAP_W),
+            (charwise_lines.as_slice(), BITMAP_W),
             (stats2.as_slice(), stats2_w),
         ],
     );
@@ -1105,7 +1110,7 @@ fn usage() {
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
            animate [N]   orbiting square, one bordered row per rendering\n  \
-          \x20      approach (family-snapped, legacy full-square): real-\n  \
+          \x20      approach (family-snapped, charwise): real-\n  \
           \x20      size render plus legend, zoomed sampled-coverage view\n  \
           \x20      (actual vs ideal, one color per\n  \
           \x20      glyph), and one line per error metric; q quits, space\n  \
