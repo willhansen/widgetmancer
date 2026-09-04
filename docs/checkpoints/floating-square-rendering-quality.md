@@ -226,3 +226,48 @@ Unit tests pin concrete picks
 comparison test is renamed tests/charwise_rendering.rs with unchanged
 bounds. `glyph_fits` / `half_cell_ideal` stay but lose their bitmap halves
 — only `per_char_coverage_error`'s filled counts were ever read.
+
+## Shaped charwise variant: protrusion penalty (debug tool row)
+
+Added a third comparison approach to `floating_square_debug`'s animate
+view: charwise with an extra cost term for how far a glyph sticks out
+past the true square. Objective per half-cell:
+
+    cost = xor_area + CHARWISE_PROTRUSION_WEIGHT * protrusion
+
+with weight 1.0 (coverage.rs const). `protrusion` is the farthest
+distance any filled point of the candidate lies outside the ideal
+overlap [0,w]x[0,h], in anchor-frame cell coords. Distance to a
+rectangle is convex and non-decreasing away from the anchor, so the max
+over any candidate's filled rect/sextant is its far corner:
+`protrusion(u,v) = hypot(max(u-w,0), max(v-h,0))` — closed form, same
+candidate enumeration as plain charwise, only the comparison key
+changes. Weight 0 reproduces plain charwise bit-for-bit (`err + 0*d`),
+asserted by test over the 16x16 lattice.
+
+Implementation: `charwise_glyph` generalized to
+`charwise_glyph_weighted(pos, square, half, weight)`;
+`charwise_neighborhood` / `charwise_shaped_neighborhood` are the weight
+0 / 1.0 wrappers (both `#[doc(hidden)]`, comparison-only, not
+game-facing). Hextant protrusion = max over filled sextants' far
+corners.
+
+Measured (16x16 offset grid, mean/max):
+
+| approach | area | center | per-char cov | jaggedness |
+|---|---|---|---|---|
+| charwise | .066/.250 | .042/.081 | .259/.604 | 1.09/3.00 |
+| charwise + protrusion | .111/.396 | .038/.079 | .326/.792 | 0.47/2.10 |
+
+The trade is the point: the penalty refuses thin glyphs that spike far
+past the edge (a full-height sliver over a shallow overlap protrudes by
+the whole uncovered height), leaving a notch instead — worst-case area
+error rises structurally (hence the shaped-only 0.45 bound in
+tests/charwise_rendering.rs, with rationale) while mean jaggedness
+roughly halves. Behavior pinned by
+`test_protrusion_penalty_trades_spike_for_even_error`: at (0.25, -0.7)
+the plain pick is the lower-third block (spikes 1/30 above the square
+across the half-cell); the shaped pick takes the 2/8 block (zero
+protrusion, error spread under the edge). Note cell coords are
+anisotropic (u = half-cell width, v = full row), so the distance is
+mildly anisotropic — fine for a debug heuristic, documented in coverage.rs.

@@ -8,9 +8,9 @@
 //! regression screams, while the printed table is the real comparison.
 
 use terminal_rendering::coverage::{
-    actual_sample, assign_colors, charwise_neighborhood, fill_centroid, jaggedness,
-    per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced, FillGrid, SX,
-    SY,
+    actual_sample, assign_colors, charwise_neighborhood, charwise_shaped_neighborhood,
+    fill_centroid, jaggedness, per_char_coverage_error, rendered_neighborhood,
+    rendered_neighborhood_forced, FillGrid, SX, SY,
 };
 use terminal_rendering::DoubleChar;
 use utility::coordinate_frame_conversions::{WorldPoint, WorldSquare};
@@ -93,6 +93,7 @@ fn measure(
 fn test_approach_comparison_metrics() {
     let auto = measure("family-snapped (auto)", rendered_neighborhood);
     let charwise = measure("charwise", charwise_neighborhood);
+    let shaped = measure("charwise + protrusion", charwise_shaped_neighborhood);
     for f in 0..4 {
         measure(&format!("forced family {f}"), move |pos| {
             rendered_neighborhood_forced(pos, f)
@@ -111,4 +112,13 @@ fn test_approach_comparison_metrics() {
     assert!(fit_center <= 0.25, "charwise center err {fit_center}");
     // jagged by design, but not chaotic
     assert!(fit_jag <= 8.0, "charwise jaggedness {fit_jag}");
+    let (shaped_area, shaped_center, _, shaped_jag) = shaped;
+    // same loose bounds as plain charwise, except area: the protrusion
+    // penalty deliberately refuses thin glyphs that spike far past the
+    // true edge (a full-height sliver protrudes by the whole uncovered
+    // height), leaving a notch instead — so its worst-case |area| error
+    // is structurally higher. It must stay a trade, not a blowup.
+    assert!(shaped_area <= 0.45, "shaped area err {shaped_area}");
+    assert!(shaped_center <= 0.25, "shaped center err {shaped_center}");
+    assert!(shaped_jag <= 8.0, "shaped jaggedness {shaped_jag}");
 }

@@ -215,6 +215,32 @@ pub fn rendered_neighborhood_forced(
 /// so ideal and candidate always share an anchor corner.
 #[doc(hidden)]
 pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    charwise_neighborhood_weighted(pos, 0.0)
+}
+
+/// Extra cost per cell-coordinate unit of protrusion in the shaped
+/// charwise variant (see `charwise_shaped_neighborhood`). 1.0 means a
+/// glyph sticking 0.2 cells past the true edge pays as much as mis-covering
+/// 0.2 cells of area — enough that thin spikes lose to evenly distributed
+/// error, without drowning the xor term.
+pub const CHARWISE_PROTRUSION_WEIGHT: f32 = 1.0;
+
+/// The shaped charwise variant: like `charwise_neighborhood`, but each
+/// cell's pick minimizes xor area plus `CHARWISE_PROTRUSION_WEIGHT` times
+/// how far the glyph sticks out past the true square's overlap with the
+/// cell. A long thin protrusion has tiny xor but large max distance, so it
+/// is heavily disincentivized; a small overextension along the true edge
+/// has small max distance and pays mostly its (small) xor. Still per-cell
+/// and analytic — no sibling awareness.
+#[doc(hidden)]
+pub fn charwise_shaped_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    charwise_neighborhood_weighted(pos, CHARWISE_PROTRUSION_WEIGHT)
+}
+
+fn charwise_neighborhood_weighted(
+    pos: WorldPoint,
+    weight: f32,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
     let center = world_point_to_world_square(pos);
     let mut grid = [[[' '; 2]; 3]; 3];
     for dx in -1..=1i32 {
@@ -222,16 +248,33 @@ pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSqu
             let square = center + vec2(dx, dy);
             for half in 0..2 {
                 grid[(dx + 1) as usize][(dy + 1) as usize][half] =
-                    charwise_glyph(pos, square, half);
+                    charwise_glyph_weighted(pos, square, half, weight);
             }
         }
     }
     (grid, center)
 }
 
+/// Distance from an anchor-frame point (u, v) to the ideal anchored
+/// rectangle [0, w] x [0, h]. Distance to a rectangle is convex and this
+/// function is non-decreasing in u and v, so the farthest point of any
+/// candidate's filled rectangle or sextant from the ideal is its corner
+/// farthest from the anchor — one formula covers every candidate class.
+///
+/// Cell coordinates are anisotropic (u spans the half-cell width, v the
+/// full row height), so this is not a true world distance; acceptable for
+/// a shape heuristic, and it never feeds the game render path.
+fn protrusion(u: f32, v: f32, w: f32, h: f32) -> f32 {
+    (u - w).max(0.0).hypot((v - h).max(0.0))
+}
+
 /// One character's glyph in the charwise approach (see
 /// `charwise_neighborhood`): the exact argmin of symmetric-difference
 /// area over the whole glyph inventory, computed in closed form.
+///
+/// `weight` extends the objective to xor area plus weight × protrusion
+/// (see `protrusion`); 0.0 reproduces the plain xor argmin exactly, since
+/// err + 0.0·d == err and all tie orderings are unchanged.
 ///
 /// Each geometry class contributes its provably best member: for strips
 /// the xor is monotone in the strip size on either side of the ideal's,
@@ -239,7 +282,7 @@ pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSqu
 /// hextant is the per-sextant majority rule (sextants are disjoint, so
 /// each decides independently). The overall winner is the minimum over
 /// the four class candidates.
-fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
+fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, weight: f32) -> char {
     // overlap of the true square with this half-cell in cell coordinates:
     // x in [0, 1] across the half-cell, y in [0, 1] up the row
     let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
@@ -273,14 +316,21 @@ fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
     // candidate anchored rectangle [0, a] x [0, b] (strips are the a=1
     // or b=1 cases, the quadrant block a=b=1/2)
     let xor = |a: f32, b: f32| w.max(a) * h.max(b) - w.min(a) * h.min(b);
+    // the penalized comparison key: at weight 0 this is plain xor, and
+    // every `+ 0.0 * d` is exact, so picks match the plain method bit for
+    // bit and all tie orderings below are unchanged
+    let cost = |err: f32, d: f32| err + weight * d;
 
     // vertical strip (eighth blocks): k/8 wide, full height. xor is
     // monotone in the width on either side of w, so the optimum is one
     // of the two eighth-grid neighbors.
     let kf = (w * 8.0).floor();
-    let (x_k, x_err) = {
-        let floor = (kf, xor(kf / 8.0, 1.0));
-        let ceil = (kf + 1.0, xor((kf + 1.0) / 8.0, 1.0));
+    let (x_k, x_cost) = {
+        let floor = (kf, cost(xor(kf / 8.0, 1.0), protrusion(kf / 8.0, 1.0, w, h)));
+        let ceil = (
+            kf + 1.0,
+            cost(xor((kf + 1.0) / 8.0, 1.0), protrusion((kf + 1.0) / 8.0, 1.0, w, h)),
+        );
         if ceil.1 < floor.1 { ceil } else { floor }
     };
     let x_strip = (
@@ -289,41 +339,44 @@ fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
         } else {
             EIGHTH_BLOCKS_FROM_RIGHT[x_k as usize]
         },
-        x_err,
+        x_cost,
     );
 
     // horizontal strip (eighth and third blocks): full width, k/8 or k/3
     // tall; the best over the union of the two grids is the better of
     // each grid's own best
     let kf_y = (h * 8.0).floor();
-    let (eighth_k, eighth_err) = {
-        let floor = (kf_y, xor(1.0, kf_y / 8.0));
-        let ceil = (kf_y + 1.0, xor(1.0, (kf_y + 1.0) / 8.0));
+    let (eighth_k, eighth_cost) = {
+        let floor = (kf_y, cost(xor(1.0, kf_y / 8.0), protrusion(1.0, kf_y / 8.0, w, h)));
+        let ceil = (
+            kf_y + 1.0,
+            cost(xor(1.0, (kf_y + 1.0) / 8.0), protrusion(1.0, (kf_y + 1.0) / 8.0, w, h)),
+        );
         if ceil.1 < floor.1 { ceil } else { floor }
     };
-    let (third_k, third_err) = {
-        let low = (1.0, xor(1.0, 1.0 / 3.0));
-        let high = (2.0, xor(1.0, 2.0 / 3.0));
+    let (third_k, third_cost) = {
+        let low = (1.0, cost(xor(1.0, 1.0 / 3.0), protrusion(1.0, 1.0 / 3.0, w, h)));
+        let high = (2.0, cost(xor(1.0, 2.0 / 3.0), protrusion(1.0, 2.0 / 3.0, w, h)));
         if high.1 < low.1 { high } else { low }
     };
-    let y_strip = if eighth_err <= third_err {
+    let y_strip = if eighth_cost <= third_cost {
         (
             if from_bottom {
                 EIGHTH_BLOCKS_FROM_BOTTOM[eighth_k as usize]
             } else {
                 EIGHTH_BLOCKS_FROM_TOP[eighth_k as usize]
             },
-            eighth_err,
+            eighth_cost,
         )
     } else if from_bottom {
         (
             [LOWER_ONE_THIRD_BLOCK, LOWER_TWO_THIRD_BLOCK][third_k as usize - 1],
-            third_err,
+            third_cost,
         )
     } else {
         (
             [UPPER_ONE_THIRD_BLOCK, UPPER_TWO_THIRD_BLOCK][third_k as usize - 1],
-            third_err,
+            third_cost,
         )
     };
 
@@ -335,15 +388,17 @@ fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
             (true, false) => '▘',
             (false, false) => '▝',
         },
-        xor(0.5, 0.5),
+        cost(xor(0.5, 0.5), protrusion(0.5, 0.5, w, h)),
     );
 
     // hextant: fill each sextant iff the square covers more than half of
     // it — the exact xor optimum over hextants, since the sextants are
-    // disjoint. err is accumulated per sextant alongside the fill bits.
+    // disjoint. err is accumulated per sextant alongside the fill bits;
+    // protrusion is the deepest any filled sextant pokes past the ideal.
     let hextant = {
         let mut array = [[false; 2]; 3]; // row 0 = top, col 0 = left
         let mut err = 0.0;
+        let mut d = 0.0f32;
         for col in 0..2 {
             for row in 0..3 {
                 // anchor coordinates: u from the touched x edge, v from
@@ -357,18 +412,27 @@ fn charwise_glyph(pos: WorldPoint, square: WorldSquare, half: usize) -> char {
                 if filled {
                     array[if from_bottom { 2 - row } else { row }]
                         [if from_left { col } else { 1 - col }] = true;
+                    // far corner of the sextant in anchor coords; the
+                    // distance function is monotone in u and v, so this
+                    // is the sextant's farthest point from the ideal
+                    d = d.max(protrusion(
+                        (col + 1) as f32 / 2.0,
+                        (row + 1) as f32 / 3.0,
+                        w,
+                        h,
+                    ));
                 }
                 err += if filled { 1.0 / 6.0 - ov } else { ov };
             }
         }
-        (hextant_array_to_char(array), err)
+        (hextant_array_to_char(array), cost(err, d))
     };
 
-    // minimum error wins; on a tie the earlier candidate (strips over
+    // minimum cost wins; on a tie the earlier candidate (strips over
     // corner geometry) keeps the silhouette closer to a rectangle
     [x_strip, y_strip, quadrant, hextant]
         .into_iter()
-        .min_by_key(|&(_, err)| OrderedFloat(err))
+        .min_by_key(|&(_, cost)| OrderedFloat(cost))
         .unwrap()
         .0
 }
@@ -873,5 +937,55 @@ mod charwise_tests {
         let bottom_left_sextant =
             hextant_array_to_char([[false, false], [false, false], [true, false]]);
         assert_eq!(cell(&grid, 1, 1), [bottom_left_sextant, SPACE]);
+    }
+
+    #[test]
+    fn test_weight_zero_matches_plain_charwise() {
+        // the weighted path at weight 0 must be the plain xor argmin,
+        // bit for bit, over the whole positive-quadrant offset lattice
+        for xi in 0..=16 {
+            for yi in 0..=16 {
+                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
+                assert_eq!(
+                    charwise_neighborhood(pos),
+                    charwise_neighborhood_weighted(pos, 0.0),
+                    "weight-0 divergence at ({xi}, {yi})/16"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_protrusion_penalty_trades_spike_for_even_error() {
+        // the center square's right half-cell sees a full-width, bottom-
+        // anchored 0.3 overlap. The plain xor argmin is the lower-third
+        // block (xor 1/30): it spikes 1/30 above the square across the
+        // whole half-cell. The shaped pick takes the 2/8 block instead:
+        // xor 0.05 but zero protrusion, spreading the error under the
+        // true edge rather than sticking out past it.
+        // (pos rounds to square (0, -1); the sliver is in the square
+        // above it, grid cell (0, 1).)
+        let pos = euclid::point2(0.25, -0.7);
+        let (plain, _) = charwise_neighborhood(pos);
+        let (shaped, _) = charwise_shaped_neighborhood(pos);
+        assert_eq!(cell(&plain, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
+        assert_eq!(cell(&shaped, 0, 1)[1], EIGHTH_BLOCKS_FROM_BOTTOM[2]);
+    }
+
+    #[test]
+    fn test_shaped_variant_changes_something() {
+        // guard against the penalty silently decaying to a no-op: over a
+        // lattice spanning both sign quadrants the shaped grid must
+        // differ from the plain one somewhere
+        let mut diffs = 0usize;
+        for xi in -16..=16 {
+            for yi in -16..=16 {
+                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
+                if charwise_neighborhood(pos) != charwise_shaped_neighborhood(pos) {
+                    diffs += 1;
+                }
+            }
+        }
+        assert!(diffs > 0, "shaped pick never diverges from plain charwise");
     }
 }
