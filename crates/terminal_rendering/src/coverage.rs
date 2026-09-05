@@ -218,12 +218,19 @@ pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSqu
     charwise_neighborhood_weighted(pos, 0.0)
 }
 
-/// Extra cost per cell-coordinate unit of protrusion in the shaped
+/// Extra cost per cell-coordinate unit of protrusion in the linear shaped
 /// charwise variant (see `charwise_shaped_neighborhood`). 1.0 means a
 /// glyph sticking 0.2 cells past the true edge pays as much as mis-covering
 /// 0.2 cells of area — enough that thin spikes lose to evenly distributed
 /// error, without drowning the xor term.
 pub const CHARWISE_PROTRUSION_WEIGHT: f32 = 1.0;
+
+/// Weight of the squared-protrusion variant (`charwise_protrusion_squared_neighborhood`).
+/// Since cell distances are < 1, `W·d²` only bites harder than linear `d`
+/// once d > 1/W: with 4.0 the quadratic discouragement kicks in past 0.25
+/// cells of protrusion — shallow overshoot is nearly free, deep spikes are
+/// hammered quadratically.
+pub const CHARWISE_PROTRUSION_SQUARED_WEIGHT: f32 = 4.0;
 
 /// The shaped charwise variant: like `charwise_neighborhood`, but each
 /// cell's pick minimizes xor area plus `CHARWISE_PROTRUSION_WEIGHT` times
@@ -234,12 +241,23 @@ pub const CHARWISE_PROTRUSION_WEIGHT: f32 = 1.0;
 /// and analytic — no sibling awareness.
 #[doc(hidden)]
 pub fn charwise_shaped_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
-    charwise_neighborhood_weighted(pos, CHARWISE_PROTRUSION_WEIGHT)
+    charwise_neighborhood_penalty(pos, CHARWISE_PROTRUSION_WEIGHT, false)
 }
 
-fn charwise_neighborhood_weighted(
+/// The squared-protrusion variant: cost = xor + weight × d². Progressive
+/// instead of flat: shallow overshoot is cheaper than under the linear
+/// penalty (d² < d for d < 1), deep protrusion far more expensive.
+#[doc(hidden)]
+pub fn charwise_protrusion_squared_neighborhood(
+    pos: WorldPoint,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    charwise_neighborhood_penalty(pos, CHARWISE_PROTRUSION_SQUARED_WEIGHT, true)
+}
+
+fn charwise_neighborhood_penalty(
     pos: WorldPoint,
     weight: f32,
+    squared: bool,
 ) -> ([[DoubleChar; 3]; 3], WorldSquare) {
     let center = world_point_to_world_square(pos);
     let mut grid = [[[' '; 2]; 3]; 3];
@@ -248,11 +266,39 @@ fn charwise_neighborhood_weighted(
             let square = center + vec2(dx, dy);
             for half in 0..2 {
                 grid[(dx + 1) as usize][(dy + 1) as usize][half] =
-                    charwise_glyph_weighted(pos, square, half, weight);
+                    charwise_glyph_parts(pos, square, half, weight, squared).0;
             }
         }
     }
     (grid, center)
+}
+
+fn charwise_neighborhood_weighted(
+    pos: WorldPoint,
+    weight: f32,
+) -> ([[DoubleChar; 3]; 3], WorldSquare) {
+    charwise_neighborhood_penalty(pos, weight, false)
+}
+
+/// The method's own objective summed over the 3x3 neighborhood: per-cell
+/// xor area plus the protrusion penalty in the method's shape (linear d or
+/// squared d²). This is the number the picker minimizes cell by cell —
+/// "the error used for rendering" in the debug tool. Cell units (a
+/// half-cell is 0.5 x 1), not world square units.
+#[doc(hidden)]
+pub fn charwise_objective(pos: WorldPoint, weight: f32, squared: bool) -> f32 {
+    let center = world_point_to_world_square(pos);
+    let mut total = 0.0f32;
+    for dx in -1..=1i32 {
+        for dy in -1..=1i32 {
+            let square = center + vec2(dx, dy);
+            for half in 0..2 {
+                let (_, err, d) = charwise_glyph_parts(pos, square, half, weight, squared);
+                total += err + weight * if squared { d * d } else { d };
+            }
+        }
+    }
+    total
 }
 
 /// Distance from an anchor-frame point (u, v) to the ideal anchored
@@ -268,13 +314,11 @@ fn protrusion(u: f32, v: f32, w: f32, h: f32) -> f32 {
     (u - w).max(0.0).hypot((v - h).max(0.0))
 }
 
-/// One character's glyph in the charwise approach (see
-/// `charwise_neighborhood`): the exact argmin of symmetric-difference
-/// area over the whole glyph inventory, computed in closed form.
-///
-/// `weight` extends the objective to xor area plus weight × protrusion
-/// (see `protrusion`); 0.0 reproduces the plain xor argmin exactly, since
-/// err + 0.0·d == err and all tie orderings are unchanged.
+/// One character's glyph pick plus its objective parts: the winning
+/// candidate's xor area (cell units) and protrusion distance. `weight`/
+/// `squared` shape the comparison key (see `charwise_objective`); weight 0
+/// reproduces the plain xor argmin exactly, since err + 0.0·penalty == err
+/// and all tie orderings are unchanged.
 ///
 /// Each geometry class contributes its provably best member: for strips
 /// the xor is monotone in the strip size on either side of the ideal's,
@@ -282,7 +326,13 @@ fn protrusion(u: f32, v: f32, w: f32, h: f32) -> f32 {
 /// hextant is the per-sextant majority rule (sextants are disjoint, so
 /// each decides independently). The overall winner is the minimum over
 /// the four class candidates.
-fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, weight: f32) -> char {
+fn charwise_glyph_parts(
+    pos: WorldPoint,
+    square: WorldSquare,
+    half: usize,
+    weight: f32,
+    squared: bool,
+) -> (char, f32, f32) {
     // overlap of the true square with this half-cell in cell coordinates:
     // x in [0, 1] across the half-cell, y in [0, 1] up the row
     let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
@@ -296,10 +346,10 @@ fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, we
         (pos.y + 0.5 - cell_bottom).clamp(0.0, 1.0),
     );
     if x1 <= x0 || y1 <= y0 {
-        return SPACE;
+        return (SPACE, 0.0, 0.0);
     }
     if x0 <= 0.0 && x1 >= 1.0 && y0 <= 0.0 && y1 >= 1.0 {
-        return FULL_BLOCK;
+        return (FULL_BLOCK, 0.0, 0.0);
     }
     // w and h are the overlap extents measured from the touched edges;
     // the ideal is then the corner-anchored rectangle [0, w] x [0, h]
@@ -319,19 +369,26 @@ fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, we
     // the penalized comparison key: at weight 0 this is plain xor, and
     // every `+ 0.0 * d` is exact, so picks match the plain method bit for
     // bit and all tie orderings below are unchanged
-    let cost = |err: f32, d: f32| err + weight * d;
+    let cost = |err: f32, d: f32| err + weight * if squared { d * d } else { d };
 
     // vertical strip (eighth blocks): k/8 wide, full height. xor is
     // monotone in the width on either side of w, so the optimum is one
-    // of the two eighth-grid neighbors.
+    // of the two eighth-grid neighbors. Candidates carry (k, err, d);
+    // comparisons use the penalized cost, so at weight 0 they reduce to
+    // the xor comparisons below.
     let kf = (w * 8.0).floor();
-    let (x_k, x_cost) = {
-        let floor = (kf, cost(xor(kf / 8.0, 1.0), protrusion(kf / 8.0, 1.0, w, h)));
+    let (x_k, x_err, x_d) = {
+        let floor = (kf, xor(kf / 8.0, 1.0), protrusion(kf / 8.0, 1.0, w, h));
         let ceil = (
             kf + 1.0,
-            cost(xor((kf + 1.0) / 8.0, 1.0), protrusion((kf + 1.0) / 8.0, 1.0, w, h)),
+            xor((kf + 1.0) / 8.0, 1.0),
+            protrusion((kf + 1.0) / 8.0, 1.0, w, h),
         );
-        if ceil.1 < floor.1 { ceil } else { floor }
+        if cost(ceil.1, ceil.2) < cost(floor.1, floor.2) {
+            ceil
+        } else {
+            floor
+        }
     };
     let x_strip = (
         if from_left {
@@ -339,44 +396,57 @@ fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, we
         } else {
             EIGHTH_BLOCKS_FROM_RIGHT[x_k as usize]
         },
-        x_cost,
+        x_err,
+        x_d,
     );
 
     // horizontal strip (eighth and third blocks): full width, k/8 or k/3
     // tall; the best over the union of the two grids is the better of
     // each grid's own best
     let kf_y = (h * 8.0).floor();
-    let (eighth_k, eighth_cost) = {
-        let floor = (kf_y, cost(xor(1.0, kf_y / 8.0), protrusion(1.0, kf_y / 8.0, w, h)));
+    let (eighth_k, eighth_err, eighth_d) = {
+        let floor = (kf_y, xor(1.0, kf_y / 8.0), protrusion(1.0, kf_y / 8.0, w, h));
         let ceil = (
             kf_y + 1.0,
-            cost(xor(1.0, (kf_y + 1.0) / 8.0), protrusion(1.0, (kf_y + 1.0) / 8.0, w, h)),
+            xor(1.0, (kf_y + 1.0) / 8.0),
+            protrusion(1.0, (kf_y + 1.0) / 8.0, w, h),
         );
-        if ceil.1 < floor.1 { ceil } else { floor }
+        if cost(ceil.1, ceil.2) < cost(floor.1, floor.2) {
+            ceil
+        } else {
+            floor
+        }
     };
-    let (third_k, third_cost) = {
-        let low = (1.0, cost(xor(1.0, 1.0 / 3.0), protrusion(1.0, 1.0 / 3.0, w, h)));
-        let high = (2.0, cost(xor(1.0, 2.0 / 3.0), protrusion(1.0, 2.0 / 3.0, w, h)));
-        if high.1 < low.1 { high } else { low }
+    let (third_k, third_err, third_d) = {
+        let low = (1.0, xor(1.0, 1.0 / 3.0), protrusion(1.0, 1.0 / 3.0, w, h));
+        let high = (2.0, xor(1.0, 2.0 / 3.0), protrusion(1.0, 2.0 / 3.0, w, h));
+        if cost(high.1, high.2) < cost(low.1, low.2) {
+            high
+        } else {
+            low
+        }
     };
-    let y_strip = if eighth_cost <= third_cost {
+    let y_strip = if cost(eighth_err, eighth_d) <= cost(third_err, third_d) {
         (
             if from_bottom {
                 EIGHTH_BLOCKS_FROM_BOTTOM[eighth_k as usize]
             } else {
                 EIGHTH_BLOCKS_FROM_TOP[eighth_k as usize]
             },
-            eighth_cost,
+            eighth_err,
+            eighth_d,
         )
     } else if from_bottom {
         (
             [LOWER_ONE_THIRD_BLOCK, LOWER_TWO_THIRD_BLOCK][third_k as usize - 1],
-            third_cost,
+            third_err,
+            third_d,
         )
     } else {
         (
             [UPPER_ONE_THIRD_BLOCK, UPPER_TWO_THIRD_BLOCK][third_k as usize - 1],
-            third_cost,
+            third_err,
+            third_d,
         )
     };
 
@@ -388,17 +458,19 @@ fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, we
             (true, false) => '▘',
             (false, false) => '▝',
         },
-        cost(xor(0.5, 0.5), protrusion(0.5, 0.5, w, h)),
+        xor(0.5, 0.5),
+        protrusion(0.5, 0.5, w, h),
     );
 
-    // hextant: fill each sextant iff the square covers more than half of
-    // it — the exact xor optimum over hextants, since the sextants are
-    // disjoint. err is accumulated per sextant alongside the fill bits;
-    // protrusion is the deepest any filled sextant pokes past the ideal.
-    let hextant = {
+    // hextant. At weight 0 the per-sextant majority rule is the exact xor
+    // optimum (sextants are disjoint). Under a protrusion penalty the fill
+    // decisions couple through max(d), so instead brute-force all 64 fill
+    // patterns — cheap, and exact for any penalty. Bit = row*2+col, row 0
+    // = top, matching hextant_character_to_binary; strict < keeps the
+    // lowest bits on ties, deterministic.
+    let hextant = if weight == 0.0 {
         let mut array = [[false; 2]; 3]; // row 0 = top, col 0 = left
         let mut err = 0.0;
-        let mut d = 0.0f32;
         for col in 0..2 {
             for row in 0..3 {
                 // anchor coordinates: u from the touched x edge, v from
@@ -412,29 +484,54 @@ fn charwise_glyph_weighted(pos: WorldPoint, square: WorldSquare, half: usize, we
                 if filled {
                     array[if from_bottom { 2 - row } else { row }]
                         [if from_left { col } else { 1 - col }] = true;
-                    // far corner of the sextant in anchor coords; the
-                    // distance function is monotone in u and v, so this
-                    // is the sextant's farthest point from the ideal
-                    d = d.max(protrusion(
-                        (col + 1) as f32 / 2.0,
-                        (row + 1) as f32 / 3.0,
-                        w,
-                        h,
-                    ));
                 }
                 err += if filled { 1.0 / 6.0 - ov } else { ov };
             }
         }
-        (hextant_array_to_char(array), cost(err, d))
+        (hextant_array_to_char(array), err, 0.0)
+    } else {
+        let mut best: Option<(f32, u32, f32, f32)> = None; // (cost, bits, err, d)
+        for bits in 0..64u32 {
+            let mut err = 0.0f32;
+            let mut d = 0.0f32;
+            for row in 0..3usize {
+                for col in 0..2usize {
+                    // display array coords -> anchor frame sextant span
+                    let a_col = if from_left { col } else { 1 - col };
+                    let a_row = if from_bottom { 2 - row } else { row };
+                    let (u1, v1) = ((a_col + 1) as f32 / 2.0, (a_row + 1) as f32 / 3.0);
+                    let ov = (u1.min(w) - a_col as f32 / 2.0).max(0.0)
+                        * (v1.min(h) - a_row as f32 / 3.0).max(0.0);
+                    let filled = bits & (1 << (row * 2 + col)) != 0;
+                    err += if filled { 1.0 / 6.0 - ov } else { ov };
+                    if filled {
+                        // the distance function is monotone in u and v, so
+                        // the far corner is the sextant's farthest point
+                        d = d.max(protrusion(u1, v1, w, h));
+                    }
+                }
+            }
+            let c = cost(err, d);
+            if best.is_none() || c < best.unwrap().0 {
+                best = Some((c, bits, err, d));
+            }
+        }
+        let (_, bits, err, d) = best.unwrap();
+        let mut array = [[false; 2]; 3];
+        for row in 0..3usize {
+            for col in 0..2usize {
+                array[row][col] = bits & (1 << (row * 2 + col)) != 0;
+            }
+        }
+        (hextant_array_to_char(array), err, d)
     };
 
     // minimum cost wins; on a tie the earlier candidate (strips over
     // corner geometry) keeps the silhouette closer to a rectangle
     [x_strip, y_strip, quadrant, hextant]
         .into_iter()
-        .min_by_key(|&(_, cost)| OrderedFloat(cost))
+        .min_by_key(|&(_, err, d)| OrderedFloat(cost(err, d)))
         .unwrap()
-        .0
 }
 
 /// Symmetric-difference area (in world square units) between the rendered
@@ -777,6 +874,453 @@ impl Metrics {
     }
 }
 
+// --- error-visualization panes -------------------------------------------------
+//
+// Full-resolution zoomed views (24x12 text cells = the native sampled
+// pixel grid, 2x3 samples per pixel, two pixels stacked per text cell)
+// that color one error metric per pane.
+
+/// Rendered-vs-ideal classification of one sample point. Match is split
+/// into filled/empty so panes can show the silhouette without a FillGrid.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SampleClass {
+    MatchFilled = 0,
+    MatchEmpty = 1,
+    /// rendered filled, ideal empty
+    Over = 2,
+    /// ideal filled, rendered empty
+    Under = 3,
+}
+
+const OVER_COLOR: Rgb = Rgb(255, 90, 90);
+const UNDER_COLOR: Rgb = Rgb(90, 160, 255);
+const XOR_COLOR: Rgb = Rgb(255, 140, 40);
+
+/// One text cell stacking two pixels vertically: same color → full block;
+/// different colors → upper as fg half-block over lower as bg half-block
+/// (the bg half-block carries the lower pixel's color, not the cell
+/// shade); one pixel → its half-block over the cell background; none →
+/// dark dot. Shared by the render zoom (`bitmap_pane`) and error panes.
+fn two_tone_cell(style: &Style, cell_bg: Rgb, up: Option<Rgb>, lo: Option<Rgb>) -> String {
+    match (up, lo) {
+        (Some(cu), Some(cl)) if cu == cl => format!("{}{}█", style.bg(cell_bg), style.fg(cu)),
+        (Some(cu), Some(cl)) => format!("{}{}▀", style.bg(cl), style.fg(cu)),
+        (Some(cu), None) => format!("{}{}▀", style.bg(cell_bg), style.fg(cu)),
+        (None, Some(cl)) => format!("{}{}▄", style.bg(cell_bg), style.fg(cl)),
+        (None, None) => format!("{}{}·", style.bg(cell_bg), style.fg(DOT_COLOR)),
+    }
+}
+
+/// Render a full-resolution pane from a per-pixel color grid (top row
+/// first), composing each text cell from its two stacked pixels.
+pub fn pane_from_colors(style: &Style, colors: &[Vec<Option<Rgb>>]) -> Vec<String> {
+    (0..TEXT_ROWS)
+        .map(|t| {
+            let mut line: String = (0..PX_W)
+                .map(|px| {
+                    two_tone_cell(
+                        style,
+                        cell_bg(px, t / 4),
+                        colors[2 * t][px],
+                        colors[2 * t + 1][px],
+                    )
+                })
+                .collect();
+            line.push_str(style.reset());
+            line
+        })
+        .collect()
+}
+
+pub fn lerp(a: Rgb, b: Rgb, t: f32) -> Rgb {
+    let t = t.clamp(0.0, 1.0);
+    Rgb(
+        (a.0 as f32 + (b.0 as f32 - a.0 as f32) * t) as u8,
+        (a.1 as f32 + (b.1 as f32 - a.1 as f32) * t) as u8,
+        (a.2 as f32 + (b.2 as f32 - a.2 as f32) * t) as u8,
+    )
+}
+
+/// 3/4-state sample grid over the render window (same lattice and
+/// half-sample offsets as FillGrid, so the two never disagree on fill).
+pub struct ClassGrid {
+    pub cells: Vec<Vec<SampleClass>>,
+    pub origin: WorldPoint, // world coords of the window's bottom-left corner
+}
+
+/// Sample counts within one display pixel (2x3 samples). `inside`/
+/// `outside` partition by the ideal square, `filled` by the render.
+#[derive(Default)]
+struct PixelStats {
+    filled: usize,
+    over: usize,
+    under: usize,
+    inside: usize,  // ideal-inside samples = match_filled + under
+    outside: usize, // ideal-outside samples = match_empty + over
+}
+
+impl ClassGrid {
+    pub fn sample(origin: WorldPoint, mut f: impl FnMut(f32, f32) -> SampleClass) -> Self {
+        let mut cells = Vec::new();
+        for j in 0..NX {
+            let mut col = Vec::new();
+            for i in 0..NY {
+                let wx = origin.x + (j as f32 + 0.5) / SX as f32;
+                let wy = origin.y + (i as f32 + 0.5) / SY as f32;
+                col.push(f(wx, wy));
+            }
+            cells.push(col);
+        }
+        ClassGrid { cells, origin }
+    }
+
+    /// Rendered-vs-ideal class at one world point (same square/half-cell
+    /// lookup as `actual_sample`).
+    pub fn class_at(
+        grid: &[[DoubleChar; 3]; 3],
+        owners: &[[[Option<usize>; 2]; 3]; 3],
+        center: WorldSquare,
+        pos: WorldPoint,
+        wx: f32,
+        wy: f32,
+    ) -> SampleClass {
+        let ideal = (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5;
+        let filled = actual_sample(grid, owners, center, wx, wy).0;
+        match (filled, ideal) {
+            (true, true) => SampleClass::MatchFilled,
+            (false, false) => SampleClass::MatchEmpty,
+            (true, false) => SampleClass::Over,
+            (false, true) => SampleClass::Under,
+        }
+    }
+
+    fn pixel(&self, px: usize, py: usize) -> PixelStats {
+        // py 0 = top pixel row; same 2x3 sample block as FillGrid::pixel
+        let mut s = PixelStats::default();
+        for j in px * 2..px * 2 + 2 {
+            for i in NY - (py + 1) * 3..NY - py * 3 {
+                match self.cells[j][i] {
+                    SampleClass::MatchFilled => {
+                        s.filled += 1;
+                        s.inside += 1;
+                    }
+                    SampleClass::MatchEmpty => s.outside += 1,
+                    SampleClass::Over => {
+                        s.filled += 1;
+                        s.over += 1;
+                        s.outside += 1;
+                    }
+                    SampleClass::Under => {
+                        s.under += 1;
+                        s.inside += 1;
+                    }
+                }
+            }
+        }
+        s
+    }
+
+    /// Full-resolution pane: each text cell stacks two pixels (upper as
+    /// fg half-block, lower as bg half-block) exactly like `bitmap_pane`,
+    /// so every metric renders at the native sampled resolution.
+    pub fn full_pane(
+        &self,
+        style: &Style,
+        color_of: impl Fn(usize, usize, &PixelStats) -> Option<Rgb>,
+    ) -> Vec<String> {
+        let color = |px: usize, py: usize| color_of(px, py, &self.pixel(px, py));
+        (0..TEXT_ROWS)
+            .map(|t| {
+                let mut line: String = (0..PX_W)
+                    .map(|px| {
+                        two_tone_cell(
+                            style,
+                            cell_bg(px, t / 4),
+                            color(px, 2 * t),
+                            color(px, 2 * t + 1),
+                        )
+                    })
+                    .collect();
+                line.push_str(style.reset());
+                line
+            })
+            .collect()
+    }
+
+    /// Ideal-square xor: all mismatched samples over the window, in world
+    /// square units (the family map's objective).
+    pub fn xor_error(&self) -> f32 {
+        let n: usize = self
+            .cells
+            .iter()
+            .flatten()
+            .filter(|&&c| matches!(c, SampleClass::Over | SampleClass::Under))
+            .count();
+        n as f32 / (SX * SY) as f32
+    }
+
+    /// Rendered area minus ideal area, in world square units (signed).
+    /// Equal to FillGrid area − 1: over-coverage minus under-coverage.
+    pub fn signed_area_error(&self) -> f32 {
+        let (over, under): (usize, usize) = self
+            .cells
+            .iter()
+            .flatten()
+            .fold((0, 0), |(o, u), &c| match c {
+                SampleClass::Over => (o + 1, u),
+                SampleClass::Under => (o, u + 1),
+                _ => (o, u),
+            });
+        (over as f32 - under as f32) / (SX * SY) as f32
+    }
+
+    /// Ideal-square-xor pane: any mismatched sample lights the pixel.
+    pub fn mismatch_pane(&self, style: &Style) -> Vec<String> {
+        self.full_pane(style, |_, _, s| (s.over + s.under > 0).then_some(XOR_COLOR))
+    }
+
+    /// Signed area pane: over-coverage red, under-coverage blue.
+    pub fn signed_pane(&self, style: &Style) -> Vec<String> {
+        self.full_pane(style, |_, _, s| {
+            if s.over > s.under {
+                Some(OVER_COLOR)
+            } else if s.under > s.over {
+                Some(UNDER_COLOR)
+            } else if s.over > 0 {
+                Some(XOR_COLOR) // split pixel: both directions in 2x3 samples
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Center-error pane: dim rendered silhouette, ideal outline, and both
+    /// centroids marked — '×' actual, '+' ideal. The value line carries the
+    /// numbers; this shows *where* the silhouette's middle sits.
+    pub fn center_pane(&self, actual: &FillGrid, pos: WorldPoint, style: &Style) -> Vec<String> {
+        // world point -> text cell; window is 3 world units = 24 cols / 12 rows
+        let pane_of = |wx: f32, wy: f32| -> (usize, usize) {
+            let c = ((wx - self.origin.x) * 8.0).floor().clamp(0.0, 23.0) as usize;
+            let r = ((self.origin.y + 3.0 - wy) * 4.0).floor().clamp(0.0, 11.0) as usize;
+            (c, r)
+        };
+        let mut marks = vec![vec![(' ', Rgb(0, 0, 0)); PX_W]; TEXT_ROWS];
+        if let Some(c) = fill_centroid(actual) {
+            let p = pane_of(c.x, c.y);
+            marks[p.1][p.0] = ('\u{00d7}', Rgb(120, 255, 255));
+        }
+        let p = pane_of(pos.x, pos.y);
+        marks[p.1][p.0] = ('+', Rgb(235, 235, 235));
+        self.full_pane(style, |px, py, s| {
+            // a marker replaces the whole text cell it lands in: the pane
+            // colors per pixel, so mark both pixels of that cell
+            if marks[py / 2][px].0 != ' ' {
+                return Some(marks[py / 2][px].1);
+            }
+            if s.inside > 0 && s.outside > 0 {
+                Some(IDEAL_COLOR) // straddles the ideal boundary: outline
+            } else if s.filled > 0 {
+                Some(Rgb(64, 64, 80)) // dim rendered fill
+            } else if s.under > 0 {
+                Some(Rgb(48, 58, 92)) // faint under-coverage tint
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Per-character coverage pane: each half-cell shaded by its local
+    /// |rendered − ideal| filled area (the `per_char_coverage_error`
+    /// contribution), from dark (0) to hot (0.25 of the half-cell).
+    pub fn per_char_heat_pane(
+        grid: &[[DoubleChar; 3]; 3],
+        center: WorldSquare,
+        pos: WorldPoint,
+        style: &Style,
+    ) -> Vec<String> {
+        let mut heat = [[[0.0f32; 2]; 3]; 3];
+        for dx in -1..=1i32 {
+            for dy in -1..=1i32 {
+                let square = center + vec2(dx, dy);
+                for half in 0..2 {
+                    let ideal = half_cell_ideal(square, half, pos);
+                    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+                    let rendered = glyph_fits().iter().find(|f| f.c == c).unwrap().count;
+                    heat[(dx + 1) as usize][(dy + 1) as usize][half] =
+                        rendered.abs_diff(ideal) as f32 / (HX * SY) as f32;
+                }
+            }
+        }
+        // window: 6 half-cells wide (4 px each), 3 half-cell rows tall
+        // (8 px each, top pane rows = +y)
+        let mut colors = vec![vec![None; PX_W]; PX_H];
+        for py in 0..PX_H {
+            for px in 0..PX_W {
+                let h = px / 4;
+                let dx = (h / 2) as i32 - 1;
+                let dy = 1 - (py / 8) as i32;
+                let v = heat[(dx + 1) as usize][(dy + 1) as usize][h % 2];
+                colors[py][px] =
+                    (v > 0.0).then(|| lerp(Rgb(70, 60, 30), Rgb(255, 200, 60), v / 0.25));
+            }
+        }
+        pane_from_colors(style, &colors)
+    }
+
+    /// Jaggedness pane: the silhouette dim, with contour pixels lit by the
+    /// local edge-step length (dark = straight, bright = a big jump).
+    pub fn jaggedness_pane(actual: &FillGrid, style: &Style) -> Vec<String> {
+        // per sample column: (top, bottom) filled sample indices
+        let col_contour: Vec<Option<(usize, usize)>> = (0..NX)
+            .map(|j| {
+                let rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
+                rows.first().map(|&lo| (lo, *rows.last().unwrap()))
+            })
+            .collect();
+        let row_contour: Vec<Option<(usize, usize)>> = (0..NY)
+            .map(|i| {
+                let cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
+                cols.first().map(|&lo| (lo, *cols.last().unwrap()))
+            })
+            .collect();
+        let mut colors = vec![vec![None; PX_W]; PX_H];
+        // dim fill base
+        for py in 0..PX_H {
+            for px in 0..PX_W {
+                let filled = (px * 2..px * 2 + 2)
+                    .any(|j| (NY - (py + 1) * 3..NY - py * 3).any(|i| actual.filled(j, i)));
+                if filled {
+                    colors[py][px] = Some(Rgb(56, 56, 70));
+                }
+            }
+        }
+        // top/bottom contours: brightest step within each pixel column
+        for px in 0..PX_W {
+            let mut best = (0.0f32, None, None); // (step, top sample, bottom sample)
+            for j in px * 2..px * 2 + 2 {
+                if j == 0 {
+                    continue;
+                }
+                if let (Some((t0, b0)), Some((t1, b1))) = (col_contour[j - 1], col_contour[j]) {
+                    let step = (actual.wy(t1) - actual.wy(t0)).abs()
+                        + (actual.wy(b1) - actual.wy(b0)).abs();
+                    if step >= best.0 {
+                        best = (step, Some(t1), Some(b1));
+                    }
+                }
+            }
+            let t = (best.0 * 8.0).clamp(0.0, 1.0);
+            if t > 0.0 {
+                let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
+                for s in [best.1, best.2].into_iter().flatten() {
+                    colors[(NY - 1 - s) / 3][px] = Some(c);
+                }
+            }
+        }
+        // left/right contours: brightest step within each pixel row
+        for py in 0..PX_H {
+            let mut best = (0.0f32, None, None);
+            for i in NY - (py + 1) * 3..NY - py * 3 {
+                if i == 0 {
+                    continue;
+                }
+                if let (Some((l0, r0)), Some((l1, r1))) = (row_contour[i - 1], row_contour[i]) {
+                    let step = (actual.wx(l1) - actual.wx(l0)).abs()
+                        + (actual.wx(r1) - actual.wx(r0)).abs();
+                    if step >= best.0 {
+                        best = (step, Some(l1), Some(r1));
+                    }
+                }
+            }
+            let t = (best.0 * 8.0).clamp(0.0, 1.0);
+            if t > 0.0 {
+                let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
+                for s in [best.1, best.2].into_iter().flatten() {
+                    colors[py][s / 2] = Some(c);
+                }
+            }
+        }
+        pane_from_colors(style, &colors)
+    }
+
+    /// Displacement pane: which mismatched samples appear when the square
+    /// is nudged by `delta` in the worst direction. Bright yellow = newly
+    /// wrong (the pop), dim red = still wrong, dim blue = recovered.
+    pub fn displacement_pane(base: &ClassGrid, shifted: &ClassGrid, style: &Style) -> Vec<String> {
+        let is_match = |c: SampleClass| matches!(c, SampleClass::MatchFilled | SampleClass::MatchEmpty);
+        let class_of = |px: usize, py: usize| -> Option<Rgb> {
+            let mut counts = [0usize; 3]; // [newly wrong, still wrong, recovered]
+            for j in px * 2..px * 2 + 2 {
+                for i in NY - (py + 1) * 3..NY - py * 3 {
+                    let (a, b) = (base.cells[j][i], shifted.cells[j][i]);
+                    match (is_match(a), is_match(b)) {
+                        (true, false) => counts[0] += 1,
+                        (false, false) => counts[1] += 1,
+                        (false, true) => counts[2] += 1,
+                        _ => {}
+                    }
+                }
+            }
+            if counts[0] > 0 {
+                Some(Rgb(255, 230, 80))
+            } else if counts[1] > 0 {
+                Some(Rgb(150, 70, 70))
+            } else if counts[2] > 0 {
+                Some(Rgb(70, 110, 150))
+            } else {
+                None
+            }
+        };
+        (0..TEXT_ROWS)
+            .map(|t| {
+                let mut line: String = (0..PX_W)
+                    .map(|px| {
+                        two_tone_cell(
+                            style,
+                            cell_bg(px, t / 4),
+                            class_of(px, 2 * t),
+                            class_of(px, 2 * t + 1),
+                        )
+                    })
+                    .collect();
+                line.push_str(style.reset());
+                line
+            })
+            .collect()
+    }
+}
+
+/// Small-displacement step for `displacement_sensitivity`: the nudge scale,
+/// so one step can cross a real glyph-pick or snap-family boundary.
+pub const DISPLACEMENT_DELTA: f32 = 1.0 / 16.0;
+
+/// Worst-case xor gained per small displacement: for each axis direction,
+/// how much the ideal-square xor of the method's own render grows when the
+/// square (and its ideal) move by `delta`. Piecewise-constant glyph picks
+/// make this 0 most of the time with jumps at pick boundaries — a direct
+/// measure of pop sensitivity. Returns (worst gain, worst direction).
+pub fn displacement_sensitivity(
+    neighborhood: impl Fn(WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare),
+    pos: WorldPoint,
+    delta: f32,
+) -> (f32, WorldMove) {
+    let error_at = |p: WorldPoint| {
+        let (grid, center) = neighborhood(p);
+        let owners = assign_colors(&grid);
+        coverage_error(&grid, &owners, center, p)
+    };
+    let base = error_at(pos);
+    let mut best = (0.0f32, WorldMove::new(1.0, 0.0));
+    for d in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
+        let dir: WorldMove = WorldMove::new(d.0, d.1);
+        let gain = error_at(pos + dir * delta) - base;
+        if gain > best.0 {
+            best = (gain, dir);
+        }
+    }
+    best
+}
+
 /// Sample grid over the render window. Indexed [x][y], y from the bottom.
 ///
 /// Sampling note: sample points sit at half-sample offsets
@@ -854,28 +1398,18 @@ impl FillGrid {
     /// pixels shows the upper pixel as fg and the lower as bg.
     pub fn bitmap_pane(&self, palette: &[Rgb], style: &Style) -> Vec<String> {
         let color_of = |owner: Option<usize>| palette[owner.unwrap_or(0) % palette.len()];
-        let cell = |t: usize, px: usize| -> String {
-            let bg = style.bg(cell_bg(px / 4, t / 4));
-            let up = self.pixel(px, 2 * t);
-            let lo = self.pixel(px, 2 * t + 1);
-            match (up, lo) {
-                (Some(ou), Some(ol)) if ou == ol => {
-                    format!("{}{}█", bg, style.fg(color_of(ou)))
-                }
-                // bg carries the lower pixel's glyph color, not the cell shade
-                (Some(ou), Some(ol)) => {
-                    format!("{}{}▀", style.bg(color_of(ol)), style.fg(color_of(ou)))
-                }
-                (Some(ou), None) => format!("{}{}▀", bg, style.fg(color_of(ou))),
-                (None, Some(ol)) => format!("{}{}▄", bg, style.fg(color_of(ol))),
-                // a shaded space would be invisible whenever the bg colors
-                // don't survive (no truecolor, pipes, copy-paste)
-                (None, None) => format!("{}{}·", bg, style.fg(DOT_COLOR)),
-            }
-        };
         (0..TEXT_ROWS)
             .map(|t| {
-                let mut line: String = (0..PX_W).map(|px| cell(t, px)).collect();
+                let mut line: String = (0..PX_W)
+                    .map(|px| {
+                        two_tone_cell(
+                            style,
+                            cell_bg(px / 4, t / 4),
+                            self.pixel(px, 2 * t).map(|o| color_of(o)),
+                            self.pixel(px, 2 * t + 1).map(|o| color_of(o)),
+                        )
+                    })
+                    .collect();
                 line.push_str(style.reset());
                 line
             })
@@ -987,5 +1521,39 @@ mod charwise_tests {
             }
         }
         assert!(diffs > 0, "shaped pick never diverges from plain charwise");
+    }
+
+    #[test]
+    fn test_squared_penalty_kickin_threshold() {
+        // the squared penalty only bites past d > 1/W2 = 0.25 cells. At
+        // (0.25, -0.7) the spike's protrusion is d = 1/30, so the squared
+        // variant keeps the plain spiky pick that the linear variant
+        // refuses (see test_protrusion_penalty_trades_spike_for_even_error)
+        let pos = euclid::point2(0.25, -0.7);
+        let (plain, _) = charwise_neighborhood(pos);
+        let (lin, _) = charwise_shaped_neighborhood(pos);
+        let (sq, _) = charwise_protrusion_squared_neighborhood(pos);
+        assert_eq!(cell(&plain, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
+        assert_eq!(cell(&lin, 0, 1)[1], EIGHTH_BLOCKS_FROM_BOTTOM[2]);
+        assert_eq!(cell(&sq, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
+    }
+
+    #[test]
+    fn test_squared_variant_changes_deep_protrusions() {
+        // guard against the quadratic silently decaying to the linear
+        // pick: past the 1/W2 kick-in it must diverge somewhere on a
+        // lattice spanning both sign quadrants
+        let mut diffs = 0usize;
+        for xi in -16..=16 {
+            for yi in -16..=16 {
+                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
+                if charwise_shaped_neighborhood(pos)
+                    != charwise_protrusion_squared_neighborhood(pos)
+                {
+                    diffs += 1;
+                }
+            }
+        }
+        assert!(diffs > 0, "squared pick never diverges from linear");
     }
 }

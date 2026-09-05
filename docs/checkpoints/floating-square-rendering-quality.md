@@ -271,3 +271,71 @@ across the half-cell); the shaped pick takes the 2/8 block (zero
 protrusion, error spread under the edge). Note cell coords are
 anisotropic (u = half-cell width, v = full row), so the distance is
 mildly anisotropic — fine for a debug heuristic, documented in coverage.rs.
+
+## Squared-protrusion variant + two-axis debug tool rework
+
+### Method 4: charwise + protrusion² (coverage.rs)
+
+Second penalized variant: cost = xor + CHARWISE_PROTRUSION_SQUARED_WEIGHT ×
+d² (4.0), where d is the same max-protrusion distance as the linear
+variant. Progressive taxation: W·d² bites harder than linear d only
+once d > 1/W (0.25 cells at W=4) — shallow overshoot is nearly free,
+deep spikes hammered quadratically. Pinned by
+`test_squared_penalty_kickin_threshold` (at the 1/30-deep spike the
+squared variant keeps the plain spiky pick the linear one refuses) and
+`test_squared_variant_changes_deep_protrusions` (diverges from linear
+at 464/1089 lattice points).
+
+Implementation: `charwise_glyph_penalty(pos, square, half, weight,
+squared)` replaces `charwise_glyph_weighted`; `charwise_shaped_neighborhood`
+(linear, W=1) and `charwise_protrusion_squared_neighborhood` (squared,
+W=4) are the wrappers; `charwise_neighborhood` = weight 0, still
+bit-identical to the plain xor argmin. Because fill decisions couple
+through max(d), the hextant is no longer per-sextant-optimal under a
+penalty: weight > 0 now brute-forces all 64 fill patterns (exact argmin,
+cheap); weight 0 keeps the majority rule so the weight-0 equivalence
+test still holds bit-for-bit. Strips/quadrant enumeration stays provably
+exact under any penalty (penalty monotone past the ideal edge, zero
+before).
+
+Lattice table (16x16, mean/max; disp = new displacement metric below):
+
+| approach | area | center | per-char | jagged | disp |
+|---|---|---|---|---|---|
+| family-snapped | .021/.042 | .079/.159 | .325/.667 | 0/0 | .099/.151 |
+| charwise | .066/.250 | .042/.081 | .259/.604 | 1.09/3.00 | .085/.167 |
+| charwise + protrusion | .155/.437 | .034/.081 | .383/.875 | .58/1.83 | .115/.312 |
+| charwise + protrusion² | .112/.396 | .038/.100 | .309/.792 | .47/1.75 | .107/.229 |
+
+Note the linear row shifted from the previous checkpoint (.111/.396 →
+.155/.437 mean/max area): exact 64-pattern hextants replace the
+majority-rule shape under the penalty, and the penalized objective
+trades area for protrusion depth. The squared variant dominates the
+linear one on every mean metric here (area, center, per-char,
+jaggedness, displacement) at the cost of tolerating shallow overshoot.
+
+### Displacement sensitivity metric
+
+`displacement_sensitivity(neighborhood, pos, delta)` in coverage.rs:
+max over the 4 axis directions of [ideal-square xor at pos + δ·d̂ minus
+xor at pos], δ = 1/16 (the nudge scale). Piecewise-constant glyph picks
+make this 0 except at pick/family boundaries — a direct worst-case pop
+measure. Generic over the neighborhood fn so all four methods share it.
+
+### Two-axis debug tool (floating_square_debug.rs animate mode)
+
+Reworked from per-method stat rows to a methods × measurements grid.
+Four data-driven rows (`const METHODS`), each: small view (3x3-square
+crop of the real glyph render), large view (9x9 animation grid + method
+info + glyph legend), then six half-res 12x6 error panes with numeric
+values — center (dim silhouette + ideal outline + '×'/'+' centroids),
+area (signed over-red/under-blue map), per-char coverage (half-cells
+heat-shaded by local error), ideal xor (any mismatch lit, max-pooled so
+slivers stay visible), jaggedness (contour cells lit by local edge-step
+length), displacement (samples newly wrong under the worst δ-nudge in
+bright yellow, still-wrong dim red, recovered dim blue). New coverage.rs
+machinery: `SampleClass`/`ClassGrid` (3-state sampled window),
+`pooled_pane` + the six pane builders, `DISPLACEMENT_DELTA`. GRID_SCREEN
+origin moved to (10, 2) (small view is now the first column). Bounds in
+tests/charwise_rendering.rs extended to the squared variant (area ≤ 0.45)
+and displacement (max ≤ 0.5 per method).

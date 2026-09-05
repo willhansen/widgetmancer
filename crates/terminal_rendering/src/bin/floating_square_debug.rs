@@ -19,31 +19,33 @@
 //!                 with the family that offset picks (a decision-boundary map)
 //!   animate (default)
 //!                 square on the alternate screen (q quits); orbit,
-//!                 arrow-key nudge, and line trajectories. Four bordered
-//!                 rows: one per rendering approach — family-snapped,
-//!                 then charwise (per character the square overlaps, the
-//!                 glyph whose known geometry best fits the square's
-//!                 overlap with that character — exact and analytic, no
-//!                 regard for sibling characters), then charwise +
-//!                 protrusion (the same per-character argmin, but the
-//!                 objective adds a penalty on how far the glyph sticks
-//!                 out past the true square, so a long thin spike loses
-//!                 to a small evenly distributed overextension)
-//!                 — each with the real-size render (square drawn in its
-//!                 glyph colors, no center marker) plus legend, the
-//!                 zoomed sampled-coverage view, and metrics: the
-//!                 comparison metrics measured identically for every
-//!                 approach, then approach-specific info (for
-//!                 family-snapped its snap family and snap error; for the
-//!                 legacy method an outline of the approach); then a
+//!                 arrow-key nudge, and line trajectories. A two-method
+//!                 comparison: the in-use game path (family-snapped) and
+//!                 a candidate replacement cycled with [ and ] (charwise;
+//!                 charwise + protrusion, objective xor + 1.0·d; charwise
+//!                 + protrusion², objective xor + 4.0·d² — progressive:
+//!                 shallow overshoot nearly free, deep spikes hammered).
+//!                 Each method row shows its large real-size grid (with
+//!                 glyph legend and the error its own picker minimizes),
+//!                 the zoomed render at native sampled resolution with
+//!                 one palette color per glyph, and ONE error measurement
+//!                 as a full-resolution colored pane with its numeric
+//!                 value — cycled with , and . through center error
+//!                 (silhouette + ideal outline + both centroids), area
+//!                 error (signed: over red / under blue), per-char
+//!                 coverage (half-cells heat-shaded by local error),
+//!                 ideal square xor (any mismatch lit), jaggedness
+//!                 (contour lit by local edge-step length), and
+//!                 displacement sensitivity (what turns wrong under the
+//!                 worst 1/16 nudge: bright yellow = newly wrong). Then a
 //!                 common row with the ideal (true square) zoom, global
 //!                 state, and controls. Left click/drag sets the orbit's
 //!                 angular position (the angle from the top-row grid's
 //!                 center to the mouse, at the fixed orbit radius); other
-//!                 buttons place the square (drag to move it), and holding
-//!                 shift/ctrl/alt while dragging (or pressing f) switches
-//!                 placement to fine control, where large mouse movements
-//!                 map to sub-cell square movements.
+//!                 buttons place the square (drag to move it), and
+//!                 holding shift/ctrl/alt while dragging (or pressing f)
+//!                 switches placement to fine control, where large mouse
+//!                 movements map to sub-cell square movements.
 //!
 //! Run via the top-level ./debug-floating-squares wrapper, or:
 //!   cargo run -p terminal_rendering --bin floating_square_debug -- animate
@@ -60,9 +62,12 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
-    self, actual_sample, assign_colors, charwise_neighborhood, charwise_shaped_neighborhood,
-    coverage_error, fill_centroid, jaggedness, per_char_coverage_error, rendered_neighborhood,
-    rendered_neighborhood_forced, FillGrid, Metrics, BITMAP_W, CHARWISE_PROTRUSION_WEIGHT,
+    self, actual_sample, assign_colors, cell_bg, charwise_neighborhood,
+    charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood, charwise_objective,
+    coverage_error, displacement_sensitivity, fill_centroid, jaggedness, lerp, pane_from_colors,
+    per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced, ClassGrid,
+    FillGrid, Metrics, BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
+    CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
@@ -275,6 +280,11 @@ fn visible_width(s: &str) -> usize {
     w
 }
 
+/// Visible width of a whole column of pre-styled lines.
+fn visible_w(lines: &[String]) -> usize {
+    lines.iter().map(|s| visible_width(s)).max().unwrap_or(0)
+}
+
 /// One titled, bordered row of side-by-side columns. Each column is its
 /// lines plus its visible width; short columns are padded with spaces so
 /// the right border stays a straight vertical line. Relies on the pane
@@ -308,34 +318,165 @@ fn boxed_row(title: &str, columns: &[(&[String], usize)]) -> Vec<String> {
     lines
 }
 
-/// The comparison metrics, measured identically for every rendering
-/// approach: center error, area error (rendered vs 1.0), per-character
-/// coverage error (sum over half-cells of |rendered - ideal| filled area),
-/// and jaggedness (total edge step length). Rendering approaches are not
-/// fitted to these.
-fn comparison_stats(
-    grid: &[[DoubleChar; 3]; 3],
+/// One render method to compare: how to produce its glyph neighborhood.
+type Neighborhood = fn(WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare);
+
+/// The game-facing render path — always the "in use" row.
+const IN_USE: (&str, Neighborhood) = ("family-snapped", rendered_neighborhood);
+
+/// Candidate replacements for the in-use method, cycled with [ and ].
+const CANDIDATES: [(&str, Neighborhood); 3] = [
+    ("charwise", charwise_neighborhood),
+    ("charwise + protrusion", charwise_shaped_neighborhood),
+    ("charwise + protrusion²", charwise_protrusion_squared_neighborhood),
+];
+
+/// The error measurements that can be cycled with , and . — one shown at a
+/// time, as a full-resolution colored pane per method.
+const METRICS: [&str; 6] = ["center", "area", "per-char", "xor", "jagged", "disp"];
+
+/// The method's own objective, formatted for the stats column ("the error
+/// used for rendering"). `index` 0 = in use, 1..=3 = CANDIDATES index + 1.
+fn objective_lines(
+    index: usize,
+    glyphs: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
     center: WorldSquare,
     pos: WorldPoint,
-    actual: &FillGrid,
-    m: &Metrics,
 ) -> Vec<String> {
-    let center_err = match fill_centroid(actual) {
-        Some(c) => {
-            let (dx, dy) = (c.x - pos.x, c.y - pos.y);
-            format!("({:+.3}, {:+.3})  |d|={:.3}", dx, dy, dx.hypot(dy))
+    match index {
+        // the family map is baked against the sampled ideal-square xor
+        0 => vec![format!(
+            "bake objective (xor)={:.3}",
+            coverage_error(glyphs, owners, center, pos)
+        )],
+        1 => vec![format!("Σ cell xor={:.3}", charwise_objective(pos, 0.0, false))],
+        2 => vec![format!(
+            "xor+{:.2}·Σd={:.3}",
+            CHARWISE_PROTRUSION_WEIGHT,
+            charwise_objective(pos, CHARWISE_PROTRUSION_WEIGHT, false)
+        )],
+        _ => vec![format!(
+            "xor+{:.2}·Σd²={:.3}",
+            CHARWISE_PROTRUSION_SQUARED_WEIGHT,
+            charwise_objective(pos, CHARWISE_PROTRUSION_SQUARED_WEIGHT, true)
+        )],
+    }
+}
+
+/// Arrow for the displacement metric's worst direction.
+fn dir_arrow(d: WorldMove) -> char {
+    if d.x > 0.0 {
+        '→'
+    } else if d.x < 0.0 {
+        '←'
+    } else if d.y > 0.0 {
+        '↑'
+    } else {
+        '↓'
+    }
+}
+
+/// One method's bordered section: large view (full animation grid, method
+/// info, its own objective), zoomed render at native sampled resolution
+/// with one palette color per glyph plus legend, and the currently selected
+/// error measurement as a full-resolution colored pane with its value.
+fn method_section(
+    title: &str,
+    nb: Neighborhood,
+    objective_idx: usize,
+    pos: WorldPoint,
+    style: &coverage::Style,
+    metric: usize,
+    extra_info: &[String],
+) -> Vec<String> {
+    let (glyphs, center) = nb(pos);
+    let owners = assign_colors(&glyphs);
+    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let actual = FillGrid::sample(sample_origin, |wx, wy| {
+        actual_sample(&glyphs, &owners, center, wx, wy)
+    });
+    let class = ClassGrid::sample(sample_origin, |wx, wy| {
+        ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
+    });
+
+    // zoomed render: native sampled pixel grid, one palette color per glyph
+    let mut zoom_col: Vec<String> = actual.bitmap_pane(&coverage::PALETTE, style);
+    let legend = glyph_legend(&glyphs, &owners, style);
+    if legend.1 > 0 {
+        zoom_col.push("glyph colors:".to_string());
+        zoom_col.push(legend.0);
+    }
+
+    // large view: full animation grid, method info, then its objective —
+    // the error the method's own picker minimizes
+    let origin0 = euclid::point2(0, 0);
+    let mut large = grid_frame(ANIMATE_GRID_RADIUS, origin0);
+    draw_neighborhood_colored(&mut large, ANIMATE_GRID_RADIUS, origin0, center, &glyphs, &owners);
+    let mut large_col: Vec<String> = large
+        .string_for_regular_display()
+        .lines()
+        .map(String::from)
+        .collect();
+    large_col.extend(extra_info.iter().cloned());
+    large_col.extend(objective_lines(objective_idx, &glyphs, &owners, center, pos));
+
+    // the selected error measurement: full-res pane + numeric value
+    let (pane, value): (Vec<String>, String) = match metric {
+        0 => {
+            let v = match fill_centroid(&actual) {
+                Some(c) => format!("({:+.2}, {:+.2})", c.x - pos.x, c.y - pos.y),
+                None => "n/a".to_string(),
+            };
+            (class.center_pane(&actual, pos, style), v)
         }
-        None => "n/a (nothing rendered)".to_string(),
-    };
-    vec![
-        format!("center err={center_err}"),
-        format!("area err={:+.3}  (area {:.3})", m.area - 1.0, m.area),
-        format!(
-            "per-char coverage err={:.4}",
-            per_char_coverage_error(grid, center, pos)
+        1 => (
+            class.signed_pane(style),
+            format!("{:+.3}", class.signed_area_error()),
         ),
-        format!("jaggedness={:.3}", jaggedness(actual)),
-    ]
+        2 => (
+            ClassGrid::per_char_heat_pane(&glyphs, center, pos, style),
+            format!("{:.3}", per_char_coverage_error(&glyphs, center, pos)),
+        ),
+        3 => (class.mismatch_pane(style), format!("{:.3}", class.xor_error())),
+        4 => (
+            ClassGrid::jaggedness_pane(&actual, style),
+            format!("{:.2}", jaggedness(&actual)),
+        ),
+        _ => {
+            let (gain, dir) = displacement_sensitivity(nb, pos, DISPLACEMENT_DELTA);
+            let shifted_pos = pos + dir * DISPLACEMENT_DELTA;
+            let (glyphs2, center2) = nb(shifted_pos);
+            let owners2 = assign_colors(&glyphs2);
+            let shifted = ClassGrid::sample(sample_origin, |wx, wy| {
+                ClassGrid::class_at(&glyphs2, &owners2, center2, shifted_pos, wx, wy)
+            });
+            (
+                ClassGrid::displacement_pane(&class, &shifted, style),
+                format!("{:.3}{}", gain, dir_arrow(dir)),
+            )
+        }
+    };
+    let mut err_col: Vec<String> = vec![format!(
+        "{:^BITMAP_W$}",
+        format!("{} (, .)", METRICS[metric])
+    )];
+    err_col.extend(pane);
+    err_col.push(format!("{:^BITMAP_W$}", value));
+
+    let (large_w, zoom_w, err_w) = (
+        visible_w(&large_col),
+        visible_w(&zoom_col),
+        visible_w(&err_col),
+    );
+    let cols = [
+        (large_col, large_w),
+        (zoom_col, zoom_w),
+        (err_col, err_w),
+    ];
+    let refs: Vec<(&[String], usize)> =
+        cols.iter().map(|(l, w)| (l.as_slice(), *w)).collect();
+    boxed_row(title, &refs)
 }
 
 /// Marks the exact square center on the half-cell grid so the snapped-vs-true
@@ -360,6 +501,31 @@ fn overlay_true_center(
     frame.grid[row as usize][col as usize] = DrawableGlyph::new('+', Some(TRUE_CENTER_COLOR), bg);
 }
 
+/// The true square drawn analytically: each display pixel is exactly
+/// 1/8 x 1/8 world units, so per-pixel ideal-coverage area is closed-form.
+/// Shading by coverage shows the sub-pixel edge phase; the sampled
+/// majority vote (whose 3-of-6 threshold produces corner divots at
+/// fractional edge positions — an edge pixel holds 1 of 2 sample columns,
+/// a corner pixel also only ≤2 of 3 rows) is what the metrics see, not
+/// what the reference should look like.
+fn ideal_pane(pos: WorldPoint, origin: WorldPoint, style: &coverage::Style) -> Vec<String> {
+    let mut colors = vec![vec![None; PX_W]; PX_H];
+    for py in 0..PX_H {
+        for px in 0..PX_W {
+            let x0 = origin.x + px as f32 / 8.0;
+            let y1 = origin.y + 3.0 - py as f32 / 8.0;
+            let ov_x = (x0 + 0.125).min(pos.x + 0.5) - x0.max(pos.x - 0.5);
+            let ov_y = y1.min(pos.y + 0.5) - (y1 - 0.125).max(pos.y - 0.5);
+            let frac = (ov_x.max(0.0) * ov_y.max(0.0)) * 64.0; // / (1/8)^2
+            if frac > 0.0 {
+                let bg = cell_bg(px / 4, py / 8);
+                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
+            }
+        }
+    }
+    pane_from_colors(style, &colors)
+}
+
 /// Sampled actual-vs-ideal coverage, using the same oracle the coherence
 /// test asserts on (tests/floating_square_coherence.rs).
 fn coverage_zoom_pane(pos: WorldPoint) -> String {
@@ -367,15 +533,9 @@ fn coverage_zoom_pane(pos: WorldPoint) -> String {
     let owners = assign_colors(&grid);
     let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
-    let ideal = FillGrid::sample(origin, |wx, wy| {
-        (
-            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
-            Some(0),
-        )
-    });
     let style = coverage::Style::from_env();
     let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
-    let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
+    let ideal_lines = ideal_pane(pos, origin, &style);
     let mut out = format!(
         "sampled coverage (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
         "actual", "ideal (true square)"
@@ -616,6 +776,11 @@ struct AnimState {
     last_mouse_cell: Option<(u16, u16)>,
     /// Mode of the drag in progress (None between drags).
     drag: Option<DragMode>,
+    /// Candidate replacement method shown in the second row (index into
+    /// CANDIDATES); the first row is always the in-use game path.
+    candidate: usize,
+    /// Which error measurement pane is displayed (index into METRICS).
+    metric: usize,
 }
 
 impl AnimState {
@@ -630,6 +795,8 @@ impl AnimState {
             fine_drag: false,
             last_mouse_cell: None,
             drag: None,
+            candidate: 0,
+            metric: 0,
         }
     }
 }
@@ -677,10 +844,11 @@ fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
     Some((event, modified))
 }
 
-/// 1-based terminal cell of the animation grid's top-left corner: just
-/// inside the first boxed row's border. If the boxed layout changes (the
-/// grid is no longer the first column of the first row), this moves with it.
-const GRID_SCREEN_ORIGIN: (u16, u16) = (2, 2);
+/// 1-based terminal cell of the animation grid's top-left corner. The
+/// large view is the second column of the first boxed row (first column is
+/// the 6-wide small view, then the 2-cell gap, then "│ " prefix): 2 + 6 + 2.
+/// If the boxed layout changes, this moves with it.
+const GRID_SCREEN_ORIGIN: (u16, u16) = (10, 2);
 
 /// World point under the (1-based) terminal cell, using the same grid
 /// geometry as the frame: 2 columns per square, rows increase downward.
@@ -719,90 +887,6 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         state.prev_family = Some(info.family);
     }
 
-    // sampled-coverage oracle (the same one the coherence test asserts on):
-    // both the zoomed views and the error metrics derive from it
-    let (glyphs, center) = rendered_neighborhood(pos);
-    let owners = assign_colors(&glyphs);
-    let (charwise_glyphs, _) = charwise_neighborhood(pos);
-    let charwise_owners = assign_colors(&charwise_glyphs);
-    let (shaped_glyphs, _) = charwise_shaped_neighborhood(pos);
-    let shaped_owners = assign_colors(&shaped_glyphs);
-    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
-    let actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&glyphs, &owners, center, wx, wy)
-    });
-    let charwise_actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&charwise_glyphs, &charwise_owners, center, wx, wy)
-    });
-    let shaped_actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&shaped_glyphs, &shaped_owners, center, wx, wy)
-    });
-    let ideal = FillGrid::sample(sample_origin, |wx, wy| {
-        (
-            (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5,
-            Some(0),
-        )
-    });
-    let metrics = Metrics::measure(&actual, pos);
-    let style = coverage::Style::from_env();
-    let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
-    let charwise_lines = charwise_actual.bitmap_pane(&coverage::PALETTE, &style);
-    let shaped_lines = shaped_actual.bitmap_pane(&coverage::PALETTE, &style);
-    let ideal_lines = ideal.bitmap_pane(&[coverage::IDEAL_COLOR], &style);
-
-    // real-size views draw the square in its glyph (palette) colors, not a
-    // uniform fill, so a glyph means the same color in every pane; no
-    // center marker — it would hide the very glyphs under inspection
-    let origin = euclid::point2(0, 0);
-    let mut frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
-    draw_neighborhood_colored(&mut frame, ANIMATE_GRID_RADIUS, origin, center, &glyphs, &owners);
-    let frame_lines: Vec<String> = frame
-        .string_for_regular_display()
-        .lines()
-        .map(String::from)
-        .collect();
-    let mut charwise_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
-    draw_neighborhood_colored(
-        &mut charwise_frame,
-        ANIMATE_GRID_RADIUS,
-        origin,
-        center,
-        &charwise_glyphs,
-        &charwise_owners,
-    );
-    let charwise_frame_lines: Vec<String> = charwise_frame
-        .string_for_regular_display()
-        .lines()
-        .map(String::from)
-        .collect();
-    let mut shaped_frame = grid_frame(ANIMATE_GRID_RADIUS, origin);
-    draw_neighborhood_colored(
-        &mut shaped_frame,
-        ANIMATE_GRID_RADIUS,
-        origin,
-        center,
-        &shaped_glyphs,
-        &shaped_owners,
-    );
-    let shaped_frame_lines: Vec<String> = shaped_frame
-        .string_for_regular_display()
-        .lines()
-        .map(String::from)
-        .collect();
-    let frame_w = frame.width();
-
-    // glyph legend in the rows under each (shorter) real-size grid
-    let under_of = |legend: (String, usize)| {
-        if legend.1 > 0 {
-            vec![("glyph colors:".to_string(), 13), legend]
-        } else {
-            Vec::new()
-        }
-    };
-    let under1 = under_of(glyph_legend(&glyphs, &owners, &style));
-    let under2 = under_of(glyph_legend(&charwise_glyphs, &charwise_owners, &style));
-    let under3 = under_of(glyph_legend(&shaped_glyphs, &shaped_owners, &style));
-
     // invert the family on the frame it changed: family switches are where
     // the visible pops happen
     let family_display = if family_changed {
@@ -815,102 +899,66 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     } else {
         short_family_name(info.family).to_string()
     };
-    let charwise_metrics = Metrics::measure(&charwise_actual, pos);
-    let shaped_metrics = Metrics::measure(&shaped_actual, pos);
-    let frac = fraction_part(pos);
-
-    // one boxed row per rendering method: real-size grid with the glyph
-    // legend underneath (it is shorter than the zoomed pane), the actual
-    // zoom, comparison metrics, then method-only metrics
-    let left_col = |frame_lines: &[String], under: &[(String, usize)]| {
-        let mut col = frame_lines.to_vec();
-        col.extend(under.iter().map(|(s, _)| s.clone()));
-        col
-    };
-    let col_w = |v: &[String]| v.iter().map(|s| visible_width(s)).max().unwrap_or(0);
-
-    let mut stats1 = comparison_stats(&glyphs, center, pos, &actual, &metrics);
-    stats1.push(String::new());
-    stats1.extend([
+    let style = coverage::Style::from_env();
+    let in_use_info = vec![
         format!("family={family_display}"),
         format!(
-            "snap=({:+.3}, {:+.3})  snap err=({:+.3}, {:+.3})",
-            info.snapped_offset.x,
-            info.snapped_offset.y,
+            "snap err=({:+.3}, {:+.3})",
             info.snapped_offset.x - offset.x,
             info.snapped_offset.y - offset.y,
         ),
-    ]);
-    let mut stats2 = comparison_stats(
-        &charwise_glyphs,
-        center,
-        pos,
-        &charwise_actual,
-        &charwise_metrics,
-    );
-    stats2.push(String::new());
-    stats2.extend([
-        "approach: charwise — per".to_string(),
-        "character, the glyph whose known".to_string(),
-        "geometry best fits the square's".to_string(),
-        "overlap with that character".to_string(),
-        "(exact, analytic). no regard for".to_string(),
-        "siblings — jagged by design.".to_string(),
-    ]);
-    let mut stats3 = comparison_stats(
-        &shaped_glyphs,
-        center,
-        pos,
-        &shaped_actual,
-        &shaped_metrics,
-    );
-    stats3.push(String::new());
-    stats3.extend([
-        "approach: charwise +".to_string(),
-        "protrusion penalty — per".to_string(),
-        "character, the xor argmin".to_string(),
-        format!("plus {:.2} × how far the", CHARWISE_PROTRUSION_WEIGHT),
-        "glyph sticks out past the".to_string(),
-        "true square's edge: a long".to_string(),
-        "thin spike costs far more".to_string(),
-        "than its area, so error".to_string(),
-        "spreads evenly instead.".to_string(),
-    ]);
-    let left1 = left_col(&frame_lines, &under1);
-    let left2 = left_col(&charwise_frame_lines, &under2);
-    let left3 = left_col(&shaped_frame_lines, &under3);
-    let stats1_w = col_w(&stats1);
-    let stats2_w = col_w(&stats2);
-    let stats3_w = col_w(&stats3);
-    let row1 = boxed_row(
-        "family-snapped",
-        &[
-            (left1.as_slice(), frame_w),
-            (actual_lines.as_slice(), BITMAP_W),
-            (stats1.as_slice(), stats1_w),
+    ];
+    let (cand_name, cand_nb) = CANDIDATES[state.candidate];
+    let cand_info = match state.candidate {
+        0 => vec![
+            "per-character xor argmin,".to_string(),
+            "no sibling awareness".to_string(),
         ],
-    );
-    let row2 = boxed_row(
-        "charwise",
-        &[
-            (left2.as_slice(), frame_w),
-            (charwise_lines.as_slice(), BITMAP_W),
-            (stats2.as_slice(), stats2_w),
-        ],
-    );
-    let row3 = boxed_row(
-        "charwise + protrusion",
-        &[
-            (left3.as_slice(), frame_w),
-            (shaped_lines.as_slice(), BITMAP_W),
-            (stats3.as_slice(), stats3_w),
-        ],
-    );
+        1 => vec![format!(
+            "per-cell xor + {:.2}·d",
+            CHARWISE_PROTRUSION_WEIGHT
+        )],
+        _ => vec![format!(
+            "per-cell xor + {:.2}·d²",
+            CHARWISE_PROTRUSION_SQUARED_WEIGHT
+        )],
+    };
 
+    let mut text = String::new();
+    for line in method_section(
+        &format!("in use: {}", IN_USE.0),
+        IN_USE.1,
+        0,
+        pos,
+        &style,
+        state.metric,
+        &in_use_info,
+    ) {
+        text.push_str(&line);
+        text.push('\n');
+    }
+    for line in method_section(
+        &format!("candidate: {cand_name}  ([ ] cycle)"),
+        cand_nb,
+        state.candidate + 1,
+        pos,
+        &style,
+        state.metric,
+        &cand_info,
+    ) {
+        text.push_str(&line);
+        text.push('\n');
+    }
 
-    // common box: ideal zoom, global state, controls — one column each
-    let mut ideal_col = vec!["ideal (true square)".to_string()];
-    ideal_col.extend(ideal_lines.iter().cloned());
+    // common box: ideal zoom (drawn analytically — see ideal_pane), global
+    // state, controls — one column each
+    let center = world_point_to_world_square(pos);
+    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let ideal_lines = ideal_pane(pos, sample_origin, &style);
+    let frac = fraction_part(pos);
+
+    let mut common_col = vec!["ideal (true square)".to_string()];
+    common_col.extend(ideal_lines.iter().cloned());
     let global = vec![
         format!(
             "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
@@ -932,6 +980,8 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         "arrows nudge 1/16",
         "o orbit  l line",
         "+/- speed  f fine-drag",
+        "[ ] candidate method",
+        ", . error metric",
         "left drag: orbit angle",
         "mid/right drag: place",
         "shift/ctrl/alt-drag fine",
@@ -939,22 +989,18 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     .iter()
     .map(|s| s.to_string())
     .collect();
-    let global_w = col_w(&global);
-    let controls_w = col_w(&controls);
-    let row4 = boxed_row(
+    let global_w = visible_w(&global);
+    let controls_w = visible_w(&controls);
+    let common_row = boxed_row(
         "common",
         &[
-            (ideal_col.as_slice(), BITMAP_W),
+            (common_col.as_slice(), BITMAP_W),
             (global.as_slice(), global_w),
             (controls.as_slice(), controls_w),
         ],
     );
-
-    let mut text = String::new();
-    for line in [row1, row2, row3, row4].concat() {
-        text.push_str(&line);
-        text.push('\n');
-    }
+    text.push_str(&common_row.join("\n"));
+    text.push('\n');
 
     if raw_mode {
         // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
@@ -1065,6 +1111,24 @@ fn run_animation(frame_count: Option<u32>) {
                     state.fine_drag = !state.fine_drag;
                     dirty = true;
                 }
+                // two-button cycles: candidate method (second row) and
+                // which error measurement pane is displayed
+                Event::Key(Key::Char(']')) => {
+                    state.candidate = (state.candidate + 1) % CANDIDATES.len();
+                    dirty = true;
+                }
+                Event::Key(Key::Char('[')) => {
+                    state.candidate = (state.candidate + CANDIDATES.len() - 1) % CANDIDATES.len();
+                    dirty = true;
+                }
+                Event::Key(Key::Char('.')) => {
+                    state.metric = (state.metric + 1) % METRICS.len();
+                    dirty = true;
+                }
+                Event::Key(Key::Char(',')) => {
+                    state.metric = (state.metric + METRICS.len() - 1) % METRICS.len();
+                    dirty = true;
+                }
                 // Left click/drag steers the orbit: the angle from the
                 // grid center to the mouse becomes the orbit's angular
                 // position (orbit radius unchanged, so the square jumps to
@@ -1141,7 +1205,7 @@ fn run_animation(frame_count: Option<u32>) {
             render_animation_frame(&mut screen, &mut state, true);
             write!(
                 screen,
-                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine"
+                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine []=cand ,.=metric"
             )
             .unwrap();
             screen.flush().unwrap();
@@ -1164,20 +1228,24 @@ fn usage() {
            families X Y  the same position with each snap family forced\n  \
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
-           animate [N]   orbiting square, one bordered row per rendering\n  \
-          \x20      approach (family-snapped, charwise, charwise + protrusion): real-\n  \
-          \x20      size render plus legend, zoomed sampled-coverage view\n  \
-          \x20      (actual vs ideal, one color per\n  \
-          \x20      glyph), and one line per error metric; q quits, space\n  \
+           animate [N]   orbiting square, two-method comparison: the in-use\n  \
+          \x20      game path (family-snapped) and a candidate replacement\n  \
+          \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
+          \x20      charwise + protrusion squared). Each row: the full grid\n  \
+          \x20      with glyph legend and the method's own objective, the\n  \
+          \x20      full-resolution zoomed render (one color per glyph), and\n  \
+          \x20      ONE error pane cycled with , and . (center, area,\n  \
+          \x20      per-char coverage, ideal xor, jaggedness, displacement\n  \
+          \x20      sensitivity) with its numeric value; q quits, space\n  \
           \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
           \x20      line trajectory, +/- change speed, left click/drag sets\n  \
           \x20      the orbit's angular position (angle from the top-row\n  \
           \x20      grid's center to the mouse); other buttons place the\n  \
-          \x20      square, and holding shift/ctrl/alt while\n  \
-          \x20      dragging (or pressing f) gives fine control: large mouse\n  \
-          \x20      movements map to sub-cell square movements. Optional frame\n  \
-          \x20      count N runs a fixed number of frames, which is also the\n  \
-          \x20      mode used when stdout is not a terminal.\n\
+          \x20      square, and holding shift/ctrl/alt while dragging (or\n  \
+          \x20      pressing f) gives fine control: large mouse movements\n  \
+          \x20      map to sub-cell square movements. Optional frame count N\n  \
+          \x20      runs a fixed number of frames, which is also the mode\n  \
+          \x20      used when stdout is not a terminal.\n\
          default: animate (runs until q; fixed frame count when piped)"
     );
 }
