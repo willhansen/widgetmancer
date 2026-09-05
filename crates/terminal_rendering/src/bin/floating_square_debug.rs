@@ -64,9 +64,9 @@ use termion::screen::IntoAlternateScreen;
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, cell_bg, charwise_neighborhood,
     charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood, charwise_objective,
-    coverage_error, displacement_sensitivity, fill_centroid, jaggedness, lerp, pane_from_colors,
-    per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced, ClassGrid,
-    FillGrid, Metrics, BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
+    coverage_error, displacement_sensitivity, fill_centroid, glyph_pane, jaggedness, lerp,
+    pane_from_colors, per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
+    ClassGrid, FillGrid, Metrics, BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
     CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
@@ -400,8 +400,9 @@ fn method_section(
         ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
     });
 
-    // zoomed render: native sampled pixel grid, one palette color per glyph
-    let mut zoom_col: Vec<String> = actual.bitmap_pane(&coverage::PALETTE, style);
+    // zoomed render: native sampled pixel grid drawn from the glyphs'
+    // exact geometry (see glyph_pane), one palette color per glyph
+    let mut zoom_col: Vec<String> = glyph_pane(&glyphs, &owners, center, &coverage::PALETTE, style);
     let legend = glyph_legend(&glyphs, &owners, style);
     if legend.1 > 0 {
         zoom_col.push("glyph colors:".to_string());
@@ -534,10 +535,10 @@ fn coverage_zoom_pane(pos: WorldPoint) -> String {
     let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
     let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
     let style = coverage::Style::from_env();
-    let actual_lines = actual.bitmap_pane(&coverage::PALETTE, &style);
+    let actual_lines = glyph_pane(&grid, &owners, center, &coverage::PALETTE, &style);
     let ideal_lines = ideal_pane(pos, origin, &style);
     let mut out = format!(
-        "sampled coverage (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
+        "actual: exact glyph geometry; ideal: analytic (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
         "actual", "ideal (true square)"
     );
     for row in 0..actual_lines.len() {

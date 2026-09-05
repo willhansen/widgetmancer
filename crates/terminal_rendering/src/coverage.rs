@@ -1290,6 +1290,138 @@ impl ClassGrid {
     }
 }
 
+/// The filled region of a glyph as axis-aligned rectangles in cell
+/// coordinates (fx across the half-cell, fy up the row) — the exact
+/// geometry `glyph_filled` point-samples; kept in sync with it by
+/// `test_glyph_rects_matches_glyph_filled`.
+fn glyph_rects(c: char) -> Vec<[f32; 4]> {
+    if c == SPACE {
+        return vec![];
+    }
+    if c == FULL_BLOCK {
+        return vec![[0.0, 0.0, 1.0, 1.0]];
+    }
+    for k in 1..8usize {
+        let k = k as f32;
+        if c == EIGHTH_BLOCKS_FROM_LEFT[k as usize] {
+            return vec![[0.0, 0.0, k / 8.0, 1.0]];
+        }
+        if c == EIGHTH_BLOCKS_FROM_RIGHT[k as usize] {
+            return vec![[1.0 - k / 8.0, 0.0, 1.0, 1.0]];
+        }
+        if c == EIGHTH_BLOCKS_FROM_BOTTOM[k as usize] {
+            return vec![[0.0, 0.0, 1.0, k / 8.0]];
+        }
+        if c == EIGHTH_BLOCKS_FROM_TOP[k as usize] {
+            return vec![[0.0, 1.0 - k / 8.0, 1.0, 1.0]];
+        }
+    }
+    match c {
+        UPPER_ONE_THIRD_BLOCK => return vec![[0.0, 2.0 / 3.0, 1.0, 1.0]],
+        UPPER_TWO_THIRD_BLOCK => return vec![[0.0, 1.0 / 3.0, 1.0, 1.0]],
+        LOWER_ONE_THIRD_BLOCK => return vec![[0.0, 0.0, 1.0, 1.0 / 3.0]],
+        LOWER_TWO_THIRD_BLOCK => return vec![[0.0, 0.0, 1.0, 2.0 / 3.0]],
+        // quadrant blocks and half blocks
+        '▖' => return vec![[0.0, 0.0, 0.5, 0.5]],
+        '▗' => return vec![[0.5, 0.0, 1.0, 0.5]],
+        '▘' => return vec![[0.0, 0.5, 0.5, 1.0]],
+        '▝' => return vec![[0.5, 0.5, 1.0, 1.0]],
+        '▌' => return vec![[0.0, 0.0, 0.5, 1.0]],
+        '▐' => return vec![[0.5, 0.0, 1.0, 1.0]],
+        '▄' => return vec![[0.0, 0.0, 1.0, 0.5]],
+        '▀' => return vec![[0.0, 0.5, 1.0, 1.0]],
+        _ => {}
+    }
+    if (FIRST_HEXTANT..=LAST_HEXTANT).contains(&c) {
+        // sextant bits: bit = row * 2 + col, row 0 = top, col 0 = left;
+        // fy is measured from the bottom, so display row r spans
+        // [(2-r)/3, (3-r)/3]
+        let bits = hextant_character_to_binary(c);
+        let mut out = Vec::new();
+        for row in 0..3usize {
+            for col in 0..2usize {
+                if bits & (1 << (row * 2 + col)) != 0 {
+                    out.push([
+                        col as f32 / 2.0,
+                        (2 - row) as f32 / 3.0,
+                        (col + 1) as f32 / 2.0,
+                        (3 - row) as f32 / 3.0,
+                    ]);
+                }
+            }
+        }
+        return out;
+    }
+    panic!("no coverage model for glyph {c:?} (U+{:04X})", c as u32);
+}
+
+/// Exact coverage fraction of one glyph's filled region within a pixel
+/// rectangle given in cell coordinates.
+fn glyph_rect_coverage(c: char, fx0: f32, fy0: f32, fx1: f32, fy1: f32) -> f32 {
+    let mut area = 0.0;
+    for [rx0, ry0, rx1, ry1] in glyph_rects(c) {
+        area += (fx1.min(rx1) - fx0.max(rx0)).max(0.0) * (fy1.min(ry1) - fy0.max(ry0)).max(0.0);
+    }
+    (area / ((fx1 - fx0) * (fy1 - fy0))).clamp(0.0, 1.0)
+}
+
+/// Zoomed render at native sampled resolution drawn from the glyphs'
+/// EXACT geometry: each display pixel is 1/8 x 1/8 world units and lies
+/// entirely within one half-cell (pixel edges align with cell bounds),
+/// so its coverage is the closed-form rect intersection above, shaded
+/// from the checkerboard to the glyph's palette color. Unlike the
+/// majority-voted `bitmap_pane`, edges and one-eighth increments show at
+/// true position. Metrics stay sampled — this is display only.
+#[doc(hidden)]
+pub fn glyph_pane(
+    grid: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+    center: WorldSquare,
+    palette: &[Rgb],
+    style: &Style,
+) -> Vec<String> {
+    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let mut colors = vec![vec![None; PX_W]; PX_H];
+    for py in 0..PX_H {
+        for px in 0..PX_W {
+            let (x0, x1) = (origin.x + px as f32 / 8.0, origin.x + (px + 1) as f32 / 8.0);
+            let (y1, y0) = (origin.y + 3.0 - py as f32 / 8.0, origin.y + 3.0 - (py + 1) as f32 / 8.0);
+            // half-cell lookup from the pixel center, same rounding as
+            // actual_sample; pixel edges align with cell bounds so the
+            // whole pixel is in one half
+            let wx = (x0 + x1) / 2.0;
+            let wy = (y0 + y1) / 2.0;
+            let sx = (wx + 0.5).floor() as i32;
+            let sy = (wy + 0.5).floor() as i32;
+            let (dx, dy) = (sx - center.x, sy - center.y);
+            if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) {
+                continue;
+            }
+            let half = if wx < sx as f32 { 0 } else { 1 };
+            let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+            if c == SPACE {
+                continue;
+            }
+            let cell_left = sx as f32 - 0.5 + 0.5 * half as f32;
+            let cell_bottom = sy as f32 - 0.5;
+            let cov = glyph_rect_coverage(
+                c,
+                ((x0 - cell_left) * 2.0).clamp(0.0, 1.0),
+                (y0 - cell_bottom).clamp(0.0, 1.0),
+                ((x1 - cell_left) * 2.0).clamp(0.0, 1.0),
+                (y1 - cell_bottom).clamp(0.0, 1.0),
+            );
+            if cov <= 0.0 {
+                continue;
+            }
+            let owner = owners[(dx + 1) as usize][(dy + 1) as usize][half].unwrap_or(0);
+            let bg = cell_bg(px / 4, py / 8);
+            colors[py][px] = Some(lerp(bg, palette[owner % palette.len()], cov));
+        }
+    }
+    pane_from_colors(style, &colors)
+}
+
 /// Small-displacement step for `displacement_sensitivity`: the nudge scale,
 /// so one step can cross a real glyph-pick or snap-family boundary.
 pub const DISPLACEMENT_DELTA: f32 = 1.0 / 16.0;
@@ -1471,6 +1603,31 @@ mod charwise_tests {
         let bottom_left_sextant =
             hextant_array_to_char([[false, false], [false, false], [true, false]]);
         assert_eq!(cell(&grid, 1, 1), [bottom_left_sextant, SPACE]);
+    }
+
+    #[test]
+    fn test_glyph_rects_matches_glyph_filled() {
+        // glyph_rects must describe the same geometry glyph_filled
+        // point-samples: every glyph, every half-sample lattice point.
+        // Half-sample offsets never land on glyph boundaries, so strict
+        // inequalities in the rect test are safe.
+        for f in glyph_fits() {
+            for i in 0..SY {
+                for j in 0..HX {
+                    let fx = (j as f32 + 0.5) / HX as f32;
+                    let fy = (i as f32 + 0.5) / SY as f32;
+                    let in_rects = glyph_rects(f.c).iter().any(|[x0, y0, x1, y1]| {
+                        fx >= *x0 && fx < *x1 && fy >= *y0 && fy < *y1
+                    });
+                    assert_eq!(
+                        in_rects,
+                        glyph_filled(f.c, fx, fy),
+                        "glyph {} at ({fx}, {fy})",
+                        f.c
+                    );
+                }
+            }
+        }
     }
 
     #[test]

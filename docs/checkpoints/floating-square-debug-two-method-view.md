@@ -93,3 +93,27 @@ remain lattice-based; only the reference picture changed. `lerp` /
 `pane_from_colors` made pub for the tool; note tool imports shadow the
 glob-imported utility::lerp. Verified divots gone at aligned (0.25,-0.7)
 and fractional (0.3,0.3) positions; all workspace tests pass.
+
+## Follow-up: exact-geometry render zoom (COMPLETE)
+
+After the analytic ideal pane, the render zoom still went through the
+sampled majority vote (>=3 of 6 samples per pixel), so glyph edges looked
+quantized next to the smooth reference, and one-eighth increments
+(half-pixel-wide steps) could thin out at the vote threshold.
+
+Fix: `glyph_rects(c)` describes each glyph's filled region as
+axis-aligned rectangles in cell coords (eighth strips, thirds, quadrants,
+halves, hextant sextants); `glyph_pane(grid, owners, center, palette,
+style)` renders the zoomed actual pane from exact per-pixel rect
+intersections (each pixel is 1/8 x 1/8 world units and pixel edges align
+with half-cell bounds, so one glyph per pixel), shaded
+lerp(checkerboard bg, palette color, coverage) — anti-aliased edges at
+true sub-pixel positions. Swapped into both render zooms (method
+sections + pos-mode coverage zoom). `bitmap_pane` (majority vote) stays
+for the coherence test's failure reports.
+
+Sync guard: `test_glyph_rects_matches_glyph_filled` checks the rect
+table against the point-sampled model for every glyph over the whole
+half-sample lattice. Intermediate shading colors verified in raw output
+(e.g. (141,141,150) between bg and IDEAL_COLOR at fractional edges).
+All workspace tests pass.
