@@ -5,6 +5,7 @@
 #   ./debug-floating-squares pos 1.3 0.7     single square at (X, Y)
 #   ./debug-floating-squares families 1.3 0.7  all snap families side by side
 #   ./debug-floating-squares sweep           offset table + family boundary map
+#   ./debug-floating-squares glyphs          block-character reference table
 #   ./debug-floating-squares animate         orbiting square (q quits)
 set -euo pipefail
 

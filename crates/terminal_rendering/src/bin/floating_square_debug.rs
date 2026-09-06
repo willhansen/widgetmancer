@@ -17,6 +17,10 @@
 //!                 side by side
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
+//!   glyphs        reference table: every block character the renderer can
+//!                 emit, each with an exact big-pixel zoom (8x24 pixels per
+//!                 character, 1/16 x 1/24 world each) framed in box drawing
+//!                 characters; plain text, so it can be redirected to a file
 //!   animate (default)
 //!                 square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. A two-method
@@ -64,7 +68,8 @@ use termion::screen::IntoAlternateScreen;
 use terminal_rendering::coverage::{
     self, actual_sample, assign_colors, cell_bg, charwise_neighborhood,
     charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood, charwise_objective,
-    coverage_error, displacement_sensitivity, fill_centroid, glyph_pane, jaggedness, lerp,
+    coverage_error, displacement_sensitivity, fill_centroid, glyph_filled, glyph_pane,
+    jaggedness, lerp,
     pane_from_colors, per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
     ClassGrid, FillGrid, Metrics, BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
     CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
@@ -697,6 +702,89 @@ fn show_sweep() {
     }
 }
 
+/// Big-pixel grid per character cell in the glyph table: the exact union
+/// lattice of the families' increments — 1/16 world horizontally (1/8-char
+/// vertical strips), 1/24 world vertically (eighths/thirds union grid) —
+/// so one character (0.5 x 1.0 world) is 8 x 24 big pixels and every glyph
+/// edge lands exactly on a pixel boundary. No rounding anywhere.
+const TABLE_PX_W: usize = 8;
+const TABLE_PX_H: usize = 24;
+
+/// Every block character the renderer can emit, by sweeping the four
+/// family generators over their full input domains (deduped, SPACE
+/// dropped). Calling the real generators means the list cannot drift
+/// from the render vocabulary.
+fn used_block_glyphs() -> Vec<char> {
+    let mut glyphs: Vec<char> = Vec::new();
+    let mut push = |c: char| {
+        if c != SPACE && !glyphs.contains(&c) {
+            glyphs.push(c);
+        }
+    };
+    for &vertical in &[false, true] {
+        for eighths in -8..=8 {
+            push(character_for_half_square_with_1d_eighths_offset(vertical, eighths));
+        }
+    }
+    for thirds in -3..=3 {
+        push(character_for_half_square_with_vertical_thirds_offset(thirds));
+    }
+    for dy in -2..=2 {
+        for dx in -2..=2 {
+            push(quadrant_block_by_offset(euclid::vec2(dx, dy)));
+        }
+    }
+    for dy in -3..=3 {
+        for dx in -2..=2 {
+            push(hextant_block_by_offset(euclid::vec2(dx, dy)));
+        }
+    }
+    glyphs
+}
+
+/// The glyph table: one entry per block character (first column), its
+/// exact 8x24 big-pixel zoom framed in box drawing characters (second
+/// column), so each glyph's cell boundary is explicit. One big pixel =
+/// one vertical half character: both=█ upper=▀ lower=▄ empty=·. Plain
+/// text only (no ANSI) — the output is meant for a file (`glyphs > x.txt`).
+fn print_glyph_table() {
+    println!("block glyph reference - exact big-pixel zoom at the union lattice");
+    println!("one character = one half-cell = 0.5 world wide x 1.0 world tall;");
+    println!("one big pixel = 1/16 world wide x 1/24 world tall (the finest");
+    println!("increments any snap family can express), so a character is 8x24");
+    println!("big pixels and every glyph edge lies exactly on a pixel boundary.");
+    println!("one big pixel = one vertical half character: both=█ upper=▀ lower=▄ empty=·");
+    for &c in &used_block_glyphs() {
+        println!();
+        println!("{c} ┌{}┐", "─".repeat(TABLE_PX_W));
+        for t in 0..TABLE_PX_H / 2 {
+            // text row t stacks world pixel rows 23-2t (upper) and
+            // 22-2t (lower), counted from the bottom (+y is up)
+            let filled = |j: usize, i: usize| {
+                glyph_filled(
+                    c,
+                    (i as f32 + 0.5) / TABLE_PX_W as f32,
+                    (j as f32 + 0.5) / TABLE_PX_H as f32,
+                )
+            };
+            let mut line = String::from("  │");
+            for i in 0..TABLE_PX_W {
+                let up = filled(TABLE_PX_H - 1 - 2 * t, i);
+                let lo = filled(TABLE_PX_H - 2 - 2 * t, i);
+                line.push(match (up, lo) {
+                    (true, true) => '█',
+                    (true, false) => '▀',
+                    (false, true) => '▄',
+                    (false, false) => '·',
+                });
+            }
+            line.push('│');
+            println!("{line}");
+        }
+        println!("  └{}┘", "─".repeat(TABLE_PX_W));
+    }
+}
+
 const ORBIT_RADIUS: f32 = 2.5;
 /// Radians per second. Matches the old 0.02 rad per 33ms frame.
 const ORBIT_SPEED: f32 = 0.6;
@@ -1229,6 +1317,9 @@ fn usage() {
            families X Y  the same position with each snap family forced\n  \
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
+           glyphs        every block character the renderer can emit, each\n  \
+          \x20      with an exact 8x24 big-pixel zoom (1/16 x 1/24 world per\n  \
+          \x20      pixel), framed; plain text, redirect to a file\n  \
            animate [N]   orbiting square, two-method comparison: the in-use\n  \
           \x20      game path (family-snapped) and a candidate replacement\n  \
           \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
@@ -1279,6 +1370,7 @@ fn main() {
             }
         },
         Some("sweep") => show_sweep(),
+        Some("glyphs") => print_glyph_table(),
         Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
             None => run_animation(None),
             Some(Ok(n)) => run_animation(Some(n)),
