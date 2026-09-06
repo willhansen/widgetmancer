@@ -35,8 +35,9 @@
 //!                 the zoomed render as union-lattice big pixels (the
 //!                 glyphs table's exact 1/16 x 1/24 world pixels, one
 //!                 palette color per glyph), and ONE error measurement
-//!                 as a full-resolution colored pane with its numeric
-//!                 value — cycled with , and . through center error
+//!                 as a colored pane on the same big-pixel lattice (one
+//!                 big pixel per sample — the grid the numbers measure),
+//!                 with its numeric value — cycled with , and . through center error
 //!                 (silhouette + ideal outline + both centroids), area
 //!                 error (signed: over red / under blue), per-char
 //!                 coverage (half-cells heat-shaded by local error),
@@ -437,7 +438,7 @@ fn method_section(
     large_col.extend(extra_info.iter().cloned());
     large_col.extend(objective_lines(objective_idx, &glyphs, &owners, center, pos));
 
-    // the selected error measurement: full-res pane + numeric value
+    // the selected error measurement: big-pixel pane + numeric value
     let (pane, value): (Vec<String>, String) = match metric {
         0 => {
             let v = match fill_centroid(&actual) {
@@ -474,11 +475,11 @@ fn method_section(
         }
     };
     let mut err_col: Vec<String> = vec![format!(
-        "{:^BITMAP_W$}",
+        "{:^BIG_PX_W$}",
         format!("{} (, .)", METRICS[metric])
     )];
     err_col.extend(pane);
-    err_col.push(format!("{:^BITMAP_W$}", value));
+    err_col.push(format!("{:^BIG_PX_W$}", value));
 
     let (large_w, zoom_w, err_w) = (
         visible_w(&large_col),

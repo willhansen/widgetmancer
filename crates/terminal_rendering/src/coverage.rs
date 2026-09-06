@@ -876,9 +876,11 @@ impl Metrics {
 
 // --- error-visualization panes -------------------------------------------------
 //
-// Full-resolution zoomed views (24x12 text cells = the native sampled
-// pixel grid, 2x3 samples per pixel, two pixels stacked per text cell)
-// that color one error metric per pane.
+// Zoomed views at the union lattice (32x24 text cells = one big pixel
+// per lattice sample over the 2x2-world window, two big pixels stacked
+// per text cell — the same grid as `big_pixel_pane`), one error metric
+// per pane. The numeric metrics are computed on this same sample grid,
+// so the panes show exactly what the numbers measure.
 
 /// Rendered-vs-ideal classification of one sample point. Match is split
 /// into filled/empty so panes can show the silhouette without a FillGrid.
@@ -948,8 +950,9 @@ pub struct ClassGrid {
     pub origin: WorldPoint, // world coords of the window's bottom-left corner
 }
 
-/// Sample counts within one display pixel (2x3 samples). `inside`/
-/// `outside` partition by the ideal square, `filled` by the render.
+/// Class counts of the single lattice sample under one big pixel.
+/// `inside`/`outside` partition by the ideal square, `filled` by the
+/// render.
 #[derive(Default)]
 struct PixelStats {
     filled: usize,
@@ -957,6 +960,29 @@ struct PixelStats {
     under: usize,
     inside: usize,  // ideal-inside samples = match_filled + under
     outside: usize, // ideal-outside samples = match_empty + over
+}
+
+impl PixelStats {
+    fn of(c: SampleClass) -> Self {
+        let mut s = PixelStats::default();
+        match c {
+            SampleClass::MatchFilled => {
+                s.filled = 1;
+                s.inside = 1;
+            }
+            SampleClass::MatchEmpty => s.outside = 1,
+            SampleClass::Over => {
+                s.filled = 1;
+                s.over = 1;
+                s.outside = 1;
+            }
+            SampleClass::Under => {
+                s.under = 1;
+                s.inside = 1;
+            }
+        }
+        s
+    }
 }
 
 impl ClassGrid {
@@ -994,57 +1020,30 @@ impl ClassGrid {
         }
     }
 
-    fn pixel(&self, px: usize, py: usize) -> PixelStats {
-        // py 0 = top pixel row; same 2x3 sample block as FillGrid::pixel
-        let mut s = PixelStats::default();
-        for j in px * 2..px * 2 + 2 {
-            for i in NY - (py + 1) * 3..NY - py * 3 {
-                match self.cells[j][i] {
-                    SampleClass::MatchFilled => {
-                        s.filled += 1;
-                        s.inside += 1;
-                    }
-                    SampleClass::MatchEmpty => s.outside += 1,
-                    SampleClass::Over => {
-                        s.filled += 1;
-                        s.over += 1;
-                        s.outside += 1;
-                    }
-                    SampleClass::Under => {
-                        s.under += 1;
-                        s.inside += 1;
-                    }
-                }
-            }
-        }
-        s
+    /// The single lattice sample under one big pixel of the 2x2-world
+    /// display window. The stored grid covers the full 3x3 neighborhood;
+    /// the window crop starts at sample column SX/2, and its top sample
+    /// row is NY - SY/2 - 1.
+    fn sample_at(&self, bp: usize, by: usize) -> SampleClass {
+        self.cells[bp + SX / 2][NY - SY / 2 - 1 - by]
     }
 
-    /// Full-resolution pane: each text cell stacks two pixels (upper as
-    /// fg half-block, lower as bg half-block) exactly like `bitmap_pane`,
-    /// so every metric renders at the native sampled resolution.
+    /// Big-pixel pane: each text cell stacks two big pixels (upper as fg
+    /// half-block, lower as bg half-block) exactly like `big_pixel_pane`,
+    /// one big pixel per lattice sample — the same grid the numeric
+    /// metrics are computed on.
     pub fn full_pane(
         &self,
         style: &Style,
         color_of: impl Fn(usize, usize, &PixelStats) -> Option<Rgb>,
     ) -> Vec<String> {
-        let color = |px: usize, py: usize| color_of(px, py, &self.pixel(px, py));
-        (0..TEXT_ROWS)
-            .map(|t| {
-                let mut line: String = (0..PX_W)
-                    .map(|px| {
-                        two_tone_cell(
-                            style,
-                            cell_bg(px, t / 4),
-                            color(px, 2 * t),
-                            color(px, 2 * t + 1),
-                        )
-                    })
-                    .collect();
-                line.push_str(style.reset());
-                line
-            })
-            .collect()
+        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+        for by in 0..BIG_PX_H {
+            for bp in 0..BIG_PX_W {
+                colors[by][bp] = color_of(bp, by, &PixelStats::of(self.sample_at(bp, by)));
+            }
+        }
+        big_pane_from_colors(style, &colors)
     }
 
     /// Ideal-square xor: all mismatched samples over the window, in world
@@ -1079,15 +1078,15 @@ impl ClassGrid {
         self.full_pane(style, |_, _, s| (s.over + s.under > 0).then_some(XOR_COLOR))
     }
 
-    /// Signed area pane: over-coverage red, under-coverage blue.
+    /// Signed area pane: over-coverage red, under-coverage blue. At one
+    /// sample per big pixel a sample is never both, so the old
+    /// split-block XOR_COLOR case is structurally gone.
     pub fn signed_pane(&self, style: &Style) -> Vec<String> {
         self.full_pane(style, |_, _, s| {
-            if s.over > s.under {
+            if s.over > 0 {
                 Some(OVER_COLOR)
-            } else if s.under > s.over {
+            } else if s.under > 0 {
                 Some(UNDER_COLOR)
-            } else if s.over > 0 {
-                Some(XOR_COLOR) // split pixel: both directions in 2x3 samples
             } else {
                 None
             }
@@ -1098,27 +1097,49 @@ impl ClassGrid {
     /// centroids marked — '×' actual, '+' ideal. The value line carries the
     /// numbers; this shows *where* the silhouette's middle sits.
     pub fn center_pane(&self, actual: &FillGrid, pos: WorldPoint, style: &Style) -> Vec<String> {
-        // world point -> text cell; window is 3 world units = 24 cols / 12 rows
+        // world point -> big pixel; window is 2 world units = 32x48 big
+        // px. The ClassGrid origin is the 3x3 window's bottom-left, i.e.
+        // half a world left of / below the display window's corner.
         let pane_of = |wx: f32, wy: f32| -> (usize, usize) {
-            let c = ((wx - self.origin.x) * 8.0).floor().clamp(0.0, 23.0) as usize;
-            let r = ((self.origin.y + 3.0 - wy) * 4.0).floor().clamp(0.0, 11.0) as usize;
+            let c = ((wx - self.origin.x - 0.5) * SX as f32)
+                .floor()
+                .clamp(0.0, (BIG_PX_W - 1) as f32) as usize;
+            let r = ((self.origin.y + 2.5 - wy) * SY as f32)
+                .floor()
+                .clamp(0.0, (BIG_PX_H - 1) as f32) as usize;
             (c, r)
         };
-        let mut marks = vec![vec![(' ', Rgb(0, 0, 0)); PX_W]; TEXT_ROWS];
+        // 1-sample-thick ideal outline: an ideal-inside sample with an
+        // ideal-outside 4-neighbor (one sample per pixel, so the old
+        // straddling-block rule becomes adjacency)
+        let inside = |j: usize, i: usize| {
+            matches!(self.cells[j][i], SampleClass::MatchFilled | SampleClass::Under)
+        };
+        let mut outline = vec![vec![false; BIG_PX_W]; BIG_PX_H];
+        for by in 0..BIG_PX_H {
+            for bp in 0..BIG_PX_W {
+                let (j, i) = (bp + SX / 2, NY - SY / 2 - 1 - by);
+                let outside_nb = (j > 0 && !inside(j - 1, i))
+                    || (j + 1 < NX && !inside(j + 1, i))
+                    || (i > 0 && !inside(j, i - 1))
+                    || (i + 1 < NY && !inside(j, i + 1));
+                outline[by][bp] = inside(j, i) && outside_nb;
+            }
+        }
+        // marks replace the whole text cell they land in
+        let mut marks = vec![vec![(' ', Rgb(0, 0, 0)); BIG_PX_W]; BIG_TEXT_ROWS];
         if let Some(c) = fill_centroid(actual) {
             let p = pane_of(c.x, c.y);
-            marks[p.1][p.0] = ('\u{00d7}', Rgb(120, 255, 255));
+            marks[p.1 / 2][p.0] = ('\u{00d7}', Rgb(120, 255, 255));
         }
         let p = pane_of(pos.x, pos.y);
-        marks[p.1][p.0] = ('+', Rgb(235, 235, 235));
-        self.full_pane(style, |px, py, s| {
-            // a marker replaces the whole text cell it lands in: the pane
-            // colors per pixel, so mark both pixels of that cell
-            if marks[py / 2][px].0 != ' ' {
-                return Some(marks[py / 2][px].1);
+        marks[p.1 / 2][p.0] = ('+', Rgb(235, 235, 235));
+        self.full_pane(style, |bp, by, s| {
+            if marks[by / 2][bp].0 != ' ' {
+                return Some(marks[by / 2][bp].1);
             }
-            if s.inside > 0 && s.outside > 0 {
-                Some(IDEAL_COLOR) // straddles the ideal boundary: outline
+            if outline[by][bp] {
+                Some(IDEAL_COLOR)
             } else if s.filled > 0 {
                 Some(Rgb(64, 64, 80)) // dim rendered fill
             } else if s.under > 0 {
@@ -1151,20 +1172,22 @@ impl ClassGrid {
                 }
             }
         }
-        // window: 6 half-cells wide (4 px each), 3 half-cell rows tall
-        // (8 px each, top pane rows = +y)
-        let mut colors = vec![vec![None; PX_W]; PX_H];
-        for py in 0..PX_H {
-            for px in 0..PX_W {
-                let h = px / 4;
-                let dx = (h / 2) as i32 - 1;
-                let dy = 1 - (py / 8) as i32;
-                let v = heat[(dx + 1) as usize][(dy + 1) as usize][h % 2];
-                colors[py][px] =
+        // 2x2-world window: half-cell lookup per big pixel from world
+        // coords, same rounding as `big_pixel_pane`
+        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+        for by in 0..BIG_PX_H {
+            for bp in 0..BIG_PX_W {
+                let wx = center.x as f32 - 1.0 + (bp as f32 + 0.5) / SX as f32;
+                let wy = center.y as f32 + 1.0 - (by as f32 + 0.5) / SY as f32;
+                let sx = (wx + 0.5).floor() as i32;
+                let sy = (wy + 0.5).floor() as i32;
+                let half = if wx < sx as f32 { 0 } else { 1 };
+                let v = heat[(sx - center.x + 1) as usize][(sy - center.y + 1) as usize][half];
+                colors[by][bp] =
                     (v > 0.0).then(|| lerp(Rgb(70, 60, 30), Rgb(255, 200, 60), v / 0.25));
             }
         }
-        pane_from_colors(style, &colors)
+        big_pane_from_colors(style, &colors)
     }
 
     /// Jaggedness pane: the silhouette dim, with contour pixels lit by the
@@ -1183,110 +1206,83 @@ impl ClassGrid {
                 cols.first().map(|&lo| (lo, *cols.last().unwrap()))
             })
             .collect();
-        let mut colors = vec![vec![None; PX_W]; PX_H];
-        // dim fill base
-        for py in 0..PX_H {
-            for px in 0..PX_W {
-                let filled = (px * 2..px * 2 + 2)
-                    .any(|j| (NY - (py + 1) * 3..NY - py * 3).any(|i| actual.filled(j, i)));
-                if filled {
-                    colors[py][px] = Some(Rgb(56, 56, 70));
+        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+        // dim fill base: one big pixel per sample
+        for by in 0..BIG_PX_H {
+            for bp in 0..BIG_PX_W {
+                if actual.filled(bp + SX / 2, NY - SY / 2 - 1 - by) {
+                    colors[by][bp] = Some(Rgb(56, 56, 70));
                 }
             }
         }
-        // top/bottom contours: brightest step within each pixel column
-        for px in 0..PX_W {
-            let mut best = (0.0f32, None, None); // (step, top sample, bottom sample)
-            for j in px * 2..px * 2 + 2 {
-                if j == 0 {
-                    continue;
-                }
-                if let (Some((t0, b0)), Some((t1, b1))) = (col_contour[j - 1], col_contour[j]) {
-                    let step = (actual.wy(t1) - actual.wy(t0)).abs()
-                        + (actual.wy(b1) - actual.wy(b0)).abs();
-                    if step >= best.0 {
-                        best = (step, Some(t1), Some(b1));
+        // top/bottom contours: step vs the neighboring sample column (the
+        // neighbor can sit just outside the 2x2 window but inside the
+        // sampled 3x3 grid, so no edge information is lost at the crop)
+        for bp in 0..BIG_PX_W {
+            let j = bp + SX / 2;
+            if j == 0 {
+                continue;
+            }
+            if let (Some((t0, b0)), Some((t1, b1))) = (col_contour[j - 1], col_contour[j]) {
+                let step = (actual.wy(t1) - actual.wy(t0)).abs()
+                    + (actual.wy(b1) - actual.wy(b0)).abs();
+                let t = (step * 8.0).clamp(0.0, 1.0);
+                if t > 0.0 {
+                    let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
+                    for s in [t1, b1] {
+                        // contour samples lie in the silhouette, hence in
+                        // the window; a pathological render poking past
+                        // the crop just skips the light-up
+                        if (SY / 2..NY - SY / 2).contains(&s) {
+                            colors[NY - SY / 2 - 1 - s][bp] = Some(c);
+                        }
                     }
                 }
             }
-            let t = (best.0 * 8.0).clamp(0.0, 1.0);
-            if t > 0.0 {
-                let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
-                for s in [best.1, best.2].into_iter().flatten() {
-                    colors[(NY - 1 - s) / 3][px] = Some(c);
-                }
-            }
         }
-        // left/right contours: brightest step within each pixel row
-        for py in 0..PX_H {
-            let mut best = (0.0f32, None, None);
-            for i in NY - (py + 1) * 3..NY - py * 3 {
-                if i == 0 {
-                    continue;
-                }
-                if let (Some((l0, r0)), Some((l1, r1))) = (row_contour[i - 1], row_contour[i]) {
-                    let step = (actual.wx(l1) - actual.wx(l0)).abs()
-                        + (actual.wx(r1) - actual.wx(r0)).abs();
-                    if step >= best.0 {
-                        best = (step, Some(l1), Some(r1));
+        // left/right contours: step vs the neighboring sample row
+        for by in 0..BIG_PX_H {
+            let i = NY - SY / 2 - 1 - by;
+            if i == 0 {
+                continue;
+            }
+            if let (Some((l0, r0)), Some((l1, r1))) = (row_contour[i - 1], row_contour[i]) {
+                let step = (actual.wx(l1) - actual.wx(l0)).abs()
+                    + (actual.wx(r1) - actual.wx(r0)).abs();
+                let t = (step * 8.0).clamp(0.0, 1.0);
+                if t > 0.0 {
+                    let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
+                    for s in [l1, r1] {
+                        if (SX / 2..SX / 2 + BIG_PX_W).contains(&s) {
+                            colors[by][s - SX / 2] = Some(c);
+                        }
                     }
                 }
             }
-            let t = (best.0 * 8.0).clamp(0.0, 1.0);
-            if t > 0.0 {
-                let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
-                for s in [best.1, best.2].into_iter().flatten() {
-                    colors[py][s / 2] = Some(c);
-                }
-            }
         }
-        pane_from_colors(style, &colors)
+        big_pane_from_colors(style, &colors)
     }
 
     /// Displacement pane: which mismatched samples appear when the square
     /// is nudged by `delta` in the worst direction. Bright yellow = newly
     /// wrong (the pop), dim red = still wrong, dim blue = recovered.
     pub fn displacement_pane(base: &ClassGrid, shifted: &ClassGrid, style: &Style) -> Vec<String> {
-        let is_match = |c: SampleClass| matches!(c, SampleClass::MatchFilled | SampleClass::MatchEmpty);
-        let class_of = |px: usize, py: usize| -> Option<Rgb> {
-            let mut counts = [0usize; 3]; // [newly wrong, still wrong, recovered]
-            for j in px * 2..px * 2 + 2 {
-                for i in NY - (py + 1) * 3..NY - py * 3 {
-                    let (a, b) = (base.cells[j][i], shifted.cells[j][i]);
-                    match (is_match(a), is_match(b)) {
-                        (true, false) => counts[0] += 1,
-                        (false, false) => counts[1] += 1,
-                        (false, true) => counts[2] += 1,
-                        _ => {}
-                    }
-                }
+        let is_match =
+            |c: SampleClass| matches!(c, SampleClass::MatchFilled | SampleClass::MatchEmpty);
+        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+        for by in 0..BIG_PX_H {
+            for bp in 0..BIG_PX_W {
+                let (j, i) = (bp + SX / 2, NY - SY / 2 - 1 - by);
+                let (a, b) = (base.cells[j][i], shifted.cells[j][i]);
+                colors[by][bp] = match (is_match(a), is_match(b)) {
+                    (true, false) => Some(Rgb(255, 230, 80)), // newly wrong
+                    (false, false) => Some(Rgb(150, 70, 70)),  // still wrong
+                    (false, true) => Some(Rgb(70, 110, 150)),  // recovered
+                    _ => None,
+                };
             }
-            if counts[0] > 0 {
-                Some(Rgb(255, 230, 80))
-            } else if counts[1] > 0 {
-                Some(Rgb(150, 70, 70))
-            } else if counts[2] > 0 {
-                Some(Rgb(70, 110, 150))
-            } else {
-                None
-            }
-        };
-        (0..TEXT_ROWS)
-            .map(|t| {
-                let mut line: String = (0..PX_W)
-                    .map(|px| {
-                        two_tone_cell(
-                            style,
-                            cell_bg(px, t / 4),
-                            class_of(px, 2 * t),
-                            class_of(px, 2 * t + 1),
-                        )
-                    })
-                    .collect();
-                line.push_str(style.reset());
-                line
-            })
-            .collect()
+        }
+        big_pane_from_colors(style, &colors)
     }
 }
 
@@ -1789,5 +1785,92 @@ mod charwise_tests {
             }
         }
         assert!(diffs > 0, "squared pick never diverges from linear");
+    }
+}
+
+#[cfg(test)]
+mod pane_tests {
+    use super::*;
+
+    /// Lit big-pixel count of a pane: '█' lights both stacked big pixels,
+    /// '▀'/'▄' one.
+    fn lit_pixels(lines: &[String]) -> usize {
+        lines
+            .iter()
+            .map(|l| {
+                l.chars()
+                    .map(|c| match c {
+                        '█' => 2,
+                        '▀' | '▄' => 1,
+                        _ => 0,
+                    })
+                    .sum::<usize>()
+            })
+            .sum()
+    }
+
+    /// Every metric pane must be BIG_TEXT_ROWS text rows of exactly
+    /// BIG_PX_W cells — the same grid as the zoom panes (a pane that
+    /// regresses to the old 24x24 display grid fails here).
+    #[test]
+    fn test_metric_panes_match_zoom_grid() {
+        let style = Style { enabled: false };
+        for pos in [
+            euclid::point2(0.0, 0.0),
+            euclid::point2(0.3, 0.42),
+            euclid::point2(-1.9, 2.37),
+        ] {
+            let (grid, center) = rendered_neighborhood(pos);
+            let owners = assign_colors(&grid);
+            let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+            let class = ClassGrid::sample(origin, |wx, wy| {
+                ClassGrid::class_at(&grid, &owners, center, pos, wx, wy)
+            });
+            let actual =
+                FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
+            let panes: Vec<Vec<String>> = vec![
+                class.center_pane(&actual, pos, &style),
+                class.signed_pane(&style),
+                ClassGrid::per_char_heat_pane(&grid, center, pos, &style),
+                class.mismatch_pane(&style),
+                ClassGrid::jaggedness_pane(&actual, &style),
+                ClassGrid::displacement_pane(&class, &class, &style),
+            ];
+            for pane in &panes {
+                assert_eq!(pane.len(), BIG_TEXT_ROWS, "row count at {pos:?}");
+                for line in pane {
+                    assert_eq!(line.chars().count(), BIG_PX_W, "width at {pos:?}");
+                }
+            }
+        }
+    }
+
+    /// The mismatch pane lights exactly the Over/Under samples of the
+    /// 2x2 window crop — the pane is the numeric xor error pixel for
+    /// pixel (what the numbers measure), not a downsampled view of it.
+    #[test]
+    fn test_mismatch_pane_lights_exactly_the_wrong_samples() {
+        let style = Style { enabled: false };
+        for xi in 0..=8 {
+            for yi in 0..=8 {
+                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
+                let (grid, center) = rendered_neighborhood(pos);
+                let owners = assign_colors(&grid);
+                let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+                let class = ClassGrid::sample(origin, |wx, wy| {
+                    ClassGrid::class_at(&grid, &owners, center, pos, wx, wy)
+                });
+                let wrong_in_crop: usize = (0..BIG_PX_H)
+                    .flat_map(|by| (0..BIG_PX_W).map(move |bp| (bp, by)))
+                    .map(|(bp, by)| class.sample_at(bp, by))
+                    .filter(|&c| matches!(c, SampleClass::Over | SampleClass::Under))
+                    .count();
+                assert_eq!(
+                    lit_pixels(&class.mismatch_pane(&style)),
+                    wrong_in_crop,
+                    "mismatch pane at ({xi}, {yi})/16"
+                );
+            }
+        }
     }
 }
