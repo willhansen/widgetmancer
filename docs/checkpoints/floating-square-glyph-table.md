@@ -24,10 +24,17 @@ boundary — this is the same lattice as coverage.rs's sample grid
 `glyphs` subcommand on floating_square_debug (also via the top-level
 ./debug-floating-squares wrapper): prints a plain-text reference table to
 stdout — one entry per block character the renderer can emit (first
-column: the character; second column: its exact 8x24 big-pixel zoom,
-framed in box drawing characters; one big pixel = one vertical half
-character: both=█ upper=▀ lower=▄ empty=·). Redirect to a file for the
-generated artifact; no separate script.
+column: the character with its official Unicode name from the UCD;
+second: its exact 8x24 big-pixel zoom, framed in box drawing characters;
+one big pixel = one vertical half character: both=█ upper=▀ lower=▄
+empty=·). Redirect to a file for the generated artifact; no separate
+script. Position rulers on every grid:
+
+- x: digits 0–8 above the frame index the big-pixel column boundaries
+  (1/16 world apart; every one is a possible vertical cut, h-eighths).
+- y: digits left of the frame index the big-pixel row boundary at the
+  top of each half-row (even numbers, 0–22 — a half-row spans 2 big
+  pixels); the bottom frame line is position 24.
 
 - Glyph set is enumerated by sweeping the four family generators
   (1d-eighths, vertical-thirds, quadrant_block_by_offset,
@@ -41,11 +48,19 @@ generated artifact; no separate script.
 - Fill decisions use coverage::glyph_filled at pixel centers — exact,
   because pixel edges align with every glyph edge (no rounding, no
   coverage lerp; contrast glyph_pane, which anti-aliases).
+- Names are hand-verified against the UCD (UnicodeData.txt) and guarded
+  by `every_used_glyph_is_named`: a new vocabulary glyph falls to
+  char_name's code-point fallback and fails the test, so names cannot
+  silently go missing. Notable: the sextant names (BLOCK SEXTANT-n,
+  digits = filled cells numbered 1–6 reading order) cross-check against
+  the hextant bit model, e.g. 🬹 = SEXTANT-3456 = all but the top row =
+  lower two-thirds.
 - Plain text only (no ANSI) so the output files cleanly.
 
 Verified: ▍ renders as exactly 3 of 8 columns; 🬀 as left half of
-exactly the top third; 🬦 as right half of the bottom two-thirds. All
-workspace tests pass (481 total).
+exactly the top third; 🬦 as right half of the bottom two-thirds; 🬏 as
+bottom-left cell; ▗ as right half of the bottom half. All workspace
+tests pass (482 total, including the new name test).
 
 ## Open (separate decision)
 

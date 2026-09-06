@@ -18,9 +18,10 @@
 //!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
 //!                 with the family that offset picks (a decision-boundary map)
 //!   glyphs        reference table: every block character the renderer can
-//!                 emit, each with an exact big-pixel zoom (8x24 pixels per
-//!                 character, 1/16 x 1/24 world each) framed in box drawing
-//!                 characters; plain text, so it can be redirected to a file
+//!                 emit with its Unicode name and an exact big-pixel zoom
+//!                 (8x24 pixels per character, 1/16 x 1/24 world each)
+//!                 framed with position rulers; plain text, redirect to a
+//!                 file
 //!   animate (default)
 //!                 square on the alternate screen (q quits); orbit,
 //!                 arrow-key nudge, and line trajectories. A two-method
@@ -742,11 +743,17 @@ fn used_block_glyphs() -> Vec<char> {
     glyphs
 }
 
-/// The glyph table: one entry per block character (first column), its
-/// exact 8x24 big-pixel zoom framed in box drawing characters (second
-/// column), so each glyph's cell boundary is explicit. One big pixel =
-/// one vertical half character: both=█ upper=▀ lower=▄ empty=·. Plain
-/// text only (no ANSI) — the output is meant for a file (`glyphs > x.txt`).
+/// The glyph table: one entry per block character (first column) with its
+/// official Unicode name (UCD), and its exact 8x24 big-pixel zoom framed
+/// in box drawing characters, so each glyph's cell boundary is explicit.
+/// Position rulers: digits above each grid index the big-pixel column
+/// boundaries (1/16 world apart — every one a possible vertical cut,
+/// h-eighths strips); digits left of each grid index the big-pixel row
+/// boundary at the top of each half-row (even numbers — a half-row
+/// spans 2 big pixels; the bottom frame line is position 24). One big
+/// pixel = one vertical half character: both=█ upper=▀ lower=▄
+/// empty=·. Plain text only (no ANSI) — the output is meant for a file
+/// (`glyphs > x.txt`).
 fn print_glyph_table() {
     println!("block glyph reference - exact big-pixel zoom at the union lattice");
     println!("one character = one half-cell = 0.5 world wide x 1.0 world tall;");
@@ -754,9 +761,22 @@ fn print_glyph_table() {
     println!("increments any snap family can express), so a character is 8x24");
     println!("big pixels and every glyph edge lies exactly on a pixel boundary.");
     println!("one big pixel = one vertical half character: both=█ upper=▀ lower=▄ empty=·");
+    println!("names are the official Unicode character names (UCD).");
+    println!("x ruler (digits above each grid): big-pixel boundary index,");
+    println!("  1/16 world apart; every one is a possible vertical cut");
+    println!("  (h-eighths).");
+    println!("y ruler (digits left of each grid, one per half-row):");
+    println!("  big-pixel boundary index at the top of that half-row;");
+    println!("  even numbers, because each half-row spans 2 big pixels.");
+    println!("  The grid bottom edge is position 24.");
+    let ruler: String = (0..=TABLE_PX_W)
+        .map(|i| char::from(b'0' + i as u8))
+        .collect();
     for &c in &used_block_glyphs() {
         println!();
-        println!("{c} ┌{}┐", "─".repeat(TABLE_PX_W));
+        println!("{c} {}", char_name(c));
+        println!("   {ruler}");
+        println!("  ┌{}┐", "─".repeat(TABLE_PX_W));
         for t in 0..TABLE_PX_H / 2 {
             // text row t stacks world pixel rows 23-2t (upper) and
             // 22-2t (lower), counted from the bottom (+y is up)
@@ -767,7 +787,7 @@ fn print_glyph_table() {
                     (j as f32 + 0.5) / TABLE_PX_H as f32,
                 )
             };
-            let mut line = String::from("  │");
+            let mut line = String::new();
             for i in 0..TABLE_PX_W {
                 let up = filled(TABLE_PX_H - 1 - 2 * t, i);
                 let lo = filled(TABLE_PX_H - 2 - 2 * t, i);
@@ -778,11 +798,65 @@ fn print_glyph_table() {
                     (false, false) => '·',
                 });
             }
-            line.push('│');
-            println!("{line}");
+            println!("{:>2}│{line}│", 2 * t);
         }
-        println!("  └{}┘", "─".repeat(TABLE_PX_W));
+        println!("{:>2}└{}┘", TABLE_PX_H, "─".repeat(TABLE_PX_W));
     }
+}
+
+/// Official Unicode name (UCD) of one table glyph. The fallback is the
+/// bare code point; the test below fails if any used glyph reaches it,
+/// so names cannot silently go missing when the vocabulary grows.
+fn char_name(c: char) -> String {
+    match c {
+        '▏' => "LEFT ONE EIGHTH BLOCK",
+        '▎' => "LEFT ONE QUARTER BLOCK",
+        '▍' => "LEFT THREE EIGHTHS BLOCK",
+        '▌' => "LEFT HALF BLOCK",
+        '▋' => "LEFT FIVE EIGHTHS BLOCK",
+        '▊' => "LEFT THREE QUARTERS BLOCK",
+        '▉' => "LEFT SEVEN EIGHTHS BLOCK",
+        '█' => "FULL BLOCK",
+        '▕' => "RIGHT ONE EIGHTH BLOCK",
+        '🮇' => "RIGHT ONE QUARTER BLOCK",
+        '🮈' => "RIGHT THREE EIGHTHS BLOCK",
+        '▐' => "RIGHT HALF BLOCK",
+        '🮉' => "RIGHT FIVE EIGHTHS BLOCK",
+        '🮊' => "RIGHT THREE QUARTERS BLOCK",
+        '🮋' => "RIGHT SEVEN EIGHTHS BLOCK",
+        '▁' => "LOWER ONE EIGHTH BLOCK",
+        '▂' => "LOWER ONE QUARTER BLOCK",
+        '▃' => "LOWER THREE EIGHTHS BLOCK",
+        '▄' => "LOWER HALF BLOCK",
+        '▅' => "LOWER FIVE EIGHTHS BLOCK",
+        '▆' => "LOWER THREE QUARTERS BLOCK",
+        '▇' => "LOWER SEVEN EIGHTHS BLOCK",
+        '▔' => "UPPER ONE EIGHTH BLOCK",
+        '🮂' => "UPPER ONE QUARTER BLOCK",
+        '🮃' => "UPPER THREE EIGHTHS BLOCK",
+        '▀' => "UPPER HALF BLOCK",
+        '🮄' => "UPPER FIVE EIGHTHS BLOCK",
+        '🮅' => "UPPER THREE QUARTERS BLOCK",
+        '🮆' => "UPPER SEVEN EIGHTHS BLOCK",
+        '🬂' => "BLOCK SEXTANT-12",
+        '🬎' => "BLOCK SEXTANT-1234",
+        '🬭' => "BLOCK SEXTANT-56",
+        '🬹' => "BLOCK SEXTANT-3456",
+        '▖' => "QUADRANT LOWER LEFT",
+        '▗' => "QUADRANT LOWER RIGHT",
+        '▘' => "QUADRANT UPPER LEFT",
+        '▝' => "QUADRANT UPPER RIGHT",
+        '🬀' => "BLOCK SEXTANT-1",
+        '🬁' => "BLOCK SEXTANT-2",
+        '🬄' => "BLOCK SEXTANT-13",
+        '🬉' => "BLOCK SEXTANT-24",
+        '🬏' => "BLOCK SEXTANT-5",
+        '🬓' => "BLOCK SEXTANT-35",
+        '🬞' => "BLOCK SEXTANT-6",
+        '🬦' => "BLOCK SEXTANT-46",
+        _ => return format!("U+{:04X}", c as u32),
+    }
+    .to_string()
 }
 
 const ORBIT_RADIUS: f32 = 2.5;
@@ -1318,8 +1392,9 @@ fn usage() {
            sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
           \x20      the family each offset picks (decision-boundary map)\n  \
            glyphs        every block character the renderer can emit, each\n  \
-          \x20      with an exact 8x24 big-pixel zoom (1/16 x 1/24 world per\n  \
-          \x20      pixel), framed; plain text, redirect to a file\n  \
+          \x20      with its Unicode name and an exact 8x24 big-pixel zoom\n  \
+          \x20      (1/16 x 1/24 world per pixel), framed with position\n  \
+          \x20      rulers; plain text, redirect to a file\n  \
            animate [N]   orbiting square, two-method comparison: the in-use\n  \
           \x20      game path (family-snapped) and a candidate replacement\n  \
           \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
@@ -1385,6 +1460,26 @@ fn main() {
             eprintln!("unknown mode: {other}");
             usage();
             std::process::exit(2);
+        }
+    }
+}
+
+#[cfg(test)]
+mod glyph_table_tests {
+    use super::*;
+
+    /// Every glyph the table renders must carry its real Unicode name: a
+    /// new family glyph reaching char_name's code-point fallback fails
+    /// here instead of shipping an anonymous table entry.
+    #[test]
+    fn every_used_glyph_is_named() {
+        for c in used_block_glyphs() {
+            let name = char_name(c);
+            assert!(
+                !name.starts_with("U+"),
+                "{c} (U+{:04X}) needs a name arm in char_name",
+                c as u32
+            );
         }
     }
 }
