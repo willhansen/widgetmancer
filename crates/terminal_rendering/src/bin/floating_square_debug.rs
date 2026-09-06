@@ -32,8 +32,9 @@
 //!                 shallow overshoot nearly free, deep spikes hammered).
 //!                 Each method row shows its large real-size grid (with
 //!                 glyph legend and the error its own picker minimizes),
-//!                 the zoomed render at native sampled resolution with
-//!                 one palette color per glyph, and ONE error measurement
+//!                 the zoomed render as union-lattice big pixels (the
+//!                 glyphs table's exact 1/16 x 1/24 world pixels, one
+//!                 palette color per glyph), and ONE error measurement
 //!                 as a full-resolution colored pane with its numeric
 //!                 value — cycled with , and . through center error
 //!                 (silhouette + ideal outline + both centroids), area
@@ -67,12 +68,12 @@ use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
 
 use terminal_rendering::coverage::{
-    self, actual_sample, assign_colors, cell_bg, charwise_neighborhood,
-    charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood, charwise_objective,
-    coverage_error, displacement_sensitivity, fill_centroid, glyph_filled, glyph_pane,
-    jaggedness, lerp,
-    pane_from_colors, per_char_coverage_error, rendered_neighborhood, rendered_neighborhood_forced,
-    ClassGrid, FillGrid, Metrics, BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
+    self, actual_sample, assign_colors, big_pane_from_colors, big_pixel_pane, cell_bg,
+    charwise_neighborhood, charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood,
+    charwise_objective, coverage_error, displacement_sensitivity, fill_centroid, glyph_filled,
+    glyph_pane, jaggedness, lerp, pane_from_colors, per_char_coverage_error,
+    rendered_neighborhood, rendered_neighborhood_forced, ClassGrid, FillGrid, Metrics, BIG_PX_W,
+    BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
     CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
 };
 use terminal_rendering::glyph_constants::named_colors::*;
@@ -406,9 +407,17 @@ fn method_section(
         ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
     });
 
-    // zoomed render: native sampled pixel grid drawn from the glyphs'
-    // exact geometry (see glyph_pane), one palette color per glyph
-    let mut zoom_col: Vec<String> = glyph_pane(&glyphs, &owners, center, &coverage::PALETTE, style);
+    // zoomed render: union-lattice big pixels (see big_pixel_pane) — every
+    // glyph edge lands on a pixel boundary, so the fill is exact, one
+    // palette color per glyph
+    let mut zoom_col: Vec<String> = vec![format!("{:^BIG_PX_W$}", "big pixels 1/16x1/24")];
+    zoom_col.extend(big_pixel_pane(
+        &glyphs,
+        &owners,
+        center,
+        &coverage::PALETTE,
+        style,
+    ));
     let legend = glyph_legend(&glyphs, &owners, style);
     if legend.1 > 0 {
         zoom_col.push("glyph colors:".to_string());
@@ -531,6 +540,44 @@ fn ideal_pane(pos: WorldPoint, origin: WorldPoint, style: &coverage::Style) -> V
         }
     }
     pane_from_colors(style, &colors)
+}
+
+/// The true square at the big-pixel union lattice over the same
+/// 2x2-world window as `big_pixel_pane`, so the animate view's ideal
+/// column lines up cell-for-cell with the actual zooms. True-square
+/// edges fall between lattice points, so pixels keep fractional analytic
+/// shading (the actual pane needs none — glyph edges are lattice-aligned).
+fn ideal_big_pixel_pane(
+    pos: WorldPoint,
+    center: WorldSquare,
+    style: &coverage::Style,
+) -> Vec<String> {
+    let (ox, oy) = (center.x as f32 - 1.0, center.y as f32 - 1.0);
+    // Work in lattice units (1/16 wide, 1/24 tall) so pixel bounds are
+    // exact integers; only the square's edges carry pos's own rounding.
+    // Direct world-unit subtraction leaves ~1e-7 f32 noise that paints
+    // epsilon slivers at exact edge alignments and off-by-one lerp
+    // colors on full rows (1/24 is not dyadic, unlike the old 1/8 pane).
+    let (sq_x0, sq_x1) = ((pos.x - 0.5 - ox) * 16.0, (pos.x + 0.5 - ox) * 16.0);
+    let (sq_y0, sq_y1) = ((pos.y - 0.5 - oy) * 24.0, (pos.y + 0.5 - oy) * 24.0);
+    let mut colors = vec![vec![None; BIG_PX_W]; coverage::BIG_PX_H];
+    for py in 0..coverage::BIG_PX_H {
+        // pixel py covers y-units [47-py, 48-py] from the window bottom;
+        // one unit is one pixel, so the overlap is the coverage fraction
+        let ov_y = (48.0 - py as f32).min(sq_y1) - (47.0 - py as f32).max(sq_y0);
+        if ov_y <= 0.0 {
+            continue;
+        }
+        for px in 0..BIG_PX_W {
+            let ov_x = (px as f32 + 1.0).min(sq_x1) - (px as f32).max(sq_x0);
+            let frac = ov_x.max(0.0) * ov_y.max(0.0);
+            if frac > 0.0 {
+                let bg = cell_bg(px / 8, py / 24);
+                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
+            }
+        }
+    }
+    big_pane_from_colors(style, &colors)
 }
 
 /// Sampled actual-vs-ideal coverage, using the same oracle the coherence
@@ -1113,11 +1160,10 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         text.push('\n');
     }
 
-    // common box: ideal zoom (drawn analytically — see ideal_pane), global
-    // state, controls — one column each
+    // common box: ideal zoom (drawn analytically — see ideal_big_pixel_pane),
+    // global state, controls — one column each
     let center = world_point_to_world_square(pos);
-    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
-    let ideal_lines = ideal_pane(pos, sample_origin, &style);
+    let ideal_lines = ideal_big_pixel_pane(pos, center, &style);
     let frac = fraction_part(pos);
 
     let mut common_col = vec!["ideal (true square)".to_string()];
@@ -1157,7 +1203,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     let common_row = boxed_row(
         "common",
         &[
-            (common_col.as_slice(), BITMAP_W),
+            (common_col.as_slice(), BIG_PX_W),
             (global.as_slice(), global_w),
             (controls.as_slice(), controls_w),
         ],

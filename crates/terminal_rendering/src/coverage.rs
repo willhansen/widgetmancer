@@ -1422,6 +1422,83 @@ pub fn glyph_pane(
     pane_from_colors(style, &colors)
 }
 
+/// Big-pixel display geometry — the `glyphs` reference table's union
+/// lattice. One big pixel = 1/16 x 1/24 world (SX x SY samples), two big
+/// pixels per text row, window = center square +/- 1.0 world: the true
+/// square's footprint always fits inside, so only rare outer-ring glyph
+/// slivers clip at the border.
+pub const BIG_PX_W: usize = 2 * SX; // 32 big pixels = 2 world wide
+pub const BIG_PX_H: usize = 2 * SY; // 48 big pixels = 2 world tall
+pub const BIG_TEXT_ROWS: usize = BIG_PX_H / 2; // 24 content rows
+
+/// Compose a big-pixel color grid (top row first) into text rows, exactly
+/// like `pane_from_colors` but at the union lattice: 8 big pixels per
+/// half-cell column, 12 text rows per character cell.
+#[doc(hidden)]
+pub fn big_pane_from_colors(style: &Style, colors: &[Vec<Option<Rgb>>]) -> Vec<String> {
+    (0..BIG_TEXT_ROWS)
+        .map(|t| {
+            let mut line: String = (0..BIG_PX_W)
+                .map(|px| {
+                    two_tone_cell(
+                        style,
+                        cell_bg(px / 8, t / 12),
+                        colors[2 * t][px],
+                        colors[2 * t + 1][px],
+                    )
+                })
+                .collect();
+            line.push_str(style.reset());
+            line
+        })
+        .collect()
+}
+
+/// Zoomed render at the union lattice of the snap families (the `glyphs`
+/// reference table's big pixels): every glyph edge lies exactly on a big
+/// pixel boundary, so sampling the pixel center with `glyph_filled`
+/// classifies the whole pixel — exact fill, no coverage shading, one
+/// palette color per owning glyph. Metrics stay sampled — display only.
+#[doc(hidden)]
+pub fn big_pixel_pane(
+    grid: &[[DoubleChar; 3]; 3],
+    owners: &[[[Option<usize>; 2]; 3]; 3],
+    center: WorldSquare,
+    palette: &[Rgb],
+    style: &Style,
+) -> Vec<String> {
+    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.0, center.y as f32 - 1.0);
+    let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+    for py in 0..BIG_PX_H {
+        for px in 0..BIG_PX_W {
+            // pixel centers sit at odd multiples of 1/(2*SX) and 1/(2*SY),
+            // never on a half-cell boundary, so center-based cell lookup
+            // is exact (pixel edges align with cell bounds)
+            let wx = origin.x + (px as f32 + 0.5) / SX as f32;
+            let wy = origin.y + 2.0 - (py as f32 + 0.5) / SY as f32;
+            let sx = (wx + 0.5).floor() as i32;
+            let sy = (wy + 0.5).floor() as i32;
+            let (dx, dy) = (sx - center.x, sy - center.y);
+            if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) {
+                continue;
+            }
+            let half = if wx < sx as f32 { 0 } else { 1 };
+            let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
+            if c == SPACE {
+                continue;
+            }
+            let cell_left = sx as f32 - 0.5 + 0.5 * half as f32;
+            let cell_bottom = sy as f32 - 0.5;
+            if !glyph_filled(c, (wx - cell_left) * 2.0, wy - cell_bottom) {
+                continue;
+            }
+            let owner = owners[(dx + 1) as usize][(dy + 1) as usize][half].unwrap_or(0);
+            colors[py][px] = Some(palette[owner % palette.len()]);
+        }
+    }
+    big_pane_from_colors(style, &colors)
+}
+
 /// Small-displacement step for `displacement_sensitivity`: the nudge scale,
 /// so one step can cross a real glyph-pick or snap-family boundary.
 pub const DISPLACEMENT_DELTA: f32 = 1.0 / 16.0;
