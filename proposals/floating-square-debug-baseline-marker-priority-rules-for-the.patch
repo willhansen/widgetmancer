@@ -1,0 +1,2413 @@
+From: pi-agent <noreply@sandbox>
+Date: Mon, 07 Sep 2026 17:10:59 GMT
+Subject: [PATCH] Floating square debug: baseline marker priority rules for the history graph
+
+Implements the user's marker priority rules for the candidate row's
+in-use baseline overlay in the floating-square debug tool's history
+graph: the baseline must never cover the main graph.
+
+- New MarkerMode (marker_mode(line, bar)) resolves each column: inside
+  the bar (L_l < L_b, incl. L_l = 0 under a bar) the horizontal-line
+  marker rides the graph color as its cell background, so the bar
+  continues behind the marker instead of being cut by it (the previous
+  replace-the-char behavior rendered a hole, e.g. ████🭻██); on the same
+  character as the bar's top (L_l == L_b > 0) the graph wins — the bar's
+  top block is drawn but in the marker (cyan) color, flagging the
+  coincidence instead of silently dropping the marker; above the graph
+  it floats on the default background as before.
+- GRAPH_COLOR const extracted (the bars' gray, also the OnGraph cell
+  background). Doc comments on sparkline_graph and the module doc
+  updated to the new rules, including the two accepted literal-reading
+  costs: a line inside the bar's top row subsumes that cell's partial
+  edge; a line in the bar's top row above the edge replaces the tip char.
+- New test baseline_marker_never_covers_the_graph: mode table, the
+  coincidence coloring (cyan bar-top block, no line char), the
+  OnGraph escape pattern (graph-color bg + cyan line + reset), and
+  float-leaves-the-tip-intact.
+
+Verification: bin tests 6 → 7; terminal_rendering 157 passed / 0 failed;
+workspace 492 / 0. Piped animate 10: mode distribution 41 Coincides
+(cyan bar tops, ~4/frame), 4 Float, 10 axis markers, 0 OnGraph in this
+orbit/metric (unit-test-pinned), no cut cells.
+
+The checkpoint also gained this follow-up section and was reordered into
+proper structure (plan first, then chronological landing verification
+and follow-ups) — earlier top-anchored edits had interleaved the
+post-landing sections between the title and the plan.
+---
+ crates/terminal_rendering/src/bin/floating_square_debug.rs | 2119 ++++++++++++++++++++++++++++++++++++++++
+ docs/checkpoints/floating-square-motion-smoothness-metric.md | 241 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 2360 insertions(+)
+
+diff --git a/crates/terminal_rendering/src/bin/floating_square_debug.rs b/crates/terminal_rendering/src/bin/floating_square_debug.rs
+new file mode 100644
+--- a/crates/terminal_rendering/src/bin/floating_square_debug.rs
++++ b/crates/terminal_rendering/src/bin/floating_square_debug.rs
+@@ -0,0 +1,2119 @@
++//! Visual debug tool for floating square rendering.
++//!
++//! Renders the same character picks the game uses
++//! (`characters_for_full_square_with_2d_offset`, one world square = 2 terminal
++//! columns) onto a checkerboard background with a dot marking each square
++//! center, so sub-square offsets are easy to eyeball. All diagnostics
++//! (snap family, snap error, coverage) describe the real render path via the
++//! `#[doc(hidden)]` debug accessors in floating_square.rs and coverage.rs, so
++//! the tool cannot drift from what the game draws and the coherence test
++//! asserts.
++//!
++//! Modes:
++//!   pos X Y       one square at world point (X, Y): frame with true-center
++//!                 marker, snap-family diagnostics, and a sampled
++//!                 actual-vs-ideal coverage view (the coherence test's oracle)
++//!   families X Y  the same position rendered with each snap family forced,
++//!                 side by side
++//!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
++//!                 with the family that offset picks (a decision-boundary map)
++//!   glyphs        reference table: every block character the renderer can
++//!                 emit with its Unicode name and an exact big-pixel zoom
++//!                 (8x24 pixels per character, 1/16 x 1/24 world each)
++//!                 framed with position rulers; plain text, redirect to a
++//!                 file
++//!   animate (default)
++//!                 square on the alternate screen (q quits); orbit,
++//!                 arrow-key nudge, and line trajectories. A two-method
++//!                 comparison: the in-use game path (family-snapped) and
++//!                 a candidate replacement cycled with [ and ] (charwise;
++//!                 charwise + protrusion, objective xor + 1.0·d; charwise
++//!                 + protrusion², objective xor + 4.0·d² — progressive:
++//!                 shallow overshoot nearly free, deep spikes hammered).
++//!                 Each method row shows its large real-size grid (with
++//!                 glyph legend and the error its own picker minimizes),
++//!                 the zoomed render as union-lattice big pixels (the
++//!                 glyphs table's exact 1/16 x 1/24 world pixels, one
++//!                 palette color per glyph), and ONE error measurement
++//!                 as a colored pane on the same big-pixel lattice (one
++//!                 big pixel per sample — the grid the numbers measure),
++//!                 with its numeric value — cycled with , and . through center error
++//!                 (silhouette + ideal outline + both centroids), area
++//!                 error (signed: over red / under blue), per-char
++//!                 coverage (half-cells heat-shaded by local error),
++//!                 ideal square xor (any mismatch lit), jaggedness
++//!                 (contour lit by local edge-step length), and
++//!                 displacement sensitivity (what turns wrong under the
++//!                 worst 1/16 nudge: bright yellow = newly wrong), and
++//!                 frame diff (which samples changed against the previous
++//!                 rendered frame — motion pops light up; n/a until one
++//!                 frame old). Each method row also carries the selected
++//!                 error's recent history as a five-row bar graph (one
++//!                 column per frame, shared y-axis across the method
++//!                 slots), sampled only on frames where the square
++//!                 actually moves — manual mouse movement counts; the
++//!                 candidate row also marks each frame's in-use error
++//!                 with a 1/8-tall horizontal-line character (the
++//!                 HORIZONTAL ONE EIGHTH BLOCK family), drawn so it never
++//!                 covers the graph: inside the bar it rides the graph
++//!                 color, on the bar's top character the graph wins drawn
++//!                 in the marker color (flagging the coincidence), and
++//!                 above the graph it floats. Then a common
++//!                 row with the ideal (true square) zoom, global state,
++//!                 and controls. Left click/drag sets the orbit's
++//!                 angular position (the angle from the top-row grid's
++//!                 center to the mouse, at the fixed orbit radius); other
++//!                 buttons place the square (drag to move it), and
++//!                 holding shift/ctrl/alt while dragging (or pressing f)
++//!                 switches placement to fine control, where large mouse
++//!                 movements map to sub-cell square movements.
++//!
++//! Run via the top-level ./debug-floating-squares wrapper, or:
++//!   cargo run -p terminal_rendering --bin floating_square_debug -- animate
++
++use std::io::{stdin, stdout, IsTerminal, Write};
++use std::sync::mpsc::channel;
++use std::thread;
++use std::time::Duration;
++
++use rgb::RGB8;
++use termion::event::{Event, Key, MouseButton, MouseEvent};
++use termion::input::{MouseTerminal, TermReadEventsAndRaw};
++use termion::raw::IntoRawMode;
++use termion::screen::IntoAlternateScreen;
++
++use terminal_rendering::coverage::{
++    self, actual_sample, assign_colors, big_pane_from_colors, big_pixel_pane, cell_bg,
++    charwise_neighborhood, charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood,
++    charwise_objective, coverage_error, displacement_sensitivity, fill_centroid, glyph_filled,
++    glyph_pane, jaggedness, lerp, pane_from_colors, per_char_coverage_error,
++    frame_diff_pane, frame_diff_xor, rendered_neighborhood, rendered_neighborhood_forced,
++    ClassGrid, FillGrid, Metrics, BIG_PX_W, BITMAP_W, PX_H, PX_W,
++    CHARWISE_PROTRUSION_SQUARED_WEIGHT, CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
++};
++use terminal_rendering::glyph_constants::named_chars::EIGHTH_BLOCKS_FROM_BOTTOM;
++use terminal_rendering::glyph_constants::named_colors::*;
++use terminal_rendering::glyph_constants::SPACE;
++use terminal_rendering::*;
++
++const SQUARE_COLOR: RGB8 = RGB8::new(255, 165, 0); // orange
++const CENTER_DOT_COLOR: RGB8 = RGB8::new(90, 90, 110);
++const BG_DARK: RGB8 = RGB8::new(16, 16, 24);
++const BG_LIGHT: RGB8 = RGB8::new(30, 30, 44);
++const ORIGIN_COLOR: RGB8 = RGB8::new(0, 180, 180);
++const TRUE_CENTER_COLOR: RGB8 = RGB8::new(120, 255, 255);
++
++/// One display color per snap family, in SnapFamily::ALL / snap_family_names()
++/// order (h-eighths, v-eighths, hextant, quadrant).
++const FAMILY_COLORS: [RGB8; 4] = [
++    RGB8::new(230, 230, 80),  // horizontal eighths: yellow
++    RGB8::new(80, 210, 210),  // vertical eighths: cyan
++    RGB8::new(100, 220, 100), // hextant: green
++    RGB8::new(220, 120, 255), // quadrant: magenta
++];
++const FAMILY_LETTERS: [char; 4] = ['H', 'V', 'X', 'Q'];
++
++fn family_index_of(name: &str) -> usize {
++    snap_family_names().iter().position(|&n| n == name).unwrap()
++}
++
++/// "horizontal eighths (x: 1/16, y: row)" -> "horizontal eighths"
++fn short_family_name(name: &str) -> &str {
++    name.split(" (").next().unwrap()
++}
++
++/// Same checkerboard parity rule as Graphics::square_is_light.
++fn bg_color_for(square: WorldSquare) -> RGB8 {
++    if (square.x + square.y).rem_euclid(2) == 0 {
++        BG_LIGHT
++    } else {
++        BG_DARK
++    }
++}
++
++/// Blank frame covering `radius` squares around `origin_square`, with a dot at
++/// each square center so sub-square offsets are visible against the grid.
++fn grid_frame(radius: i32, origin_square: WorldSquare) -> Frame {
++    let squares_wide = (2 * radius + 1) as usize;
++    let mut frame = Frame::blank(squares_wide * 2, squares_wide);
++    for dx in -radius..=radius {
++        for dy in -radius..=radius {
++            let square = euclid::point2(origin_square.x + dx, origin_square.y + dy);
++            let bg = bg_color_for(square);
++            let marker = if square == origin_square {
++                ('+', ORIGIN_COLOR)
++            } else {
++                ('·', CENTER_DOT_COLOR)
++            };
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            frame.set_by_double_wide_grid(
++                row as usize,
++                wide_col as usize,
++                [
++                    DrawableGlyph::new_colored(marker.0, marker.1, bg),
++                    DrawableGlyph::new_colored(SPACE, BLACK, bg),
++                ],
++            );
++        }
++    }
++    frame
++}
++
++/// Signed so off-grid squares (square near the animation grid's edge) can
++/// be bounds-checked before casting; casting first would wrap to huge
++/// values and overflow the width arithmetic in the check itself.
++fn frame_row_col(radius: i32, origin_square: WorldSquare, square: WorldSquare) -> [i32; 2] {
++    [
++        radius - (square.y - origin_square.y),
++        radius + (square.x - origin_square.x),
++    ]
++}
++
++/// Mirrors OffsetSquareDrawable::drawables_for_floating_square_at_point:
++/// only the 3x3 neighborhood of the rounded center square can be non-empty.
++/// `forced_family` (index into snap_family_names()) overrides the automatic
++/// family pick, for the `families` mode.
++fn draw_floating_square(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    pos: WorldPoint,
++    forced_family: Option<usize>,
++) {
++    let center = world_point_to_world_square(pos);
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = euclid::point2(center.x + dx, center.y + dy);
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            if row < 0
++                || wide_col < 0
++                || row as usize >= frame.height()
++                || wide_col as usize * 2 + 1 >= frame.width()
++            {
++                continue;
++            }
++            let [row, wide_col] = [row as usize, wide_col as usize];
++            let offset: WorldMove = pos - square.to_f32();
++            let chars = match forced_family {
++                Some(i) => characters_for_full_square_with_2d_offset_forced(offset, i),
++                None => characters_for_full_square_with_2d_offset(offset),
++            };
++            if chars != [SPACE; 2] {
++                let bg = bg_color_for(square);
++                frame.set_by_double_wide_grid(
++                    row,
++                    wide_col,
++                    chars.map(|c| DrawableGlyph::new_colored(c, SQUARE_COLOR, bg)),
++                );
++            }
++        }
++    }
++}
++
++fn pal(i: usize) -> RGB8 {
++    let coverage::Rgb(r, g, b) = coverage::PALETTE[i % coverage::PALETTE.len()];
++    RGB8::new(r, g, b)
++}
++
++/// Draws a precomputed glyph neighborhood with one palette color per
++/// half-cell glyph (matching the zoomed panes and the legend), instead of
++/// the uniform square color the diagnostic modes use.
++fn draw_neighborhood_colored(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    center: WorldSquare,
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++) {
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = euclid::point2(center.x + dx, center.y + dy);
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            if row < 0
++                || wide_col < 0
++                || row as usize >= frame.height()
++                || wide_col as usize * 2 + 1 >= frame.width()
++            {
++                continue;
++            }
++            let chars = grid[(dx + 1) as usize][(dy + 1) as usize];
++            if chars != [SPACE; 2] {
++                let bg = bg_color_for(square);
++                let glyph = |half: usize| {
++                    let color = owners[(dx + 1) as usize][(dy + 1) as usize][half]
++                        .map(pal)
++                        .unwrap_or(SQUARE_COLOR);
++                    DrawableGlyph::new_colored(chars[half], color, bg)
++                };
++                frame.set_by_double_wide_grid(
++                    row as usize,
++                    wide_col as usize,
++                    [glyph(0), glyph(1)],
++                );
++            }
++        }
++    }
++}
++
++/// (text, visible width) legend mapping each rendered half-cell glyph to
++/// its palette color, in assign_colors' scan order so legend colors match
++/// the panes. A 1x1 square spans at most 8 half-cells, so the legend always
++/// fits under the real-size grid.
++fn glyph_legend(
++    glyphs: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    style: &coverage::Style,
++) -> (String, usize) {
++    let mut legend = String::new();
++    let mut w = 0usize;
++    for dy in [1i32, 0, -1] {
++        for dx in -1..=1i32 {
++            for half in 0..2 {
++                if let Some(idx) = owners[(dx + 1) as usize][(dy + 1) as usize][half] {
++                    legend.push_str(&style.fg(coverage::PALETTE[idx % coverage::PALETTE.len()]));
++                    legend.push(glyphs[(dx + 1) as usize][(dy + 1) as usize][half]);
++                    legend.push(' ');
++                    w += 2;
++                }
++            }
++        }
++    }
++    legend.push_str(style.reset());
++    (legend, w)
++}
++
++/// Strip ANSI CSI sequences (ESC [ ... final letter) to get a line's
++/// visible width. Pane lines are full of color codes; the box borders need
++/// printable widths to pad straight right edges.
++fn visible_width(s: &str) -> usize {
++    let mut w = 0;
++    let mut chars = s.chars();
++    while let Some(c) = chars.next() {
++        if c == '\x1b' {
++            for c in chars.by_ref() {
++                if c.is_ascii_alphabetic() {
++                    break;
++                }
++            }
++        } else {
++            w += 1;
++        }
++    }
++    w
++}
++
++/// Visible width of a whole column of pre-styled lines.
++fn visible_w(lines: &[String]) -> usize {
++    lines.iter().map(|s| visible_width(s)).max().unwrap_or(0)
++}
++
++/// One titled, bordered row of side-by-side columns. Each column is its
++/// lines plus its visible width; short columns are padded with spaces so
++/// the right border stays a straight vertical line. Relies on the pane
++/// lines being color-neutral at both ends (frame lines, bitmap panes, and
++/// legends all reset their colors), so the padding and borders pick up no
++/// dangling background.
++fn boxed_row(title: &str, columns: &[(&[String], usize)]) -> Vec<String> {
++    const GAP: usize = 2;
++    let h = columns.iter().map(|c| c.0.len()).max().unwrap_or(0);
++    let inner_w: usize =
++        columns.iter().map(|c| c.1).sum::<usize>() + GAP * (columns.len() - 1) + 2;
++    let label = format!("─ {title} ");
++    let mut lines = vec![format!(
++        "┌{label}{}┐",
++        "─".repeat(inner_w - visible_width(&label))
++    )];
++    for row in 0..h {
++        let mut line = String::from("│ ");
++        for (i, (col, w)) in columns.iter().enumerate() {
++            if i > 0 {
++                line.push_str(&" ".repeat(GAP));
++            }
++            let cell = col.get(row).map(String::as_str).unwrap_or("");
++            line.push_str(cell);
++            line.push_str(&" ".repeat(w.saturating_sub(visible_width(cell))));
++        }
++        line.push_str(" │");
++        lines.push(line);
++    }
++    lines.push(format!("└{}┘", "─".repeat(inner_w)));
++    lines
++}
++
++/// One render method to compare: how to produce its glyph neighborhood.
++type Neighborhood = fn(WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare);
++
++/// The game-facing render path — always the "in use" row.
++const IN_USE: (&str, Neighborhood) = ("family-snapped", rendered_neighborhood);
++
++/// Candidate replacements for the in-use method, cycled with [ and ].
++const CANDIDATES: [(&str, Neighborhood); 3] = [
++    ("charwise", charwise_neighborhood),
++    ("charwise + protrusion", charwise_shaped_neighborhood),
++    ("charwise + protrusion²", charwise_protrusion_squared_neighborhood),
++];
++
++/// The error measurements that can be cycled with , and . — one shown at a
++/// time, as a full-resolution colored pane per method.
++const METRICS: [&str; 7] = ["center", "area", "per-char", "xor", "jagged", "disp", "frame"];
++
++/// The method's own objective, formatted for the stats column ("the error
++/// used for rendering"). `index` 0 = in use, 1..=3 = CANDIDATES index + 1.
++fn objective_lines(
++    index: usize,
++    glyphs: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++) -> Vec<String> {
++    match index {
++        // the family map is baked against the sampled ideal-square xor
++        0 => vec![format!(
++            "bake objective (xor)={:.3}",
++            coverage_error(glyphs, owners, center, pos)
++        )],
++        1 => vec![format!("Σ cell xor={:.3}", charwise_objective(pos, 0.0, false))],
++        2 => vec![format!(
++            "xor+{:.2}·Σd={:.3}",
++            CHARWISE_PROTRUSION_WEIGHT,
++            charwise_objective(pos, CHARWISE_PROTRUSION_WEIGHT, false)
++        )],
++        _ => vec![format!(
++            "xor+{:.2}·Σd²={:.3}",
++            CHARWISE_PROTRUSION_SQUARED_WEIGHT,
++            charwise_objective(pos, CHARWISE_PROTRUSION_SQUARED_WEIGHT, true)
++        )],
++    }
++}
++
++/// Arrow for the displacement metric's worst direction.
++fn dir_arrow(d: WorldMove) -> char {
++    if d.x > 0.0 {
++        '→'
++    } else if d.x < 0.0 {
++        '←'
++    } else if d.y > 0.0 {
++        '↑'
++    } else {
++        '↓'
++    }
++}
++
++/// History depth per method row: one graph column per sampled frame
++/// (~1.05s at the 33ms frame clock). Matches the zoom/error column
++/// width so the boxed rows stay aligned.
++const SPARKLINE_LEN: usize = 32;
++
++/// Graph height in text rows: each row contributes 8 levels of vertical
++/// resolution (a bar's top row still uses the 1/8th block chars), so the
++/// graph resolves 5 * 8 = 40 levels against the shared scale.
++const SPARKLINE_ROWS: usize = 5;
++
++/// A 1/8-tall horizontal line at each of the 8 eighths of a cell,
++/// indexed by position counted from the BOTTOM — the baseline overlay
++/// marker. Positions 1 and 8 are the pre-existing ▁ (U+2581) / ▔
++/// (U+2594); the middle six (U+1FB76..=U+1FB7B) are HORIZONTAL ONE
++/// EIGHTH BLOCK-2..-7 (Unicode 13.0, same Symbols-for-Legacy-Computing
++/// chart as the sextants the renderer already emits). Their official
++/// suffix counts from the TOP — hence the reversed order here. Verified
++/// against the official chart (pixel-measured, calibrated by BLOCK
++/// SEXTANT-1 = top-left) and its `→ 2594 ▔` cross-reference; pinned by
++/// `horizontal_line_family_is_top_down_numbered`.
++const H_LINE_FROM_BOTTOM: [char; 9] =
++    [' ', '▁', '🭻', '🭺', '🭹', '🭸', '🭷', '🭶', '▔'];
++
++/// The bars' color — also the background the baseline marker rides when
++/// drawn inside a bar, so the bar continues behind the line.
++const GRAPH_COLOR: coverage::Rgb = coverage::Rgb(190, 190, 200);
++
++/// One error measurement's full report for one method: the colored pane,
++/// the value string printed under it, and the scalar the history buffers
++/// sample (`None` = no data this frame — not appended, shown as n/a).
++#[derive(Default)]
++struct MetricReport {
++    pane: Vec<String>,
++    value: String,
++    number: Option<f32>,
++}
++
++/// The selected error measurement for one method — the single source of
++/// truth shared by the displayed pane/value (method_section) and the
++/// per-slot history sparklines (render_animation_frame).
++///
++/// `number` is the history scalar: `center` = |centroid − pos| (the pane
++/// shows the pair), `area` = |signed error| (the pane keeps over-red /
++/// under-blue), everything else = the displayed value as-is; `frame` is
++/// the diff against `prev`, `None` while no previous frame exists.
++fn metric_report(
++    nb: Neighborhood,
++    glyphs: &[[DoubleChar; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++    metric: usize,
++    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
++    style: &coverage::Style,
++) -> MetricReport {
++    let owners = assign_colors(glyphs);
++    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let class = || {
++        ClassGrid::sample(sample_origin, |wx, wy| {
++            ClassGrid::class_at(glyphs, &owners, center, pos, wx, wy)
++        })
++    };
++    let actual = || {
++        FillGrid::sample(sample_origin, |wx, wy| {
++            actual_sample(glyphs, &owners, center, wx, wy)
++        })
++    };
++    match metric {
++        0 => {
++            let actual = actual();
++            let class = class();
++            let c = fill_centroid(&actual);
++            MetricReport {
++                pane: class.center_pane(&actual, pos, style),
++                value: match c {
++                    Some(c) => format!("({:+.2}, {:+.2})", c.x - pos.x, c.y - pos.y),
++                    None => "n/a".to_string(),
++                },
++                number: c.map(|c| {
++                    ((c.x - pos.x) * (c.x - pos.x) + (c.y - pos.y) * (c.y - pos.y)).sqrt()
++                }),
++            }
++        }
++        1 => {
++            let class = class();
++            let signed = class.signed_area_error();
++            MetricReport {
++                pane: class.signed_pane(style),
++                value: format!("{signed:+.3}"),
++                number: Some(signed.abs()),
++            }
++        }
++        2 => {
++            let e = per_char_coverage_error(glyphs, center, pos);
++            MetricReport {
++                pane: ClassGrid::per_char_heat_pane(glyphs, center, pos, style),
++                value: format!("{e:.3}"),
++                number: Some(e),
++            }
++        }
++        3 => {
++            let class = class();
++            let xor = class.xor_error();
++            MetricReport {
++                pane: class.mismatch_pane(style),
++                value: format!("{xor:.3}"),
++                number: Some(xor),
++            }
++        }
++        4 => {
++            let actual = actual();
++            let jag = jaggedness(&actual);
++            MetricReport {
++                pane: ClassGrid::jaggedness_pane(&actual, style),
++                value: format!("{jag:.2}"),
++                number: Some(jag),
++            }
++        }
++        5 => {
++            let class = class();
++            let (gain, dir) = displacement_sensitivity(nb, pos, DISPLACEMENT_DELTA);
++            let shifted_pos = pos + dir * DISPLACEMENT_DELTA;
++            let (glyphs2, center2) = nb(shifted_pos);
++            let owners2 = assign_colors(&glyphs2);
++            // sampled on the BASE frame's origin so base and shifted
++            // grids align sample-for-sample for the pane comparison
++            let shifted = ClassGrid::sample(sample_origin, |wx, wy| {
++                ClassGrid::class_at(&glyphs2, &owners2, center2, shifted_pos, wx, wy)
++            });
++            MetricReport {
++                pane: ClassGrid::displacement_pane(&class, &shifted, style),
++                value: format!("{:.3}{}", gain, dir_arrow(dir)),
++                number: Some(gain),
++            }
++        }
++        _ => {
++            let cur = (glyphs, center);
++            let number = prev.map(|_| frame_diff_xor(prev, cur));
++            MetricReport {
++                pane: frame_diff_pane(prev, cur, style),
++                value: match number {
++                    Some(v) => format!("{v:.3}"),
++                    None => "n/a".to_string(),
++                },
++                number,
++            }
++        }
++    }
++}
++
++/// (row-from-bottom, position-from-bottom 1..=8) of the baseline line
++/// marker for a graph level: interior levels sit inside their row; a
++/// level exactly on a row seam is drawn as ▔ in the row below (the line
++/// lands on the seam); level 0 is the axis itself.
++fn line_pos(level: usize) -> (usize, usize) {
++    if level == 0 {
++        (0, 1)
++    } else {
++        let row = (level / 8).min(SPARKLINE_ROWS - 1);
++        let pos = level - 8 * row;
++        if pos == 0 {
++            (row - 1, 8)
++        } else {
++            (row, pos)
++        }
++    }
++}
++
++/// How the baseline marker is rendered in a column, given the line's and
++/// the bar's levels: coinciding with the bar's top character means the
++/// graph wins but is drawn in the marker color (the top edge is the
++/// data — its shape survives, the color flags the coincidence); inside
++/// the bar the line rides the graph color (the line never cuts the
++/// bar); at/above the graph it floats on the default background.
++enum MarkerMode {
++    Coincides,
++    OnGraph,
++    Float,
++}
++
++fn marker_mode(line: usize, bar: usize) -> MarkerMode {
++    if line == bar && bar > 0 {
++        MarkerMode::Coincides
++    } else if bar > 0 && line < bar {
++        MarkerMode::OnGraph
++    } else {
++        MarkerMode::Float
++    }
++}
++
++/// One method's recent history of the selected error as a bar graph
++/// SPARKLINE_ROWS rows tall: `level = round(v / scale * 8*ROWS)` clamped,
++/// each row contributing 8 levels of resolution — full rows are '█', the
++/// bar's top row is the matching 1/8th block (fill from the bottom, so
++/// bars look solid). Oldest sample on the left, right-aligned; empty
++/// columns show '·' on the bottom row (the zero axis) and spaces above.
++/// `baseline` (the in-use method's history, on candidate rows) marks each
++/// frame's baseline level with a 1/8-tall horizontal-line char, drawn so
++/// it never covers the graph (MarkerMode): inside the bar it rides the
++/// graph color as the cell background — the bar continues behind the
++/// line; on the same character as the bar's top the graph wins, drawn in
++/// the marker color to flag the coincidence; above the graph it floats on
++/// the default background (if it shares the bar's top row, it replaces
++/// the bar's tip char there — the bar reads as topping out at the row
++/// below). `scale` is shared across all method rows, so heights compare
++/// between methods.
++fn sparkline_graph(
++    history: &[f32],
++    baseline: Option<&[f32]>,
++    scale: f32,
++    style: &coverage::Style,
++) -> Vec<String> {
++    let levels = (8 * SPARKLINE_ROWS) as f32;
++    let level_of = |v: f32| (v / scale * levels).round().clamp(0.0, levels) as usize;
++    let dim = style.fg(coverage::DOT_COLOR);
++    let lit = style.fg(GRAPH_COLOR);
++    let base = style.fg(coverage::Rgb(0, 180, 180)); // the tool's reference-point cyan
++    let pad = SPARKLINE_LEN.saturating_sub(history.len());
++    let mut rows = vec![String::new(); SPARKLINE_ROWS];
++    for r in (0..SPARKLINE_ROWS).rev() {
++        for k in 0..SPARKLINE_LEN {
++            let (bar, line_level): (usize, Option<usize>) = if k < pad {
++                (0, None)
++            } else {
++                let i = k - pad;
++                (
++                    level_of(history[i]),
++                    baseline.filter(|b| i < b.len()).map(|b| level_of(b[i])),
++                )
++            };
++            let p = bar as isize - 8 * r as isize;
++            // the baseline marker in this cell, if it lands here
++            let marker = line_level.map(|l| (marker_mode(l, bar), line_pos(l)));
++            if let Some((mode, (lr, pos))) = marker.filter(|&(_, (lr, _))| lr == r) {
++                match mode {
++                    // inside the bar: the line rides the graph color, so
++                    // the bar continues behind the marker
++                    MarkerMode::OnGraph => {
++                        rows[r].push_str(&style.bg(GRAPH_COLOR));
++                        rows[r].push_str(&base);
++                        rows[r].push(H_LINE_FROM_BOTTOM[pos]);
++                        rows[r].push_str(style.reset());
++                    }
++                    // on the bar's top character: the graph wins, drawn
++                    // in the marker color to flag the coincidence
++                    MarkerMode::Coincides => {
++                        rows[r].push_str(&base);
++                        rows[r].push(if p >= 8 {
++                            '█'
++                        } else {
++                            EIGHTH_BLOCKS_FROM_BOTTOM[p as usize]
++                        });
++                    }
++                    // above the graph (or on the zero axis): floats
++                    _ => {
++                        rows[r].push_str(&base);
++                        rows[r].push(H_LINE_FROM_BOTTOM[pos]);
++                    }
++                }
++            } else if p >= 8 {
++                rows[r].push_str(&lit);
++                rows[r].push('█');
++            } else if p >= 1 {
++                rows[r].push_str(&lit);
++                rows[r].push(EIGHTH_BLOCKS_FROM_BOTTOM[p as usize]);
++            } else if r == 0 {
++                rows[r].push_str(&dim);
++                rows[r].push('·');
++            } else {
++                rows[r].push(' ');
++            }
++        }
++        rows[r].push_str(style.reset());
++    }
++    rows.reverse(); // emit top row first
++    rows
++}
++
++/// The 4th method-row column: the selected error's history sparkline plus
++/// the shared scale legend. Samples are taken only on frames where the
++/// square moved, so parked redraws don't dilute the window.
++fn history_column(
++    metric: usize,
++    history: &[f32],
++    baseline: Option<&[f32]>,
++    scale: f32,
++    style: &coverage::Style,
++) -> Vec<String> {
++    let mut col = vec![format!("{:^SPARKLINE_LEN$}", format!("history: {}", METRICS[metric]))];
++    col.extend(sparkline_graph(history, baseline, scale, style));
++    // the candidate row's legend names the overlay marker (🭸 = the
++    // family's middle member); both stay within the 32-wide column
++    let legend = match baseline {
++        Some(_) => format!("🭸=in-use ▁▂▃▄▅▆▇█ max={scale:.3}"),
++        None => format!("0 ▁▂▃▄▅▆▇█ max={scale:.3}"),
++    };
++    col.push(format!("{:^SPARKLINE_LEN$}", legend));
++    col
++}
++
++/// One method's bordered section: large view (full animation grid, method
++/// info, its own objective), zoomed render at native sampled resolution
++/// with one palette color per glyph plus legend, the currently selected
++/// error measurement as a full-resolution colored pane with its value
++/// (precomputed — all four slots run `metric_report` for the histories,
++/// the displayed rows reuse pane + value), and the error's recent history
++/// as a sparkline with the shared scale legend.
++fn method_section(
++    title: &str,
++    objective_idx: usize,
++    glyphs: &[[DoubleChar; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++    metric: usize,
++    style: &coverage::Style,
++    extra_info: &[String],
++    report: MetricReport,
++    history: &[f32],
++    baseline: Option<&[f32]>,
++    scale: f32,
++) -> Vec<String> {
++    let owners = assign_colors(glyphs);
++
++    // zoomed render: union-lattice big pixels (see big_pixel_pane) — every
++    // glyph edge lands on a pixel boundary, so the fill is exact, one
++    // palette color per glyph
++    let mut zoom_col: Vec<String> = vec![format!("{:^BIG_PX_W$}", "big pixels 1/16x1/24")];
++    zoom_col.extend(big_pixel_pane(
++        glyphs,
++        &owners,
++        center,
++        &coverage::PALETTE,
++        style,
++    ));
++    let legend = glyph_legend(glyphs, &owners, style);
++    if legend.1 > 0 {
++        zoom_col.push("glyph colors:".to_string());
++        zoom_col.push(legend.0);
++    }
++
++    // large view: full animation grid, method info, then its objective —
++    // the error the method's own picker minimizes
++    let origin0 = euclid::point2(0, 0);
++    let mut large = grid_frame(ANIMATE_GRID_RADIUS, origin0);
++    draw_neighborhood_colored(&mut large, ANIMATE_GRID_RADIUS, origin0, center, glyphs, &owners);
++    let mut large_col: Vec<String> = large
++        .string_for_regular_display()
++        .lines()
++        .map(String::from)
++        .collect();
++    large_col.extend(extra_info.iter().cloned());
++    large_col.extend(objective_lines(objective_idx, glyphs, &owners, center, pos));
++
++    // the selected error measurement: precomputed pane + numeric value
++    let mut err_col: Vec<String> = vec![format!(
++        "{:^BIG_PX_W$}",
++        format!("{} (, .)", METRICS[metric])
++    )];
++    err_col.extend(report.pane);
++    err_col.push(format!("{:^BIG_PX_W$}", report.value));
++
++    let spark_col = history_column(metric, history, baseline, scale, style);
++
++    let (large_w, zoom_w, err_w, spark_w) = (
++        visible_w(&large_col),
++        visible_w(&zoom_col),
++        visible_w(&err_col),
++        visible_w(&spark_col),
++    );
++    let cols = [
++        (large_col, large_w),
++        (zoom_col, zoom_w),
++        (err_col, err_w),
++        (spark_col, spark_w),
++    ];
++    let refs: Vec<(&[String], usize)> =
++        cols.iter().map(|(l, w)| (l.as_slice(), *w)).collect();
++    boxed_row(title, &refs)
++}
++
++/// Marks the exact square center on the half-cell grid so the snapped-vs-true
++/// offset (reported numerically in the text output) is also visible. Honest
++/// to half a half-cell (1/4 world unit) of quantization; overwrites whatever
++/// glyph the square put in that half-cell.
++fn overlay_true_center(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    pos: WorldPoint,
++) {
++    // frame col 0 is the left half-cell edge of the leftmost square, i.e.
++    // world x = origin.x - radius - 0.5; row 0 is the top edge of the
++    // topmost square, world y = origin.y + radius + 0.5
++    let col = ((pos.x - origin_square.x as f32 + radius as f32 + 0.5) * 2.0).floor() as i32;
++    let row = (origin_square.y as f32 + radius as f32 + 0.5 - pos.y).floor() as i32;
++    if row < 0 || col < 0 || row as usize >= frame.height() || col as usize >= frame.width() {
++        return;
++    }
++    let bg = frame.grid[row as usize][col as usize].bg_color;
++    frame.grid[row as usize][col as usize] = DrawableGlyph::new('+', Some(TRUE_CENTER_COLOR), bg);
++}
++
++/// The true square drawn analytically: each display pixel is exactly
++/// 1/8 x 1/8 world units, so per-pixel ideal-coverage area is closed-form.
++/// Shading by coverage shows the sub-pixel edge phase; the sampled
++/// majority vote (whose 3-of-6 threshold produces corner divots at
++/// fractional edge positions — an edge pixel holds 1 of 2 sample columns,
++/// a corner pixel also only ≤2 of 3 rows) is what the metrics see, not
++/// what the reference should look like.
++fn ideal_pane(pos: WorldPoint, origin: WorldPoint, style: &coverage::Style) -> Vec<String> {
++    let mut colors = vec![vec![None; PX_W]; PX_H];
++    for py in 0..PX_H {
++        for px in 0..PX_W {
++            let x0 = origin.x + px as f32 / 8.0;
++            let y1 = origin.y + 3.0 - py as f32 / 8.0;
++            let ov_x = (x0 + 0.125).min(pos.x + 0.5) - x0.max(pos.x - 0.5);
++            let ov_y = y1.min(pos.y + 0.5) - (y1 - 0.125).max(pos.y - 0.5);
++            let frac = (ov_x.max(0.0) * ov_y.max(0.0)) * 64.0; // / (1/8)^2
++            if frac > 0.0 {
++                let bg = cell_bg(px / 4, py / 8);
++                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
++            }
++        }
++    }
++    pane_from_colors(style, &colors)
++}
++
++/// The true square at the big-pixel union lattice over the same
++/// 2x2-world window as `big_pixel_pane`, so the animate view's ideal
++/// column lines up cell-for-cell with the actual zooms. True-square
++/// edges fall between lattice points, so pixels keep fractional analytic
++/// shading (the actual pane needs none — glyph edges are lattice-aligned).
++fn ideal_big_pixel_pane(
++    pos: WorldPoint,
++    center: WorldSquare,
++    style: &coverage::Style,
++) -> Vec<String> {
++    let (ox, oy) = (center.x as f32 - 1.0, center.y as f32 - 1.0);
++    // Work in lattice units (1/16 wide, 1/24 tall) so pixel bounds are
++    // exact integers; only the square's edges carry pos's own rounding.
++    // Direct world-unit subtraction leaves ~1e-7 f32 noise that paints
++    // epsilon slivers at exact edge alignments and off-by-one lerp
++    // colors on full rows (1/24 is not dyadic, unlike the old 1/8 pane).
++    let (sq_x0, sq_x1) = ((pos.x - 0.5 - ox) * 16.0, (pos.x + 0.5 - ox) * 16.0);
++    let (sq_y0, sq_y1) = ((pos.y - 0.5 - oy) * 24.0, (pos.y + 0.5 - oy) * 24.0);
++    let mut colors = vec![vec![None; BIG_PX_W]; coverage::BIG_PX_H];
++    for py in 0..coverage::BIG_PX_H {
++        // pixel py covers y-units [47-py, 48-py] from the window bottom;
++        // one unit is one pixel, so the overlap is the coverage fraction
++        let ov_y = (48.0 - py as f32).min(sq_y1) - (47.0 - py as f32).max(sq_y0);
++        if ov_y <= 0.0 {
++            continue;
++        }
++        for px in 0..BIG_PX_W {
++            let ov_x = (px as f32 + 1.0).min(sq_x1) - (px as f32).max(sq_x0);
++            let frac = ov_x.max(0.0) * ov_y.max(0.0);
++            if frac > 0.0 {
++                let bg = cell_bg(px / 8, py / 24);
++                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
++            }
++        }
++    }
++    big_pane_from_colors(style, &colors)
++}
++
++/// Sampled actual-vs-ideal coverage, using the same oracle the coherence
++/// test asserts on (tests/floating_square_coherence.rs).
++fn coverage_zoom_pane(pos: WorldPoint) -> String {
++    let (grid, center) = rendered_neighborhood(pos);
++    let owners = assign_colors(&grid);
++    let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
++    let style = coverage::Style::from_env();
++    let actual_lines = glyph_pane(&grid, &owners, center, &coverage::PALETTE, &style);
++    let ideal_lines = ideal_pane(pos, origin, &style);
++    let mut out = format!(
++        "actual: exact glyph geometry; ideal: analytic (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
++        "actual", "ideal (true square)"
++    );
++    for row in 0..actual_lines.len() {
++        out.push_str(&format!("  {}  {}\n", actual_lines[row], ideal_lines[row]));
++    }
++    out.push_str(&format!("  {}\n", Metrics::measure(&actual, pos).summary_line()));
++    out
++}
++
++/// The offset the renderer's family decision actually sees: pos relative to
++/// the rounded center square.
++fn center_offset(pos: WorldPoint) -> WorldMove {
++    pos - world_point_to_world_square(pos).to_f32()
++}
++
++fn print_family_diagnostics(pos: WorldPoint) {
++    let offset = center_offset(pos);
++    let info = snap_debug_info(offset);
++    println!(
++        "family: {}   snapped offset ({:+.4}, {:+.4})   snap err ({:+.4}, {:+.4})",
++        info.family,
++        info.snapped_offset.x,
++        info.snapped_offset.y,
++        info.snapped_offset.x - offset.x,
++        info.snapped_offset.y - offset.y,
++    );
++    // candidates ranked by measured coverage error (the family map's
++    // objective), not the center-snap proxy it used to report
++    for (i, name) in snap_family_names().iter().enumerate() {
++        let (grid, center) = rendered_neighborhood_forced(pos, i);
++        let owners = assign_colors(&grid);
++        let err = coverage_error(&grid, &owners, center, pos);
++        let mark = if *name == info.family { '>' } else { ' ' };
++        println!("  {mark} {name:<38} coverage err {err:.4}");
++    }
++}
++
++fn show_position(pos: WorldPoint) {
++    let frac = fraction_part(pos);
++    println!(
++        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})",
++        pos.x, pos.y, frac.x, frac.y,
++    );
++    print_family_diagnostics(pos);
++    let center = world_point_to_world_square(pos);
++    let mut frame = grid_frame(3, center);
++    draw_floating_square(&mut frame, 3, center, pos, None);
++    overlay_true_center(&mut frame, 3, center, pos);
++    println!("{frame}{}", Glyph::reset_colors());
++    print!("{}", coverage_zoom_pane(pos));
++}
++
++/// The same position rendered with each snap family forced, side by side.
++/// Explains the automatic pick: the winner is the family whose snapped
++/// silhouette sits closest to the true square.
++fn show_families(pos: WorldPoint) {
++    let frac = fraction_part(pos);
++    let info = snap_debug_info(center_offset(pos));
++    println!(
++        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  auto-picked family: {}",
++        pos.x, pos.y, frac.x, frac.y, info.family,
++    );
++    let center = world_point_to_world_square(pos);
++    let names = snap_family_names();
++    let err_of = |name: &str| {
++        info.candidates
++            .iter()
++            .find(|(n, _)| *n == name)
++            .map(|(_, e)| *e)
++            .unwrap()
++    };
++    let radius = 2i32;
++    let pane_w = ((2 * radius + 1) * 2) as usize; // 5 squares = 10 cols
++    let header: Vec<String> = names
++        .iter()
++        .map(|n| {
++            let mark = if *n == info.family { '>' } else { ' ' };
++            format!("{mark}{:^w$}", short_family_name(n), w = pane_w - 1)
++        })
++        .collect();
++    println!("{}", header.join("  "));
++    let err_line: Vec<String> = names
++        .iter()
++        .map(|n| format!("{:^w$.4}", err_of(n), w = pane_w))
++        .collect();
++    println!("{}", err_line.join("  "));
++    let pane_lines: Vec<Vec<String>> = (0..4)
++        .map(|i| {
++            let mut f = grid_frame(radius, center);
++            draw_floating_square(&mut f, radius, center, pos, Some(i));
++            overlay_true_center(&mut f, radius, center, pos);
++            f.string_for_regular_display()
++                .lines()
++                .map(String::from)
++                .collect()
++        })
++        .collect();
++    for row in 0..pane_lines[0].len() {
++        let line: Vec<&str> = pane_lines.iter().map(|l| l[row].as_str()).collect();
++        println!("{}", line.join("  "));
++    }
++    println!("{}", Glyph::reset_colors());
++}
++
++/// Offset table over 0..=0.5 in 1/16 steps (the finest snap grid), each cell
++/// labeled with the family that offset picks — a map of the family decision
++/// boundaries. Only the positive quadrant is shown: every snap grid is
++/// sign-symmetric, so the other quadrants are mirror images.
++fn show_sweep() {
++    let offsets: Vec<f32> = (0..=8).map(|i| i as f32 / 16.0).collect();
++    let n = offsets.len();
++    // cell = 3x3 squares (6 cols x 3 rows) + 1-col gap + 1 family-letter row
++    let (cell_h, step_x, step_y) = (3usize, 7usize, 4usize);
++    // width drops the trailing gap column; height keeps the last cell's letter row
++    let mut big = Frame::blank(n * step_x - 1, n * step_y);
++    for (yi, &y_off) in offsets.iter().enumerate() {
++        for (xi, &x_off) in offsets.iter().enumerate() {
++            let pos: WorldPoint = euclid::point2(x_off, y_off);
++            let mut cell = grid_frame(1, euclid::point2(0, 0));
++            draw_floating_square(&mut cell, 1, euclid::point2(0, 0), pos, None);
++            let row0 = yi * step_y;
++            let col0 = xi * step_x;
++            big.blit(&cell, [row0 as i32, col0 as i32]);
++            let idx = family_index_of(snap_debug_info(center_offset(pos)).family);
++            big.grid[row0 + cell_h][col0 + 2] =
++                DrawableGlyph::new(FAMILY_LETTERS[idx], Some(FAMILY_COLORS[idx]), None);
++        }
++    }
++    let header: String = offsets
++        .iter()
++        .map(|x| format!("x={x:.2} "))
++        .collect();
++    println!("        {header}");
++    for (row, line) in big.string_for_regular_display().lines().enumerate() {
++        // both prefixes are exactly 8 chars so labeled and unlabeled rows align
++        if row % step_y == 1 {
++            println!("y={:<5.3} {line}", offsets[row / step_y]);
++        } else {
++            println!("        {line}");
++        }
++    }
++    print!("{}", Glyph::reset_colors());
++    println!("\nfamilies (auto-picked per offset):");
++    for (i, name) in snap_family_names().iter().enumerate() {
++        println!(
++            "  {}{} = {}{}",
++            termion::color::Fg(termion::color::Rgb(
++                FAMILY_COLORS[i].r,
++                FAMILY_COLORS[i].g,
++                FAMILY_COLORS[i].b
++            )),
++            FAMILY_LETTERS[i],
++            name,
++            termion::style::Reset
++        );
++    }
++}
++
++/// Big-pixel grid per character cell in the glyph table: the exact union
++/// lattice of the families' increments — 1/16 world horizontally (1/8-char
++/// vertical strips), 1/24 world vertically (eighths/thirds union grid) —
++/// so one character (0.5 x 1.0 world) is 8 x 24 big pixels and every glyph
++/// edge lands exactly on a pixel boundary. No rounding anywhere.
++const TABLE_PX_W: usize = 8;
++const TABLE_PX_H: usize = 24;
++
++/// Every block character the renderer can emit, by sweeping the four
++/// family generators over their full input domains (deduped, SPACE
++/// dropped). Calling the real generators means the list cannot drift
++/// from the render vocabulary.
++fn used_block_glyphs() -> Vec<char> {
++    let mut glyphs: Vec<char> = Vec::new();
++    let mut push = |c: char| {
++        if c != SPACE && !glyphs.contains(&c) {
++            glyphs.push(c);
++        }
++    };
++    for &vertical in &[false, true] {
++        for eighths in -8..=8 {
++            push(character_for_half_square_with_1d_eighths_offset(vertical, eighths));
++        }
++    }
++    for thirds in -3..=3 {
++        push(character_for_half_square_with_vertical_thirds_offset(thirds));
++    }
++    for dy in -2..=2 {
++        for dx in -2..=2 {
++            push(quadrant_block_by_offset(euclid::vec2(dx, dy)));
++        }
++    }
++    for dy in -3..=3 {
++        for dx in -2..=2 {
++            push(hextant_block_by_offset(euclid::vec2(dx, dy)));
++        }
++    }
++    glyphs
++}
++
++/// The glyph table: one entry per block character (first column) with its
++/// official Unicode name (UCD), and its exact 8x24 big-pixel zoom framed
++/// in box drawing characters, so each glyph's cell boundary is explicit.
++/// Position rulers: digits above each grid index the big-pixel column
++/// boundaries (1/16 world apart — every one a possible vertical cut,
++/// h-eighths strips); digits left of each grid index the big-pixel row
++/// boundary at the top of each half-row (even numbers — a half-row
++/// spans 2 big pixels; the bottom frame line is position 24). One big
++/// pixel = one vertical half character: both=█ upper=▀ lower=▄
++/// empty=·. Plain text only (no ANSI) — the output is meant for a file
++/// (`glyphs > x.txt`).
++fn print_glyph_table() {
++    println!("block glyph reference - exact big-pixel zoom at the union lattice");
++    println!("one character = one half-cell = 0.5 world wide x 1.0 world tall;");
++    println!("one big pixel = 1/16 world wide x 1/24 world tall (the finest");
++    println!("increments any snap family can express), so a character is 8x24");
++    println!("big pixels and every glyph edge lies exactly on a pixel boundary.");
++    println!("one big pixel = one vertical half character: both=█ upper=▀ lower=▄ empty=·");
++    println!("names are the official Unicode character names (UCD).");
++    println!("x ruler (digits above each grid): big-pixel boundary index,");
++    println!("  1/16 world apart; every one is a possible vertical cut");
++    println!("  (h-eighths).");
++    println!("y ruler (digits left of each grid, one per half-row):");
++    println!("  big-pixel boundary index at the top of that half-row;");
++    println!("  even numbers, because each half-row spans 2 big pixels.");
++    println!("  The grid bottom edge is position 24.");
++    let ruler: String = (0..=TABLE_PX_W)
++        .map(|i| char::from(b'0' + i as u8))
++        .collect();
++    for &c in &used_block_glyphs() {
++        println!();
++        println!("{c} {}", char_name(c));
++        println!("   {ruler}");
++        println!("  ┌{}┐", "─".repeat(TABLE_PX_W));
++        for t in 0..TABLE_PX_H / 2 {
++            // text row t stacks world pixel rows 23-2t (upper) and
++            // 22-2t (lower), counted from the bottom (+y is up)
++            let filled = |j: usize, i: usize| {
++                glyph_filled(
++                    c,
++                    (i as f32 + 0.5) / TABLE_PX_W as f32,
++                    (j as f32 + 0.5) / TABLE_PX_H as f32,
++                )
++            };
++            let mut line = String::new();
++            for i in 0..TABLE_PX_W {
++                let up = filled(TABLE_PX_H - 1 - 2 * t, i);
++                let lo = filled(TABLE_PX_H - 2 - 2 * t, i);
++                line.push(match (up, lo) {
++                    (true, true) => '█',
++                    (true, false) => '▀',
++                    (false, true) => '▄',
++                    (false, false) => '·',
++                });
++            }
++            println!("{:>2}│{line}│", 2 * t);
++        }
++        println!("{:>2}└{}┘", TABLE_PX_H, "─".repeat(TABLE_PX_W));
++    }
++}
++
++/// Official Unicode name (UCD) of one table glyph. The fallback is the
++/// bare code point; the test below fails if any used glyph reaches it,
++/// so names cannot silently go missing when the vocabulary grows.
++fn char_name(c: char) -> String {
++    match c {
++        '▏' => "LEFT ONE EIGHTH BLOCK",
++        '▎' => "LEFT ONE QUARTER BLOCK",
++        '▍' => "LEFT THREE EIGHTHS BLOCK",
++        '▌' => "LEFT HALF BLOCK",
++        '▋' => "LEFT FIVE EIGHTHS BLOCK",
++        '▊' => "LEFT THREE QUARTERS BLOCK",
++        '▉' => "LEFT SEVEN EIGHTHS BLOCK",
++        '█' => "FULL BLOCK",
++        '▕' => "RIGHT ONE EIGHTH BLOCK",
++        '🮇' => "RIGHT ONE QUARTER BLOCK",
++        '🮈' => "RIGHT THREE EIGHTHS BLOCK",
++        '▐' => "RIGHT HALF BLOCK",
++        '🮉' => "RIGHT FIVE EIGHTHS BLOCK",
++        '🮊' => "RIGHT THREE QUARTERS BLOCK",
++        '🮋' => "RIGHT SEVEN EIGHTHS BLOCK",
++        '▁' => "LOWER ONE EIGHTH BLOCK",
++        '▂' => "LOWER ONE QUARTER BLOCK",
++        '▃' => "LOWER THREE EIGHTHS BLOCK",
++        '▄' => "LOWER HALF BLOCK",
++        '▅' => "LOWER FIVE EIGHTHS BLOCK",
++        '▆' => "LOWER THREE QUARTERS BLOCK",
++        '▇' => "LOWER SEVEN EIGHTHS BLOCK",
++        '▔' => "UPPER ONE EIGHTH BLOCK",
++        '🮂' => "UPPER ONE QUARTER BLOCK",
++        '🮃' => "UPPER THREE EIGHTHS BLOCK",
++        '▀' => "UPPER HALF BLOCK",
++        '🮄' => "UPPER FIVE EIGHTHS BLOCK",
++        '🮅' => "UPPER THREE QUARTERS BLOCK",
++        '🮆' => "UPPER SEVEN EIGHTHS BLOCK",
++        '🬂' => "BLOCK SEXTANT-12",
++        '🬎' => "BLOCK SEXTANT-1234",
++        '🬭' => "BLOCK SEXTANT-56",
++        '🬹' => "BLOCK SEXTANT-3456",
++        '▖' => "QUADRANT LOWER LEFT",
++        '▗' => "QUADRANT LOWER RIGHT",
++        '▘' => "QUADRANT UPPER LEFT",
++        '▝' => "QUADRANT UPPER RIGHT",
++        '🬀' => "BLOCK SEXTANT-1",
++        '🬁' => "BLOCK SEXTANT-2",
++        '🬄' => "BLOCK SEXTANT-13",
++        '🬉' => "BLOCK SEXTANT-24",
++        '🬏' => "BLOCK SEXTANT-5",
++        '🬓' => "BLOCK SEXTANT-35",
++        '🬞' => "BLOCK SEXTANT-6",
++        '🬦' => "BLOCK SEXTANT-46",
++        _ => return format!("U+{:04X}", c as u32),
++    }
++    .to_string()
++}
++
++const ORBIT_RADIUS: f32 = 2.5;
++/// Radians per second. Matches the old 0.02 rad per 33ms frame.
++const ORBIT_SPEED: f32 = 0.6;
++/// Nudge step for the arrow keys: the finest snap grid (h-eighths x step),
++/// so every nudge can cross at most one snap boundary.
++const NUDGE: f32 = 1.0 / 16.0;
++/// Per-second velocity of the line trajectory: 10x the coherence test's
++/// (0.06, 0.03) per-sample step so motion is visible in real time.
++const LINE_DIR: WorldMove = WorldMove::new(0.6, 0.3);
++/// Half-width of the animation grid in squares; fixed so mouse cells can be
++/// mapped back to world geometry.
++const ANIMATE_GRID_RADIUS: i32 = 4;
++/// Fine mouse-drag scale: world units per terminal cell of mouse travel,
++/// vs. coarse mode's direct cell-to-grid mapping (0.5 in x, 1 in y). Large
++/// mouse sweeps produce sub-cell square movements, which is what the
++/// terminal grid's resolution otherwise forbids.
++const FINE_SCALE: f32 = 1.0 / 32.0;
++
++enum Motion {
++    Orbit { theta: f32 },
++    /// Parked at a spot (arrow-key nudge or mouse placement).
++    Free { pos: WorldPoint },
++    /// Straight line through `base`, t in [-2, 2], wrapping.
++    Line { base: WorldPoint, dir: WorldMove, t: f32 },
++}
++
++impl Motion {
++    fn pos(&self) -> WorldPoint {
++        match *self {
++            Motion::Orbit { theta } => {
++                euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS)
++            }
++            Motion::Free { pos } => pos,
++            Motion::Line { base, dir, t } => base + dir * t,
++        }
++    }
++    fn advance(&mut self, dt: f32, speed: f32) {
++        match self {
++            Motion::Orbit { theta } => {
++                *theta = (*theta + ORBIT_SPEED * speed * dt).rem_euclid(std::f32::consts::TAU)
++            }
++            Motion::Free { .. } => {}
++            Motion::Line { t, .. } => *t = (*t + speed * dt + 2.0).rem_euclid(4.0) - 2.0,
++        }
++    }
++    fn name(&self) -> &'static str {
++        match self {
++            Motion::Orbit { .. } => "orbit",
++            Motion::Free { .. } => "free",
++            Motion::Line { .. } => "line",
++        }
++    }
++}
++
++/// What an in-progress mouse drag does. Hold events don't report which
++/// button is down, so the press that starts the drag picks the mode once
++/// and Holds stick with it for the whole drag.
++enum DragMode {
++    /// Left button: steer the orbit's angular position.
++    Angle,
++    /// Any other button (or left with a modifier held): place the square.
++    Place,
++}
++
++struct AnimState {
++    motion: Motion,
++    paused: bool,
++    speed: f32,
++    anim_time: Duration,
++    /// Family changes since start; each one is a potential visible pop.
++    switches: u32,
++    prev_family: Option<&'static str>,
++    /// f-key fallback for terminals that don't report mouse modifiers:
++    /// treats every drag as a fine drag.
++    fine_drag: bool,
++    /// Anchor for fine drags, which accumulate cell deltas relative to the
++    /// previous event instead of mapping cells to absolute positions.
++    last_mouse_cell: Option<(u16, u16)>,
++    /// Mode of the drag in progress (None between drags).
++    drag: Option<DragMode>,
++    /// Candidate replacement method shown in the second row (index into
++    /// CANDIDATES); the first row is always the in-use game path.
++    candidate: usize,
++    /// Which error measurement pane is displayed (index into METRICS).
++    metric: usize,
++    /// Previously rendered glyph neighborhoods per method slot (0 = the
++    /// in-use row, 1..=3 = CANDIDATES index + 1), for the frame-diff
++    /// metric. Updated after every rendered frame — moving or not — so
++    /// frame diff always compares against the immediately previous render.
++    prev_renders: [Option<([[DoubleChar; 3]; 3], WorldSquare)>; 4],
++    /// Selected error over time per method slot, sampled on frames where
++    /// the square actually moved. All four slots accumulate; `[`/`]` only
++    /// changes which two are displayed.
++    history: [Vec<f32>; 4],
++    /// Which metric the history buffers hold; a change clears them all.
++    history_metric: usize,
++    /// Position at the last history sample: a frame appends only when pos
++    /// differs (manual mouse movement and nudges count).
++    last_sample_pos: Option<WorldPoint>,
++}
++
++impl AnimState {
++    fn new() -> Self {
++        AnimState {
++            motion: Motion::Orbit { theta: 0.0 },
++            paused: false,
++            speed: 1.0,
++            anim_time: Duration::ZERO,
++            switches: 0,
++            prev_family: None,
++            fine_drag: false,
++            last_mouse_cell: None,
++            drag: None,
++            candidate: 0,
++            metric: 0,
++            prev_renders: [None; 4],
++            history: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
++            history_metric: 0,
++            last_sample_pos: None,
++        }
++    }
++
++    /// Clear all history buffers when the metric cycled to a new one —
++    /// different metrics have incomparable units.
++    fn sync_history_metric(&mut self) {
++        if self.history_metric != self.metric {
++            self.history = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
++            self.history_metric = self.metric;
++        }
++    }
++
++    /// One frame's history sample: append each slot's number only when
++    /// the square actually moved since the last sample — mouse drags and
++    /// arrow nudges change pos too, so they count; parked redraws (metric
++    /// or candidate switches, paused key presses) append nothing. `None`
++    /// numbers (frame diff before its first prev) are skipped.
++    fn record_history(&mut self, pos: WorldPoint, numbers: &[Option<f32>; 4]) {
++        if self.last_sample_pos == Some(pos) {
++            return;
++        }
++        self.last_sample_pos = Some(pos);
++        for (slot, number) in numbers.iter().enumerate() {
++            if let Some(number) = number {
++                self.history[slot].push(*number);
++                if self.history[slot].len() > SPARKLINE_LEN {
++                    self.history[slot].remove(0);
++                }
++            }
++        }
++    }
++}
++
++/// Decode an SGR mouse sequence (ESC [ < Cb ; Cx ; Cy M/m) from raw input
++/// bytes, recovering the modifier bits termion drops (shift=4, alt=8,
++/// ctrl=16 — modified events otherwise surface as Event::Unsupported or
++/// lose their modifier). Returns the event and whether any modifier was
++/// held.
++fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
++    let body = raw.strip_prefix(b"\x1b[<")?;
++    let (&final_byte, nums) = body.split_last()?;
++    if final_byte != b'M' && final_byte != b'm' {
++        return None;
++    }
++    let text = std::str::from_utf8(nums).ok()?;
++    let mut fields = text.split(';');
++    let cb: u16 = fields.next()?.parse().ok()?;
++    let cx: u16 = fields.next()?.parse().ok()?;
++    let cy: u16 = fields.next()?.parse().ok()?;
++    let modified = cb & (4 | 8 | 16) != 0;
++    let button = match cb & 3 {
++        0 => MouseButton::Left,
++        1 => MouseButton::Middle,
++        _ => MouseButton::Right,
++    };
++    let event = if cb & 64 != 0 {
++        // wheel events come only as presses
++        if final_byte != b'M' {
++            return None;
++        }
++        let button = if cb & 1 == 0 {
++            MouseButton::WheelUp
++        } else {
++            MouseButton::WheelDown
++        };
++        MouseEvent::Press(button, cx, cy)
++    } else if cb & 32 != 0 {
++        MouseEvent::Hold(cx, cy)
++    } else if final_byte == b'm' || cb & 3 == 3 {
++        MouseEvent::Release(cx, cy)
++    } else {
++        MouseEvent::Press(button, cx, cy)
++    };
++    Some((event, modified))
++}
++
++/// 1-based terminal cell of the animation grid's top-left corner. The
++/// large view is the second column of the first boxed row (first column is
++/// the 6-wide small view, then the 2-cell gap, then "│ " prefix): 2 + 6 + 2.
++/// If the boxed layout changes, this moves with it.
++const GRID_SCREEN_ORIGIN: (u16, u16) = (10, 2);
++
++/// World point under the (1-based) terminal cell, using the same grid
++/// geometry as the frame: 2 columns per square, rows increase downward.
++fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
++    let r = ANIMATE_GRID_RADIUS as f32;
++    // grid cell (0,0) sits at GRID_SCREEN_ORIGIN; within the grid the
++    // origin square spans cols 2r..=2r+1 (center 2r+0.5), row r
++    let dx_cells = col as f32 - GRID_SCREEN_ORIGIN.0 as f32 - (2.0 * r + 0.5);
++    let dy_cells = row as f32 - GRID_SCREEN_ORIGIN.1 as f32 - r;
++    euclid::point2(dx_cells * 0.5, -dy_cells)
++}
++
++/// Bearing of the mouse cell from the animation grid's center (the world
++/// origin), for steering the orbit with the left button: clicking a
++/// direction from the center moves the orbiting square to that angle,
++/// keeping the orbit radius. Unlike placement this needs no clamping —
++/// every cell has a well-defined angle.
++fn mouse_cell_angle(col: u16, row: u16) -> f32 {
++    let p = mouse_cell_point(col, row);
++    p.y.atan2(p.x)
++}
++
++/// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
++/// disables ONLCR, so bare '\n' would stair-step the frame.
++const FRAME_DT: Duration = Duration::from_millis(33);
++
++fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode: bool) {
++    let pos = state.motion.pos();
++    let offset = center_offset(pos);
++    let info = snap_debug_info(offset);
++    let family_changed = state.prev_family.is_some_and(|p| p != info.family);
++    if state.prev_family != Some(info.family) {
++        if state.prev_family.is_some() {
++            state.switches += 1;
++        }
++        state.prev_family = Some(info.family);
++    }
++
++    // invert the family on the frame it changed: family switches are where
++    // the visible pops happen
++    let family_display = if family_changed {
++        format!(
++            "{}{}{}",
++            termion::style::Invert,
++            short_family_name(info.family),
++            termion::style::NoInvert
++        )
++    } else {
++        short_family_name(info.family).to_string()
++    };
++    let style = coverage::Style::from_env();
++    let in_use_info = vec![
++        format!("family={family_display}"),
++        format!(
++            "snap err=({:+.3}, {:+.3})",
++            info.snapped_offset.x - offset.x,
++            info.snapped_offset.y - offset.y,
++        ),
++    ];
++    let cand_name = CANDIDATES[state.candidate].0;
++    let cand_info = match state.candidate {
++        0 => vec![
++            "per-character xor argmin,".to_string(),
++            "no sibling awareness".to_string(),
++        ],
++        1 => vec![format!(
++            "per-cell xor + {:.2}·d",
++            CHARWISE_PROTRUSION_WEIGHT
++        )],
++        _ => vec![format!(
++            "per-cell xor + {:.2}·d²",
++            CHARWISE_PROTRUSION_SQUARED_WEIGHT
++        )],
++    };
++
++    // All four method slots get a metric report every frame: the two
++    // displayed rows reuse pane + value, all four numbers feed the
++    // history sparklines — candidate switches only change which slots
++    // render, so every slot's history stays continuous across them.
++    state.sync_history_metric();
++    let methods: [(&str, Neighborhood); 4] = [IN_USE, CANDIDATES[0], CANDIDATES[1], CANDIDATES[2]];
++    let mut reports: Vec<MetricReport> = Vec::with_capacity(4);
++    let mut renders: Vec<([[DoubleChar; 3]; 3], WorldSquare)> = Vec::with_capacity(4);
++    let mut numbers: [Option<f32>; 4] = [None; 4];
++    for slot in 0..4 {
++        let (glyphs, center) = methods[slot].1(pos);
++        let report = metric_report(
++            methods[slot].1,
++            &glyphs,
++            center,
++            pos,
++            state.metric,
++            state.prev_renders[slot].as_ref().map(|(g, c)| (g, *c)),
++            &style,
++        );
++        numbers[slot] = report.number;
++        renders.push((glyphs, center));
++        reports.push(report);
++    }
++    state.record_history(pos, &numbers);
++    // Shared y-axis: max over every live slot keeps block heights
++    // comparable between rows and stable across candidate switches.
++    let scale = state
++        .history
++        .iter()
++        .flatten()
++        .fold(1e-6f32, |acc, &v| acc.max(v));
++
++    let mut text = String::new();
++    for line in method_section(
++        &format!("in use: {}", IN_USE.0),
++        0,
++        &renders[0].0,
++        renders[0].1,
++        pos,
++        state.metric,
++        &style,
++        &in_use_info,
++        std::mem::take(&mut reports[0]),
++        &state.history[0],
++        None, // the in-use row IS the baseline
++        scale,
++    ) {
++        text.push_str(&line);
++        text.push('\n');
++    }
++    let cand_slot = state.candidate + 1;
++    for line in method_section(
++        &format!("candidate: {cand_name}  ([ ] cycle)"),
++        cand_slot,
++        &renders[cand_slot].0,
++        renders[cand_slot].1,
++        pos,
++        state.metric,
++        &style,
++        &cand_info,
++        std::mem::take(&mut reports[cand_slot]),
++        &state.history[cand_slot],
++        Some(&state.history[0]), // mark where the in-use error sits
++        scale,
++    ) {
++        text.push_str(&line);
++        text.push('\n');
++    }
++
++    // common box: ideal zoom (drawn analytically — see ideal_big_pixel_pane),
++    // global state, controls — one column each
++    let center = world_point_to_world_square(pos);
++    let ideal_lines = ideal_big_pixel_pane(pos, center, &style);
++    let frac = fraction_part(pos);
++
++    let mut common_col = vec!["ideal (true square)".to_string()];
++    common_col.extend(ideal_lines.iter().cloned());
++    let global = vec![
++        format!(
++            "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
++            pos.x, pos.y, frac.x, frac.y,
++        ),
++        format!(
++            "{} speed={:.2}x  switches={}  t={:.1}s{}{}",
++            state.motion.name(),
++            state.speed,
++            state.switches,
++            state.anim_time.as_secs_f32(),
++            if state.paused { "  [paused]" } else { "" },
++            if state.fine_drag { "  [fine-drag]" } else { "" },
++        ),
++    ];
++    let controls: Vec<String> = [
++        "controls:",
++        "q/esc quit    space pause",
++        "arrows nudge 1/16",
++        "o orbit  l line",
++        "+/- speed  f fine-drag",
++        "[ ] candidate method",
++        ", . error metric",
++        "left drag: orbit angle",
++        "mid/right drag: place",
++        "shift/ctrl/alt-drag fine",
++    ]
++    .iter()
++    .map(|s| s.to_string())
++    .collect();
++    let global_w = visible_w(&global);
++    let controls_w = visible_w(&controls);
++    let common_row = boxed_row(
++        "common",
++        &[
++            (common_col.as_slice(), BIG_PX_W),
++            (global.as_slice(), global_w),
++            (controls.as_slice(), controls_w),
++        ],
++    );
++    text.push_str(&common_row.join("\n"));
++    text.push('\n');
++
++    // Remember all four renders for the next frame's frame-diff metric —
++    // every rendered frame, moving or not, so the diff is always against
++    // the immediately previous render.
++    for slot in 0..4 {
++        state.prev_renders[slot] = Some(renders[slot]);
++    }
++
++    if raw_mode {
++        // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
++        // to end-of-line per line so shrinking values leave no leftovers.
++        // UntilNewline clears from the cursor to end of line; CurrentLine
++        // would wipe the line content just written.
++        let eol = format!("{}\r\n", termion::clear::UntilNewline);
++        write!(out, "{}{}", text.replace('\n', &eol), Glyph::reset_colors()).unwrap();
++    } else {
++        write!(out, "{}{}", text, Glyph::reset_colors()).unwrap();
++    }
++    out.flush().unwrap();
++}
++
++/// `frame_count`: None = run until quit (interactive) or a short default
++/// (piped output).
++fn run_animation(frame_count: Option<u32>) {
++    let interactive = stdout().is_terminal();
++
++    if !interactive {
++        // Piped output (e.g. `animate 5 | less -R`): no raw mode available.
++        // These frames render instantly, so simulate the animation clock.
++        let mut state = AnimState::new();
++        for _ in 0..frame_count.unwrap_or(8) {
++            render_animation_frame(&mut stdout(), &mut state, false);
++            println!();
++            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
++            state.anim_time += FRAME_DT;
++        }
++        return;
++    }
++
++    let (tx, rx) = channel();
++    thread::spawn(move || {
++        for event in stdin().events_and_raw() {
++            if tx.send(event.unwrap()).is_err() {
++                break;
++            }
++        }
++    });
++
++    let mut screen = MouseTerminal::from(stdout().into_raw_mode().unwrap())
++        .into_alternate_screen()
++        .unwrap();
++
++    let mut state = AnimState::new();
++    let mut frames = 0u32;
++    let mut dirty = true;
++    loop {
++        while let Ok((event, raw)) = rx.try_recv() {
++            // recover the mouse modifier bits termion drops, so a held
++            // shift/ctrl/alt can select fine dragging
++            let (event, fine_mod) = match parse_sgr_mouse(&raw) {
++                Some((mouse_event, modified)) => (Event::Mouse(mouse_event), modified),
++                None => (event, false),
++            };
++            let fine = fine_mod || state.fine_drag;
++            match event {
++                Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
++                Event::Key(Key::Char(' ')) => {
++                    state.paused = !state.paused;
++                    dirty = true;
++                }
++                // Arrow keys park the square and step it across snap
++                // boundaries deterministically — an orbit sweeps past the
++                // interesting crossings before you can see them.
++                Event::Key(Key::Left) | Event::Key(Key::Right) | Event::Key(Key::Up)
++                | Event::Key(Key::Down) => {
++                    let step = match event {
++                        Event::Key(Key::Left) => euclid::vec2(-NUDGE, 0.0),
++                        Event::Key(Key::Right) => euclid::vec2(NUDGE, 0.0),
++                        Event::Key(Key::Up) => euclid::vec2(0.0, NUDGE),
++                        _ => euclid::vec2(0.0, -NUDGE),
++                    };
++                    state.motion = Motion::Free {
++                        pos: state.motion.pos() + step,
++                    };
++                    dirty = true;
++                }
++                Event::Key(Key::Char('o')) => {
++                    let p = state.motion.pos();
++                    state.motion = Motion::Orbit {
++                        theta: p.y.atan2(p.x),
++                    };
++                    state.paused = false;
++                    dirty = true;
++                }
++                Event::Key(Key::Char('l')) => {
++                    state.motion = Motion::Line {
++                        base: state.motion.pos(),
++                        dir: LINE_DIR,
++                        t: 0.0,
++                    };
++                    state.paused = false;
++                    dirty = true;
++                }
++                Event::Key(Key::Char('+') | Key::Char('=')) => {
++                    state.speed = (state.speed * 2.0).min(8.0);
++                    dirty = true;
++                }
++                Event::Key(Key::Char('-')) => {
++                    state.speed = (state.speed / 2.0).max(0.125);
++                    dirty = true;
++                }
++                // fallback fine-drag toggle for terminals that don't pass
++                // mouse modifiers through
++                Event::Key(Key::Char('f')) => {
++                    state.fine_drag = !state.fine_drag;
++                    dirty = true;
++                }
++                // two-button cycles: candidate method (second row) and
++                // which error measurement pane is displayed
++                Event::Key(Key::Char(']')) => {
++                    state.candidate = (state.candidate + 1) % CANDIDATES.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char('[')) => {
++                    state.candidate = (state.candidate + CANDIDATES.len() - 1) % CANDIDATES.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char('.')) => {
++                    state.metric = (state.metric + 1) % METRICS.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char(',')) => {
++                    state.metric = (state.metric + METRICS.len() - 1) % METRICS.len();
++                    dirty = true;
++                }
++                // Left click/drag steers the orbit: the angle from the
++                // grid center to the mouse becomes the orbit's angular
++                // position (orbit radius unchanged, so the square jumps to
++                // that bearing). Other buttons place the square (drag to
++                // move it), clamped to the visible grid; with a modifier
++                // held (or fine_drag toggled) placement is relative
++                // instead: cell deltas accumulate at FINE_SCALE, so large
++                // mouse movements produce sub-cell square movements.
++                // Press pauses so the placement sticks.
++                Event::Mouse(MouseEvent::Press(_, x, y))
++                | Event::Mouse(MouseEvent::Hold(x, y)) => {
++                    if let Event::Mouse(MouseEvent::Press(button, _, _)) = &event {
++                        state.drag = Some(if *button == MouseButton::Left && !fine {
++                            DragMode::Angle
++                        } else {
++                            DragMode::Place
++                        });
++                    }
++                    let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
++                    let clamp = |p: WorldPoint| {
++                        euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit))
++                    };
++                    match state.drag {
++                        Some(DragMode::Angle) => {
++                            state.motion = Motion::Orbit {
++                                theta: mouse_cell_angle(x, y),
++                            };
++                        }
++                        _ => {
++                            if fine {
++                                if let Some((lx, ly)) = state.last_mouse_cell {
++                                    let d: WorldMove = euclid::vec2(
++                                        (x as f32 - lx as f32) * FINE_SCALE,
++                                        (ly as f32 - y as f32) * FINE_SCALE,
++                                    );
++                                    state.motion = Motion::Free {
++                                        pos: clamp(state.motion.pos() + d),
++                                    };
++                                }
++                            } else {
++                                state.motion = Motion::Free {
++                                    pos: clamp(mouse_cell_point(x, y)),
++                                };
++                            }
++                            // anchored on every event, so grabbing or
++                            // releasing the modifier mid-drag never causes
++                            // a jump
++                            state.last_mouse_cell = Some((x, y));
++                        }
++                    }
++                    if matches!(event, Event::Mouse(MouseEvent::Press(_, _, _))) {
++                        state.paused = true;
++                    }
++                    dirty = true;
++                }
++                Event::Mouse(MouseEvent::Release(_, _)) => {
++                    state.drag = None;
++                    state.last_mouse_cell = None;
++                }
++                _ => {}
++            }
++        }
++
++        if !state.paused {
++            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
++            state.anim_time += FRAME_DT;
++            dirty = true;
++        }
++
++        // Redraw only on state change: repainting the full screen every
++        // 33ms would wipe any in-progress text selection.
++        if dirty {
++            write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
++            render_animation_frame(&mut screen, &mut state, true);
++            write!(
++                screen,
++                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine []=cand ,.=metric"
++            )
++            .unwrap();
++            screen.flush().unwrap();
++            dirty = false;
++            frames += 1;
++            if frame_count.is_some_and(|n| frames >= n) {
++                return;
++            }
++        }
++        thread::sleep(FRAME_DT);
++    }
++}
++
++fn usage() {
++    eprintln!(
++        "usage: floating_square_debug <mode>\n\
++         modes:\n  \
++           pos X Y       single square at world point (X, Y), with snap-family\n  \
++          \x20      diagnostics and a sampled coverage view\n  \
++           families X Y  the same position with each snap family forced\n  \
++           sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
++          \x20      the family each offset picks (decision-boundary map)\n  \
++           glyphs        every block character the renderer can emit, each\n  \
++          \x20      with its Unicode name and an exact 8x24 big-pixel zoom\n  \
++          \x20      (1/16 x 1/24 world per pixel), framed with position\n  \
++          \x20      rulers; plain text, redirect to a file\n  \
++           animate [N]   orbiting square, two-method comparison: the in-use\n  \
++          \x20      game path (family-snapped) and a candidate replacement\n  \
++          \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
++          \x20      charwise + protrusion squared). Each row: the full grid\n  \
++          \x20      with glyph legend and the method's own objective, the\n  \
++          \x20      full-resolution zoomed render (one color per glyph), and\n  \
++          \x20      ONE error pane cycled with , and . (center, area,\n  \
++          \x20      per-char coverage, ideal xor, jaggedness, displacement\n  \
++          \x20      sensitivity, frame diff) with its numeric value, plus\n  \
++          \x20      the error's recent history as a five-row bar graph\n  \
++          \x20      (shared y-axis; the candidate row marks the in-use\n  \
++          \x20      error with a thin horizontal line); q quits, space\n  \
++          \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
++          \x20      line trajectory, +/- change speed, left click/drag sets\n  \
++          \x20      the orbit's angular position (angle from the top-row\n  \
++          \x20      grid's center to the mouse); other buttons place the\n  \
++          \x20      square, and holding shift/ctrl/alt while dragging (or\n  \
++          \x20      pressing f) gives fine control: large mouse movements\n  \
++          \x20      map to sub-cell square movements. Optional frame count N\n  \
++          \x20      runs a fixed number of frames, which is also the mode\n  \
++          \x20      used when stdout is not a terminal.\n\
++         default: animate (runs until q; fixed frame count when piped)"
++    );
++}
++
++fn main() {
++    let args: Vec<String> = std::env::args().skip(1).collect();
++    let parse_xy = |i: usize| -> Option<(f32, f32)> {
++        match (
++            args.get(i).and_then(|s| s.parse().ok()),
++            args.get(i + 1).and_then(|s| s.parse().ok()),
++        ) {
++            (Some(x), Some(y)) => Some((x, y)),
++            _ => None,
++        }
++    };
++    match args.first().map(String::as_str) {
++        None => run_animation(None),
++        Some("pos") => match parse_xy(1) {
++            Some((x, y)) => show_position(euclid::point2(x, y)),
++            _ => {
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("families") => match parse_xy(1) {
++            Some((x, y)) => show_families(euclid::point2(x, y)),
++            _ => {
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("sweep") => show_sweep(),
++        Some("glyphs") => print_glyph_table(),
++        Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
++            None => run_animation(None),
++            Some(Ok(n)) => run_animation(Some(n)),
++            Some(Err(_)) => {
++                eprintln!("animate: frame count must be a non-negative integer");
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("--help" | "-h") => usage(),
++        Some(other) => {
++            eprintln!("unknown mode: {other}");
++            usage();
++            std::process::exit(2);
++        }
++    }
++}
++
++#[cfg(test)]
++mod glyph_table_tests {
++    use super::*;
++
++    /// Every glyph the table renders must carry its real Unicode name: a
++    /// new family glyph reaching char_name's code-point fallback fails
++    /// here instead of shipping an anonymous table entry.
++    #[test]
++    fn every_used_glyph_is_named() {
++        for c in used_block_glyphs() {
++            let name = char_name(c);
++            assert!(
++                !name.starts_with("U+"),
++                "{c} (U+{:04X}) needs a name arm in char_name",
++                c as u32
++            );
++        }
++    }
++}
++
++#[cfg(test)]
++mod history_tests {
++    use super::*;
++
++    /// The 5-row graph resolves 40 levels: scale maps to a full column of
++    /// '█' on every row (level 40 = p 8 on the top row), half-scale to 2
++    /// full rows + the half block, columns right-align, and empty cells are
++    /// '·' on the axis row / spaces above.
++    #[test]
++    fn sparkline_graph_maps_levels_and_aligns_right() {
++        let style = coverage::Style { enabled: false };
++        let rows = sparkline_graph(&[0.0, 4.0, 2.0], None, 4.0, &style);
++        assert_eq!(rows.len(), SPARKLINE_ROWS);
++        let pad = SPARKLINE_LEN - 3;
++        for (top_idx, row) in rows.iter().enumerate() {
++            let chars: Vec<char> = row.chars().collect();
++            assert_eq!(chars.len(), SPARKLINE_LEN);
++            let from_bottom = SPARKLINE_ROWS - 1 - top_idx;
++            assert!(chars[..pad].iter().all(|&c| c == if from_bottom == 0 { '·' } else { ' ' }));
++            // v = 0 → level 0; v = scale → level 40; v = scale/2 → level 20
++            assert_eq!(chars[pad], if from_bottom == 0 { '·' } else { ' ' });
++            assert_eq!(chars[pad + 1], '█');
++            match from_bottom {
++                0 | 1 => assert_eq!(chars[pad + 2], '█'),
++                2 => assert_eq!(chars[pad + 2], '▄'), // level 20 = row 2, pos 4
++                _ => assert_eq!(chars[pad + 2], ' '),
++            }
++        }
++    }
++
++    /// The baseline marker: interior levels use the reversed-order
++    /// horizontal-line family, boundary-exact levels land on the row seam
++    /// as ▔, level 0 is ▁ on the axis, level 40 is ▔ at the graph top, and
++    /// inside the bar the line rides the graph color in its cell.
++    #[test]
++    fn baseline_line_lands_on_the_right_row_and_position() {
++        let style = coverage::Style { enabled: false };
++        // scale = 40 so a value IS its level; one sample in the last column
++        for (v, row, ch) in [
++            (0.0f32, 0usize, '▁'), // the axis itself
++            (2.0, 0, '🭻'),        // 2nd from bottom = BLOCK-7
++            (5.0, 0, '🭸'),        // middle = BLOCK-4
++            (7.0, 0, '🭶'),        // 7th from bottom = BLOCK-2
++            (8.0, 0, '▔'),        // seam between rows 0/1
++            (9.0, 1, '▁'),         // row 1, pos 1
++            (16.0, 1, '▔'),        // seam between rows 1/2
++            (40.0, 4, '▔'),        // the graph top
++        ] {
++            let rows = sparkline_graph(&[4.0], Some(&[v]), 40.0, &style);
++            let bottom_up: Vec<&String> = rows.iter().rev().collect();
++            let chars: Vec<char> = bottom_up[row].chars().collect();
++            assert_eq!(chars[SPARKLINE_LEN - 1], ch, "baseline level {v}");
++        }
++        // inside the bar the line rides the graph color: bar level 4 (▄
++        // on row 0) with baseline level 3 shows the line char in that cell
++        let rows = sparkline_graph(&[4.0], Some(&[3.0]), 40.0, &style);
++        let chars: Vec<char> = rows.last().unwrap().chars().collect();
++        assert_eq!(chars[SPARKLINE_LEN - 1], '🭺');
++    }
++
++    /// The baseline never covers the graph: mode table, coincidence (the
++    /// bar's top character wins but is drawn in the marker color), inside
++    /// the bar (the line carries the graph color as its cell background),
++    /// and above the graph (floats, the bar's tip untouched).
++    #[test]
++    fn baseline_marker_never_covers_the_graph() {
++        use MarkerMode::*;
++        assert!(matches!(marker_mode(4, 4), Coincides)); // bar's top character
++        assert!(matches!(marker_mode(3, 4), OnGraph)); // inside the bar
++        assert!(matches!(marker_mode(0, 4), OnGraph)); // zero baseline under a bar
++        assert!(matches!(marker_mode(5, 4), Float)); // above the graph
++        assert!(matches!(marker_mode(0, 0), Float)); // ▁ on the axis
++
++        let plain = coverage::Style { enabled: false };
++        // coincidence: the bar's top block is drawn — no line char
++        let rows = sparkline_graph(&[4.0], Some(&[4.0]), 40.0, &plain);
++        let chars: Vec<char> = rows.last().unwrap().chars().collect();
++        assert_eq!(chars[SPARKLINE_LEN - 1], '▄');
++
++        // ... and it is colored as the marker, flagging the coincidence
++        let lit = coverage::Style { enabled: true };
++        let rows = sparkline_graph(&[4.0], Some(&[4.0]), 40.0, &lit);
++        assert!(rows.last().unwrap().contains("\u{1b}[38;2;0;180;180m▄"));
++
++        // inside the bar: the line char carries the graph color as its
++        // cell background
++        let rows = sparkline_graph(&[8.0], Some(&[4.0]), 40.0, &lit);
++        assert!(rows
++            .last()
++            .unwrap()
++            .contains("\u{1b}[48;2;190;190;200m\u{1b}[38;2;0;180;180m🭹\u{1b}[0m"));
++
++        // above the graph: the line floats — no bg escape, and the bar's
++        // tip char below is untouched (positions checked with the plain
++        // style since escapes count as chars; escapes checked with color on)
++        let rows = sparkline_graph(&[4.0], Some(&[20.0]), 40.0, &plain);
++        let bottom: Vec<char> = rows.last().unwrap().chars().collect();
++        let r2: Vec<char> = rows[SPARKLINE_ROWS - 3].chars().collect();
++        assert_eq!(bottom[SPARKLINE_LEN - 1], '▄'); // bar tip intact
++        assert_eq!(r2[SPARKLINE_LEN - 1], '🭹'); // line at (2,4), floating
++        let rows = sparkline_graph(&[4.0], Some(&[20.0]), 40.0, &lit);
++        assert!(!rows[SPARKLINE_ROWS - 3].contains("48;2;190;190;200"));
++    }
++
++    /// H_LINE_FROM_BOTTOM's middle six are U+1FB7B..=U+1FB76 in DESCENDING
++    /// code-point order: the official names count from the TOP (BLOCK-k =
++    /// k-th eighth from the top — the family anchors at ▔ U+2594 for -1
++    /// and ▁ U+2581 for -8), the opposite of the bottom-up block family.
++    /// If someone "fixes" this to ascending order, every baseline marker
++    /// mirrors — this pins the chart-verified mapping.
++    #[test]
++    fn horizontal_line_family_is_top_down_numbered() {
++        assert_eq!(H_LINE_FROM_BOTTOM[1], '\u{2581}'); // ▁ lower one eighth
++        assert_eq!(H_LINE_FROM_BOTTOM[8], '\u{2594}'); // ▔ upper one eighth
++        for pos in 2..=7usize {
++            assert_eq!(H_LINE_FROM_BOTTOM[pos], char::from_u32(0x1FB7B - (pos as u32 - 2)).unwrap());
++        }
++    }
++
++    /// History semantics: only moving frames append (manual movement
++    /// counts), all four slots accumulate independently, `None` numbers
++    /// are skipped, the buffer caps at SPARKLINE_LEN keeping the newest,
++    /// a metric change clears everything, and candidate switches change
++    /// nothing.
++    #[test]
++    fn history_appends_only_on_motion_and_caps() {
++        let mut state = AnimState::new();
++        state.sync_history_metric();
++        let p0 = euclid::point2(0.0, 0.0);
++        state.record_history(p0, &[Some(1.0), Some(2.0), Some(3.0), Some(4.0)]);
++        // parked redraw at the same pos: nothing, even with new numbers
++        state.record_history(p0, &[Some(9.0); 4]);
++        assert_eq!(state.history[0], vec![1.0]);
++        assert_eq!(state.history[3], vec![4.0]);
++        // motion appends on all slots; None skipped (frame metric's first)
++        state.record_history(euclid::point2(0.25, 0.0), &[Some(5.0), None, Some(7.0), Some(8.0)]);
++        assert_eq!(state.history[0], vec![1.0, 5.0]);
++        assert_eq!(state.history[1], vec![2.0]);
++        assert_eq!(state.history[2], vec![3.0, 7.0]);
++        // cap: only the newest SPARKLINE_LEN values survive
++        for k in 0..(SPARKLINE_LEN + 6) {
++            state.record_history(
++                euclid::point2(k as f32 * 0.25, 0.5),
++                &[Some(k as f32), None, None, None],
++            );
++        }
++        assert_eq!(state.history[0].len(), SPARKLINE_LEN);
++        assert_eq!(state.history[0][0], 6.0);
++        assert_eq!(state.history[0][SPARKLINE_LEN - 1], (SPARKLINE_LEN + 5) as f32);
++        // metric change clears all four
++        state.metric = 3;
++        state.sync_history_metric();
++        assert!(state.history.iter().all(|h| h.is_empty()));
++        // candidate switch: purely a display change — history keeps
++        state.candidate = 2;
++        state.record_history(euclid::point2(9.0, 9.0), &[Some(1.0); 4]);
++        assert_eq!(state.history[0], vec![1.0]);
++        assert_eq!(state.history[3], vec![1.0]);
++    }
++
++    /// MetricReport's history scalar: center = |centroid − pos|, area =
++    /// |signed error|, every metric reports Some except frame before its
++    /// first prev (n/a), and frame with a prev is the true diff.
++    #[test]
++    fn metric_report_history_scalars() {
++        let style = coverage::Style::from_env();
++        let pos = euclid::point2(0.3, -0.7);
++        let (glyphs, center) = rendered_neighborhood(pos);
++        let frame = METRICS.len() - 1;
++        for metric in 0..METRICS.len() {
++            let r =
++                metric_report(rendered_neighborhood, &glyphs, center, pos, metric, None, &style);
++            if metric == frame {
++                assert_eq!(r.number, None);
++                assert_eq!(r.value, "n/a");
++            } else {
++                assert!(r.number.expect("history scalar") >= 0.0, "{metric} is a magnitude");
++            }
++            assert_eq!(r.pane.len(), coverage::BIG_TEXT_ROWS);
++        }
++        let owners = assign_colors(&glyphs);
++        let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++        // center: number is the Euclidean |centroid − pos|
++        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 0, None, &style);
++        let actual =
++            FillGrid::sample(origin, |wx, wy| actual_sample(&glyphs, &owners, center, wx, wy));
++        let c = fill_centroid(&actual).unwrap();
++        let d = (c.x - pos.x).hypot(c.y - pos.y);
++        assert!((r.number.unwrap() - d).abs() < 1e-5);
++        // area: number is |signed|
++        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 1, None, &style);
++        let class = ClassGrid::sample(origin, |wx, wy| {
++            ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
++        });
++        assert_eq!(r.number, Some(class.signed_area_error().abs()));
++        // frame with a previous render: the real diff
++        let (pg, pc) = rendered_neighborhood(euclid::point2(0.55, -0.7));
++        let r =
++            metric_report(rendered_neighborhood, &glyphs, center, pos, frame, Some((&pg, pc)), &style);
++        assert!(r.number.unwrap() > 0.0);
++    }
++}
+
+diff --git a/docs/checkpoints/floating-square-motion-smoothness-metric.md b/docs/checkpoints/floating-square-motion-smoothness-metric.md
+new file mode 100644
+--- a/docs/checkpoints/floating-square-motion-smoothness-metric.md
++++ b/docs/checkpoints/floating-square-motion-smoothness-metric.md
+@@ -0,0 +1,241 @@
++# Floating square debug tool — motion smoothness metric + per-method error-over-time sparkline
++
++**Status: COMPLETE — 2026-09-07.** Stage 1 (architecture + resolved
++decisions), Stage 2 (implementation), and two same-day follow-ups
++(five-row graph + in-use baseline overlay; marker priority rules) all
++landed — see the follow-up sections at the end.
++
++## User request
++
++1. Add a frame-to-frame xor measurement: `xor(render(t-1), render(t))`, as a
++   new selectable error metric in the existing error-measurement cycle.
++2. Add a section on the right of each rendering-method row that tracks the
++   currently-selected error over time, drawn with the 1/8th-increment
++   vertical blocks (`▁▂▃▄▅▆▇█`).
++
++## Plan
++
++### New metric: `frame` (index 6 in the `,`/`.` cycle)
++
++In `coverage.rs` (kept with the shared metrics machinery, `#[doc(hidden)]`):
++
++- `frame_diff_xor(prev, cur) -> f32` — fraction of samples over the current
++  frame's 3x3 window (same lattice and denominator `SX*SY` as
++  `coverage_error`) where the two rendered fills differ. Units: world square
++  units, directly comparable to the existing `xor` metric.
++- `frame_diff_pane(prev, cur, style) -> Vec<String>` — big-pixel pane lighting
++  every sample where the two renders differ (reuse `XOR_COLOR`, same 2x2 crop
++  as the other metric panes).
++
++Both take two `([[DoubleChar;3];3], WorldSquare)` pairs and use
++`actual_sample` (owners via `assign_colors`, computed internally), so
++"no previous frame" naturally renders as empty-everywhere. Interpretation:
++frame-diff measures rendered *change* per frame — it scales with motion
++speed, so it compares methods fairly only side by side under the same
++motion (the shared-y-axis use), not as an absolute smoothness score.
++
++In `floating_square_debug.rs`:
++
++- `METRICS` grows from 6 to 7 entries (append `"frame"`).
++- `AnimState.prev_renders: [Option<([[DoubleChar;3];3], WorldSquare)>; 4]`
++  (slot 0 = in-use, 1..=3 = candidates), updated at the end of each rendered
++  frame, for **all four slots** — moving or not — so the frame metric always
++  diffs against the immediately previous render. Never reset (candidate
++  switches don't touch it); `None` only before the first frame.
++- `frame` shows `n/a` only while `prev_renders[slot]` is `None` (process
++  start); a parked square shows the true diff (renders identical →
++  `0.000`) — honest, and needs no special casing.
++
++### History column (per method row)
++
++In `AnimState`:
++
++- `history: [Vec<f32>; 4]` (same slot indexing as `prev_renders`) +
++  `history_metric: usize` (which metric the buffers hold) +
++  `last_sample_pos: Option<WorldPoint>` (pos of the last appended frame).
++- Histories reset when the metric changes (`history_metric` mismatch).
++- All four histories are appended on every frame in which the square
++  actually moves — pos differs from `last_sample_pos` (manual mouse
++  drags/angle-drags and arrow nudges change pos, so they count; parked
++  redraws like metric or candidate switches append nothing). The frame
++  metric's very first sample has no prev → skipped.
++- Candidate switches reset **nothing**: all four slots keep accumulating,
++  `[`/`]` only changes which two are displayed, and the shared y-axis
++  stays stable across switches.
++- Consequence: the loop computes all four neighborhoods + MetricReports
++  per moving frame and discards the panes of the two non-displayed slots
++  (one code path; a debug tool at 30fps can afford the extra pane work).
++
++Rendering (as landed after the follow-ups — see below for the evolution):
++
++- `SPARKLINE_LEN: usize = 32` (tunable; matches the zoom/error column
++  width), `SPARKLINE_ROWS = 5` → 40 vertical levels against the scale.
++- `sparkline_graph(history, baseline, scale, style)` — bars per frame
++  (full rows `█`, top row a bottom-up 1/8th block), `·` zero-axis row,
++  spaces above, oldest left, right-aligned.
++- **Shared y-axis**: `scale` = max over all four method histories for the
++  selected metric (floor ~1e-6) — meaningful since all four slots stay
++  live, and it keeps the axis stable across candidate switches. All
++  history scalars are magnitudes (≥ 0; center/area by abs), so the level
++  mapping needs no sign handling. Scale printed in the legend.
++- `method_section` gains a 4th column (title + graph rows + scale
++  legend) passed to `boxed_row`; the candidate row's graph additionally
++  marks the in-use (baseline) error — see the follow-ups.
++
++### Refactor (single source of truth for metric computation)
++
++The metric computation currently lives inline in `method_section`'s
++`match metric` block. Extract:
++
++- `metric_report(nb, glyphs, center, pos, metric, prev, style) -> MetricReport`
++  where `MetricReport { pane: Vec<String>, value: String, number: Option<f32> }`.
++  `number` is the history scalar: `center` = |centroid − pos| (Euclidean;
++  `None` when the fill has no centroid), `area` = |signed error| (the pane
++  keeps the red/blue sign), the rest = the displayed value as-is; `frame`
++  = the diff, `None` only while `prev` is `None`.
++
++`method_section` uses it for the pane + value string; `render_animation_frame`
++uses it to get `number` for the history **before** building the rows (so the
++current frame is the newest graph column — no one-frame lag).
++
++`method_section` takes precomputed `(glyphs, center)`, the `MetricReport`,
++the method's `history` slice, the optional `baseline`, and the shared
++`scale`, instead of calling `nb(pos)` internally.
++
++### Terminal width
++
++Measured piped output: method rows were 98 visible columns before the
++graph (the "large" column is ~24 wide — the info/objective text lines,
++not the 18-wide grid), the common row 108. The 4th column (+32, +2 gap)
++brings method rows to ~132 — the new view width. This assumes a wide
++terminal; `SPARKLINE_LEN` can drop to 16–24 if that is a problem. Mouse
++mapping (`GRID_SCREEN_ORIGIN`) is untouched: the new column goes on the
++right, so column 0 doesn't move (its stale comment is a known leftover,
++separate fix if ever).
++
++## Resolved decisions
++
++1. Y-axis: shared auto-scale — max over all four slot histories, floor
++   ~1e-6; stable across candidate switches.
++2. `SPARKLINE_LEN = 32` (~1.05s of history at the 33ms frame clock).
++3. `center` history scalar: absolute distance |centroid − pos|.
++4. `area` history scalar: |signed error| (the pane keeps the sign).
++5. Append history only when the square actually moved (pos changed since
++   the last append); manual mouse movement counts.
++6. All four slots keep history across candidate switches; `[`/`]` only
++   switches the display.
++
++## Files to touch
++
++- `crates/terminal_rendering/src/coverage.rs` — `frame_diff_xor`,
++  `frame_diff_pane`, unit tests.
++- `crates/terminal_rendering/src/bin/floating_square_debug.rs` — `METRICS`,
++  `MetricReport`/`metric_report`, the history graph, `AnimState` fields,
++  `method_section`, `render_animation_frame`, event handlers, `usage()`,
++  and the `//!` module doc's animate-mode description.
++
++## Tests
++
++- `coverage.rs`: `frame_diff_xor` unit tests — identical renders → 0.0; a
++  small move → > 0 and monotone in displacement direction.
++- `coverage.rs` `pane_tests` convention: `frame_diff_pane` is
++  BIG_TEXT_ROWS x BIG_PX_W and lights exactly the differing samples of
++  the window crop (pane ≡ number).
++- Binary: graph level mapping, right-alignment/padding, baseline landing
++  positions, and marker priority rules.
++- Binary: history semantics — append only when pos changed; metric change
++  resets all four buffers; candidate switch preserves them (no re-scale).
++- Existing `charwise_rendering` + `floating_square_coherence` tests must stay
++  green (no change to game render paths).
++
++## Landing verification — 2026-09-07
++
++- `cargo test -p terminal_rendering`: 154 passed / 0 failed — lib 141
++  (was 139; +2 frame-diff pane tests), bin 4 (+3 history/sparkline/
++  metric-report tests), integration 9.
++- `cargo test --workspace`: 489 passed / 0 failed (game crate untouched;
++  no change to game render paths).
++- Piped `animate` frames: method rows are 132 visible columns exactly
++  (98 + 2 gap + 32 sparkline); the history grows one column per frame,
++  right-aligned, and the shared scale legend tracks the running max
++  (max=0.000 → 0.049 → 0.053 across six orbit frames). Frame-metric
++  semantics (n/a before the first prev, pane ≡ number over the window
++  crop, growth with displacement) are covered by unit tests.
++- Other modes (pos / families / sweep) smoke-tested — unchanged.
++- Surfaced along the way (pre-existing, NOT from this change): a fresh
++  full recompile emits a `private_bounds` warning for the private
++  `PixelStats` in `pub fn ClassGrid::full_pane`'s signature (coverage.rs),
++  which stale incremental-compilation warning caches had been hiding —
++  left for roadmap item 2's warning cleanup.
++
++## Follow-up: five-row graph + in-use baseline overlay — 2026-09-07
++
++User request: more vertical resolution for the history graph (5 text
++rows → 40 levels against the shared scale), and show where the in-use
++(baseline) method's errors sit by overlaying a 1/8-tall horizontal-line
++character positioned accordingly.
++
++Research (user-requested): the marker chars are U+1FB76..=U+1FB7B,
++HORIZONTAL ONE EIGHTH BLOCK-2..-7 (Unicode 13.0, Symbols for Legacy
++Computing — the same U+1FB00–1FBFF chart as the sextants/right-blocks
++the renderer already emits, so no new font requirement). The official
++suffix counts from the TOP (the family's -1/-8 ends are ▔ U+2594 /
++▁ U+2581), so in bottom-up order the six new chars appear in DESCENDING
++code-point order: 1→▁ 2→🭻 3→🭺 4→🭹 5→🭸 6→🭷 7→🭶 8→▔. Verified three
++ways: the official names list (user paste of all six lines), the chart's
++`→ 2594 ▔` cross-reference, and pixel measurement of the rendered block
++chart (calibrated by BLOCK SEXTANT-1 = top-left fill, matching the repo's
++own hextant bit model). Guard test pins the order.
++
++Landed: `SPARKLINE_ROWS = 5`, level = round(v/scale·40) clamped 0..=40;
++bars (█ rows + bottom-up eighth-block tops), '·' zero-axis row, spaces
++above; baseline overlay on the candidate row only (the in-use row IS
++the baseline), boundary-exact levels draw ▔ on the row seam, level 0 is
++▁ on the axis, level 40 is ▔ at the graph top; candidate legend names
++the marker (🭸=in-use). Column width unchanged (32) — method rows stay
++132 visible columns; the graph grows the column from 3 to 7 lines, still
++shorter than the zoom column. Applied with two corrections to the
++presented diff: the v=scale test assertion is unconditional '█' (level
++40 reaches the top row at exactly p=8), and the SPARKLINE_LEN doc now
++says "graph column" (a frame is a column, not a single block).
++
++Verification: bin tests 4 → 6 (level test replaced; baseline landing +
++family-order guard added); `cargo test -p terminal_rendering` 156 / 0
++(lib 141, bin 6, integration 9); workspace 491 / 0. Piped `animate 8`:
++width still 132; in-use row = bars only; candidate row = bars + 8
++baseline marks (family chars, cyan), floating above bars and on the
++axis; legends "0 ▁▂▃▄▅▆▇█ max=…" / "🭸=in-use ▁▂▃▄▅▆▇█ max=…".
++
++## Follow-up: marker priority rules — the baseline never covers the graph — 2026-09-07
++
++User feedback after eyeballing piped frames: the baseline marker replaced
++the bar char in its cell, so a line inside the bar CUT it (`████🭻██`
++read as a hole in the bar). New rules per column (line level L_l vs bar
++level L_b), via `MarkerMode` + `GRAPH_COLOR` (the bars' gray, also the
++OnGraph cell background):
++
++- inside the bar (L_l < L_b, including L_l = 0 under a bar): the line
++  char rides the graph color as its cell background — the bar continues
++  behind the marker, solid rows render seamlessly;
++- same character as the bar's top (L_l == L_b > 0): the graph wins — the
++  bar's top block is drawn, but in the marker (cyan) color, flagging the
++  coincidence instead of silently dropping the marker;
++- above the graph (L_l > L_b, or on the zero axis): floats on the default
++  background, as before.
++
++Known accepted costs (the literal reading of the rules): a line inside
++the bar's TOP row below its edge fills that cell with the graph color
++(the bar's partial edge within the row is subsumed); a line in the bar's
++top row above its edge replaces the bar's tip char (the bar reads as
++topping out at the row below).
++
++Verification: bin tests 6 → 7 (`baseline_marker_never_covers_the_graph`:
++mode table, coincidence coloring, ride-the-graph-color escape pattern,
++float-leaves-the-tip-intact). `cargo test -p terminal_rendering` 157 / 0;
++workspace 492 / 0. Piped `animate 10` mode distribution: 41 Coincides
++(cyan bar tops, ~4 per frame — frequent and visible), 4 Float, 10 axis
++markers, 0 OnGraph occurrences in this orbit/metric (that mode is pinned
++by the unit test's escape assertion); no cut cells. Two test-side slips
++during application, both mine: level 20 is position 4 (🭹, not 🭸), and
++char-position assertions must use the plain style since escape codes
++count as chars.
+

@@ -54,7 +54,11 @@
 //!                 actually moves — manual mouse movement counts; the
 //!                 candidate row also marks each frame's in-use error
 //!                 with a 1/8-tall horizontal-line character (the
-//!                 HORIZONTAL ONE EIGHTH BLOCK family). Then a common
+//!                 HORIZONTAL ONE EIGHTH BLOCK family), drawn so it never
+//!                 covers the graph: inside the bar it rides the graph
+//!                 color, on the bar's top character the graph wins drawn
+//!                 in the marker color (flagging the coincidence), and
+//!                 above the graph it floats. Then a common
 //!                 row with the ideal (true square) zoom, global state,
 //!                 and controls. Left click/drag sets the orbit's
 //!                 angular position (the angle from the top-row grid's
@@ -419,6 +423,10 @@ const SPARKLINE_ROWS: usize = 5;
 const H_LINE_FROM_BOTTOM: [char; 9] =
     [' ', '▁', '🭻', '🭺', '🭹', '🭸', '🭷', '🭶', '▔'];
 
+/// The bars' color — also the background the baseline marker rides when
+/// drawn inside a bar, so the bar continues behind the line.
+const GRAPH_COLOR: coverage::Rgb = coverage::Rgb(190, 190, 200);
+
 /// One error measurement's full report for one method: the colored pane,
 /// the value string printed under it, and the scalar the history buffers
 /// sample (`None` = no data this frame — not appended, shown as n/a).
@@ -559,17 +567,44 @@ fn line_pos(level: usize) -> (usize, usize) {
     }
 }
 
+/// How the baseline marker is rendered in a column, given the line's and
+/// the bar's levels: coinciding with the bar's top character means the
+/// graph wins but is drawn in the marker color (the top edge is the
+/// data — its shape survives, the color flags the coincidence); inside
+/// the bar the line rides the graph color (the line never cuts the
+/// bar); at/above the graph it floats on the default background.
+enum MarkerMode {
+    Coincides,
+    OnGraph,
+    Float,
+}
+
+fn marker_mode(line: usize, bar: usize) -> MarkerMode {
+    if line == bar && bar > 0 {
+        MarkerMode::Coincides
+    } else if bar > 0 && line < bar {
+        MarkerMode::OnGraph
+    } else {
+        MarkerMode::Float
+    }
+}
+
 /// One method's recent history of the selected error as a bar graph
 /// SPARKLINE_ROWS rows tall: `level = round(v / scale * 8*ROWS)` clamped,
 /// each row contributing 8 levels of resolution — full rows are '█', the
 /// bar's top row is the matching 1/8th block (fill from the bottom, so
 /// bars look solid). Oldest sample on the left, right-aligned; empty
 /// columns show '·' on the bottom row (the zero axis) and spaces above.
-/// `baseline` (the in-use method's history, on candidate rows) marks
-/// each frame's baseline level with a 1/8-tall horizontal-line char,
-/// replacing the bar char in its cell — a baseline inside the bar cuts
-/// it, above it the line floats. `scale` is shared across all method
-/// rows, so heights compare between methods.
+/// `baseline` (the in-use method's history, on candidate rows) marks each
+/// frame's baseline level with a 1/8-tall horizontal-line char, drawn so
+/// it never covers the graph (MarkerMode): inside the bar it rides the
+/// graph color as the cell background — the bar continues behind the
+/// line; on the same character as the bar's top the graph wins, drawn in
+/// the marker color to flag the coincidence; above the graph it floats on
+/// the default background (if it shares the bar's top row, it replaces
+/// the bar's tip char there — the bar reads as topping out at the row
+/// below). `scale` is shared across all method rows, so heights compare
+/// between methods.
 fn sparkline_graph(
     history: &[f32],
     baseline: Option<&[f32]>,
@@ -579,25 +614,50 @@ fn sparkline_graph(
     let levels = (8 * SPARKLINE_ROWS) as f32;
     let level_of = |v: f32| (v / scale * levels).round().clamp(0.0, levels) as usize;
     let dim = style.fg(coverage::DOT_COLOR);
-    let lit = style.fg(coverage::Rgb(190, 190, 200));
+    let lit = style.fg(GRAPH_COLOR);
     let base = style.fg(coverage::Rgb(0, 180, 180)); // the tool's reference-point cyan
     let pad = SPARKLINE_LEN.saturating_sub(history.len());
     let mut rows = vec![String::new(); SPARKLINE_ROWS];
     for r in (0..SPARKLINE_ROWS).rev() {
         for k in 0..SPARKLINE_LEN {
-            let (bar, line): (usize, Option<(usize, usize)>) = if k < pad {
+            let (bar, line_level): (usize, Option<usize>) = if k < pad {
                 (0, None)
             } else {
                 let i = k - pad;
-                let line = baseline
-                    .filter(|b| i < b.len())
-                    .map(|b| line_pos(level_of(b[i])));
-                (level_of(history[i]), line)
+                (
+                    level_of(history[i]),
+                    baseline.filter(|b| i < b.len()).map(|b| level_of(b[i])),
+                )
             };
             let p = bar as isize - 8 * r as isize;
-            if line.is_some_and(|(lr, _)| lr == r) {
-                rows[r].push_str(&base);
-                rows[r].push(H_LINE_FROM_BOTTOM[line.unwrap().1]);
+            // the baseline marker in this cell, if it lands here
+            let marker = line_level.map(|l| (marker_mode(l, bar), line_pos(l)));
+            if let Some((mode, (lr, pos))) = marker.filter(|&(_, (lr, _))| lr == r) {
+                match mode {
+                    // inside the bar: the line rides the graph color, so
+                    // the bar continues behind the marker
+                    MarkerMode::OnGraph => {
+                        rows[r].push_str(&style.bg(GRAPH_COLOR));
+                        rows[r].push_str(&base);
+                        rows[r].push(H_LINE_FROM_BOTTOM[pos]);
+                        rows[r].push_str(style.reset());
+                    }
+                    // on the bar's top character: the graph wins, drawn
+                    // in the marker color to flag the coincidence
+                    MarkerMode::Coincides => {
+                        rows[r].push_str(&base);
+                        rows[r].push(if p >= 8 {
+                            '█'
+                        } else {
+                            EIGHTH_BLOCKS_FROM_BOTTOM[p as usize]
+                        });
+                    }
+                    // above the graph (or on the zero axis): floats
+                    _ => {
+                        rows[r].push_str(&base);
+                        rows[r].push(H_LINE_FROM_BOTTOM[pos]);
+                    }
+                }
             } else if p >= 8 {
                 rows[r].push_str(&lit);
                 rows[r].push('█');
@@ -1888,7 +1948,7 @@ mod history_tests {
     /// The baseline marker: interior levels use the reversed-order
     /// horizontal-line family, boundary-exact levels land on the row seam
     /// as ▔, level 0 is ▁ on the axis, level 40 is ▔ at the graph top, and
-    /// the marker replaces the bar char in its cell.
+    /// inside the bar the line rides the graph color in its cell.
     #[test]
     fn baseline_line_lands_on_the_right_row_and_position() {
         let style = coverage::Style { enabled: false };
@@ -1908,11 +1968,55 @@ mod history_tests {
             let chars: Vec<char> = bottom_up[row].chars().collect();
             assert_eq!(chars[SPARKLINE_LEN - 1], ch, "baseline level {v}");
         }
-        // the line replaces the bar char it lands on: bar level 4 (▄ on
-        // row 0) overlaid by baseline level 3 shows the line char
+        // inside the bar the line rides the graph color: bar level 4 (▄
+        // on row 0) with baseline level 3 shows the line char in that cell
         let rows = sparkline_graph(&[4.0], Some(&[3.0]), 40.0, &style);
         let chars: Vec<char> = rows.last().unwrap().chars().collect();
         assert_eq!(chars[SPARKLINE_LEN - 1], '🭺');
+    }
+
+    /// The baseline never covers the graph: mode table, coincidence (the
+    /// bar's top character wins but is drawn in the marker color), inside
+    /// the bar (the line carries the graph color as its cell background),
+    /// and above the graph (floats, the bar's tip untouched).
+    #[test]
+    fn baseline_marker_never_covers_the_graph() {
+        use MarkerMode::*;
+        assert!(matches!(marker_mode(4, 4), Coincides)); // bar's top character
+        assert!(matches!(marker_mode(3, 4), OnGraph)); // inside the bar
+        assert!(matches!(marker_mode(0, 4), OnGraph)); // zero baseline under a bar
+        assert!(matches!(marker_mode(5, 4), Float)); // above the graph
+        assert!(matches!(marker_mode(0, 0), Float)); // ▁ on the axis
+
+        let plain = coverage::Style { enabled: false };
+        // coincidence: the bar's top block is drawn — no line char
+        let rows = sparkline_graph(&[4.0], Some(&[4.0]), 40.0, &plain);
+        let chars: Vec<char> = rows.last().unwrap().chars().collect();
+        assert_eq!(chars[SPARKLINE_LEN - 1], '▄');
+
+        // ... and it is colored as the marker, flagging the coincidence
+        let lit = coverage::Style { enabled: true };
+        let rows = sparkline_graph(&[4.0], Some(&[4.0]), 40.0, &lit);
+        assert!(rows.last().unwrap().contains("\u{1b}[38;2;0;180;180m▄"));
+
+        // inside the bar: the line char carries the graph color as its
+        // cell background
+        let rows = sparkline_graph(&[8.0], Some(&[4.0]), 40.0, &lit);
+        assert!(rows
+            .last()
+            .unwrap()
+            .contains("\u{1b}[48;2;190;190;200m\u{1b}[38;2;0;180;180m🭹\u{1b}[0m"));
+
+        // above the graph: the line floats — no bg escape, and the bar's
+        // tip char below is untouched (positions checked with the plain
+        // style since escapes count as chars; escapes checked with color on)
+        let rows = sparkline_graph(&[4.0], Some(&[20.0]), 40.0, &plain);
+        let bottom: Vec<char> = rows.last().unwrap().chars().collect();
+        let r2: Vec<char> = rows[SPARKLINE_ROWS - 3].chars().collect();
+        assert_eq!(bottom[SPARKLINE_LEN - 1], '▄'); // bar tip intact
+        assert_eq!(r2[SPARKLINE_LEN - 1], '🭹'); // line at (2,4), floating
+        let rows = sparkline_graph(&[4.0], Some(&[20.0]), 40.0, &lit);
+        assert!(!rows[SPARKLINE_ROWS - 3].contains("48;2;190;190;200"));
     }
 
     /// H_LINE_FROM_BOTTOM's middle six are U+1FB7B..=U+1FB76 in DESCENDING

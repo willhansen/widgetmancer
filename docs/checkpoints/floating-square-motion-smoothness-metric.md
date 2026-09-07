@@ -1,69 +1,9 @@
 # Floating square debug tool — motion smoothness metric + per-method error-over-time sparkline
 
 **Status: COMPLETE — 2026-09-07.** Stage 1 (architecture + resolved
-decisions) and Stage 2 (implementation) both landed, per plan above.
-
-## Verification (2026-09-07)
-
-- `cargo test -p terminal_rendering`: 154 passed / 0 failed — lib 141
-  (was 139; +2 frame-diff pane tests), bin 4 (+3 history/sparkline/
-  metric-report tests), integration 9.
-- `cargo test --workspace`: 489 passed / 0 failed (game crate untouched;
-  no change to game render paths).
-- Piped `animate` frames: method rows are 132 visible columns exactly
-  (98 + 2 gap + 32 sparkline); the sparkline grows one block per frame,
-  right-aligned (frame k shows k value chars), and the shared scale
-  legend tracks the running max (max=0.000 → 0.049 → 0.053 across six
-  orbit frames). Frame-metric semantics (n/a before the first prev,
-  pane ≡ number over the window crop, growth with displacement) are
-  covered by unit tests.
-- Other modes (pos / families / sweep) smoke-tested — unchanged.
-- Surfaced along the way (pre-existing, NOT from this change): a fresh
-  full recompile emits a `private_bounds` warning for the private
-  `PixelStats` in `pub fn ClassGrid::full_pane`'s signature (coverage.rs),
-  which stale incremental-compilation warning caches had been hiding —
-  left for roadmap item 2's warning cleanup.
-
-## Follow-up: five-row graph + in-use baseline overlay — 2026-09-07
-
-User request: more vertical resolution for the history graph (5 text
-rows → 40 levels against the shared scale), and show where the in-use
-(baseline) method's errors sit by overlaying a 1/8-tall horizontal-line
-character positioned accordingly.
-
-Research (user-requested): the marker chars are U+1FB76..=U+1FB7B,
-HORIZONTAL ONE EIGHTH BLOCK-2..-7 (Unicode 13.0, Symbols for Legacy
-Computing — the same U+1FB00–1FBFF chart as the sextants/right-blocks
-the renderer already emits, so no new font requirement). The official
-suffix counts from the TOP (the family's -1/-8 ends are ▔ U+2594 /
-▁ U+2581), so in bottom-up order the six new chars appear in DESCENDING
-code-point order: 1→▁ 2→🭻 3→🭺 4→🭹 5→🭸 6→🭷 7→🭶 8→▔. Verified three
-ways: the official names list (user paste of all six lines), the chart's
-`→ 2594 ▔` cross-reference, and pixel measurement of the rendered block
-chart (calibrated by BLOCK SEXTANT-1 = top-left fill, matching the repo's
-own hextant bit model). Guard test pins the order.
-
-Landed: `SPARKLINE_ROWS = 5`, level = round(v/scale·40) clamped 0..=40;
-bars (█ rows + bottom-up eighth-block tops), '·' zero-axis row, spaces
-above; baseline overlay on the candidate row only (the in-use row IS
-the baseline), the line char replaces the bar char in its cell,
-boundary-exact levels draw ▔ on the row seam, level 0 is ▁ on the axis,
-level 40 is ▔ at the graph top; candidate legend names the marker
-(🭸=in-use). Column width unchanged (32) — method rows stay 132 visible
-columns; the graph grows the sparkline column from 3 to 7 lines, still
-shorter than the zoom column. Applied with two corrections to the
-presented diff: the v=scale test assertion is unconditional '█' (level
-40 reaches the top row at exactly p=8), and the SPARKLINE_LEN doc now
-says "graph column" (a frame is a column, not a single block).
-
-Verification: bin tests 4 → 6 (level test replaced; baseline landing +
-family-order guard added); `cargo test -p terminal_rendering` 156 / 0
-(lib 141, bin 6, integration 9); workspace 491 / 0. Piped `animate 8`:
-width still 132; in-use row = bars only (0 overlay chars, 0 cyan codes);
-candidate row = bars + 8 baseline marks (family chars, cyan),
-observed cutting through bars (████🭻██), floating above them (🭷 ▔ 🭷
-on the top row), and on the axis (▁); legends "0 ▁▂▃▄▅▆▇█ max=…" /
-"🭸=in-use ▁▂▃▄▅▆▇█ max=…" as designed.
+decisions), Stage 2 (implementation), and two same-day follow-ups
+(five-row graph + in-use baseline overlay; marker priority rules) all
+landed — see the follow-up sections at the end.
 
 ## User request
 
@@ -106,7 +46,7 @@ In `floating_square_debug.rs`:
   start); a parked square shows the true diff (renders identical →
   `0.000`) — honest, and needs no special casing.
 
-### Sparkline column (per method row)
+### History column (per method row)
 
 In `AnimState`:
 
@@ -126,22 +66,21 @@ In `AnimState`:
   per moving frame and discards the panes of the two non-displayed slots
   (one code path; a debug tool at 30fps can afford the extra pane work).
 
-Rendering:
+Rendering (as landed after the follow-ups — see below for the evolution):
 
-- New const `SPARKLINE_LEN: usize = 32` (tunable; matches the existing
-  zoom/error column width).
-- `sparkline_column(history, scale, style)` maps each value to
-  `level = round(value / scale * 8)` clamped to 0..8: `·` for 0,
-  `EIGHTH_BLOCKS_FROM_BOTTOM[level]` for 1..8. Oldest on the left,
-  right-aligned, padded with `·` until the buffer fills.
+- `SPARKLINE_LEN: usize = 32` (tunable; matches the zoom/error column
+  width), `SPARKLINE_ROWS = 5` → 40 vertical levels against the scale.
+- `sparkline_graph(history, baseline, scale, style)` — bars per frame
+  (full rows `█`, top row a bottom-up 1/8th block), `·` zero-axis row,
+  spaces above, oldest left, right-aligned.
 - **Shared y-axis**: `scale` = max over all four method histories for the
-  selected metric (floor ~1e-6) — meaningful now that all four slots stay
+  selected metric (floor ~1e-6) — meaningful since all four slots stay
   live, and it keeps the axis stable across candidate switches. All
-  history scalars are magnitudes (≥ 0; center/area by abs above), so
-  `level = round(value / scale * 8)` needs no sign handling. Scale printed
-  as a legend (`0 ▁▂▃▄▅▆▇█ max=…`).
-- `method_section` gains a 4th column (title + sparkline + scale legend)
-  passed to `boxed_row`.
+  history scalars are magnitudes (≥ 0; center/area by abs), so the level
+  mapping needs no sign handling. Scale printed in the legend.
+- `method_section` gains a 4th column (title + graph rows + scale
+  legend) passed to `boxed_row`; the candidate row's graph additionally
+  marks the in-use (baseline) error — see the follow-ups.
 
 ### Refactor (single source of truth for metric computation)
 
@@ -157,22 +96,22 @@ The metric computation currently lives inline in `method_section`'s
 
 `method_section` uses it for the pane + value string; `render_animation_frame`
 uses it to get `number` for the history **before** building the rows (so the
-current frame is the newest sparkline slot — no one-frame lag).
+current frame is the newest graph column — no one-frame lag).
 
-`method_section` will take precomputed `(glyphs, center)`, the `MetricReport`,
-the method's `history` slice, and the shared `scale`, instead of calling
-`nb(pos)` internally.
+`method_section` takes precomputed `(glyphs, center)`, the `MetricReport`,
+the method's `history` slice, the optional `baseline`, and the shared
+`scale`, instead of calling `nb(pos)` internally.
 
 ### Terminal width
 
-Measured piped output: method rows are 98 visible columns today (the
-"large" column is ~24 wide — the info/objective text lines, not the
-18-wide grid), the common row 108. The 4th column (+32, +2 gap) brings
-method rows to ~132 — the new view width. This assumes a wide terminal;
-`SPARKLINE_LEN` can drop to 16–24 if that is a problem. Mouse mapping
-(`GRID_SCREEN_ORIGIN`) is untouched: the new column goes on the right, so
-column 0 doesn't move (its stale comment is a known leftover, separate
-fix if ever).
+Measured piped output: method rows were 98 visible columns before the
+graph (the "large" column is ~24 wide — the info/objective text lines,
+not the 18-wide grid), the common row 108. The 4th column (+32, +2 gap)
+brings method rows to ~132 — the new view width. This assumes a wide
+terminal; `SPARKLINE_LEN` can drop to 16–24 if that is a problem. Mouse
+mapping (`GRID_SCREEN_ORIGIN`) is untouched: the new column goes on the
+right, so column 0 doesn't move (its stale comment is a known leftover,
+separate fix if ever).
 
 ## Resolved decisions
 
@@ -191,7 +130,7 @@ fix if ever).
 - `crates/terminal_rendering/src/coverage.rs` — `frame_diff_xor`,
   `frame_diff_pane`, unit tests.
 - `crates/terminal_rendering/src/bin/floating_square_debug.rs` — `METRICS`,
-  `MetricReport`/`metric_report`, `sparkline_column`, `AnimState` fields,
+  `MetricReport`/`metric_report`, the history graph, `AnimState` fields,
   `method_section`, `render_animation_frame`, event handlers, `usage()`,
   and the `//!` module doc's animate-mode description.
 
@@ -202,17 +141,101 @@ fix if ever).
 - `coverage.rs` `pane_tests` convention: `frame_diff_pane` is
   BIG_TEXT_ROWS x BIG_PX_W and lights exactly the differing samples of
   the window crop (pane ≡ number).
-- Binary: level→char mapping (0 → `·`, 8 → `█`) and right-alignment/padding
-  behavior.
+- Binary: graph level mapping, right-alignment/padding, baseline landing
+  positions, and marker priority rules.
 - Binary: history semantics — append only when pos changed; metric change
   resets all four buffers; candidate switch preserves them (no re-scale).
 - Existing `charwise_rendering` + `floating_square_coherence` tests must stay
   green (no change to game render paths).
 
-## Verification
+## Landing verification — 2026-09-07
 
-- `cargo test -p terminal_rendering` (unit + integration).
-- Piped animate frames eyeballed: frame-diff pane lights changed samples
-  only; sparkline grows rightward, resets on metric change only, stays
-  put (and unscaled) across candidate switches, and in-use vs candidate
-  share one y-axis.
+- `cargo test -p terminal_rendering`: 154 passed / 0 failed — lib 141
+  (was 139; +2 frame-diff pane tests), bin 4 (+3 history/sparkline/
+  metric-report tests), integration 9.
+- `cargo test --workspace`: 489 passed / 0 failed (game crate untouched;
+  no change to game render paths).
+- Piped `animate` frames: method rows are 132 visible columns exactly
+  (98 + 2 gap + 32 sparkline); the history grows one column per frame,
+  right-aligned, and the shared scale legend tracks the running max
+  (max=0.000 → 0.049 → 0.053 across six orbit frames). Frame-metric
+  semantics (n/a before the first prev, pane ≡ number over the window
+  crop, growth with displacement) are covered by unit tests.
+- Other modes (pos / families / sweep) smoke-tested — unchanged.
+- Surfaced along the way (pre-existing, NOT from this change): a fresh
+  full recompile emits a `private_bounds` warning for the private
+  `PixelStats` in `pub fn ClassGrid::full_pane`'s signature (coverage.rs),
+  which stale incremental-compilation warning caches had been hiding —
+  left for roadmap item 2's warning cleanup.
+
+## Follow-up: five-row graph + in-use baseline overlay — 2026-09-07
+
+User request: more vertical resolution for the history graph (5 text
+rows → 40 levels against the shared scale), and show where the in-use
+(baseline) method's errors sit by overlaying a 1/8-tall horizontal-line
+character positioned accordingly.
+
+Research (user-requested): the marker chars are U+1FB76..=U+1FB7B,
+HORIZONTAL ONE EIGHTH BLOCK-2..-7 (Unicode 13.0, Symbols for Legacy
+Computing — the same U+1FB00–1FBFF chart as the sextants/right-blocks
+the renderer already emits, so no new font requirement). The official
+suffix counts from the TOP (the family's -1/-8 ends are ▔ U+2594 /
+▁ U+2581), so in bottom-up order the six new chars appear in DESCENDING
+code-point order: 1→▁ 2→🭻 3→🭺 4→🭹 5→🭸 6→🭷 7→🭶 8→▔. Verified three
+ways: the official names list (user paste of all six lines), the chart's
+`→ 2594 ▔` cross-reference, and pixel measurement of the rendered block
+chart (calibrated by BLOCK SEXTANT-1 = top-left fill, matching the repo's
+own hextant bit model). Guard test pins the order.
+
+Landed: `SPARKLINE_ROWS = 5`, level = round(v/scale·40) clamped 0..=40;
+bars (█ rows + bottom-up eighth-block tops), '·' zero-axis row, spaces
+above; baseline overlay on the candidate row only (the in-use row IS
+the baseline), boundary-exact levels draw ▔ on the row seam, level 0 is
+▁ on the axis, level 40 is ▔ at the graph top; candidate legend names
+the marker (🭸=in-use). Column width unchanged (32) — method rows stay
+132 visible columns; the graph grows the column from 3 to 7 lines, still
+shorter than the zoom column. Applied with two corrections to the
+presented diff: the v=scale test assertion is unconditional '█' (level
+40 reaches the top row at exactly p=8), and the SPARKLINE_LEN doc now
+says "graph column" (a frame is a column, not a single block).
+
+Verification: bin tests 4 → 6 (level test replaced; baseline landing +
+family-order guard added); `cargo test -p terminal_rendering` 156 / 0
+(lib 141, bin 6, integration 9); workspace 491 / 0. Piped `animate 8`:
+width still 132; in-use row = bars only; candidate row = bars + 8
+baseline marks (family chars, cyan), floating above bars and on the
+axis; legends "0 ▁▂▃▄▅▆▇█ max=…" / "🭸=in-use ▁▂▃▄▅▆▇█ max=…".
+
+## Follow-up: marker priority rules — the baseline never covers the graph — 2026-09-07
+
+User feedback after eyeballing piped frames: the baseline marker replaced
+the bar char in its cell, so a line inside the bar CUT it (`████🭻██`
+read as a hole in the bar). New rules per column (line level L_l vs bar
+level L_b), via `MarkerMode` + `GRAPH_COLOR` (the bars' gray, also the
+OnGraph cell background):
+
+- inside the bar (L_l < L_b, including L_l = 0 under a bar): the line
+  char rides the graph color as its cell background — the bar continues
+  behind the marker, solid rows render seamlessly;
+- same character as the bar's top (L_l == L_b > 0): the graph wins — the
+  bar's top block is drawn, but in the marker (cyan) color, flagging the
+  coincidence instead of silently dropping the marker;
+- above the graph (L_l > L_b, or on the zero axis): floats on the default
+  background, as before.
+
+Known accepted costs (the literal reading of the rules): a line inside
+the bar's TOP row below its edge fills that cell with the graph color
+(the bar's partial edge within the row is subsumed); a line in the bar's
+top row above its edge replaces the bar's tip char (the bar reads as
+topping out at the row below).
+
+Verification: bin tests 6 → 7 (`baseline_marker_never_covers_the_graph`:
+mode table, coincidence coloring, ride-the-graph-color escape pattern,
+float-leaves-the-tip-intact). `cargo test -p terminal_rendering` 157 / 0;
+workspace 492 / 0. Piped `animate 10` mode distribution: 41 Coincides
+(cyan bar tops, ~4 per frame — frequent and visible), 4 Float, 10 axis
+markers, 0 OnGraph occurrences in this orbit/metric (that mode is pinned
+by the unit test's escape assertion); no cut cells. Two test-side slips
+during application, both mine: level 20 is position 4 (🭹, not 🭸), and
+char-position assertions must use the plain style since escape codes
+count as chars.
