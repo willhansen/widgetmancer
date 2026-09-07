@@ -696,6 +696,40 @@ pub fn jaggedness(actual: &FillGrid) -> f32 {
     steps
 }
 
+/// Frame-to-frame rendered change: the fraction of the current frame's 3x3
+/// sample lattice where the two rendered fills differ — same lattice and
+/// `SX*SY` denominator as `coverage_error`, so the value is directly
+/// comparable to the ideal-square `xor`. Measures rendered *change* per
+/// frame (it scales with motion speed): for comparing methods under the
+/// same motion, not an absolute smoothness score. A missing prev frame
+/// measures 0.0 — callers display n/a instead.
+#[doc(hidden)]
+pub fn frame_diff_xor(
+    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
+    cur: (&[[DoubleChar; 3]; 3], WorldSquare),
+) -> f32 {
+    let Some((pgrid, pcenter)) = prev else {
+        return 0.0;
+    };
+    let (cgrid, ccenter) = cur;
+    let powners = assign_colors(pgrid);
+    let cowners = assign_colors(cgrid);
+    let origin: WorldPoint = euclid::point2(ccenter.x as f32 - 1.5, ccenter.y as f32 - 1.5);
+    let mut diffs = 0usize;
+    for j in 0..NX {
+        for i in 0..NY {
+            let wx = origin.x + (j as f32 + 0.5) / SX as f32;
+            let wy = origin.y + (i as f32 + 0.5) / SY as f32;
+            if actual_sample(pgrid, &powners, pcenter, wx, wy).0
+                != actual_sample(cgrid, &cowners, ccenter, wx, wy).0
+            {
+                diffs += 1;
+            }
+        }
+    }
+    diffs as f32 / (SX * SY) as f32
+}
+
 /// Assign each non-space half-cell glyph a PALETTE index, scanning
 /// top-to-bottom, left-to-right so colors are stable within one report.
 /// Indexed [dx+1][dy+1][half].
@@ -1286,6 +1320,40 @@ impl ClassGrid {
     }
 }
 
+/// Frame-diff pane: lights every big pixel where the two renders' fills
+/// differ (XOR_COLOR, same 2x2 window crop as the other metric panes, one
+/// big pixel per lattice sample). A missing prev frame renders empty —
+/// no previous render, nothing to compare.
+#[doc(hidden)]
+pub fn frame_diff_pane(
+    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
+    cur: (&[[DoubleChar; 3]; 3], WorldSquare),
+    style: &Style,
+) -> Vec<String> {
+    let (cgrid, ccenter) = cur;
+    let Some((pgrid, pcenter)) = prev else {
+        return big_pane_from_colors(style, &vec![vec![None; BIG_PX_W]; BIG_PX_H]);
+    };
+    let powners = assign_colors(pgrid);
+    let cowners = assign_colors(cgrid);
+    // same window geometry as big_pixel_pane: center square ± 1 world,
+    // big-pixel centers at half-sample offsets
+    let (ox, oy) = (ccenter.x as f32 - 1.0, ccenter.y as f32 - 1.0);
+    let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
+    for py in 0..BIG_PX_H {
+        for px in 0..BIG_PX_W {
+            let wx = ox + (px as f32 + 0.5) / SX as f32;
+            let wy = oy + 2.0 - (py as f32 + 0.5) / SY as f32;
+            if actual_sample(pgrid, &powners, pcenter, wx, wy).0
+                != actual_sample(cgrid, &cowners, ccenter, wx, wy).0
+            {
+                colors[py][px] = Some(XOR_COLOR);
+            }
+        }
+    }
+    big_pane_from_colors(style, &colors)
+}
+
 /// The filled region of a glyph as axis-aligned rectangles in cell
 /// coordinates (fx across the half-cell, fy up the row) — the exact
 /// geometry `glyph_filled` point-samples; kept in sync with it by
@@ -1835,6 +1903,7 @@ mod pane_tests {
                 class.mismatch_pane(&style),
                 ClassGrid::jaggedness_pane(&actual, &style),
                 ClassGrid::displacement_pane(&class, &class, &style),
+                frame_diff_pane(Some((&grid, center)), (&grid, center), &style),
             ];
             for pane in &panes {
                 assert_eq!(pane.len(), BIG_TEXT_ROWS, "row count at {pos:?}");
@@ -1871,6 +1940,62 @@ mod pane_tests {
                     "mismatch pane at ({xi}, {yi})/16"
                 );
             }
+        }
+    }
+
+    /// Identical consecutive renders measure zero frame diff and light
+    /// nothing; a missing previous frame is no data (0.0, empty pane —
+    /// the tool displays n/a).
+    #[test]
+    fn test_frame_diff_identical_renders_measure_zero() {
+        let style = Style { enabled: false };
+        let pos = euclid::point2(0.3, -0.7);
+        let (grid, center) = rendered_neighborhood(pos);
+        let cur = (&grid, center);
+        assert_eq!(frame_diff_xor(Some(cur), cur), 0.0);
+        assert_eq!(frame_diff_xor(None, cur), 0.0);
+        for pane in [frame_diff_pane(Some(cur), cur, &style), frame_diff_pane(None, cur, &style)] {
+            assert_eq!(lit_pixels(&pane), 0);
+        }
+    }
+
+    /// A displaced frame lights exactly the differing samples of the 2x2
+    /// window crop (pane ≡ number on the shared grid), the number covers at
+    /// least the crop, and change grows with displacement.
+    #[test]
+    fn test_frame_diff_pane_lights_exactly_the_changed_samples() {
+        let style = Style { enabled: false };
+        let (pgrid, pcenter) = rendered_neighborhood(euclid::point2(0.3, -0.7));
+        let powners = assign_colors(&pgrid);
+        for (near, far) in [
+            (euclid::point2(0.55, -0.7), euclid::point2(1.3, -0.7)),
+            (euclid::point2(0.3, -0.15), euclid::point2(0.3, 0.4)),
+        ] {
+            let (cgrid, ccenter) = rendered_neighborhood(near);
+            let cowners = assign_colors(&cgrid);
+            // window crop geometry per big_pixel_pane, on the current
+            // frame's center
+            let (bx, by) = (ccenter.x as f32 - 1.0, ccenter.y as f32 - 1.0);
+            let expected: usize = (0..BIG_PX_H)
+                .flat_map(|py| (0..BIG_PX_W).map(move |px| (px, py)))
+                .map(|(px, py)| {
+                    let wx = bx + (px as f32 + 0.5) / SX as f32;
+                    let wy = by + 2.0 - (py as f32 + 0.5) / SY as f32;
+                    actual_sample(&pgrid, &powners, pcenter, wx, wy).0
+                        != actual_sample(&cgrid, &cowners, ccenter, wx, wy).0
+                })
+                .filter(|d| *d)
+                .count();
+            let pane = frame_diff_pane(Some((&pgrid, pcenter)), (&cgrid, ccenter), &style);
+            assert_eq!(lit_pixels(&pane), expected, "frame-diff pane at {near:?}");
+            let err = frame_diff_xor(Some((&pgrid, pcenter)), (&cgrid, ccenter));
+            assert!(err > 0.0, "a real move must change the render");
+            assert!(err * (SX * SY) as f32 >= expected as f32);
+            let (fgrid, fcenter) = rendered_neighborhood(far);
+            assert!(
+                frame_diff_xor(Some((&pgrid, pcenter)), (&fgrid, fcenter)) > err,
+                "frame diff must grow with displacement"
+            );
         }
     }
 }

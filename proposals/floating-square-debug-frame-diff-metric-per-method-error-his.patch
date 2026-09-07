@@ -1,0 +1,4124 @@
+From: pi-agent <noreply@sandbox>
+Date: Mon, 07 Sep 2026 05:36:02 GMT
+Subject: [PATCH] Floating square debug: frame-diff metric + per-method error-history sparkline
+
+Implements the approved Stage-2 plan from
+docs/checkpoints/floating-square-motion-smoothness-metric.md (Stage 1
+architecture + the user's four resolved decisions: center metric
+scalarizes as |centroid − pos|, area as |signed error|, history
+samples only when the square actually moved — manual mouse movement
+counts — and all four method slots keep history across candidate
+switches so the display just switches).
+
+- coverage.rs: `frame_diff_xor` / `frame_diff_pane` (`#[doc(hidden)]`
+  debug surface) — rendered change per frame on the same lattice and
+  SX*SY denominator as `coverage_error`, so the value is directly
+  comparable to the ideal-square xor; the pane lights differing
+  samples over the same 2x2 window crop as the other metric panes.
+  Two pane_tests added (identical → 0/empty; pane ≡ number over the
+  crop; change grows with displacement), plus the grid-size guard.
+- floating_square_debug.rs: METRICS 6 → 7 (+ `frame`). The metric
+  computation moved out of method_section's inline match into
+  `metric_report` (single source of truth) returning pane + value +
+  the history scalar; render_animation_frame now computes all four
+  method slots every frame (displayed rows reuse pane/value, all four
+  numbers feed the sparklines), so a candidate switch only changes
+  which slots are displayed and the shared y-axis (max over all live
+  slots, floor 1e-6) stays stable across switches. `record_history`
+  appends only when pos changed since the last sample (parked redraws
+  and metric/candidate switches append nothing); prev_renders updates
+  on every rendered frame so frame-diff always compares against the
+  immediately previous render (n/a only before the first frame).
+  New 4th method-row column: SPARKLINE_LEN=32 blocks (▁▂▃▄▅▆▇█,
+  EIGHTH_BLOCKS_FROM_BOTTOM) right-aligned with a scale legend.
+  Three bin tests: sparkline level mapping/alignment, history
+  semantics (motion-only appends, caps, metric-change resets,
+  candidate-switch preserves), and metric_report scalars.
+
+Verification: terminal_rendering 154 passed / 0 failed (lib 141, bin
+4, integration 9); workspace 489 / 0. Method rows measure 132 visible
+columns; piped frames show the sparkline growing one block per frame
+with the shared max tracking. A fresh recompile also surfaced a
+pre-existing private_bounds warning (private PixelStats in
+ClassGrid::full_pane's signature) that stale incremental caches hid —
+pre-dates this change, left for roadmap item 2.
+---
+ crates/terminal_rendering/src/coverage.rs | 2001 ++++++++++++++++++++++++++++++++++++++++
+ crates/terminal_rendering/src/bin/floating_square_debug.rs | 1878 ++++++++++++++++++++++++++++++++++++++++
+ docs/checkpoints/floating-square-motion-smoothness-metric.md | 177 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 4056 insertions(+)
+
+diff --git a/crates/terminal_rendering/src/coverage.rs b/crates/terminal_rendering/src/coverage.rs
+new file mode 100644
+--- a/crates/terminal_rendering/src/coverage.rs
++++ b/crates/terminal_rendering/src/coverage.rs
+@@ -0,0 +1,2001 @@
++//! Sampled-coverage oracle for the floating square renderer, shared by
++//! tests/floating_square_coherence.rs (which asserts edge coherence with it)
++//! and the floating_square_debug tool (which displays it). Keeping one
++//! oracle means the debug tool can never drift from what the test asserts.
++//!
++//! Not game-facing API.
++
++use std::sync::OnceLock;
++
++use euclid::vec2;
++use ordered_float::OrderedFloat;
++
++use crate::glyph_constants::*;
++use crate::hextant_blocks::{
++    hextant_array_to_char, hextant_character_to_binary, FIRST_HEXTANT, LAST_HEXTANT,
++};
++use crate::{
++    characters_for_full_square_with_2d_offset, characters_for_full_square_with_2d_offset_forced,
++    DoubleChar,
++};
++use utility::coordinate_frame_conversions::{
++    world_point_to_world_square, WorldMove, WorldPoint, WorldSquare,
++};
++
++// Samples per world unit. X needs 8 per half-cell for eighth blocks; Y must
++// divide both eighths and thirds (hextants), hence 24.
++pub const SX: usize = 16;
++pub const SY: usize = 24;
++// Render window: the 3x3 world squares around the rounded center, which is
++// the full set `OffsetSquareDrawable::drawables_for_floating_square_at_point`
++// can emit into.
++pub const NX: usize = 3 * SX;
++pub const NY: usize = 3 * SY;
++
++// Display geometry of the zoomed views: 2x3 samples per pixel, 2 pixels
++// per text row.
++pub const PX_W: usize = NX / 2; // 24 pixels wide (4 per half-cell)
++pub const PX_H: usize = NY / 3; // 24 pixels tall (8 per world square)
++pub const TEXT_ROWS: usize = PX_H / 2; // 12 content rows
++pub const BITMAP_W: usize = PX_W;
++
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct Rgb(pub u8, pub u8, pub u8);
++
++/// One color per half-cell glyph of the square (max 4 columns x 2 rows).
++pub const PALETTE: [Rgb; 8] = [
++    Rgb(255, 100, 100),
++    Rgb(255, 180, 60),
++    Rgb(230, 230, 80),
++    Rgb(100, 220, 100),
++    Rgb(80, 210, 210),
++    Rgb(120, 150, 255),
++    Rgb(220, 120, 255),
++    Rgb(255, 130, 180),
++];
++pub const IDEAL_COLOR: Rgb = Rgb(170, 170, 180);
++// background checkerboard marking the character cells (one glyph per cell)
++pub const CELL_DARK: Rgb = Rgb(26, 26, 34);
++pub const CELL_LIGHT: Rgb = Rgb(42, 42, 54);
++pub const DOT_COLOR: Rgb = Rgb(70, 70, 80);
++
++/// Checkerboard shade for a character cell, by half-cell column / cell row.
++pub fn cell_bg(half_cell_col: usize, cell_row: usize) -> Rgb {
++    if (half_cell_col + cell_row) % 2 == 0 {
++        CELL_LIGHT
++    } else {
++        CELL_DARK
++    }
++}
++
++pub struct Style {
++    pub enabled: bool,
++}
++
++impl Style {
++    pub fn from_env() -> Self {
++        let disabled = std::env::var_os("NO_COLOR").is_some()
++            || std::env::var_os("CLICOLOR").is_some_and(|v| v == "0")
++            || std::env::var_os("TERM").is_some_and(|v| v == "dumb");
++        Style {
++            enabled: !disabled,
++        }
++    }
++    pub fn fg(&self, Rgb(r, g, b): Rgb) -> String {
++        if self.enabled {
++            format!("\x1b[38;2;{r};{g};{b}m")
++        } else {
++            String::new()
++        }
++    }
++    pub fn bg(&self, Rgb(r, g, b): Rgb) -> String {
++        if self.enabled {
++            format!("\x1b[48;2;{r};{g};{b}m")
++        } else {
++            String::new()
++        }
++    }
++    pub fn reset(&self) -> &'static str {
++        if self.enabled {
++            "\x1b[0m"
++        } else {
++            ""
++        }
++    }
++}
++
++/// Exact coverage model for every glyph the renderer can emit.
++/// `fx`, `fy` are in [0, 1) within the character cell; `fy` is measured
++/// from the bottom (world +y is up).
++pub fn glyph_filled(c: char, fx: f32, fy: f32) -> bool {
++    if c == SPACE {
++        return false;
++    }
++    if c == FULL_BLOCK {
++        return true;
++    }
++    // eighth blocks, all four orientations (partials only; the arrays also
++    // contain SPACE at 0 and FULL_BLOCK at 8, handled above)
++    for k in 1..8usize {
++        let k = k as f32;
++        if c == EIGHTH_BLOCKS_FROM_LEFT[k as usize] {
++            return fx * 8.0 < k;
++        }
++        if c == EIGHTH_BLOCKS_FROM_RIGHT[k as usize] {
++            return (1.0 - fx) * 8.0 < k;
++        }
++        if c == EIGHTH_BLOCKS_FROM_BOTTOM[k as usize] {
++            return fy * 8.0 < k;
++        }
++        if c == EIGHTH_BLOCKS_FROM_TOP[k as usize] {
++            return (1.0 - fy) * 8.0 < k;
++        }
++    }
++    match c {
++        UPPER_ONE_THIRD_BLOCK => return fy > 2.0 / 3.0,
++        UPPER_TWO_THIRD_BLOCK => return fy > 1.0 / 3.0,
++        LOWER_ONE_THIRD_BLOCK => return fy < 1.0 / 3.0,
++        LOWER_TWO_THIRD_BLOCK => return fy < 2.0 / 3.0,
++        // quadrant blocks and half blocks
++        '▖' => return fx < 0.5 && fy < 0.5,
++        '▗' => return fx >= 0.5 && fy < 0.5,
++        '▘' => return fx < 0.5 && fy >= 0.5,
++        '▝' => return fx >= 0.5 && fy >= 0.5,
++        '▌' => return fx < 0.5,
++        '▐' => return fx >= 0.5,
++        '▄' => return fy < 0.5,
++        '▀' => return fy >= 0.5,
++        _ => {}
++    }
++    if (FIRST_HEXTANT..=LAST_HEXTANT).contains(&c) {
++        // sextant bits: bit = row * 2 + col, row 0 = top, col 0 = left
++        let bits = hextant_character_to_binary(c);
++        let col = if fx < 0.5 { 0 } else { 1 };
++        let row = if fy >= 2.0 / 3.0 {
++            0
++        } else if fy >= 1.0 / 3.0 {
++            1
++        } else {
++            2
++        };
++        return bits & (1 << (row * 2 + col)) != 0;
++    }
++    panic!("no coverage model for glyph {c:?} (U+{:04X})", c as u32);
++}
++
++/// Mirror of `OffsetSquareDrawable::drawables_for_floating_square_at_point`:
++/// the 3x3 neighborhood of the rounded center square. Indexed [dx+1][dy+1].
++pub fn rendered_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    let center = world_point_to_world_square(pos);
++    let mut grid = [[[' '; 2]; 3]; 3];
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = center + vec2(dx, dy);
++            let offset: WorldMove = pos - square.to_f32();
++            grid[(dx + 1) as usize][(dy + 1) as usize] =
++                characters_for_full_square_with_2d_offset(offset);
++        }
++    }
++    (grid, center)
++}
++
++/// Same as `rendered_neighborhood` but with the snap family forced, for
++/// scoring "what would family X have done" (family-map baking, debug tool).
++#[doc(hidden)]
++pub fn rendered_neighborhood_forced(
++    pos: WorldPoint,
++    family_index: usize,
++) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    let center = world_point_to_world_square(pos);
++    let mut grid = [[[' '; 2]; 3]; 3];
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = center + vec2(dx, dy);
++            let offset: WorldMove = pos - square.to_f32();
++            grid[(dx + 1) as usize][(dy + 1) as usize] =
++                characters_for_full_square_with_2d_offset_forced(offset, family_index);
++        }
++    }
++    (grid, center)
++}
++
++/// The "charwise" approach: for each character (half-cell) the true
++/// square overlaps, independently pick the glyph whose filled region best
++/// fits the square's overlap with that cell — exact, analytic, and with no
++/// regard for sibling characters, so silhouettes are jagged by design (the
++/// family-snapped render path is the coherent one). A comparison candidate
++/// for the debug tool and tests, not a game-facing render path.
++///
++/// Geometry: a character is a half-cell (0.5 world units wide, 1 row tall)
++/// and the square is exactly 2 half-cells by 1 row, so its overlap with a
++/// character is always an *anchored* rectangle — on each axis either the
++/// full cell or flush against exactly one cell edge; it can never float in
++/// the middle. Every glyph's filled region is anchored the same way
++/// (strips flush to one edge, quadrant blocks and hextants to a corner),
++/// so ideal and candidate always share an anchor corner.
++#[doc(hidden)]
++pub fn charwise_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    charwise_neighborhood_weighted(pos, 0.0)
++}
++
++/// Extra cost per cell-coordinate unit of protrusion in the linear shaped
++/// charwise variant (see `charwise_shaped_neighborhood`). 1.0 means a
++/// glyph sticking 0.2 cells past the true edge pays as much as mis-covering
++/// 0.2 cells of area — enough that thin spikes lose to evenly distributed
++/// error, without drowning the xor term.
++pub const CHARWISE_PROTRUSION_WEIGHT: f32 = 1.0;
++
++/// Weight of the squared-protrusion variant (`charwise_protrusion_squared_neighborhood`).
++/// Since cell distances are < 1, `W·d²` only bites harder than linear `d`
++/// once d > 1/W: with 4.0 the quadratic discouragement kicks in past 0.25
++/// cells of protrusion — shallow overshoot is nearly free, deep spikes are
++/// hammered quadratically.
++pub const CHARWISE_PROTRUSION_SQUARED_WEIGHT: f32 = 4.0;
++
++/// The shaped charwise variant: like `charwise_neighborhood`, but each
++/// cell's pick minimizes xor area plus `CHARWISE_PROTRUSION_WEIGHT` times
++/// how far the glyph sticks out past the true square's overlap with the
++/// cell. A long thin protrusion has tiny xor but large max distance, so it
++/// is heavily disincentivized; a small overextension along the true edge
++/// has small max distance and pays mostly its (small) xor. Still per-cell
++/// and analytic — no sibling awareness.
++#[doc(hidden)]
++pub fn charwise_shaped_neighborhood(pos: WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    charwise_neighborhood_penalty(pos, CHARWISE_PROTRUSION_WEIGHT, false)
++}
++
++/// The squared-protrusion variant: cost = xor + weight × d². Progressive
++/// instead of flat: shallow overshoot is cheaper than under the linear
++/// penalty (d² < d for d < 1), deep protrusion far more expensive.
++#[doc(hidden)]
++pub fn charwise_protrusion_squared_neighborhood(
++    pos: WorldPoint,
++) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    charwise_neighborhood_penalty(pos, CHARWISE_PROTRUSION_SQUARED_WEIGHT, true)
++}
++
++fn charwise_neighborhood_penalty(
++    pos: WorldPoint,
++    weight: f32,
++    squared: bool,
++) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    let center = world_point_to_world_square(pos);
++    let mut grid = [[[' '; 2]; 3]; 3];
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = center + vec2(dx, dy);
++            for half in 0..2 {
++                grid[(dx + 1) as usize][(dy + 1) as usize][half] =
++                    charwise_glyph_parts(pos, square, half, weight, squared).0;
++            }
++        }
++    }
++    (grid, center)
++}
++
++fn charwise_neighborhood_weighted(
++    pos: WorldPoint,
++    weight: f32,
++) -> ([[DoubleChar; 3]; 3], WorldSquare) {
++    charwise_neighborhood_penalty(pos, weight, false)
++}
++
++/// The method's own objective summed over the 3x3 neighborhood: per-cell
++/// xor area plus the protrusion penalty in the method's shape (linear d or
++/// squared d²). This is the number the picker minimizes cell by cell —
++/// "the error used for rendering" in the debug tool. Cell units (a
++/// half-cell is 0.5 x 1), not world square units.
++#[doc(hidden)]
++pub fn charwise_objective(pos: WorldPoint, weight: f32, squared: bool) -> f32 {
++    let center = world_point_to_world_square(pos);
++    let mut total = 0.0f32;
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = center + vec2(dx, dy);
++            for half in 0..2 {
++                let (_, err, d) = charwise_glyph_parts(pos, square, half, weight, squared);
++                total += err + weight * if squared { d * d } else { d };
++            }
++        }
++    }
++    total
++}
++
++/// Distance from an anchor-frame point (u, v) to the ideal anchored
++/// rectangle [0, w] x [0, h]. Distance to a rectangle is convex and this
++/// function is non-decreasing in u and v, so the farthest point of any
++/// candidate's filled rectangle or sextant from the ideal is its corner
++/// farthest from the anchor — one formula covers every candidate class.
++///
++/// Cell coordinates are anisotropic (u spans the half-cell width, v the
++/// full row height), so this is not a true world distance; acceptable for
++/// a shape heuristic, and it never feeds the game render path.
++fn protrusion(u: f32, v: f32, w: f32, h: f32) -> f32 {
++    (u - w).max(0.0).hypot((v - h).max(0.0))
++}
++
++/// One character's glyph pick plus its objective parts: the winning
++/// candidate's xor area (cell units) and protrusion distance. `weight`/
++/// `squared` shape the comparison key (see `charwise_objective`); weight 0
++/// reproduces the plain xor argmin exactly, since err + 0.0·penalty == err
++/// and all tie orderings are unchanged.
++///
++/// Each geometry class contributes its provably best member: for strips
++/// the xor is monotone in the strip size on either side of the ideal's,
++/// so the optimum is one of the two grid neighbors; the xor-optimal
++/// hextant is the per-sextant majority rule (sextants are disjoint, so
++/// each decides independently). The overall winner is the minimum over
++/// the four class candidates.
++fn charwise_glyph_parts(
++    pos: WorldPoint,
++    square: WorldSquare,
++    half: usize,
++    weight: f32,
++    squared: bool,
++) -> (char, f32, f32) {
++    // overlap of the true square with this half-cell in cell coordinates:
++    // x in [0, 1] across the half-cell, y in [0, 1] up the row
++    let cell_left = square.x as f32 - 0.5 + 0.5 * half as f32;
++    let cell_bottom = square.y as f32 - 0.5;
++    let (x0, x1) = (
++        ((pos.x - 0.5 - cell_left) * 2.0).clamp(0.0, 1.0),
++        ((pos.x + 0.5 - cell_left) * 2.0).clamp(0.0, 1.0),
++    );
++    let (y0, y1) = (
++        (pos.y - 0.5 - cell_bottom).clamp(0.0, 1.0),
++        (pos.y + 0.5 - cell_bottom).clamp(0.0, 1.0),
++    );
++    if x1 <= x0 || y1 <= y0 {
++        return (SPACE, 0.0, 0.0);
++    }
++    if x0 <= 0.0 && x1 >= 1.0 && y0 <= 0.0 && y1 >= 1.0 {
++        return (FULL_BLOCK, 0.0, 0.0);
++    }
++    // w and h are the overlap extents measured from the touched edges;
++    // the ideal is then the corner-anchored rectangle [0, w] x [0, h]
++    debug_assert!(x0 <= 0.0 || x1 >= 1.0, "overlap floats in x");
++    debug_assert!(y0 <= 0.0 || y1 >= 1.0, "overlap floats in y");
++    let from_left = x0 <= 0.0;
++    let from_bottom = y0 <= 0.0;
++    let (w, h) = (
++        if from_left { x1 } else { 1.0 - x0 },
++        if from_bottom { y1 } else { 1.0 - y0 },
++    );
++
++    // symmetric-difference area between the ideal [0, w] x [0, h] and a
++    // candidate anchored rectangle [0, a] x [0, b] (strips are the a=1
++    // or b=1 cases, the quadrant block a=b=1/2)
++    let xor = |a: f32, b: f32| w.max(a) * h.max(b) - w.min(a) * h.min(b);
++    // the penalized comparison key: at weight 0 this is plain xor, and
++    // every `+ 0.0 * d` is exact, so picks match the plain method bit for
++    // bit and all tie orderings below are unchanged
++    let cost = |err: f32, d: f32| err + weight * if squared { d * d } else { d };
++
++    // vertical strip (eighth blocks): k/8 wide, full height. xor is
++    // monotone in the width on either side of w, so the optimum is one
++    // of the two eighth-grid neighbors. Candidates carry (k, err, d);
++    // comparisons use the penalized cost, so at weight 0 they reduce to
++    // the xor comparisons below.
++    let kf = (w * 8.0).floor();
++    let (x_k, x_err, x_d) = {
++        let floor = (kf, xor(kf / 8.0, 1.0), protrusion(kf / 8.0, 1.0, w, h));
++        let ceil = (
++            kf + 1.0,
++            xor((kf + 1.0) / 8.0, 1.0),
++            protrusion((kf + 1.0) / 8.0, 1.0, w, h),
++        );
++        if cost(ceil.1, ceil.2) < cost(floor.1, floor.2) {
++            ceil
++        } else {
++            floor
++        }
++    };
++    let x_strip = (
++        if from_left {
++            EIGHTH_BLOCKS_FROM_LEFT[x_k as usize]
++        } else {
++            EIGHTH_BLOCKS_FROM_RIGHT[x_k as usize]
++        },
++        x_err,
++        x_d,
++    );
++
++    // horizontal strip (eighth and third blocks): full width, k/8 or k/3
++    // tall; the best over the union of the two grids is the better of
++    // each grid's own best
++    let kf_y = (h * 8.0).floor();
++    let (eighth_k, eighth_err, eighth_d) = {
++        let floor = (kf_y, xor(1.0, kf_y / 8.0), protrusion(1.0, kf_y / 8.0, w, h));
++        let ceil = (
++            kf_y + 1.0,
++            xor(1.0, (kf_y + 1.0) / 8.0),
++            protrusion(1.0, (kf_y + 1.0) / 8.0, w, h),
++        );
++        if cost(ceil.1, ceil.2) < cost(floor.1, floor.2) {
++            ceil
++        } else {
++            floor
++        }
++    };
++    let (third_k, third_err, third_d) = {
++        let low = (1.0, xor(1.0, 1.0 / 3.0), protrusion(1.0, 1.0 / 3.0, w, h));
++        let high = (2.0, xor(1.0, 2.0 / 3.0), protrusion(1.0, 2.0 / 3.0, w, h));
++        if cost(high.1, high.2) < cost(low.1, low.2) {
++            high
++        } else {
++            low
++        }
++    };
++    let y_strip = if cost(eighth_err, eighth_d) <= cost(third_err, third_d) {
++        (
++            if from_bottom {
++                EIGHTH_BLOCKS_FROM_BOTTOM[eighth_k as usize]
++            } else {
++                EIGHTH_BLOCKS_FROM_TOP[eighth_k as usize]
++            },
++            eighth_err,
++            eighth_d,
++        )
++    } else if from_bottom {
++        (
++            [LOWER_ONE_THIRD_BLOCK, LOWER_TWO_THIRD_BLOCK][third_k as usize - 1],
++            third_err,
++            third_d,
++        )
++    } else {
++        (
++            [UPPER_ONE_THIRD_BLOCK, UPPER_TWO_THIRD_BLOCK][third_k as usize - 1],
++            third_err,
++            third_d,
++        )
++    };
++
++    // quadrant block at the anchor corner
++    let quadrant = (
++        match (from_left, from_bottom) {
++            (true, true) => '▖',
++            (false, true) => '▗',
++            (true, false) => '▘',
++            (false, false) => '▝',
++        },
++        xor(0.5, 0.5),
++        protrusion(0.5, 0.5, w, h),
++    );
++
++    // hextant. At weight 0 the per-sextant majority rule is the exact xor
++    // optimum (sextants are disjoint). Under a protrusion penalty the fill
++    // decisions couple through max(d), so instead brute-force all 64 fill
++    // patterns — cheap, and exact for any penalty. Bit = row*2+col, row 0
++    // = top, matching hextant_character_to_binary; strict < keeps the
++    // lowest bits on ties, deterministic.
++    let hextant = if weight == 0.0 {
++        let mut array = [[false; 2]; 3]; // row 0 = top, col 0 = left
++        let mut err = 0.0;
++        for col in 0..2 {
++            for row in 0..3 {
++                // anchor coordinates: u from the touched x edge, v from
++                // the touched y edge; the ideal is [0, w] x [0, h]
++                let u_ov = ((col + 1) as f32 / 2.0).min(w) - (col as f32 / 2.0).min(w);
++                let v_ov = ((row + 1) as f32 / 3.0).min(h) - (row as f32 / 3.0).min(h);
++                let ov = u_ov * v_ov;
++                // strict >: a half-covered sextant is xor-equal either
++                // way; leaving it unfilled keeps the pick deterministic
++                let filled = 2.0 * ov > 1.0 / 6.0;
++                if filled {
++                    array[if from_bottom { 2 - row } else { row }]
++                        [if from_left { col } else { 1 - col }] = true;
++                }
++                err += if filled { 1.0 / 6.0 - ov } else { ov };
++            }
++        }
++        (hextant_array_to_char(array), err, 0.0)
++    } else {
++        let mut best: Option<(f32, u32, f32, f32)> = None; // (cost, bits, err, d)
++        for bits in 0..64u32 {
++            let mut err = 0.0f32;
++            let mut d = 0.0f32;
++            for row in 0..3usize {
++                for col in 0..2usize {
++                    // display array coords -> anchor frame sextant span
++                    let a_col = if from_left { col } else { 1 - col };
++                    let a_row = if from_bottom { 2 - row } else { row };
++                    let (u1, v1) = ((a_col + 1) as f32 / 2.0, (a_row + 1) as f32 / 3.0);
++                    let ov = (u1.min(w) - a_col as f32 / 2.0).max(0.0)
++                        * (v1.min(h) - a_row as f32 / 3.0).max(0.0);
++                    let filled = bits & (1 << (row * 2 + col)) != 0;
++                    err += if filled { 1.0 / 6.0 - ov } else { ov };
++                    if filled {
++                        // the distance function is monotone in u and v, so
++                        // the far corner is the sextant's farthest point
++                        d = d.max(protrusion(u1, v1, w, h));
++                    }
++                }
++            }
++            let c = cost(err, d);
++            if best.is_none() || c < best.unwrap().0 {
++                best = Some((c, bits, err, d));
++            }
++        }
++        let (_, bits, err, d) = best.unwrap();
++        let mut array = [[false; 2]; 3];
++        for row in 0..3usize {
++            for col in 0..2usize {
++                array[row][col] = bits & (1 << (row * 2 + col)) != 0;
++            }
++        }
++        (hextant_array_to_char(array), err, d)
++    };
++
++    // minimum cost wins; on a tie the earlier candidate (strips over
++    // corner geometry) keeps the silhouette closer to a rectangle
++    [x_strip, y_strip, quadrant, hextant]
++        .into_iter()
++        .min_by_key(|&(_, err, d)| OrderedFloat(cost(err, d)))
++        .unwrap()
++}
++
++/// Symmetric-difference area (in world square units) between the rendered
++/// glyph grid and the true 1x1 square at `pos`, on the sampling lattice.
++/// This is the objective the family map is baked against.
++#[doc(hidden)]
++pub fn coverage_error(
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++) -> f32 {
++    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let mut mismatches = 0usize;
++    for j in 0..NX {
++        for i in 0..NY {
++            let wx = origin.x + (j as f32 + 0.5) / SX as f32;
++            let wy = origin.y + (i as f32 + 0.5) / SY as f32;
++            let ideal = (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5;
++            if actual_sample(grid, owners, center, wx, wy).0 != ideal {
++                mismatches += 1;
++            }
++        }
++    }
++    mismatches as f32 / (SX * SY) as f32
++}
++
++/// Samples across a half-cell's width (half a world square).
++const HX: usize = SX / 2;
++
++/// One glyph's filled count over a half-cell's sample lattice (for
++/// per-character coverage error).
++struct GlyphFit {
++    c: char,
++    count: u32,
++}
++
++/// Every glyph the coverage model knows, with its filled sample count.
++fn glyph_fits() -> &'static [GlyphFit] {
++    static FITS: OnceLock<Vec<GlyphFit>> = OnceLock::new();
++    FITS.get_or_init(|| {
++        let mut candidates: Vec<char> = vec![SPACE, FULL_BLOCK];
++        for blocks in [
++            EIGHTH_BLOCKS_FROM_LEFT,
++            EIGHTH_BLOCKS_FROM_BOTTOM,
++            EIGHTH_BLOCKS_FROM_RIGHT,
++            EIGHTH_BLOCKS_FROM_TOP,
++        ] {
++            // indices 0 and 8 are SPACE and FULL_BLOCK, already listed
++            candidates.extend_from_slice(&blocks[1..8]);
++        }
++        candidates.extend([
++            UPPER_ONE_THIRD_BLOCK,
++            UPPER_TWO_THIRD_BLOCK,
++            LOWER_ONE_THIRD_BLOCK,
++            LOWER_TWO_THIRD_BLOCK,
++            // quadrant blocks and half blocks
++            '\u{2598}', '\u{259D}', '\u{2596}', '\u{2597}', '\u{258C}', '\u{2590}', '\u{2584}', '\u{2580}',
++        ]);
++        candidates.extend(FIRST_HEXTANT..=LAST_HEXTANT);
++        candidates
++            .into_iter()
++            .map(|c| {
++                let mut count = 0u32;
++                for i in 0..SY {
++                    for j in 0..HX {
++                        // same lattice and fx/fy mapping as actual_sample
++                        if glyph_filled(
++                            c,
++                            (j as f32 + 0.5) / HX as f32,
++                            (i as f32 + 0.5) / SY as f32,
++                        ) {
++                            count += 1;
++                        }
++                    }
++                }
++                GlyphFit { c, count }
++            })
++            .collect()
++    })
++}
++
++/// Ideal filled count of the true square over one half-cell's sample
++/// lattice (for per-character coverage error).
++fn half_cell_ideal(square: WorldSquare, half: usize, pos: WorldPoint) -> u32 {
++    let half_left = square.x as f32 - 0.5 + 0.5 * half as f32;
++    let bottom = square.y as f32 - 0.5;
++    let mut count = 0u32;
++    for i in 0..SY {
++        for j in 0..HX {
++            let wx = half_left + 0.5 * (j as f32 + 0.5) / HX as f32;
++            let wy = bottom + (i as f32 + 0.5) / SY as f32;
++            if (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5 {
++                count += 1;
++            }
++        }
++    }
++    count
++}
++
++/// Per-character coverage error: for each character half-cell, the absolute
++/// difference between the rendered glyph's filled area and the ideal
++/// square's filled area within that half-cell, summed (in world square
++/// units). Coarser than `coverage_error` (which compares sample by
++/// sample): it only asks each half-cell to contain the right *amount* of
++/// ink, regardless of where in the cell it sits.
++#[doc(hidden)]
++pub fn per_char_coverage_error(
++    grid: &[[DoubleChar; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++) -> f32 {
++    let mut total = 0u32;
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = center + vec2(dx, dy);
++            for half in 0..2 {
++                let ideal_count = half_cell_ideal(square, half, pos);
++                let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
++                let rendered = glyph_fits().iter().find(|f| f.c == c).unwrap().count;
++                total += rendered.abs_diff(ideal_count);
++            }
++        }
++    }
++    total as f32 / (HX * SY) as f32
++}
++
++/// Jaggedness of a rendered silhouette: the sum, along each of the four
++/// edges, of the perpendicular step lengths between consecutive sample
++/// columns/rows — each edge contour's total variation, in world units.
++/// A clean rectangle measures 0. Columns/rows with no fill (holes) break
++/// the contour and contribute no step.
++#[doc(hidden)]
++pub fn jaggedness(actual: &FillGrid) -> f32 {
++    let mut steps = 0.0f32;
++    // top and bottom edges: extreme filled row per sample column
++    let col_edges: Vec<Option<(f32, f32)>> = (0..NX)
++        .map(|j| {
++            let rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
++            rows.first()
++                .map(|&lo| (actual.wy(lo), actual.wy(*rows.last().unwrap())))
++        })
++        .collect();
++    for pair in col_edges.windows(2) {
++        if let (Some((bot0, top0)), Some((bot1, top1))) = (pair[0], pair[1]) {
++            steps += (top1 - top0).abs() + (bot1 - bot0).abs();
++        }
++    }
++    // left and right edges: extreme filled column per sample row
++    let row_edges: Vec<Option<(f32, f32)>> = (0..NY)
++        .map(|i| {
++            let cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
++            cols.first()
++                .map(|&lo| (actual.wx(lo), actual.wx(*cols.last().unwrap())))
++        })
++        .collect();
++    for pair in row_edges.windows(2) {
++        if let (Some((left0, right0)), Some((left1, right1))) = (pair[0], pair[1]) {
++            steps += (left1 - left0).abs() + (right1 - right0).abs();
++        }
++    }
++    steps
++}
++
++/// Frame-to-frame rendered change: the fraction of the current frame's 3x3
++/// sample lattice where the two rendered fills differ — same lattice and
++/// `SX*SY` denominator as `coverage_error`, so the value is directly
++/// comparable to the ideal-square `xor`. Measures rendered *change* per
++/// frame (it scales with motion speed): for comparing methods under the
++/// same motion, not an absolute smoothness score. A missing prev frame
++/// measures 0.0 — callers display n/a instead.
++#[doc(hidden)]
++pub fn frame_diff_xor(
++    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
++    cur: (&[[DoubleChar; 3]; 3], WorldSquare),
++) -> f32 {
++    let Some((pgrid, pcenter)) = prev else {
++        return 0.0;
++    };
++    let (cgrid, ccenter) = cur;
++    let powners = assign_colors(pgrid);
++    let cowners = assign_colors(cgrid);
++    let origin: WorldPoint = euclid::point2(ccenter.x as f32 - 1.5, ccenter.y as f32 - 1.5);
++    let mut diffs = 0usize;
++    for j in 0..NX {
++        for i in 0..NY {
++            let wx = origin.x + (j as f32 + 0.5) / SX as f32;
++            let wy = origin.y + (i as f32 + 0.5) / SY as f32;
++            if actual_sample(pgrid, &powners, pcenter, wx, wy).0
++                != actual_sample(cgrid, &cowners, ccenter, wx, wy).0
++            {
++                diffs += 1;
++            }
++        }
++    }
++    diffs as f32 / (SX * SY) as f32
++}
++
++/// Assign each non-space half-cell glyph a PALETTE index, scanning
++/// top-to-bottom, left-to-right so colors are stable within one report.
++/// Indexed [dx+1][dy+1][half].
++pub fn assign_colors(grid: &[[DoubleChar; 3]; 3]) -> [[[Option<usize>; 2]; 3]; 3] {
++    let mut owners = [[[None; 2]; 3]; 3];
++    let mut next = 0;
++    for dy in [1i32, 0, -1] {
++        for dx in -1..=1i32 {
++            for half in 0..2 {
++                if grid[(dx + 1) as usize][(dy + 1) as usize][half] != SPACE {
++                    owners[(dx + 1) as usize][(dy + 1) as usize][half] = Some(next);
++                    next += 1;
++                }
++            }
++        }
++    }
++    owners
++}
++
++/// (filled, color index) of the rendered output at a world point.
++///
++/// Square lookup uses the same half-up rounding as
++/// `world_point_to_world_square` so samples land in the same square the
++/// renderer would draw into.
++pub fn actual_sample(
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    wx: f32,
++    wy: f32,
++) -> (bool, Option<usize>) {
++    let sx = (wx + 0.5).floor() as i32;
++    let sy = (wy + 0.5).floor() as i32;
++    let (dx, dy) = (sx - center.x, sy - center.y);
++    if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) {
++        return (false, None);
++    }
++    let half = if wx < sx as f32 { 0 } else { 1 };
++    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
++    let cell_left = sx as f32 - 0.5 + 0.5 * half as f32;
++    let fx = (wx - cell_left) * 2.0;
++    let fy = wy - (sy as f32 - 0.5);
++    (
++        glyph_filled(c, fx, fy),
++        owners[(dx + 1) as usize][(dy + 1) as usize][half],
++    )
++}
++
++/// Centroid of the rendered fill, for the measured center error: how far
++/// the silhouette's actual middle sits from the true square center.
++#[doc(hidden)]
++pub fn fill_centroid(actual: &FillGrid) -> Option<WorldPoint> {
++    let (mut sx, mut sy, mut n) = (0.0f32, 0.0f32, 0usize);
++    for j in 0..NX {
++        for i in 0..NY {
++            if actual.filled(j, i) {
++                sx += actual.wx(j);
++                sy += actual.wy(i);
++                n += 1;
++            }
++        }
++    }
++    (n > 0).then(|| euclid::point2(sx / n as f32, sy / n as f32))
++}
++
++/// Silhouette metrics over a sampled actual-coverage grid, shared by the
++/// coherence test (which asserts on them) and the floating_square_debug
++/// tool (which prints them). Not game-facing API.
++#[doc(hidden)]
++#[derive(Default)]
++pub struct Metrics {
++    pub top_spread: f32,
++    pub bottom_spread: f32,
++    pub left_spread: f32,
++    pub right_spread: f32,
++    pub holes: usize,
++    pub area: f32,
++    /// per display-column flag: top or bottom edge deviates >1/8 from ideal
++    pub ragged_columns: Vec<bool>,
++}
++
++impl Metrics {
++    pub fn measure(actual: &FillGrid, pos: WorldPoint) -> Self {
++        let mut m = Metrics::default();
++        let mut tops = Vec::new();
++        let mut bottoms = Vec::new();
++        let mut column_info = Vec::new(); // (top, bottom) per sample column
++        for j in 0..NX {
++            let filled_rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
++            if filled_rows.is_empty() {
++                column_info.push(None);
++                continue;
++            }
++            let (lo, hi) = (*filled_rows.first().unwrap(), *filled_rows.last().unwrap());
++            m.holes += (hi - lo + 1) - filled_rows.len();
++            let (top, bottom) = (actual.wy(hi), actual.wy(lo));
++            tops.push(top);
++            bottoms.push(bottom);
++            column_info.push(Some((top, bottom)));
++        }
++        let spread = |v: &Vec<f32>| {
++            v.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
++                - v.iter().cloned().fold(f32::INFINITY, f32::min)
++        };
++        m.top_spread = spread(&tops);
++        m.bottom_spread = spread(&bottoms);
++
++        let mut lefts = Vec::new();
++        let mut rights = Vec::new();
++        for i in 0..NY {
++            let filled_cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
++            if filled_cols.is_empty() {
++                continue;
++            }
++            lefts.push(actual.wx(*filled_cols.first().unwrap()));
++            rights.push(actual.wx(*filled_cols.last().unwrap()));
++        }
++        m.left_spread = spread(&lefts);
++        m.right_spread = spread(&rights);
++
++        let filled_count: usize = actual.cells.iter().flatten().filter(|&&b| b).count();
++        m.area = filled_count as f32 / (SX * SY) as f32;
++
++        let (ideal_top, ideal_bottom) = (pos.y + 0.5, pos.y - 0.5);
++        m.ragged_columns = (0..PX_W)
++            .map(|px| {
++                [2 * px, 2 * px + 1].iter().any(|&j| {
++                    column_info[j].is_some_and(|(top, bottom)| {
++                        (top - ideal_top).abs() > 0.125 || (bottom - ideal_bottom).abs() > 0.125
++                    })
++                })
++            })
++            .collect();
++        m
++    }
++
++    pub fn failures(&self) -> Vec<String> {
++        let mut out = Vec::new();
++        // without this the spread checks below pass vacuously on an empty
++        // or degenerate render (no filled columns -> no spread)
++        if self.area == 0.0 {
++            out.push("no fill at all".to_string());
++        } else if (self.area - 1.0).abs() > 0.3 {
++            // 0.3 exceeds the worst-case quantization error of any single
++            // glyph family (~0.23: x edges to 1/16, y edges to 1/6)
++            out.push(format!("area {:.3} too far from 1.0", self.area));
++        }
++        for (name, spread) in [
++            ("top", self.top_spread),
++            ("bottom", self.bottom_spread),
++            ("left", self.left_spread),
++            ("right", self.right_spread),
++        ] {
++            if spread > 1e-6 {
++                out.push(format!("{name}-edge spread {spread:.3}"));
++            }
++        }
++        if self.holes > 0 {
++            out.push(format!("{} hole(s) in the fill", self.holes));
++        }
++        out
++    }
++
++    /// One-line summary, as printed by the debug tool and test reports.
++    pub fn summary_line(&self) -> String {
++        format!(
++            "edge spreads: top {:.3}  bottom {:.3}  left {:.3}  right {:.3}   holes: {}   area {:.3} (err {:+.3})",
++            self.top_spread,
++            self.bottom_spread,
++            self.left_spread,
++            self.right_spread,
++            self.holes,
++            self.area,
++            self.area - 1.0,
++        )
++    }
++}
++
++// --- error-visualization panes -------------------------------------------------
++//
++// Zoomed views at the union lattice (32x24 text cells = one big pixel
++// per lattice sample over the 2x2-world window, two big pixels stacked
++// per text cell — the same grid as `big_pixel_pane`), one error metric
++// per pane. The numeric metrics are computed on this same sample grid,
++// so the panes show exactly what the numbers measure.
++
++/// Rendered-vs-ideal classification of one sample point. Match is split
++/// into filled/empty so panes can show the silhouette without a FillGrid.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum SampleClass {
++    MatchFilled = 0,
++    MatchEmpty = 1,
++    /// rendered filled, ideal empty
++    Over = 2,
++    /// ideal filled, rendered empty
++    Under = 3,
++}
++
++const OVER_COLOR: Rgb = Rgb(255, 90, 90);
++const UNDER_COLOR: Rgb = Rgb(90, 160, 255);
++const XOR_COLOR: Rgb = Rgb(255, 140, 40);
++
++/// One text cell stacking two pixels vertically: same color → full block;
++/// different colors → upper as fg half-block over lower as bg half-block
++/// (the bg half-block carries the lower pixel's color, not the cell
++/// shade); one pixel → its half-block over the cell background; none →
++/// dark dot. Shared by the render zoom (`bitmap_pane`) and error panes.
++fn two_tone_cell(style: &Style, cell_bg: Rgb, up: Option<Rgb>, lo: Option<Rgb>) -> String {
++    match (up, lo) {
++        (Some(cu), Some(cl)) if cu == cl => format!("{}{}█", style.bg(cell_bg), style.fg(cu)),
++        (Some(cu), Some(cl)) => format!("{}{}▀", style.bg(cl), style.fg(cu)),
++        (Some(cu), None) => format!("{}{}▀", style.bg(cell_bg), style.fg(cu)),
++        (None, Some(cl)) => format!("{}{}▄", style.bg(cell_bg), style.fg(cl)),
++        (None, None) => format!("{}{}·", style.bg(cell_bg), style.fg(DOT_COLOR)),
++    }
++}
++
++/// Render a full-resolution pane from a per-pixel color grid (top row
++/// first), composing each text cell from its two stacked pixels.
++pub fn pane_from_colors(style: &Style, colors: &[Vec<Option<Rgb>>]) -> Vec<String> {
++    (0..TEXT_ROWS)
++        .map(|t| {
++            let mut line: String = (0..PX_W)
++                .map(|px| {
++                    two_tone_cell(
++                        style,
++                        cell_bg(px, t / 4),
++                        colors[2 * t][px],
++                        colors[2 * t + 1][px],
++                    )
++                })
++                .collect();
++            line.push_str(style.reset());
++            line
++        })
++        .collect()
++}
++
++pub fn lerp(a: Rgb, b: Rgb, t: f32) -> Rgb {
++    let t = t.clamp(0.0, 1.0);
++    Rgb(
++        (a.0 as f32 + (b.0 as f32 - a.0 as f32) * t) as u8,
++        (a.1 as f32 + (b.1 as f32 - a.1 as f32) * t) as u8,
++        (a.2 as f32 + (b.2 as f32 - a.2 as f32) * t) as u8,
++    )
++}
++
++/// 3/4-state sample grid over the render window (same lattice and
++/// half-sample offsets as FillGrid, so the two never disagree on fill).
++pub struct ClassGrid {
++    pub cells: Vec<Vec<SampleClass>>,
++    pub origin: WorldPoint, // world coords of the window's bottom-left corner
++}
++
++/// Class counts of the single lattice sample under one big pixel.
++/// `inside`/`outside` partition by the ideal square, `filled` by the
++/// render.
++#[derive(Default)]
++struct PixelStats {
++    filled: usize,
++    over: usize,
++    under: usize,
++    inside: usize,  // ideal-inside samples = match_filled + under
++    outside: usize, // ideal-outside samples = match_empty + over
++}
++
++impl PixelStats {
++    fn of(c: SampleClass) -> Self {
++        let mut s = PixelStats::default();
++        match c {
++            SampleClass::MatchFilled => {
++                s.filled = 1;
++                s.inside = 1;
++            }
++            SampleClass::MatchEmpty => s.outside = 1,
++            SampleClass::Over => {
++                s.filled = 1;
++                s.over = 1;
++                s.outside = 1;
++            }
++            SampleClass::Under => {
++                s.under = 1;
++                s.inside = 1;
++            }
++        }
++        s
++    }
++}
++
++impl ClassGrid {
++    pub fn sample(origin: WorldPoint, mut f: impl FnMut(f32, f32) -> SampleClass) -> Self {
++        let mut cells = Vec::new();
++        for j in 0..NX {
++            let mut col = Vec::new();
++            for i in 0..NY {
++                let wx = origin.x + (j as f32 + 0.5) / SX as f32;
++                let wy = origin.y + (i as f32 + 0.5) / SY as f32;
++                col.push(f(wx, wy));
++            }
++            cells.push(col);
++        }
++        ClassGrid { cells, origin }
++    }
++
++    /// Rendered-vs-ideal class at one world point (same square/half-cell
++    /// lookup as `actual_sample`).
++    pub fn class_at(
++        grid: &[[DoubleChar; 3]; 3],
++        owners: &[[[Option<usize>; 2]; 3]; 3],
++        center: WorldSquare,
++        pos: WorldPoint,
++        wx: f32,
++        wy: f32,
++    ) -> SampleClass {
++        let ideal = (wx - pos.x).abs() <= 0.5 && (wy - pos.y).abs() <= 0.5;
++        let filled = actual_sample(grid, owners, center, wx, wy).0;
++        match (filled, ideal) {
++            (true, true) => SampleClass::MatchFilled,
++            (false, false) => SampleClass::MatchEmpty,
++            (true, false) => SampleClass::Over,
++            (false, true) => SampleClass::Under,
++        }
++    }
++
++    /// The single lattice sample under one big pixel of the 2x2-world
++    /// display window. The stored grid covers the full 3x3 neighborhood;
++    /// the window crop starts at sample column SX/2, and its top sample
++    /// row is NY - SY/2 - 1.
++    fn sample_at(&self, bp: usize, by: usize) -> SampleClass {
++        self.cells[bp + SX / 2][NY - SY / 2 - 1 - by]
++    }
++
++    /// Big-pixel pane: each text cell stacks two big pixels (upper as fg
++    /// half-block, lower as bg half-block) exactly like `big_pixel_pane`,
++    /// one big pixel per lattice sample — the same grid the numeric
++    /// metrics are computed on.
++    pub fn full_pane(
++        &self,
++        style: &Style,
++        color_of: impl Fn(usize, usize, &PixelStats) -> Option<Rgb>,
++    ) -> Vec<String> {
++        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++        for by in 0..BIG_PX_H {
++            for bp in 0..BIG_PX_W {
++                colors[by][bp] = color_of(bp, by, &PixelStats::of(self.sample_at(bp, by)));
++            }
++        }
++        big_pane_from_colors(style, &colors)
++    }
++
++    /// Ideal-square xor: all mismatched samples over the window, in world
++    /// square units (the family map's objective).
++    pub fn xor_error(&self) -> f32 {
++        let n: usize = self
++            .cells
++            .iter()
++            .flatten()
++            .filter(|&&c| matches!(c, SampleClass::Over | SampleClass::Under))
++            .count();
++        n as f32 / (SX * SY) as f32
++    }
++
++    /// Rendered area minus ideal area, in world square units (signed).
++    /// Equal to FillGrid area − 1: over-coverage minus under-coverage.
++    pub fn signed_area_error(&self) -> f32 {
++        let (over, under): (usize, usize) = self
++            .cells
++            .iter()
++            .flatten()
++            .fold((0, 0), |(o, u), &c| match c {
++                SampleClass::Over => (o + 1, u),
++                SampleClass::Under => (o, u + 1),
++                _ => (o, u),
++            });
++        (over as f32 - under as f32) / (SX * SY) as f32
++    }
++
++    /// Ideal-square-xor pane: any mismatched sample lights the pixel.
++    pub fn mismatch_pane(&self, style: &Style) -> Vec<String> {
++        self.full_pane(style, |_, _, s| (s.over + s.under > 0).then_some(XOR_COLOR))
++    }
++
++    /// Signed area pane: over-coverage red, under-coverage blue. At one
++    /// sample per big pixel a sample is never both, so the old
++    /// split-block XOR_COLOR case is structurally gone.
++    pub fn signed_pane(&self, style: &Style) -> Vec<String> {
++        self.full_pane(style, |_, _, s| {
++            if s.over > 0 {
++                Some(OVER_COLOR)
++            } else if s.under > 0 {
++                Some(UNDER_COLOR)
++            } else {
++                None
++            }
++        })
++    }
++
++    /// Center-error pane: dim rendered silhouette, ideal outline, and both
++    /// centroids marked — '×' actual, '+' ideal. The value line carries the
++    /// numbers; this shows *where* the silhouette's middle sits.
++    pub fn center_pane(&self, actual: &FillGrid, pos: WorldPoint, style: &Style) -> Vec<String> {
++        // world point -> big pixel; window is 2 world units = 32x48 big
++        // px. The ClassGrid origin is the 3x3 window's bottom-left, i.e.
++        // half a world left of / below the display window's corner.
++        let pane_of = |wx: f32, wy: f32| -> (usize, usize) {
++            let c = ((wx - self.origin.x - 0.5) * SX as f32)
++                .floor()
++                .clamp(0.0, (BIG_PX_W - 1) as f32) as usize;
++            let r = ((self.origin.y + 2.5 - wy) * SY as f32)
++                .floor()
++                .clamp(0.0, (BIG_PX_H - 1) as f32) as usize;
++            (c, r)
++        };
++        // 1-sample-thick ideal outline: an ideal-inside sample with an
++        // ideal-outside 4-neighbor (one sample per pixel, so the old
++        // straddling-block rule becomes adjacency)
++        let inside = |j: usize, i: usize| {
++            matches!(self.cells[j][i], SampleClass::MatchFilled | SampleClass::Under)
++        };
++        let mut outline = vec![vec![false; BIG_PX_W]; BIG_PX_H];
++        for by in 0..BIG_PX_H {
++            for bp in 0..BIG_PX_W {
++                let (j, i) = (bp + SX / 2, NY - SY / 2 - 1 - by);
++                let outside_nb = (j > 0 && !inside(j - 1, i))
++                    || (j + 1 < NX && !inside(j + 1, i))
++                    || (i > 0 && !inside(j, i - 1))
++                    || (i + 1 < NY && !inside(j, i + 1));
++                outline[by][bp] = inside(j, i) && outside_nb;
++            }
++        }
++        // marks replace the whole text cell they land in
++        let mut marks = vec![vec![(' ', Rgb(0, 0, 0)); BIG_PX_W]; BIG_TEXT_ROWS];
++        if let Some(c) = fill_centroid(actual) {
++            let p = pane_of(c.x, c.y);
++            marks[p.1 / 2][p.0] = ('\u{00d7}', Rgb(120, 255, 255));
++        }
++        let p = pane_of(pos.x, pos.y);
++        marks[p.1 / 2][p.0] = ('+', Rgb(235, 235, 235));
++        self.full_pane(style, |bp, by, s| {
++            if marks[by / 2][bp].0 != ' ' {
++                return Some(marks[by / 2][bp].1);
++            }
++            if outline[by][bp] {
++                Some(IDEAL_COLOR)
++            } else if s.filled > 0 {
++                Some(Rgb(64, 64, 80)) // dim rendered fill
++            } else if s.under > 0 {
++                Some(Rgb(48, 58, 92)) // faint under-coverage tint
++            } else {
++                None
++            }
++        })
++    }
++
++    /// Per-character coverage pane: each half-cell shaded by its local
++    /// |rendered − ideal| filled area (the `per_char_coverage_error`
++    /// contribution), from dark (0) to hot (0.25 of the half-cell).
++    pub fn per_char_heat_pane(
++        grid: &[[DoubleChar; 3]; 3],
++        center: WorldSquare,
++        pos: WorldPoint,
++        style: &Style,
++    ) -> Vec<String> {
++        let mut heat = [[[0.0f32; 2]; 3]; 3];
++        for dx in -1..=1i32 {
++            for dy in -1..=1i32 {
++                let square = center + vec2(dx, dy);
++                for half in 0..2 {
++                    let ideal = half_cell_ideal(square, half, pos);
++                    let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
++                    let rendered = glyph_fits().iter().find(|f| f.c == c).unwrap().count;
++                    heat[(dx + 1) as usize][(dy + 1) as usize][half] =
++                        rendered.abs_diff(ideal) as f32 / (HX * SY) as f32;
++                }
++            }
++        }
++        // 2x2-world window: half-cell lookup per big pixel from world
++        // coords, same rounding as `big_pixel_pane`
++        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++        for by in 0..BIG_PX_H {
++            for bp in 0..BIG_PX_W {
++                let wx = center.x as f32 - 1.0 + (bp as f32 + 0.5) / SX as f32;
++                let wy = center.y as f32 + 1.0 - (by as f32 + 0.5) / SY as f32;
++                let sx = (wx + 0.5).floor() as i32;
++                let sy = (wy + 0.5).floor() as i32;
++                let half = if wx < sx as f32 { 0 } else { 1 };
++                let v = heat[(sx - center.x + 1) as usize][(sy - center.y + 1) as usize][half];
++                colors[by][bp] =
++                    (v > 0.0).then(|| lerp(Rgb(70, 60, 30), Rgb(255, 200, 60), v / 0.25));
++            }
++        }
++        big_pane_from_colors(style, &colors)
++    }
++
++    /// Jaggedness pane: the silhouette dim, with contour pixels lit by the
++    /// local edge-step length (dark = straight, bright = a big jump).
++    pub fn jaggedness_pane(actual: &FillGrid, style: &Style) -> Vec<String> {
++        // per sample column: (top, bottom) filled sample indices
++        let col_contour: Vec<Option<(usize, usize)>> = (0..NX)
++            .map(|j| {
++                let rows: Vec<usize> = (0..NY).filter(|&i| actual.filled(j, i)).collect();
++                rows.first().map(|&lo| (lo, *rows.last().unwrap()))
++            })
++            .collect();
++        let row_contour: Vec<Option<(usize, usize)>> = (0..NY)
++            .map(|i| {
++                let cols: Vec<usize> = (0..NX).filter(|&j| actual.filled(j, i)).collect();
++                cols.first().map(|&lo| (lo, *cols.last().unwrap()))
++            })
++            .collect();
++        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++        // dim fill base: one big pixel per sample
++        for by in 0..BIG_PX_H {
++            for bp in 0..BIG_PX_W {
++                if actual.filled(bp + SX / 2, NY - SY / 2 - 1 - by) {
++                    colors[by][bp] = Some(Rgb(56, 56, 70));
++                }
++            }
++        }
++        // top/bottom contours: step vs the neighboring sample column (the
++        // neighbor can sit just outside the 2x2 window but inside the
++        // sampled 3x3 grid, so no edge information is lost at the crop)
++        for bp in 0..BIG_PX_W {
++            let j = bp + SX / 2;
++            if j == 0 {
++                continue;
++            }
++            if let (Some((t0, b0)), Some((t1, b1))) = (col_contour[j - 1], col_contour[j]) {
++                let step = (actual.wy(t1) - actual.wy(t0)).abs()
++                    + (actual.wy(b1) - actual.wy(b0)).abs();
++                let t = (step * 8.0).clamp(0.0, 1.0);
++                if t > 0.0 {
++                    let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
++                    for s in [t1, b1] {
++                        // contour samples lie in the silhouette, hence in
++                        // the window; a pathological render poking past
++                        // the crop just skips the light-up
++                        if (SY / 2..NY - SY / 2).contains(&s) {
++                            colors[NY - SY / 2 - 1 - s][bp] = Some(c);
++                        }
++                    }
++                }
++            }
++        }
++        // left/right contours: step vs the neighboring sample row
++        for by in 0..BIG_PX_H {
++            let i = NY - SY / 2 - 1 - by;
++            if i == 0 {
++                continue;
++            }
++            if let (Some((l0, r0)), Some((l1, r1))) = (row_contour[i - 1], row_contour[i]) {
++                let step = (actual.wx(l1) - actual.wx(l0)).abs()
++                    + (actual.wx(r1) - actual.wx(r0)).abs();
++                let t = (step * 8.0).clamp(0.0, 1.0);
++                if t > 0.0 {
++                    let c = lerp(Rgb(60, 60, 40), Rgb(160, 255, 80), t);
++                    for s in [l1, r1] {
++                        if (SX / 2..SX / 2 + BIG_PX_W).contains(&s) {
++                            colors[by][s - SX / 2] = Some(c);
++                        }
++                    }
++                }
++            }
++        }
++        big_pane_from_colors(style, &colors)
++    }
++
++    /// Displacement pane: which mismatched samples appear when the square
++    /// is nudged by `delta` in the worst direction. Bright yellow = newly
++    /// wrong (the pop), dim red = still wrong, dim blue = recovered.
++    pub fn displacement_pane(base: &ClassGrid, shifted: &ClassGrid, style: &Style) -> Vec<String> {
++        let is_match =
++            |c: SampleClass| matches!(c, SampleClass::MatchFilled | SampleClass::MatchEmpty);
++        let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++        for by in 0..BIG_PX_H {
++            for bp in 0..BIG_PX_W {
++                let (j, i) = (bp + SX / 2, NY - SY / 2 - 1 - by);
++                let (a, b) = (base.cells[j][i], shifted.cells[j][i]);
++                colors[by][bp] = match (is_match(a), is_match(b)) {
++                    (true, false) => Some(Rgb(255, 230, 80)), // newly wrong
++                    (false, false) => Some(Rgb(150, 70, 70)),  // still wrong
++                    (false, true) => Some(Rgb(70, 110, 150)),  // recovered
++                    _ => None,
++                };
++            }
++        }
++        big_pane_from_colors(style, &colors)
++    }
++}
++
++/// Frame-diff pane: lights every big pixel where the two renders' fills
++/// differ (XOR_COLOR, same 2x2 window crop as the other metric panes, one
++/// big pixel per lattice sample). A missing prev frame renders empty —
++/// no previous render, nothing to compare.
++#[doc(hidden)]
++pub fn frame_diff_pane(
++    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
++    cur: (&[[DoubleChar; 3]; 3], WorldSquare),
++    style: &Style,
++) -> Vec<String> {
++    let (cgrid, ccenter) = cur;
++    let Some((pgrid, pcenter)) = prev else {
++        return big_pane_from_colors(style, &vec![vec![None; BIG_PX_W]; BIG_PX_H]);
++    };
++    let powners = assign_colors(pgrid);
++    let cowners = assign_colors(cgrid);
++    // same window geometry as big_pixel_pane: center square ± 1 world,
++    // big-pixel centers at half-sample offsets
++    let (ox, oy) = (ccenter.x as f32 - 1.0, ccenter.y as f32 - 1.0);
++    let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++    for py in 0..BIG_PX_H {
++        for px in 0..BIG_PX_W {
++            let wx = ox + (px as f32 + 0.5) / SX as f32;
++            let wy = oy + 2.0 - (py as f32 + 0.5) / SY as f32;
++            if actual_sample(pgrid, &powners, pcenter, wx, wy).0
++                != actual_sample(cgrid, &cowners, ccenter, wx, wy).0
++            {
++                colors[py][px] = Some(XOR_COLOR);
++            }
++        }
++    }
++    big_pane_from_colors(style, &colors)
++}
++
++/// The filled region of a glyph as axis-aligned rectangles in cell
++/// coordinates (fx across the half-cell, fy up the row) — the exact
++/// geometry `glyph_filled` point-samples; kept in sync with it by
++/// `test_glyph_rects_matches_glyph_filled`.
++fn glyph_rects(c: char) -> Vec<[f32; 4]> {
++    if c == SPACE {
++        return vec![];
++    }
++    if c == FULL_BLOCK {
++        return vec![[0.0, 0.0, 1.0, 1.0]];
++    }
++    for k in 1..8usize {
++        let k = k as f32;
++        if c == EIGHTH_BLOCKS_FROM_LEFT[k as usize] {
++            return vec![[0.0, 0.0, k / 8.0, 1.0]];
++        }
++        if c == EIGHTH_BLOCKS_FROM_RIGHT[k as usize] {
++            return vec![[1.0 - k / 8.0, 0.0, 1.0, 1.0]];
++        }
++        if c == EIGHTH_BLOCKS_FROM_BOTTOM[k as usize] {
++            return vec![[0.0, 0.0, 1.0, k / 8.0]];
++        }
++        if c == EIGHTH_BLOCKS_FROM_TOP[k as usize] {
++            return vec![[0.0, 1.0 - k / 8.0, 1.0, 1.0]];
++        }
++    }
++    match c {
++        UPPER_ONE_THIRD_BLOCK => return vec![[0.0, 2.0 / 3.0, 1.0, 1.0]],
++        UPPER_TWO_THIRD_BLOCK => return vec![[0.0, 1.0 / 3.0, 1.0, 1.0]],
++        LOWER_ONE_THIRD_BLOCK => return vec![[0.0, 0.0, 1.0, 1.0 / 3.0]],
++        LOWER_TWO_THIRD_BLOCK => return vec![[0.0, 0.0, 1.0, 2.0 / 3.0]],
++        // quadrant blocks and half blocks
++        '▖' => return vec![[0.0, 0.0, 0.5, 0.5]],
++        '▗' => return vec![[0.5, 0.0, 1.0, 0.5]],
++        '▘' => return vec![[0.0, 0.5, 0.5, 1.0]],
++        '▝' => return vec![[0.5, 0.5, 1.0, 1.0]],
++        '▌' => return vec![[0.0, 0.0, 0.5, 1.0]],
++        '▐' => return vec![[0.5, 0.0, 1.0, 1.0]],
++        '▄' => return vec![[0.0, 0.0, 1.0, 0.5]],
++        '▀' => return vec![[0.0, 0.5, 1.0, 1.0]],
++        _ => {}
++    }
++    if (FIRST_HEXTANT..=LAST_HEXTANT).contains(&c) {
++        // sextant bits: bit = row * 2 + col, row 0 = top, col 0 = left;
++        // fy is measured from the bottom, so display row r spans
++        // [(2-r)/3, (3-r)/3]
++        let bits = hextant_character_to_binary(c);
++        let mut out = Vec::new();
++        for row in 0..3usize {
++            for col in 0..2usize {
++                if bits & (1 << (row * 2 + col)) != 0 {
++                    out.push([
++                        col as f32 / 2.0,
++                        (2 - row) as f32 / 3.0,
++                        (col + 1) as f32 / 2.0,
++                        (3 - row) as f32 / 3.0,
++                    ]);
++                }
++            }
++        }
++        return out;
++    }
++    panic!("no coverage model for glyph {c:?} (U+{:04X})", c as u32);
++}
++
++/// Exact coverage fraction of one glyph's filled region within a pixel
++/// rectangle given in cell coordinates.
++fn glyph_rect_coverage(c: char, fx0: f32, fy0: f32, fx1: f32, fy1: f32) -> f32 {
++    let mut area = 0.0;
++    for [rx0, ry0, rx1, ry1] in glyph_rects(c) {
++        area += (fx1.min(rx1) - fx0.max(rx0)).max(0.0) * (fy1.min(ry1) - fy0.max(ry0)).max(0.0);
++    }
++    (area / ((fx1 - fx0) * (fy1 - fy0))).clamp(0.0, 1.0)
++}
++
++/// Zoomed render at native sampled resolution drawn from the glyphs'
++/// EXACT geometry: each display pixel is 1/8 x 1/8 world units and lies
++/// entirely within one half-cell (pixel edges align with cell bounds),
++/// so its coverage is the closed-form rect intersection above, shaded
++/// from the checkerboard to the glyph's palette color. Unlike the
++/// majority-voted `bitmap_pane`, edges and one-eighth increments show at
++/// true position. Metrics stay sampled — this is display only.
++#[doc(hidden)]
++pub fn glyph_pane(
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    palette: &[Rgb],
++    style: &Style,
++) -> Vec<String> {
++    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let mut colors = vec![vec![None; PX_W]; PX_H];
++    for py in 0..PX_H {
++        for px in 0..PX_W {
++            let (x0, x1) = (origin.x + px as f32 / 8.0, origin.x + (px + 1) as f32 / 8.0);
++            let (y1, y0) = (origin.y + 3.0 - py as f32 / 8.0, origin.y + 3.0 - (py + 1) as f32 / 8.0);
++            // half-cell lookup from the pixel center, same rounding as
++            // actual_sample; pixel edges align with cell bounds so the
++            // whole pixel is in one half
++            let wx = (x0 + x1) / 2.0;
++            let wy = (y0 + y1) / 2.0;
++            let sx = (wx + 0.5).floor() as i32;
++            let sy = (wy + 0.5).floor() as i32;
++            let (dx, dy) = (sx - center.x, sy - center.y);
++            if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) {
++                continue;
++            }
++            let half = if wx < sx as f32 { 0 } else { 1 };
++            let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
++            if c == SPACE {
++                continue;
++            }
++            let cell_left = sx as f32 - 0.5 + 0.5 * half as f32;
++            let cell_bottom = sy as f32 - 0.5;
++            let cov = glyph_rect_coverage(
++                c,
++                ((x0 - cell_left) * 2.0).clamp(0.0, 1.0),
++                (y0 - cell_bottom).clamp(0.0, 1.0),
++                ((x1 - cell_left) * 2.0).clamp(0.0, 1.0),
++                (y1 - cell_bottom).clamp(0.0, 1.0),
++            );
++            if cov <= 0.0 {
++                continue;
++            }
++            let owner = owners[(dx + 1) as usize][(dy + 1) as usize][half].unwrap_or(0);
++            let bg = cell_bg(px / 4, py / 8);
++            colors[py][px] = Some(lerp(bg, palette[owner % palette.len()], cov));
++        }
++    }
++    pane_from_colors(style, &colors)
++}
++
++/// Big-pixel display geometry — the `glyphs` reference table's union
++/// lattice. One big pixel = 1/16 x 1/24 world (SX x SY samples), two big
++/// pixels per text row, window = center square +/- 1.0 world: the true
++/// square's footprint always fits inside, so only rare outer-ring glyph
++/// slivers clip at the border.
++pub const BIG_PX_W: usize = 2 * SX; // 32 big pixels = 2 world wide
++pub const BIG_PX_H: usize = 2 * SY; // 48 big pixels = 2 world tall
++pub const BIG_TEXT_ROWS: usize = BIG_PX_H / 2; // 24 content rows
++
++/// Compose a big-pixel color grid (top row first) into text rows, exactly
++/// like `pane_from_colors` but at the union lattice: 8 big pixels per
++/// half-cell column, 12 text rows per character cell.
++#[doc(hidden)]
++pub fn big_pane_from_colors(style: &Style, colors: &[Vec<Option<Rgb>>]) -> Vec<String> {
++    (0..BIG_TEXT_ROWS)
++        .map(|t| {
++            let mut line: String = (0..BIG_PX_W)
++                .map(|px| {
++                    two_tone_cell(
++                        style,
++                        cell_bg(px / 8, t / 12),
++                        colors[2 * t][px],
++                        colors[2 * t + 1][px],
++                    )
++                })
++                .collect();
++            line.push_str(style.reset());
++            line
++        })
++        .collect()
++}
++
++/// Zoomed render at the union lattice of the snap families (the `glyphs`
++/// reference table's big pixels): every glyph edge lies exactly on a big
++/// pixel boundary, so sampling the pixel center with `glyph_filled`
++/// classifies the whole pixel — exact fill, no coverage shading, one
++/// palette color per owning glyph. Metrics stay sampled — display only.
++#[doc(hidden)]
++pub fn big_pixel_pane(
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    palette: &[Rgb],
++    style: &Style,
++) -> Vec<String> {
++    let origin: WorldPoint = euclid::point2(center.x as f32 - 1.0, center.y as f32 - 1.0);
++    let mut colors = vec![vec![None; BIG_PX_W]; BIG_PX_H];
++    for py in 0..BIG_PX_H {
++        for px in 0..BIG_PX_W {
++            // pixel centers sit at odd multiples of 1/(2*SX) and 1/(2*SY),
++            // never on a half-cell boundary, so center-based cell lookup
++            // is exact (pixel edges align with cell bounds)
++            let wx = origin.x + (px as f32 + 0.5) / SX as f32;
++            let wy = origin.y + 2.0 - (py as f32 + 0.5) / SY as f32;
++            let sx = (wx + 0.5).floor() as i32;
++            let sy = (wy + 0.5).floor() as i32;
++            let (dx, dy) = (sx - center.x, sy - center.y);
++            if !(-1..=1).contains(&dx) || !(-1..=1).contains(&dy) {
++                continue;
++            }
++            let half = if wx < sx as f32 { 0 } else { 1 };
++            let c = grid[(dx + 1) as usize][(dy + 1) as usize][half];
++            if c == SPACE {
++                continue;
++            }
++            let cell_left = sx as f32 - 0.5 + 0.5 * half as f32;
++            let cell_bottom = sy as f32 - 0.5;
++            if !glyph_filled(c, (wx - cell_left) * 2.0, wy - cell_bottom) {
++                continue;
++            }
++            let owner = owners[(dx + 1) as usize][(dy + 1) as usize][half].unwrap_or(0);
++            colors[py][px] = Some(palette[owner % palette.len()]);
++        }
++    }
++    big_pane_from_colors(style, &colors)
++}
++
++/// Small-displacement step for `displacement_sensitivity`: the nudge scale,
++/// so one step can cross a real glyph-pick or snap-family boundary.
++pub const DISPLACEMENT_DELTA: f32 = 1.0 / 16.0;
++
++/// Worst-case xor gained per small displacement: for each axis direction,
++/// how much the ideal-square xor of the method's own render grows when the
++/// square (and its ideal) move by `delta`. Piecewise-constant glyph picks
++/// make this 0 most of the time with jumps at pick boundaries — a direct
++/// measure of pop sensitivity. Returns (worst gain, worst direction).
++pub fn displacement_sensitivity(
++    neighborhood: impl Fn(WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare),
++    pos: WorldPoint,
++    delta: f32,
++) -> (f32, WorldMove) {
++    let error_at = |p: WorldPoint| {
++        let (grid, center) = neighborhood(p);
++        let owners = assign_colors(&grid);
++        coverage_error(&grid, &owners, center, p)
++    };
++    let base = error_at(pos);
++    let mut best = (0.0f32, WorldMove::new(1.0, 0.0));
++    for d in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
++        let dir: WorldMove = WorldMove::new(d.0, d.1);
++        let gain = error_at(pos + dir * delta) - base;
++        if gain > best.0 {
++            best = (gain, dir);
++        }
++    }
++    best
++}
++
++/// Sample grid over the render window. Indexed [x][y], y from the bottom.
++///
++/// Sampling note: sample points sit at half-sample offsets
++/// ((j+0.5)/16, (i+0.5)/24), which can never coincide with the
++/// half/third/eighth glyph boundaries, so coverage metrics never alias.
++pub struct FillGrid {
++    pub cells: Vec<Vec<bool>>,
++    owners: Vec<Vec<Option<usize>>>,
++    origin: WorldPoint, // world coords of the window's bottom-left corner
++}
++
++impl FillGrid {
++    pub fn sample(origin: WorldPoint, mut f: impl FnMut(f32, f32) -> (bool, Option<usize>)) -> Self {
++        let mut cells = Vec::new();
++        let mut owners = Vec::new();
++        for j in 0..NX {
++            let mut col = Vec::new();
++            let mut owner_col = Vec::new();
++            for i in 0..NY {
++                let wx = origin.x + (j as f32 + 0.5) / SX as f32;
++                let wy = origin.y + (i as f32 + 0.5) / SY as f32;
++                let (filled, owner) = f(wx, wy);
++                col.push(filled);
++                owner_col.push(owner);
++            }
++            cells.push(col);
++            owners.push(owner_col);
++        }
++        FillGrid {
++            cells,
++            owners,
++            origin,
++        }
++    }
++
++    pub fn filled(&self, j: usize, i: usize) -> bool {
++        self.cells[j][i]
++    }
++
++    pub fn wy(&self, i: usize) -> f32 {
++        self.origin.y + (i as f32 + 0.5) / SY as f32
++    }
++
++    pub fn wx(&self, j: usize) -> f32 {
++        self.origin.x + (j as f32 + 0.5) / SX as f32
++    }
++
++    /// (filled, owner) of one display pixel by majority vote. The pixel
++    /// grid aligns exactly with the half-cell grid (4x8 pixels per
++    /// half-cell), so the owner is unambiguous.
++    fn pixel(&self, px: usize, py: usize) -> Option<Option<usize>> {
++        // py 0 = top pixel row
++        let mut count = 0;
++        let mut owner = None;
++        for dj in 0..2 {
++            for di in 0..3 {
++                let j = px * 2 + dj;
++                let i = NY - 1 - (py * 3 + di);
++                if self.cells[j][i] {
++                    count += 1;
++                    owner = self.owners[j][i];
++                }
++            }
++        }
++        if count >= 3 {
++            Some(owner)
++        } else {
++            None
++        }
++    }
++
++    /// Zoomed view as styled text rows over a dark-grey checkerboard that
++    /// marks the character cells (4x8 pixels per half-cell). Filled pixels
++    /// take their glyph's color; a text cell covering two differently-owned
++    /// pixels shows the upper pixel as fg and the lower as bg.
++    pub fn bitmap_pane(&self, palette: &[Rgb], style: &Style) -> Vec<String> {
++        let color_of = |owner: Option<usize>| palette[owner.unwrap_or(0) % palette.len()];
++        (0..TEXT_ROWS)
++            .map(|t| {
++                let mut line: String = (0..PX_W)
++                    .map(|px| {
++                        two_tone_cell(
++                            style,
++                            cell_bg(px / 4, t / 4),
++                            self.pixel(px, 2 * t).map(|o| color_of(o)),
++                            self.pixel(px, 2 * t + 1).map(|o| color_of(o)),
++                        )
++                    })
++                    .collect();
++                line.push_str(style.reset());
++                line
++            })
++            .collect()
++    }
++}
++
++#[cfg(test)]
++mod charwise_tests {
++    use super::*;
++
++    fn cell(grid: &[[DoubleChar; 3]; 3], dx: i32, dy: i32) -> DoubleChar {
++        grid[(dx + 1) as usize][(dy + 1) as usize]
++    }
++
++    #[test]
++    fn test_aligned_square() {
++        let (grid, center) = charwise_neighborhood(euclid::point2(0.0, 0.0));
++        assert_eq!(center, euclid::point2(0, 0));
++        for dx in -1..=1 {
++            for dy in -1..=1 {
++                let expected = if (dx, dy) == (0, 0) {
++                    [FULL_BLOCK; 2]
++                } else {
++                    [SPACE; 2]
++                };
++                assert_eq!(cell(&grid, dx, dy), expected);
++            }
++        }
++    }
++
++    #[test]
++    fn test_half_cell_x_shift() {
++        // square spans x in [-0.25, 0.75]: the center square keeps a full
++        // right half-cell, its right neighbor gets a left half-block
++        let (grid, _) = charwise_neighborhood(euclid::point2(0.25, 0.0));
++        assert_eq!(cell(&grid, 0, 0), [RIGHT_HALF_BLOCK, FULL_BLOCK]);
++        assert_eq!(cell(&grid, 1, 0), [LEFT_HALF_BLOCK, SPACE]);
++        assert_eq!(cell(&grid, -1, 0), [SPACE; 2]);
++    }
++
++    #[test]
++    fn test_row_straddle_picks_vertical_strips() {
++        // the square at y=0.4 straddles both rows: the center row keeps a
++        // top-anchored 5/8 of the square (0.6 is nearest the eighth grid),
++        // the row above gets the bottom 3/8; thirds are farther
++        let (grid, _) = charwise_neighborhood(euclid::point2(0.0, 0.4));
++        assert_eq!(cell(&grid, 0, 0), [EIGHTH_BLOCKS_FROM_TOP[5]; 2]);
++        assert_eq!(cell(&grid, 0, 1), [EIGHTH_BLOCKS_FROM_BOTTOM[3]; 2]);
++        assert_eq!(cell(&grid, 0, -1), [SPACE; 2]);
++    }
++
++    #[test]
++    fn test_diagonal_corner_picks_hextant() {
++        // the up-right diagonal cell sees a 0.6 x 0.3 corner overlap; a
++        // single bottom-left sextant beats every strip and the quadrant
++        // (xor ~0.047 vs 0.15 for the runner-up)
++        let (grid, _) = charwise_neighborhood(euclid::point2(0.3, 0.3));
++        let bottom_left_sextant =
++            hextant_array_to_char([[false, false], [false, false], [true, false]]);
++        assert_eq!(cell(&grid, 1, 1), [bottom_left_sextant, SPACE]);
++    }
++
++    #[test]
++    fn test_glyph_rects_matches_glyph_filled() {
++        // glyph_rects must describe the same geometry glyph_filled
++        // point-samples: every glyph, every half-sample lattice point.
++        // Half-sample offsets never land on glyph boundaries, so strict
++        // inequalities in the rect test are safe.
++        for f in glyph_fits() {
++            for i in 0..SY {
++                for j in 0..HX {
++                    let fx = (j as f32 + 0.5) / HX as f32;
++                    let fy = (i as f32 + 0.5) / SY as f32;
++                    let in_rects = glyph_rects(f.c).iter().any(|[x0, y0, x1, y1]| {
++                        fx >= *x0 && fx < *x1 && fy >= *y0 && fy < *y1
++                    });
++                    assert_eq!(
++                        in_rects,
++                        glyph_filled(f.c, fx, fy),
++                        "glyph {} at ({fx}, {fy})",
++                        f.c
++                    );
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn test_weight_zero_matches_plain_charwise() {
++        // the weighted path at weight 0 must be the plain xor argmin,
++        // bit for bit, over the whole positive-quadrant offset lattice
++        for xi in 0..=16 {
++            for yi in 0..=16 {
++                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
++                assert_eq!(
++                    charwise_neighborhood(pos),
++                    charwise_neighborhood_weighted(pos, 0.0),
++                    "weight-0 divergence at ({xi}, {yi})/16"
++                );
++            }
++        }
++    }
++
++    #[test]
++    fn test_protrusion_penalty_trades_spike_for_even_error() {
++        // the center square's right half-cell sees a full-width, bottom-
++        // anchored 0.3 overlap. The plain xor argmin is the lower-third
++        // block (xor 1/30): it spikes 1/30 above the square across the
++        // whole half-cell. The shaped pick takes the 2/8 block instead:
++        // xor 0.05 but zero protrusion, spreading the error under the
++        // true edge rather than sticking out past it.
++        // (pos rounds to square (0, -1); the sliver is in the square
++        // above it, grid cell (0, 1).)
++        let pos = euclid::point2(0.25, -0.7);
++        let (plain, _) = charwise_neighborhood(pos);
++        let (shaped, _) = charwise_shaped_neighborhood(pos);
++        assert_eq!(cell(&plain, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
++        assert_eq!(cell(&shaped, 0, 1)[1], EIGHTH_BLOCKS_FROM_BOTTOM[2]);
++    }
++
++    #[test]
++    fn test_shaped_variant_changes_something() {
++        // guard against the penalty silently decaying to a no-op: over a
++        // lattice spanning both sign quadrants the shaped grid must
++        // differ from the plain one somewhere
++        let mut diffs = 0usize;
++        for xi in -16..=16 {
++            for yi in -16..=16 {
++                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
++                if charwise_neighborhood(pos) != charwise_shaped_neighborhood(pos) {
++                    diffs += 1;
++                }
++            }
++        }
++        assert!(diffs > 0, "shaped pick never diverges from plain charwise");
++    }
++
++    #[test]
++    fn test_squared_penalty_kickin_threshold() {
++        // the squared penalty only bites past d > 1/W2 = 0.25 cells. At
++        // (0.25, -0.7) the spike's protrusion is d = 1/30, so the squared
++        // variant keeps the plain spiky pick that the linear variant
++        // refuses (see test_protrusion_penalty_trades_spike_for_even_error)
++        let pos = euclid::point2(0.25, -0.7);
++        let (plain, _) = charwise_neighborhood(pos);
++        let (lin, _) = charwise_shaped_neighborhood(pos);
++        let (sq, _) = charwise_protrusion_squared_neighborhood(pos);
++        assert_eq!(cell(&plain, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
++        assert_eq!(cell(&lin, 0, 1)[1], EIGHTH_BLOCKS_FROM_BOTTOM[2]);
++        assert_eq!(cell(&sq, 0, 1)[1], LOWER_ONE_THIRD_BLOCK);
++    }
++
++    #[test]
++    fn test_squared_variant_changes_deep_protrusions() {
++        // guard against the quadratic silently decaying to the linear
++        // pick: past the 1/W2 kick-in it must diverge somewhere on a
++        // lattice spanning both sign quadrants
++        let mut diffs = 0usize;
++        for xi in -16..=16 {
++            for yi in -16..=16 {
++                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
++                if charwise_shaped_neighborhood(pos)
++                    != charwise_protrusion_squared_neighborhood(pos)
++                {
++                    diffs += 1;
++                }
++            }
++        }
++        assert!(diffs > 0, "squared pick never diverges from linear");
++    }
++}
++
++#[cfg(test)]
++mod pane_tests {
++    use super::*;
++
++    /// Lit big-pixel count of a pane: '█' lights both stacked big pixels,
++    /// '▀'/'▄' one.
++    fn lit_pixels(lines: &[String]) -> usize {
++        lines
++            .iter()
++            .map(|l| {
++                l.chars()
++                    .map(|c| match c {
++                        '█' => 2,
++                        '▀' | '▄' => 1,
++                        _ => 0,
++                    })
++                    .sum::<usize>()
++            })
++            .sum()
++    }
++
++    /// Every metric pane must be BIG_TEXT_ROWS text rows of exactly
++    /// BIG_PX_W cells — the same grid as the zoom panes (a pane that
++    /// regresses to the old 24x24 display grid fails here).
++    #[test]
++    fn test_metric_panes_match_zoom_grid() {
++        let style = Style { enabled: false };
++        for pos in [
++            euclid::point2(0.0, 0.0),
++            euclid::point2(0.3, 0.42),
++            euclid::point2(-1.9, 2.37),
++        ] {
++            let (grid, center) = rendered_neighborhood(pos);
++            let owners = assign_colors(&grid);
++            let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++            let class = ClassGrid::sample(origin, |wx, wy| {
++                ClassGrid::class_at(&grid, &owners, center, pos, wx, wy)
++            });
++            let actual =
++                FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
++            let panes: Vec<Vec<String>> = vec![
++                class.center_pane(&actual, pos, &style),
++                class.signed_pane(&style),
++                ClassGrid::per_char_heat_pane(&grid, center, pos, &style),
++                class.mismatch_pane(&style),
++                ClassGrid::jaggedness_pane(&actual, &style),
++                ClassGrid::displacement_pane(&class, &class, &style),
++                frame_diff_pane(Some((&grid, center)), (&grid, center), &style),
++            ];
++            for pane in &panes {
++                assert_eq!(pane.len(), BIG_TEXT_ROWS, "row count at {pos:?}");
++                for line in pane {
++                    assert_eq!(line.chars().count(), BIG_PX_W, "width at {pos:?}");
++                }
++            }
++        }
++    }
++
++    /// The mismatch pane lights exactly the Over/Under samples of the
++    /// 2x2 window crop — the pane is the numeric xor error pixel for
++    /// pixel (what the numbers measure), not a downsampled view of it.
++    #[test]
++    fn test_mismatch_pane_lights_exactly_the_wrong_samples() {
++        let style = Style { enabled: false };
++        for xi in 0..=8 {
++            for yi in 0..=8 {
++                let pos = euclid::point2(xi as f32 / 16.0, yi as f32 / 16.0);
++                let (grid, center) = rendered_neighborhood(pos);
++                let owners = assign_colors(&grid);
++                let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++                let class = ClassGrid::sample(origin, |wx, wy| {
++                    ClassGrid::class_at(&grid, &owners, center, pos, wx, wy)
++                });
++                let wrong_in_crop: usize = (0..BIG_PX_H)
++                    .flat_map(|by| (0..BIG_PX_W).map(move |bp| (bp, by)))
++                    .map(|(bp, by)| class.sample_at(bp, by))
++                    .filter(|&c| matches!(c, SampleClass::Over | SampleClass::Under))
++                    .count();
++                assert_eq!(
++                    lit_pixels(&class.mismatch_pane(&style)),
++                    wrong_in_crop,
++                    "mismatch pane at ({xi}, {yi})/16"
++                );
++            }
++        }
++    }
++
++    /// Identical consecutive renders measure zero frame diff and light
++    /// nothing; a missing previous frame is no data (0.0, empty pane —
++    /// the tool displays n/a).
++    #[test]
++    fn test_frame_diff_identical_renders_measure_zero() {
++        let style = Style { enabled: false };
++        let pos = euclid::point2(0.3, -0.7);
++        let (grid, center) = rendered_neighborhood(pos);
++        let cur = (&grid, center);
++        assert_eq!(frame_diff_xor(Some(cur), cur), 0.0);
++        assert_eq!(frame_diff_xor(None, cur), 0.0);
++        for pane in [frame_diff_pane(Some(cur), cur, &style), frame_diff_pane(None, cur, &style)] {
++            assert_eq!(lit_pixels(&pane), 0);
++        }
++    }
++
++    /// A displaced frame lights exactly the differing samples of the 2x2
++    /// window crop (pane ≡ number on the shared grid), the number covers at
++    /// least the crop, and change grows with displacement.
++    #[test]
++    fn test_frame_diff_pane_lights_exactly_the_changed_samples() {
++        let style = Style { enabled: false };
++        let (pgrid, pcenter) = rendered_neighborhood(euclid::point2(0.3, -0.7));
++        let powners = assign_colors(&pgrid);
++        for (near, far) in [
++            (euclid::point2(0.55, -0.7), euclid::point2(1.3, -0.7)),
++            (euclid::point2(0.3, -0.15), euclid::point2(0.3, 0.4)),
++        ] {
++            let (cgrid, ccenter) = rendered_neighborhood(near);
++            let cowners = assign_colors(&cgrid);
++            // window crop geometry per big_pixel_pane, on the current
++            // frame's center
++            let (bx, by) = (ccenter.x as f32 - 1.0, ccenter.y as f32 - 1.0);
++            let expected: usize = (0..BIG_PX_H)
++                .flat_map(|py| (0..BIG_PX_W).map(move |px| (px, py)))
++                .map(|(px, py)| {
++                    let wx = bx + (px as f32 + 0.5) / SX as f32;
++                    let wy = by + 2.0 - (py as f32 + 0.5) / SY as f32;
++                    actual_sample(&pgrid, &powners, pcenter, wx, wy).0
++                        != actual_sample(&cgrid, &cowners, ccenter, wx, wy).0
++                })
++                .filter(|d| *d)
++                .count();
++            let pane = frame_diff_pane(Some((&pgrid, pcenter)), (&cgrid, ccenter), &style);
++            assert_eq!(lit_pixels(&pane), expected, "frame-diff pane at {near:?}");
++            let err = frame_diff_xor(Some((&pgrid, pcenter)), (&cgrid, ccenter));
++            assert!(err > 0.0, "a real move must change the render");
++            assert!(err * (SX * SY) as f32 >= expected as f32);
++            let (fgrid, fcenter) = rendered_neighborhood(far);
++            assert!(
++                frame_diff_xor(Some((&pgrid, pcenter)), (&fgrid, fcenter)) > err,
++                "frame diff must grow with displacement"
++            );
++        }
++    }
++}
+
+diff --git a/crates/terminal_rendering/src/bin/floating_square_debug.rs b/crates/terminal_rendering/src/bin/floating_square_debug.rs
+new file mode 100644
+--- a/crates/terminal_rendering/src/bin/floating_square_debug.rs
++++ b/crates/terminal_rendering/src/bin/floating_square_debug.rs
+@@ -0,0 +1,1878 @@
++//! Visual debug tool for floating square rendering.
++//!
++//! Renders the same character picks the game uses
++//! (`characters_for_full_square_with_2d_offset`, one world square = 2 terminal
++//! columns) onto a checkerboard background with a dot marking each square
++//! center, so sub-square offsets are easy to eyeball. All diagnostics
++//! (snap family, snap error, coverage) describe the real render path via the
++//! `#[doc(hidden)]` debug accessors in floating_square.rs and coverage.rs, so
++//! the tool cannot drift from what the game draws and the coherence test
++//! asserts.
++//!
++//! Modes:
++//!   pos X Y       one square at world point (X, Y): frame with true-center
++//!                 marker, snap-family diagnostics, and a sampled
++//!                 actual-vs-ideal coverage view (the coherence test's oracle)
++//!   families X Y  the same position rendered with each snap family forced,
++//!                 side by side
++//!   sweep         offset table over 0..=0.5 in 1/16 steps, each cell labeled
++//!                 with the family that offset picks (a decision-boundary map)
++//!   glyphs        reference table: every block character the renderer can
++//!                 emit with its Unicode name and an exact big-pixel zoom
++//!                 (8x24 pixels per character, 1/16 x 1/24 world each)
++//!                 framed with position rulers; plain text, redirect to a
++//!                 file
++//!   animate (default)
++//!                 square on the alternate screen (q quits); orbit,
++//!                 arrow-key nudge, and line trajectories. A two-method
++//!                 comparison: the in-use game path (family-snapped) and
++//!                 a candidate replacement cycled with [ and ] (charwise;
++//!                 charwise + protrusion, objective xor + 1.0·d; charwise
++//!                 + protrusion², objective xor + 4.0·d² — progressive:
++//!                 shallow overshoot nearly free, deep spikes hammered).
++//!                 Each method row shows its large real-size grid (with
++//!                 glyph legend and the error its own picker minimizes),
++//!                 the zoomed render as union-lattice big pixels (the
++//!                 glyphs table's exact 1/16 x 1/24 world pixels, one
++//!                 palette color per glyph), and ONE error measurement
++//!                 as a colored pane on the same big-pixel lattice (one
++//!                 big pixel per sample — the grid the numbers measure),
++//!                 with its numeric value — cycled with , and . through center error
++//!                 (silhouette + ideal outline + both centroids), area
++//!                 error (signed: over red / under blue), per-char
++//!                 coverage (half-cells heat-shaded by local error),
++//!                 ideal square xor (any mismatch lit), jaggedness
++//!                 (contour lit by local edge-step length), and
++//!                 displacement sensitivity (what turns wrong under the
++//!                 worst 1/16 nudge: bright yellow = newly wrong), and
++//!                 frame diff (which samples changed against the previous
++//!                 rendered frame — motion pops light up; n/a until one
++//!                 frame old). Each method row also carries the selected
++//!                 error's recent history as a block-character sparkline
++//!                 (one 1/8th-increment block per frame, shared y-axis
++//!                 across the method slots), sampled only on frames where
++//!                 the square actually moves — manual mouse movement
++//!                 counts. Then a common row with the ideal (true square)
++//!                 zoom, global state, and controls. Left click/drag sets the orbit's
++//!                 angular position (the angle from the top-row grid's
++//!                 center to the mouse, at the fixed orbit radius); other
++//!                 buttons place the square (drag to move it), and
++//!                 holding shift/ctrl/alt while dragging (or pressing f)
++//!                 switches placement to fine control, where large mouse
++//!                 movements map to sub-cell square movements.
++//!
++//! Run via the top-level ./debug-floating-squares wrapper, or:
++//!   cargo run -p terminal_rendering --bin floating_square_debug -- animate
++
++use std::io::{stdin, stdout, IsTerminal, Write};
++use std::sync::mpsc::channel;
++use std::thread;
++use std::time::Duration;
++
++use rgb::RGB8;
++use termion::event::{Event, Key, MouseButton, MouseEvent};
++use termion::input::{MouseTerminal, TermReadEventsAndRaw};
++use termion::raw::IntoRawMode;
++use termion::screen::IntoAlternateScreen;
++
++use terminal_rendering::coverage::{
++    self, actual_sample, assign_colors, big_pane_from_colors, big_pixel_pane, cell_bg,
++    charwise_neighborhood, charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood,
++    charwise_objective, coverage_error, displacement_sensitivity, fill_centroid, glyph_filled,
++    glyph_pane, jaggedness, lerp, pane_from_colors, per_char_coverage_error,
++    frame_diff_pane, frame_diff_xor, rendered_neighborhood, rendered_neighborhood_forced,
++    ClassGrid, FillGrid, Metrics, BIG_PX_W, BITMAP_W, PX_H, PX_W,
++    CHARWISE_PROTRUSION_SQUARED_WEIGHT, CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
++};
++use terminal_rendering::glyph_constants::named_chars::EIGHTH_BLOCKS_FROM_BOTTOM;
++use terminal_rendering::glyph_constants::named_colors::*;
++use terminal_rendering::glyph_constants::SPACE;
++use terminal_rendering::*;
++
++const SQUARE_COLOR: RGB8 = RGB8::new(255, 165, 0); // orange
++const CENTER_DOT_COLOR: RGB8 = RGB8::new(90, 90, 110);
++const BG_DARK: RGB8 = RGB8::new(16, 16, 24);
++const BG_LIGHT: RGB8 = RGB8::new(30, 30, 44);
++const ORIGIN_COLOR: RGB8 = RGB8::new(0, 180, 180);
++const TRUE_CENTER_COLOR: RGB8 = RGB8::new(120, 255, 255);
++
++/// One display color per snap family, in SnapFamily::ALL / snap_family_names()
++/// order (h-eighths, v-eighths, hextant, quadrant).
++const FAMILY_COLORS: [RGB8; 4] = [
++    RGB8::new(230, 230, 80),  // horizontal eighths: yellow
++    RGB8::new(80, 210, 210),  // vertical eighths: cyan
++    RGB8::new(100, 220, 100), // hextant: green
++    RGB8::new(220, 120, 255), // quadrant: magenta
++];
++const FAMILY_LETTERS: [char; 4] = ['H', 'V', 'X', 'Q'];
++
++fn family_index_of(name: &str) -> usize {
++    snap_family_names().iter().position(|&n| n == name).unwrap()
++}
++
++/// "horizontal eighths (x: 1/16, y: row)" -> "horizontal eighths"
++fn short_family_name(name: &str) -> &str {
++    name.split(" (").next().unwrap()
++}
++
++/// Same checkerboard parity rule as Graphics::square_is_light.
++fn bg_color_for(square: WorldSquare) -> RGB8 {
++    if (square.x + square.y).rem_euclid(2) == 0 {
++        BG_LIGHT
++    } else {
++        BG_DARK
++    }
++}
++
++/// Blank frame covering `radius` squares around `origin_square`, with a dot at
++/// each square center so sub-square offsets are visible against the grid.
++fn grid_frame(radius: i32, origin_square: WorldSquare) -> Frame {
++    let squares_wide = (2 * radius + 1) as usize;
++    let mut frame = Frame::blank(squares_wide * 2, squares_wide);
++    for dx in -radius..=radius {
++        for dy in -radius..=radius {
++            let square = euclid::point2(origin_square.x + dx, origin_square.y + dy);
++            let bg = bg_color_for(square);
++            let marker = if square == origin_square {
++                ('+', ORIGIN_COLOR)
++            } else {
++                ('·', CENTER_DOT_COLOR)
++            };
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            frame.set_by_double_wide_grid(
++                row as usize,
++                wide_col as usize,
++                [
++                    DrawableGlyph::new_colored(marker.0, marker.1, bg),
++                    DrawableGlyph::new_colored(SPACE, BLACK, bg),
++                ],
++            );
++        }
++    }
++    frame
++}
++
++/// Signed so off-grid squares (square near the animation grid's edge) can
++/// be bounds-checked before casting; casting first would wrap to huge
++/// values and overflow the width arithmetic in the check itself.
++fn frame_row_col(radius: i32, origin_square: WorldSquare, square: WorldSquare) -> [i32; 2] {
++    [
++        radius - (square.y - origin_square.y),
++        radius + (square.x - origin_square.x),
++    ]
++}
++
++/// Mirrors OffsetSquareDrawable::drawables_for_floating_square_at_point:
++/// only the 3x3 neighborhood of the rounded center square can be non-empty.
++/// `forced_family` (index into snap_family_names()) overrides the automatic
++/// family pick, for the `families` mode.
++fn draw_floating_square(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    pos: WorldPoint,
++    forced_family: Option<usize>,
++) {
++    let center = world_point_to_world_square(pos);
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = euclid::point2(center.x + dx, center.y + dy);
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            if row < 0
++                || wide_col < 0
++                || row as usize >= frame.height()
++                || wide_col as usize * 2 + 1 >= frame.width()
++            {
++                continue;
++            }
++            let [row, wide_col] = [row as usize, wide_col as usize];
++            let offset: WorldMove = pos - square.to_f32();
++            let chars = match forced_family {
++                Some(i) => characters_for_full_square_with_2d_offset_forced(offset, i),
++                None => characters_for_full_square_with_2d_offset(offset),
++            };
++            if chars != [SPACE; 2] {
++                let bg = bg_color_for(square);
++                frame.set_by_double_wide_grid(
++                    row,
++                    wide_col,
++                    chars.map(|c| DrawableGlyph::new_colored(c, SQUARE_COLOR, bg)),
++                );
++            }
++        }
++    }
++}
++
++fn pal(i: usize) -> RGB8 {
++    let coverage::Rgb(r, g, b) = coverage::PALETTE[i % coverage::PALETTE.len()];
++    RGB8::new(r, g, b)
++}
++
++/// Draws a precomputed glyph neighborhood with one palette color per
++/// half-cell glyph (matching the zoomed panes and the legend), instead of
++/// the uniform square color the diagnostic modes use.
++fn draw_neighborhood_colored(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    center: WorldSquare,
++    grid: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++) {
++    for dx in -1..=1i32 {
++        for dy in -1..=1i32 {
++            let square = euclid::point2(center.x + dx, center.y + dy);
++            let [row, wide_col] = frame_row_col(radius, origin_square, square);
++            if row < 0
++                || wide_col < 0
++                || row as usize >= frame.height()
++                || wide_col as usize * 2 + 1 >= frame.width()
++            {
++                continue;
++            }
++            let chars = grid[(dx + 1) as usize][(dy + 1) as usize];
++            if chars != [SPACE; 2] {
++                let bg = bg_color_for(square);
++                let glyph = |half: usize| {
++                    let color = owners[(dx + 1) as usize][(dy + 1) as usize][half]
++                        .map(pal)
++                        .unwrap_or(SQUARE_COLOR);
++                    DrawableGlyph::new_colored(chars[half], color, bg)
++                };
++                frame.set_by_double_wide_grid(
++                    row as usize,
++                    wide_col as usize,
++                    [glyph(0), glyph(1)],
++                );
++            }
++        }
++    }
++}
++
++/// (text, visible width) legend mapping each rendered half-cell glyph to
++/// its palette color, in assign_colors' scan order so legend colors match
++/// the panes. A 1x1 square spans at most 8 half-cells, so the legend always
++/// fits under the real-size grid.
++fn glyph_legend(
++    glyphs: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    style: &coverage::Style,
++) -> (String, usize) {
++    let mut legend = String::new();
++    let mut w = 0usize;
++    for dy in [1i32, 0, -1] {
++        for dx in -1..=1i32 {
++            for half in 0..2 {
++                if let Some(idx) = owners[(dx + 1) as usize][(dy + 1) as usize][half] {
++                    legend.push_str(&style.fg(coverage::PALETTE[idx % coverage::PALETTE.len()]));
++                    legend.push(glyphs[(dx + 1) as usize][(dy + 1) as usize][half]);
++                    legend.push(' ');
++                    w += 2;
++                }
++            }
++        }
++    }
++    legend.push_str(style.reset());
++    (legend, w)
++}
++
++/// Strip ANSI CSI sequences (ESC [ ... final letter) to get a line's
++/// visible width. Pane lines are full of color codes; the box borders need
++/// printable widths to pad straight right edges.
++fn visible_width(s: &str) -> usize {
++    let mut w = 0;
++    let mut chars = s.chars();
++    while let Some(c) = chars.next() {
++        if c == '\x1b' {
++            for c in chars.by_ref() {
++                if c.is_ascii_alphabetic() {
++                    break;
++                }
++            }
++        } else {
++            w += 1;
++        }
++    }
++    w
++}
++
++/// Visible width of a whole column of pre-styled lines.
++fn visible_w(lines: &[String]) -> usize {
++    lines.iter().map(|s| visible_width(s)).max().unwrap_or(0)
++}
++
++/// One titled, bordered row of side-by-side columns. Each column is its
++/// lines plus its visible width; short columns are padded with spaces so
++/// the right border stays a straight vertical line. Relies on the pane
++/// lines being color-neutral at both ends (frame lines, bitmap panes, and
++/// legends all reset their colors), so the padding and borders pick up no
++/// dangling background.
++fn boxed_row(title: &str, columns: &[(&[String], usize)]) -> Vec<String> {
++    const GAP: usize = 2;
++    let h = columns.iter().map(|c| c.0.len()).max().unwrap_or(0);
++    let inner_w: usize =
++        columns.iter().map(|c| c.1).sum::<usize>() + GAP * (columns.len() - 1) + 2;
++    let label = format!("─ {title} ");
++    let mut lines = vec![format!(
++        "┌{label}{}┐",
++        "─".repeat(inner_w - visible_width(&label))
++    )];
++    for row in 0..h {
++        let mut line = String::from("│ ");
++        for (i, (col, w)) in columns.iter().enumerate() {
++            if i > 0 {
++                line.push_str(&" ".repeat(GAP));
++            }
++            let cell = col.get(row).map(String::as_str).unwrap_or("");
++            line.push_str(cell);
++            line.push_str(&" ".repeat(w.saturating_sub(visible_width(cell))));
++        }
++        line.push_str(" │");
++        lines.push(line);
++    }
++    lines.push(format!("└{}┘", "─".repeat(inner_w)));
++    lines
++}
++
++/// One render method to compare: how to produce its glyph neighborhood.
++type Neighborhood = fn(WorldPoint) -> ([[DoubleChar; 3]; 3], WorldSquare);
++
++/// The game-facing render path — always the "in use" row.
++const IN_USE: (&str, Neighborhood) = ("family-snapped", rendered_neighborhood);
++
++/// Candidate replacements for the in-use method, cycled with [ and ].
++const CANDIDATES: [(&str, Neighborhood); 3] = [
++    ("charwise", charwise_neighborhood),
++    ("charwise + protrusion", charwise_shaped_neighborhood),
++    ("charwise + protrusion²", charwise_protrusion_squared_neighborhood),
++];
++
++/// The error measurements that can be cycled with , and . — one shown at a
++/// time, as a full-resolution colored pane per method.
++const METRICS: [&str; 7] = ["center", "area", "per-char", "xor", "jagged", "disp", "frame"];
++
++/// The method's own objective, formatted for the stats column ("the error
++/// used for rendering"). `index` 0 = in use, 1..=3 = CANDIDATES index + 1.
++fn objective_lines(
++    index: usize,
++    glyphs: &[[DoubleChar; 3]; 3],
++    owners: &[[[Option<usize>; 2]; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++) -> Vec<String> {
++    match index {
++        // the family map is baked against the sampled ideal-square xor
++        0 => vec![format!(
++            "bake objective (xor)={:.3}",
++            coverage_error(glyphs, owners, center, pos)
++        )],
++        1 => vec![format!("Σ cell xor={:.3}", charwise_objective(pos, 0.0, false))],
++        2 => vec![format!(
++            "xor+{:.2}·Σd={:.3}",
++            CHARWISE_PROTRUSION_WEIGHT,
++            charwise_objective(pos, CHARWISE_PROTRUSION_WEIGHT, false)
++        )],
++        _ => vec![format!(
++            "xor+{:.2}·Σd²={:.3}",
++            CHARWISE_PROTRUSION_SQUARED_WEIGHT,
++            charwise_objective(pos, CHARWISE_PROTRUSION_SQUARED_WEIGHT, true)
++        )],
++    }
++}
++
++/// Arrow for the displacement metric's worst direction.
++fn dir_arrow(d: WorldMove) -> char {
++    if d.x > 0.0 {
++        '→'
++    } else if d.x < 0.0 {
++        '←'
++    } else if d.y > 0.0 {
++        '↑'
++    } else {
++        '↓'
++    }
++}
++
++/// History depth per method row: one 1/8th-increment block per sampled
++/// frame (~1.05s at the 33ms frame clock). Matches the zoom/error column
++/// width so the boxed rows stay aligned.
++const SPARKLINE_LEN: usize = 32;
++
++/// One error measurement's full report for one method: the colored pane,
++/// the value string printed under it, and the scalar the history buffers
++/// sample (`None` = no data this frame — not appended, shown as n/a).
++#[derive(Default)]
++struct MetricReport {
++    pane: Vec<String>,
++    value: String,
++    number: Option<f32>,
++}
++
++/// The selected error measurement for one method — the single source of
++/// truth shared by the displayed pane/value (method_section) and the
++/// per-slot history sparklines (render_animation_frame).
++///
++/// `number` is the history scalar: `center` = |centroid − pos| (the pane
++/// shows the pair), `area` = |signed error| (the pane keeps over-red /
++/// under-blue), everything else = the displayed value as-is; `frame` is
++/// the diff against `prev`, `None` while no previous frame exists.
++fn metric_report(
++    nb: Neighborhood,
++    glyphs: &[[DoubleChar; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++    metric: usize,
++    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
++    style: &coverage::Style,
++) -> MetricReport {
++    let owners = assign_colors(glyphs);
++    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let class = || {
++        ClassGrid::sample(sample_origin, |wx, wy| {
++            ClassGrid::class_at(glyphs, &owners, center, pos, wx, wy)
++        })
++    };
++    let actual = || {
++        FillGrid::sample(sample_origin, |wx, wy| {
++            actual_sample(glyphs, &owners, center, wx, wy)
++        })
++    };
++    match metric {
++        0 => {
++            let actual = actual();
++            let class = class();
++            let c = fill_centroid(&actual);
++            MetricReport {
++                pane: class.center_pane(&actual, pos, style),
++                value: match c {
++                    Some(c) => format!("({:+.2}, {:+.2})", c.x - pos.x, c.y - pos.y),
++                    None => "n/a".to_string(),
++                },
++                number: c.map(|c| {
++                    ((c.x - pos.x) * (c.x - pos.x) + (c.y - pos.y) * (c.y - pos.y)).sqrt()
++                }),
++            }
++        }
++        1 => {
++            let class = class();
++            let signed = class.signed_area_error();
++            MetricReport {
++                pane: class.signed_pane(style),
++                value: format!("{signed:+.3}"),
++                number: Some(signed.abs()),
++            }
++        }
++        2 => {
++            let e = per_char_coverage_error(glyphs, center, pos);
++            MetricReport {
++                pane: ClassGrid::per_char_heat_pane(glyphs, center, pos, style),
++                value: format!("{e:.3}"),
++                number: Some(e),
++            }
++        }
++        3 => {
++            let class = class();
++            let xor = class.xor_error();
++            MetricReport {
++                pane: class.mismatch_pane(style),
++                value: format!("{xor:.3}"),
++                number: Some(xor),
++            }
++        }
++        4 => {
++            let actual = actual();
++            let jag = jaggedness(&actual);
++            MetricReport {
++                pane: ClassGrid::jaggedness_pane(&actual, style),
++                value: format!("{jag:.2}"),
++                number: Some(jag),
++            }
++        }
++        5 => {
++            let class = class();
++            let (gain, dir) = displacement_sensitivity(nb, pos, DISPLACEMENT_DELTA);
++            let shifted_pos = pos + dir * DISPLACEMENT_DELTA;
++            let (glyphs2, center2) = nb(shifted_pos);
++            let owners2 = assign_colors(&glyphs2);
++            // sampled on the BASE frame's origin so base and shifted
++            // grids align sample-for-sample for the pane comparison
++            let shifted = ClassGrid::sample(sample_origin, |wx, wy| {
++                ClassGrid::class_at(&glyphs2, &owners2, center2, shifted_pos, wx, wy)
++            });
++            MetricReport {
++                pane: ClassGrid::displacement_pane(&class, &shifted, style),
++                value: format!("{:.3}{}", gain, dir_arrow(dir)),
++                number: Some(gain),
++            }
++        }
++        _ => {
++            let cur = (glyphs, center);
++            let number = prev.map(|_| frame_diff_xor(prev, cur));
++            MetricReport {
++                pane: frame_diff_pane(prev, cur, style),
++                value: match number {
++                    Some(v) => format!("{v:.3}"),
++                    None => "n/a".to_string(),
++                },
++                number,
++            }
++        }
++    }
++}
++
++/// One method's recent history of the selected error as a single line of
++/// 1/8th-increment vertical blocks: `level = round(v / scale * 8)`
++/// clamped to 0..=8, `·` for 0. Oldest sample on the left, right-aligned,
++/// `·`-padded until the buffer fills. `scale` is shared across all method
++/// rows (max over every slot's history), so block heights compare between
++/// methods.
++fn sparkline_column(history: &[f32], scale: f32, style: &coverage::Style) -> String {
++    let dim = style.fg(coverage::DOT_COLOR);
++    let lit = style.fg(coverage::Rgb(190, 190, 200));
++    let mut line = String::new();
++    for _ in 0..SPARKLINE_LEN.saturating_sub(history.len()) {
++        line.push_str(&dim);
++        line.push('·');
++    }
++    for &v in history {
++        let level = (v / scale * 8.0).round().clamp(0.0, 8.0) as usize;
++        line.push_str(if level == 0 { &dim } else { &lit });
++        line.push(if level == 0 {
++            '·'
++        } else {
++            EIGHTH_BLOCKS_FROM_BOTTOM[level]
++        });
++    }
++    line.push_str(style.reset());
++    line
++}
++
++/// The 4th method-row column: the selected error's history sparkline plus
++/// the shared scale legend. Samples are taken only on frames where the
++/// square moved, so parked redraws don't dilute the window.
++fn history_column(
++    metric: usize,
++    history: &[f32],
++    scale: f32,
++    style: &coverage::Style,
++) -> Vec<String> {
++    vec![
++        format!("{:^SPARKLINE_LEN$}", format!("history: {}", METRICS[metric])),
++        sparkline_column(history, scale, style),
++        format!("{:^SPARKLINE_LEN$}", format!("0 ▁▂▃▄▅▆▇█ max={scale:.3}")),
++    ]
++}
++
++/// One method's bordered section: large view (full animation grid, method
++/// info, its own objective), zoomed render at native sampled resolution
++/// with one palette color per glyph plus legend, the currently selected
++/// error measurement as a full-resolution colored pane with its value
++/// (precomputed — all four slots run `metric_report` for the histories,
++/// the displayed rows reuse pane + value), and the error's recent history
++/// as a sparkline with the shared scale legend.
++fn method_section(
++    title: &str,
++    objective_idx: usize,
++    glyphs: &[[DoubleChar; 3]; 3],
++    center: WorldSquare,
++    pos: WorldPoint,
++    metric: usize,
++    style: &coverage::Style,
++    extra_info: &[String],
++    report: MetricReport,
++    history: &[f32],
++    scale: f32,
++) -> Vec<String> {
++    let owners = assign_colors(glyphs);
++
++    // zoomed render: union-lattice big pixels (see big_pixel_pane) — every
++    // glyph edge lands on a pixel boundary, so the fill is exact, one
++    // palette color per glyph
++    let mut zoom_col: Vec<String> = vec![format!("{:^BIG_PX_W$}", "big pixels 1/16x1/24")];
++    zoom_col.extend(big_pixel_pane(
++        glyphs,
++        &owners,
++        center,
++        &coverage::PALETTE,
++        style,
++    ));
++    let legend = glyph_legend(glyphs, &owners, style);
++    if legend.1 > 0 {
++        zoom_col.push("glyph colors:".to_string());
++        zoom_col.push(legend.0);
++    }
++
++    // large view: full animation grid, method info, then its objective —
++    // the error the method's own picker minimizes
++    let origin0 = euclid::point2(0, 0);
++    let mut large = grid_frame(ANIMATE_GRID_RADIUS, origin0);
++    draw_neighborhood_colored(&mut large, ANIMATE_GRID_RADIUS, origin0, center, glyphs, &owners);
++    let mut large_col: Vec<String> = large
++        .string_for_regular_display()
++        .lines()
++        .map(String::from)
++        .collect();
++    large_col.extend(extra_info.iter().cloned());
++    large_col.extend(objective_lines(objective_idx, glyphs, &owners, center, pos));
++
++    // the selected error measurement: precomputed pane + numeric value
++    let mut err_col: Vec<String> = vec![format!(
++        "{:^BIG_PX_W$}",
++        format!("{} (, .)", METRICS[metric])
++    )];
++    err_col.extend(report.pane);
++    err_col.push(format!("{:^BIG_PX_W$}", report.value));
++
++    let spark_col = history_column(metric, history, scale, style);
++
++    let (large_w, zoom_w, err_w, spark_w) = (
++        visible_w(&large_col),
++        visible_w(&zoom_col),
++        visible_w(&err_col),
++        visible_w(&spark_col),
++    );
++    let cols = [
++        (large_col, large_w),
++        (zoom_col, zoom_w),
++        (err_col, err_w),
++        (spark_col, spark_w),
++    ];
++    let refs: Vec<(&[String], usize)> =
++        cols.iter().map(|(l, w)| (l.as_slice(), *w)).collect();
++    boxed_row(title, &refs)
++}
++
++/// Marks the exact square center on the half-cell grid so the snapped-vs-true
++/// offset (reported numerically in the text output) is also visible. Honest
++/// to half a half-cell (1/4 world unit) of quantization; overwrites whatever
++/// glyph the square put in that half-cell.
++fn overlay_true_center(
++    frame: &mut Frame,
++    radius: i32,
++    origin_square: WorldSquare,
++    pos: WorldPoint,
++) {
++    // frame col 0 is the left half-cell edge of the leftmost square, i.e.
++    // world x = origin.x - radius - 0.5; row 0 is the top edge of the
++    // topmost square, world y = origin.y + radius + 0.5
++    let col = ((pos.x - origin_square.x as f32 + radius as f32 + 0.5) * 2.0).floor() as i32;
++    let row = (origin_square.y as f32 + radius as f32 + 0.5 - pos.y).floor() as i32;
++    if row < 0 || col < 0 || row as usize >= frame.height() || col as usize >= frame.width() {
++        return;
++    }
++    let bg = frame.grid[row as usize][col as usize].bg_color;
++    frame.grid[row as usize][col as usize] = DrawableGlyph::new('+', Some(TRUE_CENTER_COLOR), bg);
++}
++
++/// The true square drawn analytically: each display pixel is exactly
++/// 1/8 x 1/8 world units, so per-pixel ideal-coverage area is closed-form.
++/// Shading by coverage shows the sub-pixel edge phase; the sampled
++/// majority vote (whose 3-of-6 threshold produces corner divots at
++/// fractional edge positions — an edge pixel holds 1 of 2 sample columns,
++/// a corner pixel also only ≤2 of 3 rows) is what the metrics see, not
++/// what the reference should look like.
++fn ideal_pane(pos: WorldPoint, origin: WorldPoint, style: &coverage::Style) -> Vec<String> {
++    let mut colors = vec![vec![None; PX_W]; PX_H];
++    for py in 0..PX_H {
++        for px in 0..PX_W {
++            let x0 = origin.x + px as f32 / 8.0;
++            let y1 = origin.y + 3.0 - py as f32 / 8.0;
++            let ov_x = (x0 + 0.125).min(pos.x + 0.5) - x0.max(pos.x - 0.5);
++            let ov_y = y1.min(pos.y + 0.5) - (y1 - 0.125).max(pos.y - 0.5);
++            let frac = (ov_x.max(0.0) * ov_y.max(0.0)) * 64.0; // / (1/8)^2
++            if frac > 0.0 {
++                let bg = cell_bg(px / 4, py / 8);
++                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
++            }
++        }
++    }
++    pane_from_colors(style, &colors)
++}
++
++/// The true square at the big-pixel union lattice over the same
++/// 2x2-world window as `big_pixel_pane`, so the animate view's ideal
++/// column lines up cell-for-cell with the actual zooms. True-square
++/// edges fall between lattice points, so pixels keep fractional analytic
++/// shading (the actual pane needs none — glyph edges are lattice-aligned).
++fn ideal_big_pixel_pane(
++    pos: WorldPoint,
++    center: WorldSquare,
++    style: &coverage::Style,
++) -> Vec<String> {
++    let (ox, oy) = (center.x as f32 - 1.0, center.y as f32 - 1.0);
++    // Work in lattice units (1/16 wide, 1/24 tall) so pixel bounds are
++    // exact integers; only the square's edges carry pos's own rounding.
++    // Direct world-unit subtraction leaves ~1e-7 f32 noise that paints
++    // epsilon slivers at exact edge alignments and off-by-one lerp
++    // colors on full rows (1/24 is not dyadic, unlike the old 1/8 pane).
++    let (sq_x0, sq_x1) = ((pos.x - 0.5 - ox) * 16.0, (pos.x + 0.5 - ox) * 16.0);
++    let (sq_y0, sq_y1) = ((pos.y - 0.5 - oy) * 24.0, (pos.y + 0.5 - oy) * 24.0);
++    let mut colors = vec![vec![None; BIG_PX_W]; coverage::BIG_PX_H];
++    for py in 0..coverage::BIG_PX_H {
++        // pixel py covers y-units [47-py, 48-py] from the window bottom;
++        // one unit is one pixel, so the overlap is the coverage fraction
++        let ov_y = (48.0 - py as f32).min(sq_y1) - (47.0 - py as f32).max(sq_y0);
++        if ov_y <= 0.0 {
++            continue;
++        }
++        for px in 0..BIG_PX_W {
++            let ov_x = (px as f32 + 1.0).min(sq_x1) - (px as f32).max(sq_x0);
++            let frac = ov_x.max(0.0) * ov_y.max(0.0);
++            if frac > 0.0 {
++                let bg = cell_bg(px / 8, py / 24);
++                colors[py][px] = Some(lerp(bg, coverage::IDEAL_COLOR, frac));
++            }
++        }
++    }
++    big_pane_from_colors(style, &colors)
++}
++
++/// Sampled actual-vs-ideal coverage, using the same oracle the coherence
++/// test asserts on (tests/floating_square_coherence.rs).
++fn coverage_zoom_pane(pos: WorldPoint) -> String {
++    let (grid, center) = rendered_neighborhood(pos);
++    let owners = assign_colors(&grid);
++    let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++    let actual = FillGrid::sample(origin, |wx, wy| actual_sample(&grid, &owners, center, wx, wy));
++    let style = coverage::Style::from_env();
++    let actual_lines = glyph_pane(&grid, &owners, center, &coverage::PALETTE, &style);
++    let ideal_lines = ideal_pane(pos, origin, &style);
++    let mut out = format!(
++        "actual: exact glyph geometry; ideal: analytic (1 text cell = 2 samples; background checkerboard = character cells):\n  {:BITMAP_W$}  {}\n",
++        "actual", "ideal (true square)"
++    );
++    for row in 0..actual_lines.len() {
++        out.push_str(&format!("  {}  {}\n", actual_lines[row], ideal_lines[row]));
++    }
++    out.push_str(&format!("  {}\n", Metrics::measure(&actual, pos).summary_line()));
++    out
++}
++
++/// The offset the renderer's family decision actually sees: pos relative to
++/// the rounded center square.
++fn center_offset(pos: WorldPoint) -> WorldMove {
++    pos - world_point_to_world_square(pos).to_f32()
++}
++
++fn print_family_diagnostics(pos: WorldPoint) {
++    let offset = center_offset(pos);
++    let info = snap_debug_info(offset);
++    println!(
++        "family: {}   snapped offset ({:+.4}, {:+.4})   snap err ({:+.4}, {:+.4})",
++        info.family,
++        info.snapped_offset.x,
++        info.snapped_offset.y,
++        info.snapped_offset.x - offset.x,
++        info.snapped_offset.y - offset.y,
++    );
++    // candidates ranked by measured coverage error (the family map's
++    // objective), not the center-snap proxy it used to report
++    for (i, name) in snap_family_names().iter().enumerate() {
++        let (grid, center) = rendered_neighborhood_forced(pos, i);
++        let owners = assign_colors(&grid);
++        let err = coverage_error(&grid, &owners, center, pos);
++        let mark = if *name == info.family { '>' } else { ' ' };
++        println!("  {mark} {name:<38} coverage err {err:.4}");
++    }
++}
++
++fn show_position(pos: WorldPoint) {
++    let frac = fraction_part(pos);
++    println!(
++        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})",
++        pos.x, pos.y, frac.x, frac.y,
++    );
++    print_family_diagnostics(pos);
++    let center = world_point_to_world_square(pos);
++    let mut frame = grid_frame(3, center);
++    draw_floating_square(&mut frame, 3, center, pos, None);
++    overlay_true_center(&mut frame, 3, center, pos);
++    println!("{frame}{}", Glyph::reset_colors());
++    print!("{}", coverage_zoom_pane(pos));
++}
++
++/// The same position rendered with each snap family forced, side by side.
++/// Explains the automatic pick: the winner is the family whose snapped
++/// silhouette sits closest to the true square.
++fn show_families(pos: WorldPoint) {
++    let frac = fraction_part(pos);
++    let info = snap_debug_info(center_offset(pos));
++    println!(
++        "pos=({:.3}, {:.3})  frac=({:+.3}, {:+.3})  auto-picked family: {}",
++        pos.x, pos.y, frac.x, frac.y, info.family,
++    );
++    let center = world_point_to_world_square(pos);
++    let names = snap_family_names();
++    let err_of = |name: &str| {
++        info.candidates
++            .iter()
++            .find(|(n, _)| *n == name)
++            .map(|(_, e)| *e)
++            .unwrap()
++    };
++    let radius = 2i32;
++    let pane_w = ((2 * radius + 1) * 2) as usize; // 5 squares = 10 cols
++    let header: Vec<String> = names
++        .iter()
++        .map(|n| {
++            let mark = if *n == info.family { '>' } else { ' ' };
++            format!("{mark}{:^w$}", short_family_name(n), w = pane_w - 1)
++        })
++        .collect();
++    println!("{}", header.join("  "));
++    let err_line: Vec<String> = names
++        .iter()
++        .map(|n| format!("{:^w$.4}", err_of(n), w = pane_w))
++        .collect();
++    println!("{}", err_line.join("  "));
++    let pane_lines: Vec<Vec<String>> = (0..4)
++        .map(|i| {
++            let mut f = grid_frame(radius, center);
++            draw_floating_square(&mut f, radius, center, pos, Some(i));
++            overlay_true_center(&mut f, radius, center, pos);
++            f.string_for_regular_display()
++                .lines()
++                .map(String::from)
++                .collect()
++        })
++        .collect();
++    for row in 0..pane_lines[0].len() {
++        let line: Vec<&str> = pane_lines.iter().map(|l| l[row].as_str()).collect();
++        println!("{}", line.join("  "));
++    }
++    println!("{}", Glyph::reset_colors());
++}
++
++/// Offset table over 0..=0.5 in 1/16 steps (the finest snap grid), each cell
++/// labeled with the family that offset picks — a map of the family decision
++/// boundaries. Only the positive quadrant is shown: every snap grid is
++/// sign-symmetric, so the other quadrants are mirror images.
++fn show_sweep() {
++    let offsets: Vec<f32> = (0..=8).map(|i| i as f32 / 16.0).collect();
++    let n = offsets.len();
++    // cell = 3x3 squares (6 cols x 3 rows) + 1-col gap + 1 family-letter row
++    let (cell_h, step_x, step_y) = (3usize, 7usize, 4usize);
++    // width drops the trailing gap column; height keeps the last cell's letter row
++    let mut big = Frame::blank(n * step_x - 1, n * step_y);
++    for (yi, &y_off) in offsets.iter().enumerate() {
++        for (xi, &x_off) in offsets.iter().enumerate() {
++            let pos: WorldPoint = euclid::point2(x_off, y_off);
++            let mut cell = grid_frame(1, euclid::point2(0, 0));
++            draw_floating_square(&mut cell, 1, euclid::point2(0, 0), pos, None);
++            let row0 = yi * step_y;
++            let col0 = xi * step_x;
++            big.blit(&cell, [row0 as i32, col0 as i32]);
++            let idx = family_index_of(snap_debug_info(center_offset(pos)).family);
++            big.grid[row0 + cell_h][col0 + 2] =
++                DrawableGlyph::new(FAMILY_LETTERS[idx], Some(FAMILY_COLORS[idx]), None);
++        }
++    }
++    let header: String = offsets
++        .iter()
++        .map(|x| format!("x={x:.2} "))
++        .collect();
++    println!("        {header}");
++    for (row, line) in big.string_for_regular_display().lines().enumerate() {
++        // both prefixes are exactly 8 chars so labeled and unlabeled rows align
++        if row % step_y == 1 {
++            println!("y={:<5.3} {line}", offsets[row / step_y]);
++        } else {
++            println!("        {line}");
++        }
++    }
++    print!("{}", Glyph::reset_colors());
++    println!("\nfamilies (auto-picked per offset):");
++    for (i, name) in snap_family_names().iter().enumerate() {
++        println!(
++            "  {}{} = {}{}",
++            termion::color::Fg(termion::color::Rgb(
++                FAMILY_COLORS[i].r,
++                FAMILY_COLORS[i].g,
++                FAMILY_COLORS[i].b
++            )),
++            FAMILY_LETTERS[i],
++            name,
++            termion::style::Reset
++        );
++    }
++}
++
++/// Big-pixel grid per character cell in the glyph table: the exact union
++/// lattice of the families' increments — 1/16 world horizontally (1/8-char
++/// vertical strips), 1/24 world vertically (eighths/thirds union grid) —
++/// so one character (0.5 x 1.0 world) is 8 x 24 big pixels and every glyph
++/// edge lands exactly on a pixel boundary. No rounding anywhere.
++const TABLE_PX_W: usize = 8;
++const TABLE_PX_H: usize = 24;
++
++/// Every block character the renderer can emit, by sweeping the four
++/// family generators over their full input domains (deduped, SPACE
++/// dropped). Calling the real generators means the list cannot drift
++/// from the render vocabulary.
++fn used_block_glyphs() -> Vec<char> {
++    let mut glyphs: Vec<char> = Vec::new();
++    let mut push = |c: char| {
++        if c != SPACE && !glyphs.contains(&c) {
++            glyphs.push(c);
++        }
++    };
++    for &vertical in &[false, true] {
++        for eighths in -8..=8 {
++            push(character_for_half_square_with_1d_eighths_offset(vertical, eighths));
++        }
++    }
++    for thirds in -3..=3 {
++        push(character_for_half_square_with_vertical_thirds_offset(thirds));
++    }
++    for dy in -2..=2 {
++        for dx in -2..=2 {
++            push(quadrant_block_by_offset(euclid::vec2(dx, dy)));
++        }
++    }
++    for dy in -3..=3 {
++        for dx in -2..=2 {
++            push(hextant_block_by_offset(euclid::vec2(dx, dy)));
++        }
++    }
++    glyphs
++}
++
++/// The glyph table: one entry per block character (first column) with its
++/// official Unicode name (UCD), and its exact 8x24 big-pixel zoom framed
++/// in box drawing characters, so each glyph's cell boundary is explicit.
++/// Position rulers: digits above each grid index the big-pixel column
++/// boundaries (1/16 world apart — every one a possible vertical cut,
++/// h-eighths strips); digits left of each grid index the big-pixel row
++/// boundary at the top of each half-row (even numbers — a half-row
++/// spans 2 big pixels; the bottom frame line is position 24). One big
++/// pixel = one vertical half character: both=█ upper=▀ lower=▄
++/// empty=·. Plain text only (no ANSI) — the output is meant for a file
++/// (`glyphs > x.txt`).
++fn print_glyph_table() {
++    println!("block glyph reference - exact big-pixel zoom at the union lattice");
++    println!("one character = one half-cell = 0.5 world wide x 1.0 world tall;");
++    println!("one big pixel = 1/16 world wide x 1/24 world tall (the finest");
++    println!("increments any snap family can express), so a character is 8x24");
++    println!("big pixels and every glyph edge lies exactly on a pixel boundary.");
++    println!("one big pixel = one vertical half character: both=█ upper=▀ lower=▄ empty=·");
++    println!("names are the official Unicode character names (UCD).");
++    println!("x ruler (digits above each grid): big-pixel boundary index,");
++    println!("  1/16 world apart; every one is a possible vertical cut");
++    println!("  (h-eighths).");
++    println!("y ruler (digits left of each grid, one per half-row):");
++    println!("  big-pixel boundary index at the top of that half-row;");
++    println!("  even numbers, because each half-row spans 2 big pixels.");
++    println!("  The grid bottom edge is position 24.");
++    let ruler: String = (0..=TABLE_PX_W)
++        .map(|i| char::from(b'0' + i as u8))
++        .collect();
++    for &c in &used_block_glyphs() {
++        println!();
++        println!("{c} {}", char_name(c));
++        println!("   {ruler}");
++        println!("  ┌{}┐", "─".repeat(TABLE_PX_W));
++        for t in 0..TABLE_PX_H / 2 {
++            // text row t stacks world pixel rows 23-2t (upper) and
++            // 22-2t (lower), counted from the bottom (+y is up)
++            let filled = |j: usize, i: usize| {
++                glyph_filled(
++                    c,
++                    (i as f32 + 0.5) / TABLE_PX_W as f32,
++                    (j as f32 + 0.5) / TABLE_PX_H as f32,
++                )
++            };
++            let mut line = String::new();
++            for i in 0..TABLE_PX_W {
++                let up = filled(TABLE_PX_H - 1 - 2 * t, i);
++                let lo = filled(TABLE_PX_H - 2 - 2 * t, i);
++                line.push(match (up, lo) {
++                    (true, true) => '█',
++                    (true, false) => '▀',
++                    (false, true) => '▄',
++                    (false, false) => '·',
++                });
++            }
++            println!("{:>2}│{line}│", 2 * t);
++        }
++        println!("{:>2}└{}┘", TABLE_PX_H, "─".repeat(TABLE_PX_W));
++    }
++}
++
++/// Official Unicode name (UCD) of one table glyph. The fallback is the
++/// bare code point; the test below fails if any used glyph reaches it,
++/// so names cannot silently go missing when the vocabulary grows.
++fn char_name(c: char) -> String {
++    match c {
++        '▏' => "LEFT ONE EIGHTH BLOCK",
++        '▎' => "LEFT ONE QUARTER BLOCK",
++        '▍' => "LEFT THREE EIGHTHS BLOCK",
++        '▌' => "LEFT HALF BLOCK",
++        '▋' => "LEFT FIVE EIGHTHS BLOCK",
++        '▊' => "LEFT THREE QUARTERS BLOCK",
++        '▉' => "LEFT SEVEN EIGHTHS BLOCK",
++        '█' => "FULL BLOCK",
++        '▕' => "RIGHT ONE EIGHTH BLOCK",
++        '🮇' => "RIGHT ONE QUARTER BLOCK",
++        '🮈' => "RIGHT THREE EIGHTHS BLOCK",
++        '▐' => "RIGHT HALF BLOCK",
++        '🮉' => "RIGHT FIVE EIGHTHS BLOCK",
++        '🮊' => "RIGHT THREE QUARTERS BLOCK",
++        '🮋' => "RIGHT SEVEN EIGHTHS BLOCK",
++        '▁' => "LOWER ONE EIGHTH BLOCK",
++        '▂' => "LOWER ONE QUARTER BLOCK",
++        '▃' => "LOWER THREE EIGHTHS BLOCK",
++        '▄' => "LOWER HALF BLOCK",
++        '▅' => "LOWER FIVE EIGHTHS BLOCK",
++        '▆' => "LOWER THREE QUARTERS BLOCK",
++        '▇' => "LOWER SEVEN EIGHTHS BLOCK",
++        '▔' => "UPPER ONE EIGHTH BLOCK",
++        '🮂' => "UPPER ONE QUARTER BLOCK",
++        '🮃' => "UPPER THREE EIGHTHS BLOCK",
++        '▀' => "UPPER HALF BLOCK",
++        '🮄' => "UPPER FIVE EIGHTHS BLOCK",
++        '🮅' => "UPPER THREE QUARTERS BLOCK",
++        '🮆' => "UPPER SEVEN EIGHTHS BLOCK",
++        '🬂' => "BLOCK SEXTANT-12",
++        '🬎' => "BLOCK SEXTANT-1234",
++        '🬭' => "BLOCK SEXTANT-56",
++        '🬹' => "BLOCK SEXTANT-3456",
++        '▖' => "QUADRANT LOWER LEFT",
++        '▗' => "QUADRANT LOWER RIGHT",
++        '▘' => "QUADRANT UPPER LEFT",
++        '▝' => "QUADRANT UPPER RIGHT",
++        '🬀' => "BLOCK SEXTANT-1",
++        '🬁' => "BLOCK SEXTANT-2",
++        '🬄' => "BLOCK SEXTANT-13",
++        '🬉' => "BLOCK SEXTANT-24",
++        '🬏' => "BLOCK SEXTANT-5",
++        '🬓' => "BLOCK SEXTANT-35",
++        '🬞' => "BLOCK SEXTANT-6",
++        '🬦' => "BLOCK SEXTANT-46",
++        _ => return format!("U+{:04X}", c as u32),
++    }
++    .to_string()
++}
++
++const ORBIT_RADIUS: f32 = 2.5;
++/// Radians per second. Matches the old 0.02 rad per 33ms frame.
++const ORBIT_SPEED: f32 = 0.6;
++/// Nudge step for the arrow keys: the finest snap grid (h-eighths x step),
++/// so every nudge can cross at most one snap boundary.
++const NUDGE: f32 = 1.0 / 16.0;
++/// Per-second velocity of the line trajectory: 10x the coherence test's
++/// (0.06, 0.03) per-sample step so motion is visible in real time.
++const LINE_DIR: WorldMove = WorldMove::new(0.6, 0.3);
++/// Half-width of the animation grid in squares; fixed so mouse cells can be
++/// mapped back to world geometry.
++const ANIMATE_GRID_RADIUS: i32 = 4;
++/// Fine mouse-drag scale: world units per terminal cell of mouse travel,
++/// vs. coarse mode's direct cell-to-grid mapping (0.5 in x, 1 in y). Large
++/// mouse sweeps produce sub-cell square movements, which is what the
++/// terminal grid's resolution otherwise forbids.
++const FINE_SCALE: f32 = 1.0 / 32.0;
++
++enum Motion {
++    Orbit { theta: f32 },
++    /// Parked at a spot (arrow-key nudge or mouse placement).
++    Free { pos: WorldPoint },
++    /// Straight line through `base`, t in [-2, 2], wrapping.
++    Line { base: WorldPoint, dir: WorldMove, t: f32 },
++}
++
++impl Motion {
++    fn pos(&self) -> WorldPoint {
++        match *self {
++            Motion::Orbit { theta } => {
++                euclid::point2(theta.cos() * ORBIT_RADIUS, theta.sin() * ORBIT_RADIUS)
++            }
++            Motion::Free { pos } => pos,
++            Motion::Line { base, dir, t } => base + dir * t,
++        }
++    }
++    fn advance(&mut self, dt: f32, speed: f32) {
++        match self {
++            Motion::Orbit { theta } => {
++                *theta = (*theta + ORBIT_SPEED * speed * dt).rem_euclid(std::f32::consts::TAU)
++            }
++            Motion::Free { .. } => {}
++            Motion::Line { t, .. } => *t = (*t + speed * dt + 2.0).rem_euclid(4.0) - 2.0,
++        }
++    }
++    fn name(&self) -> &'static str {
++        match self {
++            Motion::Orbit { .. } => "orbit",
++            Motion::Free { .. } => "free",
++            Motion::Line { .. } => "line",
++        }
++    }
++}
++
++/// What an in-progress mouse drag does. Hold events don't report which
++/// button is down, so the press that starts the drag picks the mode once
++/// and Holds stick with it for the whole drag.
++enum DragMode {
++    /// Left button: steer the orbit's angular position.
++    Angle,
++    /// Any other button (or left with a modifier held): place the square.
++    Place,
++}
++
++struct AnimState {
++    motion: Motion,
++    paused: bool,
++    speed: f32,
++    anim_time: Duration,
++    /// Family changes since start; each one is a potential visible pop.
++    switches: u32,
++    prev_family: Option<&'static str>,
++    /// f-key fallback for terminals that don't report mouse modifiers:
++    /// treats every drag as a fine drag.
++    fine_drag: bool,
++    /// Anchor for fine drags, which accumulate cell deltas relative to the
++    /// previous event instead of mapping cells to absolute positions.
++    last_mouse_cell: Option<(u16, u16)>,
++    /// Mode of the drag in progress (None between drags).
++    drag: Option<DragMode>,
++    /// Candidate replacement method shown in the second row (index into
++    /// CANDIDATES); the first row is always the in-use game path.
++    candidate: usize,
++    /// Which error measurement pane is displayed (index into METRICS).
++    metric: usize,
++    /// Previously rendered glyph neighborhoods per method slot (0 = the
++    /// in-use row, 1..=3 = CANDIDATES index + 1), for the frame-diff
++    /// metric. Updated after every rendered frame — moving or not — so
++    /// frame diff always compares against the immediately previous render.
++    prev_renders: [Option<([[DoubleChar; 3]; 3], WorldSquare)>; 4],
++    /// Selected error over time per method slot, sampled on frames where
++    /// the square actually moved. All four slots accumulate; `[`/`]` only
++    /// changes which two are displayed.
++    history: [Vec<f32>; 4],
++    /// Which metric the history buffers hold; a change clears them all.
++    history_metric: usize,
++    /// Position at the last history sample: a frame appends only when pos
++    /// differs (manual mouse movement and nudges count).
++    last_sample_pos: Option<WorldPoint>,
++}
++
++impl AnimState {
++    fn new() -> Self {
++        AnimState {
++            motion: Motion::Orbit { theta: 0.0 },
++            paused: false,
++            speed: 1.0,
++            anim_time: Duration::ZERO,
++            switches: 0,
++            prev_family: None,
++            fine_drag: false,
++            last_mouse_cell: None,
++            drag: None,
++            candidate: 0,
++            metric: 0,
++            prev_renders: [None; 4],
++            history: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
++            history_metric: 0,
++            last_sample_pos: None,
++        }
++    }
++
++    /// Clear all history buffers when the metric cycled to a new one —
++    /// different metrics have incomparable units.
++    fn sync_history_metric(&mut self) {
++        if self.history_metric != self.metric {
++            self.history = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
++            self.history_metric = self.metric;
++        }
++    }
++
++    /// One frame's history sample: append each slot's number only when
++    /// the square actually moved since the last sample — mouse drags and
++    /// arrow nudges change pos too, so they count; parked redraws (metric
++    /// or candidate switches, paused key presses) append nothing. `None`
++    /// numbers (frame diff before its first prev) are skipped.
++    fn record_history(&mut self, pos: WorldPoint, numbers: &[Option<f32>; 4]) {
++        if self.last_sample_pos == Some(pos) {
++            return;
++        }
++        self.last_sample_pos = Some(pos);
++        for (slot, number) in numbers.iter().enumerate() {
++            if let Some(number) = number {
++                self.history[slot].push(*number);
++                if self.history[slot].len() > SPARKLINE_LEN {
++                    self.history[slot].remove(0);
++                }
++            }
++        }
++    }
++}
++
++/// Decode an SGR mouse sequence (ESC [ < Cb ; Cx ; Cy M/m) from raw input
++/// bytes, recovering the modifier bits termion drops (shift=4, alt=8,
++/// ctrl=16 — modified events otherwise surface as Event::Unsupported or
++/// lose their modifier). Returns the event and whether any modifier was
++/// held.
++fn parse_sgr_mouse(raw: &[u8]) -> Option<(MouseEvent, bool)> {
++    let body = raw.strip_prefix(b"\x1b[<")?;
++    let (&final_byte, nums) = body.split_last()?;
++    if final_byte != b'M' && final_byte != b'm' {
++        return None;
++    }
++    let text = std::str::from_utf8(nums).ok()?;
++    let mut fields = text.split(';');
++    let cb: u16 = fields.next()?.parse().ok()?;
++    let cx: u16 = fields.next()?.parse().ok()?;
++    let cy: u16 = fields.next()?.parse().ok()?;
++    let modified = cb & (4 | 8 | 16) != 0;
++    let button = match cb & 3 {
++        0 => MouseButton::Left,
++        1 => MouseButton::Middle,
++        _ => MouseButton::Right,
++    };
++    let event = if cb & 64 != 0 {
++        // wheel events come only as presses
++        if final_byte != b'M' {
++            return None;
++        }
++        let button = if cb & 1 == 0 {
++            MouseButton::WheelUp
++        } else {
++            MouseButton::WheelDown
++        };
++        MouseEvent::Press(button, cx, cy)
++    } else if cb & 32 != 0 {
++        MouseEvent::Hold(cx, cy)
++    } else if final_byte == b'm' || cb & 3 == 3 {
++        MouseEvent::Release(cx, cy)
++    } else {
++        MouseEvent::Press(button, cx, cy)
++    };
++    Some((event, modified))
++}
++
++/// 1-based terminal cell of the animation grid's top-left corner. The
++/// large view is the second column of the first boxed row (first column is
++/// the 6-wide small view, then the 2-cell gap, then "│ " prefix): 2 + 6 + 2.
++/// If the boxed layout changes, this moves with it.
++const GRID_SCREEN_ORIGIN: (u16, u16) = (10, 2);
++
++/// World point under the (1-based) terminal cell, using the same grid
++/// geometry as the frame: 2 columns per square, rows increase downward.
++fn mouse_cell_point(col: u16, row: u16) -> WorldPoint {
++    let r = ANIMATE_GRID_RADIUS as f32;
++    // grid cell (0,0) sits at GRID_SCREEN_ORIGIN; within the grid the
++    // origin square spans cols 2r..=2r+1 (center 2r+0.5), row r
++    let dx_cells = col as f32 - GRID_SCREEN_ORIGIN.0 as f32 - (2.0 * r + 0.5);
++    let dy_cells = row as f32 - GRID_SCREEN_ORIGIN.1 as f32 - r;
++    euclid::point2(dx_cells * 0.5, -dy_cells)
++}
++
++/// Bearing of the mouse cell from the animation grid's center (the world
++/// origin), for steering the orbit with the left button: clicking a
++/// direction from the center moves the orbiting square to that angle,
++/// keeping the orbit radius. Unlike placement this needs no clamping —
++/// every cell has a well-defined angle.
++fn mouse_cell_angle(col: u16, row: u16) -> f32 {
++    let p = mouse_cell_point(col, row);
++    p.y.atan2(p.x)
++}
++
++/// `raw_mode`: true when writing to a termion raw-mode terminal. Raw mode
++/// disables ONLCR, so bare '\n' would stair-step the frame.
++const FRAME_DT: Duration = Duration::from_millis(33);
++
++fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode: bool) {
++    let pos = state.motion.pos();
++    let offset = center_offset(pos);
++    let info = snap_debug_info(offset);
++    let family_changed = state.prev_family.is_some_and(|p| p != info.family);
++    if state.prev_family != Some(info.family) {
++        if state.prev_family.is_some() {
++            state.switches += 1;
++        }
++        state.prev_family = Some(info.family);
++    }
++
++    // invert the family on the frame it changed: family switches are where
++    // the visible pops happen
++    let family_display = if family_changed {
++        format!(
++            "{}{}{}",
++            termion::style::Invert,
++            short_family_name(info.family),
++            termion::style::NoInvert
++        )
++    } else {
++        short_family_name(info.family).to_string()
++    };
++    let style = coverage::Style::from_env();
++    let in_use_info = vec![
++        format!("family={family_display}"),
++        format!(
++            "snap err=({:+.3}, {:+.3})",
++            info.snapped_offset.x - offset.x,
++            info.snapped_offset.y - offset.y,
++        ),
++    ];
++    let cand_name = CANDIDATES[state.candidate].0;
++    let cand_info = match state.candidate {
++        0 => vec![
++            "per-character xor argmin,".to_string(),
++            "no sibling awareness".to_string(),
++        ],
++        1 => vec![format!(
++            "per-cell xor + {:.2}·d",
++            CHARWISE_PROTRUSION_WEIGHT
++        )],
++        _ => vec![format!(
++            "per-cell xor + {:.2}·d²",
++            CHARWISE_PROTRUSION_SQUARED_WEIGHT
++        )],
++    };
++
++    // All four method slots get a metric report every frame: the two
++    // displayed rows reuse pane + value, all four numbers feed the
++    // history sparklines — candidate switches only change which slots
++    // render, so every slot's history stays continuous across them.
++    state.sync_history_metric();
++    let methods: [(&str, Neighborhood); 4] = [IN_USE, CANDIDATES[0], CANDIDATES[1], CANDIDATES[2]];
++    let mut reports: Vec<MetricReport> = Vec::with_capacity(4);
++    let mut renders: Vec<([[DoubleChar; 3]; 3], WorldSquare)> = Vec::with_capacity(4);
++    let mut numbers: [Option<f32>; 4] = [None; 4];
++    for slot in 0..4 {
++        let (glyphs, center) = methods[slot].1(pos);
++        let report = metric_report(
++            methods[slot].1,
++            &glyphs,
++            center,
++            pos,
++            state.metric,
++            state.prev_renders[slot].as_ref().map(|(g, c)| (g, *c)),
++            &style,
++        );
++        numbers[slot] = report.number;
++        renders.push((glyphs, center));
++        reports.push(report);
++    }
++    state.record_history(pos, &numbers);
++    // Shared y-axis: max over every live slot keeps block heights
++    // comparable between rows and stable across candidate switches.
++    let scale = state
++        .history
++        .iter()
++        .flatten()
++        .fold(1e-6f32, |acc, &v| acc.max(v));
++
++    let mut text = String::new();
++    for line in method_section(
++        &format!("in use: {}", IN_USE.0),
++        0,
++        &renders[0].0,
++        renders[0].1,
++        pos,
++        state.metric,
++        &style,
++        &in_use_info,
++        std::mem::take(&mut reports[0]),
++        &state.history[0],
++        scale,
++    ) {
++        text.push_str(&line);
++        text.push('\n');
++    }
++    let cand_slot = state.candidate + 1;
++    for line in method_section(
++        &format!("candidate: {cand_name}  ([ ] cycle)"),
++        cand_slot,
++        &renders[cand_slot].0,
++        renders[cand_slot].1,
++        pos,
++        state.metric,
++        &style,
++        &cand_info,
++        std::mem::take(&mut reports[cand_slot]),
++        &state.history[cand_slot],
++        scale,
++    ) {
++        text.push_str(&line);
++        text.push('\n');
++    }
++
++    // common box: ideal zoom (drawn analytically — see ideal_big_pixel_pane),
++    // global state, controls — one column each
++    let center = world_point_to_world_square(pos);
++    let ideal_lines = ideal_big_pixel_pane(pos, center, &style);
++    let frac = fraction_part(pos);
++
++    let mut common_col = vec!["ideal (true square)".to_string()];
++    common_col.extend(ideal_lines.iter().cloned());
++    let global = vec![
++        format!(
++            "pos=({:6.3}, {:6.3})  frac=({:+.3}, {:+.3})",
++            pos.x, pos.y, frac.x, frac.y,
++        ),
++        format!(
++            "{} speed={:.2}x  switches={}  t={:.1}s{}{}",
++            state.motion.name(),
++            state.speed,
++            state.switches,
++            state.anim_time.as_secs_f32(),
++            if state.paused { "  [paused]" } else { "" },
++            if state.fine_drag { "  [fine-drag]" } else { "" },
++        ),
++    ];
++    let controls: Vec<String> = [
++        "controls:",
++        "q/esc quit    space pause",
++        "arrows nudge 1/16",
++        "o orbit  l line",
++        "+/- speed  f fine-drag",
++        "[ ] candidate method",
++        ", . error metric",
++        "left drag: orbit angle",
++        "mid/right drag: place",
++        "shift/ctrl/alt-drag fine",
++    ]
++    .iter()
++    .map(|s| s.to_string())
++    .collect();
++    let global_w = visible_w(&global);
++    let controls_w = visible_w(&controls);
++    let common_row = boxed_row(
++        "common",
++        &[
++            (common_col.as_slice(), BIG_PX_W),
++            (global.as_slice(), global_w),
++            (controls.as_slice(), controls_w),
++        ],
++    );
++    text.push_str(&common_row.join("\n"));
++    text.push('\n');
++
++    // Remember all four renders for the next frame's frame-diff metric —
++    // every rendered frame, moving or not, so the diff is always against
++    // the immediately previous render.
++    for slot in 0..4 {
++        state.prev_renders[slot] = Some(renders[slot]);
++    }
++
++    if raw_mode {
++        // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
++        // to end-of-line per line so shrinking values leave no leftovers.
++        // UntilNewline clears from the cursor to end of line; CurrentLine
++        // would wipe the line content just written.
++        let eol = format!("{}\r\n", termion::clear::UntilNewline);
++        write!(out, "{}{}", text.replace('\n', &eol), Glyph::reset_colors()).unwrap();
++    } else {
++        write!(out, "{}{}", text, Glyph::reset_colors()).unwrap();
++    }
++    out.flush().unwrap();
++}
++
++/// `frame_count`: None = run until quit (interactive) or a short default
++/// (piped output).
++fn run_animation(frame_count: Option<u32>) {
++    let interactive = stdout().is_terminal();
++
++    if !interactive {
++        // Piped output (e.g. `animate 5 | less -R`): no raw mode available.
++        // These frames render instantly, so simulate the animation clock.
++        let mut state = AnimState::new();
++        for _ in 0..frame_count.unwrap_or(8) {
++            render_animation_frame(&mut stdout(), &mut state, false);
++            println!();
++            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
++            state.anim_time += FRAME_DT;
++        }
++        return;
++    }
++
++    let (tx, rx) = channel();
++    thread::spawn(move || {
++        for event in stdin().events_and_raw() {
++            if tx.send(event.unwrap()).is_err() {
++                break;
++            }
++        }
++    });
++
++    let mut screen = MouseTerminal::from(stdout().into_raw_mode().unwrap())
++        .into_alternate_screen()
++        .unwrap();
++
++    let mut state = AnimState::new();
++    let mut frames = 0u32;
++    let mut dirty = true;
++    loop {
++        while let Ok((event, raw)) = rx.try_recv() {
++            // recover the mouse modifier bits termion drops, so a held
++            // shift/ctrl/alt can select fine dragging
++            let (event, fine_mod) = match parse_sgr_mouse(&raw) {
++                Some((mouse_event, modified)) => (Event::Mouse(mouse_event), modified),
++                None => (event, false),
++            };
++            let fine = fine_mod || state.fine_drag;
++            match event {
++                Event::Key(Key::Char('q')) | Event::Key(Key::Esc) => return,
++                Event::Key(Key::Char(' ')) => {
++                    state.paused = !state.paused;
++                    dirty = true;
++                }
++                // Arrow keys park the square and step it across snap
++                // boundaries deterministically — an orbit sweeps past the
++                // interesting crossings before you can see them.
++                Event::Key(Key::Left) | Event::Key(Key::Right) | Event::Key(Key::Up)
++                | Event::Key(Key::Down) => {
++                    let step = match event {
++                        Event::Key(Key::Left) => euclid::vec2(-NUDGE, 0.0),
++                        Event::Key(Key::Right) => euclid::vec2(NUDGE, 0.0),
++                        Event::Key(Key::Up) => euclid::vec2(0.0, NUDGE),
++                        _ => euclid::vec2(0.0, -NUDGE),
++                    };
++                    state.motion = Motion::Free {
++                        pos: state.motion.pos() + step,
++                    };
++                    dirty = true;
++                }
++                Event::Key(Key::Char('o')) => {
++                    let p = state.motion.pos();
++                    state.motion = Motion::Orbit {
++                        theta: p.y.atan2(p.x),
++                    };
++                    state.paused = false;
++                    dirty = true;
++                }
++                Event::Key(Key::Char('l')) => {
++                    state.motion = Motion::Line {
++                        base: state.motion.pos(),
++                        dir: LINE_DIR,
++                        t: 0.0,
++                    };
++                    state.paused = false;
++                    dirty = true;
++                }
++                Event::Key(Key::Char('+') | Key::Char('=')) => {
++                    state.speed = (state.speed * 2.0).min(8.0);
++                    dirty = true;
++                }
++                Event::Key(Key::Char('-')) => {
++                    state.speed = (state.speed / 2.0).max(0.125);
++                    dirty = true;
++                }
++                // fallback fine-drag toggle for terminals that don't pass
++                // mouse modifiers through
++                Event::Key(Key::Char('f')) => {
++                    state.fine_drag = !state.fine_drag;
++                    dirty = true;
++                }
++                // two-button cycles: candidate method (second row) and
++                // which error measurement pane is displayed
++                Event::Key(Key::Char(']')) => {
++                    state.candidate = (state.candidate + 1) % CANDIDATES.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char('[')) => {
++                    state.candidate = (state.candidate + CANDIDATES.len() - 1) % CANDIDATES.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char('.')) => {
++                    state.metric = (state.metric + 1) % METRICS.len();
++                    dirty = true;
++                }
++                Event::Key(Key::Char(',')) => {
++                    state.metric = (state.metric + METRICS.len() - 1) % METRICS.len();
++                    dirty = true;
++                }
++                // Left click/drag steers the orbit: the angle from the
++                // grid center to the mouse becomes the orbit's angular
++                // position (orbit radius unchanged, so the square jumps to
++                // that bearing). Other buttons place the square (drag to
++                // move it), clamped to the visible grid; with a modifier
++                // held (or fine_drag toggled) placement is relative
++                // instead: cell deltas accumulate at FINE_SCALE, so large
++                // mouse movements produce sub-cell square movements.
++                // Press pauses so the placement sticks.
++                Event::Mouse(MouseEvent::Press(_, x, y))
++                | Event::Mouse(MouseEvent::Hold(x, y)) => {
++                    if let Event::Mouse(MouseEvent::Press(button, _, _)) = &event {
++                        state.drag = Some(if *button == MouseButton::Left && !fine {
++                            DragMode::Angle
++                        } else {
++                            DragMode::Place
++                        });
++                    }
++                    let limit = ANIMATE_GRID_RADIUS as f32 + 0.5;
++                    let clamp = |p: WorldPoint| {
++                        euclid::point2(p.x.clamp(-limit, limit), p.y.clamp(-limit, limit))
++                    };
++                    match state.drag {
++                        Some(DragMode::Angle) => {
++                            state.motion = Motion::Orbit {
++                                theta: mouse_cell_angle(x, y),
++                            };
++                        }
++                        _ => {
++                            if fine {
++                                if let Some((lx, ly)) = state.last_mouse_cell {
++                                    let d: WorldMove = euclid::vec2(
++                                        (x as f32 - lx as f32) * FINE_SCALE,
++                                        (ly as f32 - y as f32) * FINE_SCALE,
++                                    );
++                                    state.motion = Motion::Free {
++                                        pos: clamp(state.motion.pos() + d),
++                                    };
++                                }
++                            } else {
++                                state.motion = Motion::Free {
++                                    pos: clamp(mouse_cell_point(x, y)),
++                                };
++                            }
++                            // anchored on every event, so grabbing or
++                            // releasing the modifier mid-drag never causes
++                            // a jump
++                            state.last_mouse_cell = Some((x, y));
++                        }
++                    }
++                    if matches!(event, Event::Mouse(MouseEvent::Press(_, _, _))) {
++                        state.paused = true;
++                    }
++                    dirty = true;
++                }
++                Event::Mouse(MouseEvent::Release(_, _)) => {
++                    state.drag = None;
++                    state.last_mouse_cell = None;
++                }
++                _ => {}
++            }
++        }
++
++        if !state.paused {
++            state.motion.advance(FRAME_DT.as_secs_f32(), state.speed);
++            state.anim_time += FRAME_DT;
++            dirty = true;
++        }
++
++        // Redraw only on state change: repainting the full screen every
++        // 33ms would wipe any in-progress text selection.
++        if dirty {
++            write!(screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
++            render_animation_frame(&mut screen, &mut state, true);
++            write!(
++                screen,
++                "q=quit space=pause arrows=nudge o=orbit l=line +/-=speed Ldrag=angle drag=place mod+drag=fine []=cand ,.=metric"
++            )
++            .unwrap();
++            screen.flush().unwrap();
++            dirty = false;
++            frames += 1;
++            if frame_count.is_some_and(|n| frames >= n) {
++                return;
++            }
++        }
++        thread::sleep(FRAME_DT);
++    }
++}
++
++fn usage() {
++    eprintln!(
++        "usage: floating_square_debug <mode>\n\
++         modes:\n  \
++           pos X Y       single square at world point (X, Y), with snap-family\n  \
++          \x20      diagnostics and a sampled coverage view\n  \
++           families X Y  the same position with each snap family forced\n  \
++           sweep         offset table over 0..=0.5 in 1/16 steps, labeled with\n  \
++          \x20      the family each offset picks (decision-boundary map)\n  \
++           glyphs        every block character the renderer can emit, each\n  \
++          \x20      with its Unicode name and an exact 8x24 big-pixel zoom\n  \
++          \x20      (1/16 x 1/24 world per pixel), framed with position\n  \
++          \x20      rulers; plain text, redirect to a file\n  \
++           animate [N]   orbiting square, two-method comparison: the in-use\n  \
++          \x20      game path (family-snapped) and a candidate replacement\n  \
++          \x20      cycled with [ and ] (charwise, charwise + protrusion,\n  \
++          \x20      charwise + protrusion squared). Each row: the full grid\n  \
++          \x20      with glyph legend and the method's own objective, the\n  \
++          \x20      full-resolution zoomed render (one color per glyph), and\n  \
++          \x20      ONE error pane cycled with , and . (center, area,\n  \
++          \x20      per-char coverage, ideal xor, jaggedness, displacement\n  \
++          \x20      sensitivity, frame diff) with its numeric value, plus\n  \
++          \x20      the error's recent history as a block-character\n  \
++          \x20      sparkline (shared y-axis); q quits, space\n  \
++          \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
++          \x20      line trajectory, +/- change speed, left click/drag sets\n  \
++          \x20      the orbit's angular position (angle from the top-row\n  \
++          \x20      grid's center to the mouse); other buttons place the\n  \
++          \x20      square, and holding shift/ctrl/alt while dragging (or\n  \
++          \x20      pressing f) gives fine control: large mouse movements\n  \
++          \x20      map to sub-cell square movements. Optional frame count N\n  \
++          \x20      runs a fixed number of frames, which is also the mode\n  \
++          \x20      used when stdout is not a terminal.\n\
++         default: animate (runs until q; fixed frame count when piped)"
++    );
++}
++
++fn main() {
++    let args: Vec<String> = std::env::args().skip(1).collect();
++    let parse_xy = |i: usize| -> Option<(f32, f32)> {
++        match (
++            args.get(i).and_then(|s| s.parse().ok()),
++            args.get(i + 1).and_then(|s| s.parse().ok()),
++        ) {
++            (Some(x), Some(y)) => Some((x, y)),
++            _ => None,
++        }
++    };
++    match args.first().map(String::as_str) {
++        None => run_animation(None),
++        Some("pos") => match parse_xy(1) {
++            Some((x, y)) => show_position(euclid::point2(x, y)),
++            _ => {
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("families") => match parse_xy(1) {
++            Some((x, y)) => show_families(euclid::point2(x, y)),
++            _ => {
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("sweep") => show_sweep(),
++        Some("glyphs") => print_glyph_table(),
++        Some("animate") => match args.get(1).map(|s| s.parse::<u32>()) {
++            None => run_animation(None),
++            Some(Ok(n)) => run_animation(Some(n)),
++            Some(Err(_)) => {
++                eprintln!("animate: frame count must be a non-negative integer");
++                usage();
++                std::process::exit(2);
++            }
++        },
++        Some("--help" | "-h") => usage(),
++        Some(other) => {
++            eprintln!("unknown mode: {other}");
++            usage();
++            std::process::exit(2);
++        }
++    }
++}
++
++#[cfg(test)]
++mod glyph_table_tests {
++    use super::*;
++
++    /// Every glyph the table renders must carry its real Unicode name: a
++    /// new family glyph reaching char_name's code-point fallback fails
++    /// here instead of shipping an anonymous table entry.
++    #[test]
++    fn every_used_glyph_is_named() {
++        for c in used_block_glyphs() {
++            let name = char_name(c);
++            assert!(
++                !name.starts_with("U+"),
++                "{c} (U+{:04X}) needs a name arm in char_name",
++                c as u32
++            );
++        }
++    }
++}
++
++#[cfg(test)]
++mod history_tests {
++    use super::*;
++
++    /// Sparkline maps the scale's zero to `·`, its max to the full block,
++    /// half-scale to the half block, right-aligns, and left-pads with `·`.
++    #[test]
++    fn sparkline_maps_levels_and_aligns_right() {
++        let style = coverage::Style { enabled: false };
++        let chars: Vec<char> = sparkline_column(&[0.0, 2.0, 1.0], 2.0, &style).chars().collect();
++        assert_eq!(chars.len(), SPARKLINE_LEN);
++        let pad = SPARKLINE_LEN - 3;
++        assert!(chars[..pad].iter().all(|&c| c == '·'));
++        assert_eq!(chars[pad], '·'); // v = 0 → level 0
++        assert_eq!(chars[pad + 1], '█'); // v = scale → level 8
++        assert_eq!(chars[pad + 2], '▄'); // v = scale/2 → level 4
++    }
++
++    /// History semantics: only moving frames append (manual movement
++    /// counts), all four slots accumulate independently, `None` numbers
++    /// are skipped, the buffer caps at SPARKLINE_LEN keeping the newest,
++    /// a metric change clears everything, and candidate switches change
++    /// nothing.
++    #[test]
++    fn history_appends_only_on_motion_and_caps() {
++        let mut state = AnimState::new();
++        state.sync_history_metric();
++        let p0 = euclid::point2(0.0, 0.0);
++        state.record_history(p0, &[Some(1.0), Some(2.0), Some(3.0), Some(4.0)]);
++        // parked redraw at the same pos: nothing, even with new numbers
++        state.record_history(p0, &[Some(9.0); 4]);
++        assert_eq!(state.history[0], vec![1.0]);
++        assert_eq!(state.history[3], vec![4.0]);
++        // motion appends on all slots; None skipped (frame metric's first)
++        state.record_history(euclid::point2(0.25, 0.0), &[Some(5.0), None, Some(7.0), Some(8.0)]);
++        assert_eq!(state.history[0], vec![1.0, 5.0]);
++        assert_eq!(state.history[1], vec![2.0]);
++        assert_eq!(state.history[2], vec![3.0, 7.0]);
++        // cap: only the newest SPARKLINE_LEN values survive
++        for k in 0..(SPARKLINE_LEN + 6) {
++            state.record_history(
++                euclid::point2(k as f32 * 0.25, 0.5),
++                &[Some(k as f32), None, None, None],
++            );
++        }
++        assert_eq!(state.history[0].len(), SPARKLINE_LEN);
++        assert_eq!(state.history[0][0], 6.0);
++        assert_eq!(state.history[0][SPARKLINE_LEN - 1], (SPARKLINE_LEN + 5) as f32);
++        // metric change clears all four
++        state.metric = 3;
++        state.sync_history_metric();
++        assert!(state.history.iter().all(|h| h.is_empty()));
++        // candidate switch: purely a display change — history keeps
++        state.candidate = 2;
++        state.record_history(euclid::point2(9.0, 9.0), &[Some(1.0); 4]);
++        assert_eq!(state.history[0], vec![1.0]);
++        assert_eq!(state.history[3], vec![1.0]);
++    }
++
++    /// MetricReport's history scalar: center = |centroid − pos|, area =
++    /// |signed error|, every metric reports Some except frame before its
++    /// first prev (n/a), and frame with a prev is the true diff.
++    #[test]
++    fn metric_report_history_scalars() {
++        let style = coverage::Style::from_env();
++        let pos = euclid::point2(0.3, -0.7);
++        let (glyphs, center) = rendered_neighborhood(pos);
++        let frame = METRICS.len() - 1;
++        for metric in 0..METRICS.len() {
++            let r =
++                metric_report(rendered_neighborhood, &glyphs, center, pos, metric, None, &style);
++            if metric == frame {
++                assert_eq!(r.number, None);
++                assert_eq!(r.value, "n/a");
++            } else {
++                assert!(r.number.expect("history scalar") >= 0.0, "{metric} is a magnitude");
++            }
++            assert_eq!(r.pane.len(), coverage::BIG_TEXT_ROWS);
++        }
++        let owners = assign_colors(&glyphs);
++        let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
++        // center: number is the Euclidean |centroid − pos|
++        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 0, None, &style);
++        let actual =
++            FillGrid::sample(origin, |wx, wy| actual_sample(&glyphs, &owners, center, wx, wy));
++        let c = fill_centroid(&actual).unwrap();
++        let d = (c.x - pos.x).hypot(c.y - pos.y);
++        assert!((r.number.unwrap() - d).abs() < 1e-5);
++        // area: number is |signed|
++        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 1, None, &style);
++        let class = ClassGrid::sample(origin, |wx, wy| {
++            ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
++        });
++        assert_eq!(r.number, Some(class.signed_area_error().abs()));
++        // frame with a previous render: the real diff
++        let (pg, pc) = rendered_neighborhood(euclid::point2(0.55, -0.7));
++        let r =
++            metric_report(rendered_neighborhood, &glyphs, center, pos, frame, Some((&pg, pc)), &style);
++        assert!(r.number.unwrap() > 0.0);
++    }
++}
+
+diff --git a/docs/checkpoints/floating-square-motion-smoothness-metric.md b/docs/checkpoints/floating-square-motion-smoothness-metric.md
+new file mode 100644
+--- a/docs/checkpoints/floating-square-motion-smoothness-metric.md
++++ b/docs/checkpoints/floating-square-motion-smoothness-metric.md
+@@ -0,0 +1,177 @@
++# Floating square debug tool — motion smoothness metric + per-method error-over-time sparkline
++
++**Status: COMPLETE — 2026-09-07.** Stage 1 (architecture + resolved
++decisions) and Stage 2 (implementation) both landed, per plan above.
++
++## Verification (2026-09-07)
++
++- `cargo test -p terminal_rendering`: 154 passed / 0 failed — lib 141
++  (was 139; +2 frame-diff pane tests), bin 4 (+3 history/sparkline/
++  metric-report tests), integration 9.
++- `cargo test --workspace`: 489 passed / 0 failed (game crate untouched;
++  no change to game render paths).
++- Piped `animate` frames: method rows are 132 visible columns exactly
++  (98 + 2 gap + 32 sparkline); the sparkline grows one block per frame,
++  right-aligned (frame k shows k value chars), and the shared scale
++  legend tracks the running max (max=0.000 → 0.049 → 0.053 across six
++  orbit frames). Frame-metric semantics (n/a before the first prev,
++  pane ≡ number over the window crop, growth with displacement) are
++  covered by unit tests.
++- Other modes (pos / families / sweep) smoke-tested — unchanged.
++- Surfaced along the way (pre-existing, NOT from this change): a fresh
++  full recompile emits a `private_bounds` warning for the private
++  `PixelStats` in `pub fn ClassGrid::full_pane`'s signature (coverage.rs),
++  which stale incremental-compilation warning caches had been hiding —
++  left for roadmap item 2's warning cleanup.
++
++## User request
++
++1. Add a frame-to-frame xor measurement: `xor(render(t-1), render(t))`, as a
++   new selectable error metric in the existing error-measurement cycle.
++2. Add a section on the right of each rendering-method row that tracks the
++   currently-selected error over time, drawn with the 1/8th-increment
++   vertical blocks (`▁▂▃▄▅▆▇█`).
++
++## Plan
++
++### New metric: `frame` (index 6 in the `,`/`.` cycle)
++
++In `coverage.rs` (kept with the shared metrics machinery, `#[doc(hidden)]`):
++
++- `frame_diff_xor(prev, cur) -> f32` — fraction of samples over the current
++  frame's 3x3 window (same lattice and denominator `SX*SY` as
++  `coverage_error`) where the two rendered fills differ. Units: world square
++  units, directly comparable to the existing `xor` metric.
++- `frame_diff_pane(prev, cur, style) -> Vec<String>` — big-pixel pane lighting
++  every sample where the two renders differ (reuse `XOR_COLOR`, same 2x2 crop
++  as the other metric panes).
++
++Both take two `([[DoubleChar;3];3], WorldSquare)` pairs and use
++`actual_sample` (owners via `assign_colors`, computed internally), so
++"no previous frame" naturally renders as empty-everywhere. Interpretation:
++frame-diff measures rendered *change* per frame — it scales with motion
++speed, so it compares methods fairly only side by side under the same
++motion (the shared-y-axis use), not as an absolute smoothness score.
++
++In `floating_square_debug.rs`:
++
++- `METRICS` grows from 6 to 7 entries (append `"frame"`).
++- `AnimState.prev_renders: [Option<([[DoubleChar;3];3], WorldSquare)>; 4]`
++  (slot 0 = in-use, 1..=3 = candidates), updated at the end of each rendered
++  frame, for **all four slots** — moving or not — so the frame metric always
++  diffs against the immediately previous render. Never reset (candidate
++  switches don't touch it); `None` only before the first frame.
++- `frame` shows `n/a` only while `prev_renders[slot]` is `None` (process
++  start); a parked square shows the true diff (renders identical →
++  `0.000`) — honest, and needs no special casing.
++
++### Sparkline column (per method row)
++
++In `AnimState`:
++
++- `history: [Vec<f32>; 4]` (same slot indexing as `prev_renders`) +
++  `history_metric: usize` (which metric the buffers hold) +
++  `last_sample_pos: Option<WorldPoint>` (pos of the last appended frame).
++- Histories reset when the metric changes (`history_metric` mismatch).
++- All four histories are appended on every frame in which the square
++  actually moves — pos differs from `last_sample_pos` (manual mouse
++  drags/angle-drags and arrow nudges change pos, so they count; parked
++  redraws like metric or candidate switches append nothing). The frame
++  metric's very first sample has no prev → skipped.
++- Candidate switches reset **nothing**: all four slots keep accumulating,
++  `[`/`]` only changes which two are displayed, and the shared y-axis
++  stays stable across switches.
++- Consequence: the loop computes all four neighborhoods + MetricReports
++  per moving frame and discards the panes of the two non-displayed slots
++  (one code path; a debug tool at 30fps can afford the extra pane work).
++
++Rendering:
++
++- New const `SPARKLINE_LEN: usize = 32` (tunable; matches the existing
++  zoom/error column width).
++- `sparkline_column(history, scale, style)` maps each value to
++  `level = round(value / scale * 8)` clamped to 0..8: `·` for 0,
++  `EIGHTH_BLOCKS_FROM_BOTTOM[level]` for 1..8. Oldest on the left,
++  right-aligned, padded with `·` until the buffer fills.
++- **Shared y-axis**: `scale` = max over all four method histories for the
++  selected metric (floor ~1e-6) — meaningful now that all four slots stay
++  live, and it keeps the axis stable across candidate switches. All
++  history scalars are magnitudes (≥ 0; center/area by abs above), so
++  `level = round(value / scale * 8)` needs no sign handling. Scale printed
++  as a legend (`0 ▁▂▃▄▅▆▇█ max=…`).
++- `method_section` gains a 4th column (title + sparkline + scale legend)
++  passed to `boxed_row`.
++
++### Refactor (single source of truth for metric computation)
++
++The metric computation currently lives inline in `method_section`'s
++`match metric` block. Extract:
++
++- `metric_report(nb, glyphs, center, pos, metric, prev, style) -> MetricReport`
++  where `MetricReport { pane: Vec<String>, value: String, number: Option<f32> }`.
++  `number` is the history scalar: `center` = |centroid − pos| (Euclidean;
++  `None` when the fill has no centroid), `area` = |signed error| (the pane
++  keeps the red/blue sign), the rest = the displayed value as-is; `frame`
++  = the diff, `None` only while `prev` is `None`.
++
++`method_section` uses it for the pane + value string; `render_animation_frame`
++uses it to get `number` for the history **before** building the rows (so the
++current frame is the newest sparkline slot — no one-frame lag).
++
++`method_section` will take precomputed `(glyphs, center)`, the `MetricReport`,
++the method's `history` slice, and the shared `scale`, instead of calling
++`nb(pos)` internally.
++
++### Terminal width
++
++Measured piped output: method rows are 98 visible columns today (the
++"large" column is ~24 wide — the info/objective text lines, not the
++18-wide grid), the common row 108. The 4th column (+32, +2 gap) brings
++method rows to ~132 — the new view width. This assumes a wide terminal;
++`SPARKLINE_LEN` can drop to 16–24 if that is a problem. Mouse mapping
++(`GRID_SCREEN_ORIGIN`) is untouched: the new column goes on the right, so
++column 0 doesn't move (its stale comment is a known leftover, separate
++fix if ever).
++
++## Resolved decisions
++
++1. Y-axis: shared auto-scale — max over all four slot histories, floor
++   ~1e-6; stable across candidate switches.
++2. `SPARKLINE_LEN = 32` (~1.05s of history at the 33ms frame clock).
++3. `center` history scalar: absolute distance |centroid − pos|.
++4. `area` history scalar: |signed error| (the pane keeps the sign).
++5. Append history only when the square actually moved (pos changed since
++   the last append); manual mouse movement counts.
++6. All four slots keep history across candidate switches; `[`/`]` only
++   switches the display.
++
++## Files to touch
++
++- `crates/terminal_rendering/src/coverage.rs` — `frame_diff_xor`,
++  `frame_diff_pane`, unit tests.
++- `crates/terminal_rendering/src/bin/floating_square_debug.rs` — `METRICS`,
++  `MetricReport`/`metric_report`, `sparkline_column`, `AnimState` fields,
++  `method_section`, `render_animation_frame`, event handlers, `usage()`,
++  and the `//!` module doc's animate-mode description.
++
++## Tests
++
++- `coverage.rs`: `frame_diff_xor` unit tests — identical renders → 0.0; a
++  small move → > 0 and monotone in displacement direction.
++- `coverage.rs` `pane_tests` convention: `frame_diff_pane` is
++  BIG_TEXT_ROWS x BIG_PX_W and lights exactly the differing samples of
++  the window crop (pane ≡ number).
++- Binary: level→char mapping (0 → `·`, 8 → `█`) and right-alignment/padding
++  behavior.
++- Binary: history semantics — append only when pos changed; metric change
++  resets all four buffers; candidate switch preserves them (no re-scale).
++- Existing `charwise_rendering` + `floating_square_coherence` tests must stay
++  green (no change to game render paths).
++
++## Verification
++
++- `cargo test -p terminal_rendering` (unit + integration).
++- Piped animate frames eyeballed: frame-diff pane lights changed samples
++  only; sparkline grows rightward, resets on metric change only, stays
++  put (and unscaled) across candidate switches, and in-use vs candidate
++  share one y-axis.
+

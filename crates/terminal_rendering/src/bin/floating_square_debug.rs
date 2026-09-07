@@ -44,9 +44,16 @@
 //!                 ideal square xor (any mismatch lit), jaggedness
 //!                 (contour lit by local edge-step length), and
 //!                 displacement sensitivity (what turns wrong under the
-//!                 worst 1/16 nudge: bright yellow = newly wrong). Then a
-//!                 common row with the ideal (true square) zoom, global
-//!                 state, and controls. Left click/drag sets the orbit's
+//!                 worst 1/16 nudge: bright yellow = newly wrong), and
+//!                 frame diff (which samples changed against the previous
+//!                 rendered frame — motion pops light up; n/a until one
+//!                 frame old). Each method row also carries the selected
+//!                 error's recent history as a block-character sparkline
+//!                 (one 1/8th-increment block per frame, shared y-axis
+//!                 across the method slots), sampled only on frames where
+//!                 the square actually moves — manual mouse movement
+//!                 counts. Then a common row with the ideal (true square)
+//!                 zoom, global state, and controls. Left click/drag sets the orbit's
 //!                 angular position (the angle from the top-row grid's
 //!                 center to the mouse, at the fixed orbit radius); other
 //!                 buttons place the square (drag to move it), and
@@ -73,10 +80,11 @@ use terminal_rendering::coverage::{
     charwise_neighborhood, charwise_protrusion_squared_neighborhood, charwise_shaped_neighborhood,
     charwise_objective, coverage_error, displacement_sensitivity, fill_centroid, glyph_filled,
     glyph_pane, jaggedness, lerp, pane_from_colors, per_char_coverage_error,
-    rendered_neighborhood, rendered_neighborhood_forced, ClassGrid, FillGrid, Metrics, BIG_PX_W,
-    BITMAP_W, PX_H, PX_W, CHARWISE_PROTRUSION_SQUARED_WEIGHT,
-    CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
+    frame_diff_pane, frame_diff_xor, rendered_neighborhood, rendered_neighborhood_forced,
+    ClassGrid, FillGrid, Metrics, BIG_PX_W, BITMAP_W, PX_H, PX_W,
+    CHARWISE_PROTRUSION_SQUARED_WEIGHT, CHARWISE_PROTRUSION_WEIGHT, DISPLACEMENT_DELTA,
 };
+use terminal_rendering::glyph_constants::named_chars::EIGHTH_BLOCKS_FROM_BOTTOM;
 use terminal_rendering::glyph_constants::named_colors::*;
 use terminal_rendering::glyph_constants::SPACE;
 use terminal_rendering::*;
@@ -341,7 +349,7 @@ const CANDIDATES: [(&str, Neighborhood); 3] = [
 
 /// The error measurements that can be cycled with , and . — one shown at a
 /// time, as a full-resolution colored pane per method.
-const METRICS: [&str; 6] = ["center", "area", "per-char", "xor", "jagged", "disp"];
+const METRICS: [&str; 7] = ["center", "area", "per-char", "xor", "jagged", "disp", "frame"];
 
 /// The method's own objective, formatted for the stats column ("the error
 /// used for rendering"). `index` 0 = in use, 1..=3 = CANDIDATES index + 1.
@@ -385,41 +393,210 @@ fn dir_arrow(d: WorldMove) -> char {
     }
 }
 
+/// History depth per method row: one 1/8th-increment block per sampled
+/// frame (~1.05s at the 33ms frame clock). Matches the zoom/error column
+/// width so the boxed rows stay aligned.
+const SPARKLINE_LEN: usize = 32;
+
+/// One error measurement's full report for one method: the colored pane,
+/// the value string printed under it, and the scalar the history buffers
+/// sample (`None` = no data this frame — not appended, shown as n/a).
+#[derive(Default)]
+struct MetricReport {
+    pane: Vec<String>,
+    value: String,
+    number: Option<f32>,
+}
+
+/// The selected error measurement for one method — the single source of
+/// truth shared by the displayed pane/value (method_section) and the
+/// per-slot history sparklines (render_animation_frame).
+///
+/// `number` is the history scalar: `center` = |centroid − pos| (the pane
+/// shows the pair), `area` = |signed error| (the pane keeps over-red /
+/// under-blue), everything else = the displayed value as-is; `frame` is
+/// the diff against `prev`, `None` while no previous frame exists.
+fn metric_report(
+    nb: Neighborhood,
+    glyphs: &[[DoubleChar; 3]; 3],
+    center: WorldSquare,
+    pos: WorldPoint,
+    metric: usize,
+    prev: Option<(&[[DoubleChar; 3]; 3], WorldSquare)>,
+    style: &coverage::Style,
+) -> MetricReport {
+    let owners = assign_colors(glyphs);
+    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+    let class = || {
+        ClassGrid::sample(sample_origin, |wx, wy| {
+            ClassGrid::class_at(glyphs, &owners, center, pos, wx, wy)
+        })
+    };
+    let actual = || {
+        FillGrid::sample(sample_origin, |wx, wy| {
+            actual_sample(glyphs, &owners, center, wx, wy)
+        })
+    };
+    match metric {
+        0 => {
+            let actual = actual();
+            let class = class();
+            let c = fill_centroid(&actual);
+            MetricReport {
+                pane: class.center_pane(&actual, pos, style),
+                value: match c {
+                    Some(c) => format!("({:+.2}, {:+.2})", c.x - pos.x, c.y - pos.y),
+                    None => "n/a".to_string(),
+                },
+                number: c.map(|c| {
+                    ((c.x - pos.x) * (c.x - pos.x) + (c.y - pos.y) * (c.y - pos.y)).sqrt()
+                }),
+            }
+        }
+        1 => {
+            let class = class();
+            let signed = class.signed_area_error();
+            MetricReport {
+                pane: class.signed_pane(style),
+                value: format!("{signed:+.3}"),
+                number: Some(signed.abs()),
+            }
+        }
+        2 => {
+            let e = per_char_coverage_error(glyphs, center, pos);
+            MetricReport {
+                pane: ClassGrid::per_char_heat_pane(glyphs, center, pos, style),
+                value: format!("{e:.3}"),
+                number: Some(e),
+            }
+        }
+        3 => {
+            let class = class();
+            let xor = class.xor_error();
+            MetricReport {
+                pane: class.mismatch_pane(style),
+                value: format!("{xor:.3}"),
+                number: Some(xor),
+            }
+        }
+        4 => {
+            let actual = actual();
+            let jag = jaggedness(&actual);
+            MetricReport {
+                pane: ClassGrid::jaggedness_pane(&actual, style),
+                value: format!("{jag:.2}"),
+                number: Some(jag),
+            }
+        }
+        5 => {
+            let class = class();
+            let (gain, dir) = displacement_sensitivity(nb, pos, DISPLACEMENT_DELTA);
+            let shifted_pos = pos + dir * DISPLACEMENT_DELTA;
+            let (glyphs2, center2) = nb(shifted_pos);
+            let owners2 = assign_colors(&glyphs2);
+            // sampled on the BASE frame's origin so base and shifted
+            // grids align sample-for-sample for the pane comparison
+            let shifted = ClassGrid::sample(sample_origin, |wx, wy| {
+                ClassGrid::class_at(&glyphs2, &owners2, center2, shifted_pos, wx, wy)
+            });
+            MetricReport {
+                pane: ClassGrid::displacement_pane(&class, &shifted, style),
+                value: format!("{:.3}{}", gain, dir_arrow(dir)),
+                number: Some(gain),
+            }
+        }
+        _ => {
+            let cur = (glyphs, center);
+            let number = prev.map(|_| frame_diff_xor(prev, cur));
+            MetricReport {
+                pane: frame_diff_pane(prev, cur, style),
+                value: match number {
+                    Some(v) => format!("{v:.3}"),
+                    None => "n/a".to_string(),
+                },
+                number,
+            }
+        }
+    }
+}
+
+/// One method's recent history of the selected error as a single line of
+/// 1/8th-increment vertical blocks: `level = round(v / scale * 8)`
+/// clamped to 0..=8, `·` for 0. Oldest sample on the left, right-aligned,
+/// `·`-padded until the buffer fills. `scale` is shared across all method
+/// rows (max over every slot's history), so block heights compare between
+/// methods.
+fn sparkline_column(history: &[f32], scale: f32, style: &coverage::Style) -> String {
+    let dim = style.fg(coverage::DOT_COLOR);
+    let lit = style.fg(coverage::Rgb(190, 190, 200));
+    let mut line = String::new();
+    for _ in 0..SPARKLINE_LEN.saturating_sub(history.len()) {
+        line.push_str(&dim);
+        line.push('·');
+    }
+    for &v in history {
+        let level = (v / scale * 8.0).round().clamp(0.0, 8.0) as usize;
+        line.push_str(if level == 0 { &dim } else { &lit });
+        line.push(if level == 0 {
+            '·'
+        } else {
+            EIGHTH_BLOCKS_FROM_BOTTOM[level]
+        });
+    }
+    line.push_str(style.reset());
+    line
+}
+
+/// The 4th method-row column: the selected error's history sparkline plus
+/// the shared scale legend. Samples are taken only on frames where the
+/// square moved, so parked redraws don't dilute the window.
+fn history_column(
+    metric: usize,
+    history: &[f32],
+    scale: f32,
+    style: &coverage::Style,
+) -> Vec<String> {
+    vec![
+        format!("{:^SPARKLINE_LEN$}", format!("history: {}", METRICS[metric])),
+        sparkline_column(history, scale, style),
+        format!("{:^SPARKLINE_LEN$}", format!("0 ▁▂▃▄▅▆▇█ max={scale:.3}")),
+    ]
+}
+
 /// One method's bordered section: large view (full animation grid, method
 /// info, its own objective), zoomed render at native sampled resolution
-/// with one palette color per glyph plus legend, and the currently selected
-/// error measurement as a full-resolution colored pane with its value.
+/// with one palette color per glyph plus legend, the currently selected
+/// error measurement as a full-resolution colored pane with its value
+/// (precomputed — all four slots run `metric_report` for the histories,
+/// the displayed rows reuse pane + value), and the error's recent history
+/// as a sparkline with the shared scale legend.
 fn method_section(
     title: &str,
-    nb: Neighborhood,
     objective_idx: usize,
+    glyphs: &[[DoubleChar; 3]; 3],
+    center: WorldSquare,
     pos: WorldPoint,
-    style: &coverage::Style,
     metric: usize,
+    style: &coverage::Style,
     extra_info: &[String],
+    report: MetricReport,
+    history: &[f32],
+    scale: f32,
 ) -> Vec<String> {
-    let (glyphs, center) = nb(pos);
-    let owners = assign_colors(&glyphs);
-    let sample_origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
-    let actual = FillGrid::sample(sample_origin, |wx, wy| {
-        actual_sample(&glyphs, &owners, center, wx, wy)
-    });
-    let class = ClassGrid::sample(sample_origin, |wx, wy| {
-        ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
-    });
+    let owners = assign_colors(glyphs);
 
     // zoomed render: union-lattice big pixels (see big_pixel_pane) — every
     // glyph edge lands on a pixel boundary, so the fill is exact, one
     // palette color per glyph
     let mut zoom_col: Vec<String> = vec![format!("{:^BIG_PX_W$}", "big pixels 1/16x1/24")];
     zoom_col.extend(big_pixel_pane(
-        &glyphs,
+        glyphs,
         &owners,
         center,
         &coverage::PALETTE,
         style,
     ));
-    let legend = glyph_legend(&glyphs, &owners, style);
+    let legend = glyph_legend(glyphs, &owners, style);
     if legend.1 > 0 {
         zoom_col.push("glyph colors:".to_string());
         zoom_col.push(legend.0);
@@ -429,67 +606,36 @@ fn method_section(
     // the error the method's own picker minimizes
     let origin0 = euclid::point2(0, 0);
     let mut large = grid_frame(ANIMATE_GRID_RADIUS, origin0);
-    draw_neighborhood_colored(&mut large, ANIMATE_GRID_RADIUS, origin0, center, &glyphs, &owners);
+    draw_neighborhood_colored(&mut large, ANIMATE_GRID_RADIUS, origin0, center, glyphs, &owners);
     let mut large_col: Vec<String> = large
         .string_for_regular_display()
         .lines()
         .map(String::from)
         .collect();
     large_col.extend(extra_info.iter().cloned());
-    large_col.extend(objective_lines(objective_idx, &glyphs, &owners, center, pos));
+    large_col.extend(objective_lines(objective_idx, glyphs, &owners, center, pos));
 
-    // the selected error measurement: big-pixel pane + numeric value
-    let (pane, value): (Vec<String>, String) = match metric {
-        0 => {
-            let v = match fill_centroid(&actual) {
-                Some(c) => format!("({:+.2}, {:+.2})", c.x - pos.x, c.y - pos.y),
-                None => "n/a".to_string(),
-            };
-            (class.center_pane(&actual, pos, style), v)
-        }
-        1 => (
-            class.signed_pane(style),
-            format!("{:+.3}", class.signed_area_error()),
-        ),
-        2 => (
-            ClassGrid::per_char_heat_pane(&glyphs, center, pos, style),
-            format!("{:.3}", per_char_coverage_error(&glyphs, center, pos)),
-        ),
-        3 => (class.mismatch_pane(style), format!("{:.3}", class.xor_error())),
-        4 => (
-            ClassGrid::jaggedness_pane(&actual, style),
-            format!("{:.2}", jaggedness(&actual)),
-        ),
-        _ => {
-            let (gain, dir) = displacement_sensitivity(nb, pos, DISPLACEMENT_DELTA);
-            let shifted_pos = pos + dir * DISPLACEMENT_DELTA;
-            let (glyphs2, center2) = nb(shifted_pos);
-            let owners2 = assign_colors(&glyphs2);
-            let shifted = ClassGrid::sample(sample_origin, |wx, wy| {
-                ClassGrid::class_at(&glyphs2, &owners2, center2, shifted_pos, wx, wy)
-            });
-            (
-                ClassGrid::displacement_pane(&class, &shifted, style),
-                format!("{:.3}{}", gain, dir_arrow(dir)),
-            )
-        }
-    };
+    // the selected error measurement: precomputed pane + numeric value
     let mut err_col: Vec<String> = vec![format!(
         "{:^BIG_PX_W$}",
         format!("{} (, .)", METRICS[metric])
     )];
-    err_col.extend(pane);
-    err_col.push(format!("{:^BIG_PX_W$}", value));
+    err_col.extend(report.pane);
+    err_col.push(format!("{:^BIG_PX_W$}", report.value));
 
-    let (large_w, zoom_w, err_w) = (
+    let spark_col = history_column(metric, history, scale, style);
+
+    let (large_w, zoom_w, err_w, spark_w) = (
         visible_w(&large_col),
         visible_w(&zoom_col),
         visible_w(&err_col),
+        visible_w(&spark_col),
     );
     let cols = [
         (large_col, large_w),
         (zoom_col, zoom_w),
         (err_col, err_w),
+        (spark_col, spark_w),
     ];
     let refs: Vec<(&[String], usize)> =
         cols.iter().map(|(l, w)| (l.as_slice(), *w)).collect();
@@ -992,6 +1138,20 @@ struct AnimState {
     candidate: usize,
     /// Which error measurement pane is displayed (index into METRICS).
     metric: usize,
+    /// Previously rendered glyph neighborhoods per method slot (0 = the
+    /// in-use row, 1..=3 = CANDIDATES index + 1), for the frame-diff
+    /// metric. Updated after every rendered frame — moving or not — so
+    /// frame diff always compares against the immediately previous render.
+    prev_renders: [Option<([[DoubleChar; 3]; 3], WorldSquare)>; 4],
+    /// Selected error over time per method slot, sampled on frames where
+    /// the square actually moved. All four slots accumulate; `[`/`]` only
+    /// changes which two are displayed.
+    history: [Vec<f32>; 4],
+    /// Which metric the history buffers hold; a change clears them all.
+    history_metric: usize,
+    /// Position at the last history sample: a frame appends only when pos
+    /// differs (manual mouse movement and nudges count).
+    last_sample_pos: Option<WorldPoint>,
 }
 
 impl AnimState {
@@ -1008,6 +1168,39 @@ impl AnimState {
             drag: None,
             candidate: 0,
             metric: 0,
+            prev_renders: [None; 4],
+            history: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+            history_metric: 0,
+            last_sample_pos: None,
+        }
+    }
+
+    /// Clear all history buffers when the metric cycled to a new one —
+    /// different metrics have incomparable units.
+    fn sync_history_metric(&mut self) {
+        if self.history_metric != self.metric {
+            self.history = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+            self.history_metric = self.metric;
+        }
+    }
+
+    /// One frame's history sample: append each slot's number only when
+    /// the square actually moved since the last sample — mouse drags and
+    /// arrow nudges change pos too, so they count; parked redraws (metric
+    /// or candidate switches, paused key presses) append nothing. `None`
+    /// numbers (frame diff before its first prev) are skipped.
+    fn record_history(&mut self, pos: WorldPoint, numbers: &[Option<f32>; 4]) {
+        if self.last_sample_pos == Some(pos) {
+            return;
+        }
+        self.last_sample_pos = Some(pos);
+        for (slot, number) in numbers.iter().enumerate() {
+            if let Some(number) = number {
+                self.history[slot].push(*number);
+                if self.history[slot].len() > SPARKLINE_LEN {
+                    self.history[slot].remove(0);
+                }
+            }
         }
     }
 }
@@ -1119,7 +1312,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
             info.snapped_offset.y - offset.y,
         ),
     ];
-    let (cand_name, cand_nb) = CANDIDATES[state.candidate];
+    let cand_name = CANDIDATES[state.candidate].0;
     let cand_info = match state.candidate {
         0 => vec![
             "per-character xor argmin,".to_string(),
@@ -1135,27 +1328,69 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         )],
     };
 
+    // All four method slots get a metric report every frame: the two
+    // displayed rows reuse pane + value, all four numbers feed the
+    // history sparklines — candidate switches only change which slots
+    // render, so every slot's history stays continuous across them.
+    state.sync_history_metric();
+    let methods: [(&str, Neighborhood); 4] = [IN_USE, CANDIDATES[0], CANDIDATES[1], CANDIDATES[2]];
+    let mut reports: Vec<MetricReport> = Vec::with_capacity(4);
+    let mut renders: Vec<([[DoubleChar; 3]; 3], WorldSquare)> = Vec::with_capacity(4);
+    let mut numbers: [Option<f32>; 4] = [None; 4];
+    for slot in 0..4 {
+        let (glyphs, center) = methods[slot].1(pos);
+        let report = metric_report(
+            methods[slot].1,
+            &glyphs,
+            center,
+            pos,
+            state.metric,
+            state.prev_renders[slot].as_ref().map(|(g, c)| (g, *c)),
+            &style,
+        );
+        numbers[slot] = report.number;
+        renders.push((glyphs, center));
+        reports.push(report);
+    }
+    state.record_history(pos, &numbers);
+    // Shared y-axis: max over every live slot keeps block heights
+    // comparable between rows and stable across candidate switches.
+    let scale = state
+        .history
+        .iter()
+        .flatten()
+        .fold(1e-6f32, |acc, &v| acc.max(v));
+
     let mut text = String::new();
     for line in method_section(
         &format!("in use: {}", IN_USE.0),
-        IN_USE.1,
         0,
+        &renders[0].0,
+        renders[0].1,
         pos,
-        &style,
         state.metric,
+        &style,
         &in_use_info,
+        std::mem::take(&mut reports[0]),
+        &state.history[0],
+        scale,
     ) {
         text.push_str(&line);
         text.push('\n');
     }
+    let cand_slot = state.candidate + 1;
     for line in method_section(
         &format!("candidate: {cand_name}  ([ ] cycle)"),
-        cand_nb,
-        state.candidate + 1,
+        cand_slot,
+        &renders[cand_slot].0,
+        renders[cand_slot].1,
         pos,
-        &style,
         state.metric,
+        &style,
         &cand_info,
+        std::mem::take(&mut reports[cand_slot]),
+        &state.history[cand_slot],
+        scale,
     ) {
         text.push_str(&line);
         text.push('\n');
@@ -1211,6 +1446,13 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
     );
     text.push_str(&common_row.join("\n"));
     text.push('\n');
+
+    // Remember all four renders for the next frame's frame-diff metric —
+    // every rendered frame, moving or not, so the diff is always against
+    // the immediately previous render.
+    for slot in 0..4 {
+        state.prev_renders[slot] = Some(renders[slot]);
+    }
 
     if raw_mode {
         // raw mode disables ONLCR, so bare '\n' would stair-step; and erase
@@ -1450,7 +1692,9 @@ fn usage() {
           \x20      full-resolution zoomed render (one color per glyph), and\n  \
           \x20      ONE error pane cycled with , and . (center, area,\n  \
           \x20      per-char coverage, ideal xor, jaggedness, displacement\n  \
-          \x20      sensitivity) with its numeric value; q quits, space\n  \
+          \x20      sensitivity, frame diff) with its numeric value, plus\n  \
+          \x20      the error's recent history as a block-character\n  \
+          \x20      sparkline (shared y-axis); q quits, space\n  \
           \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
           \x20      line trajectory, +/- change speed, left click/drag sets\n  \
           \x20      the orbit's angular position (angle from the top-row\n  \
@@ -1528,5 +1772,107 @@ mod glyph_table_tests {
                 c as u32
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod history_tests {
+    use super::*;
+
+    /// Sparkline maps the scale's zero to `·`, its max to the full block,
+    /// half-scale to the half block, right-aligns, and left-pads with `·`.
+    #[test]
+    fn sparkline_maps_levels_and_aligns_right() {
+        let style = coverage::Style { enabled: false };
+        let chars: Vec<char> = sparkline_column(&[0.0, 2.0, 1.0], 2.0, &style).chars().collect();
+        assert_eq!(chars.len(), SPARKLINE_LEN);
+        let pad = SPARKLINE_LEN - 3;
+        assert!(chars[..pad].iter().all(|&c| c == '·'));
+        assert_eq!(chars[pad], '·'); // v = 0 → level 0
+        assert_eq!(chars[pad + 1], '█'); // v = scale → level 8
+        assert_eq!(chars[pad + 2], '▄'); // v = scale/2 → level 4
+    }
+
+    /// History semantics: only moving frames append (manual movement
+    /// counts), all four slots accumulate independently, `None` numbers
+    /// are skipped, the buffer caps at SPARKLINE_LEN keeping the newest,
+    /// a metric change clears everything, and candidate switches change
+    /// nothing.
+    #[test]
+    fn history_appends_only_on_motion_and_caps() {
+        let mut state = AnimState::new();
+        state.sync_history_metric();
+        let p0 = euclid::point2(0.0, 0.0);
+        state.record_history(p0, &[Some(1.0), Some(2.0), Some(3.0), Some(4.0)]);
+        // parked redraw at the same pos: nothing, even with new numbers
+        state.record_history(p0, &[Some(9.0); 4]);
+        assert_eq!(state.history[0], vec![1.0]);
+        assert_eq!(state.history[3], vec![4.0]);
+        // motion appends on all slots; None skipped (frame metric's first)
+        state.record_history(euclid::point2(0.25, 0.0), &[Some(5.0), None, Some(7.0), Some(8.0)]);
+        assert_eq!(state.history[0], vec![1.0, 5.0]);
+        assert_eq!(state.history[1], vec![2.0]);
+        assert_eq!(state.history[2], vec![3.0, 7.0]);
+        // cap: only the newest SPARKLINE_LEN values survive
+        for k in 0..(SPARKLINE_LEN + 6) {
+            state.record_history(
+                euclid::point2(k as f32 * 0.25, 0.5),
+                &[Some(k as f32), None, None, None],
+            );
+        }
+        assert_eq!(state.history[0].len(), SPARKLINE_LEN);
+        assert_eq!(state.history[0][0], 6.0);
+        assert_eq!(state.history[0][SPARKLINE_LEN - 1], (SPARKLINE_LEN + 5) as f32);
+        // metric change clears all four
+        state.metric = 3;
+        state.sync_history_metric();
+        assert!(state.history.iter().all(|h| h.is_empty()));
+        // candidate switch: purely a display change — history keeps
+        state.candidate = 2;
+        state.record_history(euclid::point2(9.0, 9.0), &[Some(1.0); 4]);
+        assert_eq!(state.history[0], vec![1.0]);
+        assert_eq!(state.history[3], vec![1.0]);
+    }
+
+    /// MetricReport's history scalar: center = |centroid − pos|, area =
+    /// |signed error|, every metric reports Some except frame before its
+    /// first prev (n/a), and frame with a prev is the true diff.
+    #[test]
+    fn metric_report_history_scalars() {
+        let style = coverage::Style::from_env();
+        let pos = euclid::point2(0.3, -0.7);
+        let (glyphs, center) = rendered_neighborhood(pos);
+        let frame = METRICS.len() - 1;
+        for metric in 0..METRICS.len() {
+            let r =
+                metric_report(rendered_neighborhood, &glyphs, center, pos, metric, None, &style);
+            if metric == frame {
+                assert_eq!(r.number, None);
+                assert_eq!(r.value, "n/a");
+            } else {
+                assert!(r.number.expect("history scalar") >= 0.0, "{metric} is a magnitude");
+            }
+            assert_eq!(r.pane.len(), coverage::BIG_TEXT_ROWS);
+        }
+        let owners = assign_colors(&glyphs);
+        let origin = euclid::point2(center.x as f32 - 1.5, center.y as f32 - 1.5);
+        // center: number is the Euclidean |centroid − pos|
+        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 0, None, &style);
+        let actual =
+            FillGrid::sample(origin, |wx, wy| actual_sample(&glyphs, &owners, center, wx, wy));
+        let c = fill_centroid(&actual).unwrap();
+        let d = (c.x - pos.x).hypot(c.y - pos.y);
+        assert!((r.number.unwrap() - d).abs() < 1e-5);
+        // area: number is |signed|
+        let r = metric_report(rendered_neighborhood, &glyphs, center, pos, 1, None, &style);
+        let class = ClassGrid::sample(origin, |wx, wy| {
+            ClassGrid::class_at(&glyphs, &owners, center, pos, wx, wy)
+        });
+        assert_eq!(r.number, Some(class.signed_area_error().abs()));
+        // frame with a previous render: the real diff
+        let (pg, pc) = rendered_neighborhood(euclid::point2(0.55, -0.7));
+        let r =
+            metric_report(rendered_neighborhood, &glyphs, center, pos, frame, Some((&pg, pc)), &style);
+        assert!(r.number.unwrap() > 0.0);
     }
 }
