@@ -24,6 +24,47 @@ decisions) and Stage 2 (implementation) both landed, per plan above.
   which stale incremental-compilation warning caches had been hiding —
   left for roadmap item 2's warning cleanup.
 
+## Follow-up: five-row graph + in-use baseline overlay — 2026-09-07
+
+User request: more vertical resolution for the history graph (5 text
+rows → 40 levels against the shared scale), and show where the in-use
+(baseline) method's errors sit by overlaying a 1/8-tall horizontal-line
+character positioned accordingly.
+
+Research (user-requested): the marker chars are U+1FB76..=U+1FB7B,
+HORIZONTAL ONE EIGHTH BLOCK-2..-7 (Unicode 13.0, Symbols for Legacy
+Computing — the same U+1FB00–1FBFF chart as the sextants/right-blocks
+the renderer already emits, so no new font requirement). The official
+suffix counts from the TOP (the family's -1/-8 ends are ▔ U+2594 /
+▁ U+2581), so in bottom-up order the six new chars appear in DESCENDING
+code-point order: 1→▁ 2→🭻 3→🭺 4→🭹 5→🭸 6→🭷 7→🭶 8→▔. Verified three
+ways: the official names list (user paste of all six lines), the chart's
+`→ 2594 ▔` cross-reference, and pixel measurement of the rendered block
+chart (calibrated by BLOCK SEXTANT-1 = top-left fill, matching the repo's
+own hextant bit model). Guard test pins the order.
+
+Landed: `SPARKLINE_ROWS = 5`, level = round(v/scale·40) clamped 0..=40;
+bars (█ rows + bottom-up eighth-block tops), '·' zero-axis row, spaces
+above; baseline overlay on the candidate row only (the in-use row IS
+the baseline), the line char replaces the bar char in its cell,
+boundary-exact levels draw ▔ on the row seam, level 0 is ▁ on the axis,
+level 40 is ▔ at the graph top; candidate legend names the marker
+(🭸=in-use). Column width unchanged (32) — method rows stay 132 visible
+columns; the graph grows the sparkline column from 3 to 7 lines, still
+shorter than the zoom column. Applied with two corrections to the
+presented diff: the v=scale test assertion is unconditional '█' (level
+40 reaches the top row at exactly p=8), and the SPARKLINE_LEN doc now
+says "graph column" (a frame is a column, not a single block).
+
+Verification: bin tests 4 → 6 (level test replaced; baseline landing +
+family-order guard added); `cargo test -p terminal_rendering` 156 / 0
+(lib 141, bin 6, integration 9); workspace 491 / 0. Piped `animate 8`:
+width still 132; in-use row = bars only (0 overlay chars, 0 cyan codes);
+candidate row = bars + 8 baseline marks (family chars, cyan),
+observed cutting through bars (████🭻██), floating above them (🭷 ▔ 🭷
+on the top row), and on the axis (▁); legends "0 ▁▂▃▄▅▆▇█ max=…" /
+"🭸=in-use ▁▂▃▄▅▆▇█ max=…" as designed.
+
 ## User request
 
 1. Add a frame-to-frame xor measurement: `xor(render(t-1), render(t))`, as a

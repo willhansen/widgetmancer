@@ -48,12 +48,15 @@
 //!                 frame diff (which samples changed against the previous
 //!                 rendered frame — motion pops light up; n/a until one
 //!                 frame old). Each method row also carries the selected
-//!                 error's recent history as a block-character sparkline
-//!                 (one 1/8th-increment block per frame, shared y-axis
-//!                 across the method slots), sampled only on frames where
-//!                 the square actually moves — manual mouse movement
-//!                 counts. Then a common row with the ideal (true square)
-//!                 zoom, global state, and controls. Left click/drag sets the orbit's
+//!                 error's recent history as a five-row bar graph (one
+//!                 column per frame, shared y-axis across the method
+//!                 slots), sampled only on frames where the square
+//!                 actually moves — manual mouse movement counts; the
+//!                 candidate row also marks each frame's in-use error
+//!                 with a 1/8-tall horizontal-line character (the
+//!                 HORIZONTAL ONE EIGHTH BLOCK family). Then a common
+//!                 row with the ideal (true square) zoom, global state,
+//!                 and controls. Left click/drag sets the orbit's
 //!                 angular position (the angle from the top-row grid's
 //!                 center to the mouse, at the fixed orbit radius); other
 //!                 buttons place the square (drag to move it), and
@@ -393,10 +396,28 @@ fn dir_arrow(d: WorldMove) -> char {
     }
 }
 
-/// History depth per method row: one 1/8th-increment block per sampled
-/// frame (~1.05s at the 33ms frame clock). Matches the zoom/error column
+/// History depth per method row: one graph column per sampled frame
+/// (~1.05s at the 33ms frame clock). Matches the zoom/error column
 /// width so the boxed rows stay aligned.
 const SPARKLINE_LEN: usize = 32;
+
+/// Graph height in text rows: each row contributes 8 levels of vertical
+/// resolution (a bar's top row still uses the 1/8th block chars), so the
+/// graph resolves 5 * 8 = 40 levels against the shared scale.
+const SPARKLINE_ROWS: usize = 5;
+
+/// A 1/8-tall horizontal line at each of the 8 eighths of a cell,
+/// indexed by position counted from the BOTTOM — the baseline overlay
+/// marker. Positions 1 and 8 are the pre-existing ▁ (U+2581) / ▔
+/// (U+2594); the middle six (U+1FB76..=U+1FB7B) are HORIZONTAL ONE
+/// EIGHTH BLOCK-2..-7 (Unicode 13.0, same Symbols-for-Legacy-Computing
+/// chart as the sextants the renderer already emits). Their official
+/// suffix counts from the TOP — hence the reversed order here. Verified
+/// against the official chart (pixel-measured, calibrated by BLOCK
+/// SEXTANT-1 = top-left) and its `→ 2594 ▔` cross-reference; pinned by
+/// `horizontal_line_family_is_top_down_numbered`.
+const H_LINE_FROM_BOTTOM: [char; 9] =
+    [' ', '▁', '🭻', '🭺', '🭹', '🭸', '🭷', '🭶', '▔'];
 
 /// One error measurement's full report for one method: the colored pane,
 /// the value string printed under it, and the scalar the history buffers
@@ -520,31 +541,80 @@ fn metric_report(
     }
 }
 
-/// One method's recent history of the selected error as a single line of
-/// 1/8th-increment vertical blocks: `level = round(v / scale * 8)`
-/// clamped to 0..=8, `·` for 0. Oldest sample on the left, right-aligned,
-/// `·`-padded until the buffer fills. `scale` is shared across all method
-/// rows (max over every slot's history), so block heights compare between
-/// methods.
-fn sparkline_column(history: &[f32], scale: f32, style: &coverage::Style) -> String {
+/// (row-from-bottom, position-from-bottom 1..=8) of the baseline line
+/// marker for a graph level: interior levels sit inside their row; a
+/// level exactly on a row seam is drawn as ▔ in the row below (the line
+/// lands on the seam); level 0 is the axis itself.
+fn line_pos(level: usize) -> (usize, usize) {
+    if level == 0 {
+        (0, 1)
+    } else {
+        let row = (level / 8).min(SPARKLINE_ROWS - 1);
+        let pos = level - 8 * row;
+        if pos == 0 {
+            (row - 1, 8)
+        } else {
+            (row, pos)
+        }
+    }
+}
+
+/// One method's recent history of the selected error as a bar graph
+/// SPARKLINE_ROWS rows tall: `level = round(v / scale * 8*ROWS)` clamped,
+/// each row contributing 8 levels of resolution — full rows are '█', the
+/// bar's top row is the matching 1/8th block (fill from the bottom, so
+/// bars look solid). Oldest sample on the left, right-aligned; empty
+/// columns show '·' on the bottom row (the zero axis) and spaces above.
+/// `baseline` (the in-use method's history, on candidate rows) marks
+/// each frame's baseline level with a 1/8-tall horizontal-line char,
+/// replacing the bar char in its cell — a baseline inside the bar cuts
+/// it, above it the line floats. `scale` is shared across all method
+/// rows, so heights compare between methods.
+fn sparkline_graph(
+    history: &[f32],
+    baseline: Option<&[f32]>,
+    scale: f32,
+    style: &coverage::Style,
+) -> Vec<String> {
+    let levels = (8 * SPARKLINE_ROWS) as f32;
+    let level_of = |v: f32| (v / scale * levels).round().clamp(0.0, levels) as usize;
     let dim = style.fg(coverage::DOT_COLOR);
     let lit = style.fg(coverage::Rgb(190, 190, 200));
-    let mut line = String::new();
-    for _ in 0..SPARKLINE_LEN.saturating_sub(history.len()) {
-        line.push_str(&dim);
-        line.push('·');
+    let base = style.fg(coverage::Rgb(0, 180, 180)); // the tool's reference-point cyan
+    let pad = SPARKLINE_LEN.saturating_sub(history.len());
+    let mut rows = vec![String::new(); SPARKLINE_ROWS];
+    for r in (0..SPARKLINE_ROWS).rev() {
+        for k in 0..SPARKLINE_LEN {
+            let (bar, line): (usize, Option<(usize, usize)>) = if k < pad {
+                (0, None)
+            } else {
+                let i = k - pad;
+                let line = baseline
+                    .filter(|b| i < b.len())
+                    .map(|b| line_pos(level_of(b[i])));
+                (level_of(history[i]), line)
+            };
+            let p = bar as isize - 8 * r as isize;
+            if line.is_some_and(|(lr, _)| lr == r) {
+                rows[r].push_str(&base);
+                rows[r].push(H_LINE_FROM_BOTTOM[line.unwrap().1]);
+            } else if p >= 8 {
+                rows[r].push_str(&lit);
+                rows[r].push('█');
+            } else if p >= 1 {
+                rows[r].push_str(&lit);
+                rows[r].push(EIGHTH_BLOCKS_FROM_BOTTOM[p as usize]);
+            } else if r == 0 {
+                rows[r].push_str(&dim);
+                rows[r].push('·');
+            } else {
+                rows[r].push(' ');
+            }
+        }
+        rows[r].push_str(style.reset());
     }
-    for &v in history {
-        let level = (v / scale * 8.0).round().clamp(0.0, 8.0) as usize;
-        line.push_str(if level == 0 { &dim } else { &lit });
-        line.push(if level == 0 {
-            '·'
-        } else {
-            EIGHTH_BLOCKS_FROM_BOTTOM[level]
-        });
-    }
-    line.push_str(style.reset());
-    line
+    rows.reverse(); // emit top row first
+    rows
 }
 
 /// The 4th method-row column: the selected error's history sparkline plus
@@ -553,14 +623,20 @@ fn sparkline_column(history: &[f32], scale: f32, style: &coverage::Style) -> Str
 fn history_column(
     metric: usize,
     history: &[f32],
+    baseline: Option<&[f32]>,
     scale: f32,
     style: &coverage::Style,
 ) -> Vec<String> {
-    vec![
-        format!("{:^SPARKLINE_LEN$}", format!("history: {}", METRICS[metric])),
-        sparkline_column(history, scale, style),
-        format!("{:^SPARKLINE_LEN$}", format!("0 ▁▂▃▄▅▆▇█ max={scale:.3}")),
-    ]
+    let mut col = vec![format!("{:^SPARKLINE_LEN$}", format!("history: {}", METRICS[metric]))];
+    col.extend(sparkline_graph(history, baseline, scale, style));
+    // the candidate row's legend names the overlay marker (🭸 = the
+    // family's middle member); both stay within the 32-wide column
+    let legend = match baseline {
+        Some(_) => format!("🭸=in-use ▁▂▃▄▅▆▇█ max={scale:.3}"),
+        None => format!("0 ▁▂▃▄▅▆▇█ max={scale:.3}"),
+    };
+    col.push(format!("{:^SPARKLINE_LEN$}", legend));
+    col
 }
 
 /// One method's bordered section: large view (full animation grid, method
@@ -581,6 +657,7 @@ fn method_section(
     extra_info: &[String],
     report: MetricReport,
     history: &[f32],
+    baseline: Option<&[f32]>,
     scale: f32,
 ) -> Vec<String> {
     let owners = assign_colors(glyphs);
@@ -623,7 +700,7 @@ fn method_section(
     err_col.extend(report.pane);
     err_col.push(format!("{:^BIG_PX_W$}", report.value));
 
-    let spark_col = history_column(metric, history, scale, style);
+    let spark_col = history_column(metric, history, baseline, scale, style);
 
     let (large_w, zoom_w, err_w, spark_w) = (
         visible_w(&large_col),
@@ -1373,6 +1450,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         &in_use_info,
         std::mem::take(&mut reports[0]),
         &state.history[0],
+        None, // the in-use row IS the baseline
         scale,
     ) {
         text.push_str(&line);
@@ -1390,6 +1468,7 @@ fn render_animation_frame(out: &mut impl Write, state: &mut AnimState, raw_mode:
         &cand_info,
         std::mem::take(&mut reports[cand_slot]),
         &state.history[cand_slot],
+        Some(&state.history[0]), // mark where the in-use error sits
         scale,
     ) {
         text.push_str(&line);
@@ -1693,8 +1772,9 @@ fn usage() {
           \x20      ONE error pane cycled with , and . (center, area,\n  \
           \x20      per-char coverage, ideal xor, jaggedness, displacement\n  \
           \x20      sensitivity, frame diff) with its numeric value, plus\n  \
-          \x20      the error's recent history as a block-character\n  \
-          \x20      sparkline (shared y-axis); q quits, space\n  \
+          \x20      the error's recent history as a five-row bar graph\n  \
+          \x20      (shared y-axis; the candidate row marks the in-use\n  \
+          \x20      error with a thin horizontal line); q quits, space\n  \
           \x20      pauses, arrows nudge, o resumes the orbit, l starts a\n  \
           \x20      line trajectory, +/- change speed, left click/drag sets\n  \
           \x20      the orbit's angular position (angle from the top-row\n  \
@@ -1779,18 +1859,75 @@ mod glyph_table_tests {
 mod history_tests {
     use super::*;
 
-    /// Sparkline maps the scale's zero to `·`, its max to the full block,
-    /// half-scale to the half block, right-aligns, and left-pads with `·`.
+    /// The 5-row graph resolves 40 levels: scale maps to a full column of
+    /// '█' on every row (level 40 = p 8 on the top row), half-scale to 2
+    /// full rows + the half block, columns right-align, and empty cells are
+    /// '·' on the axis row / spaces above.
     #[test]
-    fn sparkline_maps_levels_and_aligns_right() {
+    fn sparkline_graph_maps_levels_and_aligns_right() {
         let style = coverage::Style { enabled: false };
-        let chars: Vec<char> = sparkline_column(&[0.0, 2.0, 1.0], 2.0, &style).chars().collect();
-        assert_eq!(chars.len(), SPARKLINE_LEN);
+        let rows = sparkline_graph(&[0.0, 4.0, 2.0], None, 4.0, &style);
+        assert_eq!(rows.len(), SPARKLINE_ROWS);
         let pad = SPARKLINE_LEN - 3;
-        assert!(chars[..pad].iter().all(|&c| c == '·'));
-        assert_eq!(chars[pad], '·'); // v = 0 → level 0
-        assert_eq!(chars[pad + 1], '█'); // v = scale → level 8
-        assert_eq!(chars[pad + 2], '▄'); // v = scale/2 → level 4
+        for (top_idx, row) in rows.iter().enumerate() {
+            let chars: Vec<char> = row.chars().collect();
+            assert_eq!(chars.len(), SPARKLINE_LEN);
+            let from_bottom = SPARKLINE_ROWS - 1 - top_idx;
+            assert!(chars[..pad].iter().all(|&c| c == if from_bottom == 0 { '·' } else { ' ' }));
+            // v = 0 → level 0; v = scale → level 40; v = scale/2 → level 20
+            assert_eq!(chars[pad], if from_bottom == 0 { '·' } else { ' ' });
+            assert_eq!(chars[pad + 1], '█');
+            match from_bottom {
+                0 | 1 => assert_eq!(chars[pad + 2], '█'),
+                2 => assert_eq!(chars[pad + 2], '▄'), // level 20 = row 2, pos 4
+                _ => assert_eq!(chars[pad + 2], ' '),
+            }
+        }
+    }
+
+    /// The baseline marker: interior levels use the reversed-order
+    /// horizontal-line family, boundary-exact levels land on the row seam
+    /// as ▔, level 0 is ▁ on the axis, level 40 is ▔ at the graph top, and
+    /// the marker replaces the bar char in its cell.
+    #[test]
+    fn baseline_line_lands_on_the_right_row_and_position() {
+        let style = coverage::Style { enabled: false };
+        // scale = 40 so a value IS its level; one sample in the last column
+        for (v, row, ch) in [
+            (0.0f32, 0usize, '▁'), // the axis itself
+            (2.0, 0, '🭻'),        // 2nd from bottom = BLOCK-7
+            (5.0, 0, '🭸'),        // middle = BLOCK-4
+            (7.0, 0, '🭶'),        // 7th from bottom = BLOCK-2
+            (8.0, 0, '▔'),        // seam between rows 0/1
+            (9.0, 1, '▁'),         // row 1, pos 1
+            (16.0, 1, '▔'),        // seam between rows 1/2
+            (40.0, 4, '▔'),        // the graph top
+        ] {
+            let rows = sparkline_graph(&[4.0], Some(&[v]), 40.0, &style);
+            let bottom_up: Vec<&String> = rows.iter().rev().collect();
+            let chars: Vec<char> = bottom_up[row].chars().collect();
+            assert_eq!(chars[SPARKLINE_LEN - 1], ch, "baseline level {v}");
+        }
+        // the line replaces the bar char it lands on: bar level 4 (▄ on
+        // row 0) overlaid by baseline level 3 shows the line char
+        let rows = sparkline_graph(&[4.0], Some(&[3.0]), 40.0, &style);
+        let chars: Vec<char> = rows.last().unwrap().chars().collect();
+        assert_eq!(chars[SPARKLINE_LEN - 1], '🭺');
+    }
+
+    /// H_LINE_FROM_BOTTOM's middle six are U+1FB7B..=U+1FB76 in DESCENDING
+    /// code-point order: the official names count from the TOP (BLOCK-k =
+    /// k-th eighth from the top — the family anchors at ▔ U+2594 for -1
+    /// and ▁ U+2581 for -8), the opposite of the bottom-up block family.
+    /// If someone "fixes" this to ascending order, every baseline marker
+    /// mirrors — this pins the chart-verified mapping.
+    #[test]
+    fn horizontal_line_family_is_top_down_numbered() {
+        assert_eq!(H_LINE_FROM_BOTTOM[1], '\u{2581}'); // ▁ lower one eighth
+        assert_eq!(H_LINE_FROM_BOTTOM[8], '\u{2594}'); // ▔ upper one eighth
+        for pos in 2..=7usize {
+            assert_eq!(H_LINE_FROM_BOTTOM[pos], char::from_u32(0x1FB7B - (pos as u32 - 2)).unwrap());
+        }
     }
 
     /// History semantics: only moving frames append (manual movement
