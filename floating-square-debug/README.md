@@ -34,6 +34,7 @@ or directly:
 ## Layout
 
 - `src/main.rs` — the tool itself.
+- On-screen UI hierarchy: see UI-LAYOUT.md.
 - The sampled-coverage oracle (`terminal_rendering::coverage`) stays in
   `crates/terminal_rendering` because the coherence tests there share it.
 
