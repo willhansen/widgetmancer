@@ -68,8 +68,8 @@
 //!                 switches placement to fine control, where large mouse
 //!                 movements map to sub-cell square movements.
 //!
-//! Run via the top-level ./debug-floating-squares wrapper, or:
-//!   cargo run -p terminal_rendering --bin floating_square_debug -- animate
+//! Run via the ./floating-square-debug/debug-floating-squares wrapper, or:
+//!   cargo run -p floating_square_debug -- animate
 
 use std::io::{stdin, stdout, IsTerminal, Write};
 use std::sync::mpsc::channel;

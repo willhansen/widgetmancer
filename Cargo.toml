@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "floating-square-debug"]
 # exclude = ["crates/game", "crates/shapes"]
 resolver = "3"
 

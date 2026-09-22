@@ -1,0 +1,11 @@
+[package]
+name = "floating_square_debug"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rgb = "0.8.34"
+euclid = "0.22.7"
+termion = "2.0.1"
+
+terminal_rendering.workspace = true

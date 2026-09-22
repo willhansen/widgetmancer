@@ -119,8 +119,8 @@ The same oracle drives both consumers, so they can never drift apart:
 
 ## Debug tooling
 
-The top-level `./debug-floating-squares` wrapper (for
-`cargo run -p terminal_rendering --bin floating_square_debug`) renders the
+The `./floating-square-debug/debug-floating-squares` wrapper (for
+`cargo run -p floating_square_debug`) renders the
 real glyph picks on a checkerboard of square centers:
 
 - `pos X Y` — one square: family diagnostics (snapped offset, per-family
