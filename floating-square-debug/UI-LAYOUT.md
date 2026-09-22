@@ -141,17 +141,120 @@ metric report every frame so history stays continuous across candidate
 switches; the frame-diff metric compares against the immediately
 previous render (`main.rs:1589-1594`).
 
-### Metric panes (col 3, cycled with `,` / `.`)
+### The error metrics (col 3, cycled with `,` / `.`)
 
-- **center** — silhouette + ideal outline + both centroids
-- **area** — signed: over red / under blue
-- **per-char** — coverage, half-cells heat-shaded by local error
-- **xor** — ideal-square xor, any mismatch lit
-- **jagged** — contour lit by local edge-step length
-- **disp** — displacement sensitivity: what turns wrong under the worst
-  1/16 nudge (bright yellow = newly wrong)
-- **frame** — frame diff: which samples changed against the previous
-  rendered frame (motion pops light up; n/a until one frame old)
+All seven metrics measure the same render on the same **sample lattice**:
+48 × 72 sample points over the 3×3-world render window (16 × 24 per world
+square, at half-sample offsets so samples never coincide with half/third/
+eighth glyph boundaries — coverage never aliases). Every number divides
+by `SX * SY = 384`, one square's sample count, so values are in **world
+square units**. The colored pane is the exact same grid (a 2×2-world
+crop, one big pixel per lattice sample), so each pane shows pixel-for-
+pixel what its number counts — not a downsampled view.
+
+The value line under each pane also feeds the col-4 sparkline, with
+history scalars `center` = Euclidean distance and `area` = |signed|
+(`metric_report` doc, main.rs:440-447).
+
+#### `center` — silhouette position
+
+- **Measures** how far the rendered silhouette's actual middle (centroid
+  of its filled samples) sits from the true square's center.
+- **How** unweighted mean of filled-sample positions over the full
+  lattice (`fill_centroid`, coverage.rs:781); value = per-axis offset,
+  history scalar = ‖centroid − pos‖.
+- **Displayed** `({:+.2}, {:+.2})` signed x/y; pane: dim silhouette,
+  grey ideal outline, '×' actual vs '+' ideal centroid marks
+  (coverage.rs:1130-1185).
+- **Why** catches lopsided glyph picks — plausible ink distribution
+  that's nevertheless off-center, which xor can trade off against
+  shape error.
+
+#### `area` — ink amount, signed
+
+- **Measures** rendered area minus ideal area (ideal = 1 square),
+  signed: positive = bloated, negative = shrunken.
+- **How** `(over − under) / 384` over the full lattice — over =
+  rendered-filled/ideal-empty samples, under the reverse
+  (`signed_area_error`, coverage.rs:1095).
+- **Displayed** `{:+.3}`; pane: over-coverage red, under-coverage blue
+  (coverage.rs:1115-1128).
+- **Why** the signed catch-all for systematic over/undershoot; xor
+  alone can't tell which direction. Deviations past ~0.23 exceed any
+  single family's quantization error — genuine failure, not rounding.
+
+#### `per-char` — per-half-cell ink amount
+
+- **Measures** for each of the 18 character half-cells, |rendered
+  glyph fill − ideal fill| within that half-cell, summed.
+- **How** each half-cell sampled on its own 8×24 = 192-point lattice;
+  `Σ |rendered − ideal| / 192` (`per_char_coverage_error`,
+  coverage.rs:635-660). Coarser than xor: only the right *amount* of
+  ink per cell, regardless of where it sits.
+- **Displayed** `{:.3}`; pane: each half-cell heat-shaded dark → hot
+  amber at 0.25 of the cell mis-inked (coverage.rs:1187-1225).
+- **Why** localizes *which* cells pick badly, and separates "right ink
+  in the wrong spot" from real area error — charwise candidates score
+  well here even when jagged.
+
+#### `xor` — shape fidelity (the objective)
+
+- **Measures** symmetric difference between render and the true 1×1
+  square.
+- **How** mismatched-sample count over the lattice, `/ 384`
+  (`coverage_error`, coverage.rs:537). **This is the objective the
+  snap-family map was baked against** and the coherence test asserts
+  on.
+- **Displayed** `{:.3}`; pane: any mismatched sample lights orange
+  (coverage.rs:1111).
+- **Why** the ground-truth single number for shape fidelity — but
+  sample-by-sample strictness means it says nothing about edge
+  smoothness (jagged) or nearby cliffs (disp).
+
+#### `jagged` — staircase edges
+
+- **Measures** total variation of the silhouette's four edge contours.
+- **How** along each sample column/row, the perpendicular step between
+  consecutive filled extents, Σ|steps| in world units; a clean
+  rectangle measures 0 (`jaggedness`, coverage.rs:662-697).
+- **Displayed** `{:.2}`; pane: dim silhouette with contour pixels lit
+  by local step size — dark olive (straight) → bright green (a jump of
+  1/8 world is full-scale) (coverage.rs:1227-1298).
+- **Why** stair-stepping is the visual artifact charwise methods
+  produce by design; the family-snapped path's main payoff is straight
+  edges (jagged = 0).
+
+#### `disp` — pop sensitivity
+
+- **Measures** how much the method's own xor grows under the worst
+  small nudge of the square.
+- **How** re-evaluate `coverage_error` at pos ± 1/16 on each of the 4
+  axes (`DISPLACEMENT_DELTA` = 1/16, matching the finest snap grid and
+  the arrow-key nudge); value = max gain + worst direction
+  (`displacement_sensitivity`, coverage.rs:1570-1595).
+- **Displayed** `{:.3}` plus arrow (→ ← ↑ ↓); pane: the shifted render
+  re-sampled on the base frame's origin so they align sample-for-
+  sample — bright yellow = newly wrong (the pop), dim red = still
+  wrong, dim blue = recovered (coverage.rs:1300-1320).
+- **Why** glyph picks are piecewise-constant: a render can sit at zero
+  xor and still be one pick-boundary away from a large visible pop.
+  This finds that boundary and shows which samples would pop.
+
+#### `frame` — rendered change per frame (temporal)
+
+- **Measures** how much the rendered fill changed against the
+  immediately previous frame — vs. the previous *render*, not the
+  ideal.
+- **How** differing-sample count between the two frames' fills on the
+  current lattice, `/ 384` — same denominator as xor, so directly
+  comparable (`frame_diff_xor`, coverage.rs:699-731). n/a until one
+  frame old (sparkline skips it).
+- **Displayed** `{:.3}` / `n/a`; pane: every changed sample lights
+  orange, same window crop as the other panes (coverage.rs:1323-1355).
+- **Why** under identical motion, the method whose frame diff stays
+  low looks smoother on screen — the metric for comparing candidates
+  during animation, not at a static position. Scales with motion
+  speed, so it's a comparison tool, not an absolute smoothness score.
 
 ## Non-interactive modes
 
@@ -201,6 +304,7 @@ Line numbers refer to `src/main.rs` at time of writing and may drift.
 
 | What | Function | Line |
 | --- | --- | ---: |
+| sampling lattice / denominators | `SX`, `SY`, `NX`, `NY` | coverage.rs:25-33 |
 | titled box container | `boxed_row` | 317 |
 | checkerboard grid frame | `grid_frame` | 136 |
 | method rows / metric list | `IN_USE`, `CANDIDATES`, `METRICS` | 348 |
